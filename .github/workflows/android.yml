@@ -52,7 +52,20 @@ jobs:
         run: mkdir out
 
       - name: Run launcher unit tests
-        run: gradle :app_pojavlauncher:testFullDebugUnitTest
+        shell: bash
+        run: |
+          set +e
+          gradle :app_pojavlauncher:testFullDebugUnitTest --console=plain 2>&1 | tee out/launcher-unit-tests.log
+          result=${PIPESTATUS[0]}
+          if [ "$result" -ne 0 ]; then
+            python3 - <<'PY'
+          from pathlib import Path
+          lines = Path("out/launcher-unit-tests.log").read_text(errors="replace").splitlines()[-45:]
+          message = "%0A".join(line.replace("%", "%25").replace("\r", "%0D") for line in lines)
+          print(f"::error title=Launcher unit-test failure::{message}")
+          PY
+          fi
+          exit "$result"
 
       - name: Build Publishing .aab
         if: github.repository_owner == 'TeamPojavLauncher' && github.ref_name == 'v3_openjdk'
