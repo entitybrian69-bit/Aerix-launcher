@@ -427,9 +427,10 @@ public class InstanceLibraryFragment extends Fragment {
         editor.setText(getGroup(instance));
         editor.setSelection(editor.getText().length());
         int pad = dp(20);
+        editor.setPadding(pad, dp(8), pad, 0);
         new AlertDialog.Builder(requireContext())
                 .setTitle(R.string.aerix_group_title)
-                .setView(editor, pad, dp(8), pad, 0)
+                .setView(editor)
                 .setPositiveButton(R.string.global_save, (dialog, which) -> {
                     String group = editor.getText().toString().trim();
                     if (group.isEmpty()) clearGroup(instance);
