@@ -49,9 +49,11 @@ Sources checked: [Mojang version manifest](https://piston-meta.mojang.com/mc/gam
 
 ## Test coverage and claims
 
+- **CI tests/builds:** GitHub Actions run [37955759081](https://github.com/entitybrian69-bit/Aerix-launcher/actions/runs/37955759081) succeeded on commit `98cbad6` (`arena/fb5cd066-aerix-launcher`). It ran `:app_pojavlauncher:testFullDebugUnitTest`, assembled both `fullDebug` and `noruntimeDebug`, and ran the APK ABI verifier against each output.
+- **Debug APK artifacts:** [full-debug ZIP](https://github.com/entitybrian69-bit/Aerix-launcher/actions/runs/37955759081/artifacts/11627633705) (`aerix-launcher-1.0.0-full-debug`, 121,385,695 bytes) and [no-runtime-debug ZIP](https://github.com/entitybrian69-bit/Aerix-launcher/actions/runs/37955759081/artifacts/11627608769) (`aerix-launcher-1.0.0-noruntime-debug`, 92,288,597 bytes). Both ZIPs contain the APK and MD5 file.
+- **Optional Mesa artifact:** the CI lookup for an external Mesa AAR returned Not Found and was configured as non-blocking. The CI verification therefore confirms the required libraries in those two built APKs, but does not certify optional/external Mesa renderer availability on a device.
 - **Physical devices tested:** none are attached/available to this session.
 - **Emulators tested:** none.
-- **CI builds/tests:** not run in this environment; the shell has no Java runtime or Android SDK, and `adb` is unavailable.
 - **Current host:** x86_64 Linux only. Host architecture is not Android ABI/GPU coverage.
 - **Narzo 50 / Mali-G57 MC2:** retained as a required regression case; not physically tested in this session.
 - **Adreno/Vulkan, Mali/Vulkan, Mali GLES-only, ARM32, x86/x86_64, memory tiers, API 23, and API 36:** all require device/emulator testing before making a runtime compatibility claim.

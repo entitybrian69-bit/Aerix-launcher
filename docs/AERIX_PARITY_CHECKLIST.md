@@ -50,6 +50,7 @@ These are source-inventory findings, not claims that each feature was exercised 
 - [ ] Add dedicated server management/connection flows; existing logs, game-directory, controls, and file/provider tools are retained, but a new server manager has not been implemented.
 - [ ] Verify client/native-library ABI availability and backend requirements release-by-release for Minecraft 26.x on Android. Mojang metadata has been checked for 26.1.2, 26.2, and 26.3 and each declares Java 25; that metadata does not establish Android renderer or ARM32 support.
 - [ ] Complete the Narzo 50/Mali-G57 regression, Adreno/Mali Vulkan and GLES-only, ARM32, x86/x86_64, memory-tier, API-level, and orientation/inset device matrix on physical devices/emulators.
-- [ ] Run Android unit tests, assemble full and no-runtime Debug APKs, inspect every APK ABI and bundled runtime, and publish successful CI artifact links.
+- [x] CI run [37955759081](https://github.com/entitybrian69-bit/Aerix-launcher/actions/runs/37955759081) passed unit tests, built full and no-runtime Debug APKs, and ran the four-ABI native-library verifier. Artifacts: [full Debug ZIP](https://github.com/entitybrian69-bit/Aerix-launcher/actions/runs/37955759081/artifacts/11627633705) and [no-runtime Debug ZIP](https://github.com/entitybrian69-bit/Aerix-launcher/actions/runs/37955759081/artifacts/11627608769) (commit `98cbad6`). The optional Mesa artifact lookup was not found; device renderer testing remains outstanding.
+- [ ] Verify the contents of the APK artifacts and each bundled runtime on-device; CI ABI/library presence is not a physical-device launch test.
 
 A checked source box only records that a code change or source inspection exists. It does not replace CI, emulator, or physical-device verification.
