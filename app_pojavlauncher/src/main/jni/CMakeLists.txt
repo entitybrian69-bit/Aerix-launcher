@@ -34,7 +34,7 @@ target_link_libraries(SDL3-shared PRIVATE mojoexec)
 
 # ----------------------
 
-project("MojoLauncher")
+project("AerixLauncher")
 
 add_library(pojavexec SHARED
         affinity.c

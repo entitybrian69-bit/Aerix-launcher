@@ -69,6 +69,10 @@ public class MainMenuFragment extends Fragment {
 
         mPlayButton.setOnClickListener(v -> {
         Instance instance = Instances.loadSelectedInstance();
+        if (instance == null) {
+            Toast.makeText(requireContext(), R.string.no_instance, Toast.LENGTH_LONG).show();
+            return;
+        }
         File gamedir = instance.getGameDirectory();
 
         if (GameRunner.hasVkMod(gamedir)) {

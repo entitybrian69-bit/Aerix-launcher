@@ -14,7 +14,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name='PojavLauncher'
+rootProject.name='AerixLauncher'
 include ':app_pojavlauncher'
 
 include ':forge_installer'

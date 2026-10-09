@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
     <!-- App name part -->
-    <string name="app_short_name">PojavLauncher</string>
+    <string name="app_short_name">Aerix</string>
 
     <!-- Action bar part -->
 
@@ -21,7 +21,7 @@
     <string name="alerttitle_installmod">Select a mod installer</string>
 
     <!-- Error messages -->
-    <string name="error_fatal">PojavLauncher has unexpectedly crashed</string>
+    <string name="error_fatal">Aerix Launcher has unexpectedly crashed</string>
     <string name="error_no_version">No version!</string>
     <string name="error_show_more">Show more</string>
     <string name="error_show_less">Show less</string>
@@ -63,6 +63,8 @@
     <string name="mcl_setting_title_javaargs">JVM Launch arguments</string>
     <string name="mcl_setting_subtitle_javaargs">Be careful, this may make game crash if modified without knowledge.</string>
     <string name="mcl_setting_category_renderer">Renderer</string>
+    <string name="mcl_setting_renderer_auto">Smart Pick (OpenGL, recommended)</string>
+    <string name="renderer_auto_unsupported">Smart Pick could not find an OpenGL renderer for this game on this device. Auto uses GL4ES for older releases, or LTW when a compatible OpenGL ES 3 path is available for newer releases. Choose a renderer manually or select another game version.</string>
     <string name="mcl_setting_renderer_gles2_4">GL4ES (OpenGL ES 2) - 1.21.4 and lower</string>
     <string name="mcl_setting_renderer_nggl4es">Krypton Wrapper (OpenGL ES 3.2) - 26.2 and lower</string>
     <string name="mcl_setting_renderer_vulkan_zink">Zink (Vulkan) - all versions</string>
@@ -249,7 +251,7 @@
     <string name="color_default_hex" translatable="false">FFFF0000</string>
     <string name="notif_channel_name">General</string>
     <string name="notif_channel_id" translatable="false">channel_id</string>
-    <string name="lazy_service_default_title">Pojav Foreground Service</string>
+    <string name="lazy_service_default_title">Aerix Foreground Service</string>
     <string name="mcl_setting_veroption_installed">Installed</string>
     <string name="use_global_default">(Use global default)</string>
     <string name="default_control">Default controlmap</string>
@@ -279,7 +281,7 @@
     <string name="preference_gyro_sample_rate_title">Gyroscope sampling rate</string>
     <string name="preference_gyro_sample_rate_description">If you have performance issues with gyroscope controls, increase this.</string>
     <string name="microsoft_login_retry_later">Too many requests, please try again later.</string>
-    <string name="storage_required">PojavLauncher requires external storage to be attached. Please reconnect it and restart the app.</string>
+    <string name="storage_required">Aerix Launcher requires external storage to be attached. Please reconnect it and restart the app.</string>
     <string name="microsoft_login_generic">Error: %s</string>
     <string name="mcl_setting_title_buttonallcaps">Only use capital letters in button labels</string>
     <string name="mcl_setting_subtitle_buttonallcaps">Disable this if you want to use lowercase letters in your controls.</string>
@@ -352,7 +354,7 @@
     <string name="modpack_download_downloading_mods">Downloading mods (%.2f MB / %.2f MB)</string>
     <string name="modpack_download_downloading_mods_fc">Downloading mods (File %d out of %d)</string>
     <string name="modpack_download_applying_overrides">Applying overrides (%d/%d)</string>
-    <string name="modpack_install_notification_title">Pojav Modpack Installer</string>
+    <string name="modpack_install_notification_title">Aerix Modpack Installer</string>
     <string name="modpack_install_notification_success">Click here to finish modpack installation</string>
     <string name="modpack_install_notification_data_not_available">Failed to download mod loader information</string>
     <string name="modpack_install_modloader_download_failed">Failed to download the mod loader files</string>
@@ -385,7 +387,7 @@
     <string name="preference_category_miscellaneous">Miscellaneous settings</string>
     <string name="preference_category_video">Video settings</string>
     <string name="notification_permission_dialog_title">Permission request</string>
-    <string name="notification_permission_dialog_text">PojavLauncher requires a permission to post notifications to prevent game/modpack downloads from stopping when you leave the app. Without this permission, Android may shut down your downloads when you put PojavLauncher in background mode.</string>
+    <string name="notification_permission_dialog_text">Aerix Launcher requires a permission to post notifications to prevent game/modpack downloads from stopping when you leave the app. Without this permission, Android may shut down your downloads when you put Aerix Launcher in background mode.</string>
     <string name="notification_permission_toast">You can always change your mind later by going into Settings</string>
     <string name="preference_ask_for_notification_title">Allow notifications</string>
     <string name="preference_ask_for_notification_description">Click to re-request the notification permission, required for game/modpack background downloads to work properly.</string>
@@ -567,4 +569,40 @@
     <string name="mjdl_download_error_subtitle">Download failed. Check your internet connection and make sure that you have enough free disk space.</string>
     <string name="mjdl_download_error_subtitle_2">File verification failed. Please try again. If this error keeps happening, contact us on GitHub or on Discord.</string>
     <string name="bta_configuring">Configuring BTA…</string>
+
+    <!-- Aerix dashboard and navigation -->
+    <string name="aerix_welcome_title">Welcome to Aerix</string>
+    <string name="aerix_welcome_subtitle">Your Minecraft Java worlds, together in one place.</string>
+    <string name="aerix_current_instance">SELECTED INSTANCE</string>
+    <string name="aerix_edit_instance">Edit selected instance</string>
+    <string name="aerix_instance_hint">Choose a version or open the instance profile to edit details.</string>
+    <string name="aerix_quick_actions">QUICK ACCESS</string>
+    <string name="aerix_navigation_home">Home</string>
+    <string name="aerix_navigation_create">Create instance</string>
+    <string name="aerix_navigation_library">Instance library</string>
+    <string name="aerix_navigation_discover">Discover modpacks</string>
+    <string name="aerix_navigation_wallpapers">Wallpapers and appearance</string>
+    <string name="aerix_navigation_settings">Settings</string>
+    <string name="aerix_library_title">Your instance library</string>
+    <string name="aerix_library_subtitle">Select, edit, and launch your Minecraft profiles.</string>
+    <string name="aerix_library_empty">No instances yet. Create a vanilla, modded, or modpack profile to get started.</string>
+    <string name="aerix_vanilla_instance">Vanilla</string>
+    <string name="aerix_modded_instance">Modded / installer</string>
+    <string name="aerix_wallpaper_title">Wallpapers &amp; appearance</string>
+    <string name="aerix_wallpaper_subtitle">Personalize the launcher background.</string>
+    <string name="aerix_wallpaper_empty">No wallpaper selected. Choose an image from your device to preview it here.</string>
+    <string name="aerix_wallpaper_note">The selected image is stored as a document-provider reference and decoded at a bounded size. Reset restores the Aerix gradient fallback.</string>
+    <string name="aerix_wallpaper_choose">Choose image</string>
+    <string name="aerix_wallpaper_clear">Reset</string>
+    <string name="preference_updates_title">Check for launcher updates</string>
+    <string name="preference_updates_summary">Check the latest public Aerix release on GitHub.</string>
+    <string name="update_checking_title">Checking for updates</string>
+    <string name="update_checking_message">Contacting the public GitHub Releases API…</string>
+    <string name="update_result_title">Aerix Launcher updates</string>
+    <string name="update_available_message">Version %1$s is available. This installation is %2$s.</string>
+    <string name="update_up_to_date_message">You are up to date. The latest release is %1$s.</string>
+    <string name="update_open_release">Open release page</string>
+    <string name="update_dismiss">Close</string>
+    <string name="update_error_title">Could not check for updates</string>
+    <string name="update_error_message">GitHub could not be reached or no public release is available. Check your connection and try again later.</string>
 </resources>

@@ -9,12 +9,16 @@ import android.view.View;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.app.AlertDialog;
 import androidx.preference.Preference;
 import androidx.preference.PreferenceFragmentCompat;
 
+import net.kdt.pojavlaunch.BuildConfig;
 import net.kdt.pojavlaunch.LauncherActivity;
 import net.kdt.pojavlaunch.R;
+import net.kdt.pojavlaunch.Tools;
 import net.kdt.pojavlaunch.prefs.LauncherPreferences;
+import net.kdt.pojavlaunch.utils.UpdateChecker;
 
 /**
  * Preference for the main screen, any sub-screen should inherit this class for consistent behavior,
@@ -34,6 +38,7 @@ public class LauncherPreferenceFragment extends PreferenceFragmentCompat impleme
         mVisibilityUpdater = this::updateVisibility;
         addPreferencesFromResource(R.xml.pref_main);
         setupNotificationRequestPreference();
+        setupUpdateCheckPreference();
     }
 
     private void updateVisibility(){
@@ -52,6 +57,36 @@ public class LauncherPreferenceFragment extends PreferenceFragmentCompat impleme
             mRequestNotificationPermissionPreference.setVisible(false);
         }
         updateVisibility();
+    }
+
+    private void setupUpdateCheckPreference() {
+        requirePreference("check_for_updates").setOnPreferenceClickListener(preference -> {
+            if (!isAdded()) return true;
+            AlertDialog checking = new AlertDialog.Builder(requireContext())
+                    .setTitle(R.string.update_checking_title)
+                    .setMessage(R.string.update_checking_message)
+                    .setNegativeButton(R.string.update_dismiss, (dialog, which) -> dialog.dismiss())
+                    .create();
+            checking.show();
+            UpdateChecker.check((release, error) -> {
+                if (!isAdded() || !checking.isShowing()) return;
+                checking.dismiss();
+                AlertDialog.Builder result = new AlertDialog.Builder(requireContext())
+                        .setTitle(error == null ? R.string.update_result_title : R.string.update_error_title);
+                if (error != null || release == null) {
+                    result.setMessage(R.string.update_error_message)
+                            .setPositiveButton(android.R.string.ok, null);
+                } else {
+                    result.setMessage(release.isNewerThan(BuildConfig.VERSION_NAME)
+                                    ? getString(R.string.update_available_message, release.version, BuildConfig.VERSION_NAME)
+                                    : getString(R.string.update_up_to_date_message, release.version))
+                            .setPositiveButton(R.string.update_open_release, (dialog, which) ->
+                                    Tools.openURL(requireActivity(), release.pageUrl));
+                }
+                result.setNegativeButton(R.string.update_dismiss, null).show();
+            });
+            return true;
+        });
     }
 
     @Override

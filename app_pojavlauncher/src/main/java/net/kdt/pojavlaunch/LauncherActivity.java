@@ -7,11 +7,14 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.system.Os;
 import android.view.View;
 import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
@@ -30,8 +33,12 @@ import net.kdt.pojavlaunch.authenticator.accounts.Accounts;
 import net.kdt.pojavlaunch.extra.ExtraConstants;
 import net.kdt.pojavlaunch.extra.ExtraCore;
 import net.kdt.pojavlaunch.extra.ExtraListener;
+import net.kdt.pojavlaunch.fragments.InstanceLibraryFragment;
 import net.kdt.pojavlaunch.fragments.MainMenuFragment;
 import net.kdt.pojavlaunch.fragments.MicrosoftLoginFragment;
+import net.kdt.pojavlaunch.fragments.ProfileTypeSelectFragment;
+import net.kdt.pojavlaunch.fragments.SearchModFragment;
+import net.kdt.pojavlaunch.fragments.WallpaperGalleryFragment;
 import net.kdt.pojavlaunch.fragments.SelectAuthFragment;
 import net.kdt.pojavlaunch.instances.Instance;
 import net.kdt.pojavlaunch.instances.InstanceInstaller;
@@ -48,6 +55,7 @@ import net.kdt.pojavlaunch.tasks.MoJsonExtras;
 import net.kdt.pojavlaunch.tasks.AsyncVersionList;
 import net.kdt.pojavlaunch.tasks.MoJsonDownloader;
 import net.kdt.pojavlaunch.utils.NotificationUtils;
+import net.kdt.pojavlaunch.utils.WallpaperUtils;
 
 import net.kdt.pojavlaunch.R;
 
@@ -56,6 +64,11 @@ public class LauncherActivity extends BaseActivity {
 
     private FragmentContainerView mFragmentView;
     private ImageButton mSettingsButton;
+    private ImageButton mHomeButton;
+    private ImageButton mCreateButton;
+    private ImageButton mLibraryButton;
+    private ImageButton mDiscoverButton;
+    private ImageButton mWallpapersButton;
     private ProgressLayout mProgressLayout;
     private ProgressServiceKeeper mProgressServiceKeeper;
     private NotificationManager mNotificationManager;
@@ -65,8 +78,14 @@ public class LauncherActivity extends BaseActivity {
     private final FragmentManager.FragmentLifecycleCallbacks mFragmentCallbackListener = new FragmentManager.FragmentLifecycleCallbacks() {
         @Override
         public void onFragmentResumed(@NonNull FragmentManager fm, @NonNull Fragment f) {
-            mSettingsButton.setImageDrawable(ContextCompat.getDrawable(getBaseContext(), f instanceof MainMenuFragment
-                    ? R.drawable.ic_px_sliders : R.drawable.ic_px_home));
+            if (f.getParentFragment() != null || mSettingsButton == null) return;
+            mSettingsButton.setImageDrawable(ContextCompat.getDrawable(getBaseContext(), R.drawable.ic_px_sliders));
+            mHomeButton.setActivated(f instanceof MainMenuFragment);
+            mCreateButton.setActivated(f instanceof ProfileTypeSelectFragment);
+            mLibraryButton.setActivated(f instanceof InstanceLibraryFragment);
+            mDiscoverButton.setActivated(f instanceof SearchModFragment);
+            mWallpapersButton.setActivated(f instanceof WallpaperGalleryFragment);
+            mSettingsButton.setActivated(f.getClass().getName().startsWith("net.kdt.pojavlaunch.prefs.screens."));
         }
     };
 
@@ -82,24 +101,20 @@ public class LauncherActivity extends BaseActivity {
         FragmentManager manager = getSupportFragmentManager();
         if(!value || manager.isStateSaved()) return false;
         Fragment fragment = manager.findFragmentById(mFragmentView.getId());
-        // Allow starting the add account only from the main menu, should it be moved to fragment itself ?
-        if(!(fragment instanceof MainMenuFragment)) return false;
+        // The account picker is available from the persistent navigation rail on every launcher page.
+        if(fragment == null) return false;
 
         Tools.swapFragment(this, SelectAuthFragment.class, SelectAuthFragment.TAG, null);
         return false;
     };
 
-    /* Listener for the settings fragment */
+    /* Settings remains a dedicated navigation destination; Home has its own rail button. */
     private final View.OnClickListener mSettingButtonListener = v -> {
         FragmentManager manager = getSupportFragmentManager();
         if(manager.isStateSaved()) return;
         Fragment fragment = manager.findFragmentById(mFragmentView.getId());
-        if(fragment instanceof MainMenuFragment){
-            Tools.swapFragment(this, LauncherPreferenceFragment.class, SETTING_FRAGMENT_TAG, null);
-        } else{
-            // The setting button doubles as a home button now
-            Tools.backToMainMenu(this);
-        }
+        if(fragment != null && fragment.getClass().getName().startsWith("net.kdt.pojavlaunch.prefs.screens.")) return;
+        navigateTo(LauncherPreferenceFragment.class, SETTING_FRAGMENT_TAG);
     };
 
     private final ExtraListener<Boolean> mLaunchGameListener = (key, value) -> {
@@ -178,6 +193,7 @@ public class LauncherActivity extends BaseActivity {
 
         getWindow().setBackgroundDrawable(null);
         bindViews();
+        loadSavedWallpaper();
         mRequestPermissionLauncher = this.registerForActivityResult(
                 new ActivityResultContracts.RequestPermission(),
                 isAllowed -> {
@@ -193,6 +209,11 @@ public class LauncherActivity extends BaseActivity {
         ProgressKeeper.addTaskCountListener((mProgressServiceKeeper = new ProgressServiceKeeper(this)));
 
         mSettingsButton.setOnClickListener(mSettingButtonListener);
+        mHomeButton.setOnClickListener(v -> navigateTo(MainMenuFragment.class, MainMenuFragment.TAG));
+        mCreateButton.setOnClickListener(v -> navigateTo(ProfileTypeSelectFragment.class, ProfileTypeSelectFragment.TAG));
+        mLibraryButton.setOnClickListener(v -> navigateTo(InstanceLibraryFragment.class, InstanceLibraryFragment.TAG));
+        mDiscoverButton.setOnClickListener(v -> navigateTo(SearchModFragment.class, SearchModFragment.TAG));
+        mWallpapersButton.setOnClickListener(v -> navigateTo(WallpaperGalleryFragment.class, WallpaperGalleryFragment.TAG));
         ProgressKeeper.addTaskCountListener(mProgressLayout);
         ExtraCore.addExtraListener(ExtraConstants.BACK_PREFERENCE, mBackPreferenceListener);
         ExtraCore.addExtraListener(ExtraConstants.SELECT_AUTH_METHOD, mSelectAuthMethod);
@@ -328,10 +349,46 @@ public class LauncherActivity extends BaseActivity {
                 .apply();
     }
 
+    private void loadSavedWallpaper() {
+        String savedWallpaper = LauncherPreferences.DEFAULT_PREF.getString(WallpaperUtils.PREFERENCE_KEY, null);
+        if (!Tools.isValidString(savedWallpaper)) return;
+        Uri uri = Uri.parse(savedWallpaper);
+        int maxWidth = Math.max(640, getResources().getDisplayMetrics().widthPixels);
+        int maxHeight = Math.max(360, getResources().getDisplayMetrics().heightPixels);
+        PojavApplication.sExecutorService.execute(() -> {
+            try {
+                Bitmap bitmap = WallpaperUtils.decode(getApplicationContext(), uri, maxWidth, maxHeight);
+                Tools.runOnUiThread(() -> {
+                    if (isFinishing() || isDestroyed()) return;
+                    ImageView backdrop = findViewById(R.id.launcher_wallpaper_backdrop);
+                    backdrop.setImageBitmap(bitmap);
+                    backdrop.setVisibility(View.VISIBLE);
+                });
+            } catch (Exception ignored) {
+                LauncherPreferences.DEFAULT_PREF.edit().remove(WallpaperUtils.PREFERENCE_KEY).apply();
+            }
+        });
+    }
+
+    private void navigateTo(Class<? extends Fragment> fragmentClass, String tag) {
+        FragmentManager manager = getSupportFragmentManager();
+        if(manager.isStateSaved()) return;
+        manager.popBackStackImmediate(null, FragmentManager.POP_BACK_STACK_INCLUSIVE);
+        manager.beginTransaction()
+                .setReorderingAllowed(true)
+                .replace(R.id.container_fragment, fragmentClass, null, tag)
+                .commit();
+    }
+
     /** Stuff all the view boilerplate here */
     private void bindViews(){
         mFragmentView = findViewById(R.id.container_fragment);
         mSettingsButton = findViewById(R.id.setting_button);
+        mHomeButton = findViewById(R.id.home_nav_button);
+        mCreateButton = findViewById(R.id.create_nav_button);
+        mLibraryButton = findViewById(R.id.library_nav_button);
+        mDiscoverButton = findViewById(R.id.discover_nav_button);
+        mWallpapersButton = findViewById(R.id.wallpapers_nav_button);
         mProgressLayout = findViewById(R.id.progress_layout);
     }
 }

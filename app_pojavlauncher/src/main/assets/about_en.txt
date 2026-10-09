@@ -1,4 +1,4 @@
-%s (Minecraft Java Launcher for Android), version %s by Tran Khanh Duy (based on "Boardwalk" app)<br>
+%s (Minecraft Java Edition launcher for Android), version %s; based on Pojav Legacy.<br>
 
 * License:<br>
  • This application is licensed under <a href="https://github.com/PojavLauncherTeam/PojavLauncher/blob/master/LICENSE">GNU GPLv3</a>.<br>

@@ -24,6 +24,7 @@ import net.kdt.pojavlaunch.prefs.LauncherPreferences;
 import net.kdt.pojavlaunch.plugins.LibraryPlugin;
 import net.kdt.pojavlaunch.game.renderer.GameRenderer;
 import net.kdt.pojavlaunch.game.renderer.RenderSpec;
+import net.kdt.pojavlaunch.game.renderer.RendererAutoSelector;
 import net.kdt.pojavlaunch.utils.DateUtils;
 import net.kdt.pojavlaunch.utils.FileUtils;
 import net.kdt.pojavlaunch.utils.GpuUtils;
@@ -217,6 +218,22 @@ public class GameRunner {
         // We don't need the library list, the asset index, client download info for the code below
         versionInfo.libraries = null;
         versionInfo.downloads = null;
+
+        if (gameRenderer.isAutomaticSelection()) {
+            RenderSpec ltw = GameRenderer.getKnownRenderer(Renderers.LTW_RENDERER);
+            boolean ltwAvailable = ltw != null && ltw.compatibleDevice(activity);
+            String rendererId = RendererAutoSelector.select(
+                    isGl4esCompatible(versionInfo),
+                    GpuUtils.getGlInfo().glesMajorVersion,
+                    ltwAvailable
+            );
+            if (rendererId == null) {
+                if (showDialog(activity, R.string.renderer_auto_unsupported)) return;
+                System.exit(0);
+                return;
+            }
+            gameRenderer.setCurrentRenderer(rendererId);
+        }
 
         RenderSpec renderer = gameRenderer.getCurrentRenderer();
 

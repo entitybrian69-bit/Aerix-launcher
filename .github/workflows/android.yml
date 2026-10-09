@@ -1,17 +1,15 @@
-name: Android CI
+name: Aerix Android CI
 
 on:
   push:
   workflow_dispatch:
   pull_request:
-    types: [labeled]
 
 jobs:
   build:
     runs-on: ubuntu-22.04
     env:
       POJAV_GPLAY_KEYSTORE_PASSWORD: ${{ secrets.POJAV_GPLAY_KEYSTORE_PASSWORD }}
-      CURSEFORGE_API_KEY: ${{ secrets.CURSEFORGE_API_KEY }}
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -53,40 +51,47 @@ jobs:
       - name: Create out directory
         run: mkdir out
 
+      - name: Run launcher unit tests
+        run: gradle :app_pojavlauncher:testFullDebugUnitTest
+
       - name: Build Publishing .aab
         if: github.repository_owner == 'TeamPojavLauncher' && github.ref_name == 'v3_openjdk'
         run: |
           gradle :app_pojavlauncher:bundleFullGplay
           mv app_pojavlauncher/build/outputs/bundle/fullGplay/app_pojavlauncher-full-gplay.aab out/app-gplay.aab
 
-      - name: Build Debug .apk (Full)
+      - name: Build Debug APK (Full)
         run: |
-          # Build the launcher
           gradle :app_pojavlauncher:assembleFullDebug
-          mv app_pojavlauncher/build/outputs/apk/full/debug/app_pojavlauncher-full-debug.apk out/app-debug-full.apk
+          python3 scripts/verify_apk_abis.py app_pojavlauncher/build/outputs/apk/full/debug/app_pojavlauncher-full-debug.apk
+          mv app_pojavlauncher/build/outputs/apk/full/debug/app_pojavlauncher-full-debug.apk out/aerix-launcher-1.0.0-full-debug.apk
 
-      - name: Build Debug .apk (No runtime)
+      - name: Build Debug APK (No runtime)
         run: |
-         # Build the launcher (without jre8 installed)
           gradle :app_pojavlauncher:assembleNoruntimeDebug
-          mv app_pojavlauncher/build/outputs/apk/noruntime/debug/app_pojavlauncher-noruntime-debug.apk out/app-debug-noruntime.apk
+          python3 scripts/verify_apk_abis.py app_pojavlauncher/build/outputs/apk/noruntime/debug/app_pojavlauncher-noruntime-debug.apk
+          mv app_pojavlauncher/build/outputs/apk/noruntime/debug/app_pojavlauncher-noruntime-debug.apk out/aerix-launcher-1.0.0-noruntime-debug.apk
 
-      - name: Gen md5sums
+      - name: Generate checksums
         run: |
-          md5sum out/app-debug-full.apk > out/app-debug-full.md5
-          md5sum out/app-debug-noruntime.apk > out/app-debug-noruntime.md5
+          md5sum out/aerix-launcher-1.0.0-full-debug.apk > out/aerix-launcher-1.0.0-full-debug.md5
+          md5sum out/aerix-launcher-1.0.0-noruntime-debug.apk > out/aerix-launcher-1.0.0-noruntime-debug.md5
 
-      - name: Upload Debug APK (Full)
+      - name: Upload full debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug
-          path: out/app-debug-full.apk
+          name: aerix-launcher-1.0.0-full-debug
+          path: |
+            out/aerix-launcher-1.0.0-full-debug.apk
+            out/aerix-launcher-1.0.0-full-debug.md5
 
-      - name: Upload Debug APK (No runtime)
+      - name: Upload no-runtime debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug-noruntime
-          path: out/app-debug-noruntime.apk
+          name: aerix-launcher-1.0.0-noruntime-debug
+          path: |
+            out/aerix-launcher-1.0.0-noruntime-debug.apk
+            out/aerix-launcher-1.0.0-noruntime-debug.md5
 
       - name: Upload AAB
         uses: actions/upload-artifact@v4

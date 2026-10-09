@@ -8,7 +8,7 @@
         <androidx.preference.ListPreference
             android:title="@string/mcl_setting_category_renderer"
             android:key="renderer"
-            android:defaultValue="opengles2"
+            android:defaultValue="renderer_auto"
             android:icon="@drawable/ic_px_image_renderer"
             app2:useSimpleSummaryProvider="true"/>
 

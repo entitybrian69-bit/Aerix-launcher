@@ -67,8 +67,10 @@
         android:icon="@drawable/ic_px_bell"
         />
 
-
-
-
+    <Preference
+        android:key="check_for_updates"
+        android:title="@string/preference_updates_title"
+        android:summary="@string/preference_updates_summary"
+        android:icon="@drawable/ic_px_zap" />
 
 </PreferenceScreen>

@@ -1,5 +1,6 @@
 package net.kdt.pojavlaunch.game.renderer;
 
+import static net.kdt.pojavlaunch.game.renderer.def.Renderers.AUTO_RENDERER;
 import static net.kdt.pojavlaunch.game.renderer.def.Renderers.FREEDRENO_RENDERER;
 import static net.kdt.pojavlaunch.game.renderer.def.Renderers.GL4ES_RENDERER;
 import static net.kdt.pojavlaunch.game.renderer.def.Renderers.LEGACYZINK_RENDERER;
@@ -13,6 +14,8 @@ import static net.kdt.pojavlaunch.game.renderer.def.Renderers.SFPEW_RENDERER;
 
 import android.content.Context;
 import android.content.res.Resources;
+
+import net.kdt.pojavlaunch.R;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -45,8 +48,10 @@ public class RendererCache {
         String[] renderers = {
                 GL4ES_RENDERER, NGGL4ES_RENDERER, ZINK_RENDERER, LTW_RENDERER, MOBILEGLUES_RENDERER, SFPEW_RENDERER, FREEDRENO_RENDERER, MESA_RENDERER, MESA_RENDERER_EXT, LEGACYZINK_RENDERER
         };
-        ArrayList<String> rendererIds = new ArrayList<>(renderers.length);
+        ArrayList<String> rendererIds = new ArrayList<>(renderers.length + 1);
         ArrayList<String> rendererNames = new ArrayList<>(rendererIds);
+        rendererIds.add(AUTO_RENDERER);
+        rendererNames.add(resources.getString(R.string.mcl_setting_renderer_auto));
         for (String renderer : renderers) {
             RenderSpec r = GameRenderer.getKnownRenderer(renderer);
             assert r != null;
@@ -63,7 +68,9 @@ public class RendererCache {
      * Destroy compatible renderers cache
      */
     public static void releaseRendererCache() {
-        sCompatibleRenderers.rendererIds.clear();
-        sCompatibleRenderers = null;
+        if (sCompatibleRenderers != null) {
+            sCompatibleRenderers.rendererIds.clear();
+            sCompatibleRenderers = null;
+        }
     }
 }
