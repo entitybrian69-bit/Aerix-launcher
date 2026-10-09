@@ -46,7 +46,7 @@ public final class UpdateChecker {
             Release release = null;
             Exception error = null;
             try {
-                release = requestLatestRelease(applicationContext);
+                release = requestLatestRelease();
             } catch (Exception e) {
                 error = e;
             }
@@ -56,7 +56,7 @@ public final class UpdateChecker {
         });
     }
 
-    private static Release requestLatestRelease(Context context) throws IOException {
+    private static Release requestLatestRelease() throws IOException {
         HttpURLConnection connection = (HttpURLConnection) new URL(RELEASE_API).openConnection();
         connection.setRequestMethod("GET");
         connection.setConnectTimeout(6000);
