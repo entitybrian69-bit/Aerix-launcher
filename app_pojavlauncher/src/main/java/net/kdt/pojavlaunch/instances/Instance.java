@@ -21,6 +21,9 @@ public class Instance extends DisplayInstance {
     public static final String VERSION_LATEST_RELEASE = "latest_release";
     public static final String VERSION_LATEST_SNAPSHOT = "latest_snapshot";
 
+    /** Stable launcher-only identifier for library metadata such as favorites and groups. */
+    public String aerixId;
+
     public InstanceInstaller installer;
     public String renderer;
     public String jvmArgs;

@@ -107,6 +107,13 @@
                     android:contentDescription="@string/aerix_navigation_wallpapers"
                     android:src="@drawable/ic_px_image"
                     tools:ignore="HardcodedText" />
+
+                <ImageButton
+                    android:id="@+id/servers_nav_button"
+                    style="@style/AerixNavigationButton"
+                    android:contentDescription="@string/aerix_navigation_servers"
+                    android:src="@drawable/ic_px_console"
+                    tools:ignore="HardcodedText" />
             </LinearLayout>
         </ScrollView>
 

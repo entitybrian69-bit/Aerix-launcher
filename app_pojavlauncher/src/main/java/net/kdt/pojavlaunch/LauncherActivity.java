@@ -38,6 +38,7 @@ import net.kdt.pojavlaunch.fragments.MainMenuFragment;
 import net.kdt.pojavlaunch.fragments.MicrosoftLoginFragment;
 import net.kdt.pojavlaunch.fragments.ProfileTypeSelectFragment;
 import net.kdt.pojavlaunch.fragments.SearchModFragment;
+import net.kdt.pojavlaunch.fragments.ServerManagerFragment;
 import net.kdt.pojavlaunch.fragments.WallpaperGalleryFragment;
 import net.kdt.pojavlaunch.fragments.SelectAuthFragment;
 import net.kdt.pojavlaunch.instances.Instance;
@@ -69,6 +70,7 @@ public class LauncherActivity extends BaseActivity {
     private ImageButton mLibraryButton;
     private ImageButton mDiscoverButton;
     private ImageButton mWallpapersButton;
+    private ImageButton mServersButton;
     private ProgressLayout mProgressLayout;
     private ProgressServiceKeeper mProgressServiceKeeper;
     private NotificationManager mNotificationManager;
@@ -85,6 +87,7 @@ public class LauncherActivity extends BaseActivity {
             mLibraryButton.setActivated(f instanceof InstanceLibraryFragment);
             mDiscoverButton.setActivated(f instanceof SearchModFragment);
             mWallpapersButton.setActivated(f instanceof WallpaperGalleryFragment);
+            mServersButton.setActivated(f instanceof ServerManagerFragment);
             mSettingsButton.setActivated(f.getClass().getName().startsWith("net.kdt.pojavlaunch.prefs.screens."));
         }
     };
@@ -147,6 +150,7 @@ public class LauncherActivity extends BaseActivity {
         }
         String normalizedVersionId = MoJsonExtras.normalizeVersionId(selectedInstance.versionId);
         JVersionList.Version mcVersion = MoJsonExtras.getListedVersion(normalizedVersionId);
+        Instances.recordLaunch(selectedInstance);
         new MoJsonDownloader().start(
                 this.getAssets(),
                 mcVersion,
@@ -214,6 +218,7 @@ public class LauncherActivity extends BaseActivity {
         mLibraryButton.setOnClickListener(v -> navigateTo(InstanceLibraryFragment.class, InstanceLibraryFragment.TAG));
         mDiscoverButton.setOnClickListener(v -> navigateTo(SearchModFragment.class, SearchModFragment.TAG));
         mWallpapersButton.setOnClickListener(v -> navigateTo(WallpaperGalleryFragment.class, WallpaperGalleryFragment.TAG));
+        mServersButton.setOnClickListener(v -> navigateTo(ServerManagerFragment.class, ServerManagerFragment.TAG));
         ProgressKeeper.addTaskCountListener(mProgressLayout);
         ExtraCore.addExtraListener(ExtraConstants.BACK_PREFERENCE, mBackPreferenceListener);
         ExtraCore.addExtraListener(ExtraConstants.SELECT_AUTH_METHOD, mSelectAuthMethod);
@@ -389,6 +394,7 @@ public class LauncherActivity extends BaseActivity {
         mLibraryButton = findViewById(R.id.library_nav_button);
         mDiscoverButton = findViewById(R.id.discover_nav_button);
         mWallpapersButton = findViewById(R.id.wallpapers_nav_button);
+        mServersButton = findViewById(R.id.servers_nav_button);
         mProgressLayout = findViewById(R.id.progress_layout);
     }
 }

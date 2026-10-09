@@ -73,6 +73,13 @@ public class Instances {
             T instance = read(instanceDir, tClass);
 
             if(instance == null) continue;
+            if(instance instanceof Instance) {
+                Instance fullInstance = (Instance) instance;
+                if(!Tools.isValidString(fullInstance.aerixId)) {
+                    fullInstance.aerixId = UUID.randomUUID().toString();
+                    fullInstance.maybeWrite();
+                }
+            }
             instance.sanitize();
             instances.add(instance);
 
@@ -99,6 +106,25 @@ public class Instances {
 
     public static List<Instance> loadAllInstances() throws IOException {
         return loadInstances(Instance.class, null);
+    }
+
+    /** Return a persistent launcher metadata key that survives instance renames. */
+    public static String getStableId(Instance instance) {
+        if(instance == null) return "";
+        if(!Tools.isValidString(instance.aerixId)) {
+            instance.aerixId = UUID.randomUUID().toString();
+            instance.maybeWrite();
+        }
+        return instance.aerixId;
+    }
+
+    /** Record a game launch attempt for the library's recent-play sort. */
+    public static void recordLaunch(Instance instance) {
+        String stableId = getStableId(instance);
+        if(stableId.isEmpty()) return;
+        LauncherPreferences.DEFAULT_PREF.edit()
+                .putLong("aerix_instance_last_played_" + stableId, System.currentTimeMillis())
+                .apply();
     }
 
     private static File findNewInstanceRoot(String prefix) {
@@ -166,6 +192,7 @@ public class Instances {
         FileUtils.ensureDirectory(root);
         Instance instance = new Instance();
         instance.mInstanceRoot = root;
+        instance.aerixId = UUID.randomUUID().toString();
         instanceSetter.setInstanceProperties(instance);
         instance.write();
         return instance;
