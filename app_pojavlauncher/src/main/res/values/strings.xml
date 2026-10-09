@@ -625,7 +625,7 @@
     <string name="aerix_servers_loading">Loading server list…</string>
     <string name="aerix_servers_saving">Saving changes…</string>
     <string name="aerix_servers_empty">No servers yet. Add one to make it available in Minecraft Multiplayer.</string>
-    <string name="aerix_servers_note">Changes are saved in the selected game directory's standard servers.dat file. The list appears in Minecraft's Multiplayer screen; Aerix does not connect to servers for you.</string>
+    <string name="aerix_servers_note">Changes are saved in the selected game directory\'s standard servers.dat file. The list appears in Minecraft\'s Multiplayer screen; Aerix does not connect to servers for you.</string>
     <string name="aerix_servers_add">Add server</string>
     <string name="aerix_servers_add_title">Add multiplayer server</string>
     <string name="aerix_servers_edit_title">Edit multiplayer server</string>
@@ -638,7 +638,7 @@
     <string name="aerix_servers_edit">Edit</string>
     <string name="aerix_servers_delete">Delete</string>
     <string name="aerix_servers_delete_title">Remove server?</string>
-    <string name="aerix_servers_delete_message">Remove “%1$s” from this profile's server list?</string>
+    <string name="aerix_servers_delete_message">Remove “%1$s” from this profile\'s server list?</string>
     <string name="aerix_servers_save">Save</string>
     <string name="aerix_servers_saved">Server list saved</string>
     <string name="aerix_servers_address_copied">Server address copied</string>
