@@ -555,7 +555,7 @@ public class WallpaperGalleryFragment extends Fragment {
             holder.label.setText(wallpaper.name);
             holder.image.setTag(wallpaper.id);
             holder.image.setImageDrawable(null);
-            holder.PrismGlass.apply(card);
+            PrismGlass.apply(holder.card);
             holder.card.setForeground(cardBackground(selected));
             holder.card.setContentDescription(wallpaper.name + (selected ? ", selected" : ""));
             holder.card.setOnClickListener(v -> selectCatalogWallpaper(wallpaper));
