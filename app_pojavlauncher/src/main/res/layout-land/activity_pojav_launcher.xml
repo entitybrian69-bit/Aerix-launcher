@@ -73,64 +73,159 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical">
 
-                <ImageButton
-                    android:id="@+id/home_nav_button"
-                    style="@style/AerixNavigationButton"
-                    android:contentDescription="@string/aerix_navigation_home"
-                    android:src="@drawable/ic_px_home"
-                    tools:ignore="HardcodedText" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical"
+                    android:paddingBottom="2dp">
 
-                <ImageButton
-                    android:id="@+id/create_nav_button"
-                    style="@style/AerixNavigationButton"
-                    android:contentDescription="@string/aerix_navigation_create"
-                    android:src="@drawable/ic_px_dynamic"
-                    tools:ignore="HardcodedText" />
+                    <ImageButton
+                        android:id="@+id/home_nav_button"
+                        style="@style/AerixNavigationButton"
+                        android:contentDescription="@string/aerix_navigation_home"
+                        android:src="@drawable/ic_px_home" />
 
-                <ImageButton
-                    android:id="@+id/library_nav_button"
-                    style="@style/AerixNavigationButton"
-                    android:contentDescription="@string/aerix_navigation_library"
-                    android:src="@drawable/ic_px_file"
-                    tools:ignore="HardcodedText" />
+                    <TextView
+                        android:id="@+id/home_nav_label"
+                        style="@style/AerixNavigationLabel"
+                        android:text="@string/aerix_nav_home_label" />
+                </LinearLayout>
 
-                <ImageButton
-                    android:id="@+id/discover_nav_button"
-                    style="@style/AerixNavigationButton"
-                    android:contentDescription="@string/aerix_navigation_discover"
-                    android:src="@drawable/ic_modrinth"
-                    tools:ignore="HardcodedText" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical"
+                    android:paddingBottom="2dp">
 
-                <ImageButton
-                    android:id="@+id/wallpapers_nav_button"
-                    style="@style/AerixNavigationButton"
-                    android:contentDescription="@string/aerix_navigation_wallpapers"
-                    android:src="@drawable/ic_px_image"
-                    tools:ignore="HardcodedText" />
+                    <ImageButton
+                        android:id="@+id/create_nav_button"
+                        style="@style/AerixNavigationButton"
+                        android:contentDescription="@string/aerix_navigation_create"
+                        android:src="@drawable/ic_px_dynamic" />
 
-                <ImageButton
-                    android:id="@+id/skins_nav_button"
-                    style="@style/AerixNavigationButton"
-                    android:contentDescription="@string/aerix_navigation_skins"
-                    android:src="@drawable/ic_edit_profile"
-                    tools:ignore="HardcodedText" />
+                    <TextView
+                        android:id="@+id/create_nav_label"
+                        style="@style/AerixNavigationLabel"
+                        android:text="@string/aerix_nav_create_label" />
+                </LinearLayout>
 
-                <ImageButton
-                    android:id="@+id/servers_nav_button"
-                    style="@style/AerixNavigationButton"
-                    android:contentDescription="@string/aerix_navigation_servers"
-                    android:src="@drawable/ic_px_console"
-                    tools:ignore="HardcodedText" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical"
+                    android:paddingBottom="2dp">
+
+                    <ImageButton
+                        android:id="@+id/library_nav_button"
+                        style="@style/AerixNavigationButton"
+                        android:contentDescription="@string/aerix_navigation_library"
+                        android:src="@drawable/ic_px_file" />
+
+                    <TextView
+                        android:id="@+id/library_nav_label"
+                        style="@style/AerixNavigationLabel"
+                        android:text="@string/aerix_nav_library_label" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical"
+                    android:paddingBottom="2dp">
+
+                    <ImageButton
+                        android:id="@+id/discover_nav_button"
+                        style="@style/AerixNavigationButton"
+                        android:contentDescription="@string/aerix_navigation_discover"
+                        android:src="@drawable/ic_modrinth" />
+
+                    <TextView
+                        android:id="@+id/discover_nav_label"
+                        style="@style/AerixNavigationLabel"
+                        android:text="@string/aerix_nav_discover_label" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical"
+                    android:paddingBottom="2dp">
+
+                    <ImageButton
+                        android:id="@+id/wallpapers_nav_button"
+                        style="@style/AerixNavigationButton"
+                        android:contentDescription="@string/aerix_navigation_wallpapers"
+                        android:src="@drawable/ic_px_image" />
+
+                    <TextView
+                        android:id="@+id/wallpapers_nav_label"
+                        style="@style/AerixNavigationLabel"
+                        android:text="@string/aerix_nav_wallpapers_label" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical"
+                    android:paddingBottom="2dp">
+
+                    <ImageButton
+                        android:id="@+id/skins_nav_button"
+                        style="@style/AerixNavigationButton"
+                        android:contentDescription="@string/aerix_navigation_skins"
+                        android:src="@drawable/ic_edit_profile" />
+
+                    <TextView
+                        android:id="@+id/skins_nav_label"
+                        style="@style/AerixNavigationLabel"
+                        android:text="@string/aerix_nav_skins_label" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical"
+                    android:paddingBottom="2dp">
+
+                    <ImageButton
+                        android:id="@+id/servers_nav_button"
+                        style="@style/AerixNavigationButton"
+                        android:contentDescription="@string/aerix_navigation_servers"
+                        android:src="@drawable/ic_px_console" />
+
+                    <TextView
+                        android:id="@+id/servers_nav_label"
+                        style="@style/AerixNavigationLabel"
+                        android:text="@string/aerix_nav_servers_label" />
+                </LinearLayout>
             </LinearLayout>
         </ScrollView>
 
-        <ImageButton
-            android:id="@+id/setting_button"
-            style="@style/AerixNavigationButton"
-            android:contentDescription="@string/aerix_navigation_settings"
-            android:src="@drawable/ic_px_sliders"
-            tools:ignore="HardcodedText" />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_horizontal"
+            android:orientation="vertical"
+            android:paddingBottom="2dp">
 
+            <ImageButton
+                android:id="@+id/setting_button"
+                style="@style/AerixNavigationButton"
+                android:contentDescription="@string/aerix_navigation_settings"
+                android:src="@drawable/ic_px_sliders" />
+
+            <TextView
+                android:id="@+id/settings_nav_label"
+                style="@style/AerixNavigationLabel"
+                android:text="@string/aerix_nav_settings_label" />
+        </LinearLayout>
         <com.kdt.mcgui.AccountSpinner
             android:id="@+id/account_spinner"
             android:layout_width="match_parent"

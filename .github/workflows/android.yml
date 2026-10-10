@@ -42,6 +42,9 @@ jobs:
       - name: Verify bundled wallpaper catalog
         run: python3 scripts/verify_wallpapers.py
 
+      - name: Verify Home layout variants
+        run: python3 scripts/verify_launcher_layouts.py
+
       - name: Run launcher unit tests
         shell: bash
         run: |

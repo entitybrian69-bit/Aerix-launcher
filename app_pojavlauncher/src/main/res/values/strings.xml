@@ -592,6 +592,14 @@
     <string name="aerix_navigation_wallpapers">Wallpapers and appearance</string>
     <string name="aerix_navigation_servers">Multiplayer servers</string>
     <string name="aerix_navigation_settings">Settings</string>
+    <string name="aerix_nav_home_label">Home</string>
+    <string name="aerix_nav_create_label">Create</string>
+    <string name="aerix_nav_library_label">Library</string>
+    <string name="aerix_nav_discover_label">Discover</string>
+    <string name="aerix_nav_wallpapers_label">Themes</string>
+    <string name="aerix_nav_skins_label">Skins</string>
+    <string name="aerix_nav_servers_label">Servers</string>
+    <string name="aerix_nav_settings_label">Settings</string>
     <string name="instance_ram_allocation_title">Profile RAM allocation (MB)</string>
     <string name="instance_ram_allocation_hint">Blank uses the global RAM setting</string>
     <string name="instance_ram_allocation_error">Enter a value from 256 to 65536 MB, or leave it blank for the global setting.</string>

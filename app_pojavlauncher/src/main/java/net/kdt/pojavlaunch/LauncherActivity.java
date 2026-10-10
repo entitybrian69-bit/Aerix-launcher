@@ -8,6 +8,7 @@ import android.content.Intent;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
+import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -15,6 +16,7 @@ import android.system.Os;
 import android.view.View;
 import android.widget.ImageButton;
 import android.widget.ImageView;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
@@ -92,7 +94,16 @@ public class LauncherActivity extends BaseActivity {
             mWallpapersButton.setActivated(f instanceof WallpaperGalleryFragment);
             mSkinsButton.setActivated(f instanceof SkinManagerFragment);
             mServersButton.setActivated(f instanceof ServerManagerFragment);
-            mSettingsButton.setActivated(f.getClass().getName().startsWith("net.kdt.pojavlaunch.prefs.screens."));
+            boolean settingsSelected = f.getClass().getName().startsWith("net.kdt.pojavlaunch.prefs.screens.");
+            mSettingsButton.setActivated(settingsSelected);
+            setNavigationLabelState(R.id.home_nav_label, f instanceof MainMenuFragment, AerixThemeManager.SECTION_HOME);
+            setNavigationLabelState(R.id.create_nav_label, f instanceof ProfileTypeSelectFragment, AerixThemeManager.SECTION_HOME);
+            setNavigationLabelState(R.id.library_nav_label, f instanceof InstanceLibraryFragment, AerixThemeManager.SECTION_LIBRARY);
+            setNavigationLabelState(R.id.discover_nav_label, f instanceof SearchModFragment, AerixThemeManager.SECTION_DISCOVER);
+            setNavigationLabelState(R.id.wallpapers_nav_label, f instanceof WallpaperGalleryFragment, AerixThemeManager.SECTION_APPEARANCE);
+            setNavigationLabelState(R.id.skins_nav_label, f instanceof SkinManagerFragment, AerixThemeManager.SECTION_SKINS);
+            setNavigationLabelState(R.id.servers_nav_label, f instanceof ServerManagerFragment, AerixThemeManager.SECTION_SERVERS);
+            setNavigationLabelState(R.id.settings_nav_label, settingsSelected, AerixThemeManager.SECTION_SETTINGS);
         }
     };
 
@@ -224,6 +235,14 @@ public class LauncherActivity extends BaseActivity {
         mWallpapersButton.setOnClickListener(v -> navigateTo(WallpaperGalleryFragment.class, WallpaperGalleryFragment.TAG));
         mSkinsButton.setOnClickListener(v -> navigateTo(SkinManagerFragment.class, SkinManagerFragment.TAG));
         mServersButton.setOnClickListener(v -> navigateTo(ServerManagerFragment.class, ServerManagerFragment.TAG));
+        bindNavigationLabelClick(R.id.home_nav_label, mHomeButton);
+        bindNavigationLabelClick(R.id.create_nav_label, mCreateButton);
+        bindNavigationLabelClick(R.id.library_nav_label, mLibraryButton);
+        bindNavigationLabelClick(R.id.discover_nav_label, mDiscoverButton);
+        bindNavigationLabelClick(R.id.wallpapers_nav_label, mWallpapersButton);
+        bindNavigationLabelClick(R.id.skins_nav_label, mSkinsButton);
+        bindNavigationLabelClick(R.id.servers_nav_label, mServersButton);
+        bindNavigationLabelClick(R.id.settings_nav_label, mSettingsButton);
         ProgressKeeper.addTaskCountListener(mProgressLayout);
         ExtraCore.addExtraListener(ExtraConstants.BACK_PREFERENCE, mBackPreferenceListener);
         ExtraCore.addExtraListener(ExtraConstants.SELECT_AUTH_METHOD, mSelectAuthMethod);
@@ -406,6 +425,21 @@ public class LauncherActivity extends BaseActivity {
                 .setReorderingAllowed(true)
                 .replace(R.id.container_fragment, fragmentClass, null, tag)
                 .commit();
+    }
+
+    private void bindNavigationLabelClick(int labelId, ImageButton target) {
+        TextView label = findViewById(labelId);
+        if (label != null && target != null) label.setOnClickListener(v -> target.performClick());
+    }
+
+    private void setNavigationLabelState(int labelId, boolean selected, String section) {
+        TextView label = findViewById(labelId);
+        if (label == null) return;
+        label.setTextColor(selected
+                ? AerixThemeManager.accentColor(this, section)
+                : Color.rgb(230, 243, 252));
+        label.setTypeface(android.graphics.Typeface.DEFAULT,
+                selected ? android.graphics.Typeface.BOLD : android.graphics.Typeface.NORMAL);
     }
 
     /** Stuff all the view boilerplate here */
