@@ -82,24 +82,28 @@ public class MainMenuFragment extends Fragment {
         styleGlassButton(mHeroCreateButton);
         styleGlassButton(mHeroLibraryButton);
         styleGlassButton(mAccountManageButton);
-        AerixThemeManager.tintButton(mPlayButton, requireContext(), AerixThemeManager.SECTION_HOME);
+        if (mPlayButton != null) {
+            AerixThemeManager.tintButton(mPlayButton, requireContext(), AerixThemeManager.SECTION_HOME);
+        }
         updateHomeStatus();
 
-        mNewsButton.setOnClickListener(v -> Tools.openURL(requireActivity(), Tools.URL_HOME));
-        mDiscordButton.setOnClickListener(v -> Tools.openURL(requireActivity(), getString(R.string.social_media_invite)));
-        mCustomControlButton.setOnClickListener(v -> startActivity(new Intent(requireContext(), CustomControlsActivity.class)));
-        mInstallJarButton.setOnClickListener(v -> runInstallerWithConfirmation());
-        mEditProfileButton.setOnClickListener(v -> mVersionSpinner.openProfileEditor(requireActivity()));
-        mHeroCreateButton.setOnClickListener(v -> Tools.swapFragment(requireActivity(),
+        setClickIfPresent(mNewsButton, v -> Tools.openURL(requireActivity(), Tools.URL_HOME));
+        setClickIfPresent(mDiscordButton, v -> Tools.openURL(requireActivity(), getString(R.string.social_media_invite)));
+        setClickIfPresent(mCustomControlButton, v -> startActivity(new Intent(requireContext(), CustomControlsActivity.class)));
+        setClickIfPresent(mInstallJarButton, v -> runInstallerWithConfirmation());
+        setClickIfPresent(mEditProfileButton, v -> {
+            if (mVersionSpinner != null) mVersionSpinner.openProfileEditor(requireActivity());
+        });
+        setClickIfPresent(mHeroCreateButton, v -> Tools.swapFragment(requireActivity(),
                 ProfileTypeSelectFragment.class, ProfileTypeSelectFragment.TAG, null));
-        mHeroLibraryButton.setOnClickListener(v -> Tools.swapFragment(requireActivity(),
+        setClickIfPresent(mHeroLibraryButton, v -> Tools.swapFragment(requireActivity(),
                 InstanceLibraryFragment.class, InstanceLibraryFragment.TAG, null));
-        mAccountManageButton.setOnClickListener(v -> {
+        setClickIfPresent(mAccountManageButton, v -> {
             View accountSpinner = requireActivity().findViewById(R.id.account_spinner);
             if (accountSpinner != null) accountSpinner.performClick();
         });
 
-        mPlayButton.setOnClickListener(v -> {
+        setClickIfPresent(mPlayButton, v -> {
         Instance instance = Instances.loadSelectedInstance();
         if (instance == null) {
             Toast.makeText(requireContext(), R.string.no_instance, Toast.LENGTH_LONG).show();
@@ -131,15 +135,19 @@ public class MainMenuFragment extends Fragment {
         }
         });
 
-        mShareLogsButton.setOnClickListener((v) -> shareLog(requireContext()));
+        setClickIfPresent(mShareLogsButton, v -> shareLog(requireContext()));
+        setClickIfPresent(mOpenDirectoryButton, v -> openGameDirectory(v.getContext()));
 
-        mOpenDirectoryButton.setOnClickListener((v)-> openGameDirectory(v.getContext()));
+        if (mNewsButton != null) {
+            mNewsButton.setOnLongClickListener(v -> {
+                Tools.swapFragment(requireActivity(), GamepadMapperFragment.class, GamepadMapperFragment.TAG, null);
+                return true;
+            });
+        }
+    }
 
-
-        mNewsButton.setOnLongClickListener((v)->{
-            Tools.swapFragment(requireActivity(), GamepadMapperFragment.class, GamepadMapperFragment.TAG, null);
-            return true;
-        });
+    private void setClickIfPresent(@Nullable View view, @NonNull View.OnClickListener listener) {
+        if (view != null) view.setOnClickListener(listener);
     }
 
     private void openGameDirectory(Context context) {
