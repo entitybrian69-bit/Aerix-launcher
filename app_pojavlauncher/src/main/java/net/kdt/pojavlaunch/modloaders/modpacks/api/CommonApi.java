@@ -36,11 +36,12 @@ public class CommonApi implements ModpackApi {
 
     public CommonApi(String curseforgeApiKey) {
         mModrinthApi = new ModrinthApi();
-        if ("DUMMY".equals(curseforgeApiKey)) {
+        String key = curseforgeApiKey == null ? "" : curseforgeApiKey.trim();
+        if (key.isEmpty() || "DUMMY".equalsIgnoreCase(key)) {
             mCurseforgeApi = null;
             mModpackApis = new ModpackApi[]{mModrinthApi};
         } else {
-            mCurseforgeApi = new CurseforgeApi(curseforgeApiKey);
+            mCurseforgeApi = new CurseforgeApi(key);
             mModpackApis = new ModpackApi[]{mModrinthApi, mCurseforgeApi};
         }
     }
@@ -56,10 +57,10 @@ public class CommonApi implements ModpackApi {
 
         Future<?>[] futures = new Future<?>[mModpackApis.length];
         for(int i = 0; i < mModpackApis.length; i++) {
-            // Direct mod/resource-pack/shader installs are Modrinth-only here; CurseForge versions need
-            // a separate dependency/conflict workflow and should not appear as installable in this mode.
-            if (mModpackApis[i] instanceof CurseforgeApi
-                    && !"modpack".equals(searchFilters.resolvedProjectType())) continue;
+            ModpackApi api = mModpackApis[i];
+            if (searchFilters.apiSource >= 0 && sourceFor(api) != searchFilters.apiSource) continue;
+            // Modrinth has no world-save project type; world downloads are offered by CurseForge.
+            if ("world".equals(searchFilters.resolvedProjectType()) && api == mModrinthApi) continue;
             // If there is an array and its length is zero, this means that we've exhausted the results for this
             // search query and we don't need to actually do the search
             if(results[i] != null && results[i].results.length == 0) continue;
@@ -145,13 +146,17 @@ public class CommonApi implements ModpackApi {
         }
     }
 
+    private static int sourceFor(ModpackApi api) {
+        return api instanceof CurseforgeApi ? Constants.SOURCE_CURSEFORGE : Constants.SOURCE_MODRINTH;
+    }
+
     private @NonNull ModpackApi getModpackApi(int apiSource) {
         switch (apiSource) {
             case Constants.SOURCE_MODRINTH:
                 return mModrinthApi;
             case Constants.SOURCE_CURSEFORGE:
-                if (mCurseforgeApi == null) return null;
-                else return mCurseforgeApi;
+                if (mCurseforgeApi == null) throw new IllegalStateException("Add a CurseForge API key to use this source");
+                return mCurseforgeApi;
             default:
                 throw new UnsupportedOperationException("Unknown API source: " + apiSource);
         }

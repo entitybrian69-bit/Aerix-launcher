@@ -579,6 +579,7 @@
     <string name="aerix_home_library">Open library</string>
     <string name="aerix_home_account">Account</string>
     <string name="aerix_home_manage">Manage</string>
+    <string name="aerix_home_account_manage">Accounts</string>
     <string name="aerix_home_sign_in_hint">Sign in to play</string>
     <string name="aerix_home_ram">RAM allocation · %1$d MB</string>
     <string name="aerix_current_instance">SELECTED INSTANCE</string>
@@ -586,13 +587,15 @@
     <string name="aerix_instance_hint">Choose a version or open the instance profile to edit details.</string>
     <string name="aerix_quick_actions">QUICK ACCESS</string>
     <string name="aerix_navigation_home">Home</string>
+    <string name="aerix_navigation_account">Minecraft account management</string>
     <string name="aerix_navigation_create">Create instance</string>
     <string name="aerix_navigation_library">Instance library</string>
-    <string name="aerix_navigation_discover">Discover modpacks</string>
+    <string name="aerix_navigation_discover">Browse mods, packs, shaders, resource packs, and world saves</string>
     <string name="aerix_navigation_wallpapers">Wallpapers and appearance</string>
     <string name="aerix_navigation_servers">Multiplayer servers</string>
     <string name="aerix_navigation_settings">Settings</string>
     <string name="aerix_nav_home_label">Home</string>
+    <string name="aerix_nav_account_label">Account</string>
     <string name="aerix_nav_create_label">Create</string>
     <string name="aerix_nav_library_label">Library</string>
     <string name="aerix_nav_discover_label">Discover</string>
@@ -723,5 +726,42 @@
         <item>Mods</item>
         <item>Resource packs</item>
         <item>Shaders</item>
+        <item>World saves</item>
     </string-array>
+    <string-array name="aerix_discover_sources">
+        <item>All sources</item>
+        <item>Modrinth</item>
+        <item>CurseForge</item>
+    </string-array>
+    <string name="aerix_discover_title">Mods, packs &amp; worlds</string>
+    <string name="aerix_discover_source_hint">Source</string>
+    <string name="aerix_discover_source_label">Content source</string>
+    <string name="aerix_discover_curseforge_key_required">CurseForge requires your own API key. Aerix does not bundle or log a shared key. Paste your key below; it is kept in this app’s private settings on this device.</string>
+    <string name="aerix_discover_curseforge_key_summary">Optional provider. Add your own API key to search CurseForge; Aerix does not bundle one.</string>
+    <string name="aerix_discover_curseforge_key_connected">Personal CurseForge key saved on this device. Tap to replace or remove it.</string>
+    <string name="aerix_discover_curseforge_key_empty">Paste a CurseForge API key to connect this provider.</string>
+    <string name="aerix_discover_curseforge_key_saved">CurseForge key saved in this app’s private settings.</string>
+    <string name="aerix_discover_connect_curseforge">Connect CurseForge</string>
+    <string name="aerix_discover_curseforge_key_title">Connect CurseForge</string>
+    <string name="aerix_discover_curseforge_key_hint">CurseForge API key</string>
+    <string name="aerix_discover_curseforge_key_save">Save key</string>
+    <string name="aerix_discover_curseforge_key_remove">Remove key</string>
+    <string name="aerix_discover_worlds_key_note">World saves are available through CurseForge. Add your CurseForge API key to browse them.</string>
+    <string name="aerix_discover_source_key_note">CurseForge results are off until you add your own API key.</string>
+    <string name="aerix_discover_content_install_success">Content installed in the selected Minecraft profile.</string>
+    <string name="aerix_discover_world_import_success">World save installed to the selected profile.</string>
+    <string name="aerix_discover_world_import_error">Could not install this world save: %1$s</string>
+    <string name="aerix_quick_tools">Quick tools</string>
+    <string name="aerix_quick_tools_title">Quick tools</string>
+    <string name="aerix_quick_tool_controls">Controls editor</string>
+    <string name="aerix_account_title">Minecraft accounts</string>
+    <string name="aerix_account_subtitle">Choose the account used for Minecraft Java, or connect another.</string>
+    <string name="aerix_account_add">Add account</string>
+    <string name="aerix_account_empty">No account connected yet. Add a Microsoft, Ely.by, or local account to continue.</string>
+    <string name="aerix_account_current">Current</string>
+    <string name="aerix_account_use">Use account</string>
+    <string name="aerix_account_remove">Remove</string>
+    <string name="aerix_account_remove_title">Remove this account?</string>
+    <string name="aerix_account_remove_message">Remove %1$s from this device? This only removes the saved launcher account.</string>
+    <string name="aerix_account_load_error">Could not load saved accounts: %1$s</string>
 </resources>

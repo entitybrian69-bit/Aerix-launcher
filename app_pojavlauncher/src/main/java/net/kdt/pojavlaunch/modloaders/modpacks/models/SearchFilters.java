@@ -9,6 +9,8 @@ public class SearchFilters {
     public boolean isModpack;
     /** Modrinth project type: modpack, mod, resourcepack, or shader. */
     @Nullable public String projectType = "modpack";
+    /** -1 searches every configured provider; otherwise a Constants.SOURCE_* provider ID. */
+    public int apiSource = -1;
     public String name;
 
     public String resolvedProjectType() {
@@ -18,7 +20,7 @@ public class SearchFilters {
 
     public void setProjectType(String type) {
         if (type == null || !(type.equals("modpack") || type.equals("mod")
-                || type.equals("resourcepack") || type.equals("shader"))) {
+                || type.equals("resourcepack") || type.equals("shader") || type.equals("world"))) {
             throw new IllegalArgumentException("Unsupported Discover project type");
         }
         projectType = type;

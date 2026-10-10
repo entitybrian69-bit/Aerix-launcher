@@ -35,6 +35,7 @@ import net.kdt.pojavlaunch.authenticator.accounts.Accounts;
 import net.kdt.pojavlaunch.extra.ExtraConstants;
 import net.kdt.pojavlaunch.extra.ExtraCore;
 import net.kdt.pojavlaunch.extra.ExtraListener;
+import net.kdt.pojavlaunch.fragments.AccountManagerFragment;
 import net.kdt.pojavlaunch.fragments.InstanceLibraryFragment;
 import net.kdt.pojavlaunch.fragments.MainMenuFragment;
 import net.kdt.pojavlaunch.fragments.MicrosoftLoginFragment;
@@ -69,6 +70,7 @@ public class LauncherActivity extends BaseActivity {
 
     private FragmentContainerView mFragmentView;
     private ImageButton mSettingsButton;
+    private ImageButton mAccountButton;
     private ImageButton mHomeButton;
     private ImageButton mCreateButton;
     private ImageButton mLibraryButton;
@@ -88,6 +90,7 @@ public class LauncherActivity extends BaseActivity {
             if (f.getParentFragment() != null || mSettingsButton == null) return;
             mSettingsButton.setImageDrawable(ContextCompat.getDrawable(getBaseContext(), R.drawable.ic_px_sliders));
             mHomeButton.setActivated(f instanceof MainMenuFragment);
+            mAccountButton.setActivated(f instanceof AccountManagerFragment);
             mCreateButton.setActivated(f instanceof ProfileTypeSelectFragment);
             mLibraryButton.setActivated(f instanceof InstanceLibraryFragment);
             mDiscoverButton.setActivated(f instanceof SearchModFragment);
@@ -97,6 +100,7 @@ public class LauncherActivity extends BaseActivity {
             boolean settingsSelected = f.getClass().getName().startsWith("net.kdt.pojavlaunch.prefs.screens.");
             mSettingsButton.setActivated(settingsSelected);
             setNavigationLabelState(R.id.home_nav_label, f instanceof MainMenuFragment, AerixThemeManager.SECTION_HOME);
+            setNavigationLabelState(R.id.account_nav_label, f instanceof AccountManagerFragment, AerixThemeManager.SECTION_ACCOUNT);
             setNavigationLabelState(R.id.create_nav_label, f instanceof ProfileTypeSelectFragment, AerixThemeManager.SECTION_HOME);
             setNavigationLabelState(R.id.library_nav_label, f instanceof InstanceLibraryFragment, AerixThemeManager.SECTION_LIBRARY);
             setNavigationLabelState(R.id.discover_nav_label, f instanceof SearchModFragment, AerixThemeManager.SECTION_DISCOVER);
@@ -192,7 +196,7 @@ public class LauncherActivity extends BaseActivity {
 
     @Override
     public boolean setFullscreen() {
-        return false;
+        return true;
     }
 
     @Override
@@ -229,6 +233,7 @@ public class LauncherActivity extends BaseActivity {
 
         mSettingsButton.setOnClickListener(mSettingButtonListener);
         mHomeButton.setOnClickListener(v -> navigateTo(MainMenuFragment.class, MainMenuFragment.TAG));
+        mAccountButton.setOnClickListener(v -> navigateTo(AccountManagerFragment.class, AccountManagerFragment.TAG));
         mCreateButton.setOnClickListener(v -> navigateTo(ProfileTypeSelectFragment.class, ProfileTypeSelectFragment.TAG));
         mLibraryButton.setOnClickListener(v -> navigateTo(InstanceLibraryFragment.class, InstanceLibraryFragment.TAG));
         mDiscoverButton.setOnClickListener(v -> navigateTo(SearchModFragment.class, SearchModFragment.TAG));
@@ -236,6 +241,7 @@ public class LauncherActivity extends BaseActivity {
         mSkinsButton.setOnClickListener(v -> navigateTo(SkinManagerFragment.class, SkinManagerFragment.TAG));
         mServersButton.setOnClickListener(v -> navigateTo(ServerManagerFragment.class, ServerManagerFragment.TAG));
         bindNavigationLabelClick(R.id.home_nav_label, mHomeButton);
+        bindNavigationLabelClick(R.id.account_nav_label, mAccountButton);
         bindNavigationLabelClick(R.id.create_nav_label, mCreateButton);
         bindNavigationLabelClick(R.id.library_nav_label, mLibraryButton);
         bindNavigationLabelClick(R.id.discover_nav_label, mDiscoverButton);
@@ -446,6 +452,7 @@ public class LauncherActivity extends BaseActivity {
     private void bindViews(){
         mFragmentView = findViewById(R.id.container_fragment);
         mSettingsButton = findViewById(R.id.setting_button);
+        mAccountButton = findViewById(R.id.account_nav_button);
         mHomeButton = findViewById(R.id.home_nav_button);
         mCreateButton = findViewById(R.id.create_nav_button);
         mLibraryButton = findViewById(R.id.library_nav_button);
@@ -455,6 +462,7 @@ public class LauncherActivity extends BaseActivity {
         mServersButton = findViewById(R.id.servers_nav_button);
         mProgressLayout = findViewById(R.id.progress_layout);
         AerixThemeManager.tintNavigationButton(mHomeButton, this, AerixThemeManager.SECTION_HOME);
+        AerixThemeManager.tintNavigationButton(mAccountButton, this, AerixThemeManager.SECTION_ACCOUNT);
         AerixThemeManager.tintNavigationButton(mCreateButton, this, AerixThemeManager.SECTION_HOME);
         AerixThemeManager.tintNavigationButton(mLibraryButton, this, AerixThemeManager.SECTION_LIBRARY);
         AerixThemeManager.tintNavigationButton(mDiscoverButton, this, AerixThemeManager.SECTION_DISCOVER);

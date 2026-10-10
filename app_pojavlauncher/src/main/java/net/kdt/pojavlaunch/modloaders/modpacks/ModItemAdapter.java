@@ -52,7 +52,7 @@ public class ModItemAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
     private final ModIconCache mIconCache = new ModIconCache();
     private final SearchResultCallback mSearchResultCallback;
     private ModItem[] mModItems;
-    private final ModpackApi mModpackApi;
+    private ModpackApi mModpackApi;
 
     /* Cache for ever so slightly rounding the image for the corner not to stick out of the layout */
     private final float mCornerDimensionCache;
@@ -69,6 +69,21 @@ public class ModItemAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
         mModpackApi = api;
         mModItems = new ModItem[]{};
         mSearchResultCallback = callback;
+    }
+
+    public void setModpackApi(ModpackApi api) {
+        mModpackApi = api;
+    }
+
+    public void clearResults() {
+        if (mTaskInProgress != null) {
+            mTaskInProgress.cancel(true);
+            mTaskInProgress = null;
+        }
+        mCurrentResult = null;
+        mLastPage = true;
+        mModItems = MOD_ITEMS_EMPTY;
+        notifyDataSetChanged();
     }
 
     public void performSearchQuery(SearchFilters searchFilters) {
@@ -258,7 +273,12 @@ public class ModItemAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
                 RoundedBitmapDrawable drawable = RoundedBitmapDrawableFactory.create(mIconView.getResources(), bm);
                 mIconView.setImageDrawable(drawable);
             };
-            mIconCache.getImage(mImageReceiver, mModItem.getIconCacheTag(), mModItem.imageUrl);
+            if (Tools.isValidString(mModItem.imageUrl)) {
+                mIconCache.getImage(mImageReceiver, mModItem.getIconCacheTag(), mModItem.imageUrl);
+            } else {
+                mImageReceiver = null;
+                mIconView.setImageResource(getSourceDrawable(item.apiSource));
+            }
             mSourceView.setImageResource(getSourceDrawable(item.apiSource));
             mTitle.setText(item.title);
             mDescription.setText(item.description);
@@ -270,7 +290,8 @@ public class ModItemAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
 
         /** Display extended info/interaction about a modpack */
         private void setStateDetailed(ModDetail detailedItem) {
-            if(detailedItem != null) {
+            if (detailedItem != null && detailedItem.versionNames != null
+                    && detailedItem.versionNames.length > 0) {
                 setInstallEnabled(true);
                 mExtendedErrorTextView.setVisibility(View.GONE);
                 mVersionAdapter.setObjects(Arrays.asList(detailedItem.versionNames));
@@ -288,11 +309,11 @@ public class ModItemAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
                 });
                 updateInstallButtonLabel(mExtendedSpinner.getSelectedItemPosition());
             } else {
-                closeDetailedView();
                 setInstallEnabled(false);
                 mExtendedErrorTextView.setVisibility(View.VISIBLE);
                 mExtendedSpinner.setAdapter(null);
                 mVersionAdapter.setObjects(null);
+                openDetailedView();
             }
         }
 

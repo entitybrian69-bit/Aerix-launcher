@@ -10,6 +10,7 @@ import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -44,6 +45,7 @@ public class MainMenuFragment extends Fragment {
     public static final String TAG = "MainMenuFragment";
 
     private mcVersionSpinner mVersionSpinner;
+    private ImageView mAccountIcon;
     private TextView mAccountSummary;
     private TextView mRamSummary;
 
@@ -67,6 +69,8 @@ public class MainMenuFragment extends Fragment {
         Button mHeroCreateButton = view.findViewById(R.id.hero_create_button);
         Button mHeroLibraryButton = view.findViewById(R.id.hero_library_button);
         Button mAccountManageButton = view.findViewById(R.id.account_manage_button);
+        Button mQuickToolsButton = view.findViewById(R.id.quick_tools_button);
+        mAccountIcon = view.findViewById(R.id.home_account_icon);
         mAccountSummary = view.findViewById(R.id.home_account_summary);
         mRamSummary = view.findViewById(R.id.home_ram_label);
 
@@ -82,8 +86,9 @@ public class MainMenuFragment extends Fragment {
         styleGlassButton(mHeroCreateButton);
         styleGlassButton(mHeroLibraryButton);
         styleGlassButton(mAccountManageButton);
+        styleGlassButton(mQuickToolsButton);
         if (mPlayButton != null) {
-            AerixThemeManager.tintButton(mPlayButton, requireContext(), AerixThemeManager.SECTION_HOME);
+            AerixThemeManager.tintPrimaryButton(mPlayButton, requireContext(), AerixThemeManager.SECTION_HOME);
         }
         updateHomeStatus();
 
@@ -98,10 +103,9 @@ public class MainMenuFragment extends Fragment {
                 ProfileTypeSelectFragment.class, ProfileTypeSelectFragment.TAG, null));
         setClickIfPresent(mHeroLibraryButton, v -> Tools.swapFragment(requireActivity(),
                 InstanceLibraryFragment.class, InstanceLibraryFragment.TAG, null));
-        setClickIfPresent(mAccountManageButton, v -> {
-            View accountSpinner = requireActivity().findViewById(R.id.account_spinner);
-            if (accountSpinner != null) accountSpinner.performClick();
-        });
+        setClickIfPresent(mAccountManageButton, v -> Tools.swapFragment(requireActivity(),
+                AccountManagerFragment.class, AccountManagerFragment.TAG, null));
+        setClickIfPresent(mQuickToolsButton, v -> showQuickToolsDialog());
 
         setClickIfPresent(mPlayButton, v -> {
         Instance instance = Instances.loadSelectedInstance();
@@ -172,15 +176,62 @@ public class MainMenuFragment extends Fragment {
     }
 
     private void updateHomeStatus() {
+        Account account = Accounts.getCurrent();
         if (mAccountSummary != null) {
-            Account account = Accounts.getCurrent();
             mAccountSummary.setText(account == null || !Tools.isValidString(account.username)
                     ? getString(R.string.aerix_home_sign_in_hint) : account.username);
+        }
+        if (mAccountIcon != null) {
+            android.graphics.Bitmap skinFace = account == null ? null : account.getSkinFace();
+            if (skinFace == null) mAccountIcon.setImageResource(R.drawable.ic_aerix_account);
+            else mAccountIcon.setImageBitmap(skinFace);
         }
         if (mRamSummary != null) {
             mRamSummary.setText(getString(R.string.aerix_home_ram,
                     LauncherPreferences.PREF_RAM_ALLOCATION));
         }
+    }
+
+    private void showQuickToolsDialog() {
+        String[] actions = {
+                getString(R.string.mcl_tab_wiki),
+                getString(R.string.mcl_button_social_media),
+                getString(R.string.mcl_option_customcontrol),
+                getString(R.string.main_install_jar_file),
+                getString(R.string.main_share_logs),
+                getString(R.string.mcl_button_open_directory),
+                getString(R.string.aerix_quick_tool_controls)
+        };
+        new AlertDialog.Builder(requireContext())
+                .setTitle(R.string.aerix_quick_tools_title)
+                .setItems(actions, (dialog, index) -> {
+                    switch (index) {
+                        case 0:
+                            Tools.openURL(requireActivity(), Tools.URL_HOME);
+                            break;
+                        case 1:
+                            Tools.openURL(requireActivity(), getString(R.string.social_media_invite));
+                            break;
+                        case 2:
+                            startActivity(new Intent(requireContext(), CustomControlsActivity.class));
+                            break;
+                        case 3:
+                            runInstallerWithConfirmation();
+                            break;
+                        case 4:
+                            shareLog(requireContext());
+                            break;
+                        case 5:
+                            openGameDirectory(requireContext());
+                            break;
+                        case 6:
+                            Tools.swapFragment(requireActivity(), GamepadMapperFragment.class,
+                                    GamepadMapperFragment.TAG, null);
+                            break;
+                    }
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
     }
 
     private void styleGlassButton(Button button) {

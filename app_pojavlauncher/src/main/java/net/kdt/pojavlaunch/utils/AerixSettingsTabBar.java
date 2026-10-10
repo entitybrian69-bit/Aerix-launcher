@@ -82,11 +82,11 @@ public final class AerixSettingsTabBar {
     private static GradientDrawable tabBackground(Context context, boolean selected) {
         GradientDrawable drawable = new GradientDrawable();
         int accent = AerixThemeManager.accentColor(context, AerixThemeManager.SECTION_SETTINGS);
-        drawable.setColor(selected ? Color.argb(175, Color.red(accent), Color.green(accent), Color.blue(accent))
-                : Color.argb(86, 22, 41, 60));
+        drawable.setColor(selected ? Color.argb(62, Color.red(accent), Color.green(accent), Color.blue(accent))
+                : Color.argb(50, 22, 41, 60));
         drawable.setCornerRadius(dp(context, 16));
-        drawable.setStroke(dp(context, 1), selected ? Color.argb(235, 228, 250, 255)
-                : Color.argb(145, 206, 236, 255));
+        drawable.setStroke(dp(context, 1), selected ? Color.argb(220, 228, 250, 255)
+                : Color.argb(135, 206, 236, 255));
         return drawable;
     }
 

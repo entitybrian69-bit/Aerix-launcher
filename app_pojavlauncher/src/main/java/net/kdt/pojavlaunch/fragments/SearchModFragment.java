@@ -8,10 +8,12 @@ import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
+import android.text.InputType;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
+import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.Spinner;
 import android.widget.TextView;
@@ -35,6 +37,7 @@ import net.kdt.pojavlaunch.Tools;
 import net.kdt.pojavlaunch.modloaders.modpacks.ModItemAdapter;
 import net.kdt.pojavlaunch.modloaders.modpacks.api.CommonApi;
 import net.kdt.pojavlaunch.modloaders.modpacks.api.ModpackApi;
+import net.kdt.pojavlaunch.modloaders.modpacks.models.Constants;
 import net.kdt.pojavlaunch.modloaders.modpacks.models.SearchFilters;
 import net.kdt.pojavlaunch.profiles.VersionSelectorDialog;
 import net.kdt.pojavlaunch.prefs.LauncherPreferences;
@@ -55,7 +58,8 @@ public class SearchModFragment extends Fragment implements ModItemAdapter.Search
 
     public static final String TAG = "SearchModFragment";
     private static final String PREF_DISCOVER_TYPE = "aerix_discover_project_type";
-    private static final String[] DISCOVER_TYPES = {"modpack", "mod", "resourcepack", "shader"};
+    private static final String PREF_DISCOVER_SOURCE = "aerix_discover_source";
+    private static final String[] DISCOVER_TYPES = {"modpack", "mod", "resourcepack", "shader", "world"};
     private View mOverlay;
     private float mOverlayTopCache; // Padding cache reduce resource lookup
 
@@ -74,6 +78,7 @@ public class SearchModFragment extends Fragment implements ModItemAdapter.Search
     private TextView mStatusTextView;
     private ColorStateList mDefaultTextColor;
     private ModpackApi modpackApi;
+    private String mConfiguredCurseforgeKey = "";
 
     private final SearchFilters mSearchFilters;
 
@@ -124,7 +129,19 @@ public class SearchModFragment extends Fragment implements ModItemAdapter.Search
     @Override
     public void onAttach(@NonNull Context context) {
         super.onAttach(context);
-        modpackApi = new CommonApi(context.getString(R.string.curseforge_api_key));
+        reloadModpackApi();
+    }
+
+    private void reloadModpackApi() {
+        mConfiguredCurseforgeKey = getCurseforgeApiKey();
+        modpackApi = new CommonApi(mConfiguredCurseforgeKey);
+        if (mModItemAdapter != null) mModItemAdapter.setModpackApi(modpackApi);
+    }
+
+    private String getCurseforgeApiKey() {
+        String key = LauncherPreferences.DEFAULT_PREF.getString(
+                LauncherPreferences.PREF_KEY_CURSEFORGE_API_KEY, "");
+        return key == null ? "" : key.trim();
     }
 
     @Override
@@ -152,6 +169,7 @@ public class SearchModFragment extends Fragment implements ModItemAdapter.Search
         } catch (IllegalArgumentException ignored) {
             mSearchFilters.setProjectType("modpack");
         }
+        mSearchFilters.apiSource = LauncherPreferences.DEFAULT_PREF.getInt(PREF_DISCOVER_SOURCE, -1);
 
         mRecyclerview.setLayoutManager(new LinearLayoutManager(getContext()));
         mRecyclerview.setAdapter(mModItemAdapter);
@@ -187,6 +205,16 @@ public class SearchModFragment extends Fragment implements ModItemAdapter.Search
     }
 
     @Override
+    public void onResume() {
+        super.onResume();
+        String configuredKey = getCurseforgeApiKey();
+        if (!configuredKey.equals(mConfiguredCurseforgeKey)) {
+            reloadModpackApi();
+            if (mSearchEditText != null) searchMods(mSearchEditText.getText().toString());
+        }
+    }
+
+    @Override
     public void onDestroyView() {
         super.onDestroyView();
         ProgressKeeper.removeTaskCountListener(mModItemAdapter);
@@ -217,9 +245,31 @@ public class SearchModFragment extends Fragment implements ModItemAdapter.Search
     }
 
     private void searchMods(String name) {
-        mSearchProgressBar.setVisibility(View.VISIBLE);
         mSearchFilters.name = name == null ? "" : name;
+        String projectType = mSearchFilters.resolvedProjectType();
+        if ("world".equals(projectType) && mSearchFilters.apiSource == Constants.SOURCE_MODRINTH) {
+            showSearchUnavailable(R.string.aerix_discover_worlds_key_note);
+            return;
+        }
+        boolean needsCurseforge = mSearchFilters.apiSource == Constants.SOURCE_CURSEFORGE
+                || ("world".equals(projectType) && mSearchFilters.apiSource != Constants.SOURCE_MODRINTH);
+        if (needsCurseforge && getCurseforgeApiKey().isEmpty()) {
+            showSearchUnavailable("world".equals(projectType)
+                    ? R.string.aerix_discover_worlds_key_note
+                    : R.string.aerix_discover_source_key_note);
+            return;
+        }
+        mStatusTextView.setVisibility(View.GONE);
+        mSearchProgressBar.setVisibility(View.VISIBLE);
         mModItemAdapter.performSearchQuery(mSearchFilters);
+    }
+
+    private void showSearchUnavailable(int messageResource) {
+        mSearchProgressBar.setVisibility(View.GONE);
+        mModItemAdapter.clearResults();
+        mStatusTextView.setTextColor(mDefaultTextColor);
+        mStatusTextView.setText(messageResource);
+        mStatusTextView.setVisibility(View.VISIBLE);
     }
 
     private void displayFilterDialog() {
@@ -231,16 +281,26 @@ public class SearchModFragment extends Fragment implements ModItemAdapter.Search
         dialog.setOnShowListener(dialogInterface -> {
             TextView mSelectedVersion = dialog.findViewById(R.id.search_mod_selected_mc_version_textview);
             Spinner projectTypeSpinner = dialog.findViewById(R.id.search_mod_project_type_spinner);
+            Spinner sourceSpinner = dialog.findViewById(R.id.search_mod_source_spinner);
+            Button connectCurseforgeButton = dialog.findViewById(R.id.search_mod_connect_curseforge);
             Button mSelectVersionButton = dialog.findViewById(R.id.search_mod_mc_version_button);
             Button mApplyButton = dialog.findViewById(R.id.search_mod_apply_filters);
 
             assert mSelectVersionButton != null;
             assert mSelectedVersion != null;
             assert projectTypeSpinner != null;
+            assert sourceSpinner != null;
+            assert connectCurseforgeButton != null;
             assert mApplyButton != null;
             AerixThemeManager.tintButton(mSelectVersionButton, requireContext(), AerixThemeManager.SECTION_DISCOVER);
+            AerixThemeManager.tintButton(connectCurseforgeButton, requireContext(), AerixThemeManager.SECTION_DISCOVER);
             AerixThemeManager.tintButton(mApplyButton, requireContext(), AerixThemeManager.SECTION_DISCOVER);
             projectTypeSpinner.setSelection(projectTypeIndex(mSearchFilters.resolvedProjectType()));
+            sourceSpinner.setSelection(sourceIndex(mSearchFilters.apiSource));
+            connectCurseforgeButton.setOnClickListener(v -> showCurseforgeKeyDialog(() -> {
+                reloadModpackApi();
+                searchMods(mSearchEditText.getText().toString());
+            }));
 
             // Setup the expendable list behavior
             mSelectVersionButton.setOnClickListener(v -> VersionSelectorDialog.open(v.getContext(), true, (id, snapshot)-> mSelectedVersion.setText(id)));
@@ -253,16 +313,87 @@ public class SearchModFragment extends Fragment implements ModItemAdapter.Search
                 mSearchFilters.mcVersion = mSelectedVersion.getText().toString();
                 int selectedType = Math.max(0, Math.min(DISCOVER_TYPES.length - 1,
                         projectTypeSpinner.getSelectedItemPosition()));
-                mSearchFilters.setProjectType(DISCOVER_TYPES[selectedType]);
+                String projectType = DISCOVER_TYPES[selectedType];
+                int selectedSourceIndex = Math.max(0, Math.min(2, sourceSpinner.getSelectedItemPosition()));
+                int selectedSource = sourceFromIndex(selectedSourceIndex);
+                // Modrinth does not publish world-save projects; guide that selection to its supported provider.
+                if ("world".equals(projectType) && selectedSource == Constants.SOURCE_MODRINTH) {
+                    selectedSource = Constants.SOURCE_CURSEFORGE;
+                    sourceSpinner.setSelection(2);
+                }
+                mSearchFilters.setProjectType(projectType);
+                mSearchFilters.apiSource = selectedSource;
                 LauncherPreferences.DEFAULT_PREF.edit()
-                        .putString(PREF_DISCOVER_TYPE, DISCOVER_TYPES[selectedType])
+                        .putString(PREF_DISCOVER_TYPE, projectType)
+                        .putInt(PREF_DISCOVER_SOURCE, selectedSource)
                         .apply();
                 searchMods(mSearchEditText.getText().toString());
                 dialogInterface.dismiss();
+                if ((selectedSource == Constants.SOURCE_CURSEFORGE || "world".equals(projectType))
+                        && getCurseforgeApiKey().isEmpty()) {
+                    showCurseforgeKeyDialog(() -> {
+                        reloadModpackApi();
+                        searchMods(mSearchEditText.getText().toString());
+                    });
+                }
             });
         });
 
         dialog.show();
+    }
+
+    private void showCurseforgeKeyDialog(@Nullable Runnable onChanged) {
+        if (!isAdded()) return;
+        String existingKey = getCurseforgeApiKey();
+        EditText keyInput = new EditText(requireContext());
+        keyInput.setSingleLine(true);
+        keyInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        keyInput.setHint(R.string.aerix_discover_curseforge_key_hint);
+        keyInput.setPadding(dp(12), dp(10), dp(12), dp(10));
+        LinearLayout content = new LinearLayout(requireContext());
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(24), dp(6), dp(24), dp(4));
+        content.addView(keyInput, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext())
+                .setTitle(R.string.aerix_discover_curseforge_key_title)
+                .setMessage(R.string.aerix_discover_curseforge_key_required)
+                .setView(content)
+                .setPositiveButton(R.string.aerix_discover_curseforge_key_save, null)
+                .setNegativeButton(android.R.string.cancel, null);
+        if (!existingKey.isEmpty()) {
+            builder.setNeutralButton(R.string.aerix_discover_curseforge_key_remove, null);
+        }
+        AlertDialog dialog = builder.create();
+        dialog.setOnShowListener(ignored -> {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+                String key = keyInput.getText().toString().trim();
+                if (key.isEmpty() || key.length() > 512) {
+                    keyInput.setError(getString(R.string.aerix_discover_curseforge_key_empty));
+                    return;
+                }
+                LauncherPreferences.DEFAULT_PREF.edit()
+                        .putString(LauncherPreferences.PREF_KEY_CURSEFORGE_API_KEY, key)
+                        .apply();
+                dialog.dismiss();
+                if (onChanged != null) onChanged.run();
+            });
+            if (!existingKey.isEmpty()) {
+                dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(v -> {
+                    LauncherPreferences.DEFAULT_PREF.edit()
+                            .remove(LauncherPreferences.PREF_KEY_CURSEFORGE_API_KEY)
+                            .apply();
+                    dialog.dismiss();
+                    if (onChanged != null) onChanged.run();
+                });
+            }
+        });
+        dialog.show();
+    }
+
+    private int dp(float value) {
+        return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
     }
 
     private static int projectTypeIndex(String projectType) {
@@ -270,5 +401,17 @@ public class SearchModFragment extends Fragment implements ModItemAdapter.Search
             if (DISCOVER_TYPES[i].equals(projectType)) return i;
         }
         return 0;
+    }
+
+    private static int sourceIndex(int apiSource) {
+        if (apiSource == Constants.SOURCE_MODRINTH) return 1;
+        if (apiSource == Constants.SOURCE_CURSEFORGE) return 2;
+        return 0;
+    }
+
+    private static int sourceFromIndex(int selectedIndex) {
+        if (selectedIndex == 1) return Constants.SOURCE_MODRINTH;
+        if (selectedIndex == 2) return Constants.SOURCE_CURSEFORGE;
+        return -1;
     }
 }

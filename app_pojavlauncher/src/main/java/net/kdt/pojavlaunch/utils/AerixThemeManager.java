@@ -15,6 +15,7 @@ import java.util.Locale;
 /** Shared wallpaper-aware accent palette for Aerix's launcher UI. */
 public final class AerixThemeManager {
     public static final String SECTION_HOME = "home";
+    public static final String SECTION_ACCOUNT = "account";
     public static final String SECTION_LIBRARY = "library";
     public static final String SECTION_DISCOVER = "discover";
     public static final String SECTION_SERVERS = "servers";
@@ -170,15 +171,28 @@ public final class AerixThemeManager {
         return String.format(Locale.ROOT, "#%06X", color & 0xFFFFFF);
     }
 
+    /** Applies a restrained accent wash while preserving the button's glass surface and edge. */
     public static void tintButton(View view, Context context, String section) {
-        view.setBackgroundTintList(ColorStateList.valueOf(accentColor(context, section)));
+        if (view == null) return;
+        int accent = accentColor(context, section);
+        view.setBackgroundTintList(ColorStateList.valueOf(Color.argb(58,
+                Color.red(accent), Color.green(accent), Color.blue(accent))));
+    }
+
+    /** Strong accent reserved for primary actions such as Play, not for every glass control. */
+    public static void tintPrimaryButton(View view, Context context, String section) {
+        if (view == null) return;
+        int accent = accentColor(context, section);
+        view.setBackgroundTintList(ColorStateList.valueOf(Color.argb(220,
+                Color.red(accent), Color.green(accent), Color.blue(accent))));
     }
 
     /** Keeps the rail glass-neutral until selected, then applies the wallpaper-aware accent. */
     public static void tintNavigationButton(View view, Context context, String section) {
+        if (view == null) return;
         int accent = accentColor(context, section);
-        int active = Color.argb(190, Color.red(accent), Color.green(accent), Color.blue(accent));
-        int pressed = Color.argb(110, Color.red(accent), Color.green(accent), Color.blue(accent));
+        int active = Color.argb(76, Color.red(accent), Color.green(accent), Color.blue(accent));
+        int pressed = Color.argb(44, Color.red(accent), Color.green(accent), Color.blue(accent));
         view.setBackgroundTintList(new ColorStateList(
                 new int[][]{
                         new int[]{android.R.attr.state_activated},

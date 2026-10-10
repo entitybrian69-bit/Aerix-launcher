@@ -249,7 +249,7 @@ public class InstanceLibraryFragment extends Fragment {
                     GridLayout.spec(i / mCardColumns),
                     GridLayout.spec(i % mCardColumns, 1, 1f));
             params.width = 0;
-            params.height = dp(380);
+            params.height = ViewGroup.LayoutParams.WRAP_CONTENT;
             params.setMargins(dp(5), dp(5), dp(5), dp(5));
             mGrid.addView(createInstanceCard(instance), params);
         }
@@ -341,9 +341,6 @@ public class InstanceLibraryFragment extends Fragment {
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(44));
         groupParams.topMargin = dp(5);
         card.addView(group, groupParams);
-
-        View spacer = new View(requireContext());
-        card.addView(spacer, new LinearLayout.LayoutParams(1, 0, 1f));
 
         Button launch = button(getString(R.string.main_play));
         launch.setContentDescription(getString(R.string.aerix_play_instance, displayName(instance)));

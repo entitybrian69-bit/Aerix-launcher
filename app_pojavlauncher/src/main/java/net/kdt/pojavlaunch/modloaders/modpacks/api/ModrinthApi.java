@@ -83,23 +83,25 @@ public class ModrinthApi implements ModpackApi{
         JsonArray responseHits = response.getAsJsonArray("hits");
         if(responseHits == null) return null;
 
-        ModItem[] items = new ModItem[responseHits.size()];
+        ArrayList<ModItem> items = new ArrayList<>(responseHits.size());
         for(int i=0; i<responseHits.size(); ++i){
             JsonObject hit = responseHits.get(i).getAsJsonObject();
-            String projectType = hit.get("project_type").getAsString();
-            items[i] = new ModItem(
+            String projectType = jsonString(hit, "project_type", "mod");
+            String projectId = jsonString(hit, "project_id", null);
+            if (projectId == null || projectId.isEmpty()) continue;
+            items.add(new ModItem(
                     Constants.SOURCE_MODRINTH,
-                    projectType.equals("modpack"),
+                    "modpack".equals(projectType),
                     projectType,
-                    hit.get("project_id").getAsString(),
-                    hit.get("title").getAsString(),
-                    hit.get("description").getAsString(),
-                    hit.get("icon_url").getAsString()
-            );
+                    projectId,
+                    jsonString(hit, "title", "Minecraft project"),
+                    jsonString(hit, "description", ""),
+                    jsonString(hit, "icon_url", null)
+            ));
         }
         if(modrinthSearchResult == null) modrinthSearchResult = new ModrinthSearchResult();
         modrinthSearchResult.previousOffset += responseHits.size();
-        modrinthSearchResult.results = items;
+        modrinthSearchResult.results = items.toArray(new ModItem[0]);
         modrinthSearchResult.totalResultCount = response.get("total_hits").getAsInt();
         return modrinthSearchResult;
     }
@@ -191,7 +193,11 @@ public class ModrinthApi implements ModpackApi{
         if (modDetail.isModpack || "modpack".equals(modDetail.projectType)) {
             return ModpackInstaller.downloadModpack(modDetail, selectedVersion, this::installMrpack);
         }
-        installProjectWithDependencies(modDetail, selectedVersion);
+        try {
+            installProjectWithDependencies(modDetail, selectedVersion);
+        } finally {
+            ProgressLayout.clearProgress(ProgressLayout.INSTALL_MODPACK);
+        }
         return null;
     }
 

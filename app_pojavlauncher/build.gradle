@@ -75,8 +75,7 @@ android {
         versionCode getVersionCode()
         versionName "1.0.0"
         multiDexEnabled false //important
-        // Never embed a shared CurseForge credential in public APKs; use the unkeyed Modrinth provider until a secure proxy exists.
-        resValue 'string', 'curseforge_api_key', 'DUMMY'
+        // CurseForge access is enabled only when the user supplies a personal API key in private app settings.
         resValue 'string', 'group_id', 'net.kdt'
     }
 

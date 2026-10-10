@@ -2,6 +2,7 @@ package net.kdt.pojavlaunch.modloaders.modpacks.api;
 
 
 import android.content.Context;
+import android.widget.Toast;
 
 import com.kdt.mcgui.ProgressLayout;
 
@@ -55,9 +56,22 @@ public interface ModpackApi {
         ProgressLayout.setProgress(ProgressLayout.INSTALL_MODPACK, 0, R.string.global_waiting);
         PojavApplication.sExecutorService.execute(() -> {
             try {
-                installModpack(modDetail, selectedVersion);
-            }catch (IOException e) {
-                Tools.showErrorRemote(context, R.string.modpack_install_download_failed, e);
+                LoaderInstaller installer = installModpack(modDetail, selectedVersion);
+                if (installer == null && modDetail != null && !modDetail.isModpack) {
+                    int successMessage = "world".equals(modDetail.projectType)
+                            ? R.string.aerix_discover_world_import_success
+                            : R.string.aerix_discover_content_install_success;
+                    Tools.runOnUiThread(() -> Toast.makeText(context.getApplicationContext(),
+                            successMessage, Toast.LENGTH_LONG).show());
+                }
+            } catch (IOException e) {
+                if (modDetail != null && "world".equals(modDetail.projectType)) {
+                    String message = context.getString(R.string.aerix_discover_world_import_error,
+                            e.getLocalizedMessage() == null ? e.getClass().getSimpleName() : e.getLocalizedMessage());
+                    Tools.showErrorRemote(message, e);
+                } else {
+                    Tools.showErrorRemote(context, R.string.modpack_install_download_failed, e);
+                }
             }
         });
     }
