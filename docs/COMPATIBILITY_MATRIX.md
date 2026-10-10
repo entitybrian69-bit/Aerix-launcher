@@ -119,8 +119,8 @@ The launcher activities declare `sensorLandscape`; this is a source-level orient
 
 | Evidence | Status |
 |---|---|
-| Last known passing CI | Run [37967648292](https://github.com/entitybrian69-bit/Aerix-launcher/actions/runs/37967648292), code commit `acb63f1`: unit tests, full/no-runtime Debug APK builds, and four-ABI APK verifier passed. Subsequent worktree edits are not covered by that run until CI is rerun. |
-| CI artifacts | [Full Debug ZIP](https://github.com/entitybrian69-bit/Aerix-launcher/actions/runs/37967648292/artifacts/11633559491) and [no-runtime Debug ZIP](https://github.com/entitybrian69-bit/Aerix-launcher/actions/runs/37967648292/artifacts/11634338036). They contain APKs and MD5 files. |
+| Latest passing code CI | Run [38018016829](https://github.com/entitybrian69-bit/Aerix-launcher/actions/runs/38018016829), code commit `2e7b3ac`: unit tests, wallpaper verifier, full/no-runtime Debug APK builds, and four-ABI APK verifier passed. |
+| CI artifacts | [Full Debug artifact](https://github.com/entitybrian69-bit/Aerix-launcher/actions/runs/38018016829/artifacts/11657700995) and [no-runtime Debug artifact](https://github.com/entitybrian69-bit/Aerix-launcher/actions/runs/38018016829/artifacts/11657246349). They contain APKs and MD5 files. |
 | Release AAB | Not produced by this fork's Debug CI. CI produces Debug APKs, **not a release AAB**. |
 | Mesa external artifact lookup | **Non-blocking — Not Found. Do not retry.** Optional Mesa assets/device availability are not verified by that lookup. |
 | Physical devices | Not Tested |
