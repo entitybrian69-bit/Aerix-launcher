@@ -35,7 +35,7 @@ import net.kdt.pojavlaunch.BuildConfig;
 import net.kdt.pojavlaunch.R;
 
 public class PojavApplication extends MGApplication {
-	public static final String CRASH_REPORT_TAG = "PojavCrashReport";
+	public static final String CRASH_REPORT_TAG = "AerixCrashReport";
 	public static final ExecutorService sExecutorService = new ThreadPoolExecutor(4, 4, 500, TimeUnit.MILLISECONDS,  new LinkedBlockingQueue<>());
 
 	private void installFatalErrorHandler() {

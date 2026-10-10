@@ -10,38 +10,13 @@ apply from: rootProject.file('gradle/prefab_bypass.gradle')
 
 import de.undercouch.gradle.tasks.download.Download
 
-static def getDate() { return new Date().format('yyyyMMdd') }
-
-static def getDateSeconds() {
-    if (System.getenv("GITHUB_ACTIONS") == "true") {
-        return Integer.parseInt(System.getenv("GITHUB_RUN_NUMBER"))
-    } else {
-        return 172005
+static def getVersionCode() {
+    final int AERIX_VERSION_CODE_BASE = 173000
+    String buildNumber = System.getenv("GITHUB_RUN_NUMBER")
+    if (buildNumber != null && buildNumber.isInteger()) {
+        return AERIX_VERSION_CODE_BASE + Integer.parseInt(buildNumber)
     }
-}
-
-def getVersionName = {
-    def currentBranch = grgit.branch.current()
-    def latestCommit = grgit.log(maxCommits: 1)
-    def dateToday = getDate()
-    if(currentBranch == null || latestCommit == null) {
-        return "LOCAL-${dateToday}"
-    }else {
-        def branchName = currentBranch.getName()
-        def commitAbbreviation = latestCommit.abbreviatedId
-        return "pojav-legacy-${dateToday}-${commitAbbreviation}-${branchName}"
-    }
-}
-
-def getCFApiKey = {
-    String key = System.getenv("CURSEFORGE_API_KEY")
-    if(key != null) return key
-    File curseforgeKeyFile = new File("./curseforge_key.txt")
-    if(curseforgeKeyFile.canRead() && curseforgeKeyFile.isFile()) {
-        return curseforgeKeyFile.text
-    }
-    logger.warn('BUILD: You have no CurseForge key, the curseforge api will get disabled !')
-    return "DUMMY"
+    return AERIX_VERSION_CODE_BASE
 }
 
 configurations {
@@ -97,10 +72,10 @@ android {
         applicationId "net.kdt.pojavlaunch"
         minSdkVersion 23
         targetSdkVersion 36
-        versionCode getDateSeconds()
-        versionName getVersionName()
+        versionCode getVersionCode()
+        versionName "1.0.0"
         multiDexEnabled false //important
-        resValue 'string', 'curseforge_api_key', getCFApiKey()
+        // CurseForge access is enabled only when the user supplies a personal API key in private app settings.
         resValue 'string', 'group_id', 'net.kdt'
     }
 
@@ -113,7 +88,6 @@ android {
         
         noruntime {
             dimension "runtime"
-            versionNameSuffix "-noruntime"
         }
     }
 
@@ -124,8 +98,8 @@ android {
             shrinkResources false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             signingConfig signingConfigs.customDebug
-            resValue "string", "app_name", "PojavLauncher (Debug)"
-            resValue "string", "app_short_name", "PojavLauncher (Debug)"
+            resValue "string", "app_name", "Aerix Launcher (Debug)"
+            resValue "string", "app_short_name", "Aerix"
             resValue 'string', 'application_package', 'net.kdt.pojavlaunch.debug'
             resValue 'string', 'storageProviderAuthorities', 'net.kdt.pojavlaunch.scoped.gamefolder.debug'
         }
@@ -145,8 +119,8 @@ android {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
             signingConfig signingConfigs.customRelease
-            resValue "string", "app_name", "PojavLauncher (Minecraft: Java Edition for Android)"
-            resValue "string", "app_short_name", "PojavLauncher"
+            resValue "string", "app_name", "Aerix Launcher"
+            resValue "string", "app_short_name", "Aerix"
             resValue 'string', 'application_package', 'net.kdt.pojavlaunch'
             resValue 'string', 'storageProviderAuthorities', 'net.kdt.pojavlaunch.scoped.gamefolder'
         }
@@ -159,8 +133,8 @@ android {
             initWith release
             signingConfig signingConfigs.customDebug // WIP, changeme
             applicationIdSuffix '.pub'
-            resValue "string", "app_name", "PojavLauncher (Nightly)"
-            resValue "string", "app_short_name", "PojavLauncher (Nightly)"
+            resValue "string", "app_name", "Aerix Launcher (Nightly)"
+            resValue "string", "app_short_name", "Aerix"
             resValue 'string', 'application_package', 'net.kdt.pojavlaunch.pub'
             resValue 'string', 'storageProviderAuthorities', 'net.kdt.pojavlaunch.pub.scoped.gamefolder'
             matchingFallbacks += List.of("release")
@@ -339,6 +313,8 @@ afterEvaluate {
 }
 
 dependencies {
+    testImplementation 'junit:junit:4.13.2'
+
     implementation 'androidx.documentfile:documentfile:1.1.0'
     implementation platform('androidx.compose:compose-bom:2026.06.01')
     implementation 'androidx.compose.ui:ui'

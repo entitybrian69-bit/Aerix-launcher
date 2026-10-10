@@ -5,7 +5,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/background_app"
+    android:background="@android:color/transparent"
     android:orientation="vertical"
     >
     <ScrollView
@@ -54,7 +54,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="@dimen/padding_large"
-                android:background="@drawable/background_line"
+                android:background="@drawable/aerix_nav_button"
                 android:textSize="@dimen/_13ssp"
 
                 android:ems="10"
@@ -78,7 +78,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="32dp"
                 android:layout_marginEnd="@dimen/padding_medium"
-                android:background="@drawable/background_line"
+                android:background="@drawable/aerix_nav_button"
                 android:hint="@string/version_select_hint"
                 android:paddingHorizontal="@dimen/padding_heavy"
                 android:textSize="@dimen/_13ssp"
@@ -117,7 +117,7 @@
                 android:layout_marginTop="32dp"
                 android:layout_marginEnd="@dimen/padding_medium"
 
-                android:background="@drawable/background_line"
+                android:background="@drawable/aerix_nav_button"
                 android:hint="@string/use_global_default"
                 android:paddingHorizontal="@dimen/padding_heavy"
                 android:textSize="@dimen/_13ssp"
@@ -150,7 +150,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="32dp"
-                android:background="@drawable/background_line"
+                android:background="@drawable/aerix_nav_button"
                 android:paddingHorizontal="@dimen/padding_heavy"
                 android:button="@null"
                 android:text="@string/instance_shared_data_off"
@@ -158,6 +158,26 @@
                 app:layout_constraintTop_toBottomOf="@+id/vprof_editor_ctrl_spinner"
                 tools:layout_editor_absoluteX="22dp"/>
 
+
+            <TextView
+                android:id="@+id/vprof_ram_allocation_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/instance_ram_allocation_title"
+                app:layout_constraintBottom_toTopOf="@+id/vprof_ram_allocation"
+                app:layout_constraintStart_toStartOf="@+id/vprof_ram_allocation" />
+
+            <EditText
+                android:id="@+id/vprof_ram_allocation"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="32dp"
+                android:background="@drawable/aerix_nav_button"
+                android:hint="@string/instance_ram_allocation_hint"
+                android:inputType="number"
+                android:paddingHorizontal="@dimen/padding_heavy"
+                android:textSize="@dimen/_13ssp"
+                app:layout_constraintTop_toBottomOf="@+id/vprof_editor_data_checkbox_container" />
 
             <TextView
                 android:id="@+id/textView6"
@@ -172,14 +192,32 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="32dp"
-                android:background="@drawable/background_line"
+                android:background="@drawable/aerix_nav_button"
                 android:ems="10"
                 android:hint="@string/use_global_default"
                 android:inputType="text"
                 android:paddingHorizontal="@dimen/padding_heavy"
                 android:textSize="@dimen/_13ssp"
+                app:layout_constraintTop_toBottomOf="@+id/vprof_ram_allocation" />
 
-                app:layout_constraintTop_toBottomOf="@+id/vprof_editor_data_checkbox_container" />
+            <TextView
+                android:id="@+id/vprof_editor_args_mode_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/instance_jvm_args_mode_title"
+                app:layout_constraintBottom_toTopOf="@+id/vprof_editor_args_mode"
+                app:layout_constraintStart_toStartOf="@+id/vprof_editor_args_mode" />
+
+            <Spinner
+                android:id="@+id/vprof_editor_args_mode"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="32dp"
+                android:background="@drawable/aerix_nav_button"
+                android:dropDownWidth="match_parent"
+                android:paddingVertical="0px"
+                app:layout_constraintTop_toBottomOf="@id/vprof_editor_jre_args"
+                tools:paddingVertical="@dimen/_12sdp" />
 
             <TextView
                 android:id="@+id/textView2"
@@ -193,10 +231,10 @@
                 android:id="@+id/vprof_editor_spinner_runtime"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:background="@drawable/background_line"
+                android:background="@drawable/aerix_nav_button"
                 android:paddingVertical="0px"
                 android:layout_marginTop="32dp"
-                app:layout_constraintTop_toBottomOf="@id/vprof_editor_jre_args"
+                app:layout_constraintTop_toBottomOf="@id/vprof_editor_args_mode"
                 tools:paddingVertical="@dimen/_12sdp" />
 
             <ImageView
@@ -224,7 +262,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="32dp"
-                android:background="@drawable/background_line"
+                android:background="@drawable/aerix_nav_button"
                 android:dropDownWidth="match_parent"
                 android:paddingVertical="0px"
 

@@ -104,12 +104,19 @@ public class Accounts {
 	}
 
 	public static void setCurrent(Account account) {
+		if (account == null || account.mSaveLocation == null) return;
 		LauncherPreferences.DEFAULT_PREF
 				.edit().putString(PROFILE_PREF_FILE, account.mSaveLocation.getName())
 				.apply();
 	}
 
+	public static void clearCurrent() {
+		LauncherPreferences.DEFAULT_PREF.edit().remove(PROFILE_PREF_FILE).apply();
+	}
+
 	public static void delete(Account account) {
+		if (account == null || account.mSaveLocation == null) return;
+		if (account.mSaveLocation.getName().equals(getSelectedAccount())) clearCurrent();
 		boolean ignored = account.mSaveLocation.delete();
 	}
 

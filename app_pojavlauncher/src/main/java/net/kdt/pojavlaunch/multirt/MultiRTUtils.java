@@ -62,10 +62,11 @@ public class MultiRTUtils {
         NewJREUtil.ExternalRuntime[] downloadableRuntimes = NewJREUtil.ExternalRuntime.values();
 
         for (NewJREUtil.ExternalRuntime downloadableruntime : downloadableRuntimes) {
-            if(getExactJreName(downloadableruntime.majorVersion) == null){
-                // x86 isn't supported for JRE21+
-                if (!(Tools.DEVICE_ARCHITECTURE == Architecture.ARCH_X86 && downloadableruntime.majorVersion >= 21))
-                    runtimesToDownload.add(downloadableruntime);
+            if (getExactJreName(downloadableruntime.majorVersion) == null
+                    && RuntimeAbiPolicy.isRuntimeAvailable(
+                            Architecture.archAsString(Tools.DEVICE_ARCHITECTURE),
+                            downloadableruntime.majorVersion)) {
+                runtimesToDownload.add(downloadableruntime);
             }
         }
         return runtimesToDownload;

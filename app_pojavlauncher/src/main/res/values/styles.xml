@@ -37,13 +37,34 @@
     </style>
 
     <style name="MojoLauncher.Button" parent="Widget.AppCompat.Button">
-        <item name="android:background">@drawable/button_flat</item>
+        <item name="android:background">@drawable/aerix_nav_button</item>
     </style>
 
     <style name="MojoLauncher.Button.Toggle" parent="MojoLauncher.Button">
-        <item name="android:background">@drawable/button_flat_toggle</item>
+        <item name="android:background">@drawable/aerix_nav_button</item>
     </style>
 
+
+    <style name="AerixNavigationButton">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">42dp</item>
+        <item name="android:layout_marginBottom">4dp</item>
+        <item name="android:background">@drawable/aerix_nav_button</item>
+        <item name="android:padding">8dp</item>
+        <item name="android:scaleType">fitCenter</item>
+        <item name="android:tint">#E4F0FB</item>
+    </style>
+
+    <style name="AerixNavigationLabel">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">13dp</item>
+        <item name="android:gravity">center</item>
+        <item name="android:includeFontPadding">false</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:textColor">#E6F3FC</item>
+        <item name="android:textSize">8sp</item>
+    </style>
 
     <style name="LauncherFragment_Divider">
         <item name="android:layout_width">@dimen/padding_tiny</item>

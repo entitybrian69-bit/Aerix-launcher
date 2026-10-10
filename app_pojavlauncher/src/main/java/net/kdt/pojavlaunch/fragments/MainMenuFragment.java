@@ -5,10 +5,13 @@ import static net.kdt.pojavlaunch.Tools.shareLog;
 
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageButton;
+import android.widget.ImageView;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
@@ -26,9 +29,13 @@ import net.kdt.pojavlaunch.Tools;
 import net.kdt.pojavlaunch.contracts.OpenDocumentWithExtension;
 import net.kdt.pojavlaunch.extra.ExtraConstants;
 import net.kdt.pojavlaunch.extra.ExtraCore;
+import net.kdt.pojavlaunch.authenticator.accounts.Account;
+import net.kdt.pojavlaunch.authenticator.accounts.Accounts;
 import net.kdt.pojavlaunch.instances.Instance;
 import net.kdt.pojavlaunch.instances.Instances;
+import net.kdt.pojavlaunch.prefs.LauncherPreferences;
 import net.kdt.pojavlaunch.progresskeeper.ProgressKeeper;
+import net.kdt.pojavlaunch.utils.AerixThemeManager;
 import net.kdt.pojavlaunch.utils.FileUtils;
 import net.kdt.pojavlaunch.utils.jre.GameRunner;
 
@@ -38,6 +45,9 @@ public class MainMenuFragment extends Fragment {
     public static final String TAG = "MainMenuFragment";
 
     private mcVersionSpinner mVersionSpinner;
+    private ImageView mAccountIcon;
+    private TextView mAccountSummary;
+    private TextView mRamSummary;
 
     private final ActivityResultLauncher<Object> mModInstallerLauncher =
             registerForActivityResult(new OpenDocumentWithExtension("jar"), (data)->{
@@ -50,82 +60,77 @@ public class MainMenuFragment extends Fragment {
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-        Button mNewsButton = view.findViewById(R.id.news_button);
-        Button mDiscordButton = view.findViewById(R.id.social_media_button);
-        Button mCustomControlButton = view.findViewById(R.id.custom_control_button);
-        Button mInstallJarButton = view.findViewById(R.id.install_jar_button);
-        Button mShareLogsButton = view.findViewById(R.id.share_logs_button);
-        Button mOpenDirectoryButton = view.findViewById(R.id.open_files_button);
+        Button mHeroCreateButton = view.findViewById(R.id.hero_create_button);
+        Button mHeroLibraryButton = view.findViewById(R.id.hero_library_button);
+        Button mHeroModsButton = view.findViewById(R.id.hero_mods_button);
+        Button mAccountManageButton = view.findViewById(R.id.account_manage_button);
+        Button mQuickToolsButton = view.findViewById(R.id.quick_tools_button);
+        mAccountIcon = view.findViewById(R.id.home_account_icon);
+        mAccountSummary = view.findViewById(R.id.home_account_summary);
+        mRamSummary = view.findViewById(R.id.home_ram_label);
 
         ImageButton mEditProfileButton = view.findViewById(R.id.edit_profile_button);
         Button mPlayButton = view.findViewById(R.id.play_button);
         mVersionSpinner = view.findViewById(R.id.mc_version_spinner);
-
-        if (mNewsButton != null) {
-            mNewsButton.setOnClickListener(v -> Tools.openURL(requireActivity(), Tools.URL_HOME));
-            mNewsButton.setOnLongClickListener((v)->{
-                Tools.swapFragment(requireActivity(), GamepadMapperFragment.class, GamepadMapperFragment.TAG, null);
-                return true;
-            });
-        }
-        if (mDiscordButton != null) {
-            mDiscordButton.setOnClickListener(v -> Tools.openURL(requireActivity(), getString(R.string.social_media_invite)));
-        }
-        if (mCustomControlButton != null) {
-            mCustomControlButton.setOnClickListener(v -> startActivity(new Intent(requireContext(), CustomControlsActivity.class)));
-        }
-        if (mInstallJarButton != null) {
-            mInstallJarButton.setOnClickListener(v -> runInstallerWithConfirmation());
-        }
-        if (mEditProfileButton != null) {
-            mEditProfileButton.setOnClickListener(v -> {
-                if (mVersionSpinner != null) {
-                    mVersionSpinner.openProfileEditor(requireActivity());
-                }
-            });
-        }
-
+        styleGlassButton(mHeroCreateButton);
+        styleGlassButton(mHeroLibraryButton);
+        styleGlassButton(mHeroModsButton);
+        styleGlassButton(mAccountManageButton);
+        styleGlassButton(mQuickToolsButton);
         if (mPlayButton != null) {
-            mPlayButton.setOnClickListener(v -> {
-                Instance instance = Instances.loadSelectedInstance();
-                if (instance == null) {
-                    Toast.makeText(requireContext(), R.string.no_instance, Toast.LENGTH_LONG).show();
-                    return;
-                }
-                File gamedir = instance.getGameDirectory();
-
-                if (GameRunner.hasVkMod(gamedir)) {
-                    new AlertDialog.Builder(requireContext())
-                        .setTitle(R.string.vk_mod_title)
-                        .setMessage(R.string.vk_mod_message)
-                        .setPositiveButton(R.string.continue_button, (d, w) -> {
-                            ExtraCore.setValue(ExtraConstants.LAUNCH_GAME, true);
-                        })
-                        .show();
-                } else if (GameRunner.hasReplay(gamedir) && GameRunner.hasFfmpeg(requireContext())) {
-                    new AlertDialog.Builder(requireContext())
-                        .setTitle(R.string.no_ffmpeg_title)
-                        .setMessage(R.string.no_ffmpeg_message)
-                        .setPositiveButton(R.string.install_button, (d, w) -> {
-                            Tools.openURL(requireActivity(), "https://github.com/MojoLauncher/FFmpegPlugin/releases");
-                        })
-                        .setNegativeButton(R.string.continue_button, (d, w) -> {
-                            ExtraCore.setValue(ExtraConstants.LAUNCH_GAME, true);
-                        })
-                        .show();
-                } else {
-                    ExtraCore.setValue(ExtraConstants.LAUNCH_GAME, true);
-                }
-            });
+            AerixThemeManager.tintPrimaryButton(mPlayButton, requireContext(), AerixThemeManager.SECTION_HOME);
         }
+        updateHomeStatus();
 
-        if (mShareLogsButton != null) {
-            mShareLogsButton.setOnClickListener((v) -> shareLog(requireContext()));
-        }
+        setClickIfPresent(mEditProfileButton, v -> {
+            if (mVersionSpinner != null) mVersionSpinner.openProfileEditor(requireActivity());
+        });
+        setClickIfPresent(mHeroCreateButton, v -> Tools.swapFragment(requireActivity(),
+                ProfileTypeSelectFragment.class, ProfileTypeSelectFragment.TAG, null));
+        setClickIfPresent(mHeroLibraryButton, v -> Tools.swapFragment(requireActivity(),
+                InstanceLibraryFragment.class, InstanceLibraryFragment.TAG, null));
+        setClickIfPresent(mHeroModsButton, v -> Tools.swapFragment(requireActivity(),
+                SearchModFragment.class, SearchModFragment.TAG, null));
+        setClickIfPresent(mAccountManageButton, v -> Tools.swapFragment(requireActivity(),
+                AccountManagerFragment.class, AccountManagerFragment.TAG, null));
+        setClickIfPresent(mQuickToolsButton, v -> showQuickToolsDialog());
 
-        if (mOpenDirectoryButton != null) {
-            mOpenDirectoryButton.setOnClickListener((v)-> openGameDirectory(v.getContext()));
+        setClickIfPresent(mPlayButton, v -> {
+        Instance instance = Instances.loadSelectedInstance();
+        if (instance == null) {
+            Toast.makeText(requireContext(), R.string.no_instance, Toast.LENGTH_LONG).show();
+            return;
         }
+        File gamedir = instance.getGameDirectory();
+
+        if (GameRunner.hasVkMod(gamedir)) {
+            new AlertDialog.Builder(requireContext())
+            .setTitle(R.string.vk_mod_title)
+            .setMessage(R.string.vk_mod_message)
+            .setPositiveButton(R.string.continue_button, (d, w) -> {
+                ExtraCore.setValue(ExtraConstants.LAUNCH_GAME, true);
+            })
+            .show();
+        } else if (GameRunner.hasReplay(gamedir) && GameRunner.hasFfmpeg(requireContext())) {
+          new AlertDialog.Builder(requireContext())
+            .setTitle(R.string.no_ffmpeg_title)
+            .setMessage(R.string.no_ffmpeg_message)
+            .setPositiveButton(R.string.install_button, (d, w) -> {
+             Tools.openURL(requireActivity(), "https://github.com/MojoLauncher/FFmpegPlugin/releases");
+    })
+    .setNegativeButton(R.string.continue_button, (d, w) -> {
+        ExtraCore.setValue(ExtraConstants.LAUNCH_GAME, true);
+    })
+    .show();
+        } else {
+        ExtraCore.setValue(ExtraConstants.LAUNCH_GAME, true);
+        }
+        });
+
+    }
+
+    private void setClickIfPresent(@Nullable View view, @NonNull View.OnClickListener listener) {
+        if (view != null) view.setOnClickListener(listener);
     }
 
     private void openGameDirectory(Context context) {
@@ -145,7 +150,76 @@ public class MainMenuFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
+        updateHomeStatus();
         ExtraCore.setValue(ExtraConstants.REFRESH_ACCOUNT_SPINNER, true);
+    }
+
+    private void updateHomeStatus() {
+        Account account = Accounts.getCurrent();
+        if (mAccountSummary != null) {
+            mAccountSummary.setText(account == null || !Tools.isValidString(account.username)
+                    ? getString(R.string.aerix_home_sign_in_hint) : account.username);
+        }
+        if (mAccountIcon != null) {
+            android.graphics.Bitmap skinFace = account == null ? null : account.getSkinFace();
+            if (skinFace == null) mAccountIcon.setImageResource(R.drawable.ic_aerix_account);
+            else mAccountIcon.setImageBitmap(skinFace);
+        }
+        if (mRamSummary != null) {
+            mRamSummary.setText(getString(R.string.aerix_home_ram,
+                    LauncherPreferences.PREF_RAM_ALLOCATION));
+        }
+    }
+
+    private void showQuickToolsDialog() {
+        String[] actions = {
+                getString(R.string.mcl_tab_wiki),
+                getString(R.string.mcl_button_social_media),
+                getString(R.string.mcl_option_customcontrol),
+                getString(R.string.main_install_jar_file),
+                getString(R.string.main_share_logs),
+                getString(R.string.mcl_button_open_directory),
+                getString(R.string.aerix_quick_tool_controls)
+        };
+        new AlertDialog.Builder(requireContext())
+                .setTitle(R.string.aerix_quick_tools_title)
+                .setItems(actions, (dialog, index) -> {
+                    switch (index) {
+                        case 0:
+                            Tools.openURL(requireActivity(), Tools.URL_HOME);
+                            break;
+                        case 1:
+                            Tools.openURL(requireActivity(), getString(R.string.social_media_invite));
+                            break;
+                        case 2:
+                            startActivity(new Intent(requireContext(), CustomControlsActivity.class));
+                            break;
+                        case 3:
+                            runInstallerWithConfirmation();
+                            break;
+                        case 4:
+                            shareLog(requireContext());
+                            break;
+                        case 5:
+                            openGameDirectory(requireContext());
+                            break;
+                        case 6:
+                            Tools.swapFragment(requireActivity(), GamepadMapperFragment.class,
+                                    GamepadMapperFragment.TAG, null);
+                            break;
+                    }
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    private void styleGlassButton(Button button) {
+        if (button == null) return;
+        button.setBackgroundResource(R.drawable.aerix_nav_button);
+        button.setBackgroundTintList(null);
+        button.setTextColor(Color.WHITE);
+        button.setAllCaps(false);
+        button.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
     }
 
     private void runInstallerWithConfirmation() {

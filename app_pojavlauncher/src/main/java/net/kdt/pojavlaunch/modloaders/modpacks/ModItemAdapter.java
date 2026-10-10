@@ -7,6 +7,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewStub;
+import android.widget.AdapterView;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.Spinner;
@@ -51,7 +52,7 @@ public class ModItemAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
     private final ModIconCache mIconCache = new ModIconCache();
     private final SearchResultCallback mSearchResultCallback;
     private ModItem[] mModItems;
-    private final ModpackApi mModpackApi;
+    private ModpackApi mModpackApi;
 
     /* Cache for ever so slightly rounding the image for the corner not to stick out of the layout */
     private final float mCornerDimensionCache;
@@ -68,6 +69,21 @@ public class ModItemAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
         mModpackApi = api;
         mModItems = new ModItem[]{};
         mSearchResultCallback = callback;
+    }
+
+    public void setModpackApi(ModpackApi api) {
+        mModpackApi = api;
+    }
+
+    public void clearResults() {
+        if (mTaskInProgress != null) {
+            mTaskInProgress.cancel(true);
+            mTaskInProgress = null;
+        }
+        mCurrentResult = null;
+        mLastPage = true;
+        mModItems = MOD_ITEMS_EMPTY;
+        notifyDataSetChanged();
     }
 
     public void performSearchQuery(SearchFilters searchFilters) {
@@ -249,6 +265,7 @@ public class ModItemAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
             }
 
             mModItem = item;
+            mModItem.requestedMinecraftVersion = mSearchFilters == null ? null : mSearchFilters.mcVersion;
             // here the previous reference to the image receiver will disappear
             mImageReceiver = bm->{
                 mImageReceiver = null;
@@ -256,7 +273,12 @@ public class ModItemAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
                 RoundedBitmapDrawable drawable = RoundedBitmapDrawableFactory.create(mIconView.getResources(), bm);
                 mIconView.setImageDrawable(drawable);
             };
-            mIconCache.getImage(mImageReceiver, mModItem.getIconCacheTag(), mModItem.imageUrl);
+            if (Tools.isValidString(mModItem.imageUrl)) {
+                mIconCache.getImage(mImageReceiver, mModItem.getIconCacheTag(), mModItem.imageUrl);
+            } else {
+                mImageReceiver = null;
+                mIconView.setImageResource(getSourceDrawable(item.apiSource));
+            }
             mSourceView.setImageResource(getSourceDrawable(item.apiSource));
             mTitle.setText(item.title);
             mDescription.setText(item.description);
@@ -268,18 +290,45 @@ public class ModItemAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
 
         /** Display extended info/interaction about a modpack */
         private void setStateDetailed(ModDetail detailedItem) {
-            if(detailedItem != null) {
+            if (detailedItem != null && detailedItem.versionNames != null
+                    && detailedItem.versionNames.length > 0) {
                 setInstallEnabled(true);
                 mExtendedErrorTextView.setVisibility(View.GONE);
                 mVersionAdapter.setObjects(Arrays.asList(detailedItem.versionNames));
                 mExtendedSpinner.setAdapter(mVersionAdapter);
+                mExtendedSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+                    @Override
+                    public void onItemSelected(android.widget.AdapterView<?> parent, View view, int position, long id) {
+                        updateInstallButtonLabel(position);
+                    }
+
+                    @Override
+                    public void onNothingSelected(android.widget.AdapterView<?> parent) {
+                        if (mExtendedButton != null) mExtendedButton.setText(R.string.generic_install);
+                    }
+                });
+                updateInstallButtonLabel(mExtendedSpinner.getSelectedItemPosition());
             } else {
-                closeDetailedView();
                 setInstallEnabled(false);
                 mExtendedErrorTextView.setVisibility(View.VISIBLE);
                 mExtendedSpinner.setAdapter(null);
                 mVersionAdapter.setObjects(null);
+                openDetailedView();
             }
+        }
+
+        private void updateInstallButtonLabel(int position) {
+            if (mExtendedButton == null || mModDetail == null) return;
+            if (mModDetail.isModpack || mModDetail.versionDependencies == null
+                    || position < 0 || position >= mModDetail.versionDependencies.length) {
+                mExtendedButton.setText(R.string.generic_install);
+                return;
+            }
+            String[] dependencies = mModDetail.versionDependencies[position];
+            int dependencyCount = dependencies == null ? 0 : dependencies.length;
+            if (dependencyCount == 0) mExtendedButton.setText(R.string.generic_install);
+            else mExtendedButton.setText(mExtendedButton.getContext().getString(
+                    R.string.aerix_discover_install_dependencies, dependencyCount));
         }
 
         private void openDetailedView() {

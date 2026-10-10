@@ -140,12 +140,16 @@ public class GpuUtils {
         return true;
     }
 
+    /**
+     * Checks Android's declared Vulkan hardware features. This is a renderer-list prerequisite,
+     * not proof that the driver satisfies a particular game's Vulkan extension/feature set.
+     */
     public static boolean checkVulkanSupport(PackageManager packageManager) {
-        if(SDK_INT >= Build.VERSION_CODES.N) {
-            return packageManager.hasSystemFeature(PackageManager.FEATURE_VULKAN_HARDWARE_LEVEL) &&
-                    packageManager.hasSystemFeature(PackageManager.FEATURE_VULKAN_HARDWARE_VERSION);
-        }
-        return false;
+        return GpuCapabilityPolicy.declaresVulkanHardwareSupport(
+                SDK_INT,
+                packageManager.hasSystemFeature(PackageManager.FEATURE_VULKAN_HARDWARE_LEVEL),
+                packageManager.hasSystemFeature(PackageManager.FEATURE_VULKAN_HARDWARE_VERSION)
+        );
     }
 
     public static boolean checkChromebook(PackageManager packageManager) {

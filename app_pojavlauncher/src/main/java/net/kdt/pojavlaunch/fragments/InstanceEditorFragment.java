@@ -47,8 +47,8 @@ public class InstanceEditorFragment extends Fragment implements CropperUtils.Cro
     private Instance mInstance;
     private String mSelectedControlLayout;
     private Button mSaveButton, mDeleteButton, mControlSelectButton, mVersionSelectButton;
-    private Spinner mDefaultRuntime, mDefaultRenderer;
-    private EditText mDefaultName, mDefaultJvmArgument;
+    private Spinner mDefaultRuntime, mDefaultRenderer, mDefaultArgsMode;
+    private EditText mDefaultName, mDefaultJvmArgument, mDefaultRamAllocation;
     private TextView mDefaultVersion, mDefaultControl;
     private ImageView mInstanceIcon;
     private CheckBox mSharedDataCheckbox;
@@ -82,11 +82,16 @@ public class InstanceEditorFragment extends Fragment implements CropperUtils.Cro
         renderList.addAll(Arrays.asList(list.rendererDisplayNames));
         renderList.add(view.getContext().getString(R.string.global_default));
         mDefaultRenderer.setAdapter(new ArrayAdapter<>(view.getContext(), R.layout.item_simple_list_1, renderList));
+        List<String> argumentModes = Arrays.asList(
+                getString(R.string.instance_jvm_args_replace),
+                getString(R.string.instance_jvm_args_global_first),
+                getString(R.string.instance_jvm_args_profile_first));
+        mDefaultArgsMode.setAdapter(new ArrayAdapter<>(view.getContext(), R.layout.item_simple_list_1, argumentModes));
 
         // Set up behaviors
         mSaveButton.setOnClickListener(v -> {
+            if (!save()) return;
             InstanceIconProvider.dropIcon(mInstance);
-            save();
             Tools.backToMainMenu(requireActivity());
         });
 
@@ -173,6 +178,8 @@ public class InstanceEditorFragment extends Fragment implements CropperUtils.Cro
 
         mDefaultVersion.setText(instance.versionId);
         mDefaultJvmArgument.setText(nullToEmpty(instance.jvmArgs));
+        mDefaultArgsMode.setSelection(Math.max(0, Math.min(Instance.ARGS_MODE_LAST, instance.argsMode)));
+        mDefaultRamAllocation.setText(instance.ramAllocation > 0 ? String.valueOf(instance.ramAllocation) : "");
         mDefaultName.setText(nullToEmpty(instance.name));
         mDefaultControl.setText(mSelectedControlLayout == null ? nullToEmpty(instance.controlLayout) : mSelectedControlLayout);
         mSharedDataCheckbox.setChecked(instance.sharedData);
@@ -182,10 +189,12 @@ public class InstanceEditorFragment extends Fragment implements CropperUtils.Cro
         mDefaultControl = view.findViewById(R.id.vprof_editor_ctrl_spinner);
         mDefaultRuntime = view.findViewById(R.id.vprof_editor_spinner_runtime);
         mDefaultRenderer = view.findViewById(R.id.vprof_editor_instance_renderer);
+        mDefaultArgsMode = view.findViewById(R.id.vprof_editor_args_mode);
         mDefaultVersion = view.findViewById(R.id.vprof_editor_version_spinner);
 
         mDefaultName = view.findViewById(R.id.vprof_editor_instance_name);
         mDefaultJvmArgument = view.findViewById(R.id.vprof_editor_jre_args);
+        mDefaultRamAllocation = view.findViewById(R.id.vprof_ram_allocation);
 
         mSaveButton = view.findViewById(R.id.vprof_editor_save_button);
         mDeleteButton = view.findViewById(R.id.vprof_editor_delete_button);
@@ -195,11 +204,28 @@ public class InstanceEditorFragment extends Fragment implements CropperUtils.Cro
         mSharedDataCheckbox = view.findViewById(R.id.vprof_editor_data_checkbox_container);
     }
 
-    private void save(){
+    private boolean save(){
+        String ramText = mDefaultRamAllocation.getText().toString().trim();
+        int ramAllocation = 0;
+        if (!ramText.isEmpty()) {
+            try {
+                ramAllocation = Integer.parseInt(ramText);
+            } catch (NumberFormatException e) {
+                mDefaultRamAllocation.setError(getString(R.string.instance_ram_allocation_error));
+                return false;
+            }
+            if (ramAllocation < 256 || ramAllocation > 65536) {
+                mDefaultRamAllocation.setError(getString(R.string.instance_ram_allocation_error));
+                return false;
+            }
+        }
+
         //First, check for potential issues in the inputs
         mInstance.versionId = mDefaultVersion.getText().toString();
         mInstance.controlLayout = mDefaultControl.getText().toString();
         mInstance.jvmArgs = mDefaultJvmArgument.getText().toString();
+        mInstance.argsMode = mDefaultArgsMode.getSelectedItemPosition();
+        mInstance.ramAllocation = ramAllocation;
 
         String newName = mDefaultName.getText().toString();
         if(mInstance.controlLayout.isEmpty()) mInstance.controlLayout = null;
@@ -217,8 +243,10 @@ public class InstanceEditorFragment extends Fragment implements CropperUtils.Cro
                 Instances.renameInstanceDirectory(mInstance, newName);
             mInstance.name = newName;
             mInstance.write();
+            return true;
         }catch (Exception e) {
             Tools.showErrorRemote(e);
+            return false;
         }
     }
 

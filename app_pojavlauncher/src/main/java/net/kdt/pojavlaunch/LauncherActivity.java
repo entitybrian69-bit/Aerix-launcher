@@ -1,17 +1,21 @@
 package net.kdt.pojavlaunch;
 
-import static android.content.res.Configuration.ORIENTATION_PORTRAIT;
 import android.Manifest;
 import android.app.NotificationManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.graphics.Color;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.system.Os;
 import android.view.View;
 import android.widget.ImageButton;
+import android.widget.ImageView;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
@@ -30,8 +34,15 @@ import net.kdt.pojavlaunch.authenticator.accounts.Accounts;
 import net.kdt.pojavlaunch.extra.ExtraConstants;
 import net.kdt.pojavlaunch.extra.ExtraCore;
 import net.kdt.pojavlaunch.extra.ExtraListener;
+import net.kdt.pojavlaunch.fragments.AccountManagerFragment;
+import net.kdt.pojavlaunch.fragments.InstanceLibraryFragment;
 import net.kdt.pojavlaunch.fragments.MainMenuFragment;
 import net.kdt.pojavlaunch.fragments.MicrosoftLoginFragment;
+import net.kdt.pojavlaunch.fragments.ProfileTypeSelectFragment;
+import net.kdt.pojavlaunch.fragments.SearchModFragment;
+import net.kdt.pojavlaunch.fragments.ServerManagerFragment;
+import net.kdt.pojavlaunch.fragments.SkinManagerFragment;
+import net.kdt.pojavlaunch.fragments.WallpaperGalleryFragment;
 import net.kdt.pojavlaunch.fragments.SelectAuthFragment;
 import net.kdt.pojavlaunch.instances.Instance;
 import net.kdt.pojavlaunch.instances.InstanceInstaller;
@@ -47,7 +58,9 @@ import net.kdt.pojavlaunch.services.ProgressServiceKeeper;
 import net.kdt.pojavlaunch.tasks.MoJsonExtras;
 import net.kdt.pojavlaunch.tasks.AsyncVersionList;
 import net.kdt.pojavlaunch.tasks.MoJsonDownloader;
+import net.kdt.pojavlaunch.utils.AerixThemeManager;
 import net.kdt.pojavlaunch.utils.NotificationUtils;
+import net.kdt.pojavlaunch.utils.WallpaperUtils;
 
 import net.kdt.pojavlaunch.R;
 
@@ -56,6 +69,14 @@ public class LauncherActivity extends BaseActivity {
 
     private FragmentContainerView mFragmentView;
     private ImageButton mSettingsButton;
+    private ImageButton mAccountButton;
+    private ImageButton mHomeButton;
+    private ImageButton mCreateButton;
+    private ImageButton mLibraryButton;
+    private ImageButton mDiscoverButton;
+    private ImageButton mWallpapersButton;
+    private ImageButton mSkinsButton;
+    private ImageButton mServersButton;
     private ProgressLayout mProgressLayout;
     private ProgressServiceKeeper mProgressServiceKeeper;
     private NotificationManager mNotificationManager;
@@ -65,8 +86,27 @@ public class LauncherActivity extends BaseActivity {
     private final FragmentManager.FragmentLifecycleCallbacks mFragmentCallbackListener = new FragmentManager.FragmentLifecycleCallbacks() {
         @Override
         public void onFragmentResumed(@NonNull FragmentManager fm, @NonNull Fragment f) {
-            mSettingsButton.setImageDrawable(ContextCompat.getDrawable(getBaseContext(), f instanceof MainMenuFragment
-                    ? R.drawable.ic_px_sliders : R.drawable.ic_px_home));
+            if (f.getParentFragment() != null || mSettingsButton == null) return;
+            mSettingsButton.setImageDrawable(ContextCompat.getDrawable(getBaseContext(), R.drawable.ic_px_sliders));
+            mHomeButton.setActivated(f instanceof MainMenuFragment);
+            mAccountButton.setActivated(f instanceof AccountManagerFragment);
+            mCreateButton.setActivated(f instanceof ProfileTypeSelectFragment);
+            mLibraryButton.setActivated(f instanceof InstanceLibraryFragment);
+            mDiscoverButton.setActivated(f instanceof SearchModFragment);
+            mWallpapersButton.setActivated(f instanceof WallpaperGalleryFragment);
+            mSkinsButton.setActivated(f instanceof SkinManagerFragment);
+            mServersButton.setActivated(f instanceof ServerManagerFragment);
+            boolean settingsSelected = f.getClass().getName().startsWith("net.kdt.pojavlaunch.prefs.screens.");
+            mSettingsButton.setActivated(settingsSelected);
+            setNavigationLabelState(R.id.home_nav_label, f instanceof MainMenuFragment, AerixThemeManager.SECTION_HOME);
+            setNavigationLabelState(R.id.account_nav_label, f instanceof AccountManagerFragment, AerixThemeManager.SECTION_ACCOUNT);
+            setNavigationLabelState(R.id.create_nav_label, f instanceof ProfileTypeSelectFragment, AerixThemeManager.SECTION_HOME);
+            setNavigationLabelState(R.id.library_nav_label, f instanceof InstanceLibraryFragment, AerixThemeManager.SECTION_LIBRARY);
+            setNavigationLabelState(R.id.discover_nav_label, f instanceof SearchModFragment, AerixThemeManager.SECTION_DISCOVER);
+            setNavigationLabelState(R.id.wallpapers_nav_label, f instanceof WallpaperGalleryFragment, AerixThemeManager.SECTION_APPEARANCE);
+            setNavigationLabelState(R.id.skins_nav_label, f instanceof SkinManagerFragment, AerixThemeManager.SECTION_SKINS);
+            setNavigationLabelState(R.id.servers_nav_label, f instanceof ServerManagerFragment, AerixThemeManager.SECTION_SERVERS);
+            setNavigationLabelState(R.id.settings_nav_label, settingsSelected, AerixThemeManager.SECTION_SETTINGS);
         }
     };
 
@@ -82,24 +122,20 @@ public class LauncherActivity extends BaseActivity {
         FragmentManager manager = getSupportFragmentManager();
         if(!value || manager.isStateSaved()) return false;
         Fragment fragment = manager.findFragmentById(mFragmentView.getId());
-        // Allow starting the add account only from the main menu, should it be moved to fragment itself ?
-        if(!(fragment instanceof MainMenuFragment)) return false;
+        // The account picker is available from the persistent navigation rail on every launcher page.
+        if(fragment == null) return false;
 
         Tools.swapFragment(this, SelectAuthFragment.class, SelectAuthFragment.TAG, null);
         return false;
     };
 
-    /* Listener for the settings fragment */
+    /* Settings remains a dedicated navigation destination; Home has its own rail button. */
     private final View.OnClickListener mSettingButtonListener = v -> {
         FragmentManager manager = getSupportFragmentManager();
         if(manager.isStateSaved()) return;
         Fragment fragment = manager.findFragmentById(mFragmentView.getId());
-        if(fragment instanceof MainMenuFragment){
-            Tools.swapFragment(this, LauncherPreferenceFragment.class, SETTING_FRAGMENT_TAG, null);
-        } else{
-            // The setting button doubles as a home button now
-            Tools.backToMainMenu(this);
-        }
+        if(fragment != null && fragment.getClass().getName().startsWith("net.kdt.pojavlaunch.prefs.screens.")) return;
+        navigateTo(LauncherPreferenceFragment.class, SETTING_FRAGMENT_TAG);
     };
 
     private final ExtraListener<Boolean> mLaunchGameListener = (key, value) -> {
@@ -132,6 +168,7 @@ public class LauncherActivity extends BaseActivity {
         }
         String normalizedVersionId = MoJsonExtras.normalizeVersionId(selectedInstance.versionId);
         JVersionList.Version mcVersion = MoJsonExtras.getListedVersion(normalizedVersionId);
+        Instances.recordLaunch(selectedInstance);
         new MoJsonDownloader().start(
                 this.getAssets(),
                 mcVersion,
@@ -153,12 +190,12 @@ public class LauncherActivity extends BaseActivity {
     };
     @Override
     protected boolean shouldIgnoreNotch() {
-        return getResources().getConfiguration().orientation == ORIENTATION_PORTRAIT;
+        return true;
     }
 
     @Override
     public boolean setFullscreen() {
-        return false;
+        return true;
     }
 
     @Override
@@ -178,6 +215,7 @@ public class LauncherActivity extends BaseActivity {
 
         getWindow().setBackgroundDrawable(null);
         bindViews();
+        loadSavedWallpaper();
         mRequestPermissionLauncher = this.registerForActivityResult(
                 new ActivityResultContracts.RequestPermission(),
                 isAllowed -> {
@@ -193,6 +231,23 @@ public class LauncherActivity extends BaseActivity {
         ProgressKeeper.addTaskCountListener((mProgressServiceKeeper = new ProgressServiceKeeper(this)));
 
         mSettingsButton.setOnClickListener(mSettingButtonListener);
+        mHomeButton.setOnClickListener(v -> navigateTo(MainMenuFragment.class, MainMenuFragment.TAG));
+        mAccountButton.setOnClickListener(v -> navigateTo(AccountManagerFragment.class, AccountManagerFragment.TAG));
+        mCreateButton.setOnClickListener(v -> navigateTo(ProfileTypeSelectFragment.class, ProfileTypeSelectFragment.TAG));
+        mLibraryButton.setOnClickListener(v -> navigateTo(InstanceLibraryFragment.class, InstanceLibraryFragment.TAG));
+        mDiscoverButton.setOnClickListener(v -> navigateTo(SearchModFragment.class, SearchModFragment.TAG));
+        mWallpapersButton.setOnClickListener(v -> navigateTo(WallpaperGalleryFragment.class, WallpaperGalleryFragment.TAG));
+        mSkinsButton.setOnClickListener(v -> navigateTo(SkinManagerFragment.class, SkinManagerFragment.TAG));
+        mServersButton.setOnClickListener(v -> navigateTo(ServerManagerFragment.class, ServerManagerFragment.TAG));
+        bindNavigationLabelClick(R.id.home_nav_label, mHomeButton);
+        bindNavigationLabelClick(R.id.account_nav_label, mAccountButton);
+        bindNavigationLabelClick(R.id.create_nav_label, mCreateButton);
+        bindNavigationLabelClick(R.id.library_nav_label, mLibraryButton);
+        bindNavigationLabelClick(R.id.discover_nav_label, mDiscoverButton);
+        bindNavigationLabelClick(R.id.wallpapers_nav_label, mWallpapersButton);
+        bindNavigationLabelClick(R.id.skins_nav_label, mSkinsButton);
+        bindNavigationLabelClick(R.id.servers_nav_label, mServersButton);
+        bindNavigationLabelClick(R.id.settings_nav_label, mSettingsButton);
         ProgressKeeper.addTaskCountListener(mProgressLayout);
         ExtraCore.addExtraListener(ExtraConstants.BACK_PREFERENCE, mBackPreferenceListener);
         ExtraCore.addExtraListener(ExtraConstants.SELECT_AUTH_METHOD, mSelectAuthMethod);
@@ -328,10 +383,91 @@ public class LauncherActivity extends BaseActivity {
                 .apply();
     }
 
+    private void loadSavedWallpaper() {
+        String savedWallpaper = LauncherPreferences.DEFAULT_PREF.getString(WallpaperUtils.PREFERENCE_KEY, null);
+        String wallpaperId = WallpaperUtils.selectedId(this);
+        int maxWidth = Math.max(960, getResources().getDisplayMetrics().widthPixels);
+        int maxHeight = Math.max(540, getResources().getDisplayMetrics().heightPixels);
+        PojavApplication.sExecutorService.execute(() -> {
+            Bitmap bitmap = null;
+            try {
+                if (Tools.isValidString(savedWallpaper)) {
+                    bitmap = WallpaperUtils.decode(getApplicationContext(), Uri.parse(savedWallpaper), maxWidth, maxHeight);
+                } else {
+                    bitmap = WallpaperUtils.decodeBundled(getApplicationContext(), wallpaperId, maxWidth, maxHeight);
+                }
+            } catch (Exception customFailure) {
+                if (Tools.isValidString(savedWallpaper)) {
+                    LauncherPreferences.DEFAULT_PREF.edit().remove(WallpaperUtils.PREFERENCE_KEY).apply();
+                    try {
+                        bitmap = WallpaperUtils.decodeBundled(getApplicationContext(), wallpaperId, maxWidth, maxHeight);
+                    } catch (Exception bundledFailure) {
+                        android.util.Log.e("AerixWallpaper", "Failed to load wallpaper", bundledFailure);
+                    }
+                }
+            }
+            if (bitmap == null) return;
+            AerixThemeManager.setWallpaperAccentIfMissing(WallpaperUtils.sampleAccentColor(bitmap));
+            Bitmap selectedBitmap = bitmap;
+            Tools.runOnUiThread(() -> {
+                if (isFinishing() || isDestroyed()) {
+                    selectedBitmap.recycle();
+                    return;
+                }
+                ImageView backdrop = findViewById(R.id.launcher_wallpaper_backdrop);
+                if (backdrop == null) return;
+                backdrop.setImageBitmap(selectedBitmap);
+                backdrop.setVisibility(View.VISIBLE);
+            });
+        });
+    }
+
+    private void navigateTo(Class<? extends Fragment> fragmentClass, String tag) {
+        FragmentManager manager = getSupportFragmentManager();
+        if(manager.isStateSaved()) return;
+        manager.popBackStackImmediate(null, FragmentManager.POP_BACK_STACK_INCLUSIVE);
+        manager.beginTransaction()
+                .setReorderingAllowed(true)
+                .replace(R.id.container_fragment, fragmentClass, null, tag)
+                .commit();
+    }
+
+    private void bindNavigationLabelClick(int labelId, ImageButton target) {
+        TextView label = findViewById(labelId);
+        if (label != null && target != null) label.setOnClickListener(v -> target.performClick());
+    }
+
+    private void setNavigationLabelState(int labelId, boolean selected, String section) {
+        TextView label = findViewById(labelId);
+        if (label == null) return;
+        label.setTextColor(selected
+                ? AerixThemeManager.accentColor(this, section)
+                : Color.rgb(230, 243, 252));
+        label.setTypeface(android.graphics.Typeface.DEFAULT,
+                selected ? android.graphics.Typeface.BOLD : android.graphics.Typeface.NORMAL);
+    }
+
     /** Stuff all the view boilerplate here */
     private void bindViews(){
         mFragmentView = findViewById(R.id.container_fragment);
         mSettingsButton = findViewById(R.id.setting_button);
+        mAccountButton = findViewById(R.id.account_nav_button);
+        mHomeButton = findViewById(R.id.home_nav_button);
+        mCreateButton = findViewById(R.id.create_nav_button);
+        mLibraryButton = findViewById(R.id.library_nav_button);
+        mDiscoverButton = findViewById(R.id.discover_nav_button);
+        mWallpapersButton = findViewById(R.id.wallpapers_nav_button);
+        mSkinsButton = findViewById(R.id.skins_nav_button);
+        mServersButton = findViewById(R.id.servers_nav_button);
         mProgressLayout = findViewById(R.id.progress_layout);
+        AerixThemeManager.tintNavigationButton(mHomeButton, this, AerixThemeManager.SECTION_HOME);
+        AerixThemeManager.tintNavigationButton(mAccountButton, this, AerixThemeManager.SECTION_ACCOUNT);
+        AerixThemeManager.tintNavigationButton(mCreateButton, this, AerixThemeManager.SECTION_HOME);
+        AerixThemeManager.tintNavigationButton(mLibraryButton, this, AerixThemeManager.SECTION_LIBRARY);
+        AerixThemeManager.tintNavigationButton(mDiscoverButton, this, AerixThemeManager.SECTION_DISCOVER);
+        AerixThemeManager.tintNavigationButton(mWallpapersButton, this, AerixThemeManager.SECTION_APPEARANCE);
+        AerixThemeManager.tintNavigationButton(mSkinsButton, this, AerixThemeManager.SECTION_SKINS);
+        AerixThemeManager.tintNavigationButton(mServersButton, this, AerixThemeManager.SECTION_SERVERS);
+        AerixThemeManager.tintNavigationButton(mSettingsButton, this, AerixThemeManager.SECTION_SETTINGS);
     }
 }

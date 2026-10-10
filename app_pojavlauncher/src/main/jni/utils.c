@@ -8,6 +8,7 @@
 #include "log.h"
 
 #include "utils.h"
+#include <mojoexec.h>
 
 typedef void (*android_update_LD_LIBRARY_PATH_t)(const char*);
 
@@ -120,4 +121,63 @@ JNIEnv* get_attached_env(JavaVM* jvm) {
         return NULL;
     }
     return jvm_env;
+}
+
+
+typedef void (*EglProcedure)(void);
+typedef EglProcedure (*EglGetProcAddressFunction)(const char*);
+
+JNIEXPORT jboolean JNICALL
+Java_net_kdt_pojavlaunch_game_renderer_NativeEglApiProbe_hasRequiredEglApi(
+        JNIEnv *env, jclass clazz) {
+    (void) env;
+    (void) clazz;
+
+    void *renderer_handle = mojoexec_acq_egl_handle();
+    if (renderer_handle == NULL) {
+        LOGE("Renderer EGL probe could not acquire the selected renderer handle");
+        return JNI_FALSE;
+    }
+
+    EglGetProcAddressFunction get_proc_address =
+            (EglGetProcAddressFunction) dlsym(renderer_handle, "eglGetProcAddress");
+    if (get_proc_address == NULL) {
+        LOGE("Renderer does not export eglGetProcAddress");
+        return JNI_FALSE;
+    }
+
+    // SDL loads these EGL core procedures through eglGetProcAddress. Requiring each one here
+    // avoids treating a partial EGL shim as a complete renderer library.
+    static const char *required_functions[] = {
+            "eglGetDisplay",
+            "eglInitialize",
+            "eglTerminate",
+            "eglChooseConfig",
+            "eglGetConfigAttrib",
+            "eglCreateWindowSurface",
+            "eglCreatePbufferSurface",
+            "eglDestroySurface",
+            "eglCreateContext",
+            "eglDestroyContext",
+            "eglMakeCurrent",
+            "eglSwapBuffers",
+            "eglSwapInterval",
+            "eglBindAPI",
+            "eglQueryString",
+            "eglGetError"
+    };
+
+    const size_t function_count = sizeof(required_functions) / sizeof(required_functions[0]);
+    for (size_t i = 0; i < function_count; i++) {
+        void *symbol = dlsym(renderer_handle, required_functions[i]);
+        EglProcedure procedure = symbol != NULL
+                ? (EglProcedure) symbol
+                : get_proc_address(required_functions[i]);
+        if (procedure == NULL) {
+            LOGE("Renderer EGL API is incomplete: missing %s", required_functions[i]);
+            return JNI_FALSE;
+        }
+    }
+
+    return JNI_TRUE;
 }

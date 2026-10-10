@@ -4,6 +4,9 @@ import android.Manifest;
 import android.app.Activity;
 import android.net.Uri;
 import android.os.Bundle;
+import android.text.InputType;
+import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
@@ -16,6 +19,7 @@ import net.kdt.pojavlaunch.R;
 import net.kdt.pojavlaunch.LauncherActivity;
 import net.kdt.pojavlaunch.PojavApplication;
 import net.kdt.pojavlaunch.Tools;
+import net.kdt.pojavlaunch.prefs.LauncherPreferences;
 import net.kdt.pojavlaunch.progresskeeper.ProgressKeeper;
 import net.kdt.pojavlaunch.tasks.DataMigrator;
 
@@ -53,6 +57,7 @@ public class LauncherPreferenceMiscellaneousFragment extends LauncherPreferenceF
             return true;
         });
         setupCacheClearPreference();
+        setupCurseforgeApiKeyPreference();
         setupMicrophoneRequestPreference();
         updateVisibility();
     }
@@ -65,6 +70,72 @@ public class LauncherPreferenceMiscellaneousFragment extends LauncherPreferenceF
     @Override
     public void onResume() {
         super.onResume();
+    }
+
+    private void setupCurseforgeApiKeyPreference() {
+        Preference preference = requirePreference(LauncherPreferences.PREF_KEY_CURSEFORGE_API_KEY);
+        updateCurseforgePreferenceSummary(preference);
+        preference.setOnPreferenceClickListener(clicked -> {
+            showCurseforgeKeyDialog(preference);
+            return true;
+        });
+    }
+
+    private void showCurseforgeKeyDialog(Preference preference) {
+        String currentKey = LauncherPreferences.DEFAULT_PREF.getString(
+                LauncherPreferences.PREF_KEY_CURSEFORGE_API_KEY, "");
+        EditText keyInput = new EditText(requireContext());
+        keyInput.setSingleLine(true);
+        keyInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        keyInput.setHint(R.string.aerix_discover_curseforge_key_hint);
+        keyInput.setPadding(dp(12), dp(10), dp(12), dp(10));
+
+        LinearLayout content = new LinearLayout(requireContext());
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(24), dp(6), dp(24), dp(4));
+        content.addView(keyInput, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext())
+                .setTitle(R.string.aerix_discover_curseforge_key_title)
+                .setMessage(R.string.aerix_discover_curseforge_key_required)
+                .setView(content)
+                .setPositiveButton(R.string.aerix_discover_curseforge_key_save, (dialog, which) -> {
+                    String key = keyInput.getText().toString().trim();
+                    if (key.isEmpty() || key.length() > 512) {
+                        Toast.makeText(requireContext(), R.string.aerix_discover_curseforge_key_empty,
+                                Toast.LENGTH_LONG).show();
+                        return;
+                    }
+                    LauncherPreferences.DEFAULT_PREF.edit()
+                            .putString(LauncherPreferences.PREF_KEY_CURSEFORGE_API_KEY, key)
+                            .apply();
+                    updateCurseforgePreferenceSummary(preference);
+                    Toast.makeText(requireContext(), R.string.aerix_discover_curseforge_key_saved,
+                            Toast.LENGTH_SHORT).show();
+                })
+                .setNegativeButton(android.R.string.cancel, null);
+        if (currentKey != null && !currentKey.trim().isEmpty()) {
+            builder.setNeutralButton(R.string.aerix_discover_curseforge_key_remove, (dialog, which) -> {
+                LauncherPreferences.DEFAULT_PREF.edit()
+                        .remove(LauncherPreferences.PREF_KEY_CURSEFORGE_API_KEY)
+                        .apply();
+                updateCurseforgePreferenceSummary(preference);
+            });
+        }
+        builder.show();
+    }
+
+    private void updateCurseforgePreferenceSummary(Preference preference) {
+        String key = LauncherPreferences.DEFAULT_PREF.getString(
+                LauncherPreferences.PREF_KEY_CURSEFORGE_API_KEY, "");
+        preference.setSummary(key == null || key.trim().isEmpty()
+                ? R.string.aerix_discover_curseforge_key_summary
+                : R.string.aerix_discover_curseforge_key_connected);
+    }
+
+    private int dp(float value) {
+        return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
     }
 
     private void setupMicrophoneRequestPreference() {

@@ -10,9 +10,15 @@ import net.kdt.pojavlaunch.R;
 import net.kdt.pojavlaunch.Tools;
 import net.kdt.pojavlaunch.prefs.CustomSeekBarPreference;
 import net.kdt.pojavlaunch.prefs.LauncherPreferences;
+import net.kdt.pojavlaunch.utils.AerixThemeManager;
 
 public class LauncherPreferenceControlFragment extends LauncherPreferenceFragment {
     private boolean mGyroAvailable = false;
+
+    @Override
+    protected String themeSection() {
+        return AerixThemeManager.SECTION_CONTROLS;
+    }
     @Override
     public void onCreatePreferences(Bundle b, String str) {
         // Get values

@@ -21,6 +21,12 @@ public class Instance extends DisplayInstance {
     public static final String VERSION_LATEST_RELEASE = "latest_release";
     public static final String VERSION_LATEST_SNAPSHOT = "latest_snapshot";
 
+    /** Stable launcher-only identifier for library metadata such as favorites and groups. */
+    public String aerixId;
+
+    /** Zero uses the launcher-wide RAM allocation; positive values are per-profile MB. */
+    public int ramAllocation;
+
     public InstanceInstaller installer;
     public String renderer;
     public String jvmArgs;
@@ -39,10 +45,15 @@ public class Instance extends DisplayInstance {
     }
 
     private void sanitizeArgs() {
-        if(argsMode > ARGS_MODE_LAST) {
+        if(argsMode < 0 || argsMode > ARGS_MODE_LAST) {
             argsMode = 0;
             jvmArgs = null;
         }
+        if(ramAllocation < 0 || (ramAllocation > 0 && ramAllocation < 256) || ramAllocation > 65536) ramAllocation = 0;
+    }
+
+    public int getLaunchRamAllocation() {
+        return ramAllocation >= 256 ? ramAllocation : LauncherPreferences.PREF_RAM_ALLOCATION;
     }
 
     /**

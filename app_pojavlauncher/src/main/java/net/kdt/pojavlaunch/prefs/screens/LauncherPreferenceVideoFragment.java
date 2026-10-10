@@ -20,6 +20,7 @@ import net.kdt.pojavlaunch.game.renderer.extra.GLESProvider;
 import net.kdt.pojavlaunch.prefs.CustomSeekBarPreference;
 import net.kdt.pojavlaunch.prefs.LauncherPreferences;
 import net.kdt.pojavlaunch.game.renderer.GameRenderer;
+import net.kdt.pojavlaunch.utils.AerixThemeManager;
 import net.kdt.pojavlaunch.utils.GpuUtils;
 
 /**
@@ -27,6 +28,11 @@ import net.kdt.pojavlaunch.utils.GpuUtils;
  */
 public class LauncherPreferenceVideoFragment extends LauncherPreferenceFragment {
     private Boolean hasAngle = null;
+
+    @Override
+    protected String themeSection() {
+        return AerixThemeManager.SECTION_RENDERER;
+    }
     @Override
     public void onCreatePreferences(Bundle b, String str) {
         addPreferencesFromResource(R.xml.pref_video);

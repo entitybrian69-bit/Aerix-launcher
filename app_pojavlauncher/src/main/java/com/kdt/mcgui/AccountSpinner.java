@@ -12,6 +12,7 @@ import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.util.AttributeSet;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
@@ -48,6 +49,7 @@ import net.kdt.pojavlaunch.R;
 
 public class AccountSpinner extends AppCompatSpinner implements LoginListener, AdapterView.OnItemSelectedListener, ValueAnimator.AnimatorUpdateListener {
     private Adapter mAdapter;
+    private boolean mUserOpenedAccounts;
     /* Login progress bar stuff */
     private int mMaxSteps = 5;
     private final ValueAnimator mLoginStepAnimator = ValueAnimator.ofFloat(mMaxSteps);
@@ -127,7 +129,7 @@ public class AccountSpinner extends AppCompatSpinner implements LoginListener, A
         setOnItemSelectedListener(this);
         reload();
 
-        setBackgroundColor(getResources().getColor(R.color.background_status_bar));
+        setBackgroundResource(R.drawable.aerix_nav_button);
         mLoginBarPaint.setColor(getResources().getColor(R.color.minebutton_color));
         mLoginBarPaint.setStrokeWidth(getResources().getDimensionPixelOffset(R.dimen._2sdp));
         mLoginStepAnimator.addUpdateListener(this);
@@ -238,16 +240,24 @@ public class AccountSpinner extends AppCompatSpinner implements LoginListener, A
     }
 
     @Override
+    public boolean onTouchEvent(MotionEvent event) {
+        if (event.getActionMasked() == MotionEvent.ACTION_DOWN) mUserOpenedAccounts = true;
+        return super.onTouchEvent(event);
+    }
+
+    @Override
     public void onItemSelected(AdapterView<?> adapterView, View view, int i, long l) {
         Account account = mAdapter.getItem(i);
         if(account == null) {
             if(i == 0) {
-                createAccount();
+                if (mUserOpenedAccounts && isShown()) createAccount();
             }else {
                 Tools.showError(adapterView.getContext(), new NullPointerException());
             }
+            mUserOpenedAccounts = false;
             return;
         }
+        mUserOpenedAccounts = false;
         Accounts.setCurrent(account);
         refreshAccount(account);
         dismissPopup();

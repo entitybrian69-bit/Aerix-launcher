@@ -29,10 +29,16 @@ import net.kdt.pojavlaunch.contracts.OpenDocumentWithExtension;
 import net.kdt.pojavlaunch.multirt.MultiRTConfigDialog;
 import net.kdt.pojavlaunch.prefs.CustomSeekBarPreference;
 import net.kdt.pojavlaunch.prefs.LauncherPreferences;
+import net.kdt.pojavlaunch.utils.AerixThemeManager;
 import net.kdt.pojavlaunch.utils.MemoryUtils;
 
 public class LauncherPreferenceJavaFragment extends LauncherPreferenceFragment {
     private EditText mSetJavaMemory;
+
+    @Override
+    protected String themeSection() {
+        return AerixThemeManager.SECTION_JAVA;
+    }
     private final Handler uiHandler = new Handler(Looper.getMainLooper());
     private Runnable memoryUpdater;
     private MultiRTConfigDialog mDialogScreen;
