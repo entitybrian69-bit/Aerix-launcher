@@ -1,297 +1,115 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
+    android:layout_width="match_parent" android:layout_height="match_parent"
     android:background="@drawable/aerix_backdrop">
 
-    <ImageView
-        android:id="@+id/launcher_wallpaper_backdrop"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:alpha="0.84"
+    <ImageView android:id="@+id/launcher_wallpaper_backdrop" android:layout_width="0dp"
+        android:layout_height="0dp" android:scaleType="centerCrop" android:visibility="gone"
         android:importantForAccessibility="no"
-        android:scaleType="centerCrop"
-        android:visibility="gone"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
-
-    <View
-        android:id="@+id/launcher_wallpaper_shade"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:background="#210A1220"
+        app:layout_constraintTop_toTopOf="parent" app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent" app:layout_constraintEnd_toEndOf="parent" />
+    <View android:layout_width="0dp" android:layout_height="0dp" android:background="#1905142D"
         android:importantForAccessibility="no"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        app:layout_constraintTop_toTopOf="parent" app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent" app:layout_constraintEnd_toEndOf="parent" />
 
-    <LinearLayout
-        android:id="@+id/aerix_navigation_rail"
-        android:layout_width="72dp"
-        android:layout_height="0dp"
-        android:layout_marginStart="12dp"
-        android:layout_marginTop="12dp"
-        android:layout_marginBottom="12dp"
-        android:background="@drawable/aerix_rail_background"
-        android:gravity="center_horizontal"
-        android:orientation="vertical"
-        android:paddingHorizontal="8dp"
-        android:paddingVertical="10dp"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent">
-
-        <TextView
-            android:id="@+id/aerix_wordmark"
-            android:layout_width="match_parent"
-            android:layout_height="36dp"
-            android:gravity="center"
-            android:includeFontPadding="false"
-            android:letterSpacing="0.11"
-            android:text="AERIX"
-            android:textColor="#D8E9FA"
-            android:textSize="10sp"
-            android:textStyle="bold"
-            tools:ignore="HardcodedText" />
-
-        <ScrollView
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:fillViewport="false"
-            android:overScrollMode="never"
-            android:scrollbars="none">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center_horizontal"
-                    android:orientation="vertical"
-                    android:paddingBottom="2dp">
-
-                    <ImageButton
-                        android:id="@+id/home_nav_button"
-                        style="@style/AerixNavigationButton"
-                        android:contentDescription="@string/aerix_navigation_home"
-                        android:src="@drawable/ic_px_home" />
-
-                    <TextView
-                        android:id="@+id/home_nav_label"
-                        style="@style/AerixNavigationLabel"
-                        android:text="@string/aerix_nav_home_label" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center_horizontal"
-                    android:orientation="vertical"
-                    android:paddingBottom="2dp">
-
-                    <ImageButton
-                        android:id="@+id/discover_nav_button"
-                        style="@style/AerixNavigationButton"
-                        android:contentDescription="@string/aerix_navigation_discover"
-                        android:src="@drawable/ic_modrinth" />
-
-                    <TextView
-                        android:id="@+id/discover_nav_label"
-                        style="@style/AerixNavigationLabel"
-                        android:text="@string/aerix_nav_discover_label" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center_horizontal"
-                    android:orientation="vertical"
-                    android:paddingBottom="2dp">
-
-                    <ImageButton
-                        android:id="@+id/create_nav_button"
-                        style="@style/AerixNavigationButton"
-                        android:contentDescription="@string/aerix_navigation_create"
-                        android:src="@drawable/ic_px_dynamic" />
-
-                    <TextView
-                        android:id="@+id/create_nav_label"
-                        style="@style/AerixNavigationLabel"
-                        android:text="@string/aerix_nav_create_label" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center_horizontal"
-                    android:orientation="vertical"
-                    android:paddingBottom="2dp">
-
-                    <ImageButton
-                        android:id="@+id/library_nav_button"
-                        style="@style/AerixNavigationButton"
-                        android:contentDescription="@string/aerix_navigation_library"
-                        android:src="@drawable/ic_px_file" />
-
-                    <TextView
-                        android:id="@+id/library_nav_label"
-                        style="@style/AerixNavigationLabel"
-                        android:text="@string/aerix_nav_library_label" />
-                </LinearLayout>
-
-
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center_horizontal"
-                    android:orientation="vertical"
-                    android:paddingBottom="2dp">
-
-                    <ImageButton
-                        android:id="@+id/wallpapers_nav_button"
-                        style="@style/AerixNavigationButton"
-                        android:contentDescription="@string/aerix_navigation_wallpapers"
-                        android:src="@drawable/ic_px_image" />
-
-                    <TextView
-                        android:id="@+id/wallpapers_nav_label"
-                        style="@style/AerixNavigationLabel"
-                        android:text="@string/aerix_nav_wallpapers_label" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center_horizontal"
-                    android:orientation="vertical"
-                    android:paddingBottom="2dp">
-
-                    <ImageButton
-                        android:id="@+id/skins_nav_button"
-                        style="@style/AerixNavigationButton"
-                        android:contentDescription="@string/aerix_navigation_skins"
-                        android:src="@drawable/ic_edit_profile" />
-
-                    <TextView
-                        android:id="@+id/skins_nav_label"
-                        style="@style/AerixNavigationLabel"
-                        android:text="@string/aerix_nav_skins_label" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center_horizontal"
-                    android:orientation="vertical"
-                    android:paddingBottom="2dp">
-
-                    <ImageButton
-                        android:id="@+id/servers_nav_button"
-                        style="@style/AerixNavigationButton"
-                        android:contentDescription="@string/aerix_navigation_servers"
-                        android:src="@drawable/ic_px_console" />
-
-                    <TextView
-                        android:id="@+id/servers_nav_label"
-                        style="@style/AerixNavigationLabel"
-                        android:text="@string/aerix_nav_servers_label" />
-                </LinearLayout>
-            </LinearLayout>
-        </ScrollView>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:gravity="center_horizontal"
-            android:orientation="vertical"
-            android:paddingBottom="2dp">
-
-            <ImageButton
-                android:id="@+id/account_nav_button"
-                style="@style/AerixNavigationButton"
-                android:contentDescription="@string/aerix_navigation_account"
-                android:src="@drawable/ic_aerix_account" />
-
-            <TextView
-                android:id="@+id/account_nav_label"
-                style="@style/AerixNavigationLabel"
-                android:text="@string/aerix_nav_account_label" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:gravity="center_horizontal"
-            android:orientation="vertical"
-            android:paddingBottom="2dp">
-
-            <ImageButton
-                android:id="@+id/setting_button"
-                style="@style/AerixNavigationButton"
-                android:contentDescription="@string/aerix_navigation_settings"
-                android:src="@drawable/ic_px_sliders" />
-
-            <TextView
-                android:id="@+id/settings_nav_label"
-                style="@style/AerixNavigationLabel"
-                android:text="@string/aerix_nav_settings_label" />
-        </LinearLayout>
-
-        <!-- Kept in the view tree so existing Microsoft/Ely.by callbacks can refresh account state. -->
-        <com.kdt.mcgui.AccountSpinner
-            android:id="@+id/account_spinner"
-            android:layout_width="1dp"
-            android:layout_height="1dp"
-            android:visibility="gone"
-            android:dropDownWidth="250dp"
-            android:dropDownVerticalOffset="0dp"
-            android:gravity="center"
-            tools:ignore="RtlSymmetry" />
+    <LinearLayout android:id="@+id/prism_top_bar" android:layout_width="0dp"
+        android:layout_height="54dp" android:layout_marginHorizontal="16dp" android:layout_marginTop="12dp"
+        android:background="@drawable/prism_bar" android:gravity="center_vertical"
+        android:orientation="horizontal" android:paddingHorizontal="16dp"
+        app:layout_constraintTop_toTopOf="parent" app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="◆" android:textColor="#A5EAFF" android:textSize="24sp"
+            android:contentDescription="@string/app_name" />
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:layout_marginStart="12dp" android:text="AERIX" android:textStyle="bold"
+            android:letterSpacing="0.1" android:textColor="#F0F9FF" android:textSize="13sp" />
+        <TextView android:id="@+id/prism_page_title" android:layout_width="0dp" android:layout_height="wrap_content"
+            android:layout_weight="1" android:layout_marginStart="16dp"
+            android:ellipsize="end" android:maxLines="1" android:text="@string/aerix_nav_home_label"
+            android:textColor="#D8EAF8" android:textSize="14sp" />
+        <TextView android:id="@+id/prism_search_button" android:layout_width="110dp"
+            android:layout_height="40dp" android:background="@drawable/aerix_nav_button"
+            android:gravity="center_vertical" android:paddingHorizontal="12dp"
+            android:text="@string/prism_search" android:textColor="#D8ECFA" android:textSize="12sp" />
+        <ImageButton android:id="@+id/account_nav_button" style="@style/PrismTopIcon"
+            android:layout_marginStart="10dp" android:contentDescription="@string/aerix_navigation_account"
+            android:src="@drawable/ic_aerix_account" />
+        <ImageButton android:id="@+id/setting_button" style="@style/PrismTopIcon"
+            android:layout_marginStart="4dp" android:contentDescription="@string/aerix_navigation_settings"
+            android:src="@drawable/ic_px_sliders" />
     </LinearLayout>
 
-    <androidx.constraintlayout.widget.ConstraintLayout
-        android:id="@+id/launcher_content_panel"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:layout_marginStart="12dp"
-        android:layout_marginTop="12dp"
-        android:layout_marginEnd="12dp"
-        android:layout_marginBottom="12dp"
+    <LinearLayout android:id="@+id/prism_dock" android:layout_width="wrap_content"
+        android:layout_height="56dp" android:layout_marginBottom="12dp"
+        android:background="@drawable/prism_bar" android:gravity="center_vertical"
+        android:orientation="horizontal" android:paddingHorizontal="10dp"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toEndOf="@id/aerix_navigation_rail"
-        app:layout_constraintTop_toTopOf="parent">
+        app:layout_constraintStart_toStartOf="parent" app:layout_constraintEnd_toEndOf="parent">
+            <LinearLayout android:layout_width="68dp" android:layout_height="match_parent"
+                android:gravity="center" android:orientation="vertical">
+                <ImageButton android:id="@+id/home_nav_button" style="@style/PrismDockIcon"
+                    android:contentDescription="@string/aerix_navigation_home" android:src="@drawable/ic_px_home" />
+                <TextView android:id="@+id/home_nav_label" style="@style/PrismDockLabel"
+                    android:text="@string/aerix_nav_home_label" />
+            </LinearLayout>
+            <LinearLayout android:layout_width="68dp" android:layout_height="match_parent"
+                android:gravity="center" android:orientation="vertical">
+                <ImageButton android:id="@+id/create_nav_button" style="@style/PrismDockIcon"
+                    android:contentDescription="@string/aerix_navigation_create" android:src="@drawable/ic_px_dynamic" />
+                <TextView android:id="@+id/create_nav_label" style="@style/PrismDockLabel"
+                    android:text="@string/aerix_nav_create_label" />
+            </LinearLayout>
+            <LinearLayout android:layout_width="68dp" android:layout_height="match_parent"
+                android:gravity="center" android:orientation="vertical">
+                <ImageButton android:id="@+id/library_nav_button" style="@style/PrismDockIcon"
+                    android:contentDescription="@string/aerix_navigation_library" android:src="@drawable/ic_px_file" />
+                <TextView android:id="@+id/library_nav_label" style="@style/PrismDockLabel"
+                    android:text="@string/aerix_nav_library_label" />
+            </LinearLayout>
+            <LinearLayout android:layout_width="68dp" android:layout_height="match_parent"
+                android:gravity="center" android:orientation="vertical">
+                <ImageButton android:id="@+id/discover_nav_button" style="@style/PrismDockIcon"
+                    android:contentDescription="@string/aerix_navigation_discover" android:src="@drawable/ic_modrinth" />
+                <TextView android:id="@+id/discover_nav_label" style="@style/PrismDockLabel"
+                    android:text="@string/aerix_nav_discover_label" />
+            </LinearLayout>
+            <LinearLayout android:layout_width="68dp" android:layout_height="match_parent"
+                android:gravity="center" android:orientation="vertical">
+                <ImageButton android:id="@+id/skins_nav_button" style="@style/PrismDockIcon"
+                    android:contentDescription="@string/aerix_navigation_skins" android:src="@drawable/ic_edit_profile" />
+                <TextView android:id="@+id/skins_nav_label" style="@style/PrismDockLabel"
+                    android:text="@string/prism_studio" />
+            </LinearLayout>
+        <ImageButton android:id="@+id/prism_more_button" style="@style/PrismTopIcon"
+            android:layout_width="40dp" android:layout_height="40dp"
+            android:contentDescription="@string/prism_more" android:src="@drawable/prism_ic_more" />
+    </LinearLayout>
 
-        <androidx.fragment.app.FragmentContainerView
-            android:id="@+id/container_fragment"
+    <androidx.constraintlayout.widget.ConstraintLayout android:id="@+id/launcher_content_panel"
+        android:layout_width="0dp" android:layout_height="0dp"
+        android:layout_marginHorizontal="16dp" android:layout_marginVertical="8dp"
+        app:layout_constraintTop_toBottomOf="@id/prism_top_bar"
+        app:layout_constraintBottom_toTopOf="@id/prism_dock"
+        app:layout_constraintStart_toStartOf="parent" app:layout_constraintEnd_toEndOf="parent">
+        <androidx.fragment.app.FragmentContainerView android:id="@+id/container_fragment"
             android:name="net.kdt.pojavlaunch.fragments.MainMenuFragment"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
+            android:layout_width="match_parent" android:layout_height="0dp"
             android:background="@android:color/transparent"
-            app:layout_constraintBottom_toTopOf="@id/progress_layout"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
-
-        <com.kdt.mcgui.ProgressLayout
-            android:id="@+id/progress_layout"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:visibility="gone"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent" />
+            app:layout_constraintTop_toTopOf="parent" app:layout_constraintBottom_toTopOf="@id/progress_layout" />
+        <com.kdt.mcgui.ProgressLayout android:id="@+id/progress_layout"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:visibility="gone" app:layout_constraintBottom_toBottomOf="parent" />
     </androidx.constraintlayout.widget.ConstraintLayout>
 
+    <!-- Nonvisual auth dispatcher and routes remain available to the floating More menu. -->
+    <FrameLayout android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone"
+        app:layout_constraintTop_toTopOf="parent" app:layout_constraintStart_toStartOf="parent">
+        <ImageButton android:id="@+id/wallpapers_nav_button" android:layout_width="1dp" android:layout_height="1dp" />
+        <ImageButton android:id="@+id/servers_nav_button" android:layout_width="1dp" android:layout_height="1dp" />
+        <com.kdt.mcgui.AccountSpinner android:id="@+id/account_spinner"
+            android:layout_width="1dp" android:layout_height="1dp" />
+    </FrameLayout>
 </androidx.constraintlayout.widget.ConstraintLayout>

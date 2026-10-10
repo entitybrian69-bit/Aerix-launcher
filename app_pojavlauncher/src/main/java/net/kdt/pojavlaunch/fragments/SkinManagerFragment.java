@@ -37,6 +37,7 @@ import net.kdt.pojavlaunch.authenticator.AuthType;
 import net.kdt.pojavlaunch.authenticator.accounts.Account;
 import net.kdt.pojavlaunch.authenticator.accounts.Accounts;
 import net.kdt.pojavlaunch.utils.AerixThemeManager;
+import net.kdt.pojavlaunch.utils.PrismGlass;
 import net.kdt.pojavlaunch.utils.MinecraftSkinLookup;
 import net.kdt.pojavlaunch.utils.MinecraftSkinUploader;
 
@@ -149,7 +150,7 @@ public class SkinManagerFragment extends Fragment {
         accountPanel.setGravity(Gravity.CENTER_VERTICAL);
         mPreview = new ImageView(requireContext());
         mPreview.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        mPreview.setBackground(panelBackground());
+        PrismGlass.apply(mPreview);
         accountPanel.addView(mPreview, new LinearLayout.LayoutParams(dp(120), dp(120)));
         LinearLayout accountText = new LinearLayout(requireContext());
         accountText.setOrientation(LinearLayout.VERTICAL);
@@ -402,7 +403,7 @@ public class SkinManagerFragment extends Fragment {
         LinearLayout panel = new LinearLayout(requireContext());
         panel.setOrientation(LinearLayout.VERTICAL);
         panel.setPadding(dp(16), dp(14), dp(16), dp(14));
-        panel.setBackground(panelBackground());
+        PrismGlass.apply(panel);
         return panel;
     }
 

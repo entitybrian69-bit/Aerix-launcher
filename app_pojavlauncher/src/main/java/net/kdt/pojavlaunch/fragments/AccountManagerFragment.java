@@ -30,6 +30,7 @@ import net.kdt.pojavlaunch.authenticator.accounts.Accounts;
 import net.kdt.pojavlaunch.extra.ExtraConstants;
 import net.kdt.pojavlaunch.extra.ExtraCore;
 import net.kdt.pojavlaunch.utils.AerixThemeManager;
+import net.kdt.pojavlaunch.utils.PrismGlass;
 
 import java.io.IOException;
 import java.util.List;
@@ -58,7 +59,7 @@ public class AccountManagerFragment extends Fragment {
         LinearLayout header = new LinearLayout(requireContext());
         header.setGravity(Gravity.CENTER_VERTICAL);
         header.setPadding(dp(20), dp(12), dp(16), dp(12));
-        header.setBackground(panelBackground());
+        PrismGlass.apply(header);
         LinearLayout titleStack = new LinearLayout(requireContext());
         titleStack.setOrientation(LinearLayout.VERTICAL);
         TextView title = text(getString(R.string.aerix_account_title), 22, true);
@@ -158,7 +159,7 @@ public class AccountManagerFragment extends Fragment {
         LinearLayout card = new LinearLayout(requireContext());
         card.setOrientation(LinearLayout.VERTICAL);
         card.setPadding(dp(16), dp(14), dp(16), dp(14));
-        card.setBackground(panelBackground());
+        PrismGlass.apply(card);
         LinearLayout summary = new LinearLayout(requireContext());
         summary.setGravity(Gravity.CENTER_VERTICAL);
         ImageView avatar = new ImageView(requireContext());

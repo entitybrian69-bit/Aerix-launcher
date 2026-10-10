@@ -37,6 +37,7 @@ import net.kdt.pojavlaunch.instances.Instance;
 import net.kdt.pojavlaunch.instances.Instances;
 import net.kdt.pojavlaunch.prefs.LauncherPreferences;
 import net.kdt.pojavlaunch.utils.AerixThemeManager;
+import net.kdt.pojavlaunch.utils.PrismGlass;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -110,7 +111,7 @@ public class InstanceLibraryFragment extends Fragment {
         header.setGravity(Gravity.CENTER_VERTICAL);
         header.setOrientation(LinearLayout.HORIZONTAL);
         header.setPadding(pad, dp(12), pad, dp(12));
-        header.setBackground(panelBackground());
+        PrismGlass.apply(header);
 
         LinearLayout titleStack = new LinearLayout(requireContext());
         titleStack.setOrientation(LinearLayout.VERTICAL);
@@ -281,7 +282,7 @@ public class InstanceLibraryFragment extends Fragment {
         LinearLayout card = new LinearLayout(requireContext());
         card.setOrientation(LinearLayout.VERTICAL);
         card.setPadding(dp(15), dp(12), dp(15), dp(11));
-        card.setBackground(panelBackground());
+        PrismGlass.apply(card);
 
         TextView name = text(displayName(instance), 16, "#F1F6FC", true);
         name.setMaxLines(1);

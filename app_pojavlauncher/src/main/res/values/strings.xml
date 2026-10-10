@@ -573,6 +573,15 @@
     <!-- Aerix dashboard and navigation -->
     <string name="aerix_welcome_title">Aerix Home</string>
     <string name="aerix_welcome_subtitle">Your Minecraft Java worlds, together in one place.</string>
+    <string name="prism_studio">Studio</string>
+    <string name="prism_search">⌕  Discover</string>
+    <string name="prism_more">More pages</string>
+    <string name="prism_create_title">Create a new world to play</string>
+    <string name="prism_ready">Ready when you are</string>
+    <string name="prism_home_title">Your next world awaits</string>
+    <string name="prism_launch_world">Launch world</string>
+    <string name="prism_open_profile">Selected instance</string>
+    <string name="prism_no_profile">Create an instance to begin</string>
     <string name="aerix_home_browse_mods">Browse mods &amp; packs</string>
     <string name="aerix_auth_hint">Choose how to sign in. Microsoft requires a Minecraft Java license; local accounts cannot access online services.</string>
     <string name="aerix_home_eyebrow">AERIX / MINECRAFT JAVA</string>

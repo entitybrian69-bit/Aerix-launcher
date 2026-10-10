@@ -45,6 +45,27 @@
     </style>
 
 
+    <style name="PrismDockIcon">
+        <item name="android:layout_width">42dp</item>
+        <item name="android:layout_height">32dp</item>
+        <item name="android:background">@drawable/prism_dock_item</item>
+        <item name="android:padding">7dp</item>
+        <item name="android:scaleType">fitCenter</item>
+        <item name="android:tint">@color/prism_nav_icon</item>
+    </style>
+    <style name="PrismDockLabel">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">17dp</item>
+        <item name="android:gravity">center</item>
+        <item name="android:includeFontPadding">false</item>
+        <item name="android:textColor">#F0F7FF</item>
+        <item name="android:textSize">10sp</item>
+    </style>
+    <style name="PrismTopIcon" parent="PrismDockIcon">
+        <item name="android:layout_width">42dp</item>
+        <item name="android:layout_height">42dp</item>
+        <item name="android:padding">10dp</item>
+    </style>
     <style name="AerixNavigationButton">
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">42dp</item>

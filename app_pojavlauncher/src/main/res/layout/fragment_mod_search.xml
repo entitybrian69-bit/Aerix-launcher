@@ -62,6 +62,18 @@
 
             />
 
+        <HorizontalScrollView
+            android:id="@+id/prism_discover_scroll"
+            android:layout_width="0dp" android:layout_height="48dp"
+            android:fillViewport="false" android:scrollbars="none"
+            app:layout_constraintTop_toBottomOf="@id/search_mod_edittext"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent">
+            <LinearLayout android:id="@+id/prism_discover_chips"
+                android:layout_width="wrap_content" android:layout_height="match_parent"
+                android:gravity="center_vertical" android:orientation="horizontal" />
+        </HorizontalScrollView>
+
         <ProgressBar
             android:id="@+id/search_mod_progressbar"
             style="?android:attr/progressBarStyleHorizontal"
@@ -69,7 +81,7 @@
             android:layout_height="wrap_content"
             android:indeterminate="true"
             android:visibility="gone"
-            app:layout_constraintTop_toBottomOf="@+id/search_mod_edittext"
+            app:layout_constraintTop_toBottomOf="@id/prism_discover_scroll"
             tools:layout_editor_absoluteX="13dp" />
 
 

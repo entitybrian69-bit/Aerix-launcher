@@ -1,6 +1,8 @@
 package net.kdt.pojavlaunch;
 
 import android.Manifest;
+import android.animation.ObjectAnimator;
+import android.animation.ValueAnimator;
 import android.app.NotificationManager;
 import android.content.Context;
 import android.content.Intent;
@@ -15,6 +17,7 @@ import android.system.Os;
 import android.view.View;
 import android.widget.ImageButton;
 import android.widget.ImageView;
+import android.widget.PopupMenu;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -60,6 +63,7 @@ import net.kdt.pojavlaunch.tasks.AsyncVersionList;
 import net.kdt.pojavlaunch.tasks.MoJsonDownloader;
 import net.kdt.pojavlaunch.utils.AerixThemeManager;
 import net.kdt.pojavlaunch.utils.NotificationUtils;
+import net.kdt.pojavlaunch.utils.PrismGlass;
 import net.kdt.pojavlaunch.utils.WallpaperUtils;
 
 import net.kdt.pojavlaunch.R;
@@ -78,6 +82,8 @@ public class LauncherActivity extends BaseActivity {
     private ImageButton mSkinsButton;
     private ImageButton mServersButton;
     private ProgressLayout mProgressLayout;
+    private TextView mPageTitle;
+    private ObjectAnimator mDockMotion;
     private ProgressServiceKeeper mProgressServiceKeeper;
     private NotificationManager mNotificationManager;
     private static ActivityResultLauncher<String> mRequestPermissionLauncher;
@@ -98,6 +104,7 @@ public class LauncherActivity extends BaseActivity {
             mServersButton.setActivated(f instanceof ServerManagerFragment);
             boolean settingsSelected = f.getClass().getName().startsWith("net.kdt.pojavlaunch.prefs.screens.");
             mSettingsButton.setActivated(settingsSelected);
+            updatePageTitle(f, settingsSelected);
             setNavigationLabelState(R.id.home_nav_label, f instanceof MainMenuFragment, AerixThemeManager.SECTION_HOME);
             setNavigationLabelState(R.id.account_nav_label, f instanceof AccountManagerFragment, AerixThemeManager.SECTION_ACCOUNT);
             setNavigationLabelState(R.id.create_nav_label, f instanceof ProfileTypeSelectFragment, AerixThemeManager.SECTION_HOME);
@@ -231,6 +238,21 @@ public class LauncherActivity extends BaseActivity {
         ProgressKeeper.addTaskCountListener((mProgressServiceKeeper = new ProgressServiceKeeper(this)));
 
         mSettingsButton.setOnClickListener(mSettingButtonListener);
+        View more = findViewById(R.id.prism_more_button);
+        if (more != null) more.setOnClickListener(this::showMorePages);
+        View search = findViewById(R.id.prism_search_button);
+        if (search != null) search.setOnClickListener(v -> navigateTo(SearchModFragment.class, SearchModFragment.TAG));
+        PrismGlass.apply(findViewById(R.id.prism_top_bar));
+        PrismGlass.apply(findViewById(R.id.prism_dock));
+        View dock = findViewById(R.id.prism_dock);
+        if (dock != null && (Build.VERSION.SDK_INT < 26 || ValueAnimator.areAnimatorsEnabled())) {
+            mDockMotion = ObjectAnimator.ofFloat(dock, View.TRANSLATION_Y, 0f,
+                    -4f * getResources().getDisplayMetrics().density);
+            mDockMotion.setDuration(3000);
+            mDockMotion.setRepeatCount(ValueAnimator.INFINITE);
+            mDockMotion.setRepeatMode(ValueAnimator.REVERSE);
+            mDockMotion.start();
+        }
         mHomeButton.setOnClickListener(v -> navigateTo(MainMenuFragment.class, MainMenuFragment.TAG));
         mAccountButton.setOnClickListener(v -> navigateTo(AccountManagerFragment.class, AccountManagerFragment.TAG));
         mCreateButton.setOnClickListener(v -> navigateTo(ProfileTypeSelectFragment.class, ProfileTypeSelectFragment.TAG));
@@ -270,12 +292,14 @@ public class LauncherActivity extends BaseActivity {
         super.onResume();
         ContextExecutor.setActivity(this);
         InstanceInstaller.postInstallCheck(this);
+        if (mDockMotion != null && mDockMotion.isPaused()) mDockMotion.resume();
     }
 
     @Override
     protected void onPause() {
         super.onPause();
         ContextExecutor.clearActivity();
+        if (mDockMotion != null) mDockMotion.pause();
     }
 
     @Override
@@ -287,6 +311,7 @@ public class LauncherActivity extends BaseActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        if (mDockMotion != null) mDockMotion.cancel();
         mProgressLayout.cleanUpObservers();
         ProgressKeeper.removeTaskCountListener(mProgressLayout);
         ProgressKeeper.removeTaskCountListener(mProgressServiceKeeper);
@@ -414,10 +439,17 @@ public class LauncherActivity extends BaseActivity {
                     selectedBitmap.recycle();
                     return;
                 }
+                PrismGlass.setWallpaper(selectedBitmap);
                 ImageView backdrop = findViewById(R.id.launcher_wallpaper_backdrop);
                 if (backdrop == null) return;
                 backdrop.setImageBitmap(selectedBitmap);
                 backdrop.setVisibility(View.VISIBLE);
+                View top = findViewById(R.id.prism_top_bar);
+                View dock = findViewById(R.id.prism_dock);
+                if (top != null) top.invalidate();
+                if (dock != null) dock.invalidate();
+                Fragment current = getSupportFragmentManager().findFragmentById(R.id.container_fragment);
+                if (current != null && current.getView() != null) current.getView().invalidate();
             });
         });
     }
@@ -450,6 +482,7 @@ public class LauncherActivity extends BaseActivity {
     /** Stuff all the view boilerplate here */
     private void bindViews(){
         mFragmentView = findViewById(R.id.container_fragment);
+        mPageTitle = findViewById(R.id.prism_page_title);
         mSettingsButton = findViewById(R.id.setting_button);
         mAccountButton = findViewById(R.id.account_nav_button);
         mHomeButton = findViewById(R.id.home_nav_button);
@@ -469,5 +502,40 @@ public class LauncherActivity extends BaseActivity {
         AerixThemeManager.tintNavigationButton(mSkinsButton, this, AerixThemeManager.SECTION_SKINS);
         AerixThemeManager.tintNavigationButton(mServersButton, this, AerixThemeManager.SECTION_SERVERS);
         AerixThemeManager.tintNavigationButton(mSettingsButton, this, AerixThemeManager.SECTION_SETTINGS);
+    }
+
+    private void updatePageTitle(Fragment fragment, boolean settingsSelected) {
+        if (mPageTitle == null) return;
+        int title = R.string.aerix_nav_home_label;
+        if (fragment instanceof SearchModFragment) title = R.string.aerix_nav_discover_label;
+        else if (fragment instanceof ProfileTypeSelectFragment) title = R.string.aerix_nav_create_label;
+        else if (fragment instanceof InstanceLibraryFragment) title = R.string.aerix_nav_library_label;
+        else if (fragment instanceof AccountManagerFragment) title = R.string.aerix_nav_account_label;
+        else if (fragment instanceof WallpaperGalleryFragment) title = R.string.aerix_nav_wallpapers_label;
+        else if (fragment instanceof SkinManagerFragment) title = R.string.aerix_nav_skins_label;
+        else if (fragment instanceof ServerManagerFragment) title = R.string.aerix_nav_servers_label;
+        else if (settingsSelected) title = R.string.aerix_nav_settings_label;
+        else if (!(fragment instanceof MainMenuFragment)) title = R.string.aerix_nav_create_label;
+        mPageTitle.setText(title);
+    }
+
+    private void showMorePages(View anchor) {
+        PopupMenu menu = new PopupMenu(this, anchor);
+        menu.getMenu().add(0, 1, 0, R.string.aerix_nav_wallpapers_label);
+        menu.getMenu().add(0, 2, 1, R.string.aerix_nav_servers_label);
+        menu.getMenu().add(0, 3, 2, R.string.aerix_nav_account_label);
+        menu.getMenu().add(0, 4, 3, R.string.aerix_nav_settings_label);
+        menu.getMenu().add(0, 5, 4, R.string.mcl_option_customcontrol);
+        menu.setOnMenuItemClickListener(item -> {
+            switch (item.getItemId()) {
+                case 1: navigateTo(WallpaperGalleryFragment.class, WallpaperGalleryFragment.TAG); return true;
+                case 2: navigateTo(ServerManagerFragment.class, ServerManagerFragment.TAG); return true;
+                case 3: navigateTo(AccountManagerFragment.class, AccountManagerFragment.TAG); return true;
+                case 4: navigateTo(LauncherPreferenceFragment.class, SETTING_FRAGMENT_TAG); return true;
+                case 5: startActivity(new Intent(this, CustomControlsActivity.class)); return true;
+                default: return false;
+            }
+        });
+        menu.show();
     }
 }

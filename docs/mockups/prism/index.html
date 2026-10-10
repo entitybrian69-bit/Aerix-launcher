@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0a182c">
+  <title>Aerix Prism — ten-screen concept</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif; background: #081322; color: #f2f8ff; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; background: radial-gradient(ellipse at 18% 2%, #194264 0, transparent 36%), radial-gradient(ellipse at 82% 15%, #382e62 0, transparent 32%), #081322; }
+    .shell { max-width: 1512px; margin: auto; padding: clamp(24px, 4vw, 64px); }
+    header { display: flex; align-items: start; justify-content: space-between; gap: 22px; margin-bottom: 30px; }
+    .eyebrow { color: #91e2f4; letter-spacing: .19em; font-size: .76rem; font-weight: 750; text-transform: uppercase; }
+    h1 { font-size: clamp(2.3rem, 5vw, 5rem); line-height: 1; letter-spacing: -.055em; margin: 13px 0 18px; }
+    .intro { max-width: 750px; color: #c4d7e9; line-height: 1.65; font-size: 1.04rem; }
+    .count { flex: none; border: 1px solid #8bd9ec7a; border-radius: 999px; padding: 10px 17px; background: #b8eafa13; color: #c4eef5; font-size: .84rem; }
+    .principles { display: flex; flex-wrap: wrap; gap: 9px; margin: 24px 0 32px; }
+    .principles span { border: 1px solid #b2dbee42; border-radius: 999px; padding: 9px 14px; background: #d9eeff12; color: #dcecf5; font-size: .86rem; }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+    article { min-width: 0; overflow: hidden; border: 1px solid #aec9e958; border-radius: 23px; background: linear-gradient(145deg, #c7e8ff18, #5c76af1a); box-shadow: 0 16px 52px #0005, inset 0 1px 0 #ffffff46; }
+    article a { display: block; background: #091a2a; line-height: 0; }
+    article img { display: block; width: 100%; height: auto; aspect-ratio: 2.25 / 1; object-fit: contain; transition: transform .3s ease; }
+    article a:hover img { transform: scale(1.025); }
+    .details { padding: 20px 23px 25px; }
+    .details small { color: #8ddcef; font-weight: 750; letter-spacing: .14em; }
+    h2 { font-size: 1.32rem; margin: 6px 0 8px; }
+    .details p { margin: 0; color: #bdd0e0; line-height: 1.55; font-size: .93rem; }
+    .note { margin-top: 28px; border: 1px solid #b1ddef3d; border-radius: 18px; padding: 18px 21px; color: #bfd2e2; background: #d0efff0d; line-height: 1.55; }
+    .note strong { color: white; }
+    footer { color: #9bb2c5; font-size: .86rem; padding: 28px 0 8px; }
+    @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } header { display: block; } .count { display: inline-block; margin-top: 8px; } }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <div>
+        <div class="eyebrow">Aerix Launcher / visual direction 01</div>
+        <h1>Meet Prism.</h1>
+        <div class="intro">Ten distinct landscape screens for an immersive Minecraft Java launcher. The old left scrolling rail gives way to a floating horizontal dock; everyday actions sit in clear, blurred crystal surfaces. Launch is an orb, not the old rectangular Play button.</div>
+      </div>
+      <div class="count">10 individual PNG mockups</div>
+    </header>
+    <div class="principles" aria-label="Design principles">
+      <span>Immersive edge-to-edge</span><span>Refractive glass + backdrop blur</span><span>Floating horizontal navigation</span><span>New controls and hierarchy</span><span>All core features represented</span>
+    </div>
+    <section class="grid" aria-label="Ten full-screen mockups">
+      <article><a href="01-home.png" target="_blank" aria-label="Open Home image full size"><img src="01-home.png" alt="Home mockup with world card, recent sessions and circular launch orb"></a><div class="details"><small>01 / START</small><h2>Home</h2><p>Selected instance, account and hardware context, recent play, content shortcut and a new glass launch orb.</p></div></article>
+      <article><a href="02-create.png" target="_blank" aria-label="Open Create image full size"><img src="02-create.png" alt="Create mockup with vanilla, modded and modpack routes" loading="lazy"></a><div class="details"><small>02 / BUILD</small><h2>Create</h2><p>Vanilla, Fabric, Forge, NeoForge, Quilt, Legacy Fabric, OptiFine, older versions and modpack import. Version and runtime stay selectable.</p></div></article>
+      <article><a href="03-library.png" target="_blank" aria-label="Open Library image full size"><img src="03-library.png" alt="Library mockup with profile cards and management controls" loading="lazy"></a><div class="details"><small>03 / ORGANIZE</small><h2>Instance library</h2><p>Profile search, groups, favorites, pinning and sorting; select, edit, clone, back up, delete or launch an instance.</p></div></article>
+      <article><a href="04-discover.png" target="_blank" aria-label="Open Discover image full size"><img src="04-discover.png" alt="Discover mockup with providers, category filters, results and install preview" loading="lazy"></a><div class="details"><small>04 / EXPLORE</small><h2>Mods &amp; packs</h2><p>Modrinth and optional user-key CurseForge browsing. Modpacks, mods, shaders, resource packs and world saves with version/loader filters and install details.</p></div></article>
+      <article><a href="05-accounts.png" target="_blank" aria-label="Open Accounts image full size"><img src="05-accounts.png" alt="Accounts mockup with account cards and three sign-in providers" loading="lazy"></a><div class="details"><small>05 / IDENTITY</small><h2>Accounts</h2><p>Microsoft, Ely.by and local accounts, skin faces, current-account state, select/remove actions and clearly distinguished sign-in methods.</p></div></article>
+      <article><a href="06-skins.png" target="_blank" aria-label="Open Skins image full size"><img src="06-skins.png" alt="Skin Studio mockup with character preview and upload controls" loading="lazy"></a><div class="details"><small>06 / PERSONALIZE</small><h2>Skin Studio</h2><p>Public username search and skin preview; local PNG selection and confirmed upload only for an eligible Microsoft account.</p></div></article>
+      <article><a href="07-servers.png" target="_blank" aria-label="Open Servers image full size"><img src="07-servers.png" alt="Multiplayer mockup with saved server list and editing controls" loading="lazy"></a><div class="details"><small>07 / CONNECT</small><h2>Saved servers</h2><p>Selected profile’s server list with add, edit, copy and delete controls. Joining still happens inside Minecraft, not from a fake launcher connect button.</p></div></article>
+      <article><a href="08-appearance.png" target="_blank" aria-label="Open Appearance image full size"><img src="08-appearance.png" alt="Appearance mockup with wallpaper gallery and adaptive palette" loading="lazy"></a><div class="details"><small>08 / ATMOSPHERE</small><h2>Appearance</h2><p>25 bundled wallpapers and custom images, live preview, wallpaper-derived colors, presets, custom hex and Material You.</p></div></article>
+      <article><a href="09-settings.png" target="_blank" aria-label="Open Settings image full size"><img src="09-settings.png" alt="Settings mockup with renderer, memory, runtime and update controls" loading="lazy"></a><div class="details"><small>09 / PERFORMANCE</small><h2>Settings</h2><p>Renderer capability choices, GL4ES/LTW Smart Pick, manual ANGLE and Vulkan/Zink, memory, game resolution, Java runtime, launcher and update tools.</p></div></article>
+      <article><a href="10-controls.png" target="_blank" aria-label="Open Controls image full size"><img src="10-controls.png" alt="Controls mockup with touch layout stage, palette and properties" loading="lazy"></a><div class="details"><small>10 / INPUT</small><h2>Controls</h2><p>Touch, gamepad, mouse and layouts: draggable control overlays, bindings, size/opacity dials, presets and import/export.</p></div></article>
+    </section>
+    <aside class="note"><strong>Concept art, not a shipped build.</strong> These images propose layout and atmosphere; some illustrative player names, server states, version numbers and tiny AI-rendered labels may be inaccurate. The captions describe the intended feature coverage, not a claim that every pictured interaction is implemented or tested. Review the visuals before changing launcher code.</aside>
+    <footer>Aerix Prism concept · open any image to inspect it at full size · no application code changed for these mockups</footer>
+  </main>
+</body>
+</html>

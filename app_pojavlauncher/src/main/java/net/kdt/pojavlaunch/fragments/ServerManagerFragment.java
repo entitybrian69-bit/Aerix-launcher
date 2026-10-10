@@ -30,6 +30,7 @@ import net.kdt.pojavlaunch.R;
 import net.kdt.pojavlaunch.instances.Instance;
 import net.kdt.pojavlaunch.instances.Instances;
 import net.kdt.pojavlaunch.utils.AerixThemeManager;
+import net.kdt.pojavlaunch.utils.PrismGlass;
 import net.kdt.pojavlaunch.utils.MinecraftServerListStore;
 
 import java.io.File;
@@ -75,7 +76,7 @@ public class ServerManagerFragment extends Fragment {
         LinearLayout header = new LinearLayout(requireContext());
         header.setOrientation(LinearLayout.VERTICAL);
         header.setPadding(dp(20), dp(14), dp(20), dp(14));
-        header.setBackground(panelBackground());
+        PrismGlass.apply(header);
         header.addView(text(getString(R.string.aerix_servers_title), 22, "#F1F6FC", true));
         TextView subtitle = text(getString(R.string.aerix_servers_subtitle), 12, "#AABCD0", false);
         LinearLayout.LayoutParams subtitleParams = wrapParams();
@@ -189,7 +190,7 @@ public class ServerManagerFragment extends Fragment {
             LinearLayout card = new LinearLayout(requireContext());
             card.setOrientation(LinearLayout.VERTICAL);
             card.setPadding(dp(15), dp(12), dp(15), dp(12));
-            card.setBackground(panelBackground());
+            PrismGlass.apply(card);
 
             TextView name = text(entry.name, 16, "#F1F6FC", true);
             name.setMaxLines(1);

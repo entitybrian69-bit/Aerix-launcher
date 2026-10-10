@@ -187,19 +187,10 @@ public final class AerixThemeManager {
         view.setBackgroundTintList(null);
     }
 
-    /** Keeps the rail glass-neutral until selected, then applies the wallpaper-aware accent. */
+    /** Floating dock selection has its own light crystal surface. */
     public static void tintNavigationButton(View view, Context context, String section) {
         if (view == null) return;
-        int accent = accentColor(context, section);
-        int active = Color.argb(76, Color.red(accent), Color.green(accent), Color.blue(accent));
-        int pressed = Color.argb(44, Color.red(accent), Color.green(accent), Color.blue(accent));
-        view.setBackgroundTintList(new ColorStateList(
-                new int[][]{
-                        new int[]{android.R.attr.state_activated},
-                        new int[]{android.R.attr.state_pressed},
-                        new int[]{}
-                },
-                new int[]{active, pressed, Color.TRANSPARENT}
-        ));
+        view.setBackgroundResource(R.drawable.prism_dock_item);
+        view.setBackgroundTintList(null);
     }
 }

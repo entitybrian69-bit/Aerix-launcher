@@ -16,6 +16,7 @@ import net.kdt.pojavlaunch.Tools;
 import net.kdt.pojavlaunch.instances.Instance;
 import net.kdt.pojavlaunch.instances.Instances;
 import net.kdt.pojavlaunch.utils.AerixThemeManager;
+import net.kdt.pojavlaunch.utils.PrismGlass;
 
 import java.io.IOException;
 
@@ -30,6 +31,8 @@ public class ProfileTypeSelectFragment extends Fragment {
         super.onViewCreated(view, savedInstanceState);
         view.setBackgroundColor(Color.TRANSPARENT);
         styleCreatePage(view);
+        PrismGlass.apply(view.findViewById(R.id.create_vanilla_panel));
+        PrismGlass.apply(view.findViewById(R.id.create_modded_panel));
         view.findViewById(R.id.vanilla_profile).setOnClickListener(v -> {
             try {
                 Instance instance = Instances.createDefaultInstance();

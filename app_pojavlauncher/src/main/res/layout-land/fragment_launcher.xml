@@ -1,252 +1,100 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:id="@+id/fragment_menu_main"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="@android:color/transparent"
-    android:clipToPadding="false"
-    android:fillViewport="true">
+    android:id="@+id/fragment_menu_main" android:layout_width="match_parent"
+    android:layout_height="match_parent" android:fillViewport="true"
+    android:clipToPadding="false" android:scrollbars="none"
+    android:background="@android:color/transparent">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" android:paddingHorizontal="10dp" android:paddingVertical="12dp">
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="@string/prism_home_title" android:textColor="#F3FBFF"
+            android:textSize="32sp" android:textStyle="bold" />
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="4dp" android:text="@string/aerix_welcome_subtitle"
+            android:textColor="#D8E8F4" android:textSize="13sp" />
 
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="12dp">
-
-        <TextView
-            android:id="@+id/home_title"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/aerix_welcome_title"
-            android:textColor="#F1F6FC"
-            android:textSize="24sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/home_subtitle"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
-            android:text="@string/aerix_welcome_subtitle"
-            android:textColor="#E2ECF5"
-            android:textSize="12sp" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
-            android:baselineAligned="false"
-            android:orientation="horizontal">
-
-            <LinearLayout
-                android:id="@+id/instance_panel"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="7dp"
-                android:layout_weight="1"
-                android:background="@drawable/aerix_panel_background"
-                android:orientation="vertical"
-                android:padding="16dp">
-
-                <TextView
-                    android:id="@+id/home_hero_eyebrow"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:letterSpacing="0.1"
-                    android:text="@string/aerix_home_eyebrow"
-                    android:textColor="#DFF8FF"
-                    android:textSize="11sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/home_hero_message"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:text="@string/aerix_home_hero_title"
-                    android:textColor="#FFFFFF"
-                    android:textSize="24sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/home_hero_description"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:text="@string/aerix_home_hero_caption"
-                    android:textColor="#E0EDF7"
-                    android:textSize="12sp" />
-
-                <LinearLayout
-                    android:id="@+id/hero_action_row"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="20dp"
-                    android:orientation="horizontal">
-
-                    <Button
-                        android:id="@+id/hero_create_button"
-                        android:layout_width="0dp"
-                        android:layout_height="48dp"
-                        android:layout_marginEnd="4dp"
-                        android:layout_weight="1"
-                        android:text="@string/aerix_home_create"
-                        android:textAllCaps="false"
-                        android:textColor="#FFFFFF"
-                        android:textSize="12sp" />
-
-                    <Button
-                        android:id="@+id/hero_library_button"
-                        android:layout_width="0dp"
-                        android:layout_height="48dp"
-                        android:layout_marginStart="4dp"
-                        android:layout_weight="1"
-                        android:text="@string/aerix_home_library"
-                        android:textAllCaps="false"
-                        android:textColor="#FFFFFF"
-                        android:textSize="12sp" />
-                </LinearLayout>
-
-                <Button
-                    android:id="@+id/hero_mods_button"
-                    android:layout_width="match_parent"
-                    android:layout_height="44dp"
-                    android:layout_marginTop="10dp"
-                    android:background="@drawable/aerix_nav_button"
-                    android:text="@string/aerix_home_browse_mods"
-                    android:textAllCaps="false"
-                    android:textColor="#FFFFFF"
-                    android:textSize="12sp" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:id="@+id/quick_actions_panel"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="7dp"
-                android:layout_weight="1"
-                android:background="@drawable/aerix_panel_background"
-                android:orientation="vertical"
-                android:padding="16dp">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
-
-                    <ImageView
-                        android:id="@+id/home_account_icon"
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
-                        android:background="@drawable/aerix_nav_button"
-                        android:contentDescription="@string/aerix_home_account"
-                        android:padding="9dp"
-                        android:src="@drawable/ic_aerix_account"
-                        app:tint="#EAF7FF" />
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="8dp"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-                        <TextView
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:text="@string/aerix_home_account"
-                            android:textColor="#EDF7FF"
-                            android:textSize="12sp"
-                            android:textStyle="bold" />
-                        <TextView
-                            android:id="@+id/home_account_summary"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:ellipsize="end"
-                            android:maxLines="1"
-                            android:textColor="#D7E6F2"
-                            android:textSize="11sp" />
-                    </LinearLayout>
-
-                    <Button
-                        android:id="@+id/account_manage_button"
-                        android:layout_width="88dp"
-                        android:layout_height="40dp"
-                        android:text="@string/aerix_home_account_manage"
-                        android:textAllCaps="false"
-                        android:textColor="#FFFFFF"
-                        android:textSize="12sp" />
-                </LinearLayout>
-
-                <TextView
-                    android:id="@+id/current_instance_label"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="14dp"
-                    android:text="@string/aerix_current_instance"
-                    android:textColor="#D6ECFA"
-                    android:textSize="11sp"
-                    android:textStyle="bold" />
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:layout_marginTop="4dp"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
-                    <com.kdt.mcgui.mcVersionSpinner
-                        android:id="@+id/mc_version_spinner"
-                        android:layout_width="0dp"
-                        android:layout_height="match_parent"
-                        android:layout_weight="1"
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="16dp" android:baselineAligned="false" android:orientation="horizontal">
+            <LinearLayout android:id="@+id/instance_panel" android:layout_width="0dp"
+                android:layout_height="wrap_content" android:layout_weight="1.22"
+                android:layout_marginEnd="8dp" android:background="@drawable/aerix_panel_background"
+                android:orientation="vertical" android:padding="18dp">
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:text="@string/prism_open_profile" android:letterSpacing="0.12"
+                    android:textColor="#C4E8FA" android:textSize="11sp" android:textStyle="bold" />
+                <LinearLayout android:layout_width="match_parent" android:layout_height="54dp"
+                    android:layout_marginTop="12dp" android:gravity="center_vertical" android:orientation="horizontal">
+                    <com.kdt.mcgui.mcVersionSpinner android:id="@+id/mc_version_spinner"
+                        android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1"
                         android:background="@android:color/transparent"
                         android:drawableEnd="@drawable/spinner_arrow"
-                        app:drawableEndSize="@dimen/padding_heavy"
-                        app:drawableStartIntegerScaling="true"
-                        app:drawableStartSize="@dimen/_36sdp"
-                        app:drawableEndPadding="@dimen/_1sdp" />
-                    <ImageButton
-                        android:id="@+id/edit_profile_button"
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
-                        android:background="@drawable/aerix_nav_button"
-                        android:contentDescription="@string/aerix_edit_instance"
-                        android:padding="10dp"
-                        android:src="@drawable/ic_px_edit"
-                        app:tint="#E4F0FB" />
+                        app:drawableStartIntegerScaling="true" app:drawableStartSize="@dimen/_36sdp"
+                        app:drawableEndSize="@dimen/padding_heavy" app:drawableEndPadding="@dimen/_1sdp" />
+                    <ImageButton android:id="@+id/edit_profile_button"
+                        android:layout_width="44dp" android:layout_height="44dp"
+                        android:background="@drawable/aerix_nav_button" android:padding="11dp"
+                        android:contentDescription="@string/aerix_edit_instance" android:src="@drawable/ic_px_edit"
+                        app:tint="#EAF8FF" />
                 </LinearLayout>
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp" android:text="@string/aerix_home_hero_caption"
+                    android:textSize="13sp" android:textColor="#E0F0FA" />
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp" android:gravity="center_vertical" android:orientation="horizontal">
+                    <ImageView android:id="@+id/home_account_icon" android:layout_width="32dp"
+                        android:layout_height="32dp" android:contentDescription="@string/aerix_home_account"
+                        android:src="@drawable/ic_aerix_account" app:tint="#E9F6FF" />
+                    <TextView android:id="@+id/home_account_summary" android:layout_width="0dp"
+                        android:layout_height="wrap_content" android:layout_weight="1"
+                        android:layout_marginStart="8dp" android:ellipsize="end" android:maxLines="1"
+                        android:textColor="#E6F5FC" android:textSize="12sp" />
+                    <TextView android:id="@+id/home_ram_label" android:layout_width="wrap_content"
+                        android:layout_height="wrap_content" android:textColor="#D9ECF9" android:textSize="11sp" />
+                </LinearLayout>
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:layout_marginTop="20dp" android:orientation="horizontal">
+                    <Button android:id="@+id/hero_create_button" android:layout_width="0dp"
+                        android:layout_height="44dp" android:layout_weight="1" android:layout_marginEnd="4dp"
+                        android:text="@string/aerix_home_create" android:textAllCaps="false" />
+                    <Button android:id="@+id/hero_library_button" android:layout_width="0dp"
+                        android:layout_height="44dp" android:layout_weight="1" android:layout_marginStart="4dp"
+                        android:text="@string/aerix_home_library" android:textAllCaps="false" />
+                </LinearLayout>
+                <Button android:id="@+id/hero_mods_button" android:layout_width="match_parent"
+                    android:layout_height="44dp" android:layout_marginTop="8dp"
+                    android:text="@string/aerix_home_browse_mods" android:textAllCaps="false" />
+            </LinearLayout>
 
-                <TextView
-                    android:id="@+id/home_ram_label"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:background="@drawable/aerix_nav_button"
-                    android:drawableStart="@drawable/ic_px_ram"
-                    android:minHeight="36dp"
-                    android:gravity="center_vertical"
-                    android:paddingHorizontal="10dp"
-                    android:textColor="#ECF6FF"
-                    android:textSize="11sp" />
-
-                <Button
-                    android:id="@+id/quick_tools_button"
-                    android:layout_width="match_parent"
-                    android:layout_height="40dp"
-                    android:layout_marginTop="10dp"
-                    android:text="@string/aerix_quick_tools"
-                    android:textAllCaps="false"
-                    android:textColor="#FFFFFF" />
-
-                <com.kdt.mcgui.MineButton
-                    android:id="@+id/play_button"
-                    android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:layout_marginTop="10dp"
-                    android:text="@string/main_play"
-                    android:textColor="#FFFFFF"
-                    android:textSize="16sp" />
+            <LinearLayout android:id="@+id/quick_actions_panel" android:layout_width="0dp"
+                android:layout_height="wrap_content" android:layout_weight="0.85"
+                android:layout_marginStart="8dp" android:background="@android:color/transparent"
+                android:gravity="center_horizontal" android:orientation="vertical" android:padding="16dp">
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:text="@string/prism_ready" android:textSize="17sp" android:textStyle="bold"
+                    android:textColor="#F5FBFF" android:gravity="center" />
+                <FrameLayout android:layout_width="match_parent" android:layout_height="132dp"
+                    android:layout_marginTop="6dp">
+                    <Button android:id="@+id/play_button" android:layout_width="108dp"
+                        android:layout_height="108dp" android:layout_gravity="center"
+                        android:background="@drawable/prism_orb" android:contentDescription="@string/prism_launch_world"
+                        android:text="▷" android:textAllCaps="false" android:textColor="#173756"
+                        android:textSize="42sp" />
+                </FrameLayout>
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:text="@string/prism_launch_world" android:gravity="center"
+                    android:textSize="13sp" android:textColor="#F0F9FF" />
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp" android:orientation="horizontal">
+                    <Button android:id="@+id/account_manage_button" android:layout_width="0dp"
+                        android:layout_height="42dp" android:layout_weight="1"
+                        android:layout_marginEnd="4dp" android:text="@string/aerix_home_account_manage"
+                        android:textAllCaps="false" />
+                    <Button android:id="@+id/quick_tools_button" android:layout_width="0dp"
+                        android:layout_height="42dp" android:layout_weight="1"
+                        android:layout_marginStart="4dp" android:text="@string/aerix_quick_tools"
+                        android:textAllCaps="false" />
+                </LinearLayout>
             </LinearLayout>
         </LinearLayout>
     </LinearLayout>

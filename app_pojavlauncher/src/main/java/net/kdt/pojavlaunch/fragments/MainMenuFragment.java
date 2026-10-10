@@ -4,6 +4,8 @@ import static net.kdt.pojavlaunch.Tools.openPath;
 import static net.kdt.pojavlaunch.Tools.shareLog;
 
 import android.content.Context;
+import android.animation.ObjectAnimator;
+import android.animation.ValueAnimator;
 import android.content.Intent;
 import android.graphics.Color;
 import android.os.Bundle;
@@ -37,6 +39,7 @@ import net.kdt.pojavlaunch.prefs.LauncherPreferences;
 import net.kdt.pojavlaunch.progresskeeper.ProgressKeeper;
 import net.kdt.pojavlaunch.utils.AerixThemeManager;
 import net.kdt.pojavlaunch.utils.FileUtils;
+import net.kdt.pojavlaunch.utils.PrismGlass;
 import net.kdt.pojavlaunch.utils.jre.GameRunner;
 
 import java.io.File;
@@ -45,6 +48,7 @@ public class MainMenuFragment extends Fragment {
     public static final String TAG = "MainMenuFragment";
 
     private mcVersionSpinner mVersionSpinner;
+    private ObjectAnimator mOrbMotion;
     private ImageView mAccountIcon;
     private TextView mAccountSummary;
     private TextView mRamSummary;
@@ -77,9 +81,23 @@ public class MainMenuFragment extends Fragment {
         styleGlassButton(mHeroModsButton);
         styleGlassButton(mAccountManageButton);
         styleGlassButton(mQuickToolsButton);
-        if (mPlayButton != null) {
+        if (mPlayButton != null && getResources().getConfiguration().orientation ==
+                android.content.res.Configuration.ORIENTATION_LANDSCAPE) {
+            mPlayButton.setBackgroundResource(R.drawable.prism_orb);
+            mPlayButton.setBackgroundTintList(null);
+            mPlayButton.setTextColor(Color.rgb(23, 55, 86));
+            mOrbMotion = ObjectAnimator.ofFloat(mPlayButton, View.TRANSLATION_Y, 0f,
+                    -7f * getResources().getDisplayMetrics().density);
+            mOrbMotion.setDuration(2200);
+            mOrbMotion.setRepeatCount(ValueAnimator.INFINITE);
+            mOrbMotion.setRepeatMode(ValueAnimator.REVERSE);
+            if (android.os.Build.VERSION.SDK_INT < 26 || ValueAnimator.areAnimatorsEnabled()) {
+                mOrbMotion.start();
+            }
+        } else if (mPlayButton != null) {
             AerixThemeManager.tintPrimaryButton(mPlayButton, requireContext(), AerixThemeManager.SECTION_HOME);
         }
+        PrismGlass.apply(view.findViewById(R.id.instance_panel));
         updateHomeStatus();
 
         setClickIfPresent(mEditProfileButton, v -> {
@@ -127,6 +145,27 @@ public class MainMenuFragment extends Fragment {
         }
         });
 
+    }
+
+    @Override
+    public void onStop() {
+        if (mOrbMotion != null) mOrbMotion.pause();
+        super.onStop();
+    }
+
+    @Override
+    public void onStart() {
+        super.onStart();
+        if (mOrbMotion != null && mOrbMotion.isPaused()) mOrbMotion.resume();
+    }
+
+    @Override
+    public void onDestroyView() {
+        if (mOrbMotion != null) {
+            mOrbMotion.cancel();
+            mOrbMotion = null;
+        }
+        super.onDestroyView();
     }
 
     private void setClickIfPresent(@Nullable View view, @NonNull View.OnClickListener listener) {

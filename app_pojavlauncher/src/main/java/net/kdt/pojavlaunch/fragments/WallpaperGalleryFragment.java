@@ -37,6 +37,7 @@ import net.kdt.pojavlaunch.Tools;
 import net.kdt.pojavlaunch.prefs.LauncherPreferences;
 import net.kdt.pojavlaunch.utils.AerixSettingsTabBar;
 import net.kdt.pojavlaunch.utils.AerixThemeManager;
+import net.kdt.pojavlaunch.utils.PrismGlass;
 import net.kdt.pojavlaunch.utils.WallpaperUtils;
 
 import java.io.IOException;
@@ -90,7 +91,7 @@ public class WallpaperGalleryFragment extends Fragment {
         header.setOrientation(LinearLayout.HORIZONTAL);
         header.setGravity(Gravity.CENTER_VERTICAL);
         header.setPadding(dp(20), dp(10), dp(20), dp(10));
-        header.setBackground(panelBackground());
+        PrismGlass.apply(header);
         LinearLayout titleStack = new LinearLayout(requireContext());
         titleStack.setOrientation(LinearLayout.VERTICAL);
         titleStack.addView(text(getString(R.string.aerix_wallpaper_title), 22, "#F1F6FC", true));
@@ -121,7 +122,7 @@ public class WallpaperGalleryFragment extends Fragment {
         LinearLayout galleryPanel = new LinearLayout(requireContext());
         galleryPanel.setOrientation(LinearLayout.VERTICAL);
         galleryPanel.setPadding(dp(12), dp(10), dp(12), dp(8));
-        galleryPanel.setBackground(panelBackground());
+        PrismGlass.apply(galleryPanel);
         body.addView(galleryPanel, new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.MATCH_PARENT, 1f));
         LinearLayout galleryHeading = new LinearLayout(requireContext());
@@ -159,7 +160,7 @@ public class WallpaperGalleryFragment extends Fragment {
         LinearLayout sidePanel = new LinearLayout(requireContext());
         sidePanel.setOrientation(LinearLayout.VERTICAL);
         sidePanel.setPadding(dp(12), dp(10), dp(12), dp(10));
-        sidePanel.setBackground(panelBackground());
+        PrismGlass.apply(sidePanel);
         LinearLayout.LayoutParams sideParams = new LinearLayout.LayoutParams(
                 Math.max(dp(248), Math.min(dp(312), (int) (getResources().getConfiguration().screenWidthDp * 0.28f))),
                 ViewGroup.LayoutParams.MATCH_PARENT);
@@ -171,7 +172,7 @@ public class WallpaperGalleryFragment extends Fragment {
         sidePanel.addView(previewTitle, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(24)));
         FrameLayout previewFrame = new FrameLayout(requireContext());
-        previewFrame.setBackground(panelBackground());
+        PrismGlass.apply(previewFrame);
         previewFrame.setClipToOutline(true);
         sidePanel.addView(previewFrame, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, 0, 0.78f));
@@ -554,7 +555,7 @@ public class WallpaperGalleryFragment extends Fragment {
             holder.label.setText(wallpaper.name);
             holder.image.setTag(wallpaper.id);
             holder.image.setImageDrawable(null);
-            holder.card.setBackground(panelBackground());
+            holder.PrismGlass.apply(card);
             holder.card.setForeground(cardBackground(selected));
             holder.card.setContentDescription(wallpaper.name + (selected ? ", selected" : ""));
             holder.card.setOnClickListener(v -> selectCatalogWallpaper(wallpaper));

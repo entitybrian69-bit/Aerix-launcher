@@ -44,6 +44,7 @@ import net.kdt.pojavlaunch.prefs.LauncherPreferences;
 import net.kdt.pojavlaunch.progresskeeper.ProgressKeeper;
 import net.kdt.pojavlaunch.progresskeeper.TaskCountListener;
 import net.kdt.pojavlaunch.utils.AerixThemeManager;
+import net.kdt.pojavlaunch.utils.PrismGlass;
 
 import org.apache.commons.io.IOUtils;
 
@@ -152,6 +153,7 @@ public class SearchModFragment extends Fragment implements ModItemAdapter.Search
         mOverlayTopCache = getResources().getDimension(R.dimen.fragment_padding_medium);
 
         mOverlay = view.findViewById(R.id.search_mod_overlay);
+        PrismGlass.apply(mOverlay);
         mSearchEditText = view.findViewById(R.id.search_mod_edittext);
         mSearchProgressBar = view.findViewById(R.id.search_mod_progressbar);
         mRecyclerview = view.findViewById(R.id.search_mod_list);
@@ -170,6 +172,7 @@ public class SearchModFragment extends Fragment implements ModItemAdapter.Search
             mSearchFilters.setProjectType("modpack");
         }
         mSearchFilters.apiSource = LauncherPreferences.DEFAULT_PREF.getInt(PREF_DISCOVER_SOURCE, -1);
+        updateDiscoverChips(view);
 
         mRecyclerview.setLayoutManager(new LinearLayoutManager(getContext()));
         mRecyclerview.setAdapter(mModItemAdapter);
@@ -242,6 +245,56 @@ public class SearchModFragment extends Fragment implements ModItemAdapter.Search
                 mStatusTextView.setText(R.string.search_modpack_no_result);
                 break;
         }
+    }
+
+    private void updateDiscoverChips(View root) {
+        LinearLayout row = root.findViewById(R.id.prism_discover_chips);
+        if (row == null) return;
+        row.removeAllViews();
+        addDiscoverChip(row, "Modrinth", mSearchFilters.apiSource == Constants.SOURCE_MODRINTH, () -> {
+            mSearchFilters.apiSource = Constants.SOURCE_MODRINTH;
+            saveSourceAndRefresh(root);
+        });
+        addDiscoverChip(row, "CurseForge", mSearchFilters.apiSource == Constants.SOURCE_CURSEFORGE, () -> {
+            mSearchFilters.apiSource = Constants.SOURCE_CURSEFORGE;
+            saveSourceAndRefresh(root);
+        });
+        String[] labels = {"Modpacks", "Mods", "Resource packs", "Shaders", "World saves"};
+        for (int i = 0; i < DISCOVER_TYPES.length; i++) {
+            final String type = DISCOVER_TYPES[i];
+            addDiscoverChip(row, labels[i], type.equals(mSearchFilters.resolvedProjectType()), () -> {
+                mSearchFilters.setProjectType(type);
+                if ("world".equals(type) && mSearchFilters.apiSource == Constants.SOURCE_MODRINTH) {
+                    mSearchFilters.apiSource = Constants.SOURCE_CURSEFORGE;
+                }
+                LauncherPreferences.DEFAULT_PREF.edit().putString(PREF_DISCOVER_TYPE, type).apply();
+                saveSourceAndRefresh(root);
+            });
+        }
+        addDiscoverChip(row, "Filters", false, this::displayFilterDialog);
+    }
+
+    private void addDiscoverChip(LinearLayout row, String label, boolean selected, Runnable action) {
+        TextView chip = new TextView(requireContext());
+        chip.setText(label);
+        chip.setTextSize(12);
+        chip.setGravity(android.view.Gravity.CENTER);
+        chip.setPadding(dp(14), 0, dp(14), 0);
+        chip.setMinHeight(dp(38));
+        chip.setBackgroundResource(R.drawable.prism_dock_item);
+        chip.setActivated(selected);
+        chip.setTextColor(selected ? Color.rgb(20, 53, 78) : Color.WHITE);
+        chip.setOnClickListener(v -> action.run());
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, dp(38));
+        params.rightMargin = dp(7);
+        row.addView(chip, params);
+    }
+
+    private void saveSourceAndRefresh(View root) {
+        LauncherPreferences.DEFAULT_PREF.edit().putInt(PREF_DISCOVER_SOURCE, mSearchFilters.apiSource).apply();
+        updateDiscoverChips(root);
+        searchMods(mSearchEditText.getText().toString());
     }
 
     private void searchMods(String name) {
@@ -327,6 +380,7 @@ public class SearchModFragment extends Fragment implements ModItemAdapter.Search
                         .putString(PREF_DISCOVER_TYPE, projectType)
                         .putInt(PREF_DISCOVER_SOURCE, selectedSource)
                         .apply();
+                updateDiscoverChips(requireView());
                 searchMods(mSearchEditText.getText().toString());
                 dialogInterface.dismiss();
                 if ((selectedSource == Constants.SOURCE_CURSEFORGE || "world".equals(projectType))
