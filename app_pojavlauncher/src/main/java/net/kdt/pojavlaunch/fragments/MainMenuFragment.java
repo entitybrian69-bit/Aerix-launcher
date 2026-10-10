@@ -60,12 +60,6 @@ public class MainMenuFragment extends Fragment {
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-        Button mNewsButton = view.findViewById(R.id.news_button);
-        Button mDiscordButton = view.findViewById(R.id.social_media_button);
-        Button mCustomControlButton = view.findViewById(R.id.custom_control_button);
-        Button mInstallJarButton = view.findViewById(R.id.install_jar_button);
-        Button mShareLogsButton = view.findViewById(R.id.share_logs_button);
-        Button mOpenDirectoryButton = view.findViewById(R.id.open_files_button);
         Button mHeroCreateButton = view.findViewById(R.id.hero_create_button);
         Button mHeroLibraryButton = view.findViewById(R.id.hero_library_button);
         Button mAccountManageButton = view.findViewById(R.id.account_manage_button);
@@ -77,12 +71,6 @@ public class MainMenuFragment extends Fragment {
         ImageButton mEditProfileButton = view.findViewById(R.id.edit_profile_button);
         Button mPlayButton = view.findViewById(R.id.play_button);
         mVersionSpinner = view.findViewById(R.id.mc_version_spinner);
-        styleGlassButton(mNewsButton);
-        styleGlassButton(mDiscordButton);
-        styleGlassButton(mCustomControlButton);
-        styleGlassButton(mInstallJarButton);
-        styleGlassButton(mShareLogsButton);
-        styleGlassButton(mOpenDirectoryButton);
         styleGlassButton(mHeroCreateButton);
         styleGlassButton(mHeroLibraryButton);
         styleGlassButton(mAccountManageButton);
@@ -92,10 +80,6 @@ public class MainMenuFragment extends Fragment {
         }
         updateHomeStatus();
 
-        setClickIfPresent(mNewsButton, v -> Tools.openURL(requireActivity(), Tools.URL_HOME));
-        setClickIfPresent(mDiscordButton, v -> Tools.openURL(requireActivity(), getString(R.string.social_media_invite)));
-        setClickIfPresent(mCustomControlButton, v -> startActivity(new Intent(requireContext(), CustomControlsActivity.class)));
-        setClickIfPresent(mInstallJarButton, v -> runInstallerWithConfirmation());
         setClickIfPresent(mEditProfileButton, v -> {
             if (mVersionSpinner != null) mVersionSpinner.openProfileEditor(requireActivity());
         });
@@ -139,15 +123,6 @@ public class MainMenuFragment extends Fragment {
         }
         });
 
-        setClickIfPresent(mShareLogsButton, v -> shareLog(requireContext()));
-        setClickIfPresent(mOpenDirectoryButton, v -> openGameDirectory(v.getContext()));
-
-        if (mNewsButton != null) {
-            mNewsButton.setOnLongClickListener(v -> {
-                Tools.swapFragment(requireActivity(), GamepadMapperFragment.class, GamepadMapperFragment.TAG, null);
-                return true;
-            });
-        }
     }
 
     private void setClickIfPresent(@Nullable View view, @NonNull View.OnClickListener listener) {
