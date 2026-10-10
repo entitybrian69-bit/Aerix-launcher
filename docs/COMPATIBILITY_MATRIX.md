@@ -1,61 +1,133 @@
-# Aerix Launcher Android compatibility matrix
+# Aerix Launcher compatibility matrix
 
-**Status:** source audit and implementation guardrails, not a device-compatibility certification. This document reflects the checked-out launcher source and the published runtime archive manifest as inspected on 2026-10-09. It does not claim that every listed combination has launched Minecraft successfully.
+**Evidence status:** this is a source/runtime-archive audit, not a device-compatibility certification. Every cell that lacks direct evidence is explicitly marked **Not Tested**. Source support, packaged ABI presence, and successful Minecraft launch are separate claims.
 
-## Android platform and native ABI declarations
+## Android OS API levels
 
-| Area | Source-level declaration | Verification status |
-| --- | --- | --- |
-| Minimum Android | API 23 (`minSdkVersion` in `app_pojavlauncher/build.gradle`) | Declared; no physical API 23 device tested in this environment |
-| Target Android | API 36 (`targetSdkVersion`) | Declared; no API 36 device/emulator test run |
-| Native ABIs | `arm64-v8a`, `armeabi-v7a`, `x86`, and `x86_64` appear in `jniLibs` and the shipped renderer AARs; native CMake targets are not restricted by an `abiFilters` list | Source assets inspected; APK split contents/build not verified |
-| Baseline graphics API | The manifest requests OpenGL ES 2.0; GL4ES is the GLES 2 route. LTW and several newer wrappers require GLES 3 or later | Source inspected; hardware behavior is unverified |
-| Vulkan | Android Vulkan hardware-level and hardware-version package features are used as a prerequisite for Vulkan renderer visibility. Those flags do not prove a driver's backend-specific extension/feature set | Source inspected; no Vulkan device query or physical Vulkan test was run |
+The manifest declares `minSdkVersion 23` (Android 6.0) and `targetSdkVersion 36`. This table does **not** imply that each release has been installed or tested.
 
-The application targets Android 36; this is not a promise that all future Android releases or every device configuration behave identically. Android 16+ may also apply large-screen orientation policies that differ from handset behavior.
+| Android API | Manifest/source relationship | Install/runtime test | Physical-device or emulator test |
+|---|---|---|---|
+| API 23 | Declared minimum (`minSdkVersion 23`, Android 6.0) | Not Tested | Not Tested |
+| API 24 | Inside declared API 23–36 range | Not Tested | Not Tested |
+| API 25 | Inside declared API 23–36 range | Not Tested | Not Tested |
+| API 26 | Inside declared API 23–36 range | Not Tested | Not Tested |
+| API 27 | Inside declared API 23–36 range | Not Tested | Not Tested |
+| API 28 | Inside declared API 23–36 range | Not Tested | Not Tested |
+| API 29 | Inside declared API 23–36 range | Not Tested | Not Tested |
+| API 30 | Inside declared API 23–36 range | Not Tested | Not Tested |
+| API 31 | Inside declared API 23–36 range | Not Tested | Not Tested |
+| API 32 | Inside declared API 23–36 range | Not Tested | Not Tested |
+| API 33 | Inside declared API 23–36 range | Not Tested | Not Tested |
+| API 34 | Inside declared API 23–36 range | Not Tested | Not Tested |
+| API 35 | Inside declared API 23–36 range | Not Tested | Not Tested |
+| API 36 | Declared target (`targetSdkVersion 36`) | Not Tested | Not Tested |
 
-## Runtime and ABI matrix
+## Native ABI and runtime archive availability
 
-The launcher selects a Java major from each installed Minecraft version's `javaVersion` metadata and installs a compatible runtime. The checkout lists Java 8, 17, 21, and 25 runtime channels. Java 8 is assembled into the `full` build; newer runtime archives are downloaded on demand and verified against the signed runtime manifest.
+| Android ABI | APK native-library verifier | Java 8/17 channel | Java 21 channel | Java 25 channel | Minecraft launch on this ABI |
+|---|---|---|---|---|---|
+| `arm64-v8a` | Present in both CI Debug APKs | Archive/channel available | Archive/channel available | Archive/channel available | Not Tested |
+| `armeabi-v7a` | Present in both CI Debug APKs | Archive/channel available | Archive/channel available | Archive/channel available; **not proof of Minecraft 26.x ARM32 support** | Not Tested |
+| `x86` | Present in both CI Debug APKs | Java 8/17 available | Filtered by launcher policy | Filtered by launcher policy; no Java 25 channel | Not Tested |
+| `x86_64` | Present in both CI Debug APKs | Archive/channel available | Archive/channel available | Archive/channel available | Not Tested |
 
-The published runtime manifest tree is available at [MojoLauncher/android-openjdk-build-multiarch runtime downloads](https://github.com/MojoLauncher/jre-download). Its archive entries show:
+**APK ABI presence ≠ device launch test.** CI inspects native library entries in built APKs; it does not run Android, start a JVM on each ABI, or launch Minecraft. Runtime archives also do not guarantee that the matching Minecraft client, LWJGL, modloader, or native libraries exist for that ABI.
 
-| Process ABI | Java 8 / 17 (`jre-new`) | Java 21 (`jre-21`) | Java 25 (`jre-25`) | Launcher caveat |
-| --- | --- | --- | --- | --- |
-| `arm64-v8a` | Archive present | Archive present | Archive present | Native game libraries and renderer support still vary by Minecraft version/modloader |
-| `armeabi-v7a` | Archive present | Archive present | Archive present | Java runtime availability does not prove the game's LWJGL/native artifacts support 32-bit ARM |
-| `x86` | Archive present | Archive present, but launcher currently filters Java 21+ for 32-bit x86 | No archive present | Treat Java 8/17 as the current launcher-supported runtime set |
-| `x86_64` | Archive present | Archive present | Archive present | Game/modloader native artifacts still have to provide x86_64 variants |
+## Renderer/backend routes
 
-The runtime archive manifest is evidence of available runtime packages, not evidence that Minecraft itself runs on every ABI. In particular, ARM32 Java 25 availability is **not** a claim that any Minecraft 26.x release has ARM32 game/native support.
+| Renderer/backend | Source availability and prerequisites | Selection policy | Device/GPU/driver test |
+|---|---|---|---|
+| GL4ES | Bundled renderer route; Android manifest baseline is GLES 2.0. Smart Pick's existing version rule may select it for compatible older game releases. | Smart Pick eligible when the game-version rule allows it; also manually selectable. | Not Tested |
+| LTW | Optional native library/AAR; requires a usable GLES 3 context and installed LTW library. | Smart Pick eligible only when GLES 3 is detected and LTW is present; otherwise not selected. | Not Tested |
+| ANGLE | Existing system/external GLES provider code. System ANGLE is considered on supported Android releases; external ANGLE requires its plugin/library. It is not proof that ANGLE is packaged on a device. | Manual opt-in only; not selected by Smart Pick. | Not Tested |
+| Vulkan (Zink / related routes) | Renderer implementations exist; Android Vulkan package-feature declarations are only a prerequisite. They do not prove Vulkan API version, required extensions/features, driver quality, or surface presentation. | **Manual-select only. Vulkan is never selected automatically.** | Not Tested |
 
-## Renderer routes and constraints
+Smart Pick currently uses only the GL4ES/LTW OpenGL routes. Renderer choices must remain capability-, ABI-, GLES-, installed-library-, and game-requirement-driven; manufacturer/model is not a compatibility signal. EGL entry-point fallback behavior is source-level only and not hardware-certified.
 
-| Route | Source-level constraint | Selection policy |
-| --- | --- | --- |
-| GL4ES | Bundled for all four declared ABIs; intended for GLES 2 and older Minecraft compatibility contexts | Smart Pick uses this only for versions identified by the existing release-date compatibility rule |
-| LTW | Available only where the LTW native library is installed and GLES 3 is detected | Smart Pick uses this for newer versions when the device and installed library meet those checks |
-| NG-GL4ES / MobileGlues / SFPEW | Present as renderer implementations and packaged dependencies; several require GLES 3 | Kept as manual choices when the device package reports them compatible. Game-version support must be confirmed for the specific release/modpack |
-| Zink / Mesa / Freedreno | Some variants are optional or external and require their matching native assets; Zink uses Vulkan | Smart Pick does not select a Vulkan-only renderer. Android feature flags are only a prerequisite, not backend-extension certification |
-| Renderer EGL entry points | SDL needs a complete set of core EGL calls, often obtained through `eglGetProcAddress` | Renderer setup now checks the selected library's usable EGL entry points and retries the GL4ES fallback before reporting failure |
+## Java runtime × Minecraft 26.x × ABI matrix
 
-The launch pipeline reads the official Mojang version JSON and uses its declared Java major version. The official manifest and per-version JSON were checked on 2026-10-09: **26.1.2, 26.2, and 26.3 each declare Java 25**. The Java requirement is therefore known; Android ABI and successful game launch are separate questions.
+Mojang version metadata checked 2026-10-09 declares **Java 25** for 26.1.2, 26.2, and 26.3. Java 8 is included in the `full` APK; signed runtime channels are also available on demand. Java 17, 21, and 25 are signed on-demand channels. The Java 21/25 channels are filtered on 32-bit x86 by launcher policy. “Available” describes a runtime package/channel only; it does not certify the game/native ABI.
 
-Mojang's official 26.2 release notes describe Vulkan as experimental, with OpenGL as a fallback, and list Vulkan 1.2 plus dynamic-rendering and push-descriptor support as the then-current Vulkan requirement. Mojang's Java Edition system-requirements page, updated 2026-07-21, now uses Vulkan 1.3-capable graphics as its minimum PC target; it also notes that below-minimum hardware may still launch, without guaranteed performance or visuals. Those PC requirements do **not** certify an Android translation layer. The 26.3 per-version launcher JSON supplies Java/runtime metadata, not an Android renderer compatibility declaration.
+| JRE channel | Delivery | Minecraft version | ABI | Required Java major | Runtime channel availability | Metadata-level compatibility / caveat | Actual Android game launch |
+|---|---|---|---|---|---|---|---|
+| Java 8 | Full APK bundle (plus signed on-demand channel) | 26.1.2 | `arm64-v8a` | Java 25 required | Available | Not compatible: Mojang metadata requires Java 25 | Not Tested |
+| Java 8 | Full APK bundle (plus signed on-demand channel) | 26.1.2 | `armeabi-v7a` | Java 25 required | Available | Not compatible: Mojang metadata requires Java 25 | Not Tested |
+| Java 8 | Full APK bundle (plus signed on-demand channel) | 26.1.2 | `x86` | Java 25 required | Available | Not compatible: Mojang metadata requires Java 25 | Not Tested |
+| Java 8 | Full APK bundle (plus signed on-demand channel) | 26.1.2 | `x86_64` | Java 25 required | Available | Not compatible: Mojang metadata requires Java 25 | Not Tested |
+| Java 8 | Full APK bundle (plus signed on-demand channel) | 26.2 | `arm64-v8a` | Java 25 required | Available | Not compatible: Mojang metadata requires Java 25 | Not Tested |
+| Java 8 | Full APK bundle (plus signed on-demand channel) | 26.2 | `armeabi-v7a` | Java 25 required | Available | Not compatible: Mojang metadata requires Java 25 | Not Tested |
+| Java 8 | Full APK bundle (plus signed on-demand channel) | 26.2 | `x86` | Java 25 required | Available | Not compatible: Mojang metadata requires Java 25 | Not Tested |
+| Java 8 | Full APK bundle (plus signed on-demand channel) | 26.2 | `x86_64` | Java 25 required | Available | Not compatible: Mojang metadata requires Java 25 | Not Tested |
+| Java 8 | Full APK bundle (plus signed on-demand channel) | 26.3 | `arm64-v8a` | Java 25 required | Available | Not compatible: Mojang metadata requires Java 25 | Not Tested |
+| Java 8 | Full APK bundle (plus signed on-demand channel) | 26.3 | `armeabi-v7a` | Java 25 required | Available | Not compatible: Mojang metadata requires Java 25 | Not Tested |
+| Java 8 | Full APK bundle (plus signed on-demand channel) | 26.3 | `x86` | Java 25 required | Available | Not compatible: Mojang metadata requires Java 25 | Not Tested |
+| Java 8 | Full APK bundle (plus signed on-demand channel) | 26.3 | `x86_64` | Java 25 required | Available | Not compatible: Mojang metadata requires Java 25 | Not Tested |
+| Java 17 | Signed on-demand channel | 26.1.2 | `arm64-v8a` | Java 25 required | Available | Not compatible: Mojang metadata requires Java 25 | Not Tested |
+| Java 17 | Signed on-demand channel | 26.1.2 | `armeabi-v7a` | Java 25 required | Available | Not compatible: Mojang metadata requires Java 25 | Not Tested |
+| Java 17 | Signed on-demand channel | 26.1.2 | `x86` | Java 25 required | Available | Not compatible: Mojang metadata requires Java 25 | Not Tested |
+| Java 17 | Signed on-demand channel | 26.1.2 | `x86_64` | Java 25 required | Available | Not compatible: Mojang metadata requires Java 25 | Not Tested |
+| Java 17 | Signed on-demand channel | 26.2 | `arm64-v8a` | Java 25 required | Available | Not compatible: Mojang metadata requires Java 25 | Not Tested |
+| Java 17 | Signed on-demand channel | 26.2 | `armeabi-v7a` | Java 25 required | Available | Not compatible: Mojang metadata requires Java 25 | Not Tested |
+| Java 17 | Signed on-demand channel | 26.2 | `x86` | Java 25 required | Available | Not compatible: Mojang metadata requires Java 25 | Not Tested |
+| Java 17 | Signed on-demand channel | 26.2 | `x86_64` | Java 25 required | Available | Not compatible: Mojang metadata requires Java 25 | Not Tested |
+| Java 17 | Signed on-demand channel | 26.3 | `arm64-v8a` | Java 25 required | Available | Not compatible: Mojang metadata requires Java 25 | Not Tested |
+| Java 17 | Signed on-demand channel | 26.3 | `armeabi-v7a` | Java 25 required | Available | Not compatible: Mojang metadata requires Java 25 | Not Tested |
+| Java 17 | Signed on-demand channel | 26.3 | `x86` | Java 25 required | Available | Not compatible: Mojang metadata requires Java 25 | Not Tested |
+| Java 17 | Signed on-demand channel | 26.3 | `x86_64` | Java 25 required | Available | Not compatible: Mojang metadata requires Java 25 | Not Tested |
+| Java 21 | Signed on-demand channel | 26.1.2 | `arm64-v8a` | Java 25 required | Available | Not compatible: Mojang metadata requires Java 25 | Not Tested |
+| Java 21 | Signed on-demand channel | 26.1.2 | `armeabi-v7a` | Java 25 required | Available | Not compatible: Mojang metadata requires Java 25 | Not Tested |
+| Java 21 | Signed on-demand channel | 26.1.2 | `x86` | Java 25 required | Filtered by launcher policy | Not compatible: Mojang metadata requires Java 25 | Not Tested |
+| Java 21 | Signed on-demand channel | 26.1.2 | `x86_64` | Java 25 required | Available | Not compatible: Mojang metadata requires Java 25 | Not Tested |
+| Java 21 | Signed on-demand channel | 26.2 | `arm64-v8a` | Java 25 required | Available | Not compatible: Mojang metadata requires Java 25 | Not Tested |
+| Java 21 | Signed on-demand channel | 26.2 | `armeabi-v7a` | Java 25 required | Available | Not compatible: Mojang metadata requires Java 25 | Not Tested |
+| Java 21 | Signed on-demand channel | 26.2 | `x86` | Java 25 required | Filtered by launcher policy | Not compatible: Mojang metadata requires Java 25 | Not Tested |
+| Java 21 | Signed on-demand channel | 26.2 | `x86_64` | Java 25 required | Available | Not compatible: Mojang metadata requires Java 25 | Not Tested |
+| Java 21 | Signed on-demand channel | 26.3 | `arm64-v8a` | Java 25 required | Available | Not compatible: Mojang metadata requires Java 25 | Not Tested |
+| Java 21 | Signed on-demand channel | 26.3 | `armeabi-v7a` | Java 25 required | Available | Not compatible: Mojang metadata requires Java 25 | Not Tested |
+| Java 21 | Signed on-demand channel | 26.3 | `x86` | Java 25 required | Filtered by launcher policy | Not compatible: Mojang metadata requires Java 25 | Not Tested |
+| Java 21 | Signed on-demand channel | 26.3 | `x86_64` | Java 25 required | Available | Not compatible: Mojang metadata requires Java 25 | Not Tested |
+| Java 25 | Signed on-demand channel | 26.1.2 | `arm64-v8a` | Java 25 required | Available | Java major matches metadata; game/native ABI support Not Tested | Not Tested |
+| Java 25 | Signed on-demand channel | 26.1.2 | `armeabi-v7a` | Java 25 required | Available | Runtime exists; NOT proof of ARM32 Minecraft 26.x support | Not Tested |
+| Java 25 | Signed on-demand channel | 26.1.2 | `x86` | Java 25 required | Not available: Java 25 is filtered on x86 | Not compatible: no Java 25 runtime channel for x86 | Not Tested |
+| Java 25 | Signed on-demand channel | 26.1.2 | `x86_64` | Java 25 required | Available | Java major matches metadata; game/native ABI support Not Tested | Not Tested |
+| Java 25 | Signed on-demand channel | 26.2 | `arm64-v8a` | Java 25 required | Available | Java major matches metadata; game/native ABI support Not Tested | Not Tested |
+| Java 25 | Signed on-demand channel | 26.2 | `armeabi-v7a` | Java 25 required | Available | Runtime exists; NOT proof of ARM32 Minecraft 26.x support | Not Tested |
+| Java 25 | Signed on-demand channel | 26.2 | `x86` | Java 25 required | Not available: Java 25 is filtered on x86 | Not compatible: no Java 25 runtime channel for x86 | Not Tested |
+| Java 25 | Signed on-demand channel | 26.2 | `x86_64` | Java 25 required | Available | Java major matches metadata; game/native ABI support Not Tested | Not Tested |
+| Java 25 | Signed on-demand channel | 26.3 | `arm64-v8a` | Java 25 required | Available | Java major matches metadata; game/native ABI support Not Tested | Not Tested |
+| Java 25 | Signed on-demand channel | 26.3 | `armeabi-v7a` | Java 25 required | Available | Runtime exists; NOT proof of ARM32 Minecraft 26.x support | Not Tested |
+| Java 25 | Signed on-demand channel | 26.3 | `x86` | Java 25 required | Not available: Java 25 is filtered on x86 | Not compatible: no Java 25 runtime channel for x86 | Not Tested |
+| Java 25 | Signed on-demand channel | 26.3 | `x86_64` | Java 25 required | Available | Java major matches metadata; game/native ABI support Not Tested | Not Tested |
 
-The launcher currently does not query the loaded Vulkan driver's API version, physical-device features/extensions, or presentation-surface support. Its package feature flags are only a coarse prerequisite, and Smart Pick currently chooses only GL4ES/LTW OpenGL routes; it does not auto-select Zink/Vulkan. Consequently, Minecraft 26.1.2/26.2/26.3 metadata is available and the required Java major is known, but those game versions' Android renderer/ABI combinations remain **unverified**. The presence of a Java 25 archive for ARM32 is not evidence that a 26.x client or its native dependencies support ARM32.
+**ARM32 warning:** Java 25 being present in the runtime archive manifest for `armeabi-v7a` is **NOT proof** that Minecraft 26.x, its client jar, LWJGL, modloader, or native libraries support ARM32. Those rows remain **Not Tested**.
 
-Sources checked: [Mojang version manifest](https://piston-meta.mojang.com/mc/game/version_manifest_v2.json), [26.1.2 metadata](https://piston-meta.mojang.com/v1/packages/78941de799d2675be5bddca699b245d7cbd567ae/26.1.2.json), [26.2 metadata](https://piston-meta.mojang.com/v1/packages/d367f3dfbc0b3e14688df2311359deb609b234e3/26.2.json), [26.3 metadata](https://piston-meta.mojang.com/v1/packages/702fe59163c6ee6578607daa85811d9bc9c7cc40/26.3.json), [Mojang's 26.2 release notes](https://www.minecraft.net/en-us/article/minecraft-java-edition-26-2), and [Java Edition system requirements](https://www.minecraft.net/en-us/article/minecraft-java-edition-system-requirements).
+For Minecraft versions other than 26.1.2, 26.2, and 26.3, this cross-product matrix is **Not Tested** here; check that version's official `javaVersion` metadata and the native artifacts used by the selected profile.
 
-## Test coverage and claims
+## Form factors and orientation
 
-- **CI tests/builds:** GitHub Actions run [37967648292](https://github.com/entitybrian69-bit/Aerix-launcher/actions/runs/37967648292) succeeded on commit `acb63f1` (`arena/fb5cd066-aerix-launcher`). It ran `:app_pojavlauncher:testFullDebugUnitTest` (including the new NBT server-list round-trip tests), assembled both `fullDebug` and `noruntimeDebug`, and ran the APK ABI verifier against each output.
-- **Debug APK artifacts:** [full-debug ZIP](https://github.com/entitybrian69-bit/Aerix-launcher/actions/runs/37967648292/artifacts/11633559491) (`aerix-launcher-1.0.0-full-debug`, 121,401,959 bytes) and [no-runtime-debug ZIP](https://github.com/entitybrian69-bit/Aerix-launcher/actions/runs/37967648292/artifacts/11634338036) (`aerix-launcher-1.0.0-noruntime-debug`, 92,305,114 bytes). Both ZIPs contain the APK and MD5 file.
-- **Optional Mesa artifact:** the CI lookup for an external Mesa AAR returned Not Found and was configured as non-blocking. The CI verification therefore confirms the required libraries in those two built APKs, but does not certify optional/external Mesa renderer availability on a device.
-- **Physical devices tested:** none are attached/available to this session.
-- **Emulators tested:** none.
-- **Current host:** x86_64 Linux only. Host architecture is not Android ABI/GPU coverage.
-- **Narzo 50 / Mali-G57 MC2:** retained as a required regression case; not physically tested in this session.
-- **Adreno/Vulkan, Mali/Vulkan, Mali GLES-only, ARM32, x86/x86_64, memory tiers, API 23, and API 36:** all require device/emulator testing before making a runtime compatibility claim.
+The launcher activities declare `sensorLandscape`; this is a source-level orientation request, not proof of correct layout, input, window-inset, fold posture, or game behavior. Large-screen Android policies may override requested orientation.
 
-Aerix does not claim to work on all Android devices. The source-level envelope is Android API 23+, with the four listed native ABIs and renderer/runtime availability constrained by the actual device, game metadata, and native libraries. Successful game launch on a specific combination remains unverified until that combination is tested.
+| Form factor | Launcher orientation/layout source declaration | UI / inset / posture test | Game launch test |
+|---|---|---|---|
+| Phone in landscape | Landscape-first launcher shell; `sensorLandscape` declared | Not Tested | Not Tested |
+| Tablet | Responsive rail/card layouts exist; `sensorLandscape` declared | Not Tested | Not Tested |
+| Foldable | `sensorLandscape` declared; hinge/posture-specific adaptation not verified | Not Tested | Not Tested |
+| Chromebook | `sensorLandscape` declared; keyboard/mouse paths exist in source | Not Tested | Not Tested |
+
+## CI and test boundary
+
+| Evidence | Status |
+|---|---|
+| Last known passing CI | Run [37967648292](https://github.com/entitybrian69-bit/Aerix-launcher/actions/runs/37967648292), code commit `acb63f1`: unit tests, full/no-runtime Debug APK builds, and four-ABI APK verifier passed. Subsequent worktree edits are not covered by that run until CI is rerun. |
+| CI artifacts | [Full Debug ZIP](https://github.com/entitybrian69-bit/Aerix-launcher/actions/runs/37967648292/artifacts/11633559491) and [no-runtime Debug ZIP](https://github.com/entitybrian69-bit/Aerix-launcher/actions/runs/37967648292/artifacts/11634338036). They contain APKs and MD5 files. |
+| Release AAB | Not produced by this fork's Debug CI. CI produces Debug APKs, **not a release AAB**. |
+| Mesa external artifact lookup | **Non-blocking — Not Found. Do not retry.** Optional Mesa assets/device availability are not verified by that lookup. |
+| Physical devices | Not Tested |
+| Android emulators | Not Tested |
+| API 23 handset/device | Not Tested |
+| API 36 device/emulator | Not Tested |
+| Narzo 50 / Mali-G57 MC2 regression | Not Tested |
+| Adreno Vulkan / GLES-only, Mali Vulkan / GLES-only, ARM32, x86, x86_64 and memory-tier combinations | Not Tested |
+
+No universal Android or GPU compatibility claim is made. The source-level envelope is API 23–36 and the four ABIs listed above; successful launch remains unverified for every device/game/runtime/renderer combination.

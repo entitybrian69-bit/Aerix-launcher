@@ -7,6 +7,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewStub;
+import android.widget.AdapterView;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.Spinner;
@@ -249,6 +250,7 @@ public class ModItemAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
             }
 
             mModItem = item;
+            mModItem.requestedMinecraftVersion = mSearchFilters == null ? null : mSearchFilters.mcVersion;
             // here the previous reference to the image receiver will disappear
             mImageReceiver = bm->{
                 mImageReceiver = null;
@@ -273,6 +275,18 @@ public class ModItemAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
                 mExtendedErrorTextView.setVisibility(View.GONE);
                 mVersionAdapter.setObjects(Arrays.asList(detailedItem.versionNames));
                 mExtendedSpinner.setAdapter(mVersionAdapter);
+                mExtendedSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+                    @Override
+                    public void onItemSelected(android.widget.AdapterView<?> parent, View view, int position, long id) {
+                        updateInstallButtonLabel(position);
+                    }
+
+                    @Override
+                    public void onNothingSelected(android.widget.AdapterView<?> parent) {
+                        if (mExtendedButton != null) mExtendedButton.setText(R.string.generic_install);
+                    }
+                });
+                updateInstallButtonLabel(mExtendedSpinner.getSelectedItemPosition());
             } else {
                 closeDetailedView();
                 setInstallEnabled(false);
@@ -280,6 +294,20 @@ public class ModItemAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
                 mExtendedSpinner.setAdapter(null);
                 mVersionAdapter.setObjects(null);
             }
+        }
+
+        private void updateInstallButtonLabel(int position) {
+            if (mExtendedButton == null || mModDetail == null) return;
+            if (mModDetail.isModpack || mModDetail.versionDependencies == null
+                    || position < 0 || position >= mModDetail.versionDependencies.length) {
+                mExtendedButton.setText(R.string.generic_install);
+                return;
+            }
+            String[] dependencies = mModDetail.versionDependencies[position];
+            int dependencyCount = dependencies == null ? 0 : dependencies.length;
+            if (dependencyCount == 0) mExtendedButton.setText(R.string.generic_install);
+            else mExtendedButton.setText(mExtendedButton.getContext().getString(
+                    R.string.aerix_discover_install_dependencies, dependencyCount));
         }
 
         private void openDetailedView() {

@@ -15,7 +15,7 @@
         android:layout_height="wrap_content"
         android:text="@string/aerix_welcome_title"
         android:textColor="#F1F6FC"
-        android:textSize="25sp"
+        android:textSize="24sp"
         android:textStyle="bold"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
@@ -24,10 +24,10 @@
         android:id="@+id/home_subtitle"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="3dp"
+        android:layout_marginTop="2dp"
         android:text="@string/aerix_welcome_subtitle"
-        android:textColor="#AABCD0"
-        android:textSize="13sp"
+        android:textColor="#C6D8E8"
+        android:textSize="12sp"
         app:layout_constraintStart_toStartOf="@id/home_title"
         app:layout_constraintTop_toBottomOf="@id/home_title" />
 
@@ -36,38 +36,202 @@
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:orientation="vertical"
-        app:layout_constraintGuide_percent="0.5" />
+        app:layout_constraintGuide_percent="0.56" />
 
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/instance_panel"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:layout_marginTop="16dp"
-        android:layout_marginEnd="8dp"
+        android:layout_marginTop="12dp"
+        android:layout_marginEnd="7dp"
         android:background="@drawable/aerix_panel_background"
-        android:padding="16dp"
+        android:padding="24dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toStartOf="@id/home_center_guideline"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/home_subtitle">
 
         <TextView
-            android:id="@+id/current_instance_label"
+            android:id="@+id/home_hero_eyebrow"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:letterSpacing="0.08"
-            android:text="@string/aerix_current_instance"
-            android:textColor="#91B5D0"
+            android:letterSpacing="0.12"
+            android:text="AERIX  /  MINECRAFT JAVA"
+            android:textColor="#DFF8FF"
             android:textSize="11sp"
             android:textStyle="bold"
             app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            tools:ignore="HardcodedText" />
+
+        <TextView
+            android:id="@+id/home_hero_message"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="28dp"
+            android:lineSpacingExtra="-2dp"
+            android:text="@string/aerix_home_hero_title"
+            android:textColor="#FFFFFF"
+            android:textSize="35sp"
+            android:textStyle="bold"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/home_hero_eyebrow" />
+
+        <TextView
+            android:id="@+id/home_hero_description"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:lineSpacingExtra="3dp"
+            android:text="@string/aerix_home_hero_caption"
+            android:textColor="#E0EDF7"
+            android:textSize="14sp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/home_hero_message" />
+
+        <TextView
+            android:id="@+id/home_hero_footer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="14dp"
+            android:letterSpacing="0.08"
+            android:text="CREATE  ·  CUSTOMIZE  ·  PLAY"
+            android:textColor="#DBF4FF"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            app:layout_constraintBottom_toTopOf="@id/hero_action_row"
+            app:layout_constraintStart_toStartOf="parent"
+            tools:ignore="HardcodedText" />
+
+        <LinearLayout
+            android:id="@+id/hero_action_row"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:orientation="horizontal"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent">
+
+            <Button
+                android:id="@+id/hero_create_button"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_marginEnd="6dp"
+                android:layout_weight="1"
+                android:drawableStart="@drawable/ic_px_dynamic"
+                android:gravity="center"
+                android:text="@string/aerix_home_create"
+                android:textAllCaps="false"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <Button
+                android:id="@+id/hero_library_button"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_marginStart="6dp"
+                android:layout_weight="1"
+                android:drawableStart="@drawable/ic_px_file"
+                android:gravity="center"
+                android:text="@string/aerix_home_library"
+                android:textAllCaps="false"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/quick_actions_panel"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_marginStart="7dp"
+        android:layout_marginTop="12dp"
+        android:background="@drawable/aerix_panel_background"
+        android:padding="14dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toEndOf="@id/home_center_guideline"
+        app:layout_constraintTop_toBottomOf="@id/home_subtitle">
+
+        <ImageView
+            android:id="@+id/home_account_icon"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="@drawable/aerix_nav_button"
+            android:contentDescription="@string/aerix_home_account"
+            android:padding="10dp"
+            android:src="@drawable/ic_edit_profile"
+            android:tint="#EAF7FF"
+            app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
+
+        <LinearLayout
+            android:id="@+id/home_account_copy"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:orientation="vertical"
+            app:layout_constraintBottom_toBottomOf="@id/home_account_icon"
+            app:layout_constraintEnd_toStartOf="@id/account_manage_button"
+            app:layout_constraintStart_toEndOf="@id/home_account_icon"
+            app:layout_constraintTop_toTopOf="@id/home_account_icon">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:letterSpacing="0.08"
+                android:text="@string/aerix_home_account"
+                android:textColor="#EDF7FF"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/home_account_summary"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="#BDD1E1"
+                android:textSize="10sp"
+                tools:text="Sign in to play" />
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/account_manage_button"
+            android:layout_width="88dp"
+            android:layout_height="40dp"
+            android:background="@drawable/aerix_nav_button"
+            android:text="@string/aerix_home_manage"
+            android:textAllCaps="false"
+            android:textColor="#FFFFFF"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            app:layout_constraintBottom_toBottomOf="@id/home_account_icon"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="@id/home_account_icon" />
+
+        <TextView
+            android:id="@+id/current_instance_label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:letterSpacing="0.08"
+            android:text="@string/aerix_current_instance"
+            android:textColor="#D6ECFA"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/home_account_icon" />
 
         <com.kdt.mcgui.mcVersionSpinner
             android:id="@+id/mc_version_spinner"
             android:layout_width="0dp"
-            android:layout_height="58dp"
-            android:layout_marginTop="9dp"
+            android:layout_height="52dp"
+            android:layout_marginTop="4dp"
             android:background="@android:color/transparent"
             android:drawableEnd="@drawable/spinner_arrow"
             app:drawableEndSize="@dimen/padding_heavy"
@@ -80,11 +244,11 @@
 
         <ImageButton
             android:id="@+id/edit_profile_button"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
             android:background="@drawable/aerix_nav_button"
             android:contentDescription="@string/aerix_edit_instance"
-            android:padding="12dp"
+            android:padding="11dp"
             android:src="@drawable/ic_px_edit"
             android:tint="#E4F0FB"
             app:layout_constraintBottom_toBottomOf="@id/mc_version_spinner"
@@ -95,69 +259,63 @@
             android:id="@+id/instance_hint"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
+            android:layout_marginTop="1dp"
             android:text="@string/aerix_instance_hint"
-            android:textColor="#AABCD0"
-            android:textSize="12sp"
+            android:textColor="#C6D8E8"
+            android:textSize="10sp"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@id/mc_version_spinner" />
 
-        <com.kdt.mcgui.MineButton
-            android:id="@+id/play_button"
-            android:layout_width="match_parent"
-            android:layout_height="58dp"
-            android:layout_marginTop="14dp"
-            android:text="@string/main_play"
-            android:textAllCaps="true"
-            app:layout_constraintBottom_toBottomOf="parent"
+        <TextView
+            android:id="@+id/home_ram_label"
+            android:layout_width="0dp"
+            android:layout_height="36dp"
+            android:layout_marginTop="6dp"
+            android:background="@drawable/aerix_nav_button"
+            android:drawableStart="@drawable/ic_px_ram"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="10dp"
+            android:textColor="#ECF6FF"
+            android:textSize="11sp"
+            android:textStyle="bold"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@id/instance_hint"
-            app:layout_constraintVertical_bias="1.0" />
-    </androidx.constraintlayout.widget.ConstraintLayout>
-
-    <androidx.constraintlayout.widget.ConstraintLayout
-        android:id="@+id/quick_actions_panel"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:layout_marginStart="8dp"
-        android:layout_marginTop="16dp"
-        android:background="@drawable/aerix_panel_background"
-        android:padding="16dp"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toEndOf="@id/home_center_guideline"
-        app:layout_constraintTop_toBottomOf="@id/home_subtitle">
+            tools:text="RAM allocation · 4096 MB" />
 
         <TextView
             android:id="@+id/quick_actions_title"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
             android:letterSpacing="0.08"
             android:text="@string/aerix_quick_actions"
-            android:textColor="#91B5D0"
-            android:textSize="11sp"
+            android:textColor="#D6ECFA"
+            android:textSize="10sp"
             android:textStyle="bold"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
+            app:layout_constraintTop_toBottomOf="@id/home_ram_label" />
 
         <com.kdt.mcgui.LauncherMenuButton
             android:id="@+id/news_button"
             style="@style/LauncherMenuButton.Universal"
             android:layout_width="0dp"
-            android:layout_height="48dp"
-            android:layout_marginTop="10dp"
+            android:layout_height="38dp"
+            android:layout_marginTop="5dp"
             android:drawableStart="@drawable/ic_px_book"
             android:gravity="center_vertical"
+            android:paddingStart="9dp"
             android:text="@string/mcl_tab_wiki"
+            android:textColor="#FFFFFF"
+            android:textSize="11sp"
             app:layout_constraintEnd_toStartOf="@id/quick_actions_divider"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@id/quick_actions_title" />
 
         <View
             android:id="@+id/quick_actions_divider"
-            android:layout_width="8dp"
+            android:layout_width="7dp"
             android:layout_height="0dp"
             app:layout_constraintBottom_toBottomOf="@id/news_button"
             app:layout_constraintEnd_toStartOf="@id/social_media_button"
@@ -168,10 +326,13 @@
             android:id="@+id/social_media_button"
             style="@style/LauncherMenuButton.Universal"
             android:layout_width="0dp"
-            android:layout_height="48dp"
+            android:layout_height="38dp"
             android:drawableStart="@drawable/ic_social_media"
             android:gravity="center_vertical"
+            android:paddingStart="9dp"
             android:text="@string/mcl_button_social_media"
+            android:textColor="#FFFFFF"
+            android:textSize="11sp"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toEndOf="@id/quick_actions_divider"
             app:layout_constraintTop_toTopOf="@id/news_button" />
@@ -180,11 +341,14 @@
             android:id="@+id/custom_control_button"
             style="@style/LauncherMenuButton.Universal"
             android:layout_width="0dp"
-            android:layout_height="48dp"
-            android:layout_marginTop="8dp"
+            android:layout_height="38dp"
+            android:layout_marginTop="5dp"
             android:drawableStart="@drawable/ic_px_gamepad"
             android:gravity="center_vertical"
+            android:paddingStart="9dp"
             android:text="@string/mcl_option_customcontrol"
+            android:textColor="#FFFFFF"
+            android:textSize="11sp"
             app:layout_constraintEnd_toStartOf="@id/quick_actions_divider"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@id/news_button" />
@@ -193,10 +357,13 @@
             android:id="@+id/install_jar_button"
             style="@style/LauncherMenuButton.Universal"
             android:layout_width="0dp"
-            android:layout_height="48dp"
+            android:layout_height="38dp"
             android:drawableStart="@drawable/ic_px_java_run"
             android:gravity="center_vertical"
+            android:paddingStart="9dp"
             android:text="@string/main_install_jar_file"
+            android:textColor="#FFFFFF"
+            android:textSize="11sp"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toEndOf="@id/quick_actions_divider"
             app:layout_constraintTop_toTopOf="@id/custom_control_button" />
@@ -205,11 +372,14 @@
             android:id="@+id/share_logs_button"
             style="@style/LauncherMenuButton.Universal"
             android:layout_width="0dp"
-            android:layout_height="48dp"
-            android:layout_marginTop="8dp"
+            android:layout_height="38dp"
+            android:layout_marginTop="5dp"
             android:drawableStart="@drawable/ic_px_sharelog"
             android:gravity="center_vertical"
+            android:paddingStart="9dp"
             android:text="@string/main_share_logs"
+            android:textColor="#FFFFFF"
+            android:textSize="11sp"
             app:layout_constraintEnd_toStartOf="@id/quick_actions_divider"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@id/custom_control_button" />
@@ -218,13 +388,30 @@
             android:id="@+id/open_files_button"
             style="@style/LauncherMenuButton.Universal"
             android:layout_width="0dp"
-            android:layout_height="48dp"
+            android:layout_height="38dp"
             android:drawableStart="@drawable/ic_px_folder"
             android:gravity="center_vertical"
+            android:paddingStart="9dp"
             android:text="@string/mcl_button_open_directory"
+            android:textColor="#FFFFFF"
+            android:textSize="11sp"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toEndOf="@id/quick_actions_divider"
             app:layout_constraintTop_toTopOf="@id/share_logs_button" />
+
+        <com.kdt.mcgui.MineButton
+            android:id="@+id/play_button"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginTop="8dp"
+            android:text="@string/main_play"
+            android:textAllCaps="true"
+            android:textSize="18sp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/open_files_button"
+            app:layout_constraintVertical_bias="1.0" />
     </androidx.constraintlayout.widget.ConstraintLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

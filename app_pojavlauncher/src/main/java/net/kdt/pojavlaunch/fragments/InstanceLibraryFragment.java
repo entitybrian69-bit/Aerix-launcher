@@ -1,6 +1,8 @@
 package net.kdt.pojavlaunch.fragments;
 
 import android.app.AlertDialog;
+import android.content.ContentResolver;
+import android.net.Uri;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
@@ -18,6 +20,8 @@ import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
@@ -31,8 +35,10 @@ import net.kdt.pojavlaunch.extra.ExtraCore;
 import net.kdt.pojavlaunch.instances.Instance;
 import net.kdt.pojavlaunch.instances.Instances;
 import net.kdt.pojavlaunch.prefs.LauncherPreferences;
+import net.kdt.pojavlaunch.utils.AerixThemeManager;
 
 import java.io.IOException;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashSet;
@@ -65,6 +71,9 @@ public class InstanceLibraryFragment extends Fragment {
     private String mGroupFilter;
     private int mSortMode;
     private int mCardColumns = 1;
+    private Instance mPendingBackup;
+    private final ActivityResultLauncher<String> mBackupLauncher = registerForActivityResult(
+            new ActivityResultContracts.CreateDocument("application/zip"), this::onBackupDestination);
 
     public InstanceLibraryFragment() {
         super();
@@ -239,7 +248,7 @@ public class InstanceLibraryFragment extends Fragment {
                     GridLayout.spec(i / mCardColumns),
                     GridLayout.spec(i % mCardColumns, 1, 1f));
             params.width = 0;
-            params.height = dp(320);
+            params.height = dp(380);
             params.setMargins(dp(5), dp(5), dp(5), dp(5));
             mGrid.addView(createInstanceCard(instance), params);
         }
@@ -345,6 +354,19 @@ public class InstanceLibraryFragment extends Fragment {
         card.addView(launch, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(44)));
 
+        LinearLayout dataActions = new LinearLayout(requireContext());
+        dataActions.setOrientation(LinearLayout.HORIZONTAL);
+        Button clone = button(getString(R.string.aerix_clone_action));
+        clone.setOnClickListener(v -> confirmClone(instance));
+        Button backup = button(getString(R.string.aerix_backup_action));
+        backup.setOnClickListener(v -> startBackup(instance));
+        addActionButton(dataActions, clone);
+        addActionButton(dataActions, backup);
+        LinearLayout.LayoutParams dataActionParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(44));
+        dataActionParams.topMargin = dp(4);
+        card.addView(dataActions, dataActionParams);
+
         LinearLayout actions = new LinearLayout(requireContext());
         actions.setOrientation(LinearLayout.HORIZONTAL);
         Button edit = button(getString(R.string.global_edit));
@@ -445,6 +467,61 @@ public class InstanceLibraryFragment extends Fragment {
                 })
                 .setNegativeButton(android.R.string.cancel, null)
                 .show();
+    }
+
+    private void confirmClone(Instance instance) {
+        int message = instance.sharedData ? R.string.aerix_clone_shared_message : R.string.aerix_clone_message;
+        new AlertDialog.Builder(requireContext())
+                .setTitle(R.string.aerix_clone_title)
+                .setMessage(getString(message, displayName(instance)))
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton(R.string.aerix_clone_action, (dialog, which) ->
+                        PojavApplication.sExecutorService.execute(() -> {
+                            try {
+                                Instances.cloneInstance(instance, displayName(instance) + " Copy");
+                                FragmentActivity activity = getActivity();
+                                if (isAdded() && activity != null) activity.runOnUiThread(() -> {
+                                    if (!isAdded()) return;
+                                    Toast.makeText(activity, R.string.aerix_clone_complete, Toast.LENGTH_SHORT).show();
+                                    refreshInstances();
+                                });
+                            } catch (IOException e) {
+                                postError(e);
+                            }
+                        }))
+                .show();
+    }
+
+    private void startBackup(Instance instance) {
+        mPendingBackup = instance;
+        String safeName = displayName(instance).replaceAll("[^A-Za-z0-9._-]", "_");
+        mBackupLauncher.launch(safeName + "-backup.zip");
+    }
+
+    private void onBackupDestination(Uri uri) {
+        Instance instance = mPendingBackup;
+        mPendingBackup = null;
+        if (uri == null || instance == null || !isAdded()) return;
+        ContentResolver resolver = requireContext().getContentResolver();
+        PojavApplication.sExecutorService.execute(() -> {
+            Exception failure = null;
+            try {
+                try (OutputStream output = resolver.openOutputStream(uri, "w")) {
+                    if (output == null) throw new IOException("The selected destination could not be opened");
+                    Instances.writeBackup(instance, output);
+                }
+            } catch (Exception e) {
+                failure = e;
+            }
+            final Exception backupFailure = failure;
+            FragmentActivity activity = getActivity();
+            if (activity == null) return;
+            activity.runOnUiThread(() -> {
+                if (!isAdded()) return;
+                if (backupFailure != null) Tools.showError(activity, backupFailure);
+                else Toast.makeText(activity, R.string.aerix_backup_complete, Toast.LENGTH_LONG).show();
+            });
+        });
     }
 
     private void confirmDelete(Instance instance) {
@@ -558,6 +635,7 @@ public class InstanceLibraryFragment extends Fragment {
         button.setMinimumWidth(dp(0));
         button.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         button.setBackgroundResource(R.drawable.aerix_nav_button);
+        AerixThemeManager.tintButton(button, requireContext(), AerixThemeManager.SECTION_LIBRARY);
         button.setPadding(dp(6), 0, dp(6), 0);
         return button;
     }
@@ -573,9 +651,9 @@ public class InstanceLibraryFragment extends Fragment {
 
     private GradientDrawable panelBackground() {
         GradientDrawable drawable = new GradientDrawable();
-        drawable.setColor(Color.argb(218, 22, 36, 56));
+        drawable.setColor(Color.argb(136, 31, 58, 82));
         drawable.setCornerRadius(dp(20));
-        drawable.setStroke(dp(1), Color.argb(42, 121, 156, 191));
+        drawable.setStroke(dp(1), Color.argb(170, 222, 246, 255));
         return drawable;
     }
 

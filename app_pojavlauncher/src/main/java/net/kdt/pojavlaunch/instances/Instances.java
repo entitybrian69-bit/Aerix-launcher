@@ -10,11 +10,17 @@ import net.kdt.pojavlaunch.utils.FileUtils;
 import net.kdt.pojavlaunch.utils.JSONUtils;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 public class Instances {
     private static final File sInstancePath = new File(Tools.DIR_GAME_HOME, "instances");
@@ -160,6 +166,101 @@ public class Instances {
         File instanceDirectory = instance.mInstanceRoot;
         if(instanceDirectory == null) return;
         org.apache.commons.io.FileUtils.deleteDirectory(instanceDirectory);
+    }
+
+    /**
+     * Clone an installed profile directory without duplicating launcher metadata identity.
+     * Shared-data profiles continue to point at the shared game directory.
+     */
+    public static Instance cloneInstance(Instance source, String newName) throws IOException {
+        if (source == null || source.mInstanceRoot == null || !source.mInstanceRoot.isDirectory()) {
+            throw new IOException("The selected profile directory is unavailable");
+        }
+        if (source.installer != null) throw new IOException("Finish the profile installation before cloning it");
+        String safeName = newName == null ? "" : newName.trim();
+        String directoryPrefix = safeName.isEmpty() ? null : FileUtils.escapeFileName(safeName);
+        File target = findNewInstanceRoot(directoryPrefix);
+        try {
+            org.apache.commons.io.FileUtils.copyDirectory(source.mInstanceRoot, target);
+            Instance clone = read(target, Instance.class);
+            if (clone == null) throw new IOException("Could not read the cloned profile metadata");
+            clone.aerixId = UUID.randomUUID().toString();
+            if (!safeName.isEmpty()) clone.name = safeName;
+            clone.write();
+            return clone;
+        } catch (IOException | RuntimeException e) {
+            try {
+                org.apache.commons.io.FileUtils.deleteDirectory(target);
+            } catch (IOException cleanupError) {
+                e.addSuppressed(cleanupError);
+            }
+            if (e instanceof IOException) throw (IOException) e;
+            throw new IOException("Could not clone the profile", e);
+        }
+    }
+
+    /** Export the profile directory and, for shared-data profiles, the shared game directory. */
+    public static void writeBackup(Instance instance, OutputStream output) throws IOException {
+        if (instance == null || instance.mInstanceRoot == null || !instance.mInstanceRoot.isDirectory()) {
+            throw new IOException("The selected profile directory is unavailable");
+        }
+        try (ZipOutputStream zip = new ZipOutputStream(output)) {
+            Set<String> entries = new HashSet<>();
+            Set<String> visitedDirectories = new HashSet<>();
+            addBackupDirectory(zip, instance.mInstanceRoot, instance.mInstanceRoot,
+                    "profile/", entries, visitedDirectories);
+            if (instance.sharedData && SHARED_DATA_DIRECTORY.isDirectory()) {
+                addBackupDirectory(zip, SHARED_DATA_DIRECTORY, SHARED_DATA_DIRECTORY,
+                        "shared-data/", entries, visitedDirectories);
+            }
+            String lineBreak = String.valueOf((char) 10);
+            String safeName = instance.name == null ? "" : instance.name.replace((char) 10, ' ');
+            String safeVersion = instance.versionId == null ? "" : instance.versionId.replace((char) 10, ' ');
+            String metadata = "Aerix profile backup" + lineBreak
+                    + "name=" + safeName + lineBreak
+                    + "version=" + safeVersion + lineBreak
+                    + "sharedDataIncluded=" + instance.sharedData + lineBreak;
+            zip.putNextEntry(new ZipEntry("backup-info.txt"));
+            zip.write(metadata.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            zip.closeEntry();
+            zip.finish();
+        }
+    }
+
+    private static void addBackupDirectory(ZipOutputStream zip, File directory, File root,
+                                           String prefix, Set<String> entries,
+                                           Set<String> visitedDirectories) throws IOException {
+        String canonicalRoot = root.getCanonicalPath();
+        String canonicalDirectory = directory.getCanonicalPath();
+        if (!canonicalDirectory.equals(canonicalRoot)
+                && !canonicalDirectory.startsWith(canonicalRoot + File.separator)) {
+            throw new IOException("A profile file resolves outside its backup directory");
+        }
+        if (!visitedDirectories.add(prefix + canonicalDirectory)) return;
+        File[] children = directory.listFiles();
+        if (children == null) throw new IOException("Could not read profile directory " + directory.getName());
+        for (File child : children) {
+            String canonicalChild = child.getCanonicalPath();
+            if (!canonicalChild.equals(canonicalRoot)
+                    && !canonicalChild.startsWith(canonicalRoot + File.separator)) {
+                throw new IOException("A profile file resolves outside its backup directory");
+            }
+            if (child.isDirectory()) {
+                addBackupDirectory(zip, child, root, prefix, entries, visitedDirectories);
+                continue;
+            }
+            if (!child.isFile()) continue;
+            String relative = root.toURI().relativize(child.getCanonicalFile().toURI()).getPath();
+            String zipName = prefix + relative;
+            if (!entries.add(zipName)) continue;
+            zip.putNextEntry(new ZipEntry(zipName));
+            try (FileInputStream input = new FileInputStream(child)) {
+                byte[] buffer = new byte[32768];
+                int read;
+                while ((read = input.read(buffer)) != -1) zip.write(buffer, 0, read);
+            }
+            zip.closeEntry();
+        }
     }
 
     /**

@@ -4,7 +4,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/background_app"
+    android:background="@android:color/transparent"
     android:paddingHorizontal="@dimen/fragment_padding_medium">
 
 
@@ -40,7 +40,7 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginTop="@dimen/padding_extra_large"
-        android:background="@drawable/background_line"
+        android:background="@drawable/aerix_nav_button"
         android:minHeight="48dp"
         android:paddingVertical="0dp"
         android:paddingStart="7dp"
@@ -74,7 +74,7 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginTop="@dimen/padding_extra_large"
-        android:background="@drawable/background_line"
+        android:background="@drawable/aerix_nav_button"
         android:minHeight="48dp"
         android:paddingVertical="0dp"
         android:paddingStart="7dp"

@@ -571,8 +571,16 @@
     <string name="bta_configuring">Configuring BTA…</string>
 
     <!-- Aerix dashboard and navigation -->
-    <string name="aerix_welcome_title">Welcome to Aerix</string>
+    <string name="aerix_welcome_title">Aerix Home</string>
     <string name="aerix_welcome_subtitle">Your Minecraft Java worlds, together in one place.</string>
+    <string name="aerix_home_hero_title">Make room\nfor wonder.</string>
+    <string name="aerix_home_hero_caption">Shape a world that is yours. Create a profile, customize your setup, and jump in.</string>
+    <string name="aerix_home_create">Create instance</string>
+    <string name="aerix_home_library">Open library</string>
+    <string name="aerix_home_account">Account</string>
+    <string name="aerix_home_manage">Manage</string>
+    <string name="aerix_home_sign_in_hint">Sign in to play</string>
+    <string name="aerix_home_ram">RAM allocation · %1$d MB</string>
     <string name="aerix_current_instance">SELECTED INSTANCE</string>
     <string name="aerix_edit_instance">Edit selected instance</string>
     <string name="aerix_instance_hint">Choose a version or open the instance profile to edit details.</string>
@@ -584,6 +592,13 @@
     <string name="aerix_navigation_wallpapers">Wallpapers and appearance</string>
     <string name="aerix_navigation_servers">Multiplayer servers</string>
     <string name="aerix_navigation_settings">Settings</string>
+    <string name="instance_ram_allocation_title">Profile RAM allocation (MB)</string>
+    <string name="instance_ram_allocation_hint">Blank uses the global RAM setting</string>
+    <string name="instance_ram_allocation_error">Enter a value from 256 to 65536 MB, or leave it blank for the global setting.</string>
+    <string name="instance_jvm_args_mode_title">Profile JVM arguments mode</string>
+    <string name="instance_jvm_args_replace">Use profile arguments only</string>
+    <string name="instance_jvm_args_global_first">Global arguments, then profile arguments</string>
+    <string name="instance_jvm_args_profile_first">Profile arguments, then global arguments</string>
     <string name="aerix_library_title">Your instance library</string>
     <string name="aerix_library_subtitle">Select, edit, and launch your Minecraft profiles.</string>
     <string name="aerix_library_empty">No instances yet. Create a vanilla, modded, or modpack profile to get started.</string>
@@ -609,6 +624,13 @@
     <string name="aerix_sort_recent">Recently played</string>
     <string name="aerix_sort_chip">Sort: %1$s</string>
     <string name="aerix_play_instance">Play %1$s</string>
+    <string name="aerix_clone_action">Clone</string>
+    <string name="aerix_clone_title">Clone profile</string>
+    <string name="aerix_clone_message">Copy the files and settings for “%1$s” into a new profile?</string>
+    <string name="aerix_clone_shared_message">“%1$s” uses the shared game directory. The new profile will share the same worlds and game files.</string>
+    <string name="aerix_clone_complete">Profile cloned</string>
+    <string name="aerix_backup_action">Backup</string>
+    <string name="aerix_backup_complete">Profile backup saved</string>
     <string name="aerix_vanilla_instance">Vanilla</string>
     <string name="aerix_modded_instance">Modded / installer</string>
     <string name="aerix_wallpaper_title">Wallpapers &amp; appearance</string>
@@ -659,4 +681,39 @@
     <string name="update_dismiss">Close</string>
     <string name="update_error_title">Could not check for updates</string>
     <string name="update_error_message">GitHub could not be reached or no public release is available. Check your connection and try again later.</string>
+    <string name="aerix_navigation_skins">Skin Studio</string>
+    <string name="aerix_skin_title">Skin Studio</string>
+    <string name="aerix_skin_subtitle">Search public Minecraft skins, preview a PNG, or upload to your account.</string>
+    <string name="aerix_skin_search_hint">Search skins by Minecraft Java username</string>
+    <string name="aerix_skin_search_action">Search</string>
+    <string name="aerix_skin_searching">Searching Mojang profiles…</string>
+    <string name="aerix_skin_search_found">Public skin found for %1$s. Choose a PNG to upload to your account.</string>
+    <string name="aerix_skin_no_account">No account selected</string>
+    <string name="aerix_skin_sign_in">Sign in to a Microsoft Minecraft account to upload a skin.</string>
+    <string name="aerix_skin_microsoft_only">Skin upload is available for Microsoft accounts only.</string>
+    <string name="aerix_skin_reauthenticate">Your Microsoft session is missing or expired. Sign in again before uploading.</string>
+    <string name="aerix_skin_account_ready">Microsoft account ready. Select a 64 × 64 PNG skin to preview it.</string>
+    <string name="aerix_skin_model">Player model</string>
+    <string name="aerix_skin_note">Choose a 64 × 64 PNG (maximum 1 MiB). Uploads go directly to the official Minecraft Services endpoint over HTTPS. Aerix never displays or logs your access token. Upload replaces your current skin.</string>
+    <string name="aerix_skin_choose">Choose PNG</string>
+    <string name="aerix_skin_upload">Upload skin</string>
+    <string name="aerix_skin_confirm_title">Replace current skin?</string>
+    <string name="aerix_skin_confirm_message">This uploads the selected skin to the signed-in Microsoft Minecraft profile. Continue only if this is your account.</string>
+    <string name="aerix_skin_uploading">Uploading skin securely…</string>
+    <string name="aerix_skin_upload_success">Skin upload succeeded.</string>
+    <string name="aerix_skin_upload_failed">Skin upload failed. Check your connection and account, then try again.</string>
+    <string name="aerix_skin_preview_ready">Preview ready. Choose the classic or slim model before uploading.</string>
+    <string name="aerix_skin_invalid_dimensions">Use a 64 × 64 PNG Minecraft skin.</string>
+    <string name="aerix_skin_invalid_image">The selected file is not a valid PNG image.</string>
+    <string-array name="aerix_skin_variants">
+        <item>Classic arms</item>
+        <item>Slim arms</item>
+    </string-array>
+    <string name="aerix_discover_install_dependencies">Install project + %1$d required dependencies</string>
+    <string-array name="aerix_discover_project_types">
+        <item>Modpacks</item>
+        <item>Mods</item>
+        <item>Resource packs</item>
+        <item>Shaders</item>
+    </string-array>
 </resources>

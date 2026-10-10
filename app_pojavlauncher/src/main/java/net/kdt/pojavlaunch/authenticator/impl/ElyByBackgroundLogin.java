@@ -88,7 +88,7 @@ public class ElyByBackgroundLogin implements BackgroundLogin {
 
     private void acquireTokens(boolean isRefresh, String code) throws IOException, PresentableException {
         URL url = new URL(authTokenUrl);
-        Log.i("MicrosoftLogin", "isRefresh=" + isRefresh + ", authCode= "+code);
+        Log.i("ElyByLogin", "Requesting Ely.by account tokens (refresh=" + isRefresh + ")");
 
         String formData = CommonLoginUtils.convertToFormData(
                 "client_id", "mojolauncher2",

@@ -39,6 +39,7 @@ import net.kdt.pojavlaunch.fragments.MicrosoftLoginFragment;
 import net.kdt.pojavlaunch.fragments.ProfileTypeSelectFragment;
 import net.kdt.pojavlaunch.fragments.SearchModFragment;
 import net.kdt.pojavlaunch.fragments.ServerManagerFragment;
+import net.kdt.pojavlaunch.fragments.SkinManagerFragment;
 import net.kdt.pojavlaunch.fragments.WallpaperGalleryFragment;
 import net.kdt.pojavlaunch.fragments.SelectAuthFragment;
 import net.kdt.pojavlaunch.instances.Instance;
@@ -55,6 +56,7 @@ import net.kdt.pojavlaunch.services.ProgressServiceKeeper;
 import net.kdt.pojavlaunch.tasks.MoJsonExtras;
 import net.kdt.pojavlaunch.tasks.AsyncVersionList;
 import net.kdt.pojavlaunch.tasks.MoJsonDownloader;
+import net.kdt.pojavlaunch.utils.AerixThemeManager;
 import net.kdt.pojavlaunch.utils.NotificationUtils;
 import net.kdt.pojavlaunch.utils.WallpaperUtils;
 
@@ -70,6 +72,7 @@ public class LauncherActivity extends BaseActivity {
     private ImageButton mLibraryButton;
     private ImageButton mDiscoverButton;
     private ImageButton mWallpapersButton;
+    private ImageButton mSkinsButton;
     private ImageButton mServersButton;
     private ProgressLayout mProgressLayout;
     private ProgressServiceKeeper mProgressServiceKeeper;
@@ -87,6 +90,7 @@ public class LauncherActivity extends BaseActivity {
             mLibraryButton.setActivated(f instanceof InstanceLibraryFragment);
             mDiscoverButton.setActivated(f instanceof SearchModFragment);
             mWallpapersButton.setActivated(f instanceof WallpaperGalleryFragment);
+            mSkinsButton.setActivated(f instanceof SkinManagerFragment);
             mServersButton.setActivated(f instanceof ServerManagerFragment);
             mSettingsButton.setActivated(f.getClass().getName().startsWith("net.kdt.pojavlaunch.prefs.screens."));
         }
@@ -218,6 +222,7 @@ public class LauncherActivity extends BaseActivity {
         mLibraryButton.setOnClickListener(v -> navigateTo(InstanceLibraryFragment.class, InstanceLibraryFragment.TAG));
         mDiscoverButton.setOnClickListener(v -> navigateTo(SearchModFragment.class, SearchModFragment.TAG));
         mWallpapersButton.setOnClickListener(v -> navigateTo(WallpaperGalleryFragment.class, WallpaperGalleryFragment.TAG));
+        mSkinsButton.setOnClickListener(v -> navigateTo(SkinManagerFragment.class, SkinManagerFragment.TAG));
         mServersButton.setOnClickListener(v -> navigateTo(ServerManagerFragment.class, ServerManagerFragment.TAG));
         ProgressKeeper.addTaskCountListener(mProgressLayout);
         ExtraCore.addExtraListener(ExtraConstants.BACK_PREFERENCE, mBackPreferenceListener);
@@ -356,22 +361,40 @@ public class LauncherActivity extends BaseActivity {
 
     private void loadSavedWallpaper() {
         String savedWallpaper = LauncherPreferences.DEFAULT_PREF.getString(WallpaperUtils.PREFERENCE_KEY, null);
-        if (!Tools.isValidString(savedWallpaper)) return;
-        Uri uri = Uri.parse(savedWallpaper);
-        int maxWidth = Math.max(640, getResources().getDisplayMetrics().widthPixels);
-        int maxHeight = Math.max(360, getResources().getDisplayMetrics().heightPixels);
+        String wallpaperId = WallpaperUtils.selectedId(this);
+        int maxWidth = Math.max(960, getResources().getDisplayMetrics().widthPixels);
+        int maxHeight = Math.max(540, getResources().getDisplayMetrics().heightPixels);
         PojavApplication.sExecutorService.execute(() -> {
+            Bitmap bitmap = null;
             try {
-                Bitmap bitmap = WallpaperUtils.decode(getApplicationContext(), uri, maxWidth, maxHeight);
-                Tools.runOnUiThread(() -> {
-                    if (isFinishing() || isDestroyed()) return;
-                    ImageView backdrop = findViewById(R.id.launcher_wallpaper_backdrop);
-                    backdrop.setImageBitmap(bitmap);
-                    backdrop.setVisibility(View.VISIBLE);
-                });
-            } catch (Exception ignored) {
-                LauncherPreferences.DEFAULT_PREF.edit().remove(WallpaperUtils.PREFERENCE_KEY).apply();
+                if (Tools.isValidString(savedWallpaper)) {
+                    bitmap = WallpaperUtils.decode(getApplicationContext(), Uri.parse(savedWallpaper), maxWidth, maxHeight);
+                } else {
+                    bitmap = WallpaperUtils.decodeBundled(getApplicationContext(), wallpaperId, maxWidth, maxHeight);
+                }
+            } catch (Exception customFailure) {
+                if (Tools.isValidString(savedWallpaper)) {
+                    LauncherPreferences.DEFAULT_PREF.edit().remove(WallpaperUtils.PREFERENCE_KEY).apply();
+                    try {
+                        bitmap = WallpaperUtils.decodeBundled(getApplicationContext(), wallpaperId, maxWidth, maxHeight);
+                    } catch (Exception bundledFailure) {
+                        android.util.Log.e("AerixWallpaper", "Failed to load wallpaper", bundledFailure);
+                    }
+                }
             }
+            if (bitmap == null) return;
+            AerixThemeManager.setWallpaperAccentIfMissing(WallpaperUtils.sampleAccentColor(bitmap));
+            Bitmap selectedBitmap = bitmap;
+            Tools.runOnUiThread(() -> {
+                if (isFinishing() || isDestroyed()) {
+                    selectedBitmap.recycle();
+                    return;
+                }
+                ImageView backdrop = findViewById(R.id.launcher_wallpaper_backdrop);
+                if (backdrop == null) return;
+                backdrop.setImageBitmap(selectedBitmap);
+                backdrop.setVisibility(View.VISIBLE);
+            });
         });
     }
 
@@ -394,7 +417,16 @@ public class LauncherActivity extends BaseActivity {
         mLibraryButton = findViewById(R.id.library_nav_button);
         mDiscoverButton = findViewById(R.id.discover_nav_button);
         mWallpapersButton = findViewById(R.id.wallpapers_nav_button);
+        mSkinsButton = findViewById(R.id.skins_nav_button);
         mServersButton = findViewById(R.id.servers_nav_button);
         mProgressLayout = findViewById(R.id.progress_layout);
+        AerixThemeManager.tintNavigationButton(mHomeButton, this, AerixThemeManager.SECTION_HOME);
+        AerixThemeManager.tintNavigationButton(mCreateButton, this, AerixThemeManager.SECTION_HOME);
+        AerixThemeManager.tintNavigationButton(mLibraryButton, this, AerixThemeManager.SECTION_LIBRARY);
+        AerixThemeManager.tintNavigationButton(mDiscoverButton, this, AerixThemeManager.SECTION_DISCOVER);
+        AerixThemeManager.tintNavigationButton(mWallpapersButton, this, AerixThemeManager.SECTION_APPEARANCE);
+        AerixThemeManager.tintNavigationButton(mSkinsButton, this, AerixThemeManager.SECTION_SKINS);
+        AerixThemeManager.tintNavigationButton(mServersButton, this, AerixThemeManager.SECTION_SERVERS);
+        AerixThemeManager.tintNavigationButton(mSettingsButton, this, AerixThemeManager.SECTION_SETTINGS);
     }
 }

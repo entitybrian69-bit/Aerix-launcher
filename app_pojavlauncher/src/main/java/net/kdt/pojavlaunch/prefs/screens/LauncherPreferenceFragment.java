@@ -4,20 +4,32 @@ package net.kdt.pojavlaunch.prefs.screens;
 import android.Manifest;
 import android.app.Activity;
 import android.content.SharedPreferences;
+import android.content.res.ColorStateList;
+import android.graphics.Color;
 import android.os.Bundle;
+import android.view.Gravity;
+import android.view.LayoutInflater;
 import android.view.View;
+import android.view.ViewGroup;
+import android.widget.LinearLayout;
+
+import androidx.recyclerview.widget.RecyclerView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.preference.Preference;
 import androidx.preference.PreferenceFragmentCompat;
+import androidx.preference.PreferenceGroup;
+import androidx.preference.PreferenceScreen;
 
 import net.kdt.pojavlaunch.BuildConfig;
 import net.kdt.pojavlaunch.LauncherActivity;
 import net.kdt.pojavlaunch.R;
 import net.kdt.pojavlaunch.Tools;
 import net.kdt.pojavlaunch.prefs.LauncherPreferences;
+import net.kdt.pojavlaunch.utils.AerixSettingsTabBar;
+import net.kdt.pojavlaunch.utils.AerixThemeManager;
 import net.kdt.pojavlaunch.utils.UpdateChecker;
 
 /**
@@ -27,10 +39,51 @@ import net.kdt.pojavlaunch.utils.UpdateChecker;
 public class LauncherPreferenceFragment extends PreferenceFragmentCompat implements SharedPreferences.OnSharedPreferenceChangeListener {
     protected Runnable mVisibilityUpdater = () -> {};
 
+    @Nullable
+    @Override
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
+                             @Nullable Bundle savedInstanceState) {
+        View preferences = super.onCreateView(inflater, container, savedInstanceState);
+        LinearLayout root = new LinearLayout(requireContext());
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(dp(4), dp(4), dp(4), dp(4));
+        root.setBackgroundColor(Color.TRANSPARENT);
+        root.addView(AerixSettingsTabBar.create(requireContext(), requireActivity(), getClass()),
+                new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(42)));
+        LinearLayout.LayoutParams contentParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f);
+        contentParams.topMargin = dp(6);
+        root.addView(preferences, contentParams);
+        return root;
+    }
+
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-        view.setBackgroundColor(getResources().getColor(R.color.background_app));
+        view.setBackgroundColor(Color.TRANSPARENT);
         super.onViewCreated(view, savedInstanceState);
+        RecyclerView list = view.findViewById(android.R.id.list);
+        if (list != null) {
+            list.setBackgroundColor(Color.TRANSPARENT);
+            list.setClipToPadding(false);
+            list.setPadding(dp(10), dp(10), dp(10), dp(10));
+        }
+        applySettingsAccent(getPreferenceScreen(), ColorStateList.valueOf(
+                AerixThemeManager.accentColor(requireContext(), themeSection())));
+    }
+
+    private int dp(float value) {
+        return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
+    }
+
+    private void applySettingsAccent(PreferenceGroup group, ColorStateList tint) {
+        if (group == null) return;
+        for (int i = 0; i < group.getPreferenceCount(); i++) {
+            Preference preference = group.getPreference(i);
+            if (preference.getIcon() != null) preference.setIconTintList(tint);
+            if (preference instanceof PreferenceGroup) {
+                applySettingsAccent((PreferenceGroup) preference, tint);
+            }
+        }
     }
 
     @Override
@@ -39,6 +92,10 @@ public class LauncherPreferenceFragment extends PreferenceFragmentCompat impleme
         addPreferencesFromResource(R.xml.pref_main);
         setupNotificationRequestPreference();
         setupUpdateCheckPreference();
+    }
+
+    protected String themeSection() {
+        return AerixThemeManager.SECTION_SETTINGS;
     }
 
     private void updateVisibility(){

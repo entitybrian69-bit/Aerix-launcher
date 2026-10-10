@@ -29,6 +29,7 @@ import net.kdt.pojavlaunch.PojavApplication;
 import net.kdt.pojavlaunch.R;
 import net.kdt.pojavlaunch.instances.Instance;
 import net.kdt.pojavlaunch.instances.Instances;
+import net.kdt.pojavlaunch.utils.AerixThemeManager;
 import net.kdt.pojavlaunch.utils.MinecraftServerListStore;
 
 import java.io.File;
@@ -377,6 +378,7 @@ public class ServerManagerFragment extends Fragment {
         button.setAllCaps(false);
         button.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         button.setBackgroundResource(R.drawable.aerix_nav_button);
+        AerixThemeManager.tintButton(button, requireContext(), AerixThemeManager.SECTION_SERVERS);
         return button;
     }
 
@@ -391,9 +393,9 @@ public class ServerManagerFragment extends Fragment {
 
     private GradientDrawable panelBackground() {
         GradientDrawable drawable = new GradientDrawable();
-        drawable.setColor(Color.argb(218, 22, 36, 56));
+        drawable.setColor(Color.argb(136, 31, 58, 82));
         drawable.setCornerRadius(dp(18));
-        drawable.setStroke(dp(1), Color.argb(42, 121, 156, 191));
+        drawable.setStroke(dp(1), Color.argb(170, 222, 246, 255));
         return drawable;
     }
 

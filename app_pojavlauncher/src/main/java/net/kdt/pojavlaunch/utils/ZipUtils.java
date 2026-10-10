@@ -39,12 +39,27 @@ public class ZipUtils {
     public static void zipExtract(ZipFile zipFile, String dirName, File destination) throws IOException {
         Enumeration<? extends ZipEntry> zipEntries = zipFile.entries();
 
+        File canonicalRoot = destination.getCanonicalFile();
+        String rootPath = canonicalRoot.getCanonicalPath();
         int dirNameLen = dirName.length();
         while(zipEntries.hasMoreElements()) {
             ZipEntry zipEntry = zipEntries.nextElement();
             String entryName = zipEntry.getName();
             if(!entryName.startsWith(dirName) || zipEntry.isDirectory()) continue;
-            File zipDestination = new File(destination, entryName.substring(dirNameLen));
+            String relativePath = entryName.substring(dirNameLen);
+            if (relativePath.isEmpty() || relativePath.startsWith("/") || relativePath.contains("\\")
+                    || relativePath.indexOf('\0') >= 0) {
+                throw new IOException("Unsafe path in ZIP archive: " + entryName);
+            }
+            for (String pathPart : relativePath.split("/")) {
+                if ("..".equals(pathPart) || ".".equals(pathPart) || pathPart.isEmpty()) {
+                    throw new IOException("Unsafe path in ZIP archive: " + entryName);
+                }
+            }
+            File zipDestination = new File(canonicalRoot, relativePath).getCanonicalFile();
+            if (!zipDestination.getCanonicalPath().startsWith(rootPath + File.separator)) {
+                throw new IOException("ZIP archive entry escapes its destination: " + entryName);
+            }
             FileUtils.ensureParentDirectory(zipDestination);
             try (InputStream inputStream = zipFile.getInputStream(zipEntry);
                  OutputStream outputStream = new FileOutputStream(zipDestination)) {

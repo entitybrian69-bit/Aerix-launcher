@@ -1,57 +1,48 @@
-# Aerix implementation parity checklist
+# Aerix Launcher parity checklist
 
-The six reference screenshots and exact logo were attached in the conversation, but their image files are not present in this checkout or the workspace upload directory. A landscape-first native shell is now in place, but screenshot-by-screenshot comparison and exact logo integration remain blocked until those original files are accessible. The Aerix README text was supplied inline; README replacement is still pending an asset audit so the result does not ship with broken image references or unsupported claims.
+Status reflects the current source/worktree, not a promise of physical-device behavior. **Done** means the source path exists and is documented; **In Progress** means a partial implementation exists or build/device verification remains; **Blocked** means the item cannot be finished without missing assets or external evidence. An untested device matrix remains **Not Tested** even when source status is Done.
 
-## Confirmed target-project foundations to preserve
+| Requested item | Status | Evidence / remaining work |
+|---|---|---|
+| Preserve the Minecraft Java launch, version metadata, runtime, native-library, and classpath foundations | Done | Existing Pojav/Mojo launch path remains; renderer/runtime changes are additions around it. |
+| Aerix identity, Android `versionName` 1.0.0, and valid version code | Done | Build configuration retains the existing package/storage strategy. Check each future release variant. |
+| Apply the uploaded Aerix logo | Blocked | No uploaded logo is present in this checkout/searchable workspace; only the upstream `pojavlauncher.png` was found. Do not redraw or substitute it. |
+| Match the approved liquid-glass mockups across screens | In Progress | Landscape wallpaper-backed shell, glass rail/panels, cyan active states, settings tabs, and Home/Create/Library/Discover/Skins/Servers/Appearance styling are implemented in source. No device screenshots/build are available for visual comparison, so parity is not claimed. |
+| Exact six reference screenshots | Blocked | Screenshot files are absent from the workspace. Keep `<!-- MISSING: screenshot-1..6.png -->` until supplied. |
+| Landscape-first navigation and Home/Create/Library/Discover/Skins/Servers/Settings routes | Done | Rail routes and account spinner remain; `skins_nav_button` is present in both portrait and landscape layout resources. Orientation, touch, and window-inset behavior remain Not Tested. |
+| Home design with hero, account management, selected profile, RAM summary, quick actions, and Play | In Progress | Existing launch/account/profile actions are retained and restyled; the new layout has not been rendered or build-tested. |
+| Create vanilla/modded/modpack instances with upstream installation flows | Done | Existing profile and loader flows are retained; glass styling is source-only until CI/device verification. |
+| Instance library: select, edit, delete, launch, favorites/groups/pins/sort/recent launches | Done | Profile storage stays authoritative; metadata is persisted in launcher preferences. |
+| Instance clone and backup/export | Done | Clone and ZIP backup actions exist; confirm shared-data semantics and verify error/recovery cases. |
+| Per-instance JVM-argument merge/replace modes | In Progress | Instance model stores `jvmArgs`/`argsMode`; complete editor wiring and launch verification remain. |
+| Per-instance RAM override | In Progress | Global RAM allocation is shown on Home; profile-specific override is not wired through memory warnings and Java heap arguments. |
+| Discover categories, filters, details, pagination, attribution, and verified downloads | In Progress | Modrinth-backed browser and category selection exist; complete install/dependency/conflict coverage remains. |
+| Modrinth installation, dependency resolution, conflicts, rollback, and path safety | In Progress | Existing importer/install flow is retained; dependency/conflict/recovery paths need explicit tests. |
+| CurseForge integration without embedded credentials | Done | Public builds do not embed a shared key/token; secure credential/proxy integration is not present. |
+| Account login and account/skin face display | Done | Existing account spinner/authentication and cached-face rendering are preserved. |
+| Skin username lookup and preview | In Progress | Source queries Mojang public profile/session endpoints over HTTPS with username validation, bounded responses, no bearer token, and a texture-host allowlist. Requires compile/live-network verification. |
+| Skin upload to the signed-in Microsoft account | In Progress | User-selected 64×64 PNG uploads only after confirmation; remote search results are preview-only. Minecraft Services behavior is not live-tested. |
+| Renderer settings and capability-driven GL4ES/LTW/ANGLE/Vulkan policy | In Progress | Smart Pick is restricted to GL4ES/LTW capability/game/library rules; ANGLE is manual opt-in and Vulkan/Zink manual-select only. Device behavior remains Not Tested. |
+| Renderer policy avoids device-brand/model workarounds | Done | Policy uses ABI, game requirements, GLES/GPU capability, and installed renderer artifacts. |
+| EGL/OpenGL fallback behavior | Done | Source has EGL entry-point checks and GL4ES fallback; physical renderer behavior remains Not Tested. |
+| Controls, gamepad, touch, editor, and preserved launch controls | Done | Existing paths remain. Orientation, input, inset, and device-specific behavior remains Not Tested. |
+| 25 bundled wallpaper choices | In Progress | Catalog and image files `01`–`25` exist. `01`–`20` are generated scenes; `21`–`25` are color-tuned variants derived from those assets. Gallery binding/selection has not been compiled or rendered. |
+| Wallpaper changes full-screen image and wallpaper-derived launcher colors | In Progress | Bundled/custom image decoding, persistence, sampled accent, theme modes, and full-screen backdrop integration exist in source. Build/device verification remains. |
+| Fifteen presets, custom hex, Material You, and per-section accents | In Progress | Theme manager and controls exist in source; Android API 31+ Material You reads system wallpaper colors. UI behavior and persistence remain unverified. |
+| Multiplayer server list manager | Done | Add/edit/copy/delete reads and writes selected profile `servers.dat`; this is a local list editor, not a direct-connect client. |
+| Server order/import/export/status/favorites/direct connect | In Progress | These additional actions are not implemented. Direct connection is not claimed. |
+| Secure updater | In Progress | Release metadata check opens the GitHub release page; no in-app APK download/hash/signature/install/rollback flow is claimed. |
+| README and product assets | In Progress | `README.aerix.md` now documents the current feature status and retains exact missing-asset markers. Upstream `README.md` is unchanged. Team portrait `assets/team/entitybrian.jpg` is absent. |
+| Compatibility matrix | Done | `docs/COMPATIBILITY_MATRIX.md` enumerates API 23–36, four ABIs, renderer routes, Java-runtime × Minecraft 26.x × ABI rows, and form factors; unknown cells are Not Tested. |
+| CI build/tests/APK artifacts for this worktree | In Progress | Earlier passing run [37967648292](https://github.com/entitybrian69-bit/Aerix-launcher/actions/runs/37967648292) built full/no-runtime Debug APKs and passed ABI verification at commit `acb63f1`; it does not cover current edits. Local build is unavailable here (no Java or Android SDK found). CI must rerun after push. |
+| Release AAB | Not produced | CI produces Debug APKs, not a release AAB. |
+| Physical-device/emulator coverage | Blocked | No emulator or physical device is available in this environment. Keep all applicable matrix cells Not Tested. |
+| Optional Mesa artifact lookup | Done | **Non-blocking — Not Found. Do not retry.** |
 
-- [x] Android launcher and Minecraft Java launch pipeline, including version metadata, classpath/native extraction, and Java runtime selection.
-- [x] Existing instance/profile selection, editing, installer, login, and migration flows.
-- [x] Existing Microsoft/offline/auth-server login paths present in the target source.
-- [x] Existing renderer implementations and plugin hooks present in the target source.
-- [x] Existing custom touch controls, gamepad mapping, file/provider flows, logs/crash reporting, and settings screens present in the target source.
-- [x] Existing Modrinth and CurseForge mod/modpack code paths are retained, but the distributed Aerix build uses the unkeyed Modrinth provider only. No CurseForge API key is embedded or injected into CI artifacts; CurseForge API access stays disabled until a secure proxy/credential flow exists.
+## Asset handoff markers
 
-These are source-inventory findings, not claims that each feature was exercised in this session.
+- Logo: `<!-- MISSING: aerix-logo.svg -->`
+- Reference screenshots: `<!-- MISSING: screenshot-1..6.png -->`
+- Team image: `<!-- MISSING: assets/team/entitybrian.jpg -->`
 
-## Aerix delivery checklist
-
-### Blocked on supplied material
-
-- [ ] Compare all six screenshots against native launcher screens.
-- [ ] Apply the exact supplied Aerix logo to launcher icon, splash, navigation, and About locations. Do not substitute the Pojav icon or a redraw. The current shell uses a text-only “AERIX” label until the actual logo file is available.
-- [ ] Copy/verify the README-referenced artwork and screenshots. `assets/team/entitybrian.jpg` was not among the supplied attachment filenames and must be checked once the assets are accessible.
-- [ ] Inspect reference commit `a0254b9` and reconcile reference features. The requested reference branch is not present in the origin/API branch list available to this session.
-
-### Implemented in this worktree
-
-- [x] Declare landscape orientation for the launcher, storage gate, launcher settings, and error screens while leaving external browser/OAuth activities and the game host's existing orientation behavior alone.
-- [x] Add a dark, responsive Aerix navigation rail and dashboard shell with Home, Create, Library, Discover, Wallpapers, Servers, Settings, and persistent account access. It uses an opaque/gradient fallback rather than depending on blur/translucency.
-- [x] Route Create to the existing vanilla/loader/modpack creation flows and Discover to the existing Modrinth-backed modpack browser.
-- [x] Add a responsive instance library with asynchronous enumeration, select-and-launch, edit, delete confirmation, a real empty state, persistent favorites/group labels, group/favorite filters, pinned-first ordering, and name/version/recent-play sorting. Stable metadata IDs survive instance renames; existing instance storage and launch code remain authoritative.
-- [x] Add a profile-aware multiplayer server manager that reads, preserves, and safely rewrites the selected profile's standard compressed `servers.dat`, with add/edit/copy/delete actions and unit-testable NBT storage.
-- [x] Add a custom wallpaper picker with a bounded image decoder, persisted document URI, preview, reset action, and gradient fallback. The curated wallpaper catalog/screenshots are not present in this checkout.
-- [x] Add a manual GitHub Releases check in Settings. It uses the public API without credentials and opens the release page; it does not download or silently install APKs.
-- [x] Add Smart Pick as the new-install renderer default using the existing version-to-renderer compatibility rule; it selects GL4ES for compatible older game versions and LTW only when GLES 3 and the LTW library are available. It never auto-selects Zink/Vulkan.
-- [x] Validate the EGL API needed by SDL after loading a renderer and retry the GL4ES route if the chosen backend is unusable.
-- [x] Keep Vulkan package-feature detection explicitly documented as a prerequisite rather than a promise of backend-specific Vulkan features.
-- [x] Add an ABI/runtime availability policy for the Java 8/17/21/25 channels and unit tests for renderer selection, Vulkan declarations, and runtime/ABI filtering.
-- [x] Add a CI APK ABI check for the four declared ABIs.
-- [x] Set the Android version name/build labels to Aerix Launcher 1.0.0 and choose a version-code sequence above this checkout's previous local version code. The existing application ID and Pojav storage folder are retained to avoid silently abandoning existing data.
-- [x] Publish the source-level Android/GPU/ABI/runtime envelope and clearly separate it from physical-device verification.
-
-### Remaining feature and verification work
-
-- [ ] Apply and compare the exact supplied logo and six screenshots; complete screenshot-level spacing, artwork, and page-parity review.
-- [ ] Import the exact supplied README and referenced image files. Reconcile claims against code, correct the Android 8.0+ statement to the actual manifest minimum API 23 / Android 6.0, and verify all URLs and asset paths.
-- [ ] Complete the curated wallpaper library; the current picker only supports user-selected images because the supplied wallpaper assets are not in the workspace.
-- [ ] Add instance clone/backup/export actions and verify rename, delete, and migration behavior with real profiles.
-- [ ] Expand Discover to the requested project categories, filters, details, compatibility, dependencies, verified downloads, destinations, cancellation/retry, caching, and attribution; exercise both providers through a secure configuration.
-- [ ] Verify permitted skin-search endpoints/terms and implement account-safe preview/download/equip flows; do not present a website link as an API.
-- [ ] Implement secure in-app update download/installation if required; current release checker intentionally only opens the GitHub release page.
-- [ ] Add server discovery/direct connection flows if required; this server manager edits Minecraft's local `servers.dat` list and intentionally does not connect to servers itself.
-- [ ] Verify client/native-library ABI availability and backend requirements release-by-release for Minecraft 26.x on Android. Mojang metadata has been checked for 26.1.2, 26.2, and 26.3 and each declares Java 25; that metadata does not establish Android renderer or ARM32 support.
-- [ ] Complete the Narzo 50/Mali-G57 regression, Adreno/Mali Vulkan and GLES-only, ARM32, x86/x86_64, memory-tier, API-level, and orientation/inset device matrix on physical devices/emulators.
-- [x] CI run [37967648292](https://github.com/entitybrian69-bit/Aerix-launcher/actions/runs/37967648292) on commit `acb63f1` passed launcher unit tests (including the compressed `servers.dat` round-trip tests), built full and no-runtime Debug APKs, and ran the four-ABI native-library verifier. Artifacts: [full Debug ZIP](https://github.com/entitybrian69-bit/Aerix-launcher/actions/runs/37967648292/artifacts/11633559491) and [no-runtime Debug ZIP](https://github.com/entitybrian69-bit/Aerix-launcher/actions/runs/37967648292/artifacts/11634338036). The optional Mesa artifact lookup was not found; device renderer testing remains outstanding.
-- [ ] Verify the contents of the APK artifacts and each bundled runtime on-device; CI ABI/library presence is not a physical-device launch test.
-
-A checked source box only records that a code change or source inspection exists. It does not replace CI, emulator, or physical-device verification.
+These are explicit blockers, not permission to fabricate substitutes. Keep upstream `README.md` unchanged until the intended assets can be reviewed together.

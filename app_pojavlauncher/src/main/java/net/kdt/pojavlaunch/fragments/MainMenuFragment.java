@@ -5,10 +5,12 @@ import static net.kdt.pojavlaunch.Tools.shareLog;
 
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageButton;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
@@ -26,9 +28,13 @@ import net.kdt.pojavlaunch.Tools;
 import net.kdt.pojavlaunch.contracts.OpenDocumentWithExtension;
 import net.kdt.pojavlaunch.extra.ExtraConstants;
 import net.kdt.pojavlaunch.extra.ExtraCore;
+import net.kdt.pojavlaunch.authenticator.accounts.Account;
+import net.kdt.pojavlaunch.authenticator.accounts.Accounts;
 import net.kdt.pojavlaunch.instances.Instance;
 import net.kdt.pojavlaunch.instances.Instances;
+import net.kdt.pojavlaunch.prefs.LauncherPreferences;
 import net.kdt.pojavlaunch.progresskeeper.ProgressKeeper;
+import net.kdt.pojavlaunch.utils.AerixThemeManager;
 import net.kdt.pojavlaunch.utils.FileUtils;
 import net.kdt.pojavlaunch.utils.jre.GameRunner;
 
@@ -38,6 +44,8 @@ public class MainMenuFragment extends Fragment {
     public static final String TAG = "MainMenuFragment";
 
     private mcVersionSpinner mVersionSpinner;
+    private TextView mAccountSummary;
+    private TextView mRamSummary;
 
     private final ActivityResultLauncher<Object> mModInstallerLauncher =
             registerForActivityResult(new OpenDocumentWithExtension("jar"), (data)->{
@@ -56,16 +64,40 @@ public class MainMenuFragment extends Fragment {
         Button mInstallJarButton = view.findViewById(R.id.install_jar_button);
         Button mShareLogsButton = view.findViewById(R.id.share_logs_button);
         Button mOpenDirectoryButton = view.findViewById(R.id.open_files_button);
+        Button mHeroCreateButton = view.findViewById(R.id.hero_create_button);
+        Button mHeroLibraryButton = view.findViewById(R.id.hero_library_button);
+        Button mAccountManageButton = view.findViewById(R.id.account_manage_button);
+        mAccountSummary = view.findViewById(R.id.home_account_summary);
+        mRamSummary = view.findViewById(R.id.home_ram_label);
 
         ImageButton mEditProfileButton = view.findViewById(R.id.edit_profile_button);
         Button mPlayButton = view.findViewById(R.id.play_button);
         mVersionSpinner = view.findViewById(R.id.mc_version_spinner);
+        styleGlassButton(mNewsButton);
+        styleGlassButton(mDiscordButton);
+        styleGlassButton(mCustomControlButton);
+        styleGlassButton(mInstallJarButton);
+        styleGlassButton(mShareLogsButton);
+        styleGlassButton(mOpenDirectoryButton);
+        styleGlassButton(mHeroCreateButton);
+        styleGlassButton(mHeroLibraryButton);
+        styleGlassButton(mAccountManageButton);
+        AerixThemeManager.tintButton(mPlayButton, requireContext(), AerixThemeManager.SECTION_HOME);
+        updateHomeStatus();
 
         mNewsButton.setOnClickListener(v -> Tools.openURL(requireActivity(), Tools.URL_HOME));
         mDiscordButton.setOnClickListener(v -> Tools.openURL(requireActivity(), getString(R.string.social_media_invite)));
         mCustomControlButton.setOnClickListener(v -> startActivity(new Intent(requireContext(), CustomControlsActivity.class)));
         mInstallJarButton.setOnClickListener(v -> runInstallerWithConfirmation());
         mEditProfileButton.setOnClickListener(v -> mVersionSpinner.openProfileEditor(requireActivity()));
+        mHeroCreateButton.setOnClickListener(v -> Tools.swapFragment(requireActivity(),
+                ProfileTypeSelectFragment.class, ProfileTypeSelectFragment.TAG, null));
+        mHeroLibraryButton.setOnClickListener(v -> Tools.swapFragment(requireActivity(),
+                InstanceLibraryFragment.class, InstanceLibraryFragment.TAG, null));
+        mAccountManageButton.setOnClickListener(v -> {
+            View accountSpinner = requireActivity().findViewById(R.id.account_spinner);
+            if (accountSpinner != null) accountSpinner.performClick();
+        });
 
         mPlayButton.setOnClickListener(v -> {
         Instance instance = Instances.loadSelectedInstance();
@@ -127,7 +159,29 @@ public class MainMenuFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
+        updateHomeStatus();
         ExtraCore.setValue(ExtraConstants.REFRESH_ACCOUNT_SPINNER, true);
+    }
+
+    private void updateHomeStatus() {
+        if (mAccountSummary != null) {
+            Account account = Accounts.getCurrent();
+            mAccountSummary.setText(account == null || !Tools.isValidString(account.username)
+                    ? getString(R.string.aerix_home_sign_in_hint) : account.username);
+        }
+        if (mRamSummary != null) {
+            mRamSummary.setText(getString(R.string.aerix_home_ram,
+                    LauncherPreferences.PREF_RAM_ALLOCATION));
+        }
+    }
+
+    private void styleGlassButton(Button button) {
+        if (button == null) return;
+        button.setBackgroundResource(R.drawable.aerix_nav_button);
+        button.setBackgroundTintList(null);
+        button.setTextColor(Color.WHITE);
+        button.setAllCaps(false);
+        button.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
     }
 
     private void runInstallerWithConfirmation() {

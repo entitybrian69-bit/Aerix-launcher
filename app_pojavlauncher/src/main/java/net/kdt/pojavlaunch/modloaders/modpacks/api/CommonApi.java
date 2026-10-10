@@ -56,6 +56,10 @@ public class CommonApi implements ModpackApi {
 
         Future<?>[] futures = new Future<?>[mModpackApis.length];
         for(int i = 0; i < mModpackApis.length; i++) {
+            // Direct mod/resource-pack/shader installs are Modrinth-only here; CurseForge versions need
+            // a separate dependency/conflict workflow and should not appear as installable in this mode.
+            if (mModpackApis[i] instanceof CurseforgeApi
+                    && !"modpack".equals(searchFilters.resolvedProjectType())) continue;
             // If there is an array and its length is zero, this means that we've exhausted the results for this
             // search query and we don't need to actually do the search
             if(results[i] != null && results[i].results.length == 0) continue;

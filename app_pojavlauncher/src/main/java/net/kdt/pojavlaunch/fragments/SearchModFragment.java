@@ -13,6 +13,7 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ProgressBar;
+import android.widget.Spinner;
 import android.widget.TextView;
 
 import androidx.activity.result.ActivityResultLauncher;
@@ -36,8 +37,10 @@ import net.kdt.pojavlaunch.modloaders.modpacks.api.CommonApi;
 import net.kdt.pojavlaunch.modloaders.modpacks.api.ModpackApi;
 import net.kdt.pojavlaunch.modloaders.modpacks.models.SearchFilters;
 import net.kdt.pojavlaunch.profiles.VersionSelectorDialog;
+import net.kdt.pojavlaunch.prefs.LauncherPreferences;
 import net.kdt.pojavlaunch.progresskeeper.ProgressKeeper;
 import net.kdt.pojavlaunch.progresskeeper.TaskCountListener;
+import net.kdt.pojavlaunch.utils.AerixThemeManager;
 
 import org.apache.commons.io.IOUtils;
 
@@ -51,6 +54,8 @@ import java.io.OutputStream;
 public class SearchModFragment extends Fragment implements ModItemAdapter.SearchResultCallback {
 
     public static final String TAG = "SearchModFragment";
+    private static final String PREF_DISCOVER_TYPE = "aerix_discover_project_type";
+    private static final String[] DISCOVER_TYPES = {"modpack", "mod", "resourcepack", "shader"};
     private View mOverlay;
     private float mOverlayTopCache; // Padding cache reduce resource lookup
 
@@ -113,7 +118,7 @@ public class SearchModFragment extends Fragment implements ModItemAdapter.Search
     public SearchModFragment(){
         super(R.layout.fragment_mod_search);
         mSearchFilters = new SearchFilters();
-        mSearchFilters.isModpack = true;
+        mSearchFilters.setProjectType("modpack");
     }
 
     @Override
@@ -135,8 +140,18 @@ public class SearchModFragment extends Fragment implements ModItemAdapter.Search
         mRecyclerview = view.findViewById(R.id.search_mod_list);
         mStatusTextView = view.findViewById(R.id.search_mod_status_text);
         mFilterButton = view.findViewById(R.id.search_mod_filter);
+        AerixThemeManager.tintButton(mFilterButton, requireContext(), AerixThemeManager.SECTION_DISCOVER);
 
+        mStatusTextView.setTextColor(Color.WHITE);
         mDefaultTextColor = mStatusTextView.getTextColors();
+        mSearchEditText.setTextColor(Color.WHITE);
+        mSearchEditText.setHintTextColor(Color.LTGRAY);
+        String savedType = LauncherPreferences.DEFAULT_PREF.getString(PREF_DISCOVER_TYPE, "modpack");
+        try {
+            mSearchFilters.setProjectType(savedType);
+        } catch (IllegalArgumentException ignored) {
+            mSearchFilters.setProjectType("modpack");
+        }
 
         mRecyclerview.setLayoutManager(new LinearLayoutManager(getContext()));
         mRecyclerview.setAdapter(mModItemAdapter);
@@ -158,6 +173,7 @@ public class SearchModFragment extends Fragment implements ModItemAdapter.Search
         });
         mFilterButton.setOnClickListener(v -> displayFilterDialog());
         mImportButton = view.findViewById(R.id.mineButton_import_local_modpack);
+        AerixThemeManager.tintButton(mImportButton, requireContext(), AerixThemeManager.SECTION_DISCOVER);
         mImportButton.setOnClickListener(v -> {
             mImportLauncher.launch("*/*");
         });
@@ -214,12 +230,17 @@ public class SearchModFragment extends Fragment implements ModItemAdapter.Search
         // setup the view behavior
         dialog.setOnShowListener(dialogInterface -> {
             TextView mSelectedVersion = dialog.findViewById(R.id.search_mod_selected_mc_version_textview);
+            Spinner projectTypeSpinner = dialog.findViewById(R.id.search_mod_project_type_spinner);
             Button mSelectVersionButton = dialog.findViewById(R.id.search_mod_mc_version_button);
             Button mApplyButton = dialog.findViewById(R.id.search_mod_apply_filters);
 
             assert mSelectVersionButton != null;
             assert mSelectedVersion != null;
+            assert projectTypeSpinner != null;
             assert mApplyButton != null;
+            AerixThemeManager.tintButton(mSelectVersionButton, requireContext(), AerixThemeManager.SECTION_DISCOVER);
+            AerixThemeManager.tintButton(mApplyButton, requireContext(), AerixThemeManager.SECTION_DISCOVER);
+            projectTypeSpinner.setSelection(projectTypeIndex(mSearchFilters.resolvedProjectType()));
 
             // Setup the expendable list behavior
             mSelectVersionButton.setOnClickListener(v -> VersionSelectorDialog.open(v.getContext(), true, (id, snapshot)-> mSelectedVersion.setText(id)));
@@ -230,11 +251,24 @@ public class SearchModFragment extends Fragment implements ModItemAdapter.Search
             // Apply the new settings
             mApplyButton.setOnClickListener(v -> {
                 mSearchFilters.mcVersion = mSelectedVersion.getText().toString();
+                int selectedType = Math.max(0, Math.min(DISCOVER_TYPES.length - 1,
+                        projectTypeSpinner.getSelectedItemPosition()));
+                mSearchFilters.setProjectType(DISCOVER_TYPES[selectedType]);
+                LauncherPreferences.DEFAULT_PREF.edit()
+                        .putString(PREF_DISCOVER_TYPE, DISCOVER_TYPES[selectedType])
+                        .apply();
                 searchMods(mSearchEditText.getText().toString());
                 dialogInterface.dismiss();
             });
         });
 
         dialog.show();
+    }
+
+    private static int projectTypeIndex(String projectType) {
+        for (int i = 0; i < DISCOVER_TYPES.length; i++) {
+            if (DISCOVER_TYPES[i].equals(projectType)) return i;
+        }
+        return 0;
     }
 }
