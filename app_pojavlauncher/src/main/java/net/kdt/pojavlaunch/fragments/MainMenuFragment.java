@@ -61,49 +61,71 @@ public class MainMenuFragment extends Fragment {
         Button mPlayButton = view.findViewById(R.id.play_button);
         mVersionSpinner = view.findViewById(R.id.mc_version_spinner);
 
-        mNewsButton.setOnClickListener(v -> Tools.openURL(requireActivity(), Tools.URL_HOME));
-        mDiscordButton.setOnClickListener(v -> Tools.openURL(requireActivity(), getString(R.string.social_media_invite)));
-        mCustomControlButton.setOnClickListener(v -> startActivity(new Intent(requireContext(), CustomControlsActivity.class)));
-        mInstallJarButton.setOnClickListener(v -> runInstallerWithConfirmation());
-        mEditProfileButton.setOnClickListener(v -> mVersionSpinner.openProfileEditor(requireActivity()));
-
-        mPlayButton.setOnClickListener(v -> {
-        Instance instance = Instances.loadSelectedInstance();
-        File gamedir = instance.getGameDirectory();
-
-        if (GameRunner.hasVkMod(gamedir)) {
-            new AlertDialog.Builder(requireContext())
-            .setTitle(R.string.vk_mod_title)
-            .setMessage(R.string.vk_mod_message)
-            .setPositiveButton(R.string.continue_button, (d, w) -> {
-                ExtraCore.setValue(ExtraConstants.LAUNCH_GAME, true);
-            })
-            .show();
-        } else if (GameRunner.hasReplay(gamedir) && GameRunner.hasFfmpeg(requireContext())) {
-          new AlertDialog.Builder(requireContext())
-            .setTitle(R.string.no_ffmpeg_title)
-            .setMessage(R.string.no_ffmpeg_message)
-            .setPositiveButton(R.string.install_button, (d, w) -> {
-             Tools.openURL(requireActivity(), "https://github.com/MojoLauncher/FFmpegPlugin/releases");
-    })
-    .setNegativeButton(R.string.continue_button, (d, w) -> {
-        ExtraCore.setValue(ExtraConstants.LAUNCH_GAME, true);
-    })
-    .show();
-        } else {
-        ExtraCore.setValue(ExtraConstants.LAUNCH_GAME, true);
+        if (mNewsButton != null) {
+            mNewsButton.setOnClickListener(v -> Tools.openURL(requireActivity(), Tools.URL_HOME));
+            mNewsButton.setOnLongClickListener((v)->{
+                Tools.swapFragment(requireActivity(), GamepadMapperFragment.class, GamepadMapperFragment.TAG, null);
+                return true;
+            });
         }
-        });
+        if (mDiscordButton != null) {
+            mDiscordButton.setOnClickListener(v -> Tools.openURL(requireActivity(), getString(R.string.social_media_invite)));
+        }
+        if (mCustomControlButton != null) {
+            mCustomControlButton.setOnClickListener(v -> startActivity(new Intent(requireContext(), CustomControlsActivity.class)));
+        }
+        if (mInstallJarButton != null) {
+            mInstallJarButton.setOnClickListener(v -> runInstallerWithConfirmation());
+        }
+        if (mEditProfileButton != null) {
+            mEditProfileButton.setOnClickListener(v -> {
+                if (mVersionSpinner != null) {
+                    mVersionSpinner.openProfileEditor(requireActivity());
+                }
+            });
+        }
 
-        mShareLogsButton.setOnClickListener((v) -> shareLog(requireContext()));
+        if (mPlayButton != null) {
+            mPlayButton.setOnClickListener(v -> {
+                Instance instance = Instances.loadSelectedInstance();
+                if (instance == null) {
+                    Toast.makeText(requireContext(), R.string.no_instance, Toast.LENGTH_LONG).show();
+                    return;
+                }
+                File gamedir = instance.getGameDirectory();
 
-        mOpenDirectoryButton.setOnClickListener((v)-> openGameDirectory(v.getContext()));
+                if (GameRunner.hasVkMod(gamedir)) {
+                    new AlertDialog.Builder(requireContext())
+                        .setTitle(R.string.vk_mod_title)
+                        .setMessage(R.string.vk_mod_message)
+                        .setPositiveButton(R.string.continue_button, (d, w) -> {
+                            ExtraCore.setValue(ExtraConstants.LAUNCH_GAME, true);
+                        })
+                        .show();
+                } else if (GameRunner.hasReplay(gamedir) && GameRunner.hasFfmpeg(requireContext())) {
+                    new AlertDialog.Builder(requireContext())
+                        .setTitle(R.string.no_ffmpeg_title)
+                        .setMessage(R.string.no_ffmpeg_message)
+                        .setPositiveButton(R.string.install_button, (d, w) -> {
+                            Tools.openURL(requireActivity(), "https://github.com/MojoLauncher/FFmpegPlugin/releases");
+                        })
+                        .setNegativeButton(R.string.continue_button, (d, w) -> {
+                            ExtraCore.setValue(ExtraConstants.LAUNCH_GAME, true);
+                        })
+                        .show();
+                } else {
+                    ExtraCore.setValue(ExtraConstants.LAUNCH_GAME, true);
+                }
+            });
+        }
 
+        if (mShareLogsButton != null) {
+            mShareLogsButton.setOnClickListener((v) -> shareLog(requireContext()));
+        }
 
-        mNewsButton.setOnLongClickListener((v)->{
-            Tools.swapFragment(requireActivity(), GamepadMapperFragment.class, GamepadMapperFragment.TAG, null);
-            return true;
-        });
+        if (mOpenDirectoryButton != null) {
+            mOpenDirectoryButton.setOnClickListener((v)-> openGameDirectory(v.getContext()));
+        }
     }
 
     private void openGameDirectory(Context context) {
