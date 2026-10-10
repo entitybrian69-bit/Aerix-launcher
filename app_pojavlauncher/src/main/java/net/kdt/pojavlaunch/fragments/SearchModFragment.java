@@ -25,7 +25,7 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.core.math.MathUtils;
 import androidx.fragment.app.Fragment;
-import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.kdt.mcgui.ProgressLayout;
@@ -38,6 +38,7 @@ import net.kdt.pojavlaunch.modloaders.modpacks.ModItemAdapter;
 import net.kdt.pojavlaunch.modloaders.modpacks.api.CommonApi;
 import net.kdt.pojavlaunch.modloaders.modpacks.api.ModpackApi;
 import net.kdt.pojavlaunch.modloaders.modpacks.models.Constants;
+import net.kdt.pojavlaunch.modloaders.modpacks.models.ModItem;
 import net.kdt.pojavlaunch.modloaders.modpacks.models.SearchFilters;
 import net.kdt.pojavlaunch.profiles.VersionSelectorDialog;
 import net.kdt.pojavlaunch.prefs.LauncherPreferences;
@@ -58,8 +59,8 @@ import java.io.OutputStream;
 public class SearchModFragment extends Fragment implements ModItemAdapter.SearchResultCallback {
 
     public static final String TAG = "SearchModFragment";
-    private static final String PREF_DISCOVER_TYPE = "aerix_discover_project_type";
-    private static final String PREF_DISCOVER_SOURCE = "aerix_discover_source";
+    static final String PREF_DISCOVER_TYPE = "aerix_discover_project_type";
+    static final String PREF_DISCOVER_SOURCE = "aerix_discover_source";
     private static final String[] DISCOVER_TYPES = {"modpack", "mod", "resourcepack", "shader", "world"};
     private View mOverlay;
     private float mOverlayTopCache; // Padding cache reduce resource lookup
@@ -77,6 +78,7 @@ public class SearchModFragment extends Fragment implements ModItemAdapter.Search
     private ModItemAdapter mModItemAdapter;
     private ProgressBar mSearchProgressBar;
     private TextView mStatusTextView;
+    private TextView mDetailTitle, mDetailSource, mDetailDescription;
     private ColorStateList mDefaultTextColor;
     private ModpackApi modpackApi;
     private String mConfiguredCurseforgeKey = "";
@@ -150,6 +152,7 @@ public class SearchModFragment extends Fragment implements ModItemAdapter.Search
         // You can only access resources after attaching to current context
         mModItemAdapter = new ModItemAdapter(getResources(), modpackApi, this);
         ProgressKeeper.addTaskCountListener(mModItemAdapter);
+        mModItemAdapter.setProjectSelectionListener(this::showProjectDetail);
         mOverlayTopCache = getResources().getDimension(R.dimen.fragment_padding_medium);
 
         mOverlay = view.findViewById(R.id.search_mod_overlay);
@@ -158,13 +161,17 @@ public class SearchModFragment extends Fragment implements ModItemAdapter.Search
         mSearchProgressBar = view.findViewById(R.id.search_mod_progressbar);
         mRecyclerview = view.findViewById(R.id.search_mod_list);
         mStatusTextView = view.findViewById(R.id.search_mod_status_text);
+        mDetailTitle = view.findViewById(R.id.prism_mod_detail_title);
+        mDetailSource = view.findViewById(R.id.prism_mod_detail_source);
+        mDetailDescription = view.findViewById(R.id.prism_mod_detail_description);
         mFilterButton = view.findViewById(R.id.search_mod_filter);
-        AerixThemeManager.tintButton(mFilterButton, requireContext(), AerixThemeManager.SECTION_DISCOVER);
+        mFilterButton.setBackgroundResource(R.drawable.prism_create_side_button);
+        mFilterButton.setColorFilter(Color.rgb(20, 45, 66));
 
-        mStatusTextView.setTextColor(Color.WHITE);
+        mStatusTextView.setTextColor(Color.rgb(22, 46, 65));
         mDefaultTextColor = mStatusTextView.getTextColors();
-        mSearchEditText.setTextColor(Color.WHITE);
-        mSearchEditText.setHintTextColor(Color.LTGRAY);
+        mSearchEditText.setTextColor(Color.rgb(22, 46, 65));
+        mSearchEditText.setHintTextColor(Color.rgb(86, 112, 130));
         String savedType = LauncherPreferences.DEFAULT_PREF.getString(PREF_DISCOVER_TYPE, "modpack");
         try {
             mSearchFilters.setProjectType(savedType);
@@ -174,7 +181,15 @@ public class SearchModFragment extends Fragment implements ModItemAdapter.Search
         mSearchFilters.apiSource = LauncherPreferences.DEFAULT_PREF.getInt(PREF_DISCOVER_SOURCE, -1);
         updateDiscoverChips(view);
 
-        mRecyclerview.setLayoutManager(new LinearLayoutManager(getContext()));
+        int columns = getResources().getConfiguration().orientation
+                == android.content.res.Configuration.ORIENTATION_LANDSCAPE ? 2 : 1;
+        GridLayoutManager manager = new GridLayoutManager(requireContext(), columns);
+        manager.setSpanSizeLookup(new GridLayoutManager.SpanSizeLookup() {
+            @Override public int getSpanSize(int position) {
+                return mModItemAdapter.getItemViewType(position) == 1 ? columns : 1;
+            }
+        });
+        mRecyclerview.setLayoutManager(manager);
         mRecyclerview.setAdapter(mModItemAdapter);
 
         mRecyclerview.addOnScrollListener(mOverlayPositionListener);
@@ -247,10 +262,21 @@ public class SearchModFragment extends Fragment implements ModItemAdapter.Search
         }
     }
 
+    private void showProjectDetail(ModItem item) {
+        if (mDetailTitle == null) return;
+        mDetailTitle.setText(item.title);
+        mDetailSource.setText(item.apiSource == Constants.SOURCE_MODRINTH ? "Modrinth" : "CurseForge");
+        mDetailDescription.setText(item.description);
+    }
+
     private void updateDiscoverChips(View root) {
         LinearLayout row = root.findViewById(R.id.prism_discover_chips);
         if (row == null) return;
         row.removeAllViews();
+        addDiscoverChip(row, getString(R.string.prism_all_sources), mSearchFilters.apiSource == -1, () -> {
+            mSearchFilters.apiSource = -1;
+            saveSourceAndRefresh(root);
+        });
         addDiscoverChip(row, "Modrinth", mSearchFilters.apiSource == Constants.SOURCE_MODRINTH, () -> {
             mSearchFilters.apiSource = Constants.SOURCE_MODRINTH;
             saveSourceAndRefresh(root);
@@ -283,7 +309,7 @@ public class SearchModFragment extends Fragment implements ModItemAdapter.Search
         chip.setMinHeight(dp(38));
         chip.setBackgroundResource(R.drawable.prism_dock_item);
         chip.setActivated(selected);
-        chip.setTextColor(selected ? Color.rgb(20, 53, 78) : Color.WHITE);
+        chip.setTextColor(Color.rgb(20, 53, 78));
         chip.setOnClickListener(v -> action.run());
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT, dp(38));
@@ -299,6 +325,11 @@ public class SearchModFragment extends Fragment implements ModItemAdapter.Search
 
     private void searchMods(String name) {
         mSearchFilters.name = name == null ? "" : name;
+        if (mDetailTitle != null) {
+            mDetailTitle.setText(R.string.prism_mod_detail_prompt);
+            mDetailSource.setText("");
+            mDetailDescription.setText(R.string.prism_mod_detail_hint);
+        }
         String projectType = mSearchFilters.resolvedProjectType();
         if ("world".equals(projectType) && mSearchFilters.apiSource == Constants.SOURCE_MODRINTH) {
             showSearchUnavailable(R.string.aerix_discover_worlds_key_note);

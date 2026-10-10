@@ -53,6 +53,15 @@ public class ModItemAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
     private final SearchResultCallback mSearchResultCallback;
     private ModItem[] mModItems;
     private ModpackApi mModpackApi;
+    private ProjectSelectionListener mProjectSelectionListener;
+
+    public interface ProjectSelectionListener {
+        void onProjectSelected(ModItem item);
+    }
+
+    public void setProjectSelectionListener(ProjectSelectionListener listener) {
+        mProjectSelectionListener = listener;
+    }
 
     /* Cache for ever so slightly rounding the image for the corner not to stick out of the layout */
     private final float mCornerDimensionCache;
@@ -185,6 +194,8 @@ public class ModItemAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
             super(view);
             mViewHolderSet.add(this);
             view.setOnClickListener(v -> {
+                if (mProjectSelectionListener != null && mModItem != null)
+                    mProjectSelectionListener.onProjectSelected(mModItem);
                 if(!hasExtended()){
                     // Inflate the ViewStub
                     mExtendedLayout = ((ViewStub)v.findViewById(R.id.mod_limited_state_stub)).inflate();

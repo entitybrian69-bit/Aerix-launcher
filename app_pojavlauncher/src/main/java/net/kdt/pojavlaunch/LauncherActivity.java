@@ -243,7 +243,7 @@ public class LauncherActivity extends BaseActivity {
         View search = findViewById(R.id.prism_search_button);
         if (search != null) search.setOnClickListener(v -> navigateTo(SearchModFragment.class, SearchModFragment.TAG));
         PrismGlass.apply(findViewById(R.id.prism_top_bar));
-        PrismGlass.apply(findViewById(R.id.prism_dock));
+        // The compact dock remains clear and opaque enough for dark icons.
         View dock = findViewById(R.id.prism_dock);
         if (dock != null && (Build.VERSION.SDK_INT < 26 || ValueAnimator.areAnimatorsEnabled())) {
             mDockMotion = ObjectAnimator.ofFloat(dock, View.TRANSLATION_Y, 0f,
@@ -472,9 +472,7 @@ public class LauncherActivity extends BaseActivity {
     private void setNavigationLabelState(int labelId, boolean selected, String section) {
         TextView label = findViewById(labelId);
         if (label == null) return;
-        label.setTextColor(selected
-                ? AerixThemeManager.accentColor(this, section)
-                : Color.rgb(230, 243, 252));
+        label.setTextColor(selected ? Color.rgb(16, 24, 32) : Color.rgb(34, 52, 70));
         label.setTypeface(android.graphics.Typeface.DEFAULT,
                 selected ? android.graphics.Typeface.BOLD : android.graphics.Typeface.NORMAL);
     }
@@ -516,7 +514,7 @@ public class LauncherActivity extends BaseActivity {
         else if (fragment instanceof ServerManagerFragment) title = R.string.aerix_nav_servers_label;
         else if (settingsSelected) title = R.string.aerix_nav_settings_label;
         else if (!(fragment instanceof MainMenuFragment)) title = R.string.aerix_nav_create_label;
-        mPageTitle.setText(title);
+        mPageTitle.setText("AERIX / " + getString(title));
     }
 
     private void showMorePages(View anchor) {

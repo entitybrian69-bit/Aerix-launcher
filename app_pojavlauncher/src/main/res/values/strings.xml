@@ -573,9 +573,22 @@
     <!-- Aerix dashboard and navigation -->
     <string name="aerix_welcome_title">Aerix Home</string>
     <string name="aerix_welcome_subtitle">Your Minecraft Java worlds, together in one place.</string>
+    <string name="prism_home_breadcrumb">AERIX / Home</string>
     <string name="prism_studio">Studio</string>
     <string name="prism_search">⌕  Discover</string>
     <string name="prism_more">More pages</string>
+    <string name="prism_all_sources">All sources</string>
+    <string name="prism_mods_heading">Discover something new</string>
+    <string name="prism_mod_detail_prompt">Select a project</string>
+    <string name="prism_mod_detail_hint">Tap a project card to see available versions and install it.</string>
+    <string name="prism_project_art">Project icon</string>
+    <string name="prism_project_source">Project source</string>
+    <string name="prism_library_search">Search your instances</string>
+    <string name="prism_library_details">Details</string>
+    <string name="prism_create_workbench">Make a world your own</string>
+    <string name="prism_modpack_import">Modpack import</string>
+    <string name="prism_all_modpacks">Browse all packs</string>
+    <string name="prism_cover_illustration">Illustrative landscape artwork</string>
     <string name="prism_create_title">Create a new world to play</string>
     <string name="prism_ready">Ready when you are</string>
     <string name="prism_home_title">Your next world awaits</string>

@@ -50,7 +50,7 @@ public final class AerixSettingsTabBar {
             boolean selected = current == destination;
             TextView tab = new TextView(context);
             tab.setText(LABELS[i]);
-            tab.setTextColor(Color.WHITE);
+            tab.setTextColor(Color.rgb(16, 24, 32));
             tab.setTextSize(12);
             tab.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
             tab.setGravity(Gravity.CENTER);
@@ -81,9 +81,8 @@ public final class AerixSettingsTabBar {
 
     private static GradientDrawable tabBackground(Context context, boolean selected) {
         GradientDrawable drawable = new GradientDrawable();
-        int accent = AerixThemeManager.accentColor(context, AerixThemeManager.SECTION_SETTINGS);
-        drawable.setColor(selected ? Color.argb(62, Color.red(accent), Color.green(accent), Color.blue(accent))
-                : Color.argb(50, 22, 41, 60));
+        drawable.setColor(selected ? Color.argb(220, 238, 250, 255)
+                : Color.argb(155, 223, 240, 250));
         drawable.setCornerRadius(dp(context, 16));
         drawable.setStroke(dp(context, 1), selected ? Color.argb(220, 228, 250, 255)
                 : Color.argb(135, 206, 236, 255));

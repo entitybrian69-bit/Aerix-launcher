@@ -9,12 +9,15 @@ import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.text.InputType;
 import android.text.TextUtils;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.GridLayout;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.ScrollView;
@@ -63,6 +66,10 @@ public class InstanceLibraryFragment extends Fragment {
 
     private LinearLayout mRoot;
     private GridLayout mGrid;
+    private LinearLayout mDetailHost;
+    private EditText mSearch;
+    private boolean mHasDetailPane;
+    private String mSelectedId;
     private ProgressBar mProgress;
     private TextView mEmptyState;
     private Button mFavoritesFilterButton;
@@ -111,12 +118,12 @@ public class InstanceLibraryFragment extends Fragment {
         header.setGravity(Gravity.CENTER_VERTICAL);
         header.setOrientation(LinearLayout.HORIZONTAL);
         header.setPadding(pad, dp(12), pad, dp(12));
-        PrismGlass.apply(header);
+        // The header floats on the wallpaper; only the controls have a glass footprint.
 
         LinearLayout titleStack = new LinearLayout(requireContext());
         titleStack.setOrientation(LinearLayout.VERTICAL);
-        TextView title = text(getString(R.string.aerix_library_title), 22, "#F1F6FC", true);
-        TextView subtitle = text(getString(R.string.aerix_library_subtitle), 12, "#AABCD0", false);
+        TextView title = text(getString(R.string.aerix_library_title), 22, "#183148", true);
+        TextView subtitle = text(getString(R.string.aerix_library_subtitle), 12, "#39546B", false);
         titleStack.addView(title);
         LinearLayout.LayoutParams subtitleParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
@@ -151,39 +158,70 @@ public class InstanceLibraryFragment extends Fragment {
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         updateFilterLabels();
 
+        mSearch = new EditText(requireContext());
+        mSearch.setSingleLine(true);
+        mSearch.setTextSize(14);
+        mSearch.setHint(R.string.prism_library_search);
+        mSearch.setTextColor(Color.rgb(22, 46, 65));
+        mSearch.setHintTextColor(Color.rgb(86, 112, 130));
+        mSearch.setBackgroundResource(R.drawable.prism_create_side_button);
+        mSearch.setPadding(dp(16), 0, dp(16), 0);
+        LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(43));
+        searchParams.setMargins(dp(5), dp(8), dp(5), dp(2));
+        mRoot.addView(mSearch, searchParams);
+        mSearch.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                renderInstances();
+            }
+            @Override public void afterTextChanged(Editable s) { }
+        });
+
         mProgress = new ProgressBar(requireContext());
         LinearLayout.LayoutParams progressParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         progressParams.gravity = Gravity.CENTER;
-        progressParams.topMargin = dp(18);
         mRoot.addView(mProgress, progressParams);
-
-        mEmptyState = text(getString(R.string.aerix_library_empty), 15, "#B8C8D9", false);
+        mEmptyState = text(getString(R.string.aerix_library_empty), 15, "#254358", false);
         mEmptyState.setGravity(Gravity.CENTER);
         mEmptyState.setPadding(dp(24), dp(20), dp(24), dp(20));
         mEmptyState.setVisibility(View.GONE);
-        LinearLayout.LayoutParams emptyParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        emptyParams.topMargin = dp(14);
-        mRoot.addView(mEmptyState, emptyParams);
+        mRoot.addView(mEmptyState, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
+        LinearLayout body = new LinearLayout(requireContext());
+        body.setOrientation(LinearLayout.HORIZONTAL);
+        mRoot.addView(body, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
         ScrollView scroll = new ScrollView(requireContext());
         scroll.setFillViewport(true);
         scroll.setClipToPadding(false);
-        scroll.setPadding(0, dp(10), 0, dp(8));
-        LinearLayout.LayoutParams scrollParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f);
-        scrollParams.topMargin = dp(8);
-        mRoot.addView(scroll, scrollParams);
-
+        scroll.setPadding(0, dp(8), 0, dp(80));
+        body.addView(scroll, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f));
         mGrid = new GridLayout(requireContext());
         mGrid.setAlignmentMode(GridLayout.ALIGN_BOUNDS);
         mGrid.setUseDefaultMargins(false);
         int widthDp = getResources().getConfiguration().screenWidthDp;
+        mHasDetailPane = widthDp >= 700;
         mCardColumns = widthDp >= 1150 ? 3 : (widthDp >= 700 ? 2 : 1);
         mGrid.setColumnCount(mCardColumns);
         scroll.addView(mGrid, new ScrollView.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        if (mHasDetailPane) {
+            ScrollView detailScroll = new ScrollView(requireContext());
+            detailScroll.setFillViewport(true);
+            LinearLayout.LayoutParams detailParams = new LinearLayout.LayoutParams(dp(238),
+                    ViewGroup.LayoutParams.MATCH_PARENT);
+            detailParams.setMargins(dp(7), dp(7), dp(5), dp(75));
+            body.addView(detailScroll, detailParams);
+            mDetailHost = new LinearLayout(requireContext());
+            mDetailHost.setOrientation(LinearLayout.VERTICAL);
+            PrismGlass.apply(mDetailHost);
+            detailScroll.addView(mDetailHost);
+        } else {
+            mDetailHost = null;
+        }
         return mRoot;
     }
 
@@ -220,6 +258,7 @@ public class InstanceLibraryFragment extends Fragment {
     private void renderInstances() {
         if (mGrid == null || mEmptyState == null) return;
         mGrid.removeAllViews();
+        if (mDetailHost != null) mDetailHost.removeAllViews();
         if (mAllInstances.isEmpty()) {
             mEmptyState.setText(R.string.aerix_library_empty);
             mEmptyState.setVisibility(View.VISIBLE);
@@ -234,6 +273,9 @@ public class InstanceLibraryFragment extends Fragment {
                 if (FILTER_UNGROUPED.equals(mGroupFilter) && !group.isEmpty()) continue;
                 if (!FILTER_UNGROUPED.equals(mGroupFilter) && !mGroupFilter.equals(group)) continue;
             }
+            String query = mSearch == null ? "" : mSearch.getText().toString().trim().toLowerCase(Locale.ROOT);
+            if (!query.isEmpty() && !displayName(instance).toLowerCase(Locale.ROOT).contains(query)
+                    && (instance.versionId == null || !instance.versionId.toLowerCase(Locale.ROOT).contains(query))) continue;
             visible.add(instance);
         }
         Collections.sort(visible, this::compareInstances);
@@ -244,6 +286,12 @@ public class InstanceLibraryFragment extends Fragment {
         }
 
         mEmptyState.setVisibility(View.GONE);
+        Instance selected = visible.get(0);
+        for (Instance item : visible) {
+            if (stableId(item).equals(mSelectedId)) { selected = item; break; }
+        }
+        mSelectedId = stableId(selected);
+        if (mDetailHost != null) mDetailHost.addView(createDetailContent(selected));
         for (int i = 0; i < visible.size(); i++) {
             Instance instance = visible.get(i);
             GridLayout.LayoutParams params = new GridLayout.LayoutParams(
@@ -278,111 +326,134 @@ public class InstanceLibraryFragment extends Fragment {
         return String.CASE_INSENSITIVE_ORDER.compare(left == null ? "" : left, right == null ? "" : right);
     }
 
+    private int coverFor(Instance instance) {
+        int index = (stableId(instance).hashCode() & Integer.MAX_VALUE) % 3;
+        return index == 0 ? R.drawable.prism_cover_river
+                : index == 1 ? R.drawable.prism_cover_cherry : R.drawable.prism_cover_sunset;
+    }
+
     private View createInstanceCard(Instance instance) {
         LinearLayout card = new LinearLayout(requireContext());
         card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(dp(15), dp(12), dp(15), dp(11));
+        card.setPadding(dp(8), dp(8), dp(8), dp(9));
         PrismGlass.apply(card);
-
-        TextView name = text(displayName(instance), 16, "#F1F6FC", true);
-        name.setMaxLines(1);
+        ImageView cover = new ImageView(requireContext());
+        cover.setImageResource(coverFor(instance));
+        cover.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        cover.setContentDescription(getString(R.string.prism_cover_illustration));
+        card.addView(cover, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(95)));
+        TextView name = text(displayName(instance), 16, "#152D42", true);
+        name.setSingleLine(true);
         name.setEllipsize(TextUtils.TruncateAt.END);
-        card.addView(name, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-
+        LinearLayout.LayoutParams nameParams = new LinearLayout.LayoutParams(-1, -2);
+        nameParams.topMargin = dp(7);
+        card.addView(name, nameParams);
         String version = Tools.isValidString(instance.versionId) ? instance.versionId : getString(R.string.error_no_version);
-        TextView versionText = text(version, 12, "#93B8D4", false);
-        LinearLayout.LayoutParams versionParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        versionParams.topMargin = dp(3);
-        card.addView(versionText, versionParams);
-
-        String normalizedVersion = instance.versionId == null ? "" : instance.versionId.toLowerCase(Locale.ROOT);
-        boolean modded = instance.installer != null || normalizedVersion.contains("fabric")
-                || normalizedVersion.contains("forge") || normalizedVersion.contains("quilt")
-                || normalizedVersion.contains("neoforge") || normalizedVersion.contains("optifine");
-        TextView loader = text(modded ? getString(R.string.aerix_modded_instance)
-                : getString(R.string.aerix_vanilla_instance), 11, "#B7C9D8", false);
-        loader.setPadding(dp(9), dp(4), dp(9), dp(4));
-        GradientDrawable badge = new GradientDrawable();
-        badge.setColor(Color.argb(42, 105, 180, 235));
-        badge.setCornerRadius(dp(10));
-        loader.setBackground(badge);
-        LinearLayout.LayoutParams badgeParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        badgeParams.topMargin = dp(7);
-        card.addView(loader, badgeParams);
-
-        LinearLayout metadataActions = new LinearLayout(requireContext());
-        metadataActions.setOrientation(LinearLayout.HORIZONTAL);
-        Button favorite = button(isFavorite(instance) ? getString(R.string.aerix_favorite_on)
-                : getString(R.string.aerix_favorite_off));
-        favorite.setOnClickListener(v -> {
-            setFavorite(instance, !isFavorite(instance));
-            renderInstances();
-        });
-        Button pin = button(isPinned(instance) ? getString(R.string.aerix_pin_on)
-                : getString(R.string.aerix_pin_off));
-        pin.setOnClickListener(v -> {
-            setPinned(instance, !isPinned(instance));
-            renderInstances();
-        });
-        addActionButton(metadataActions, favorite);
-        addActionButton(metadataActions, pin);
-        LinearLayout.LayoutParams metadataParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(44));
-        metadataParams.topMargin = dp(6);
-        card.addView(metadataActions, metadataParams);
-
-        Button group = button(groupButtonLabel(instance));
-        group.setMaxLines(1);
-        group.setEllipsize(TextUtils.TruncateAt.END);
-        group.setOnClickListener(v -> editGroup(instance));
-        LinearLayout.LayoutParams groupParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(44));
-        groupParams.topMargin = dp(5);
-        card.addView(group, groupParams);
-
-        Button launch = button(getString(R.string.main_play));
-        launch.setContentDescription(getString(R.string.aerix_play_instance, displayName(instance)));
-        launch.setOnClickListener(v -> {
-            Instances.setSelectedInstance(instance);
-            ExtraCore.setValue(ExtraConstants.REFRESH_VERSION_SPINNER, null);
-            ExtraCore.setValue(ExtraConstants.LAUNCH_GAME, true);
-        });
-        card.addView(launch, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(44)));
-
-        LinearLayout dataActions = new LinearLayout(requireContext());
-        dataActions.setOrientation(LinearLayout.HORIZONTAL);
-        Button clone = button(getString(R.string.aerix_clone_action));
-        clone.setOnClickListener(v -> confirmClone(instance));
-        Button backup = button(getString(R.string.aerix_backup_action));
-        backup.setOnClickListener(v -> startBackup(instance));
-        addActionButton(dataActions, clone);
-        addActionButton(dataActions, backup);
-        LinearLayout.LayoutParams dataActionParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(44));
-        dataActionParams.topMargin = dp(4);
-        card.addView(dataActions, dataActionParams);
-
+        TextView versionText = text(version, 12, "#36566B", false);
+        versionText.setSingleLine(true);
+        versionText.setEllipsize(TextUtils.TruncateAt.END);
+        card.addView(versionText);
         LinearLayout actions = new LinearLayout(requireContext());
         actions.setOrientation(LinearLayout.HORIZONTAL);
-        Button edit = button(getString(R.string.global_edit));
+        Button details = lightButton(getString(R.string.prism_library_details));
+        details.setOnClickListener(v -> showDetails(instance));
+        addActionButton(actions, details);
+        Button play = lightButton(getString(R.string.main_play));
+        play.setContentDescription(getString(R.string.aerix_play_instance, displayName(instance)));
+        play.setOnClickListener(v -> launchInstance(instance));
+        addActionButton(actions, play);
+        LinearLayout.LayoutParams actionsParams = new LinearLayout.LayoutParams(-1, dp(39));
+        actionsParams.topMargin = dp(7);
+        card.addView(actions, actionsParams);
+        card.setOnClickListener(v -> showDetails(instance));
+        return card;
+    }
+
+    private Button lightButton(String label) {
+        Button button = button(label);
+        button.setBackgroundResource(R.drawable.prism_create_side_button);
+        button.setTextColor(Color.rgb(20, 47, 65));
+        button.setTextSize(12);
+        return button;
+    }
+
+    private void showDetails(Instance instance) {
+        mSelectedId = stableId(instance);
+        if (mDetailHost != null) {
+            mDetailHost.removeAllViews();
+            mDetailHost.addView(createDetailContent(instance));
+        } else {
+            ScrollView detailScroll = new ScrollView(requireContext());
+            detailScroll.addView(createDetailContent(instance));
+            new AlertDialog.Builder(requireContext())
+                    .setView(detailScroll)
+                    .setNegativeButton(android.R.string.cancel, null).show();
+        }
+    }
+
+    private void launchInstance(Instance instance) {
+        Instances.setSelectedInstance(instance);
+        ExtraCore.setValue(ExtraConstants.REFRESH_VERSION_SPINNER, null);
+        ExtraCore.setValue(ExtraConstants.LAUNCH_GAME, true);
+    }
+
+    private View createDetailContent(Instance instance) {
+        LinearLayout detail = new LinearLayout(requireContext());
+        detail.setOrientation(LinearLayout.VERTICAL);
+        detail.setPadding(dp(12), dp(12), dp(12), dp(14));
+        if (!mHasDetailPane) PrismGlass.apply(detail);
+        ImageView cover = new ImageView(requireContext());
+        cover.setImageResource(coverFor(instance));
+        cover.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        cover.setContentDescription(getString(R.string.prism_cover_illustration));
+        detail.addView(cover, new LinearLayout.LayoutParams(-1, dp(93)));
+        TextView name = text(displayName(instance), 17, "#152D42", true);
+        LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(-1, -2);
+        titleParams.topMargin = dp(8);
+        detail.addView(name, titleParams);
+        String version = Tools.isValidString(instance.versionId) ? instance.versionId : getString(R.string.error_no_version);
+        detail.addView(text(version, 12, "#36566B", false));
+        String normalized = version.toLowerCase(Locale.ROOT);
+        boolean modded = instance.installer != null || normalized.contains("fabric")
+                || normalized.contains("forge") || normalized.contains("quilt")
+                || normalized.contains("optifine");
+        detail.addView(text(getString(modded ? R.string.aerix_modded_instance
+                : R.string.aerix_vanilla_instance), 12, "#36566B", false));
+        Button play = lightButton(getString(R.string.main_play));
+        play.setOnClickListener(v -> launchInstance(instance));
+        addDetailAction(detail, play);
+        Button favorite = lightButton(getString(isFavorite(instance) ? R.string.aerix_favorite_on : R.string.aerix_favorite_off));
+        favorite.setOnClickListener(v -> { setFavorite(instance, !isFavorite(instance)); renderInstances(); });
+        addDetailAction(detail, favorite);
+        Button pin = lightButton(getString(isPinned(instance) ? R.string.aerix_pin_on : R.string.aerix_pin_off));
+        pin.setOnClickListener(v -> { setPinned(instance, !isPinned(instance)); renderInstances(); });
+        addDetailAction(detail, pin);
+        Button group = lightButton(groupButtonLabel(instance));
+        group.setOnClickListener(v -> editGroup(instance));
+        addDetailAction(detail, group);
+        Button edit = lightButton(getString(R.string.global_edit));
         edit.setOnClickListener(v -> {
             Instances.setSelectedInstance(instance);
-            Tools.swapFragment(requireActivity(), InstanceEditorFragment.class,
-                    InstanceEditorFragment.TAG, null);
+            Tools.swapFragment(requireActivity(), InstanceEditorFragment.class, InstanceEditorFragment.TAG, null);
         });
-        Button delete = button(getString(R.string.global_delete));
+        addDetailAction(detail, edit);
+        Button clone = lightButton(getString(R.string.aerix_clone_action));
+        clone.setOnClickListener(v -> confirmClone(instance));
+        addDetailAction(detail, clone);
+        Button backup = lightButton(getString(R.string.aerix_backup_action));
+        backup.setOnClickListener(v -> startBackup(instance));
+        addDetailAction(detail, backup);
+        Button delete = lightButton(getString(R.string.global_delete));
         delete.setOnClickListener(v -> confirmDelete(instance));
-        addActionButton(actions, edit);
-        addActionButton(actions, delete);
-        LinearLayout.LayoutParams actionParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(44));
-        actionParams.topMargin = dp(4);
-        card.addView(actions, actionParams);
-        return card;
+        addDetailAction(detail, delete);
+        return detail;
+    }
+
+    private void addDetailAction(LinearLayout detail, Button action) {
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(38));
+        params.topMargin = dp(5);
+        detail.addView(action, params);
     }
 
     private void addActionButton(LinearLayout parent, Button button) {

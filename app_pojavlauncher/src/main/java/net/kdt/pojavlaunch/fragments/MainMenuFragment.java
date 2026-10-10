@@ -76,6 +76,10 @@ public class MainMenuFragment extends Fragment {
         ImageButton mEditProfileButton = view.findViewById(R.id.edit_profile_button);
         Button mPlayButton = view.findViewById(R.id.play_button);
         mVersionSpinner = view.findViewById(R.id.mc_version_spinner);
+        if (mVersionSpinner != null && getResources().getConfiguration().orientation ==
+                android.content.res.Configuration.ORIENTATION_LANDSCAPE) {
+            mVersionSpinner.setTextColor(Color.rgb(20, 42, 64));
+        }
         styleGlassButton(mHeroCreateButton);
         styleGlassButton(mHeroLibraryButton);
         styleGlassButton(mHeroModsButton);
@@ -86,8 +90,9 @@ public class MainMenuFragment extends Fragment {
             mPlayButton.setBackgroundResource(R.drawable.prism_orb);
             mPlayButton.setBackgroundTintList(null);
             mPlayButton.setTextColor(Color.rgb(23, 55, 86));
-            mOrbMotion = ObjectAnimator.ofFloat(mPlayButton, View.TRANSLATION_Y, 0f,
-                    -7f * getResources().getDisplayMetrics().density);
+            mOrbMotion = ObjectAnimator.ofFloat(mPlayButton, View.TRANSLATION_Y,
+                    -16f * getResources().getDisplayMetrics().density,
+                    -23f * getResources().getDisplayMetrics().density);
             mOrbMotion.setDuration(2200);
             mOrbMotion.setRepeatCount(ValueAnimator.INFINITE);
             mOrbMotion.setRepeatMode(ValueAnimator.REVERSE);

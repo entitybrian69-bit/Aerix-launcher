@@ -68,8 +68,7 @@ public class LauncherPreferenceFragment extends PreferenceFragmentCompat impleme
             list.setClipToPadding(false);
             list.setPadding(dp(10), dp(10), dp(10), dp(10));
         }
-        applySettingsAccent(getPreferenceScreen(), ColorStateList.valueOf(
-                AerixThemeManager.accentColor(requireContext(), themeSection())));
+        applySettingsAccent(getPreferenceScreen(), ColorStateList.valueOf(Color.BLACK));
     }
 
     private int dp(float value) {

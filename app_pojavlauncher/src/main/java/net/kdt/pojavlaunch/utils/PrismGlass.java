@@ -16,8 +16,8 @@ public final class PrismGlass {
 
     public static synchronized void setWallpaper(Bitmap wallpaper) {
         // Filtered downsampling produces a soft background even on pre-Android 12 devices.
-        int w = Math.max(1, wallpaper.getWidth() / 18);
-        int h = Math.max(1, wallpaper.getHeight() / 18);
+        int w = Math.max(1, wallpaper.getWidth() / 4);
+        int h = Math.max(1, wallpaper.getHeight() / 4);
         backdrop = Bitmap.createScaledBitmap(wallpaper, w, h, true);
     }
 
@@ -62,7 +62,7 @@ public final class PrismGlass {
                         offsetX - screenX + image.getWidth() * scale,
                         offsetY - screenY + image.getHeight() * scale), paint);
             }
-            paint.setColor(0x59446591);
+            paint.setColor(0x24D9ECFA);
             paint.setStyle(Paint.Style.FILL);
             canvas.drawRect(area, paint);
             canvas.restore();

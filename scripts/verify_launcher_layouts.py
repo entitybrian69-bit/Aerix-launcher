@@ -9,6 +9,8 @@ RES = Path("app_pojavlauncher/src/main/res")
 HOME_LAYOUTS = sorted(RES.glob("layout*/fragment_launcher.xml"))
 PROFILE_LAYOUTS = sorted(RES.glob("layout*/fragment_profile_type.xml"))
 DISCOVER_FILTER_LAYOUT = RES / "layout/dialog_mod_filters.xml"
+DISCOVER_LAYOUTS = sorted(RES.glob("layout*/fragment_mod_search.xml"))
+DISCOVER_CARD_LAYOUT = RES / "layout/view_mod.xml"
 ANDROID_ID = "{http://schemas.android.com/apk/res/android}id"
 
 HOME_REQUIRED_IDS = {
@@ -35,6 +37,15 @@ PROFILE_REQUIRED_IDS = {
     "modded_profile_neoforge",
     "modded_profile_modpack",
     "modded_profile_bta",
+}
+DISCOVER_PAGE_IDS = {
+    "search_mod_overlay", "search_mod_edittext", "search_mod_filter",
+    "prism_discover_chips", "search_mod_progressbar", "search_mod_list",
+    "search_mod_status_text", "mineButton_import_local_modpack",
+}
+DISCOVER_CARD_IDS = {
+    "mod_thumbnail_imageview", "mod_source_imageview", "mod_title_textview",
+    "mod_body_textview", "mod_limited_state_stub",
 }
 DISCOVER_REQUIRED_IDS = {
     "search_mod_source_spinner",
@@ -78,6 +89,8 @@ def verify_variants(paths: list[Path], required_ids: set[str], label: str) -> bo
 def main() -> int:
     passed = verify_variants(HOME_LAYOUTS, HOME_REQUIRED_IDS, "Home")
     passed = verify_variants(PROFILE_LAYOUTS, PROFILE_REQUIRED_IDS, "Create profile") and passed
+    passed = verify_variants(DISCOVER_LAYOUTS, DISCOVER_PAGE_IDS, "Discover") and passed
+    passed = verify(DISCOVER_CARD_LAYOUT, DISCOVER_CARD_IDS, "Discover card") and passed
     passed = verify(DISCOVER_FILTER_LAYOUT, DISCOVER_REQUIRED_IDS, "Discover filter") and passed
     return 0 if passed else 1
 
