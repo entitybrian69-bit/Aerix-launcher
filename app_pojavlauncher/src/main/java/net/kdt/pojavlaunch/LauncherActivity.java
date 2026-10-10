@@ -240,9 +240,6 @@ public class LauncherActivity extends BaseActivity {
         mSettingsButton.setOnClickListener(mSettingButtonListener);
         View more = findViewById(R.id.prism_more_button);
         if (more != null) more.setOnClickListener(this::showMorePages);
-        View search = findViewById(R.id.prism_search_button);
-        if (search != null) search.setOnClickListener(v -> navigateTo(SearchModFragment.class, SearchModFragment.TAG));
-        PrismGlass.apply(findViewById(R.id.prism_top_bar));
         // The compact dock remains clear and opaque enough for dark icons.
         View dock = findViewById(R.id.prism_dock);
         if (dock != null && (Build.VERSION.SDK_INT < 26 || ValueAnimator.areAnimatorsEnabled())) {
@@ -444,9 +441,7 @@ public class LauncherActivity extends BaseActivity {
                 if (backdrop == null) return;
                 backdrop.setImageBitmap(selectedBitmap);
                 backdrop.setVisibility(View.VISIBLE);
-                View top = findViewById(R.id.prism_top_bar);
                 View dock = findViewById(R.id.prism_dock);
-                if (top != null) top.invalidate();
                 if (dock != null) dock.invalidate();
                 Fragment current = getSupportFragmentManager().findFragmentById(R.id.container_fragment);
                 if (current != null && current.getView() != null) current.getView().invalidate();
