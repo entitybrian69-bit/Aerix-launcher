@@ -6,6 +6,7 @@ import android.app.Activity;
 import android.content.SharedPreferences;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
+import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.LayoutInflater;
@@ -79,7 +80,12 @@ public class LauncherPreferenceFragment extends PreferenceFragmentCompat impleme
         if (group == null) return;
         for (int i = 0; i < group.getPreferenceCount(); i++) {
             Preference preference = group.getPreference(i);
-            if (preference.getIcon() != null) preference.setIconTintList(tint);
+            Drawable icon = preference.getIcon();
+            if (icon != null) {
+                icon = icon.mutate();
+                icon.setTintList(tint);
+                preference.setIcon(icon);
+            }
             if (preference instanceof PreferenceGroup) {
                 applySettingsAccent((PreferenceGroup) preference, tint);
             }
