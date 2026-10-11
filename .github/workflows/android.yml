@@ -76,25 +76,32 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          mkdir -p .ci-logs
-          rm -f .ci-logs/*.log
           {
             echo "### What went wrong"
             grep -n -A 30 "What went wrong" build.log | head -60
             echo
             echo "### Errors"
-            grep -nE "error:|FAILED|Execution failed" build.log | head -40
+            grep -nE "error:|FAILED|Execution failed" build.log | head -60
             echo
             echo "### Tail"
             tail -120 build.log
-          } > ".ci-logs/build-$(date +%s).log"
+          } > err.txt
+          # Post it as a commit comment first: that can never lose a race.
+          gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/comments" \
+            -f "body=$(cat err.txt)" || true
+          mkdir -p .ci-logs
+          rm -f .ci-logs/*.log
+          cp err.txt ".ci-logs/build-$(date +%s).log"
           git config user.name "CI debug"
           git config user.email "ci@local"
           git add .ci-logs
           git commit -m "CI debug: build log" || true
-          git push origin "HEAD:$(git rev-parse --abbrev-ref HEAD)" || true
-          gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/comments" \
-            -f "body=CI build failure, log pushed to .ci-logs" || true
+          branch="$(git rev-parse --abbrev-ref HEAD)"
+          for i in 1 2 3 4 5; do
+            git pull --rebase origin "$branch" >/dev/null 2>&1
+            git push origin "HEAD:$branch" && break
+            sleep 10
+          done
 
       - name: Upload build log
         if: failure()
