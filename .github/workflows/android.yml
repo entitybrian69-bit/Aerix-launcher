@@ -61,21 +61,8 @@ jobs:
 
       - name: Build Debug .apk (Full)
         run: |
-          set -o pipefail
-          gradle :app_pojavlauncher:assembleFullDebug 2>&1 | tee build.log
-
-      - name: Capture build error
-        id: err
-        if: failure()
-        run: |
-          BODY=$(grep -nE "error:|FAILED|What went wrong|Execution failed" -A 6 build.log | tail -c 2400 | base64 -w0)
-          if [ -z "$BODY" ]; then BODY=$(tail -c 2400 build.log | base64 -w0); fi
-          echo "msg=$BODY" >> $GITHUB_OUTPUT
-
-      - name: "CI-ERROR ${{ steps.err.outputs.msg }}"
-        if: failure()
-        run: echo captured
-
+          # Build the launcher
+          gradle :app_pojavlauncher:assembleFullDebug
           mv app_pojavlauncher/build/outputs/apk/full/debug/app_pojavlauncher-full-debug.apk out/app-debug-full.apk
 
       - name: Build Debug .apk (No runtime)
