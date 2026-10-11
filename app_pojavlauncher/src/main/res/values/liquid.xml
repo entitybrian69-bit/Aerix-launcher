@@ -18,6 +18,7 @@
 
     <!-- surfaces (all translucent so the aurora stays visible) -->
     <color name="liquid_scrim">#CC05080F</color>
+    <color name="liquid_scrim_soft">#A6050810</color>
     <color name="liquid_abyss_top">#060A14</color>
     <color name="liquid_abyss_mid">#08182C</color>
     <color name="liquid_abyss_bottom">#03080F</color>
@@ -52,6 +53,11 @@
     <dimen name="liquid_row_height">88dp</dimen>
     <dimen name="liquid_touch_min">64dp</dimen>
     <dimen name="liquid_dock_height">88dp</dimen>
+    <dimen name="liquid_column_narrow">480dp</dimen>
+    <dimen name="liquid_column">520dp</dimen>
+    <dimen name="liquid_column_wide">600dp</dimen>
+    <dimen name="liquid_dialog_min_major">420dp</dimen>
+    <dimen name="liquid_dialog_min_minor">320dp</dimen>
 
     <!-- Theme used by the launcher shell: transparent window so the animated
          aurora backdrop can live behind every screen. -->
@@ -73,6 +79,124 @@
         <item name="android:fontFamily">@font/noto_sans_bold</item>
         <item name="android:letterSpacing">0.14</item>
         <item name="android:textAllCaps">true</item>
+    </style>
+
+    <!-- The Liquid Crystal shell.
+
+         Everything the old launcher drew with a flat grey rectangle is now
+         drawn in glass over the aurora. The changes live in the theme, so
+         every screen that is not rewritten yet still picks them up. -->
+    <style name="MojoLauncher.Liquid" parent="MojoLauncher">
+        <!-- window -->
+        <item name="android:statusBarColor">@color/liquid_abyss_top</item>
+        <item name="android:navigationBarColor">@color/liquid_abyss_bottom</item>
+        <item name="android:windowBackground">@drawable/liquid_window</item>
+
+        <!-- text -->
+        <item name="android:textColorPrimary">@color/liquid_ink</item>
+        <item name="android:textColorSecondary">@color/liquid_dim</item>
+        <item name="android:textColorTertiary">@color/liquid_faint</item>
+        <item name="android:textColorHint">@color/liquid_faint</item>
+
+        <!-- accents drive switches, seekbars, checkboxes, cursors -->
+        <item name="colorPrimary">@color/liquid_cyan</item>
+        <item name="colorAccent">@color/liquid_cyan</item>
+        <item name="colorControlNormal">@color/liquid_ink_2</item>
+        <item name="colorControlActivated">@color/liquid_cyan</item>
+        <item name="colorControlHighlight">@color/liquid_glass_press</item>
+
+        <!-- widgets -->
+        <item name="mineButtonBackground">@drawable/liquid_tile</item>
+        <item name="buttonStyle">@style/Liquid.Button</item>
+        <item name="android:buttonStyle">@style/Liquid.Button</item>
+        <item name="android:buttonStyleToggle">@style/Liquid.Button</item>
+        <item name="android:editTextStyle">@style/Liquid.EditText</item>
+        <item name="android:spinnerStyle">@style/Liquid.Spinner</item>
+        <item name="android:seekBarStyle">@style/Liquid.SeekBar</item>
+        <item name="seekBarStyle">@style/Liquid.SeekBar</item>
+        <item name="android:progressBarStyleHorizontal">@style/Liquid.ProgressBar</item>
+        <item name="android:listDivider">@drawable/liquid_divider</item>
+        <item name="android:divider">@drawable/liquid_divider</item>
+        <item name="android:listChoiceBackgroundIndicator">@drawable/liquid_choice</item>
+        <item name="android:scrollbarThumbVertical">@drawable/liquid_scrollbar</item>
+        <item name="android:scrollbarThumbHorizontal">@drawable/liquid_scrollbar</item>
+
+        <!-- popups, spinners and dialogs become glass -->
+        <item name="android:popupMenuStyle">@style/Liquid.PopupMenu</item>
+        <item name="popupMenuStyle">@style/Liquid.PopupMenu</item>
+        <item name="android:alertDialogTheme">@style/Liquid.Dialog</item>
+        <item name="alertDialogTheme">@style/Liquid.Dialog</item>
+        <item name="android:dialogTheme">@style/Liquid.Dialog</item>
+        <item name="dialogTheme">@style/Liquid.Dialog</item>
+
+        <!-- preferences -->
+        <item name="preferenceTheme">@style/Liquid.PreferenceTheme</item>
+    </style>
+
+    <style name="Liquid.Button" parent="Widget.AppCompat.Button">
+        <item name="android:background">@drawable/liquid_tile</item>
+        <item name="android:textColor">@color/liquid_ink</item>
+        <item name="android:textSize">@dimen/_11ssp</item>
+        <item name="android:minHeight">@dimen/liquid_touch_min</item>
+        <item name="android:paddingStart">@dimen/liquid_pad</item>
+        <item name="android:paddingEnd">@dimen/liquid_pad</item>
+        <item name="android:gravity">center</item>
+    </style>
+
+    <style name="Liquid.EditText" parent="Widget.AppCompat.EditText">
+        <item name="android:background">@drawable/liquid_field</item>
+        <item name="android:textColor">@color/liquid_ink</item>
+        <item name="android:textColorHint">@color/liquid_faint</item>
+        <item name="android:minHeight">@dimen/liquid_touch_min</item>
+    </style>
+
+    <style name="Liquid.Spinner" parent="Widget.AppCompat.Spinner">
+        <item name="android:background">@drawable/liquid_field</item>
+        <item name="android:popupBackground">@drawable/liquid_dialog</item>
+        <item name="android:minHeight">@dimen/liquid_touch_min</item>
+    </style>
+
+    <style name="Liquid.SeekBar" parent="Widget.AppCompat.SeekBar">
+        <item name="android:progressDrawable">@drawable/liquid_progress</item>
+        <item name="android:thumb">@drawable/liquid_knob</item>
+        <item name="android:thumbOffset">0dp</item>
+        <item name="android:minHeight">@dimen/liquid_touch_min</item>
+    </style>
+
+    <style name="Liquid.ProgressBar" parent="Widget.AppCompat.ProgressBar.Horizontal">
+        <item name="android:progressDrawable">@drawable/liquid_progress</item>
+        <item name="android:minHeight">@dimen/_4sdp</item>
+    </style>
+
+    <style name="Liquid.PopupMenu" parent="Widget.AppCompat.PopupMenu">
+        <item name="android:popupBackground">@drawable/liquid_dialog</item>
+        <item name="android:textColorPrimary">@color/liquid_ink</item>
+        <item name="android:textColorSecondary">@color/liquid_dim</item>
+    </style>
+
+    <style name="Liquid.Dialog" parent="Theme.AppCompat.Dialog.Alert">
+        <item name="android:windowBackground">@drawable/liquid_dialog</item>
+        <item name="android:background">@color/liquid_scrim</item>
+        <item name="android:textColorPrimary">@color/liquid_ink</item>
+        <item name="android:textColorSecondary">@color/liquid_dim</item>
+        <item name="android:colorAccent">@color/liquid_cyan</item>
+        <item name="colorAccent">@color/liquid_cyan</item>
+        <item name="android:windowMinWidthMajor">@dimen/liquid_dialog_min_major</item>
+        <item name="android:windowMinWidthMinor">@dimen/liquid_dialog_min_minor</item>
+    </style>
+
+    <style name="Liquid.PreferenceTheme" parent="PreferenceThemeOverlay.v14.Material">
+        <item name="preferenceFragmentListStyle">@style/Liquid.PreferenceList</item>
+    </style>
+
+    <style name="Liquid.PreferenceList">
+        <item name="android:background">@android:color/transparent</item>
+        <item name="android:divider">@drawable/liquid_divider</item>
+        <item name="android:dividerHeight">1dp</item>
+        <item name="android:paddingStart">@dimen/liquid_gap</item>
+        <item name="android:paddingEnd">@dimen/liquid_gap</item>
+        <item name="android:scrollbars">none</item>
+        <item name="android:overScrollMode">never</item>
     </style>
 
     <style name="LiquidQuickAction" parent="Widget.AppCompat.Button">

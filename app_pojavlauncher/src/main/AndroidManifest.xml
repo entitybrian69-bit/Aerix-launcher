@@ -103,6 +103,7 @@
             android:screenOrientation="sensorLandscape" />
         <activity
             android:name="net.kdt.pojavlaunch.CustomControlsActivity"
+            android:theme="@style/MojoLauncher.Liquid"
             android:configChanges="keyboardHidden|orientation|screenSize|keyboard|navigation"
             android:exported="false"
             android:screenOrientation="sensorLandscape">

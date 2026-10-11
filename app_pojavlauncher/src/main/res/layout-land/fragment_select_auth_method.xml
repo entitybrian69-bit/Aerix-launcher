@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:layout_width="match_parent"
+    android:layout_width="@dimen/liquid_column"
     android:layout_height="match_parent"
-    android:background="@color/liquid_scrim_soft"
-    android:paddingHorizontal="@dimen/fragment_padding_medium">
+    android:background="@drawable/liquid_column"
+    android:paddingHorizontal="@dimen/fragment_padding_medium" android:layout_gravity="center_horizontal">
     <androidx.constraintlayout.widget.ConstraintLayout
         xmlns:tools="http://schemas.android.com/tools"
         android:layout_width="match_parent"
