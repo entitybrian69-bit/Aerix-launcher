@@ -6,6 +6,11 @@ on:
   pull_request:
     types: [labeled]
 
+# TEMPORARY: lets the agent read build errors that it cannot download logs for.
+permissions:
+  contents: read
+  issues: write
+
 jobs:
   build:
     runs-on: ubuntu-22.04
@@ -62,8 +67,32 @@ jobs:
       - name: Build Debug .apk (Full)
         run: |
           # Build the launcher
-          gradle :app_pojavlauncher:assembleFullDebug
+          gradle :app_pojavlauncher:assembleFullDebug 2>&1 | tee build.log
+          exit ${PIPESTATUS[0]}
           mv app_pojavlauncher/build/outputs/apk/full/debug/app_pojavlauncher-full-debug.apk out/app-debug-full.apk
+
+      - name: Report the failure as an issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          {
+            echo "### Errors"
+            grep -nE "error:|FAILED|What went wrong|Execution failed|^\* " build.log | head -60
+            echo
+            echo "### Tail"
+            tail -60 build.log
+          } > err.txt
+          gh issue create \
+            --title "CI debug: build errors on $(git rev-parse --short HEAD)" \
+            --body-file err.txt || true
+
+      - name: Upload build log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build.log
 
       - name: Build Debug .apk (No runtime)
         run: |
