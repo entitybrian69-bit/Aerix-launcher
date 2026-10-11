@@ -110,9 +110,11 @@
                     android:layout_gravity="center_horizontal">
 
                     <View
+                        android:id="@+id/liquid_launch_ring"
                         android:layout_width="@dimen/_212sdp"
                         android:layout_height="@dimen/_212sdp"
                         android:layout_gravity="center"
+                        android:id="@+id/liquid_launch_ring"
                         android:background="@drawable/liquid_ring"/>
 
                     <Button
