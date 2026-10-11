@@ -64,243 +64,160 @@ HTML = r'''<!DOCTYPE html>
 <title>Aerix — Mirai shell preview</title>
 <style>
 :root {
-  --primary: #FFB59F; --onPrimary: #5F1600;
-  --primaryContainer: #C4502B; --onPrimaryContainer: #FFFFFF;
-  --secondary: #FFB59F; --onSecondary: #512214;
-  --secondaryContainer: #643122; --onSecondaryContainer: #FFC8B9;
-  --tertiary: #F0D44C; --onTertiary: #393000;
-  --tertiaryContainer: #C4AA22; --onTertiaryContainer: #272000;
-  --error: #FFB4AB; --onError: #690005;
-  --errorContainer: #93000A; --onErrorContainer: #FFDAD6;
-  --surface: #1C110E; --onSurface: #F4DED8;
-  --surfaceVariant: #58423B; --onSurfaceVariant: #DFC0B7;
-  --outline: #A68B83; --outlineVariant: #58423B;
-  --surfaceContainerLowest: #160C09; --surfaceContainerLow: #241916;
-  --surfaceContainer: #291D19; --surfaceContainerHigh: #342723;
-  --surfaceContainerHighest: #3F322E;
+  --page: #0D0F14;
+  --panel: rgba(23,43,58,.62);
+  --panelRaised: rgba(34,59,78,.69);
+  --border: rgba(230,250,255,.47);
+  --borderSoft: rgba(230,250,255,.28);
+  --accent: #8DEFE0;
+  --onAccent: #06201D;
+  --auroraCyan: #37DCEC;
+  --auroraViolet: #7A71F5;
+  --text: #F1F6FA;
+  --text2: #A8B9C5;
+  --text3: #7D909D;
 }
 * { box-sizing: border-box; }
 body {
-  margin: 0; background: #0a0605; color: #eee;
+  margin: 0; background: #05070a; color: #eee;
   font-family: Inter, "Segoe UI", Roboto, system-ui, sans-serif;
   display: flex; flex-direction: column; align-items: center;
-  min-height: 100vh; padding: 24px 16px 48px;
+  min-height: 100vh; padding: 22px 14px 40px;
 }
 h1 { font-size: 17px; font-weight: 600; margin: 0 0 2px; }
-p.sub { margin: 0 0 18px; color: #8d8d95; font-size: 13px; }
+p.sub { margin: 0 0 16px; color: #7d8590; font-size: 12.5px; }
 
-/* ---------- the device -------------------------------------------------- */
 .device {
-  position: relative; width: min(96vw, 1180px); aspect-ratio: 16 / 9;
-  border-radius: 22px; overflow: hidden;
-  box-shadow: 0 40px 90px rgba(0,0,0,.72), 0 0 0 1px rgba(255,255,255,.07);
-  background: var(--surfaceContainerLowest);
+  position: relative; width: min(96vw, 1200px); aspect-ratio: 16 / 9;
+  border-radius: 20px; overflow: hidden;
+  background: var(--page);
+  box-shadow: 0 36px 84px rgba(0,0,0,.7), 0 0 0 1px rgba(255,255,255,.06);
 }
+/* Mirai paints one cached aurora pass: cyan to violet, barely there. */
+.aurora {
+  position: absolute; inset: 0;
+  background: linear-gradient(135deg, rgba(55,220,236,.10) 0%, rgba(0,0,0,0) 52%, rgba(122,113,245,.09) 100%);
+}
+.shell { position: absolute; inset: 0; display: flex; }
+.bodywrap { flex: 1; display: flex; min-height: 0; }
 
-/* ---------- animated backdrop (MiraiBackdropView) ----------------------- */
-.backdrop { position: absolute; inset: -18%; filter: blur(64px) saturate(135%); }
-.backdrop i {
-  position: absolute; display: block; border-radius: 50%;
-  opacity: .62; mix-blend-mode: screen;
-}
-.backdrop i:nth-child(1) {
-  width: 46%; height: 62%; left: 4%; top: 6%;
-  background: var(--primaryContainer);
-  animation: drift1 19s ease-in-out infinite;
-}
-.backdrop i:nth-child(2) {
-  width: 54%; height: 58%; right: 2%; top: -6%;
-  background: var(--tertiaryContainer); opacity: .5;
-  animation: drift2 23s ease-in-out infinite;
-}
-.backdrop i:nth-child(3) {
-  width: 42%; height: 70%; left: 30%; bottom: -22%;
-  background: var(--secondaryContainer); opacity: .55;
-  animation: drift3 27s ease-in-out infinite;
-}
-.backdrop i:nth-child(4) {
-  width: 30%; height: 44%; right: 22%; bottom: -10%;
-  background: var(--surfaceContainerHighest); opacity: .8;
-  animation: drift1 31s ease-in-out infinite reverse;
-}
-@keyframes drift1 {
-  0%,100% { transform: translate3d(0,0,0) scale(1); }
-  50%     { transform: translate3d(7%, 5%, 0) scale(1.16); }
-}
-@keyframes drift2 {
-  0%,100% { transform: translate3d(0,0,0) scale(1.08); }
-  50%     { transform: translate3d(-8%, 7%, 0) scale(.92); }
-}
-@keyframes drift3 {
-  0%,100% { transform: translate3d(0,0,0) scale(.95); }
-  50%     { transform: translate3d(-6%, -8%, 0) scale(1.2); }
-}
-.scrim { position: absolute; inset: 0; background: rgba(10,7,16,.70); }
-
-/* ---------- shell -------------------------------------------------------- */
-.shell { position: absolute; inset: 0; display: flex; flex-direction: column; }
-
-/* header */
-header {
-  height: 12.5%; flex: none; display: flex; align-items: center; gap: 14px;
-  padding: 0 2.2%; background: color-mix(in srgb, var(--surfaceContainerLow) 88%, transparent);
-  border-bottom: 1px solid color-mix(in srgb, var(--outlineVariant) 70%, transparent);
-  backdrop-filter: blur(14px);
-}
-header .title {
-  font-size: clamp(15px, 1.5vw, 21px); font-weight: 700; color: var(--onSurface);
-  letter-spacing: -.2px;
-}
-.spacer { flex: 1; }
-.pill {
-  display: flex; align-items: center; gap: 9px; height: 58%;
-  padding: 0 16px; border-radius: 999px;
-  background: var(--surfaceContainerHighest); color: var(--onSurface);
-  font-size: clamp(10px, 1vw, 13px); white-space: nowrap;
-  border: 1px solid color-mix(in srgb, var(--outline) 40%, transparent);
-}
-.pill .avatar {
-  width: 1.65em; height: 1.65em; border-radius: 50%;
-  background: linear-gradient(140deg, var(--primary), var(--tertiary));
-}
-.iconbtn {
-  height: 58%; aspect-ratio: 1; display: grid; place-items: center;
-  border-radius: 999px; color: var(--onSurfaceVariant);
-  background: transparent; border: 0; cursor: pointer;
-}
-.iconbtn:hover { background: color-mix(in srgb, var(--onSurface) 10%, transparent); }
-.iconbtn svg { width: 52%; height: 52%; stroke: currentColor; fill: none;
-  stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
-
-/* body: rail + page */
-.body { flex: 1; display: flex; min-height: 0; }
+/* ---------- the rail: a floating glass capsule -------------------------- */
 .rail {
-  width: 8.4%; flex: none; display: flex; flex-direction: column; align-items: center;
-  gap: 8px; padding: 12px 0;
-  background: color-mix(in srgb, var(--surfaceContainerLow) 78%, transparent);
-  border-right: 1px solid color-mix(in srgb, var(--outlineVariant) 70%, transparent);
-  backdrop-filter: blur(14px);
+  width: 68px; flex: none; padding: 10px 4px; display: flex; flex-direction: column;
 }
+.capsule {
+  flex: 1; border-radius: 50px; padding: 10px 0;
+  background: rgba(43,80,99,.94);
+  border: 1px solid var(--borderSoft);
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  box-shadow: 0 6px 24px rgba(0,6,16,.4);
+}
+.mark {
+  width: 38px; height: 38px; border-radius: 12px; margin-bottom: 4px;
+  background: rgba(141,239,224,.16); border: 1px solid var(--borderSoft);
+  display: grid; place-items: center; cursor: pointer;
+}
+.mark svg { width: 24px; height: 24px; }
 .slot {
-  width: 84%; border: 0; background: transparent; cursor: pointer;
-  display: flex; flex-direction: column; align-items: center; gap: 5px;
-  padding: 9px 0 8px; border-radius: 16px; color: var(--onSurfaceVariant);
-  transition: background .18s, color .18s;
+  width: 44px; height: 42px; border-radius: 12px; cursor: pointer;
+  background: var(--panel); border: 1px solid var(--borderSoft);
+  display: grid; place-items: center; transition: background .14s, border-color .14s;
 }
-.slot svg { width: 40%; max-width: 26px; height: auto; stroke: currentColor; fill: none;
-  stroke-width: 1.85; stroke-linecap: round; stroke-linejoin: round; }
-.slot span { font-size: clamp(7px, .72vw, 11px); letter-spacing: .2px; }
-.slot:hover { background: color-mix(in srgb, var(--onSurface) 8%, transparent); }
-.slot.on { color: var(--onPrimaryContainer); background: var(--primaryContainer); }
-.slot.on span { font-weight: 700; }
-.rail .grow { flex: 1; }
+.slot svg { width: 22px; height: 22px; stroke: var(--text2); fill: none;
+  stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.slot:hover { background: var(--panelRaised); }
+.slot.on { background: var(--accent); border-color: var(--accent); }
+.slot.on svg { stroke: var(--onAccent); }
+.divider { width: 28px; height: 1px; background: var(--borderSoft); margin: 2px 0; }
 
-.page { flex: 1; min-width: 0; padding: 2.2% 2.6%; overflow: hidden; }
-
-/* ---------- shared page furniture --------------------------------------- */
-.card {
-  background: color-mix(in srgb, var(--surfaceContainer) 92%, transparent);
-  border: 1px solid color-mix(in srgb, var(--outlineVariant) 62%, transparent);
-  border-radius: 20px; padding: 20px;
-  backdrop-filter: blur(18px);
+/* ---------- page furniture --------------------------------------------- */
+.page { flex: 1; min-width: 0; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+.panel {
+  background: var(--panel); border: 1px solid var(--borderSoft); border-radius: 18px;
+  padding: 16px; backdrop-filter: blur(14px); position: relative; overflow: hidden;
 }
-.card.flat { background: color-mix(in srgb, var(--surfaceContainerLow) 82%, transparent); }
-.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; height: 100%; }
-.col { display: flex; flex-direction: column; min-height: 0; }
-.eyebrow {
-  text-transform: uppercase; letter-spacing: .12em; font-size: 10px;
-  color: var(--outline); font-weight: 700; margin: 0 0 10px;
+.panel::before {
+  content: ''; position: absolute; inset: 0 0 auto 0; height: 40%;
+  background: linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,0));
+  pointer-events: none;
 }
-.btn {
-  border: 1px solid color-mix(in srgb, var(--outlineVariant) 70%, transparent);
-  background: color-mix(in srgb, var(--surfaceContainerHigh) 70%, transparent);
-  color: var(--onSurface); border-radius: 16px; cursor: pointer;
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 7px; font-size: clamp(9px, .82vw, 12px); padding: 12px 6px;
-  transition: transform .14s, background .18s;
+.row { display: flex; gap: 10px; }
+.col { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+.grow { flex: 1; min-height: 0; }
+.label { font-size: 11px; color: var(--text2); letter-spacing: .04em; text-transform: uppercase; font-weight: 700; }
+.title { font-size: clamp(15px, 1.7vw, 26px); font-weight: 700; color: var(--text); }
+.sub2 { font-size: 12px; color: var(--text2); }
+.muted { font-size: 11px; color: var(--text3); }
+.playwrap { position: relative; display: grid; place-items: center; }
+.halo {
+  position: absolute; width: 150px; height: 150px; border-radius: 50%;
+  background: conic-gradient(from 0deg, rgba(141,239,224,0), rgba(141,239,224,.55), rgba(141,239,224,0) 70%);
+  -webkit-mask: radial-gradient(circle, transparent 46px, #000 47px, #000 62px, transparent 63px);
+          mask: radial-gradient(circle, transparent 46px, #000 47px, #000 62px, transparent 63px);
+  animation: spin 9s linear infinite;
 }
-.btn:hover { background: var(--surfaceContainerHighest); transform: translateY(-2px); }
-.btn svg { width: 22%; max-width: 24px; height: auto; stroke: currentColor; fill: none;
-  stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+@keyframes spin { to { transform: rotate(360deg); } }
 .play {
-  width: 100%; border: 0; border-radius: 20px; cursor: pointer;
-  background: linear-gradient(135deg, var(--primary), var(--primaryContainer));
-  color: var(--onPrimary); font-size: clamp(15px, 1.5vw, 21px); font-weight: 700;
-  padding: 22px 0; display: flex; align-items: center; justify-content: center; gap: 12px;
-  box-shadow: 0 14px 34px color-mix(in srgb, var(--primaryContainer) 42%, transparent);
+  width: 96px; height: 96px; border-radius: 50%; border: 1px solid var(--borderSoft);
+  background: var(--panel); display: grid; place-items: center; cursor: pointer;
+  position: relative;
 }
-.play svg { width: 1em; height: 1em; stroke: currentColor; fill: currentColor; }
-.hint { color: var(--onSurfaceVariant); font-size: clamp(9px, .85vw, 12px); text-align: center; }
-.version {
-  display: flex; align-items: center; gap: 12px;
-  background: var(--surfaceContainerHighest); border-radius: 14px; padding: 10px 14px;
-  color: var(--onSurface); font-size: clamp(10px, .95vw, 14px); margin-bottom: 8px;
-}
-.dot { width: 10px; height: 10px; border-radius: 50%; background: var(--tertiary); flex: none; }
-.muted { color: var(--onSurfaceVariant); font-size: clamp(9px, .82vw, 12px); }
-.row {
-  display: flex; align-items: center; gap: 14px; padding: 12px 14px;
-  border-radius: 14px; color: var(--onSurface);
-  background: color-mix(in srgb, var(--surfaceContainerHigh) 55%, transparent);
-  margin-bottom: 10px; font-size: clamp(10px, .92vw, 13px);
-}
-.row .icon {
-  width: 34px; height: 34px; border-radius: 11px; flex: none; display: grid; place-items: center;
-  background: linear-gradient(140deg, var(--primaryContainer), var(--tertiaryContainer));
-  color: var(--onPrimaryContainer);
-}
-.row .icon svg { width: 55%; height: 55%; stroke: currentColor; fill: none; stroke-width: 2; }
-.row .grow { flex: 1; min-width: 0; }
-.tag {
-  font-size: 9px; padding: 3px 9px; border-radius: 999px;
-  background: var(--secondaryContainer); color: var(--onSecondaryContainer);
-}
-.mini {
-  border: 1px solid color-mix(in srgb, var(--outlineVariant) 70%, transparent);
-  background: transparent; color: var(--onSurfaceVariant); border-radius: 11px;
-  padding: 7px 14px; font-size: clamp(9px, .8vw, 12px); cursor: pointer;
-}
-.mini.primary { background: var(--primary); color: var(--onPrimary); border: 0; }
-.switch {
-  width: 42px; height: 24px; border-radius: 999px; flex: none; position: relative;
-  background: var(--surfaceContainerHighest); border: 1px solid var(--outlineVariant);
-}
-.switch.on { background: var(--primary); border-color: var(--primary); }
-.switch::after {
-  content: ''; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px;
-  border-radius: 50%; background: var(--onPrimary); transition: left .18s;
-}
-.switch.on::after { left: 21px; background: var(--onPrimary); }
-.swatches { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; }
-.swatch {
-  border: 2px solid transparent; border-radius: 16px; overflow: hidden; cursor: pointer;
-  background: transparent; padding: 0; text-align: left;
-}
-.swatch.on { border-color: var(--onSurface); }
-.swatch .strip { height: 34px; display: flex; }
-.swatch .strip i { flex: 1; }
-.swatch .name { font-size: 9px; padding: 5px 3px; color: var(--onSurfaceVariant); text-align: center; }
-.wallpaper-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.play svg { width: 34px; height: 34px; fill: var(--text); }
 .tile {
-  aspect-ratio: 16/10; border-radius: 16px; position: relative; overflow: hidden; cursor: pointer;
-  border: 2px solid color-mix(in srgb, var(--outlineVariant) 60%, transparent);
-  display: grid; place-items: center; color: var(--onSurfaceVariant); font-size: 11px;
+  flex: 1; background: var(--panel); border: 1px solid var(--borderSoft);
+  border-radius: 18px; padding: 0 16px; display: flex; align-items: center; gap: 12px;
+  cursor: pointer; height: 78px;
 }
-.tile.on { border-color: var(--primary); }
-.tile .a { position: absolute; inset: 0; filter: blur(22px); opacity: .9; }
-.empty { flex: 1; display: grid; place-items: center; color: var(--outline); font-size: 12px; }
+.tile svg { width: 26px; height: 26px; stroke: var(--text2); fill: none;
+  stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.tool {
+  width: 100%; height: 40px; border-radius: 12px; background: var(--panel);
+  border: 1px solid var(--borderSoft); color: var(--text); font-size: 12px;
+  display: flex; align-items: center; gap: 10px; padding: 0 14px; cursor: pointer;
+}
+.tool svg { width: 18px; height: 18px; stroke: var(--text2); fill: none; stroke-width: 1.9; }
+.pillrow { display: flex; gap: 8px; }
+.chip {
+  height: 26px; padding: 0 12px; border-radius: 50px; background: var(--panel);
+  border: 1px solid var(--borderSoft); color: var(--text2); font-size: 11px;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.chip.on { background: var(--accent); color: var(--onAccent); border-color: var(--accent); }
+.list { display: flex; flex-direction: column; gap: 4px; }
+.item {
+  display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 12px;
+  background: rgba(23,43,58,.34); color: var(--text); font-size: 13px;
+}
+.item.on { background: rgba(141,239,224,.8); color: var(--onAccent); font-weight: 600; }
+.item .box {
+  width: 28px; height: 28px; border-radius: 8px; flex: none;
+  background: rgba(0,0,0,.2); display: grid; place-items: center;
+}
+.item .box svg { width: 18px; height: 18px; stroke: var(--text2); fill: none; stroke-width: 1.9; }
+.swatches { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
+.swatch { border: 2px solid transparent; border-radius: 12px; overflow: hidden; cursor: pointer; background: none; padding: 0; }
+.swatch.on { border-color: var(--text); }
+.swatch .strip { height: 26px; display: flex; }
+.swatch .strip i { flex: 1; }
+.swatch .name { font-size: 8.5px; padding: 4px 2px; color: var(--text3); text-align: center; }
+.walltiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.walltile {
+  aspect-ratio: 16/10; border-radius: 14px; position: relative; overflow: hidden; cursor: pointer;
+  border: 2px solid var(--borderSoft); display: grid; place-items: center; color: var(--text2); font-size: 11px;
+}
+.walltile.on { border-color: var(--accent); }
+.walltile i { position: absolute; inset: 0; }
 
-/* ---------- page tabs under the device ---------------------------------- */
-.tabs { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 20px; }
+.tabs { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 18px; }
 .tabs button {
   border: 1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.05);
-  color: #d8d8e0; border-radius: 999px; padding: 8px 16px; font-size: 12.5px; cursor: pointer;
+  color: #d8d8e0; border-radius: 999px; padding: 8px 15px; font-size: 12.5px; cursor: pointer;
 }
 .tabs button.on { background: #fff; color: #111; border-color: #fff; }
-.palettes { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 12px; }
+.palettes { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 10px; }
 .palettes button {
   border: 1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.05);
-  color: #d8d8e0; border-radius: 999px; padding: 6px 14px; font-size: 12px; cursor: pointer;
+  color: #d8d8e0; border-radius: 999px; padding: 6px 13px; font-size: 12px; cursor: pointer;
 }
 .palettes button.on { border-color: #fff; color: #fff; }
 </style>
@@ -308,24 +225,15 @@ header .title {
 <body>
 
 <h1>Aerix — Mirai shell</h1>
-<p class="sub">Live preview of the interface now in the sources · landscape · animated backdrop · seven palettes</p>
+<p class="sub">Rebuilt on Mirai's own glass system · no top bar · floating rail capsule · aurora pass · landscape</p>
 
 <div class="device">
-  <div class="backdrop"><i></i><i></i><i></i><i></i></div>
-  <div class="scrim"></div>
-
+  <div class="aurora"></div>
   <div class="shell">
-    <header>
-      <div class="title" id="title">Home</div>
-      <div class="spacer"></div>
-      <div class="pill"><span class="avatar"></span><span>Steve</span></div>
-      <button class="iconbtn" title="Settings">
-        <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="8" cy="18" r="2"/></svg>
-      </button>
-    </header>
-
-    <div class="body">
-      <nav class="rail" id="rail"></nav>
+    <div class="bodywrap">
+      <nav class="rail">
+        <div class="capsule" id="capsule"></div>
+      </nav>
       <main class="page" id="page"></main>
     </div>
   </div>
@@ -336,150 +244,172 @@ header .title {
 
 <script>
 const ICONS = {
-  home:    '<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9.5 21v-6h5v6"/>',
-  plus:    '<path d="M12 5v14M5 12h14"/>',
-  folder:  '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
-  compass: '<circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/>',
-  image:   '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="m4 17 5-5 4 4 3-2 4 4"/>',
-  sliders: '<path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="8" cy="18" r="2"/>',
-  play:    '<path d="M6 4l14 8-14 8z"/>',
-  edit:    '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
-  trash:   '<path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/>',
-  box:     '<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5"/><path d="M12 13v8"/>',
-  gamepad: '<path d="M8 10h8M11 7v6"/><circle cx="16.5" cy="11.5" r="1"/><circle cx="7.5" cy="13.5" r="1"/><rect x="2" y="6" width="20" height="12" rx="5"/>',
-  java:    '<path d="M8 17c-2.5 0-4-1.6-4-4 0-2.6 2-4.5 5-4.5"/><path d="M9 5s4 2.5 4 6c0 0 2 1 2 3"/><path d="M13 19c0-3 3-5 6-5"/><path d="M10 21c0-2 1.5-3.5 3.5-3.5"/>',
-  share:   '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 10.6 6.8-4M8.6 13.4l6.8 4"/>',
-  book:    '<path d="M4 4h7a3 3 0 0 1 3 3v13a2.5 2.5 0 0 0-2.5-2.5H4z"/><path d="M20 4h-3a3 3 0 0 0-3 3v13a2.5 2.5 0 0 1 2.5-2.5H20z"/>',
-  people:  '<path d="M16 20v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 20v-2a4 4 0 0 0-3-3.9"/><path d="M16 3.1a4 4 0 0 1 0 7.8"/>',
-  search:  '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
-  settings:'<path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 7.5 19l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.6 1.6 0 0 0 3 13.6H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.6 7l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.6 1.6 0 0 0 10 3.1V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 2.7 1.1l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0 1.1 2.7H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1.3z"/>',
-  download:'<path d="M12 3v12"/><path d="m7 11 5 5 5-5"/><path d="M4 21h16"/>',
-  check:   '<path d="m4 12 5 5L20 6"/>',
+  mark: '<path d="M32 9 L53 51 H43 L32 30 L21 51 H11 Z" fill="#D7E2EA" stroke="none"/><path d="M32 22 L38 35 H26 Z" fill="#0B1420" stroke="none"/>',
+  home: '<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9.5 21v-6h5v6"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  dashboard: '<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
+  public: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.6 3 2.6 15 0 18-2.6-3-2.6-15 0-18z"/>',
+  paint: '<path d="M19 11.5 12.5 5 5 12.5V19h6.5z"/><path d="M5 19c-1.7 0-3 1.3-3 3h6c0-1.7-1.3-3-3-3z"/><circle cx="8.5" cy="8.5" r="1"/>',
+  settings: '<circle cx="12" cy="12" r="3.2"/><path d="M19.4 14a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 7.5 19l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.6 1.6 0 0 0 3 13.6H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.6 7l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.6 1.6 0 0 0 10 3.1V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 2.7 1.1l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0 1.1 2.7H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1.3z"/>',
+  person: '<circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/>',
+  play: '<path d="M6 4l14 8-14 8z"/>',
+  search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
+  folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+  gamepad: '<rect x="2" y="6" width="20" height="12" rx="5"/><path d="M8 10h8M11 7v6"/><circle cx="16.5" cy="11.5" r="1"/><circle cx="7.5" cy="13.5" r="1"/>',
+  download: '<path d="M12 3v12"/><path d="m7 11 5 5 5-5"/><path d="M4 21h16"/>',
+  arrow: '<path d="m9 6 6 6-6 6"/>',
+  box: '<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5"/><path d="M12 13v8"/>',
+  java: '<path d="M8 17c-2.5 0-4-1.6-4-4 0-2.6 2-4.5 5-4.5"/><path d="M9 5s4 2.5 4 6c0 0 2 1 2 3"/><path d="M13 19c0-3 3-5 6-5"/><path d="M10 21c0-2 1.5-3.5 3.5-3.5"/>',
+  edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
+  trash: '<path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/>',
+  check: '<path d="m4 12 5 5L20 6"/>',
 };
-
-const svg = (name, cls) => `<svg viewBox="0 0 24 24"${cls ? ` class="${cls}"` : ''}>${ICONS[name]}</svg>`;
+const svg = n => `<svg viewBox="0 0 24 24">${ICONS[n]}</svg>`;
 
 const DESTINATIONS = [
-  { key: 'home',       icon: 'home',    label: 'Home',       title: 'Home' },
-  { key: 'new',        icon: 'plus',    label: 'New',        title: 'New instance' },
-  { key: 'library',    icon: 'folder',  label: 'Library',    title: 'Library' },
-  { key: 'discover',   icon: 'compass', label: 'Discover',   title: 'Discover' },
-  { key: 'wallpaper',  icon: 'image',   label: 'Wallpaper',  title: 'Wallpapers' },
-  { key: 'settings',   icon: 'sliders', label: 'Settings',   title: 'Settings' },
+  { key: 'home',      icon: 'home',      label: 'Home',       title: 'Home' },
+  { key: 'new',       icon: 'plus',      label: 'New Instance', title: 'New instance' },
+  { key: 'library',   icon: 'dashboard', label: 'Library',    title: 'Library' },
+  { key: 'discover',  icon: 'public',    label: 'Discover',   title: 'Discover' },
+  { key: 'wallpaper', icon: 'paint',     label: 'Wallpapers', title: 'Wallpapers' },
+  { key: 'settings',  icon: 'settings',  label: 'Settings',   title: 'Settings' },
 ];
 
 const PAGES = {
   home: `
-    <div class="grid2">
-      <div class="col" style="gap:18px">
-        <div class="card">
-          <div class="version"><span class="dot"></span><span>Fabric Loader 1.20.4</span>
-            <span class="grow"></span><span class="muted">Java 21</span></div>
-          <div class="muted">Instances · 3 installed</div>
+    <div class="row" style="flex:1.3;min-height:0">
+      <div class="panel" style="flex:1.55;display:flex;flex-direction:column">
+        <div class="label">Instances</div>
+        <div class="title" style="margin-top:6px">Fabric Loader 1.20.4</div>
+        <div class="sub2" style="margin-top:4px">Java 21 · 4 GB · 3 installed profiles</div>
+        <div style="flex:1"></div>
+        <div class="pillrow">
+          <span class="chip on">${svg('check')}Ready</span>
+          <span class="chip">Vulkan</span>
+          <span class="chip">Latest release</span>
         </div>
-        <p class="eyebrow">Quick actions</p>
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
-          <button class="btn">${svg('gamepad')}<span>Controls</span></button>
-          <button class="btn">${svg('java')}<span>Install jar</span></button>
-          <button class="btn">${svg('share')}<span>Share logs</span></button>
-          <button class="btn">${svg('folder')}<span>Files</span></button>
-          <button class="btn">${svg('book')}<span>Wiki</span></button>
-          <button class="btn">${svg('people')}<span>Discord</span></button>
+        <div class="row" style="margin-top:12px">
+          <div class="tool" style="flex:1;justify-content:center">${svg('plus')}Create instance</div>
+          <div class="tool" style="flex:1;justify-content:center">${svg('dashboard')}Manage</div>
         </div>
       </div>
-      <div class="card col" style="justify-content:center;align-items:center;gap:16px">
-        <button class="play">${svg('play')}<span>Launch</span></button>
-        <div class="hint">Fabric Loader 1.20.4 · Java 21 · 4 GB</div>
-        <div class="muted">Everything is ready.</div>
+      <div class="col" style="flex:.85">
+        <div class="panel grow" style="display:grid;place-items:center">
+          <div class="playwrap">
+            <div class="halo"></div>
+            <div class="play">${svg('play')}</div>
+          </div>
+          <div class="title" style="font-size:15px;margin-top:12px">Play</div>
+        </div>
+        <div class="panel" style="height:74px;display:flex;align-items:center;gap:12px">
+          ${svg('download')}
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:700">Tasks</div>
+            <div class="sub2">Nothing running</div>
+          </div>
+          ${svg('arrow')}
+        </div>
+      </div>
+    </div>
+    <div class="row" style="height:78px">
+      <div class="tile">${svg('plus')}<div><div style="font-size:13px;font-weight:700">Create instance</div><div class="muted">A fresh game profile</div></div></div>
+      <div class="tile">${svg('search')}<div><div style="font-size:13px;font-weight:700">Explore content</div><div class="muted">Modpacks, mods and more</div></div></div>
+      <div class="tile">${svg('dashboard')}<div><div style="font-size:13px;font-weight:700">Your library</div><div class="muted">3 installed profiles</div></div></div>
+      <div class="tile">${svg('folder')}<div><div style="font-size:13px;font-weight:700">File space</div><div class="muted">Worlds, logs and exports</div></div></div>
+    </div>
+    <div class="row" style="flex:1;min-height:0">
+      <div class="panel" style="flex:1.7">
+        <div class="label">Recent</div>
+        <div class="list" style="margin-top:10px">
+          <div class="item on"><span class="box">${svg('box')}</span>Survival world</div>
+          <div class="item"><span class="box">${svg('box')}</span>Create modpack</div>
+          <div class="item"><span class="box">${svg('box')}</span>Vanilla testing</div>
+        </div>
+      </div>
+      <div class="panel" style="flex:.72">
+        <div class="label">Quick tools</div>
+        <div class="col" style="margin-top:10px;gap:8px">
+          <div class="tool">${svg('gamepad')}Controls</div>
+          <div class="tool">${svg('java')}Install jar</div>
+          <div class="tool">${svg('download')}Share logs</div>
+        </div>
       </div>
     </div>`,
   new: `
-    <div class="grid2">
-      <div class="card col" style="gap:14px">
-        <p class="eyebrow">Vanilla</p>
-        <div class="row"><span class="icon">${svg('box')}</span><span class="grow"><b>Latest release</b><br><span class="muted">1.20.4 · stable</span></span></div>
-        <div class="row"><span class="icon">${svg('box')}</span><span class="grow"><b>Snapshot</b><br><span class="muted">24w14a · experimental</span></span></div>
+    <div class="row" style="flex:1;min-height:0">
+      <div class="panel col grow">
+        <div class="label">Vanilla</div>
+        <div class="item"><span class="box">${svg('box')}</span><div style="flex:1"><b>Latest release</b><br><span class="muted">1.20.4 · stable</span></div></div>
+        <div class="item"><span class="box">${svg('box')}</span><div style="flex:1"><b>Snapshot</b><br><span class="muted">24w14a · experimental</span></div></div>
       </div>
-      <div class="card col" style="gap:14px">
-        <p class="eyebrow">Modded</p>
-        <div class="row"><span class="icon">${svg('box')}</span><span class="grow"><b>Fabric</b><br><span class="muted">Loader 0.15.11</span></span></div>
-        <div class="row"><span class="icon">${svg('box')}</span><span class="grow"><b>Forge</b><br><span class="muted">1.20.4 · 49.0.19</span></span></div>
-        <div class="row"><span class="icon">${svg('box')}</span><span class="grow"><b>NeoForge</b><br><span class="muted">1.20.4 · 20.4.80</span></span></div>
-        <div class="row"><span class="icon">${svg('download')}</span><span class="grow"><b>OptiFine</b><br><span class="muted">HD U I7</span></span></div>
+      <div class="panel col grow">
+        <div class="label">Modded</div>
+        <div class="item"><span class="box">${svg('box')}</span><div style="flex:1"><b>Fabric</b><br><span class="muted">Loader 0.15.11</span></div></div>
+        <div class="item"><span class="box">${svg('box')}</span><div style="flex:1"><b>Forge</b><br><span class="muted">1.20.4 · 49.0.19</span></div></div>
+        <div class="item"><span class="box">${svg('box')}</span><div style="flex:1"><b>NeoForge</b><br><span class="muted">1.20.4 · 20.4.80</span></div></div>
+        <div class="item"><span class="box">${svg('download')}</span><div style="flex:1"><b>OptiFine</b><br><span class="muted">HD U I7</span></div></div>
       </div>
     </div>`,
   library: `
-    <div class="col" style="gap:12px">
-      <div style="display:flex;gap:12px;align-items:center;margin-bottom:4px">
-        <p class="eyebrow" style="margin:0">Instances</p><span class="grow"></span>
-        <button class="mini">${svg('plus')} New</button>
+    <div class="panel col grow">
+      <div class="label">Instances</div>
+      <div class="list" style="margin-top:10px">
+        <div class="item on"><span class="box">${svg('box')}</span><div style="flex:1"><b>Survival world</b><br><span class="muted">Fabric Loader 1.20.4</span></div>${svg('edit')}${svg('trash')}</div>
+        <div class="item"><span class="box">${svg('box')}</span><div style="flex:1"><b>Create modpack</b><br><span class="muted">Forge 1.20.1</span></div>${svg('edit')}${svg('trash')}</div>
+        <div class="item"><span class="box">${svg('box')}</span><div style="flex:1"><b>Vanilla testing</b><br><span class="muted">1.21</span></div>${svg('edit')}${svg('trash')}</div>
       </div>
-      <div class="row"><span class="icon">${svg('box')}</span><span class="grow"><b>Survival world</b><br><span class="muted">Fabric Loader 1.20.4</span></span><span class="tag">selected</span><button class="mini">${svg('edit')}</button><button class="mini">${svg('trash')}</button></div>
-      <div class="row"><span class="icon">${svg('box')}</span><span class="grow"><b>Create modpack</b><br><span class="muted">Forge 1.20.1</span></span><button class="mini">${svg('edit')}</button><button class="mini">${svg('trash')}</button></div>
-      <div class="row"><span class="icon">${svg('box')}</span><span class="grow"><b>Vanilla testing</b><br><span class="muted">1.21</span></span><button class="mini">${svg('edit')}</button><button class="mini">${svg('trash')}</button></div>
-      <div class="card flat" style="margin-top:6px">
-        <div class="muted">Storage · 2.4 GB used of 12 GB</div>
-      </div>
+      <div style="flex:1"></div>
+      <div class="sub2">Storage · 2.4 GB used of 12 GB</div>
     </div>`,
   discover: `
-    <div class="col" style="gap:14px;height:100%">
-      <div class="card" style="display:flex;gap:14px;align-items:center">
-        <div style="flex:1;display:flex;align-items:center;gap:10px;color:var(--onSurfaceVariant)">
-          ${svg('search')}<span style="font-size:13px">Search mods, modpacks and resource packs</span>
-        </div>
-        <button class="mini primary">${svg('search')} Search</button>
+    <div class="panel" style="display:flex;gap:12px;align-items:center">
+      ${svg('search')}<span class="sub2" style="flex:1">Search mods, modpacks and resource packs</span>
+      <div class="chip on">${svg('search')}Search</div>
+    </div>
+    <div class="row grow">
+      <div class="panel col grow">
+        <div class="label">Popular on 1.20.4</div>
+        <div class="item"><span class="box">${svg('box')}</span><div style="flex:1"><b>Sodium</b><br><span class="muted">Performance · 4.1 M downloads</span></div></div>
+        <div class="item"><span class="box">${svg('box')}</span><div style="flex:1"><b>Iris Shaders</b><br><span class="muted">Graphics · 3.2 M downloads</span></div></div>
+        <div class="item"><span class="box">${svg('box')}</span><div style="flex:1"><b>JEI</b><br><span class="muted">Utility · 9.8 M downloads</span></div></div>
       </div>
-      <div class="grid2" style="gap:14px">
-        <div class="card flat col" style="gap:10px">
-          <p class="eyebrow">Popular on 1.20.4</p>
-          <div class="row"><span class="icon">${svg('box')}</span><span class="grow"><b>Sodium</b><br><span class="muted">Performance · 4.1 M downloads</span></span></div>
-          <div class="row"><span class="icon">${svg('box')}</span><span class="grow"><b>Iris Shaders</b><br><span class="muted">Graphics · 3.2 M downloads</span></span></div>
-          <div class="row"><span class="icon">${svg('box')}</span><span class="grow"><b>JEI</b><br><span class="muted">Utility · 9.8 M downloads</span></span></div>
-          <div class="row"><span class="icon">${svg('box')}</span><span class="grow"><b>Xaero's Minimap</b><br><span class="muted">Map · 5.4 M downloads</span></span></div>
-        </div>
-        <div class="card flat col" style="gap:10px">
-          <p class="eyebrow">Sources</p>
-          <div class="row"><span class="icon">${svg('box')}</span><span class="grow"><b>Modrinth</b></span></div>
-          <div class="row"><span class="icon">${svg('box')}</span><span class="grow"><b>CurseForge</b></span></div>
-          <div class="row"><span class="icon">${svg('download')}</span><span class="grow"><b>Install from file</b><br><span class="muted">jar, zip or mrpack</span></span></div>
-        </div>
+      <div class="panel col" style="flex:.8">
+        <div class="label">Sources</div>
+        <div class="item"><span class="box">${svg('box')}</span><div style="flex:1"><b>Modrinth</b></div></div>
+        <div class="item"><span class="box">${svg('box')}</span><div style="flex:1"><b>CurseForge</b></div></div>
+        <div class="item"><span class="box">${svg('download')}</span><div style="flex:1"><b>Install from file</b></div></div>
       </div>
     </div>`,
   wallpaper: `
-    <div class="col" style="gap:16px">
-      <div class="card" style="display:flex;gap:16px;align-items:center">
-        <div style="flex:1">
-          <div style="font-size:15px;font-weight:700;color:var(--onSurface)">Wallpapers</div>
-          <div class="muted">The launcher backdrop, or a picture from the device.</div>
-        </div>
-        <button class="mini primary">Pick from storage</button>
-        <button class="mini">Use launcher backdrop</button>
+    <div class="panel col grow">
+      <div class="label">Wallpapers</div>
+      <div class="sub2">The launcher backdrop, or a picture from the device.</div>
+      <div class="row" style="margin-top:8px">
+        <div class="tool" style="flex:1;justify-content:center">Pick from storage</div>
+        <div class="tool" style="flex:1;justify-content:center">Use launcher backdrop</div>
       </div>
-      <p class="eyebrow">Backdrops</p>
-      <div class="wallpaper-tiles">
-        <div class="tile on"><i class="a" style="background:radial-gradient(circle at 30% 30%, var(--primaryContainer), transparent 70%), radial-gradient(circle at 70% 60%, var(--tertiaryContainer), transparent 70%), var(--surfaceContainerLowest)"></i><span style="position:relative">Aurora</span></div>
-        <div class="tile"><i class="a" style="background:linear-gradient(135deg, var(--secondaryContainer), var(--surfaceContainerLowest))"></i><span style="position:relative">Dusk</span></div>
-        <div class="tile"><i class="a" style="background:linear-gradient(200deg, var(--tertiaryContainer), var(--surfaceContainerLowest))"></i><span style="position:relative">Meadow</span></div>
+      <div class="walltiles" style="margin-top:8px">
+        <div class="walltile on"><i style="background:linear-gradient(135deg,rgba(55,220,236,.18),rgba(122,113,245,.16)),var(--page)"></i><span style="position:relative">Aurora</span></div>
+        <div class="walltile"><i style="background:linear-gradient(200deg,rgba(141,239,224,.16),var(--page))"></i><span style="position:relative">Dusk</span></div>
+        <div class="walltile"><i style="background:linear-gradient(160deg,rgba(243,169,217,.16),var(--page))"></i><span style="position:relative">Meadow</span></div>
       </div>
-      <div class="card flat" style="flex:1;display:grid;place-items:center">
-        <div class="muted">Preview of the picture that is applied</div>
-      </div>
+      <div style="flex:1"></div>
     </div>`,
   settings: `
-    <div class="grid2" style="gap:18px">
-      <div class="card col" style="gap:12px">
-        <p class="eyebrow">Appearance</p>
+    <div class="row grow">
+      <div class="panel col grow">
+        <div class="label">Appearance</div>
         <div class="swatches" id="swatches"></div>
-        <div class="row"><span class="grow"><b>Keep the launcher sideways</b><br><span class="muted">Hold the screen in landscape</span></span><span class="switch on"></span></div>
-        <div class="row"><span class="grow"><b>Animate the backdrop</b><br><span class="muted">Pauses under battery saver</span></span><span class="switch on"></span></div>
+        <div class="item"><div style="flex:1"><b>Keep the launcher sideways</b><br><span class="muted">Hold the screen in landscape</span></div><span class="chip on">On</span></div>
+        <div class="item"><div style="flex:1"><b>Backdrop opacity</b><br><span class="muted">How much of the wallpaper shows through</span></div><span class="chip">70%</span></div>
       </div>
-      <div class="card col" style="gap:12px">
-        <p class="eyebrow">Sections</p>
-        <div class="row"><span class="icon">${svg('gamepad')}</span><span class="grow"><b>Video</b><br><span class="muted">Resolution, renderer, performance</span></span></div>
-        <div class="row"><span class="icon">${svg('gamepad')}</span><span class="grow"><b>Control</b><br><span class="muted">Buttons, gestures, mouse</span></span></div>
-        <div class="row"><span class="icon">${svg('java')}</span><span class="grow"><b>Java</b><br><span class="muted">Runtimes and arguments</span></span></div>
-        <div class="row"><span class="icon">${svg('folder')}</span><span class="grow"><b>Miscellaneous</b></span></div>
-        <div class="row"><span class="icon">${svg('settings')}</span><span class="grow"><b>Experimental</b></span></div>
+      <div class="panel col" style="flex:.9">
+        <div class="label">Sections</div>
+        <div class="item"><div style="flex:1"><b>Video</b><br><span class="muted">Resolution, renderer, performance</span></div>${svg('arrow')}</div>
+        <div class="item"><div style="flex:1"><b>Control</b><br><span class="muted">Buttons, gestures, mouse</span></div>${svg('arrow')}</div>
+        <div class="item"><div style="flex:1"><b>Java</b><br><span class="muted">Runtimes and arguments</span></div>${svg('arrow')}</div>
+        <div class="item"><div style="flex:1"><b>Miscellaneous</b></div>${svg('arrow')}</div>
+        <div class="item"><div style="flex:1"><b>Experimental</b></div>${svg('arrow')}</div>
       </div>
     </div>`,
 };
@@ -492,11 +422,10 @@ let palette = 'embermire';
 function applyPalette(key) {
   palette = key;
   const p = PALETTES[key];
-  for (const [name, value] of Object.entries(p)) {
-    document.documentElement.style.setProperty('--' + name, value);
-  }
-  document.querySelectorAll('#palettes button').forEach(b =>
-    b.classList.toggle('on', b.dataset.key === key));
+  // The palette tints the page underneath the glass, the glass itself stays put.
+  const base = p.surfaceContainer || '#291D19';
+  document.documentElement.style.setProperty('--page', base);
+  document.querySelectorAll('#palettes button').forEach(b => b.classList.toggle('on', b.dataset.key === key));
   if (current === 'settings') renderSwatches();
 }
 
@@ -507,49 +436,35 @@ function renderSwatches() {
     const p = PALETTES[key];
     return `<button class="swatch ${key === palette ? 'on' : ''}" data-palette="${key}">
       <span class="strip">
-        <i style="background:${p.primary}"></i>
-        <i style="background:${p.secondary}"></i>
-        <i style="background:${p.tertiary}"></i>
-        <i style="background:${p.surfaceContainer}"></i>
-      </span>
-      <span class="name">${key.replace(/([A-Z])/g, ' $1')}</span>
-    </button>`;
+        <i style="background:${p.primary}"></i><i style="background:${p.secondary}"></i>
+        <i style="background:${p.tertiary}"></i><i style="background:${p.surfaceContainer}"></i>
+      </span><span class="name">${key.replace(/([A-Z])/g, ' $1')}</span></button>`;
   }).join('');
-  host.querySelectorAll('button').forEach(b =>
-    b.onclick = () => applyPalette(b.dataset.palette));
+  host.querySelectorAll('button').forEach(b => b.onclick = () => applyPalette(b.dataset.palette));
 }
 
 function renderRail() {
-  const settingsSlot = DESTINATIONS.length - 1;
-  document.getElementById('rail').innerHTML = DESTINATIONS.map((d, i) => `
-    ${i === settingsSlot ? '<span class="grow"></span>' : ''}
-    <button class="slot ${d.key === current ? 'on' : ''}" data-key="${d.key}">
-      ${svg(d.icon)}<span>${d.label}</span>
-    </button>`).join('');
-  document.getElementById('rail').querySelectorAll('button').forEach(b =>
-    b.onclick = () => show(b.dataset.key));
+  document.getElementById('capsule').innerHTML =
+    `<div class="mark" title="Aerix"><svg viewBox="0 0 64 64">${ICONS.mark}</svg></div>` +
+    DESTINATIONS.map(d => `<div class="slot ${d.key === current ? 'on' : ''}" data-key="${d.key}" title="${d.label}">${svg(d.icon)}</div>`).join('') +
+    `<div class="divider"></div>` +
+    `<div class="slot ${current === 'accounts' ? 'on' : ''}" data-key="accounts" title="Accounts">${svg('person')}</div>`;
+  document.getElementById('capsule').querySelectorAll('.slot').forEach(s => s.onclick = () => show(s.dataset.key));
 }
 
 function show(key) {
   current = key;
   const d = DESTINATIONS.find(x => x.key === key);
-  document.getElementById('title').textContent = d.title;
-  document.getElementById('page').innerHTML = PAGES[key];
+  document.getElementById('page').innerHTML = PAGES[key] || PAGES.home;
   renderRail();
   if (key === 'settings') renderSwatches();
-  document.querySelectorAll('#tabs button').forEach(b =>
-    b.classList.toggle('on', b.dataset.key === key));
+  document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.key === key));
 }
 
-document.getElementById('tabs').innerHTML = DESTINATIONS.map(d =>
-  `<button data-key="${d.key}">${d.title}</button>`).join('');
-document.getElementById('tabs').querySelectorAll('button').forEach(b =>
-  b.onclick = () => show(b.dataset.key));
-
-document.getElementById('palettes').innerHTML = Object.keys(PALETTES).map(key =>
-  `<button data-key="${key}">${PALETTES[key].__label}</button>`).join('');
-document.querySelectorAll('#palettes button').forEach(b =>
-  b.onclick = () => applyPalette(b.dataset.key));
+document.getElementById('tabs').innerHTML = DESTINATIONS.map(d => `<button data-key="${d.key}">${d.title}</button>`).join('');
+document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => show(b.dataset.key));
+document.getElementById('palettes').innerHTML = Object.keys(PALETTES).map(k => `<button data-key="${k}">${PALETTES[k].__label}</button>`).join('');
+document.querySelectorAll('#palettes button').forEach(b => b.onclick = () => applyPalette(b.dataset.key));
 
 applyPalette('embermire');
 show('home');
