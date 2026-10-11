@@ -178,10 +178,10 @@
     </style>
 
     <style name="Liquid.PreferenceTheme" parent="PreferenceThemeOverlay.v14.Material">
-        <item name="preferenceFragmentListStyle">@style/Liquid.PreferenceList</item>
+        <item name="preferenceFragmentListStyle">@style/LiquidPreferenceList</item>
     </style>
 
-    <style name="Liquid.PreferenceList">
+    <style name="LiquidPreferenceList">
         <item name="android:background">@android:color/transparent</item>
         <item name="android:divider">@drawable/liquid_divider</item>
         <item name="android:dividerHeight">1dp</item>
