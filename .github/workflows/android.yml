@@ -67,17 +67,21 @@ jobs:
           gradle :app_pojavlauncher:assembleFullDebug 2>&1 | tee build.log
           mv app_pojavlauncher/build/outputs/apk/full/debug/app_pojavlauncher-full-debug.apk out/app-debug-full.apk
 
-      - name: Publish build log
-        if: "always() && !startsWith(github.event.head_commit.message, 'Ci[log]')"
+      - name: Capture build error
+        id: err
+        if: failure()
         run: |
-          mkdir -p .ci
-          tail -n 300 build.log > .ci/last-build.log 2>/dev/null || echo "no build log" > .ci/last-build.log
-          git config user.name "ci-bot"
-          git config user.email "ci-bot@users.noreply.github.com"
-          git fetch origin ${GITHUB_REF_NAME} && git reset --soft FETCH_HEAD
-          git add -f .ci/last-build.log
-          git commit -m "Ci[log]: build output" || echo "nothing to commit"
-          git push origin HEAD:${GITHUB_REF_NAME} || echo "push skipped"
+          if [ -f build.log ]; then
+            BODY=$(grep -nE "error:|FAILED|What went wrong|Exception|Execution failed" -A 6 build.log | tail -c 2400 | base64 -w0)
+            if [ -z "$BODY" ]; then BODY=$(tail -c 2400 build.log | base64 -w0); fi
+          else
+            BODY=$(echo "no build.log produced" | base64 -w0)
+          fi
+          echo "msg=$BODY" >> $GITHUB_OUTPUT
+
+      - name: "CI-ERROR ${{ steps.err.outputs.msg }}"
+        if: failure()
+        run: echo "error captured"
 
       - name: Build Debug .apk (No runtime)
         if: "!startsWith(github.event.head_commit.message, 'Ci[log]')"
