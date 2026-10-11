@@ -1,0 +1,90 @@
+### Errors
+369:> Task :app_pojavlauncher:processFullDebugResources FAILED
+380:* What went wrong:
+381:Execution failed for task ':app_pojavlauncher:processFullDebugResources'.
+384:     ERROR: AAPT: error: resource style/Liquid (aka net.kdt.pojavlaunch.debug:style/Liquid) not found.
+385:     error: failed linking references.
+389:* Try:
+401:BUILD FAILED in 41s
+
+### Tail
+/home/runner/work/Aerix-launcher/Aerix-launcher/app_pojavlauncher/src/main/res/values-uk/strings.xml:232:4: Multiple substitutions specified in non-positional format of string resource string/memory_warning_msg. Did you mean to add the formatted="false" attribute?
+/home/runner/work/Aerix-launcher/Aerix-launcher/app_pojavlauncher/src/main/res/values-uk/strings.xml:290:4: Multiple substitutions specified in non-positional format of string resource string/modpack_download_applying_overrides. Did you mean to add the formatted="false" attribute?
+/home/runner/work/Aerix-launcher/Aerix-launcher/app_pojavlauncher/src/main/res/values-uk/strings.xml:291:4: Multiple substitutions specified in non-positional format of string resource string/modpack_download_downloading_metadata. Did you mean to add the formatted="false" attribute?
+/home/runner/work/Aerix-launcher/Aerix-launcher/app_pojavlauncher/src/main/res/values-uk/strings.xml:292:4: Multiple substitutions specified in non-positional format of string resource string/modpack_download_downloading_mods. Did you mean to add the formatted="false" attribute?
+/home/runner/work/Aerix-launcher/Aerix-launcher/app_pojavlauncher/src/main/res/values-uk/strings.xml:298:4: Multiple substitutions specified in non-positional format of string resource string/modpack_download_downloading_mods_fc. Did you mean to add the formatted="false" attribute?
+/home/runner/work/Aerix-launcher/Aerix-launcher/app_pojavlauncher/src/main/res/values-en-rGB/strings.xml:146:4: Multiple substitutions specified in non-positional format of string resource string/mcl_launch_downloading_progress. Did you mean to add the formatted="false" attribute?
+/home/runner/work/Aerix-launcher/Aerix-launcher/app_pojavlauncher/src/main/res/values-uk/strings.xml:346:4: Multiple substitutions specified in non-positional format of string resource string/newdl_downloading_game_files. Did you mean to add the formatted="false" attribute?
+/home/runner/work/Aerix-launcher/Aerix-launcher/app_pojavlauncher/src/main/res/values-uk/strings.xml:332:4: Multiple substitutions specified in non-positional format of string resource string/newdl_downloading_game_files_size. Did you mean to add the formatted="false" attribute?
+/home/runner/work/Aerix-launcher/Aerix-launcher/app_pojavlauncher/src/main/res/values-uk/strings.xml:331:4: Multiple substitutions specified in non-positional format of string resource string/newdl_extracting_native_libraries. Did you mean to add the formatted="false" attribute?
+/home/runner/work/Aerix-launcher/Aerix-launcher/app_pojavlauncher/src/main/res/values-en-rGB/strings.xml:228:4: Multiple substitutions specified in non-positional format of string resource string/memory_warning_msg. Did you mean to add the formatted="false" attribute?
+/home/runner/work/Aerix-launcher/Aerix-launcher/app_pojavlauncher/src/main/res/values-en-rGB/strings.xml:275:4: Multiple substitutions specified in non-positional format of string resource string/modpack_download_applying_overrides. Did you mean to add the formatted="false" attribute?
+/home/runner/work/Aerix-launcher/Aerix-launcher/app_pojavlauncher/src/main/res/values-uk/strings.xml:217:4: Multiple substitutions specified in non-positional format of string resource string/newerdl_inserting_metadata_count. Did you mean to add the formatted="false" attribute?
+/home/runner/work/Aerix-launcher/Aerix-launcher/app_pojavlauncher/src/main/res/values-en-rGB/strings.xml:276:4: Multiple substitutions specified in non-positional format of string resource string/modpack_download_downloading_metadata. Did you mean to add the formatted="false" attribute?
+/home/runner/work/Aerix-launcher/Aerix-launcher/app_pojavlauncher/src/main/res/values-en-rGB/strings.xml:277:4: Multiple substitutions specified in non-positional format of string resource string/modpack_download_downloading_mods. Did you mean to add the formatted="false" attribute?
+/home/runner/work/Aerix-launcher/Aerix-launcher/app_pojavlauncher/src/main/res/values-en-rGB/strings.xml:283:4: Multiple substitutions specified in non-positional format of string resource string/modpack_download_downloading_mods_fc. Did you mean to add the formatted="false" attribute?
+/home/runner/work/Aerix-launcher/Aerix-launcher/app_pojavlauncher/src/main/res/values-ms/strings.xml:115:4: Multiple substitutions specified in non-positional format of string resource string/mcl_launch_downloading_progress. Did you mean to add the formatted="false" attribute?
+/home/runner/work/Aerix-launcher/Aerix-launcher/app_pojavlauncher/src/main/res/values-ms/strings.xml:118:4: Multiple substitutions specified in non-positional format of string resource string/memory_warning_msg. Did you mean to add the formatted="false" attribute?
+/home/runner/work/Aerix-launcher/Aerix-launcher/app_pojavlauncher/src/main/res/values-vi/strings.xml:20:4: Multiple substitutions specified in non-positional format of string resource string/address_memory_warning_msg. Did you mean to add the formatted="false" attribute?
+/home/runner/work/Aerix-launcher/Aerix-launcher/app_pojavlauncher/src/main/res/values-vi/strings.xml:172:4: Multiple substitutions specified in non-positional format of string resource string/mcl_launch_downloading_progress. Did you mean to add the formatted="false" attribute?
+/home/runner/work/Aerix-launcher/Aerix-launcher/app_pojavlauncher/src/main/res/values-vi/strings.xml:263:4: Multiple substitutions specified in non-positional format of string resource string/memory_warning_msg. Did you mean to add the formatted="false" attribute?
+/home/runner/work/Aerix-launcher/Aerix-launcher/app_pojavlauncher/src/main/res/values-vi/strings.xml:325:4: Multiple substitutions specified in non-positional format of string resource string/modpack_download_applying_overrides. Did you mean to add the formatted="false" attribute?
+/home/runner/work/Aerix-launcher/Aerix-launcher/app_pojavlauncher/src/main/res/values-vi/strings.xml:326:4: Multiple substitutions specified in non-positional format of string resource string/modpack_download_downloading_metadata. Did you mean to add the formatted="false" attribute?
+/home/runner/work/Aerix-launcher/Aerix-launcher/app_pojavlauncher/src/main/res/values-vi/strings.xml:327:4: Multiple substitutions specified in non-positional format of string resource string/modpack_download_downloading_mods. Did you mean to add the formatted="false" attribute?
+/home/runner/work/Aerix-launcher/Aerix-launcher/app_pojavlauncher/src/main/res/values-vi/strings.xml:333:4: Multiple substitutions specified in non-positional format of string resource string/modpack_download_downloading_mods_fc. Did you mean to add the formatted="false" attribute?
+/home/runner/work/Aerix-launcher/Aerix-launcher/app_pojavlauncher/src/main/res/values-vi/strings.xml:371:4: Multiple substitutions specified in non-positional format of string resource string/newdl_downloading_game_files. Did you mean to add the formatted="false" attribute?
+/home/runner/work/Aerix-launcher/Aerix-launcher/app_pojavlauncher/src/main/res/values-vi/strings.xml:369:4: Multiple substitutions specified in non-positional format of string resource string/newdl_downloading_game_files_size. Did you mean to add the formatted="false" attribute?
+/home/runner/work/Aerix-launcher/Aerix-launcher/app_pojavlauncher/src/main/res/values-vi/strings.xml:368:4: Multiple substitutions specified in non-positional format of string resource string/newdl_extracting_native_libraries. Did you mean to add the formatted="false" attribute?
+/home/runner/work/Aerix-launcher/Aerix-launcher/app_pojavlauncher/src/main/res/values-no/strings.xml:96:4: Multiple substitutions specified in non-positional format of string resource string/mcl_launch_downloading_progress. Did you mean to add the formatted="false" attribute?
+/home/runner/work/Aerix-launcher/Aerix-launcher/app_pojavlauncher/src/main/res/values-no/strings.xml:98:4: Multiple substitutions specified in non-positional format of string resource string/memory_warning_msg. Did you mean to add the formatted="false" attribute?
+
+> Task :app_pojavlauncher:processFullDebugManifest
+> Task :app_pojavlauncher:processFullDebugManifestForPackage
+> Task :mojoexec:jni_bindings:compileDebugLibraryResources
+> Task :sdl:jni_bindings:compileDebugLibraryResources
+> Task :mojoexec:jni_bindings:parseDebugLocalResources
+> Task :glfw:jni_bindings:javaPreCompileDebug
+> Task :sdl:jni_bindings:parseDebugLocalResources
+> Task :glfw:jni_bindings:parseDebugLocalResources
+> Task :mojoexec:jni_bindings:javaPreCompileDebug
+> Task :sdl:jni_bindings:generateDebugRFile
+> Task :sdl:jni_bindings:javaPreCompileDebug
+> Task :mojoexec:jni_bindings:generateDebugRFile
+> Task :app_pojavlauncher:javaPreCompileFullDebug
+> Task :glfw:jni_bindings:generateDebugRFile
+> Task :mojoexec:jni_bindings:compileDebugJavaWithJavac
+> Task :mojoexec:jni_bindings:bundleLibCompileToJarDebug
+> Task :app_pojavlauncher:processFullDebugResources FAILED
+
+> Task :sdl:jni_bindings:compileDebugJavaWithJavac
+Note: Some input files use or override a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run_3-1791694641645.json
+
+[Incubating] Problems report is available at: file:///home/runner/work/Aerix-launcher/Aerix-launcher/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app_pojavlauncher:processFullDebugResources'.
+> A failure occurred while executing com.android.build.gradle.internal.res.LinkApplicationAndroidResourcesTask$TaskAction
+   > Android resource linking failed
+     ERROR: AAPT: error: resource style/Liquid (aka net.kdt.pojavlaunch.debug:style/Liquid) not found.
+     error: failed linking references.
+     
+         
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.14.3/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD FAILED in 41s
+55 actionable tasks: 55 executed
