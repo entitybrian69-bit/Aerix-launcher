@@ -8,7 +8,7 @@ on:
 
 # TEMPORARY: lets the agent read build errors that it cannot download logs for.
 permissions:
-  contents: read
+  contents: write
   issues: write
 
 jobs:
@@ -71,21 +71,26 @@ jobs:
           exit ${PIPESTATUS[0]}
           mv app_pojavlauncher/build/outputs/apk/full/debug/app_pojavlauncher-full-debug.apk out/app-debug-full.apk
 
-      - name: Report the failure as an issue
+      - name: Report the failure into the branch
         if: failure()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          mkdir -p .ci-logs
           {
             echo "### Errors"
-            grep -nE "error:|FAILED|What went wrong|Execution failed|^\* " build.log | head -60
+            grep -nE "error:|FAILED|What went wrong|Execution failed|^\* " build.log | head -80
             echo
             echo "### Tail"
-            tail -60 build.log
-          } > err.txt
-          gh issue create \
-            --title "CI debug: build errors on $(git rev-parse --short HEAD)" \
-            --body-file err.txt || true
+            tail -80 build.log
+          } > ".ci-logs/build-$(date +%s).log"
+          git config user.name "CI debug"
+          git config user.email "ci@local"
+          git add .ci-logs
+          git commit -m "CI debug: build log" || true
+          git push origin "HEAD:$(git rev-parse --abbrev-ref HEAD)" || true
+          gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/comments" \
+            -f "body=CI build failure, log pushed to .ci-logs" || true
 
       - name: Upload build log
         if: failure()
