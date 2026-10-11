@@ -77,12 +77,16 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p .ci-logs
+          rm -f .ci-logs/*.log
           {
+            echo "### What went wrong"
+            grep -n -A 30 "What went wrong" build.log | head -60
+            echo
             echo "### Errors"
-            grep -nE "error:|FAILED|What went wrong|Execution failed|^\* " build.log | head -80
+            grep -nE "error:|FAILED|Execution failed" build.log | head -40
             echo
             echo "### Tail"
-            tail -80 build.log
+            tail -120 build.log
           } > ".ci-logs/build-$(date +%s).log"
           git config user.name "CI debug"
           git config user.email "ci@local"
