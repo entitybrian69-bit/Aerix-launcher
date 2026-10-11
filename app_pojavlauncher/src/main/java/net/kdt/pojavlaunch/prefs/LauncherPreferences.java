@@ -36,6 +36,8 @@ public class LauncherPreferences {
 	public static String PREF_CUSTOM_JAVA_ARGS;
     public static boolean PREF_FORCE_ENGLISH = false;
     public static boolean PREF_FORCE_LANDSCAPE = true;
+    public static String PREF_MIRAI_PALETTE = "embermire";
+    public static String PREF_MIRAI_WALLPAPER = "";
     public static final String PREF_VERSION_REPOS = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json";
     public static boolean PREF_DISABLE_GESTURES = false;
     public static boolean PREF_DISABLE_SWAP_HAND = false;
@@ -93,6 +95,8 @@ public class LauncherPreferences {
 		PREF_DEFAULTCTRL_PATH = DEFAULT_PREF.getString("defaultCtrl", Tools.CTRLDEF_FILE);
         PREF_FORCE_ENGLISH = DEFAULT_PREF.getBoolean("force_english", false);
         PREF_FORCE_LANDSCAPE = DEFAULT_PREF.getBoolean("force_landscape", true);
+        PREF_MIRAI_PALETTE = DEFAULT_PREF.getString("mirai_palette", "embermire");
+        PREF_MIRAI_WALLPAPER = DEFAULT_PREF.getString("mirai_wallpaper", "");
         PREF_DISABLE_GESTURES = DEFAULT_PREF.getBoolean("disableGestures",false);
         PREF_DISABLE_SWAP_HAND = DEFAULT_PREF.getBoolean("disableDoubleTap", false);
         PREF_RAM_ALLOCATION = DEFAULT_PREF.getInt("allocation", findBestRAMAllocation(ctx));

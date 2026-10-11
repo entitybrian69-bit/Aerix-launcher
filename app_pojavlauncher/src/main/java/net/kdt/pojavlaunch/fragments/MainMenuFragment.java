@@ -26,6 +26,7 @@ import com.kdt.mcgui.mcVersionSpinner;
 import net.kdt.pojavlaunch.CustomControlsActivity;
 import net.kdt.pojavlaunch.R;
 
+import net.kdt.pojavlaunch.PojavApplication;
 import net.kdt.pojavlaunch.Tools;
 import net.kdt.pojavlaunch.contracts.OpenDocumentWithExtension;
 import net.kdt.pojavlaunch.extra.ExtraConstants;
@@ -170,12 +171,16 @@ public class MainMenuFragment extends Fragment {
     /** Fills the hero card with the version that is currently selected. */
     private void refreshInstanceDetail() {
         if (mInstanceDetail == null) return;
-        Instance instance = Instances.loadSelectedInstance();
-        if (instance == null || !Tools.isValidString(instance.versionId)) {
-            mInstanceDetail.setText(R.string.liquid_instance_default);
-            return;
-        }
-        mInstanceDetail.setText(instance.versionId);
+        // Read the instance off the main thread, it touches the disk.
+        PojavApplication.sExecutorService.execute(() -> {
+            Instance instance = Instances.loadSelectedInstance();
+            String detail = (instance == null || !Tools.isValidString(instance.versionId))
+                    ? getString(R.string.liquid_instance_default)
+                    : instance.versionId;
+            Tools.runOnUiThread(() -> {
+                if (mInstanceDetail != null) mInstanceDetail.setText(detail);
+            });
+        });
     }
 
     private void runInstallerWithConfirmation() {

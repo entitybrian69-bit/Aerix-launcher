@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Library: every instance, with new, edit and delete. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="@dimen/mirai_space_xxl">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/mirai_library_title"
+            android:textColor="?attr/miraiOnSurface"
+            android:textSize="22sp"
+            android:textStyle="bold"/>
+
+        <Button
+            android:id="@+id/mirai_new_instance"
+            android:layout_width="wrap_content"
+            android:layout_height="@dimen/mirai_shell_action_height"
+            android:background="@drawable/mirai_button"
+            android:drawableStart="@drawable/ic_px_edit"
+            android:drawablePadding="@dimen/mirai_space_xs"
+            android:paddingStart="@dimen/mirai_space_lg"
+            android:paddingEnd="@dimen/mirai_space_lg"
+            android:text="@string/mirai_library_new"
+            android:textColor="?attr/miraiOnPrimary"
+            tools:ignore="TextContrastCheck"/>
+
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/mirai_library_empty"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/mirai_space_xxl"
+        android:gravity="center"
+        android:text="@string/mirai_library_empty"
+        android:textColor="?attr/miraiOnSurfaceVariant"
+        android:textSize="14sp"
+        android:visibility="gone"
+        tools:visibility="visible"/>
+
+    <ListView
+        android:id="@+id/mirai_instance_list"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="@dimen/mirai_space_lg"
+        android:layout_weight="1"
+        android:divider="@drawable/mirai_divider"
+        android:dividerHeight="1dp"
+        android:listSelector="@drawable/mirai_choice"
+        android:scrollbars="none"
+        tools:listitem="@layout/item_mirai_instance"/>
+
+</LinearLayout>

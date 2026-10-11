@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Shell header: page title on the left, account and settings on the right. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="@dimen/mirai_shell_header_height"
+    android:background="?attr/miraiSurfaceContainerLow"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingStart="@dimen/mirai_space_xl"
+    android:paddingEnd="@dimen/mirai_space_xl">
+
+    <TextView
+        android:id="@+id/mirai_title"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:ellipsize="end"
+        android:singleLine="true"
+        android:text="@string/app_name"
+        android:textColor="?attr/miraiOnSurface"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        tools:text="Home"/>
+
+    <com.kdt.mcgui.AccountSpinner
+        android:id="@+id/account_spinner"
+        android:layout_width="200dp"
+        android:layout_height="@dimen/mirai_shell_action_height"
+        android:layout_marginEnd="@dimen/mirai_space_sm"
+        android:background="@drawable/mirai_field"
+        android:dropDownWidth="250dp"
+        android:dropDownVerticalOffset="@dimen/mirai_shell_action_height"/>
+
+    <ImageButton
+        android:id="@+id/setting_button"
+        android:layout_width="@dimen/mirai_shell_action_height"
+        android:layout_height="@dimen/mirai_shell_action_height"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:contentDescription="@string/mcl_settings"
+        android:padding="8dp"
+        android:src="@drawable/ic_px_sliders"/>
+
+</LinearLayout>

@@ -3,9 +3,9 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
-    android:layout_width="@dimen/liquid_column"
+    android:layout_width="@dimen/mirai_content_column"
     android:layout_height="match_parent"
-    android:background="@drawable/liquid_column"
+    android:background="@drawable/mirai_card"
     android:orientation="vertical"
      android:layout_gravity="center_horizontal">
     <ScrollView

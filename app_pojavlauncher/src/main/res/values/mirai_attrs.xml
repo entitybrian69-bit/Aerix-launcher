@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Palette slots. Each Mirai theme fills every one of them, so a
+     palette switch repaints the whole shell with no layout change. -->
+<resources>
+    <attr name="miraiPrimary" format="color|reference" />
+    <attr name="miraiOnPrimary" format="color|reference" />
+    <attr name="miraiPrimaryContainer" format="color|reference" />
+    <attr name="miraiOnPrimaryContainer" format="color|reference" />
+    <attr name="miraiSecondary" format="color|reference" />
+    <attr name="miraiOnSecondary" format="color|reference" />
+    <attr name="miraiSecondaryContainer" format="color|reference" />
+    <attr name="miraiOnSecondaryContainer" format="color|reference" />
+    <attr name="miraiTertiary" format="color|reference" />
+    <attr name="miraiOnTertiary" format="color|reference" />
+    <attr name="miraiTertiaryContainer" format="color|reference" />
+    <attr name="miraiOnTertiaryContainer" format="color|reference" />
+    <attr name="miraiError" format="color|reference" />
+    <attr name="miraiOnError" format="color|reference" />
+    <attr name="miraiErrorContainer" format="color|reference" />
+    <attr name="miraiOnErrorContainer" format="color|reference" />
+    <attr name="miraiBackground" format="color|reference" />
+    <attr name="miraiOnBackground" format="color|reference" />
+    <attr name="miraiSurface" format="color|reference" />
+    <attr name="miraiOnSurface" format="color|reference" />
+    <attr name="miraiSurfaceVariant" format="color|reference" />
+    <attr name="miraiOnSurfaceVariant" format="color|reference" />
+    <attr name="miraiOutline" format="color|reference" />
+    <attr name="miraiOutlineVariant" format="color|reference" />
+    <attr name="miraiSurfaceContainerLowest" format="color|reference" />
+    <attr name="miraiSurfaceContainerLow" format="color|reference" />
+    <attr name="miraiSurfaceContainer" format="color|reference" />
+    <attr name="miraiSurfaceContainerHigh" format="color|reference" />
+    <attr name="miraiSurfaceContainerHighest" format="color|reference" />
+    <attr name="miraiAccent" format="color|reference" />
+</resources>

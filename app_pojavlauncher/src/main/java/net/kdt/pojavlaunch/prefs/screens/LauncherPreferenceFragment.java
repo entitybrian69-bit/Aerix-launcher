@@ -25,7 +25,6 @@ public class LauncherPreferenceFragment extends PreferenceFragmentCompat impleme
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-        view.setBackgroundColor(getResources().getColor(R.color.liquid_scrim));
         super.onViewCreated(view, savedInstanceState);
     }
 
@@ -76,6 +75,8 @@ public class LauncherPreferenceFragment extends PreferenceFragmentCompat impleme
         if ("force_landscape".equals(s) && activity instanceof LauncherActivity) {
             ((LauncherActivity) activity).applyOrientationPreference();
         }
+        // A new palette means a new theme, so the shell is rebuilt with it.
+        if ("mirai_palette".equals(s) && activity != null) activity.recreate();
     }
 
     protected Preference requirePreference(CharSequence key) {

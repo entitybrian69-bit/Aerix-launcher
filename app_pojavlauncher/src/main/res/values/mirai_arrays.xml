@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="mirai_palette_names">
+        <item>@string/mirai_palette_embermire</item>
+        <item>@string/mirai_palette_velvet_rose</item>
+        <item>@string/mirai_palette_mistwave</item>
+        <item>@string/mirai_palette_glacier</item>
+        <item>@string/mirai_palette_verdant_field</item>
+        <item>@string/mirai_palette_urban_ash</item>
+        <item>@string/mirai_palette_verdant_dawn</item>
+    </string-array>
+    <string-array name="mirai_palette_values">
+        <item>embermire</item>
+        <item>velvetrose</item>
+        <item>mistwave</item>
+        <item>glacier</item>
+        <item>verdantfield</item>
+        <item>urbanash</item>
+        <item>verdantdawn</item>
+    </string-array>
+</resources>

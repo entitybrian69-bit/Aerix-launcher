@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Mirai metrics (AerixMetrics) and spacing scale (AerixSpacing). -->
+<resources>
+    <dimen name="mirai_space_zero">0dp</dimen>
+    <dimen name="mirai_space_hairline">1dp</dimen>
+    <dimen name="mirai_space_xxs">2dp</dimen>
+    <dimen name="mirai_space_tiny">3dp</dimen>
+    <dimen name="mirai_space_xs">4dp</dimen>
+    <dimen name="mirai_space_xs_plus">5dp</dimen>
+    <dimen name="mirai_space_sm_compact">6dp</dimen>
+    <dimen name="mirai_space_sm_tight">7dp</dimen>
+    <dimen name="mirai_space_sm">8dp</dimen>
+    <dimen name="mirai_space_sm_narrow">9dp</dimen>
+    <dimen name="mirai_space_sm_plus">10dp</dimen>
+    <dimen name="mirai_space_md_tight">11dp</dimen>
+    <dimen name="mirai_space_md">12dp</dimen>
+    <dimen name="mirai_space_md_plus">14dp</dimen>
+    <dimen name="mirai_space_lg">16dp</dimen>
+    <dimen name="mirai_space_lg_plus">18dp</dimen>
+    <dimen name="mirai_space_xl">20dp</dimen>
+    <dimen name="mirai_space_xl_plus">22dp</dimen>
+    <dimen name="mirai_space_xxl">24dp</dimen>
+    <dimen name="mirai_space_xxxl">32dp</dimen>
+    <dimen name="mirai_pill_tab_height">38dp</dimen>
+    <dimen name="mirai_page_header_height">44dp</dimen>
+    <dimen name="mirai_shell_header_height">60dp</dimen>
+    <dimen name="mirai_shell_header_height_compact">48dp</dimen>
+    <dimen name="mirai_shell_action_height">40dp</dimen>
+    <dimen name="mirai_shell_action_height_compact">36dp</dimen>
+    <dimen name="mirai_navigation_rail_width">68dp</dimen>
+    <dimen name="mirai_expanded_navigation_rail_width">78dp</dimen>
+    <dimen name="mirai_rail_icon">24dp</dimen>
+    <dimen name="mirai_rail_icon_compact">20dp</dimen>
+    <dimen name="mirai_avatar">38dp</dimen>
+    <dimen name="mirai_avatar_compact">32dp</dimen>
+    <dimen name="mirai_content_column">520dp</dimen>
+    <dimen name="mirai_content_column_narrow">480dp</dimen>
+    <dimen name="mirai_content_column_wide">600dp</dimen>
+    <dimen name="mirai_quick_action_height">84dp</dimen>
+</resources>

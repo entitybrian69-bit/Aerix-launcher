@@ -1,0 +1,407 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Mirai shell theme. One style per palette; the launcher sets the
+     chosen one before its content view is created. -->
+<resources>
+
+    <style name="MiraiTheme.Base" parent="Theme.AppCompat.NoActionBar">
+        <item name="windowNoTitle">true</item>
+        <item name="windowActionBar">false</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:listDivider">@drawable/mirai_divider</item>
+        <item name="android:divider">@drawable/mirai_divider</item>
+        <item name="android:listChoiceBackgroundIndicator">@drawable/mirai_choice</item>
+        <item name="android:scrollbarThumbVertical">@drawable/mirai_scrollbar</item>
+        <item name="android:scrollbarThumbHorizontal">@drawable/mirai_scrollbar</item>
+        <item name="android:buttonStyle">@style/Mirai.Button</item>
+        <item name="buttonStyle">@style/Mirai.Button</item>
+        <item name="android:editTextStyle">@style/Mirai.EditText</item>
+        <item name="android:spinnerStyle">@style/Mirai.Spinner</item>
+        <item name="android:seekBarStyle">@style/Mirai.SeekBar</item>
+        <item name="seekBarStyle">@style/Mirai.SeekBar</item>
+        <item name="mineButtonBackground">@drawable/mirai_button</item>
+        <item name="preferenceTheme">@style/Mirai.PreferenceTheme</item>
+        <item name="android:alertDialogTheme">@style/Mirai.Dialog</item>
+        <item name="alertDialogTheme">@style/Mirai.Dialog</item>
+        <item name="android:dialogTheme">@style/Mirai.Dialog</item>
+        <item name="dialogTheme">@style/Mirai.Dialog</item>
+        <item name="android:popupMenuStyle">@style/Mirai.PopupMenu</item>
+        <item name="popupMenuStyle">@style/Mirai.PopupMenu</item>
+    </style>
+
+    <style name="MiraiTheme.Embermire" parent="MiraiTheme.Base">
+        <item name="miraiPrimary">@color/mirai_embermire_primary</item>
+        <item name="miraiOnPrimary">@color/mirai_embermire_onprimary</item>
+        <item name="miraiPrimaryContainer">@color/mirai_embermire_primarycontainer</item>
+        <item name="miraiOnPrimaryContainer">@color/mirai_embermire_onprimarycontainer</item>
+        <item name="miraiSecondary">@color/mirai_embermire_secondary</item>
+        <item name="miraiOnSecondary">@color/mirai_embermire_onsecondary</item>
+        <item name="miraiSecondaryContainer">@color/mirai_embermire_secondarycontainer</item>
+        <item name="miraiOnSecondaryContainer">@color/mirai_embermire_onsecondarycontainer</item>
+        <item name="miraiTertiary">@color/mirai_embermire_tertiary</item>
+        <item name="miraiOnTertiary">@color/mirai_embermire_ontertiary</item>
+        <item name="miraiTertiaryContainer">@color/mirai_embermire_tertiarycontainer</item>
+        <item name="miraiOnTertiaryContainer">@color/mirai_embermire_ontertiarycontainer</item>
+        <item name="miraiError">@color/mirai_embermire_error</item>
+        <item name="miraiOnError">@color/mirai_embermire_onerror</item>
+        <item name="miraiErrorContainer">@color/mirai_embermire_errorcontainer</item>
+        <item name="miraiOnErrorContainer">@color/mirai_embermire_onerrorcontainer</item>
+        <item name="miraiBackground">@color/mirai_embermire_background</item>
+        <item name="miraiOnBackground">@color/mirai_embermire_onbackground</item>
+        <item name="miraiSurface">@color/mirai_embermire_surface</item>
+        <item name="miraiOnSurface">@color/mirai_embermire_onsurface</item>
+        <item name="miraiSurfaceVariant">@color/mirai_embermire_surfacevariant</item>
+        <item name="miraiOnSurfaceVariant">@color/mirai_embermire_onsurfacevariant</item>
+        <item name="miraiOutline">@color/mirai_embermire_outline</item>
+        <item name="miraiOutlineVariant">@color/mirai_embermire_outlinevariant</item>
+        <item name="miraiSurfaceContainerLowest">@color/mirai_embermire_surfacecontainerlowest</item>
+        <item name="miraiSurfaceContainerLow">@color/mirai_embermire_surfacecontainerlow</item>
+        <item name="miraiSurfaceContainer">@color/mirai_embermire_surfacecontainer</item>
+        <item name="miraiSurfaceContainerHigh">@color/mirai_embermire_surfacecontainerhigh</item>
+        <item name="miraiSurfaceContainerHighest">@color/mirai_embermire_surfacecontainerhighest</item>
+        <item name="miraiAccent">@color/mirai_embermire_primary</item>
+        <item name="colorPrimary">@color/mirai_embermire_primary</item>
+        <item name="colorPrimaryDark">@color/mirai_embermire_surfacecontainerlowest</item>
+        <item name="colorAccent">@color/mirai_embermire_primary</item>
+        <item name="colorControlNormal">@color/mirai_embermire_onsurfacevariant</item>
+        <item name="colorControlActivated">@color/mirai_embermire_primary</item>
+        <item name="android:textColorPrimary">@color/mirai_embermire_onsurface</item>
+        <item name="android:textColorSecondary">@color/mirai_embermire_onsurfacevariant</item>
+        <item name="android:textColorTertiary">@color/mirai_embermire_outline</item>
+        <item name="android:textColorHint">@color/mirai_embermire_outline</item>
+        <item name="android:colorBackground">@color/mirai_embermire_background</item>
+        <item name="android:windowBackground">@color/mirai_embermire_background</item>
+        <item name="android:statusBarColor">@color/mirai_embermire_surfacecontainerlowest</item>
+        <item name="android:navigationBarColor">@color/mirai_embermire_surfacecontainerlowest</item>
+    </style>
+
+    <style name="MiraiTheme.VelvetRose" parent="MiraiTheme.Base">
+        <item name="miraiPrimary">@color/mirai_velvetrose_primary</item>
+        <item name="miraiOnPrimary">@color/mirai_velvetrose_onprimary</item>
+        <item name="miraiPrimaryContainer">@color/mirai_velvetrose_primarycontainer</item>
+        <item name="miraiOnPrimaryContainer">@color/mirai_velvetrose_onprimarycontainer</item>
+        <item name="miraiSecondary">@color/mirai_velvetrose_secondary</item>
+        <item name="miraiOnSecondary">@color/mirai_velvetrose_onsecondary</item>
+        <item name="miraiSecondaryContainer">@color/mirai_velvetrose_secondarycontainer</item>
+        <item name="miraiOnSecondaryContainer">@color/mirai_velvetrose_onsecondarycontainer</item>
+        <item name="miraiTertiary">@color/mirai_velvetrose_tertiary</item>
+        <item name="miraiOnTertiary">@color/mirai_velvetrose_ontertiary</item>
+        <item name="miraiTertiaryContainer">@color/mirai_velvetrose_tertiarycontainer</item>
+        <item name="miraiOnTertiaryContainer">@color/mirai_velvetrose_ontertiarycontainer</item>
+        <item name="miraiError">@color/mirai_velvetrose_error</item>
+        <item name="miraiOnError">@color/mirai_velvetrose_onerror</item>
+        <item name="miraiErrorContainer">@color/mirai_velvetrose_errorcontainer</item>
+        <item name="miraiOnErrorContainer">@color/mirai_velvetrose_onerrorcontainer</item>
+        <item name="miraiBackground">@color/mirai_velvetrose_background</item>
+        <item name="miraiOnBackground">@color/mirai_velvetrose_onbackground</item>
+        <item name="miraiSurface">@color/mirai_velvetrose_surface</item>
+        <item name="miraiOnSurface">@color/mirai_velvetrose_onsurface</item>
+        <item name="miraiSurfaceVariant">@color/mirai_velvetrose_surfacevariant</item>
+        <item name="miraiOnSurfaceVariant">@color/mirai_velvetrose_onsurfacevariant</item>
+        <item name="miraiOutline">@color/mirai_velvetrose_outline</item>
+        <item name="miraiOutlineVariant">@color/mirai_velvetrose_outlinevariant</item>
+        <item name="miraiSurfaceContainerLowest">@color/mirai_velvetrose_surfacecontainerlowest</item>
+        <item name="miraiSurfaceContainerLow">@color/mirai_velvetrose_surfacecontainerlow</item>
+        <item name="miraiSurfaceContainer">@color/mirai_velvetrose_surfacecontainer</item>
+        <item name="miraiSurfaceContainerHigh">@color/mirai_velvetrose_surfacecontainerhigh</item>
+        <item name="miraiSurfaceContainerHighest">@color/mirai_velvetrose_surfacecontainerhighest</item>
+        <item name="miraiAccent">@color/mirai_velvetrose_primary</item>
+        <item name="colorPrimary">@color/mirai_velvetrose_primary</item>
+        <item name="colorPrimaryDark">@color/mirai_velvetrose_surfacecontainerlowest</item>
+        <item name="colorAccent">@color/mirai_velvetrose_primary</item>
+        <item name="colorControlNormal">@color/mirai_velvetrose_onsurfacevariant</item>
+        <item name="colorControlActivated">@color/mirai_velvetrose_primary</item>
+        <item name="android:textColorPrimary">@color/mirai_velvetrose_onsurface</item>
+        <item name="android:textColorSecondary">@color/mirai_velvetrose_onsurfacevariant</item>
+        <item name="android:textColorTertiary">@color/mirai_velvetrose_outline</item>
+        <item name="android:textColorHint">@color/mirai_velvetrose_outline</item>
+        <item name="android:colorBackground">@color/mirai_velvetrose_background</item>
+        <item name="android:windowBackground">@color/mirai_velvetrose_background</item>
+        <item name="android:statusBarColor">@color/mirai_velvetrose_surfacecontainerlowest</item>
+        <item name="android:navigationBarColor">@color/mirai_velvetrose_surfacecontainerlowest</item>
+    </style>
+
+    <style name="MiraiTheme.Mistwave" parent="MiraiTheme.Base">
+        <item name="miraiPrimary">@color/mirai_mistwave_primary</item>
+        <item name="miraiOnPrimary">@color/mirai_mistwave_onprimary</item>
+        <item name="miraiPrimaryContainer">@color/mirai_mistwave_primarycontainer</item>
+        <item name="miraiOnPrimaryContainer">@color/mirai_mistwave_onprimarycontainer</item>
+        <item name="miraiSecondary">@color/mirai_mistwave_secondary</item>
+        <item name="miraiOnSecondary">@color/mirai_mistwave_onsecondary</item>
+        <item name="miraiSecondaryContainer">@color/mirai_mistwave_secondarycontainer</item>
+        <item name="miraiOnSecondaryContainer">@color/mirai_mistwave_onsecondarycontainer</item>
+        <item name="miraiTertiary">@color/mirai_mistwave_tertiary</item>
+        <item name="miraiOnTertiary">@color/mirai_mistwave_ontertiary</item>
+        <item name="miraiTertiaryContainer">@color/mirai_mistwave_tertiarycontainer</item>
+        <item name="miraiOnTertiaryContainer">@color/mirai_mistwave_ontertiarycontainer</item>
+        <item name="miraiError">@color/mirai_mistwave_error</item>
+        <item name="miraiOnError">@color/mirai_mistwave_onerror</item>
+        <item name="miraiErrorContainer">@color/mirai_mistwave_errorcontainer</item>
+        <item name="miraiOnErrorContainer">@color/mirai_mistwave_onerrorcontainer</item>
+        <item name="miraiBackground">@color/mirai_mistwave_background</item>
+        <item name="miraiOnBackground">@color/mirai_mistwave_onbackground</item>
+        <item name="miraiSurface">@color/mirai_mistwave_surface</item>
+        <item name="miraiOnSurface">@color/mirai_mistwave_onsurface</item>
+        <item name="miraiSurfaceVariant">@color/mirai_mistwave_surfacevariant</item>
+        <item name="miraiOnSurfaceVariant">@color/mirai_mistwave_onsurfacevariant</item>
+        <item name="miraiOutline">@color/mirai_mistwave_outline</item>
+        <item name="miraiOutlineVariant">@color/mirai_mistwave_outlinevariant</item>
+        <item name="miraiSurfaceContainerLowest">@color/mirai_mistwave_surfacecontainerlowest</item>
+        <item name="miraiSurfaceContainerLow">@color/mirai_mistwave_surfacecontainerlow</item>
+        <item name="miraiSurfaceContainer">@color/mirai_mistwave_surfacecontainer</item>
+        <item name="miraiSurfaceContainerHigh">@color/mirai_mistwave_surfacecontainerhigh</item>
+        <item name="miraiSurfaceContainerHighest">@color/mirai_mistwave_surfacecontainerhighest</item>
+        <item name="miraiAccent">@color/mirai_mistwave_primary</item>
+        <item name="colorPrimary">@color/mirai_mistwave_primary</item>
+        <item name="colorPrimaryDark">@color/mirai_mistwave_surfacecontainerlowest</item>
+        <item name="colorAccent">@color/mirai_mistwave_primary</item>
+        <item name="colorControlNormal">@color/mirai_mistwave_onsurfacevariant</item>
+        <item name="colorControlActivated">@color/mirai_mistwave_primary</item>
+        <item name="android:textColorPrimary">@color/mirai_mistwave_onsurface</item>
+        <item name="android:textColorSecondary">@color/mirai_mistwave_onsurfacevariant</item>
+        <item name="android:textColorTertiary">@color/mirai_mistwave_outline</item>
+        <item name="android:textColorHint">@color/mirai_mistwave_outline</item>
+        <item name="android:colorBackground">@color/mirai_mistwave_background</item>
+        <item name="android:windowBackground">@color/mirai_mistwave_background</item>
+        <item name="android:statusBarColor">@color/mirai_mistwave_surfacecontainerlowest</item>
+        <item name="android:navigationBarColor">@color/mirai_mistwave_surfacecontainerlowest</item>
+    </style>
+
+    <style name="MiraiTheme.Glacier" parent="MiraiTheme.Base">
+        <item name="miraiPrimary">@color/mirai_glacier_primary</item>
+        <item name="miraiOnPrimary">@color/mirai_glacier_onprimary</item>
+        <item name="miraiPrimaryContainer">@color/mirai_glacier_primarycontainer</item>
+        <item name="miraiOnPrimaryContainer">@color/mirai_glacier_onprimarycontainer</item>
+        <item name="miraiSecondary">@color/mirai_glacier_secondary</item>
+        <item name="miraiOnSecondary">@color/mirai_glacier_onsecondary</item>
+        <item name="miraiSecondaryContainer">@color/mirai_glacier_secondarycontainer</item>
+        <item name="miraiOnSecondaryContainer">@color/mirai_glacier_onsecondarycontainer</item>
+        <item name="miraiTertiary">@color/mirai_glacier_tertiary</item>
+        <item name="miraiOnTertiary">@color/mirai_glacier_ontertiary</item>
+        <item name="miraiTertiaryContainer">@color/mirai_glacier_tertiarycontainer</item>
+        <item name="miraiOnTertiaryContainer">@color/mirai_glacier_ontertiarycontainer</item>
+        <item name="miraiError">@color/mirai_glacier_error</item>
+        <item name="miraiOnError">@color/mirai_glacier_onerror</item>
+        <item name="miraiErrorContainer">@color/mirai_glacier_errorcontainer</item>
+        <item name="miraiOnErrorContainer">@color/mirai_glacier_onerrorcontainer</item>
+        <item name="miraiBackground">@color/mirai_glacier_background</item>
+        <item name="miraiOnBackground">@color/mirai_glacier_onbackground</item>
+        <item name="miraiSurface">@color/mirai_glacier_surface</item>
+        <item name="miraiOnSurface">@color/mirai_glacier_onsurface</item>
+        <item name="miraiSurfaceVariant">@color/mirai_glacier_surfacevariant</item>
+        <item name="miraiOnSurfaceVariant">@color/mirai_glacier_onsurfacevariant</item>
+        <item name="miraiOutline">@color/mirai_glacier_outline</item>
+        <item name="miraiOutlineVariant">@color/mirai_glacier_outlinevariant</item>
+        <item name="miraiSurfaceContainerLowest">@color/mirai_glacier_surfacecontainerlowest</item>
+        <item name="miraiSurfaceContainerLow">@color/mirai_glacier_surfacecontainerlow</item>
+        <item name="miraiSurfaceContainer">@color/mirai_glacier_surfacecontainer</item>
+        <item name="miraiSurfaceContainerHigh">@color/mirai_glacier_surfacecontainerhigh</item>
+        <item name="miraiSurfaceContainerHighest">@color/mirai_glacier_surfacecontainerhighest</item>
+        <item name="miraiAccent">@color/mirai_glacier_primary</item>
+        <item name="colorPrimary">@color/mirai_glacier_primary</item>
+        <item name="colorPrimaryDark">@color/mirai_glacier_surfacecontainerlowest</item>
+        <item name="colorAccent">@color/mirai_glacier_primary</item>
+        <item name="colorControlNormal">@color/mirai_glacier_onsurfacevariant</item>
+        <item name="colorControlActivated">@color/mirai_glacier_primary</item>
+        <item name="android:textColorPrimary">@color/mirai_glacier_onsurface</item>
+        <item name="android:textColorSecondary">@color/mirai_glacier_onsurfacevariant</item>
+        <item name="android:textColorTertiary">@color/mirai_glacier_outline</item>
+        <item name="android:textColorHint">@color/mirai_glacier_outline</item>
+        <item name="android:colorBackground">@color/mirai_glacier_background</item>
+        <item name="android:windowBackground">@color/mirai_glacier_background</item>
+        <item name="android:statusBarColor">@color/mirai_glacier_surfacecontainerlowest</item>
+        <item name="android:navigationBarColor">@color/mirai_glacier_surfacecontainerlowest</item>
+    </style>
+
+    <style name="MiraiTheme.VerdantField" parent="MiraiTheme.Base">
+        <item name="miraiPrimary">@color/mirai_verdantfield_primary</item>
+        <item name="miraiOnPrimary">@color/mirai_verdantfield_onprimary</item>
+        <item name="miraiPrimaryContainer">@color/mirai_verdantfield_primarycontainer</item>
+        <item name="miraiOnPrimaryContainer">@color/mirai_verdantfield_onprimarycontainer</item>
+        <item name="miraiSecondary">@color/mirai_verdantfield_secondary</item>
+        <item name="miraiOnSecondary">@color/mirai_verdantfield_onsecondary</item>
+        <item name="miraiSecondaryContainer">@color/mirai_verdantfield_secondarycontainer</item>
+        <item name="miraiOnSecondaryContainer">@color/mirai_verdantfield_onsecondarycontainer</item>
+        <item name="miraiTertiary">@color/mirai_verdantfield_tertiary</item>
+        <item name="miraiOnTertiary">@color/mirai_verdantfield_ontertiary</item>
+        <item name="miraiTertiaryContainer">@color/mirai_verdantfield_tertiarycontainer</item>
+        <item name="miraiOnTertiaryContainer">@color/mirai_verdantfield_ontertiarycontainer</item>
+        <item name="miraiError">@color/mirai_verdantfield_error</item>
+        <item name="miraiOnError">@color/mirai_verdantfield_onerror</item>
+        <item name="miraiErrorContainer">@color/mirai_verdantfield_errorcontainer</item>
+        <item name="miraiOnErrorContainer">@color/mirai_verdantfield_onerrorcontainer</item>
+        <item name="miraiBackground">@color/mirai_verdantfield_background</item>
+        <item name="miraiOnBackground">@color/mirai_verdantfield_onbackground</item>
+        <item name="miraiSurface">@color/mirai_verdantfield_surface</item>
+        <item name="miraiOnSurface">@color/mirai_verdantfield_onsurface</item>
+        <item name="miraiSurfaceVariant">@color/mirai_verdantfield_surfacevariant</item>
+        <item name="miraiOnSurfaceVariant">@color/mirai_verdantfield_onsurfacevariant</item>
+        <item name="miraiOutline">@color/mirai_verdantfield_outline</item>
+        <item name="miraiOutlineVariant">@color/mirai_verdantfield_outlinevariant</item>
+        <item name="miraiSurfaceContainerLowest">@color/mirai_verdantfield_surfacecontainerlowest</item>
+        <item name="miraiSurfaceContainerLow">@color/mirai_verdantfield_surfacecontainerlow</item>
+        <item name="miraiSurfaceContainer">@color/mirai_verdantfield_surfacecontainer</item>
+        <item name="miraiSurfaceContainerHigh">@color/mirai_verdantfield_surfacecontainerhigh</item>
+        <item name="miraiSurfaceContainerHighest">@color/mirai_verdantfield_surfacecontainerhighest</item>
+        <item name="miraiAccent">@color/mirai_verdantfield_primary</item>
+        <item name="colorPrimary">@color/mirai_verdantfield_primary</item>
+        <item name="colorPrimaryDark">@color/mirai_verdantfield_surfacecontainerlowest</item>
+        <item name="colorAccent">@color/mirai_verdantfield_primary</item>
+        <item name="colorControlNormal">@color/mirai_verdantfield_onsurfacevariant</item>
+        <item name="colorControlActivated">@color/mirai_verdantfield_primary</item>
+        <item name="android:textColorPrimary">@color/mirai_verdantfield_onsurface</item>
+        <item name="android:textColorSecondary">@color/mirai_verdantfield_onsurfacevariant</item>
+        <item name="android:textColorTertiary">@color/mirai_verdantfield_outline</item>
+        <item name="android:textColorHint">@color/mirai_verdantfield_outline</item>
+        <item name="android:colorBackground">@color/mirai_verdantfield_background</item>
+        <item name="android:windowBackground">@color/mirai_verdantfield_background</item>
+        <item name="android:statusBarColor">@color/mirai_verdantfield_surfacecontainerlowest</item>
+        <item name="android:navigationBarColor">@color/mirai_verdantfield_surfacecontainerlowest</item>
+    </style>
+
+    <style name="MiraiTheme.UrbanAsh" parent="MiraiTheme.Base">
+        <item name="miraiPrimary">@color/mirai_urbanash_primary</item>
+        <item name="miraiOnPrimary">@color/mirai_urbanash_onprimary</item>
+        <item name="miraiPrimaryContainer">@color/mirai_urbanash_primarycontainer</item>
+        <item name="miraiOnPrimaryContainer">@color/mirai_urbanash_onprimarycontainer</item>
+        <item name="miraiSecondary">@color/mirai_urbanash_secondary</item>
+        <item name="miraiOnSecondary">@color/mirai_urbanash_onsecondary</item>
+        <item name="miraiSecondaryContainer">@color/mirai_urbanash_secondarycontainer</item>
+        <item name="miraiOnSecondaryContainer">@color/mirai_urbanash_onsecondarycontainer</item>
+        <item name="miraiTertiary">@color/mirai_urbanash_tertiary</item>
+        <item name="miraiOnTertiary">@color/mirai_urbanash_ontertiary</item>
+        <item name="miraiTertiaryContainer">@color/mirai_urbanash_tertiarycontainer</item>
+        <item name="miraiOnTertiaryContainer">@color/mirai_urbanash_ontertiarycontainer</item>
+        <item name="miraiError">@color/mirai_urbanash_error</item>
+        <item name="miraiOnError">@color/mirai_urbanash_onerror</item>
+        <item name="miraiErrorContainer">@color/mirai_urbanash_errorcontainer</item>
+        <item name="miraiOnErrorContainer">@color/mirai_urbanash_onerrorcontainer</item>
+        <item name="miraiBackground">@color/mirai_urbanash_background</item>
+        <item name="miraiOnBackground">@color/mirai_urbanash_onbackground</item>
+        <item name="miraiSurface">@color/mirai_urbanash_surface</item>
+        <item name="miraiOnSurface">@color/mirai_urbanash_onsurface</item>
+        <item name="miraiSurfaceVariant">@color/mirai_urbanash_surfacevariant</item>
+        <item name="miraiOnSurfaceVariant">@color/mirai_urbanash_onsurfacevariant</item>
+        <item name="miraiOutline">@color/mirai_urbanash_outline</item>
+        <item name="miraiOutlineVariant">@color/mirai_urbanash_outlinevariant</item>
+        <item name="miraiSurfaceContainerLowest">@color/mirai_urbanash_surfacecontainerlowest</item>
+        <item name="miraiSurfaceContainerLow">@color/mirai_urbanash_surfacecontainerlow</item>
+        <item name="miraiSurfaceContainer">@color/mirai_urbanash_surfacecontainer</item>
+        <item name="miraiSurfaceContainerHigh">@color/mirai_urbanash_surfacecontainerhigh</item>
+        <item name="miraiSurfaceContainerHighest">@color/mirai_urbanash_surfacecontainerhighest</item>
+        <item name="miraiAccent">@color/mirai_urbanash_primary</item>
+        <item name="colorPrimary">@color/mirai_urbanash_primary</item>
+        <item name="colorPrimaryDark">@color/mirai_urbanash_surfacecontainerlowest</item>
+        <item name="colorAccent">@color/mirai_urbanash_primary</item>
+        <item name="colorControlNormal">@color/mirai_urbanash_onsurfacevariant</item>
+        <item name="colorControlActivated">@color/mirai_urbanash_primary</item>
+        <item name="android:textColorPrimary">@color/mirai_urbanash_onsurface</item>
+        <item name="android:textColorSecondary">@color/mirai_urbanash_onsurfacevariant</item>
+        <item name="android:textColorTertiary">@color/mirai_urbanash_outline</item>
+        <item name="android:textColorHint">@color/mirai_urbanash_outline</item>
+        <item name="android:colorBackground">@color/mirai_urbanash_background</item>
+        <item name="android:windowBackground">@color/mirai_urbanash_background</item>
+        <item name="android:statusBarColor">@color/mirai_urbanash_surfacecontainerlowest</item>
+        <item name="android:navigationBarColor">@color/mirai_urbanash_surfacecontainerlowest</item>
+    </style>
+
+    <style name="MiraiTheme.VerdantDawn" parent="MiraiTheme.Base">
+        <item name="miraiPrimary">@color/mirai_verdantdawn_primary</item>
+        <item name="miraiOnPrimary">@color/mirai_verdantdawn_onprimary</item>
+        <item name="miraiPrimaryContainer">@color/mirai_verdantdawn_primarycontainer</item>
+        <item name="miraiOnPrimaryContainer">@color/mirai_verdantdawn_onprimarycontainer</item>
+        <item name="miraiSecondary">@color/mirai_verdantdawn_secondary</item>
+        <item name="miraiOnSecondary">@color/mirai_verdantdawn_onsecondary</item>
+        <item name="miraiSecondaryContainer">@color/mirai_verdantdawn_secondarycontainer</item>
+        <item name="miraiOnSecondaryContainer">@color/mirai_verdantdawn_onsecondarycontainer</item>
+        <item name="miraiTertiary">@color/mirai_verdantdawn_tertiary</item>
+        <item name="miraiOnTertiary">@color/mirai_verdantdawn_ontertiary</item>
+        <item name="miraiTertiaryContainer">@color/mirai_verdantdawn_tertiarycontainer</item>
+        <item name="miraiOnTertiaryContainer">@color/mirai_verdantdawn_ontertiarycontainer</item>
+        <item name="miraiError">@color/mirai_verdantdawn_error</item>
+        <item name="miraiOnError">@color/mirai_verdantdawn_onerror</item>
+        <item name="miraiErrorContainer">@color/mirai_verdantdawn_errorcontainer</item>
+        <item name="miraiOnErrorContainer">@color/mirai_verdantdawn_onerrorcontainer</item>
+        <item name="miraiBackground">@color/mirai_verdantdawn_background</item>
+        <item name="miraiOnBackground">@color/mirai_verdantdawn_onbackground</item>
+        <item name="miraiSurface">@color/mirai_verdantdawn_surface</item>
+        <item name="miraiOnSurface">@color/mirai_verdantdawn_onsurface</item>
+        <item name="miraiSurfaceVariant">@color/mirai_verdantdawn_surfacevariant</item>
+        <item name="miraiOnSurfaceVariant">@color/mirai_verdantdawn_onsurfacevariant</item>
+        <item name="miraiOutline">@color/mirai_verdantdawn_outline</item>
+        <item name="miraiOutlineVariant">@color/mirai_verdantdawn_outlinevariant</item>
+        <item name="miraiSurfaceContainerLowest">@color/mirai_verdantdawn_surfacecontainerlowest</item>
+        <item name="miraiSurfaceContainerLow">@color/mirai_verdantdawn_surfacecontainerlow</item>
+        <item name="miraiSurfaceContainer">@color/mirai_verdantdawn_surfacecontainer</item>
+        <item name="miraiSurfaceContainerHigh">@color/mirai_verdantdawn_surfacecontainerhigh</item>
+        <item name="miraiSurfaceContainerHighest">@color/mirai_verdantdawn_surfacecontainerhighest</item>
+        <item name="miraiAccent">@color/mirai_verdantdawn_primary</item>
+        <item name="colorPrimary">@color/mirai_verdantdawn_primary</item>
+        <item name="colorPrimaryDark">@color/mirai_verdantdawn_surfacecontainerlowest</item>
+        <item name="colorAccent">@color/mirai_verdantdawn_primary</item>
+        <item name="colorControlNormal">@color/mirai_verdantdawn_onsurfacevariant</item>
+        <item name="colorControlActivated">@color/mirai_verdantdawn_primary</item>
+        <item name="android:textColorPrimary">@color/mirai_verdantdawn_onsurface</item>
+        <item name="android:textColorSecondary">@color/mirai_verdantdawn_onsurfacevariant</item>
+        <item name="android:textColorTertiary">@color/mirai_verdantdawn_outline</item>
+        <item name="android:textColorHint">@color/mirai_verdantdawn_outline</item>
+        <item name="android:colorBackground">@color/mirai_verdantdawn_background</item>
+        <item name="android:windowBackground">@color/mirai_verdantdawn_background</item>
+        <item name="android:statusBarColor">@color/mirai_verdantdawn_surfacecontainerlowest</item>
+        <item name="android:navigationBarColor">@color/mirai_verdantdawn_surfacecontainerlowest</item>
+    </style>
+
+    <style name="Mirai.Button.Outline" parent="Widget.AppCompat.Button">
+        <item name="android:background">@drawable/mirai_button_outline</item>
+        <item name="android:textColor">?attr/miraiOnSurface</item>
+        <item name="android:minHeight">@dimen/mirai_shell_action_height</item>
+        <item name="android:gravity">center</item>
+        <item name="android:maxLines">2</item>
+    </style>
+
+    <style name="Mirai.Button" parent="Widget.AppCompat.Button">
+        <item name="android:background">@drawable/mirai_button</item>
+        <item name="android:textColor">?attr/miraiOnPrimary</item>
+        <item name="android:minHeight">@dimen/mirai_shell_action_height</item>
+        <item name="android:gravity">center</item>
+    </style>
+
+    <style name="Mirai.EditText" parent="Widget.AppCompat.EditText">
+        <item name="android:background">@drawable/mirai_field</item>
+        <item name="android:textColor">?attr/miraiOnSurface</item>
+        <item name="android:textColorHint">?attr/miraiOutline</item>
+    </style>
+
+    <style name="Mirai.Spinner" parent="Widget.AppCompat.Spinner">
+        <item name="android:background">@drawable/mirai_field</item>
+        <item name="android:popupBackground">@drawable/mirai_dialog_bg</item>
+    </style>
+
+    <style name="Mirai.SeekBar" parent="Widget.AppCompat.SeekBar">
+        <item name="android:progressDrawable">@drawable/mirai_progress</item>
+        <item name="android:thumb">@drawable/mirai_knob</item>
+        <item name="android:thumbOffset">0dp</item>
+    </style>
+
+    <style name="Mirai.PopupMenu" parent="Widget.AppCompat.PopupMenu">
+        <item name="android:popupBackground">@drawable/mirai_dialog_bg</item>
+    </style>
+
+    <style name="Mirai.Dialog" parent="Theme.AppCompat.Dialog.Alert">
+        <item name="android:windowBackground">@drawable/mirai_dialog_bg</item>
+        <item name="android:background">?attr/miraiSurfaceContainerHigh</item>
+        <item name="android:textColorPrimary">?attr/miraiOnSurface</item>
+        <item name="android:textColorSecondary">?attr/miraiOnSurfaceVariant</item>
+        <item name="colorAccent">?attr/miraiPrimary</item>
+    </style>
+
+    <style name="Mirai.PreferenceTheme" parent="PreferenceThemeOverlay.v14.Material">
+        <item name="preferenceFragmentListStyle">@style/MiraiPreferenceList</item>
+    </style>
+
+    <style name="MiraiPreferenceList">
+        <item name="android:background">@android:color/transparent</item>
+        <item name="android:divider">@drawable/mirai_divider</item>
+        <item name="android:dividerHeight">1dp</item>
+        <item name="android:scrollbars">none</item>
+    </style>
+</resources>

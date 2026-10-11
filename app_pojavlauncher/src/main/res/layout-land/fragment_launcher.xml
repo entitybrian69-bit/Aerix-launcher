@@ -1,101 +1,88 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- LAUNCH tab (landscape).
-
-     The launcher is used sideways, so the screen splits: instance and quick
-     actions on the left, the launch crystal on the right. Nothing is stacked
-     into a long scroll any more. -->
+<!-- Home, Mirai style: instance and quick actions on the left, launch on the right.
+     Every id the main menu binds is kept. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:baselineAligned="false"
     android:orientation="horizontal"
-    android:paddingStart="@dimen/liquid_pad_large"
-    android:paddingTop="@dimen/liquid_pad"
-    android:paddingEnd="@dimen/liquid_pad_large"
-    android:paddingBottom="@dimen/_110sdp">
+    android:padding="@dimen/mirai_space_xxl">
 
-    <!-- Left: instance + quick actions  -->
     <LinearLayout
         android:layout_width="0dp"
         android:layout_height="match_parent"
-        android:layout_marginEnd="@dimen/liquid_gap_large"
+        android:layout_marginEnd="@dimen/mirai_space_xl"
         android:layout_weight="1"
         android:orientation="vertical">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="@drawable/liquid_card"
+            android:background="@drawable/mirai_card"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingStart="@dimen/liquid_pad"
-            android:paddingTop="@dimen/liquid_pad"
-            android:paddingEnd="@dimen/liquid_gap"
-            android:paddingBottom="@dimen/liquid_pad">
+            android:padding="@dimen/mirai_space_lg">
 
-            <FrameLayout
-                android:layout_width="@dimen/_64sdp"
-                android:layout_height="@dimen/_64sdp">
-
-                <ImageView
-                    android:id="@+id/liquid_instance_icon"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:background="@drawable/liquid_orb"
-                    android:contentDescription="@string/liquid_selected_instance"
-                    android:padding="@dimen/_16sdp"
-                    android:src="@drawable/ic_px_home"/>
-
-            </FrameLayout>
+            <ImageView
+                android:id="@+id/liquid_instance_icon"
+                android:layout_width="56dp"
+                android:layout_height="56dp"
+                android:background="@drawable/mirai_rail_pill"
+                android:contentDescription="@string/liquid_selected_instance"
+                android:padding="16dp"
+                android:src="@drawable/ic_px_home"/>
 
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="@dimen/liquid_gap_large"
+                android:layout_marginStart="@dimen/mirai_space_lg"
                 android:layout_weight="1"
                 android:orientation="vertical">
 
                 <com.kdt.mcgui.mcVersionSpinner
                     android:id="@+id/mc_version_spinner"
                     android:layout_width="match_parent"
-                    android:layout_height="@dimen/_36sdp"
+                    android:layout_height="40dp"
                     android:background="@android:color/transparent"
-                    android:drawablePadding="@dimen/liquid_gap"
+                    android:drawablePadding="@dimen/mirai_space_xs"
                     android:drawableEnd="@drawable/ic_expand_more"
                     android:gravity="center_vertical"
-                    android:textColor="@color/liquid_ink"
-                    android:textSize="@dimen/_13ssp"/>
+                    android:textColor="?attr/miraiOnSurface"
+                    android:textSize="16sp"/>
 
                 <TextView
                     android:id="@+id/liquid_instance_detail"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:fontFamily="@font/noto_sans_bold"
                     android:text="@string/liquid_instance_default"
-                    android:textColor="@color/liquid_dim"
-                    android:textSize="@dimen/_9ssp"/>
+                    android:textColor="?attr/miraiOnSurfaceVariant"
+                    android:textSize="12sp"/>
 
             </LinearLayout>
 
             <ImageButton
                 android:id="@+id/edit_profile_button"
-                android:layout_width="@dimen/liquid_touch_min"
-                android:layout_height="@dimen/liquid_touch_min"
-                android:background="@drawable/liquid_orb"
+                android:layout_width="@dimen/mirai_shell_action_height"
+                android:layout_height="@dimen/mirai_shell_action_height"
+                android:background="@drawable/mirai_button_outline"
                 android:contentDescription="@string/global_edit"
-                android:padding="@dimen/_18sdp"
+                android:padding="8dp"
                 android:src="@drawable/ic_px_edit"/>
 
         </LinearLayout>
 
         <TextView
-            style="@style/LiquidSectionLabel"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/liquid_gap_large"
-            android:layout_marginBottom="@dimen/liquid_gap"
-            android:text="@string/liquid_quick_actions"/>
+            android:layout_marginTop="@dimen/mirai_space_xxl"
+            android:layout_marginBottom="@dimen/mirai_space_md"
+            android:letterSpacing="0.08"
+            android:text="@string/liquid_quick_actions"
+            android:textAllCaps="true"
+            android:textColor="?attr/miraiOutline"
+            android:textSize="11sp"
+            android:textStyle="bold"/>
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -104,76 +91,70 @@
 
             <Button
                 android:id="@+id/custom_control_button"
-                style="@style/LiquidQuickAction"
+                style="@style/Mirai.Button.Outline"
                 android:layout_width="0dp"
-                android:layout_height="@dimen/_84sdp"
-                android:layout_marginEnd="@dimen/liquid_gap"
+                android:layout_height="@dimen/mirai_quick_action_height"
+                android:layout_marginEnd="@dimen/mirai_space_sm"
                 android:layout_weight="1"
                 android:drawableTop="@drawable/ic_px_gamepad"
                 android:text="@string/mcl_option_customcontrol"/>
 
             <Button
                 android:id="@+id/install_jar_button"
-                style="@style/LiquidQuickAction"
+                style="@style/Mirai.Button.Outline"
                 android:layout_width="0dp"
-                android:layout_height="@dimen/_84sdp"
-                android:layout_marginStart="@dimen/liquid_gap"
+                android:layout_height="@dimen/mirai_quick_action_height"
+                android:layout_marginStart="@dimen/mirai_space_sm"
+                android:layout_marginEnd="@dimen/mirai_space_sm"
                 android:layout_weight="1"
                 android:drawableTop="@drawable/ic_px_java_run"
                 android:text="@string/main_install_jar_file"/>
 
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/liquid_gap"
-            android:orientation="horizontal">
-
             <Button
                 android:id="@+id/share_logs_button"
-                style="@style/LiquidQuickAction"
+                style="@style/Mirai.Button.Outline"
                 android:layout_width="0dp"
-                android:layout_height="@dimen/_84sdp"
-                android:layout_marginEnd="@dimen/liquid_gap"
+                android:layout_height="@dimen/mirai_quick_action_height"
+                android:layout_marginStart="@dimen/mirai_space_sm"
                 android:layout_weight="1"
                 android:drawableTop="@drawable/ic_px_sharelog"
                 android:text="@string/main_share_logs"/>
 
-            <Button
-                android:id="@+id/open_files_button"
-                style="@style/LiquidQuickAction"
-                android:layout_width="0dp"
-                android:layout_height="@dimen/_84sdp"
-                android:layout_marginStart="@dimen/liquid_gap"
-                android:layout_weight="1"
-                android:drawableTop="@drawable/ic_px_folder"
-                android:text="@string/mcl_button_open_directory"/>
-
         </LinearLayout>
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/liquid_gap"
+            android:layout_marginTop="@dimen/mirai_space_md"
             android:orientation="horizontal">
 
             <Button
-                android:id="@+id/news_button"
-                style="@style/LiquidQuickAction"
+                android:id="@+id/open_files_button"
+                style="@style/Mirai.Button.Outline"
                 android:layout_width="0dp"
-                android:layout_height="@dimen/_84sdp"
-                android:layout_marginEnd="@dimen/liquid_gap"
+                android:layout_height="@dimen/mirai_quick_action_height"
+                android:layout_marginEnd="@dimen/mirai_space_sm"
+                android:layout_weight="1"
+                android:drawableTop="@drawable/ic_px_folder"
+                android:text="@string/mcl_button_open_directory"/>
+
+            <Button
+                android:id="@+id/news_button"
+                style="@style/Mirai.Button.Outline"
+                android:layout_width="0dp"
+                android:layout_height="@dimen/mirai_quick_action_height"
+                android:layout_marginStart="@dimen/mirai_space_sm"
+                android:layout_marginEnd="@dimen/mirai_space_sm"
                 android:layout_weight="1"
                 android:drawableTop="@drawable/ic_px_book"
                 android:text="@string/mcl_tab_wiki"/>
 
             <Button
                 android:id="@+id/social_media_button"
-                style="@style/LiquidQuickAction"
+                style="@style/Mirai.Button.Outline"
                 android:layout_width="0dp"
-                android:layout_height="@dimen/_84sdp"
-                android:layout_marginStart="@dimen/liquid_gap"
+                android:layout_height="@dimen/mirai_quick_action_height"
+                android:layout_marginStart="@dimen/mirai_space_sm"
                 android:layout_weight="1"
                 android:drawableTop="@drawable/ic_social_media"
                 android:text="@string/mcl_button_social_media"/>
@@ -182,61 +163,38 @@
 
     </LinearLayout>
 
-    <!-- Right: the launch crystal  -->
-    <FrameLayout
+    <LinearLayout
         android:layout_width="0dp"
         android:layout_height="match_parent"
         android:layout_weight="1"
-        android:background="@drawable/liquid_card"
-        android:gravity="center">
+        android:background="@drawable/mirai_card"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="@dimen/mirai_space_xxl">
 
-        <LinearLayout
+        <Button
+            android:id="@+id/play_button"
+            android:layout_width="280dp"
+            android:layout_height="72dp"
+            android:background="@drawable/mirai_button"
+            android:drawableStart="@drawable/ic_px_home"
+            android:drawablePadding="@dimen/mirai_space_md"
+            android:paddingStart="@dimen/mirai_space_xl"
+            android:paddingEnd="@dimen/mirai_space_xl"
+            android:text="@string/liquid_launch"
+            android:textColor="?attr/miraiOnPrimary"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            tools:ignore="TextContrastCheck"/>
+
+        <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:gravity="center_horizontal"
-            android:orientation="vertical">
+            android:layout_marginTop="@dimen/mirai_space_lg"
+            android:text="@string/liquid_launch_hint"
+            android:textColor="?attr/miraiOnSurfaceVariant"
+            android:textSize="13sp"/>
 
-            <FrameLayout
-                android:layout_width="@dimen/_200sdp"
-                android:layout_height="@dimen/_200sdp"
-                android:layout_gravity="center_horizontal">
-
-                <View
-                    android:id="@+id/liquid_launch_ring"
-                    android:layout_width="@dimen/_232sdp"
-                    android:layout_height="@dimen/_232sdp"
-                    android:layout_gravity="center"
-                    android:background="@drawable/liquid_ring"/>
-
-                <Button
-                    android:id="@+id/play_button"
-                    android:layout_width="@dimen/_200sdp"
-                    android:layout_height="@dimen/_200sdp"
-                    android:layout_gravity="center"
-                    android:background="@drawable/liquid_launch_orb"
-                    android:fontFamily="@font/noto_sans_bold"
-                    android:letterSpacing="0.18"
-                    android:text="@string/liquid_launch"
-                    android:textAllCaps="true"
-                    android:textColor="#06121C"
-                    android:textSize="@dimen/_15ssp"/>
-
-            </FrameLayout>
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/liquid_pad"
-                android:fontFamily="@font/noto_sans_bold"
-                android:letterSpacing="0.12"
-                android:text="@string/liquid_launch_hint"
-                android:textColor="@color/liquid_dim"
-                android:textSize="@dimen/_10ssp"
-                tools:ignore="TextContrastCheck"/>
-
-        </LinearLayout>
-
-    </FrameLayout>
+    </LinearLayout>
 
 </LinearLayout>

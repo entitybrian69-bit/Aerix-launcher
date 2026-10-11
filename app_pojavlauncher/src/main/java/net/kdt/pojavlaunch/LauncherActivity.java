@@ -6,12 +6,16 @@ import android.app.NotificationManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
+import android.content.res.ColorStateList;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.system.Os;
+import android.util.TypedValue;
 import android.view.View;
+import android.graphics.Color;
+import android.graphics.Typeface;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -36,6 +40,7 @@ import net.kdt.pojavlaunch.extra.ExtraConstants;
 import net.kdt.pojavlaunch.extra.ExtraCore;
 import net.kdt.pojavlaunch.extra.ExtraListener;
 import net.kdt.pojavlaunch.fragments.FabricInstallFragment;
+import net.kdt.pojavlaunch.fragments.InstanceListFragment;
 import net.kdt.pojavlaunch.fragments.ForgeInstallFragment;
 import net.kdt.pojavlaunch.fragments.InstanceEditorFragment;
 import net.kdt.pojavlaunch.fragments.MainMenuFragment;
@@ -45,6 +50,7 @@ import net.kdt.pojavlaunch.fragments.NeoforgeInstallFragment;
 import net.kdt.pojavlaunch.fragments.OptiFineInstallFragment;
 import net.kdt.pojavlaunch.fragments.ProfileTypeSelectFragment;
 import net.kdt.pojavlaunch.fragments.SearchModFragment;
+import net.kdt.pojavlaunch.fragments.WallpaperFragment;
 import net.kdt.pojavlaunch.fragments.SelectAuthFragment;
 import net.kdt.pojavlaunch.instances.Instance;
 import net.kdt.pojavlaunch.instances.InstanceInstaller;
@@ -56,6 +62,8 @@ import net.kdt.pojavlaunch.prefs.LauncherPreferences;
 import net.kdt.pojavlaunch.prefs.screens.LauncherPreferenceControlFragment;
 import net.kdt.pojavlaunch.prefs.screens.LauncherPreferenceExperimentalFragment;
 import net.kdt.pojavlaunch.prefs.screens.LauncherPreferenceFragment;
+import net.kdt.pojavlaunch.ui.MiraiBackdropView;
+import net.kdt.pojavlaunch.ui.MiraiTheme;
 import net.kdt.pojavlaunch.prefs.screens.LauncherPreferenceJavaFragment;
 import net.kdt.pojavlaunch.prefs.screens.LauncherPreferenceMiscellaneousFragment;
 import net.kdt.pojavlaunch.prefs.screens.LauncherPreferenceVideoFragment;
@@ -79,53 +87,38 @@ public class LauncherActivity extends BaseActivity {
     private NotificationManager mNotificationManager;
     private static ActivityResultLauncher<String> mRequestPermissionLauncher;
 
-    /* The crystal dock: ten destinations, one tap each */
-    private static final int[] DOCK_SLOTS = {
-            R.id.dock_launch, R.id.dock_instances, R.id.dock_mods, R.id.dock_controls,
-            R.id.dock_settings, R.id.dock_video, R.id.dock_input, R.id.dock_java,
-            R.id.dock_misc, R.id.dock_labs
+    /* Mirai's rail: six destinations down the left edge */
+    private static final int[] RAIL_SLOTS = {
+            R.id.rail_home, R.id.rail_new_instance, R.id.rail_library,
+            R.id.rail_discover, R.id.rail_wallpapers, R.id.rail_settings
     };
-    private static final int[] DOCK_ICONS = {
-            R.drawable.ic_px_home, R.drawable.ic_px_file, R.drawable.ic_px_dynamic,
-            R.drawable.ic_px_gamepad, R.drawable.ic_px_sliders, R.drawable.ic_px_image_renderer,
-            R.drawable.ic_px_gestures, R.drawable.ic_px_java, R.drawable.ic_px_alt_sliders,
-            R.drawable.ic_px_experiment
+    private static final int[] RAIL_ICONS = {
+            R.drawable.ic_px_home, R.drawable.ic_px_edit, R.drawable.ic_px_folder,
+            R.drawable.ic_px_dynamic, R.drawable.ic_px_image, R.drawable.ic_px_sliders
     };
-    private static final int[] DOCK_LABELS = {
-            R.string.liquid_tab_launch, R.string.liquid_tab_instances, R.string.liquid_tab_mods,
-            R.string.liquid_tab_controls, R.string.liquid_tab_settings, R.string.liquid_tab_video,
-            R.string.liquid_tab_input, R.string.liquid_tab_java, R.string.liquid_tab_misc,
-            R.string.liquid_tab_labs
+    private static final int[] RAIL_LABELS = {
+            R.string.mirai_rail_home, R.string.mirai_rail_new_instance, R.string.mirai_rail_library,
+            R.string.mirai_rail_discover, R.string.mirai_rail_wallpapers, R.string.mirai_rail_settings
     };
 
-    private final View.OnClickListener[] mDockActions = new View.OnClickListener[] {
-            // LAUNCH
+    private TextView mTitleView;
+
+    private final View.OnClickListener[] mRailActions = new View.OnClickListener[] {
+            // HOME
             v -> Tools.backToMainMenu(this),
-            // INSTANCE - edit the currently selected instance
-            v -> Tools.swapFragment(this, InstanceEditorFragment.class,
-                    InstanceEditorFragment.TAG, null),
-            // MODS - search mods and modpacks
+            // NEW INSTANCE
+            v -> Tools.swapFragment(this, ProfileTypeSelectFragment.class,
+                    ProfileTypeSelectFragment.TAG, null),
+            // LIBRARY
+            v -> Tools.swapFragment(this, InstanceListFragment.class,
+                    InstanceListFragment.TAG, null),
+            // DISCOVER
             v -> Tools.swapFragment(this, SearchModFragment.class, SearchModFragment.TAG, null),
-            // CONTROL - the control editor keeps its own activity
-            v -> startActivity(new Intent(this, CustomControlsActivity.class)),
+            // WALLPAPERS
+            v -> Tools.swapFragment(this, WallpaperFragment.class, WallpaperFragment.TAG, null),
             // SETTINGS
             v -> Tools.swapFragment(this, LauncherPreferenceFragment.class,
-                    SETTING_FRAGMENT_TAG, null),
-            // VIDEO
-            v -> Tools.swapFragment(this, LauncherPreferenceVideoFragment.class,
-                    "VIDEO_FRAGMENT", null),
-            // INPUT
-            v -> Tools.swapFragment(this, LauncherPreferenceControlFragment.class,
-                    "CONTROL_FRAGMENT", null),
-            // JAVA
-            v -> Tools.swapFragment(this, LauncherPreferenceJavaFragment.class,
-                    "JAVA_FRAGMENT", null),
-            // MISC
-            v -> Tools.swapFragment(this, LauncherPreferenceMiscellaneousFragment.class,
-                    "MISC_FRAGMENT", null),
-            // LABS
-            v -> Tools.swapFragment(this, LauncherPreferenceExperimentalFragment.class,
-                    "EXPERIMENTAL_FRAGMENT", null)
+                    SETTING_FRAGMENT_TAG, null)
     };
 
     /* Allows to switch from one button "type" to another */
@@ -134,7 +127,7 @@ public class LauncherActivity extends BaseActivity {
         public void onFragmentResumed(@NonNull FragmentManager fm, @NonNull Fragment f) {
             mSettingsButton.setImageDrawable(ContextCompat.getDrawable(getBaseContext(), f instanceof MainMenuFragment
                     ? R.drawable.ic_px_sliders : R.drawable.ic_px_home));
-            highlightDock(f);
+            highlightRail(f);
         }
     };
 
@@ -231,6 +224,7 @@ public class LauncherActivity extends BaseActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        setTheme(MiraiTheme.themeFor(LauncherPreferences.PREF_MIRAI_PALETTE));
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_pojav_launcher);
         MoJsonDownloader.prepareSubstitutionMap(getAssets());
@@ -246,7 +240,8 @@ public class LauncherActivity extends BaseActivity {
 
         getWindow().setBackgroundDrawable(null);
         bindViews();
-        bindLiquidDock();
+        bindMiraiRail();
+        applyBackdropPreference();
         applyOrientationPreference();
         mRequestPermissionLauncher = this.registerForActivityResult(
                 new ActivityResultContracts.RequestPermission(),
@@ -280,64 +275,87 @@ public class LauncherActivity extends BaseActivity {
         mProgressLayout.observe(ProgressLayout.DATA_MIGRATION);
     }
 
-    /* Binds the crystal dock: icon, label, accent colour and destination. */
-    private void bindLiquidDock() {
-        int[] accents = {
-                R.color.liquid_cyan, R.color.liquid_mint, R.color.liquid_violet,
-                R.color.liquid_azure, R.color.liquid_cyan, R.color.liquid_rose,
-                R.color.liquid_mint, R.color.liquid_amber, R.color.liquid_cyan,
-                R.color.liquid_violet
-        };
-        for (int i = 0; i < DOCK_SLOTS.length; i++) {
-            View slot = findViewById(DOCK_SLOTS[i]);
+    /* Binds the rail: icon, label and destination. */
+    private void bindMiraiRail() {
+        for (int i = 0; i < RAIL_SLOTS.length; i++) {
+            View slot = findViewById(RAIL_SLOTS[i]);
             if (slot == null) continue;
-            ImageView iconView = slot.findViewById(R.id.dock_slot_icon);
-            TextView label = slot.findViewById(R.id.dock_slot_label);
-            if (iconView != null) {
-                iconView.setImageResource(DOCK_ICONS[i]);
-                ImageViewCompat.setImageTintList(iconView,
-                        android.content.res.ColorStateList.valueOf(
-                                ResourcesCompat.getColor(getResources(), accents[i], getTheme())));
-            }
-            if (label != null) label.setText(DOCK_LABELS[i]);
-            slot.setOnClickListener(mDockActions[i]);
+            ImageView iconView = slot.findViewById(R.id.rail_slot_icon);
+            TextView label = slot.findViewById(R.id.rail_slot_label);
+            if (iconView != null) iconView.setImageResource(RAIL_ICONS[i]);
+            if (label != null) label.setText(RAIL_LABELS[i]);
+            slot.setOnClickListener(mRailActions[i]);
+        }
+        mTitleView = findViewById(R.id.mirai_title);
+        View settingsButton = findViewById(R.id.setting_button);
+        if (settingsButton != null) {
+            settingsButton.setOnClickListener(v -> Tools.swapFragment(this,
+                    LauncherPreferenceFragment.class, SETTING_FRAGMENT_TAG, null));
         }
     }
 
-    /* Highlights the dock slot that matches the visible fragment. */
-    private void highlightDock(@NonNull Fragment fragment) {
-        int index = dockIndexFor(fragment);
-        for (int i = 0; i < DOCK_SLOTS.length; i++) {
-            View slot = findViewById(DOCK_SLOTS[i]);
+    /* Marks the destination that is on screen. */
+    private void highlightRail(@NonNull Fragment fragment) {
+        int index = railIndexFor(fragment);
+        if (mTitleView != null) {
+            mTitleView.setText(index < 0 ? R.string.app_name : RAIL_LABELS[index]);
+        }
+        for (int i = 0; i < RAIL_SLOTS.length; i++) {
+            View slot = findViewById(RAIL_SLOTS[i]);
             if (slot == null) continue;
-            View halo = slot.findViewById(R.id.dock_slot_halo);
-            TextView label = slot.findViewById(R.id.dock_slot_label);
+            View pill = slot.findViewById(R.id.rail_slot_pill);
+            ImageView iconView = slot.findViewById(R.id.rail_slot_icon);
+            TextView label = slot.findViewById(R.id.rail_slot_label);
             boolean active = i == index;
-            if (halo != null) halo.setVisibility(active ? View.VISIBLE : View.GONE);
-            if (label != null) label.setTextColor(ResourcesCompat.getColor(getResources(),
-                    active ? R.color.liquid_ink : R.color.liquid_faint, getTheme()));
-            slot.setAlpha(active ? 1f : 0.78f);
+            if (pill != null) pill.setVisibility(active ? View.VISIBLE : View.GONE);
+            int colour = resolveColour(active
+                    ? R.attr.miraiOnPrimaryContainer
+                    : R.attr.miraiOnSurfaceVariant);
+            if (iconView != null) {
+                ImageViewCompat.setImageTintList(iconView, ColorStateList.valueOf(colour));
+            }
+            if (label != null) {
+                label.setTextColor(colour);
+                label.setTypeface(label.getTypeface(), active ? Typeface.BOLD : Typeface.NORMAL);
+            }
         }
     }
 
-    private static int dockIndexFor(@NonNull Fragment fragment) {
+    private static int railIndexFor(@NonNull Fragment fragment) {
         Class<?> fragmentClass = fragment.getClass();
         if (fragmentClass == MainMenuFragment.class) return 0;
-        if (fragmentClass == InstanceEditorFragment.class
-                || fragmentClass == ProfileTypeSelectFragment.class) return 1;
+        if (fragmentClass == ProfileTypeSelectFragment.class
+                || fragmentClass == InstanceEditorFragment.class) return 1;
+        if (fragmentClass == InstanceListFragment.class) return 2;
         if (fragmentClass == SearchModFragment.class
                 || fragmentClass == ModVersionListFragment.class
                 || fragmentClass == FabricInstallFragment.class
                 || fragmentClass == ForgeInstallFragment.class
                 || fragmentClass == NeoforgeInstallFragment.class
-                || fragmentClass == OptiFineInstallFragment.class) return 2;
-        if (fragmentClass == LauncherPreferenceVideoFragment.class) return 5;
-        if (fragmentClass == LauncherPreferenceControlFragment.class) return 6;
-        if (fragmentClass == LauncherPreferenceJavaFragment.class) return 7;
-        if (fragmentClass == LauncherPreferenceMiscellaneousFragment.class) return 8;
-        if (fragmentClass == LauncherPreferenceExperimentalFragment.class) return 9;
-        if (fragmentClass == LauncherPreferenceFragment.class) return 4;
+                || fragmentClass == OptiFineInstallFragment.class) return 3;
+        if (fragmentClass == WallpaperFragment.class) return 4;
+        if (fragmentClass == LauncherPreferenceFragment.class
+                || fragmentClass == LauncherPreferenceVideoFragment.class
+                || fragmentClass == LauncherPreferenceControlFragment.class
+                || fragmentClass == LauncherPreferenceJavaFragment.class
+                || fragmentClass == LauncherPreferenceMiscellaneousFragment.class
+                || fragmentClass == LauncherPreferenceExperimentalFragment.class) return 5;
         return -1;
+    }
+
+    /* Reads a colour out of the palette that is currently applied. */
+    private int resolveColour(int attr) {
+        TypedValue value = new TypedValue();
+        if (getTheme().resolveAttribute(attr, value, true)) return value.data;
+        return Color.WHITE;
+    }
+
+    /* Restores the wallpaper the user picked, if any. */
+    private void applyBackdropPreference() {
+        View backdrop = findViewById(R.id.mirai_backdrop);
+        if (backdrop instanceof MiraiBackdropView) {
+            ((MiraiBackdropView) backdrop).setWallpaperPath(LauncherPreferences.PREF_MIRAI_WALLPAPER);
+        }
     }
 
     @Override
@@ -345,6 +363,7 @@ public class LauncherActivity extends BaseActivity {
         super.onResume();
         ContextExecutor.setActivity(this);
         InstanceInstaller.postInstallCheck(this);
+        applyBackdropPreference();
         applyOrientationPreference();
     }
 

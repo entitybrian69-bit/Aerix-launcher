@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Mirai's left navigation rail. Six destinations, account on top. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/mirai_rail"
+    android:layout_width="@dimen/mirai_navigation_rail_width"
+    android:layout_height="match_parent"
+    android:background="@drawable/mirai_rail_bg"
+    android:gravity="center_horizontal"
+    android:orientation="vertical"
+    android:paddingTop="@dimen/mirai_space_md"
+    android:paddingBottom="@dimen/mirai_space_md">
+
+    <include android:id="@+id/rail_home" layout="@layout/item_mirai_rail"/>
+    <include android:id="@+id/rail_new_instance" layout="@layout/item_mirai_rail"/>
+    <include android:id="@+id/rail_library" layout="@layout/item_mirai_rail"/>
+    <include android:id="@+id/rail_discover" layout="@layout/item_mirai_rail"/>
+    <include android:id="@+id/rail_wallpapers" layout="@layout/item_mirai_rail"/>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"/>
+
+    <include android:id="@+id/rail_settings" layout="@layout/item_mirai_rail"/>
+
+</LinearLayout>
