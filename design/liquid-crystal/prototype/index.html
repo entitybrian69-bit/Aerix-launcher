@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aerix · Liquid Crystal — interactive prototype</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="room">
+  <div class="ambient" id="ambient">
+    <span class="blob b1"></span>
+    <span class="blob b2"></span>
+    <span class="blob b3"></span>
+    <span class="blob b4"></span>
+    <span class="blob b5"></span>
+    <span class="blob b6"></span>
+    <span class="caustics"></span>
+  </div>
+
+  <div class="phone-wrap">
+    <div class="phone" id="phone">
+      <div class="screen" id="screen">
+        <div class="wallpaper" id="wallpaper"></div>
+        <div class="statusbar">
+          <span class="clock">9:41</span>
+          <span class="status-icons" id="statusIcons"></span>
+        </div>
+        <header class="head" id="head"></header>
+        <main class="content" id="content"></main>
+        <nav class="dock glass" id="dock"></nav>
+        <div class="home-indicator"></div>
+      </div>
+      <div class="bezel"></div>
+    </div>
+  </div>
+
+  <aside class="legend">
+    <h1>Aerix <span>Liquid Crystal</span></h1>
+    <p>Ten tabs, every launcher feature kept. Nothing from the old shell survives:
+       no left rail, no stacked list of buttons, no MineButton play bar. Navigation
+       lives in one floating crystal dock.</p>
+    <ul id="legendList"></ul>
+    <p class="hint">Click a tab, or use ← →  ·  toggles are live</p>
+  </aside>
+</div>
+<script type="module" src="app.js"></script>
+</body>
+</html>
