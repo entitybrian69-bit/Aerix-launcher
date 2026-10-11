@@ -7,6 +7,9 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
+import android.view.animation.Animation;
+import android.view.animation.LinearInterpolator;
+import android.view.animation.RotateAnimation;
 import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.TextView;
@@ -60,6 +63,7 @@ public class MainMenuFragment extends Fragment {
         Button mOpenDirectoryButton = view.findViewById(R.id.open_files_button);
 
         mInstanceDetail = view.findViewById(R.id.liquid_instance_detail);
+        startRingSweep(view.findViewById(R.id.liquid_launch_ring));
         ImageButton mEditProfileButton = view.findViewById(R.id.edit_profile_button);
         Button mPlayButton = view.findViewById(R.id.play_button);
         mVersionSpinner = view.findViewById(R.id.mc_version_spinner);
@@ -150,6 +154,17 @@ public class MainMenuFragment extends Fragment {
         super.onResume();
         ExtraCore.setValue(ExtraConstants.REFRESH_ACCOUNT_SPINNER, true);
         refreshInstanceDetail();
+    }
+
+    /** Slowly turns the sweep ring that sits behind the launch crystal. */
+    private void startRingSweep(View ring) {
+        if (ring == null) return;
+        RotateAnimation sweep = new RotateAnimation(0f, 360f,
+                Animation.RELATIVE_TO_SELF, 0.5f, Animation.RELATIVE_TO_SELF, 0.5f);
+        sweep.setDuration(9000);
+        sweep.setRepeatCount(Animation.INFINITE);
+        sweep.setInterpolator(new LinearInterpolator());
+        ring.startAnimation(sweep);
     }
 
     /** Fills the hero card with the version that is currently selected. */

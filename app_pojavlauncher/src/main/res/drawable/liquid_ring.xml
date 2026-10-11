@@ -1,14 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Slowly orbiting accent ring around the launch crystal. -->
-<animated-rotate xmlns:android="http://schemas.android.com/apk/res/android"
-    android:pivotX="50%" android:pivotY="50%" android:fromDegrees="0" android:toDegrees="360"
-    android:framesCount="12" android:frameDuration="200">
-    <shape android:shape="ring"
-        android:innerRadiusRatio="2.9" android:thicknessRatio="42" android:useLevel="false">
-        <gradient android:angle="0"
-            android:startColor="#006EF0FF"
-            android:centerColor="#CC7CFFCB"
-            android:endColor="#CCA78BFA"
-            android:type="sweep"/>
-    </shape>
-</animated-rotate>
+<!-- The sweep ring behind the launch crystal. It is static here, the fragment
+     rotates the view, because animated-rotate needs private framework attrs. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="ring"
+    android:innerRadiusRatio="2.6"
+    android:thicknessRatio="30"
+    android:useLevel="false">
+    <gradient
+        android:type="sweep"
+        android:startColor="#006EF0FF"
+        android:centerColor="#806EF0FF"
+        android:centerY="0.3"
+        android:endColor="#CCA78BFA"/>
+</shape>
