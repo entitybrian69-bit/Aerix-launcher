@@ -60,6 +60,13 @@
         android:summary="@string/preference_force_english_description"
         android:icon="@drawable/ic_px_translate"/>
 
+    <SwitchPreferenceCompat
+        android:title="@string/preference_force_landscape_title"
+        android:key="force_landscape"
+        android:summary="@string/preference_force_landscape_description"
+        android:defaultValue="true"
+        android:icon="@drawable/ic_px_switch_arrows_x"/>
+
     <Preference
         android:title="@string/preference_ask_for_notification_title"
         android:summary="@string/preference_ask_for_notification_description"

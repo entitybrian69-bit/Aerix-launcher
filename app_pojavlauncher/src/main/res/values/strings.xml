@@ -587,5 +587,7 @@
     <string name="liquid_selected_instance">Selected instance</string>
     <string name="liquid_accounts">Account</string>
     <string name="mcl_settings">Settings</string>
+    <string name="preference_force_landscape_title">Keep the launcher sideways</string>
+    <string name="preference_force_landscape_description">Holds the launcher in landscape, the way the game runs. Turn it off to let the launcher follow your phone instead.</string>
 
 </resources>

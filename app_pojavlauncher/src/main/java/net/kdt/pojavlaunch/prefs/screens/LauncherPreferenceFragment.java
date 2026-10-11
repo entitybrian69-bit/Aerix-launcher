@@ -72,6 +72,10 @@ public class LauncherPreferenceFragment extends PreferenceFragmentCompat impleme
     @Override
     public void onSharedPreferenceChanged(SharedPreferences p, String s) {
         LauncherPreferences.loadPreferences(getContext());
+        Activity activity = getActivity();
+        if ("force_landscape".equals(s) && activity instanceof LauncherActivity) {
+            ((LauncherActivity) activity).applyOrientationPreference();
+        }
     }
 
     protected Preference requirePreference(CharSequence key) {

@@ -5,6 +5,7 @@ import android.Manifest;
 import android.app.NotificationManager;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.ActivityInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.os.Build;
@@ -246,6 +247,7 @@ public class LauncherActivity extends BaseActivity {
         getWindow().setBackgroundDrawable(null);
         bindViews();
         bindLiquidDock();
+        applyOrientationPreference();
         mRequestPermissionLauncher = this.registerForActivityResult(
                 new ActivityResultContracts.RequestPermission(),
                 isAllowed -> {
@@ -343,6 +345,17 @@ public class LauncherActivity extends BaseActivity {
         super.onResume();
         ContextExecutor.setActivity(this);
         InstanceInstaller.postInstallCheck(this);
+        applyOrientationPreference();
+    }
+
+    /**
+     * Holds the launcher sideways, the way the game runs. The preference lets
+     * the user hand orientation back to the device at any time.
+     */
+    public void applyOrientationPreference() {
+        setRequestedOrientation(LauncherPreferences.PREF_FORCE_LANDSCAPE
+                ? ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                : ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
     }
 
     @Override
