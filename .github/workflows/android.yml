@@ -60,38 +60,18 @@ jobs:
           mv app_pojavlauncher/build/outputs/bundle/fullGplay/app_pojavlauncher-full-gplay.aab out/app-gplay.aab
 
       - name: Build Debug .apk (Full)
-        if: "!startsWith(github.event.head_commit.message, 'Ci[log]')"
         run: |
-          # Build the launcher, keeping the output so a failure can be read
-          set -o pipefail
-          gradle :app_pojavlauncher:assembleFullDebug 2>&1 | tee build.log
+          # Build the launcher
+          gradle :app_pojavlauncher:assembleFullDebug
           mv app_pojavlauncher/build/outputs/apk/full/debug/app_pojavlauncher-full-debug.apk out/app-debug-full.apk
 
-      - name: Capture build error
-        id: err
-        if: failure()
-        run: |
-          if [ -f build.log ]; then
-            BODY=$(grep -nE "error:|FAILED|What went wrong|Exception|Execution failed" -A 6 build.log | tail -c 2400 | base64 -w0)
-            if [ -z "$BODY" ]; then BODY=$(tail -c 2400 build.log | base64 -w0); fi
-          else
-            BODY=$(echo "no build.log produced" | base64 -w0)
-          fi
-          echo "msg=$BODY" >> $GITHUB_OUTPUT
-
-      - name: "CI-ERROR ${{ steps.err.outputs.msg }}"
-        if: failure()
-        run: echo "error captured"
-
       - name: Build Debug .apk (No runtime)
-        if: "!startsWith(github.event.head_commit.message, 'Ci[log]')"
         run: |
          # Build the launcher (without jre8 installed)
           gradle :app_pojavlauncher:assembleNoruntimeDebug
           mv app_pojavlauncher/build/outputs/apk/noruntime/debug/app_pojavlauncher-noruntime-debug.apk out/app-debug-noruntime.apk
 
       - name: Gen md5sums
-        if: "!startsWith(github.event.head_commit.message, 'Ci[log]')"
         run: |
           md5sum out/app-debug-full.apk > out/app-debug-full.md5
           md5sum out/app-debug-noruntime.apk > out/app-debug-noruntime.md5
