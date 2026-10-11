@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Pressable glass tile used by the quick actions and by list rows. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_pressed="true">
+        <shape android:shape="rectangle">
+            <corners android:radius="@dimen/liquid_radius_panel"/>
+            <solid android:color="@color/liquid_glass_press"/>
+            <stroke android:width="1dp" android:color="@color/liquid_glass_highlight"/>
+        </shape>
+    </item>
+    <item>
+        <layer-list>
+            <item>
+                <shape android:shape="rectangle">
+                    <corners android:radius="@dimen/liquid_radius_panel"/>
+                    <gradient android:angle="315"
+                        android:startColor="@color/liquid_glass_rim_iridescent_a"
+                        android:centerColor="@color/liquid_glass_rim_iridescent_b"
+                        android:endColor="@color/liquid_glass_rim_iridescent_c"
+                        android:type="linear"/>
+                </shape>
+            </item>
+            <item android:left="1.5dp" android:top="1.5dp" android:right="1.5dp" android:bottom="1.5dp">
+                <shape android:shape="rectangle">
+                    <corners android:radius="@dimen/liquid_radius_panel"/>
+                    <gradient android:angle="270"
+                        android:startColor="@color/liquid_glass_fill_top"
+                        android:centerColor="@color/liquid_glass_fill_mid"
+                        android:endColor="@color/liquid_glass_fill_bottom"
+                        android:centerY="0.45"
+                        android:type="linear"/>
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+</selector>

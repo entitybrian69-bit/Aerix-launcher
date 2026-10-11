@@ -12,6 +12,8 @@ import android.os.Bundle;
 import android.system.Os;
 import android.view.View;
 import android.widget.ImageButton;
+import android.widget.ImageView;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
@@ -20,6 +22,8 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.core.content.res.ResourcesCompat;
+import androidx.core.widget.ImageViewCompat;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentContainerView;
 import androidx.fragment.app.FragmentManager;
@@ -30,8 +34,16 @@ import net.kdt.pojavlaunch.authenticator.accounts.Accounts;
 import net.kdt.pojavlaunch.extra.ExtraConstants;
 import net.kdt.pojavlaunch.extra.ExtraCore;
 import net.kdt.pojavlaunch.extra.ExtraListener;
+import net.kdt.pojavlaunch.fragments.FabricInstallFragment;
+import net.kdt.pojavlaunch.fragments.ForgeInstallFragment;
+import net.kdt.pojavlaunch.fragments.InstanceEditorFragment;
 import net.kdt.pojavlaunch.fragments.MainMenuFragment;
 import net.kdt.pojavlaunch.fragments.MicrosoftLoginFragment;
+import net.kdt.pojavlaunch.fragments.ModVersionListFragment;
+import net.kdt.pojavlaunch.fragments.NeoforgeInstallFragment;
+import net.kdt.pojavlaunch.fragments.OptiFineInstallFragment;
+import net.kdt.pojavlaunch.fragments.ProfileTypeSelectFragment;
+import net.kdt.pojavlaunch.fragments.SearchModFragment;
 import net.kdt.pojavlaunch.fragments.SelectAuthFragment;
 import net.kdt.pojavlaunch.instances.Instance;
 import net.kdt.pojavlaunch.instances.InstanceInstaller;
@@ -40,7 +52,12 @@ import net.kdt.pojavlaunch.lifecycle.ContextAwareDoneListener;
 import net.kdt.pojavlaunch.lifecycle.ContextExecutor;
 import net.kdt.pojavlaunch.modloaders.modpacks.imagecache.IconCacheJanitor;
 import net.kdt.pojavlaunch.prefs.LauncherPreferences;
+import net.kdt.pojavlaunch.prefs.screens.LauncherPreferenceControlFragment;
+import net.kdt.pojavlaunch.prefs.screens.LauncherPreferenceExperimentalFragment;
 import net.kdt.pojavlaunch.prefs.screens.LauncherPreferenceFragment;
+import net.kdt.pojavlaunch.prefs.screens.LauncherPreferenceJavaFragment;
+import net.kdt.pojavlaunch.prefs.screens.LauncherPreferenceMiscellaneousFragment;
+import net.kdt.pojavlaunch.prefs.screens.LauncherPreferenceVideoFragment;
 import net.kdt.pojavlaunch.progresskeeper.ProgressKeeper;
 import net.kdt.pojavlaunch.progresskeeper.TaskCountListener;
 import net.kdt.pojavlaunch.services.ProgressServiceKeeper;
@@ -61,12 +78,62 @@ public class LauncherActivity extends BaseActivity {
     private NotificationManager mNotificationManager;
     private static ActivityResultLauncher<String> mRequestPermissionLauncher;
 
+    /* The crystal dock: ten destinations, one tap each */
+    private static final int[] DOCK_SLOTS = {
+            R.id.dock_launch, R.id.dock_instances, R.id.dock_mods, R.id.dock_controls,
+            R.id.dock_settings, R.id.dock_video, R.id.dock_input, R.id.dock_java,
+            R.id.dock_misc, R.id.dock_labs
+    };
+    private static final int[] DOCK_ICONS = {
+            R.drawable.ic_px_home, R.drawable.ic_px_file, R.drawable.ic_px_dynamic,
+            R.drawable.ic_px_gamepad, R.drawable.ic_px_sliders, R.drawable.ic_px_image_renderer,
+            R.drawable.ic_px_gestures, R.drawable.ic_px_java, R.drawable.ic_px_alt_sliders,
+            R.drawable.ic_px_experiment
+    };
+    private static final int[] DOCK_LABELS = {
+            R.string.liquid_tab_launch, R.string.liquid_tab_instances, R.string.liquid_tab_mods,
+            R.string.liquid_tab_controls, R.string.liquid_tab_settings, R.string.liquid_tab_video,
+            R.string.liquid_tab_input, R.string.liquid_tab_java, R.string.liquid_tab_misc,
+            R.string.liquid_tab_labs
+    };
+
+    private final View.OnClickListener[] mDockActions = new View.OnClickListener[] {
+            // LAUNCH
+            v -> Tools.backToMainMenu(this),
+            // INSTANCE - edit the currently selected instance
+            v -> Tools.swapFragment(this, InstanceEditorFragment.class,
+                    InstanceEditorFragment.TAG, null),
+            // MODS - search mods and modpacks
+            v -> Tools.swapFragment(this, SearchModFragment.class, SearchModFragment.TAG, null),
+            // CONTROL - the control editor keeps its own activity
+            v -> startActivity(new Intent(this, CustomControlsActivity.class)),
+            // SETTINGS
+            v -> Tools.swapFragment(this, LauncherPreferenceFragment.class,
+                    SETTING_FRAGMENT_TAG, null),
+            // VIDEO
+            v -> Tools.swapFragment(this, LauncherPreferenceVideoFragment.class,
+                    "VIDEO_FRAGMENT", null),
+            // INPUT
+            v -> Tools.swapFragment(this, LauncherPreferenceControlFragment.class,
+                    "CONTROL_FRAGMENT", null),
+            // JAVA
+            v -> Tools.swapFragment(this, LauncherPreferenceJavaFragment.class,
+                    "JAVA_FRAGMENT", null),
+            // MISC
+            v -> Tools.swapFragment(this, LauncherPreferenceMiscellaneousFragment.class,
+                    "MISC_FRAGMENT", null),
+            // LABS
+            v -> Tools.swapFragment(this, LauncherPreferenceExperimentalFragment.class,
+                    "EXPERIMENTAL_FRAGMENT", null)
+    };
+
     /* Allows to switch from one button "type" to another */
     private final FragmentManager.FragmentLifecycleCallbacks mFragmentCallbackListener = new FragmentManager.FragmentLifecycleCallbacks() {
         @Override
         public void onFragmentResumed(@NonNull FragmentManager fm, @NonNull Fragment f) {
             mSettingsButton.setImageDrawable(ContextCompat.getDrawable(getBaseContext(), f instanceof MainMenuFragment
                     ? R.drawable.ic_px_sliders : R.drawable.ic_px_home));
+            highlightDock(f);
         }
     };
 
@@ -178,6 +245,7 @@ public class LauncherActivity extends BaseActivity {
 
         getWindow().setBackgroundDrawable(null);
         bindViews();
+        bindLiquidDock();
         mRequestPermissionLauncher = this.registerForActivityResult(
                 new ActivityResultContracts.RequestPermission(),
                 isAllowed -> {
@@ -208,6 +276,66 @@ public class LauncherActivity extends BaseActivity {
         mProgressLayout.observe(ProgressLayout.DOWNLOAD_VERSION_LIST);
         mProgressLayout.observe(ProgressLayout.INSTANCE_INSTALL);
         mProgressLayout.observe(ProgressLayout.DATA_MIGRATION);
+    }
+
+    /* Binds the crystal dock: icon, label, accent colour and destination. */
+    private void bindLiquidDock() {
+        int[] accents = {
+                R.color.liquid_cyan, R.color.liquid_mint, R.color.liquid_violet,
+                R.color.liquid_azure, R.color.liquid_cyan, R.color.liquid_rose,
+                R.color.liquid_mint, R.color.liquid_amber, R.color.liquid_cyan,
+                R.color.liquid_violet
+        };
+        for (int i = 0; i < DOCK_SLOTS.length; i++) {
+            View slot = findViewById(DOCK_SLOTS[i]);
+            if (slot == null) continue;
+            ImageView iconView = slot.findViewById(R.id.dock_slot_icon);
+            TextView label = slot.findViewById(R.id.dock_slot_label);
+            if (iconView != null) {
+                iconView.setImageResource(DOCK_ICONS[i]);
+                ImageViewCompat.setImageTintList(iconView,
+                        android.content.res.ColorStateList.valueOf(
+                                ResourcesCompat.getColor(getResources(), accents[i], getTheme())));
+            }
+            if (label != null) label.setText(DOCK_LABELS[i]);
+            slot.setOnClickListener(mDockActions[i]);
+        }
+    }
+
+    /* Highlights the dock slot that matches the visible fragment. */
+    private void highlightDock(@NonNull Fragment fragment) {
+        int index = dockIndexFor(fragment);
+        for (int i = 0; i < DOCK_SLOTS.length; i++) {
+            View slot = findViewById(DOCK_SLOTS[i]);
+            if (slot == null) continue;
+            View halo = slot.findViewById(R.id.dock_slot_halo);
+            TextView label = slot.findViewById(R.id.dock_slot_label);
+            boolean active = i == index;
+            if (halo != null) halo.setVisibility(active ? View.VISIBLE : View.GONE);
+            if (label != null) label.setTextColor(ResourcesCompat.getColor(getResources(),
+                    active ? R.color.liquid_ink : R.color.liquid_faint, getTheme()));
+            slot.setAlpha(active ? 1f : 0.78f);
+        }
+    }
+
+    private static int dockIndexFor(@NonNull Fragment fragment) {
+        Class<?> fragmentClass = fragment.getClass();
+        if (fragmentClass == MainMenuFragment.class) return 0;
+        if (fragmentClass == InstanceEditorFragment.class
+                || fragmentClass == ProfileTypeSelectFragment.class) return 1;
+        if (fragmentClass == SearchModFragment.class
+                || fragmentClass == ModVersionListFragment.class
+                || fragmentClass == FabricInstallFragment.class
+                || fragmentClass == ForgeInstallFragment.class
+                || fragmentClass == NeoforgeInstallFragment.class
+                || fragmentClass == OptiFineInstallFragment.class) return 2;
+        if (fragmentClass == LauncherPreferenceVideoFragment.class) return 5;
+        if (fragmentClass == LauncherPreferenceControlFragment.class) return 6;
+        if (fragmentClass == LauncherPreferenceJavaFragment.class) return 7;
+        if (fragmentClass == LauncherPreferenceMiscellaneousFragment.class) return 8;
+        if (fragmentClass == LauncherPreferenceExperimentalFragment.class) return 9;
+        if (fragmentClass == LauncherPreferenceFragment.class) return 4;
+        return -1;
     }
 
     @Override

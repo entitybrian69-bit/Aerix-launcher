@@ -567,4 +567,25 @@
     <string name="mjdl_download_error_subtitle">Download failed. Check your internet connection and make sure that you have enough free disk space.</string>
     <string name="mjdl_download_error_subtitle_2">File verification failed. Please try again. If this error keeps happening, contact us on GitHub or on Discord.</string>
     <string name="bta_configuring">Configuring BTA…</string>
+
+    <!-- Liquid Crystal shell -->
+    <string name="liquid_dock_tab">Launcher tab</string>
+    <string name="liquid_tab_launch">Launch</string>
+    <string name="liquid_tab_instances">Instance</string>
+    <string name="liquid_tab_mods">Mods</string>
+    <string name="liquid_tab_controls">Control</string>
+    <string name="liquid_tab_settings">Settings</string>
+    <string name="liquid_tab_video">Video</string>
+    <string name="liquid_tab_input">Input</string>
+    <string name="liquid_tab_java">Java</string>
+    <string name="liquid_tab_misc">Misc</string>
+    <string name="liquid_tab_labs">Labs</string>
+    <string name="liquid_launch">Launch</string>
+    <string name="liquid_launch_hint">Tap to launch</string>
+    <string name="liquid_instance_default">No instance selected</string>
+    <string name="liquid_quick_actions">Quick actions</string>
+    <string name="liquid_selected_instance">Selected instance</string>
+    <string name="liquid_accounts">Account</string>
+    <string name="mcl_settings">Settings</string>
+
 </resources>

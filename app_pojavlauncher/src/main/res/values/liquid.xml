@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Liquid Crystal: colours and shapes for the re-imagined launcher shell. -->
+<resources>
+
+    <!-- ink -->
+    <color name="liquid_ink">#EEF7FF</color>
+    <color name="liquid_ink_2">#BCD2E3</color>
+    <color name="liquid_dim">#92AEC6</color>
+    <color name="liquid_faint">#6C88A1</color>
+
+    <!-- accents -->
+    <color name="liquid_cyan">#6EF0FF</color>
+    <color name="liquid_mint">#7CFFCB</color>
+    <color name="liquid_violet">#A78BFA</color>
+    <color name="liquid_azure">#60A5FA</color>
+    <color name="liquid_rose">#FF8AB0</color>
+    <color name="liquid_amber">#FFC77A</color>
+
+    <!-- surfaces (all translucent so the aurora stays visible) -->
+    <color name="liquid_scrim">#CC05080F</color>
+    <color name="liquid_abyss_top">#060A14</color>
+    <color name="liquid_abyss_mid">#08182C</color>
+    <color name="liquid_abyss_bottom">#03080F</color>
+
+    <color name="liquid_glass_fill_top">#26FFFFFF</color>
+    <color name="liquid_glass_fill_mid">#12FFFFFF</color>
+    <color name="liquid_glass_fill_bottom">#08FFFFFF</color>
+    <color name="liquid_glass_rim">#4DFFFFFF</color>
+    <color name="liquid_glass_rim_iridescent_a">#59B0F0FF</color>
+    <color name="liquid_glass_rim_iridescent_b">#47A2A8FF</color>
+    <color name="liquid_glass_rim_iridescent_c">#1FFFFFFF</color>
+    <color name="liquid_glass_highlight">#59FFFFFF</color>
+    <color name="liquid_glass_press">#33FFFFFF</color>
+
+    <color name="liquid_dock_fill">#1FFFFFFF</color>
+    <color name="liquid_tab_active_cyan">#386EF0FF</color>
+    <color name="liquid_tab_active_mint">#387CFFCB</color>
+    <color name="liquid_tab_active_violet">#38A78BFA</color>
+    <color name="liquid_tab_active_azure">#3860A5FA</color>
+
+    <color name="liquid_stroke_soft">#1AFFFFFF</color>
+    <color name="liquid_shadow">#66000000</color>
+
+    <!-- dimensions, kept generous on purpose -->
+    <dimen name="liquid_radius_panel">32dp</dimen>
+    <dimen name="liquid_radius_card">40dp</dimen>
+    <dimen name="liquid_radius_pill">48dp</dimen>
+    <dimen name="liquid_gap">12dp</dimen>
+    <dimen name="liquid_gap_large">20dp</dimen>
+    <dimen name="liquid_pad">24dp</dimen>
+    <dimen name="liquid_pad_large">32dp</dimen>
+    <dimen name="liquid_row_height">88dp</dimen>
+    <dimen name="liquid_touch_min">64dp</dimen>
+    <dimen name="liquid_dock_height">88dp</dimen>
+
+    <!-- Theme used by the launcher shell: transparent window so the animated
+         aurora backdrop can live behind every screen. -->
+    <style name="MojoLauncher.Liquid" parent="MojoLauncher">
+        <item name="android:windowBackground">@color/liquid_abyss_bottom</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@color/liquid_abyss_bottom</item>
+    </style>
+
+    <style name="LiquidTitle">
+        <item name="android:textColor">@color/liquid_ink</item>
+        <item name="android:textSize">@dimen/_20ssp</item>
+        <item name="android:fontFamily">@font/noto_sans_bold</item>
+    </style>
+
+    <style name="LiquidSectionLabel">
+        <item name="android:textColor">@color/liquid_faint</item>
+        <item name="android:textSize">@dimen/_9ssp</item>
+        <item name="android:fontFamily">@font/noto_sans_bold</item>
+        <item name="android:letterSpacing">0.14</item>
+        <item name="android:textAllCaps">true</item>
+    </style>
+
+    <style name="LiquidQuickAction" parent="Widget.AppCompat.Button">
+        <item name="android:background">@drawable/liquid_tile</item>
+        <item name="android:textColor">@color/liquid_ink</item>
+        <item name="android:textSize">@dimen/_10ssp</item>
+        <item name="android:fontFamily">@font/noto_sans_bold</item>
+        <item name="android:drawablePadding">@dimen/_8sdp</item>
+        <item name="android:paddingTop">@dimen/_14sdp</item>
+        <item name="android:paddingBottom">@dimen/_14sdp</item>
+        <item name="android:gravity">center</item>
+        <item name="android:maxLines">2</item>
+        <item name="android:minHeight">@dimen/liquid_touch_min</item>
+    </style>
+
+    <style name="LiquidBody">
+        <item name="android:textColor">@color/liquid_dim</item>
+        <item name="android:textSize">@dimen/_11ssp</item>
+    </style>
+
+</resources>

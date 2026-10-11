@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The launch crystal: a liquid gradient orb that dims when pressed. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_pressed="true">
+        <shape android:shape="oval">
+            <gradient android:angle="45"
+                android:startColor="#5BC8E0"
+                android:centerColor="#62CCB0"
+                android:endColor="#8B74D6"
+                android:type="linear"/>
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="oval">
+            <gradient android:angle="45"
+                android:startColor="#78F4FF"
+                android:centerColor="#7CFFCB"
+                android:endColor="#A78BFA"
+                android:type="linear"/>
+        </shape>
+    </item>
+</selector>

@@ -9,6 +9,7 @@ import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageButton;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
@@ -38,6 +39,7 @@ public class MainMenuFragment extends Fragment {
     public static final String TAG = "MainMenuFragment";
 
     private mcVersionSpinner mVersionSpinner;
+    private TextView mInstanceDetail;
 
     private final ActivityResultLauncher<Object> mModInstallerLauncher =
             registerForActivityResult(new OpenDocumentWithExtension("jar"), (data)->{
@@ -57,6 +59,7 @@ public class MainMenuFragment extends Fragment {
         Button mShareLogsButton = view.findViewById(R.id.share_logs_button);
         Button mOpenDirectoryButton = view.findViewById(R.id.open_files_button);
 
+        mInstanceDetail = view.findViewById(R.id.liquid_instance_detail);
         ImageButton mEditProfileButton = view.findViewById(R.id.edit_profile_button);
         Button mPlayButton = view.findViewById(R.id.play_button);
         mVersionSpinner = view.findViewById(R.id.mc_version_spinner);
@@ -146,6 +149,18 @@ public class MainMenuFragment extends Fragment {
     public void onResume() {
         super.onResume();
         ExtraCore.setValue(ExtraConstants.REFRESH_ACCOUNT_SPINNER, true);
+        refreshInstanceDetail();
+    }
+
+    /** Fills the hero card with the version that is currently selected. */
+    private void refreshInstanceDetail() {
+        if (mInstanceDetail == null) return;
+        Instance instance = Instances.loadSelectedInstance();
+        if (instance == null || !Tools.isValidString(instance.versionId)) {
+            mInstanceDetail.setText(R.string.liquid_instance_default);
+            return;
+        }
+        mInstanceDetail.setText(instance.versionId);
     }
 
     private void runInstallerWithConfirmation() {

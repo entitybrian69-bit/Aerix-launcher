@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One dock destination: a generous glass orb with a label underneath. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/dock_slot_root"
+    android:layout_width="@dimen/_68sdp"
+    android:layout_height="match_parent"
+    android:layout_marginStart="@dimen/_2sdp"
+    android:layout_marginEnd="@dimen/_2sdp"
+    android:background="?android:attr/selectableItemBackground"
+    android:clickable="true"
+    android:focusable="true"
+    android:gravity="center"
+    android:orientation="vertical">
+
+    <FrameLayout
+        android:layout_width="@dimen/_44sdp"
+        android:layout_height="@dimen/_44sdp"
+        android:layout_gravity="center_horizontal">
+
+        <View
+            android:id="@+id/dock_slot_halo"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/liquid_orb"
+            android:visibility="gone"
+            tools:visibility="visible"/>
+
+        <ImageView
+            android:id="@+id/dock_slot_icon"
+            android:layout_width="@dimen/_24sdp"
+            android:layout_height="@dimen/_24sdp"
+            android:layout_gravity="center"
+            android:contentDescription="@string/liquid_dock_tab"
+            tools:src="@drawable/ic_px_home"/>
+
+    </FrameLayout>
+
+    <TextView
+        android:id="@+id/dock_slot_label"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/_2sdp"
+        android:ellipsize="none"
+        android:fontFamily="@font/noto_sans_bold"
+        android:singleLine="true"
+        android:textColor="@color/liquid_faint"
+        android:textSize="@dimen/_8ssp"
+        android:textAllCaps="true"
+        tools:text="LAUNCH"/>
+
+</LinearLayout>

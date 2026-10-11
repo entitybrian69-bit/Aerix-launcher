@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="@dimen/liquid_radius_pill"/>
+            <gradient android:angle="315"
+                android:startColor="@color/liquid_glass_highlight"
+                android:centerColor="@color/liquid_glass_rim_iridescent_b"
+                android:endColor="@color/liquid_glass_rim_iridescent_c"
+                android:type="linear"/>
+        </shape>
+    </item>
+    <item android:left="1.5dp" android:top="1.5dp" android:right="1.5dp" android:bottom="1.5dp">
+        <shape android:shape="rectangle">
+            <corners android:radius="@dimen/liquid_radius_pill"/>
+            <gradient android:angle="270"
+                android:startColor="#2EFFFFFF"
+                android:centerColor="#17FFFFFF"
+                android:endColor="#0F1A2634"
+                android:centerY="0.45"
+                android:type="linear"/>
+        </shape>
+    </item>
+</layer-list>

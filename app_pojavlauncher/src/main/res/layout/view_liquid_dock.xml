@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The floating crystal dock: the only navigation in the new shell.
+     Ten destinations, nothing cramped, everything reachable with one tap. -->
+<HorizontalScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_gravity="bottom"
+    android:scrollbars="none"
+    android:overScrollMode="never"
+    android:clipToPadding="false"
+    android:paddingStart="@dimen/liquid_pad"
+    android:paddingEnd="@dimen/liquid_pad"
+    android:paddingBottom="@dimen/liquid_gap">
+
+    <LinearLayout
+        android:id="@+id/liquid_dock"
+        android:layout_width="wrap_content"
+        android:layout_height="@dimen/liquid_dock_height"
+        android:layout_gravity="bottom"
+        android:background="@drawable/liquid_dock"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="@dimen/liquid_gap"
+        android:paddingEnd="@dimen/liquid_gap">
+
+        <include android:id="@+id/dock_launch" layout="@layout/item_liquid_dock_slot"/>
+        <include android:id="@+id/dock_instances" layout="@layout/item_liquid_dock_slot"/>
+        <include android:id="@+id/dock_mods" layout="@layout/item_liquid_dock_slot"/>
+        <include android:id="@+id/dock_controls" layout="@layout/item_liquid_dock_slot"/>
+        <include android:id="@+id/dock_settings" layout="@layout/item_liquid_dock_slot"/>
+        <include android:id="@+id/dock_video" layout="@layout/item_liquid_dock_slot"/>
+        <include android:id="@+id/dock_input" layout="@layout/item_liquid_dock_slot"/>
+        <include android:id="@+id/dock_java" layout="@layout/item_liquid_dock_slot"/>
+        <include android:id="@+id/dock_misc" layout="@layout/item_liquid_dock_slot"/>
+        <include android:id="@+id/dock_labs" layout="@layout/item_liquid_dock_slot"/>
+
+    </LinearLayout>
+</HorizontalScrollView>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Liquid launch gradient: cyan -> mint -> violet. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <corners android:radius="@dimen/liquid_radius_card"/>
+    <gradient android:angle="45"
+        android:startColor="#78F4FF"
+        android:centerColor="#7CFFCB"
+        android:endColor="#A78BFA"
+        android:type="linear"/>
+</shape>

@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aerix · Liquid Crystal — landscape app preview</title>
+<style>
+  :root{
+    --ink:#EEF7FF; --ink2:#BCD2E3; --dim:#92AEC6; --faint:#6C88A1;
+    --cyan:#6EF0FF; --mint:#7CFFCB; --violet:#A78BFA;
+    --azure:#60A5FA; --rose:#FF8AB0; --amber:#FFC77A;
+    --abyss:#03080f;
+    --glass: linear-gradient(160deg, rgba(255,255,255,.15), rgba(255,255,255,.06) 46%, rgba(255,255,255,.03));
+    --rim: rgba(255,255,255,.28);
+    --blur: blur(28px) saturate(170%);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    background:radial-gradient(120% 90% at 50% 0%, #0a1220 0%, #04080f 60%, #02060c 100%);
+    color:var(--ink);
+    font-family:"Inter","Noto Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:22px; padding:28px;
+  }
+
+  /* ---------------------------------------------------------- frame --- */
+  .frame{
+    position:relative; width:min(1240px, 96vw); aspect-ratio:16/9;
+    border-radius:34px; overflow:hidden; isolation:isolate;
+    background:linear-gradient(180deg,#060a14,#081426 55%,#03080f);
+    box-shadow:0 40px 120px rgba(0,0,0,.7), 0 0 0 1.5px rgba(255,255,255,.10),
+               0 0 90px rgba(80,200,255,.14);
+  }
+
+  /* --------------------------------------------------------- aurora --- */
+  .aurora{position:absolute; inset:-12%; z-index:0; filter:blur(58px)}
+  .aurora i{position:absolute; display:block; border-radius:50%; mix-blend-mode:screen}
+  .a1{width:52%; height:78%; left:-8%; top:-14%; background:radial-gradient(circle,rgba(110,240,255,.62),transparent 68%); animation:d1 32s ease-in-out infinite alternate}
+  .a2{width:46%; height:70%; right:-6%; top:2%;  background:radial-gradient(circle,rgba(167,139,250,.52),transparent 68%); animation:d2 41s ease-in-out infinite alternate}
+  .a3{width:60%; height:66%; left:26%; top:22%; background:radial-gradient(circle,rgba(96,165,250,.42),transparent 70%); animation:d3 47s ease-in-out infinite alternate}
+  .a4{width:44%; height:64%; left:2%;  bottom:-18%;background:radial-gradient(circle,rgba(124,255,203,.36),transparent 70%); animation:d2 37s ease-in-out infinite alternate-reverse}
+  .a5{width:40%; height:60%; right:6%; bottom:-14%;background:radial-gradient(circle,rgba(110,240,255,.40),transparent 70%); animation:d1 44s ease-in-out infinite alternate-reverse}
+  .a6{width:34%; height:54%; left:44%; bottom:4%; background:radial-gradient(circle,rgba(255,138,176,.28),transparent 70%); animation:d3 52s ease-in-out infinite alternate}
+  @keyframes d1{from{transform:translate3d(0,0,0) scale(1)} to{transform:translate3d(7%,5%,0) scale(1.16)}}
+  @keyframes d2{from{transform:translate3d(0,0,0) scale(1.1)} to{transform:translate3d(-8%,7%,0) scale(.94)}}
+  @keyframes d3{from{transform:translate3d(0,0,0) scale(.96)} to{transform:translate3d(5%,-6%,0) scale(1.2)}}
+  .veil{position:absolute; inset:0; z-index:1; pointer-events:none;
+    background:radial-gradient(120% 100% at 50% 48%, transparent 40%, rgba(3,8,15,.72) 100%)}
+
+  /* ---------------------------------------------------------- glass --- */
+  .glass{position:relative; background:var(--glass); backdrop-filter:var(--blur); -webkit-backdrop-filter:var(--blur);
+    border-radius:26px; box-shadow:0 16px 38px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.30), inset 0 -1px 0 rgba(255,255,255,.05)}
+  .glass::after{content:""; position:absolute; inset:1px; border-radius:inherit; pointer-events:none;
+    background:linear-gradient(160deg, rgba(110,240,255,.16), rgba(167,139,250,.10) 46%, rgba(255,255,255,0) 70%)}
+
+  /* -------------------------------------------------------- content --- */
+  .scr{position:absolute; inset:0; z-index:2; display:grid; grid-template-rows:auto 1fr auto; padding:2.2% 2.6% 0}
+
+  .topbar{display:flex; align-items:center; gap:14px}
+  .account{display:flex; align-items:center; gap:12px; padding:10px 18px 10px 12px; border-radius:999px}
+  .avatar{width:40px; height:40px; border-radius:50%; display:grid; place-items:center; font-weight:800; font-size:15px;
+    background:linear-gradient(135deg,var(--cyan),var(--mint) 55%,var(--violet)); color:#06121c; box-shadow:0 0 24px rgba(110,240,255,.35)}
+  .account b{font-size:15px; font-weight:700}
+  .account small{display:block; font-size:11.5px; color:var(--dim)}
+  .spacer{flex:1}
+  .orbbtn{width:48px; height:48px; border-radius:50%; display:grid; place-items:center; cursor:pointer}
+
+  .cols{display:grid; grid-template-columns:1fr 1fr; gap:2.2%; padding-top:2.4%; min-height:0}
+  .left{display:flex; flex-direction:column; gap:2.4%; min-width:0}
+
+  .hero{display:flex; align-items:center; gap:18px; padding:18px 20px}
+  .hero .ico{width:64px; height:64px; border-radius:22px; display:grid; place-items:center; flex:0 0 auto;
+    background:linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,.05)); box-shadow:inset 0 0 0 1px var(--rim)}
+  .hero .txt{flex:1; min-width:0}
+  .hero .txt b{font-size:19px; font-weight:750; letter-spacing:-.2px; display:block}
+  .hero .txt small{font-size:12.5px; color:var(--dim)}
+  .hero .edit{width:52px; height:52px; border-radius:50%; display:grid; place-items:center; flex:0 0 auto; cursor:pointer;
+    background:rgba(255,255,255,.10); box-shadow:inset 0 0 0 1px var(--rim)}
+
+  .kicker{font-size:11px; font-weight:800; letter-spacing:2.6px; text-transform:uppercase; color:var(--cyan); margin:0 0 10px}
+  .tiles{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+  .tile{padding:14px 12px; border-radius:22px; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:9px; cursor:pointer; text-align:center; min-height:86px;
+    background:var(--glass); backdrop-filter:var(--blur); -webkit-backdrop-filter:var(--blur);
+    box-shadow:0 10px 24px rgba(0,0,0,.32), inset 0 1px 0 rgba(255,255,255,.26)}
+  .tile span{font-size:12px; font-weight:700; color:var(--ink2); line-height:1.25}
+  .tile:hover{transform:translateY(-2px)}
+  .tile{transition:transform .2s ease}
+
+  .right{min-width:0; display:flex}
+  .console{width:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px; padding:26px; border-radius:30px}
+  .corewrap{position:relative; width:min(240px, 34vh); aspect-ratio:1; display:grid; place-items:center}
+  .ring{position:absolute; inset:-16px; border-radius:50%; border:3px solid rgba(110,240,255,.30);
+    border-top-color:rgba(167,139,250,.95); border-right-color:transparent; animation:spin 9s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .halo{position:absolute; inset:0; border-radius:50%; box-shadow:0 0 80px rgba(110,240,255,.42), inset 0 0 0 1px rgba(255,255,255,.20)}
+  .core{position:relative; width:100%; height:100%; border-radius:50%; display:grid; place-items:center; cursor:pointer;
+    background:linear-gradient(135deg,#78F4FF,#7CFFCB 46%,#A78BFA);
+    box-shadow:0 22px 60px rgba(70,220,255,.42), inset 0 2px 0 rgba(255,255,255,.5)}
+  .core::after{content:""; position:absolute; inset:0 0 46% 0; border-radius:50% 50% 0 0;
+    background:linear-gradient(180deg, rgba(255,255,255,.42), transparent)}
+  .core svg{position:relative; margin-left:6px; filter:drop-shadow(0 2px 6px rgba(6,18,28,.35))}
+  .console .label{font-size:14px; font-weight:800; letter-spacing:5px; text-transform:uppercase}
+  .console .sub{font-size:13px; color:var(--dim); margin-top:-10px}
+
+  /* ----------------------------------------------------------- dock --- */
+  .dock{position:absolute; z-index:6; left:2.4%; right:2.4%; bottom:2.6%; height:15%;
+    border-radius:999px; display:flex; align-items:center; padding:0 14px}
+  .slot{flex:1; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; cursor:pointer; position:relative}
+  .slot .pill{position:absolute; inset:12% 4%; border-radius:999px; z-index:-1; opacity:0;
+    background:linear-gradient(160deg, rgba(255,255,255,.26), rgba(255,255,255,.07));
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.40), 0 0 26px rgba(110,240,255,.20); transition:opacity .3s}
+  .slot.on .pill{opacity:1}
+  .slot .dot{position:absolute; top:12%; width:18px; height:3px; border-radius:2px; background:currentColor; box-shadow:0 0 12px currentColor; opacity:0; transition:opacity .3s}
+  .slot.on .dot{opacity:1}
+  .slot svg{opacity:.72; transition:opacity .25s, transform .3s}
+  .slot.on svg{opacity:1; transform:translateY(-2px)}
+  .slot label{font-size:9.5px; font-weight:800; letter-spacing:.6px; text-transform:uppercase; color:var(--faint); cursor:pointer; transition:color .25s}
+  .slot.on label{color:currentColor}
+
+  /* --------------------------------------------------------- legend --- */
+  .legend{max-width:1240px; font-size:13.5px; line-height:1.6; color:var(--dim); text-align:center}
+  .legend b{color:var(--ink)}
+  .legend .tag{display:inline-block; margin:0 4px; padding:2px 9px; border-radius:999px; font-size:11.5px;
+    background:rgba(110,240,255,.12); color:var(--cyan); box-shadow:inset 0 0 0 1px rgba(110,240,255,.28)}
+  svg{display:block}
+</style>
+</head>
+<body>
+
+<div class="frame">
+  <div class="aurora">
+    <i class="a1"></i><i class="a2"></i><i class="a3"></i>
+    <i class="a4"></i><i class="a5"></i><i class="a6"></i>
+  </div>
+  <div class="veil"></div>
+
+  <div class="scr">
+    <!-- top: account pill + settings ---------------------------------- -->
+    <div class="topbar">
+      <div class="account glass">
+        <div class="avatar">A</div>
+        <div><b>AerixPlayer</b><small>Microsoft account</small></div>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#92AEC6" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="spacer"></div>
+      <div class="orbbtn glass" title="Settings">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#EEF7FF" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/>
+          <circle cx="9" cy="7" r="2.2" fill="#6EF0FF" stroke="none"/><circle cx="15" cy="12" r="2.2" fill="#7CFFCB" stroke="none"/><circle cx="8" cy="17" r="2.2" fill="#A78BFA" stroke="none"/>
+        </svg>
+      </div>
+    </div>
+
+    <!-- two columns ---------------------------------------------------- -->
+    <div class="cols">
+      <div class="left">
+        <div class="hero glass">
+          <div class="ico">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#6EF0FF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 10.5 12 4l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path d="M9 21v-7h6v7"/>
+            </svg>
+          </div>
+          <div class="txt">
+            <b>1.21.4 · Fabric 0.16.9</b>
+            <small>Selected instance · tap to change version</small>
+          </div>
+          <div class="edit">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#EEF7FF" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>
+            </svg>
+          </div>
+        </div>
+
+        <div>
+          <p class="kicker">Quick actions</p>
+          <div class="tiles">
+            <div class="tile">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#7CFFCB" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="7" width="20" height="12" rx="6"/><path d="M7 12h3M7 15h2"/><circle cx="16" cy="12.5" r="1.4" fill="#7CFFCB" stroke="none"/><circle cx="18.2" cy="15" r="1.4" fill="#7CFFCB" stroke="none"/>
+              </svg>
+              <span>Custom controls</span>
+            </div>
+            <div class="tile">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFC77A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M8 3v7a4 4 0 0 0 8 0V3"/><path d="M12 14v7"/><path d="M3 21h18"/>
+              </svg>
+              <span>Execute jar</span>
+            </div>
+            <div class="tile">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6EF0FF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M12 16V4"/><polyline points="8 8 12 4 16 8"/>
+              </svg>
+              <span>Share logs</span>
+            </div>
+            <div class="tile">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#A78BFA" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+              </svg>
+              <span>Game directory</span>
+            </div>
+            <div class="tile">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#60A5FA" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 5a2 2 0 0 1 2-2h12v18H6a2 2 0 0 1-2-2z"/><path d="M8 7h8M8 11h8M8 15h5"/>
+              </svg>
+              <span>Wiki</span>
+            </div>
+            <div class="tile">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FF8AB0" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="9"/><path d="M3.5 9h17M3.5 15h17"/><path d="M12 3c2.5 3 2.5 15 0 18M12 3c-2.5 3-2.5 15 0 18"/>
+              </svg>
+              <span>Community</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="right">
+        <div class="console glass">
+          <div class="corewrap">
+            <div class="halo"></div>
+            <div class="ring"></div>
+            <div class="core">
+              <svg width="72" height="72" viewBox="0 0 24 24" fill="#06121C"><path d="M7 4.5v15l13-7.5z"/></svg>
+            </div>
+          </div>
+          <div class="label">Launch</div>
+          <div class="sub">Tap to launch</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- dock ----------------------------------------------------------- -->
+    <nav class="dock glass" id="dock"></nav>
+  </div>
+</div>
+
+<p class="legend">
+  <b>Implemented in the app, not just drawn.</b>
+  <span class="tag">AuroraBackdropView</span> drifts six light blobs behind every screen, and freezes itself when the
+  device turns animations off or enters battery saver.
+  <span class="tag">fragment_launcher.xml</span> is built landscape first, the play bar is now a crystal, and the ten
+  destinations live in one floating dock. The nine screens behind the other dock slots still use their current layouts
+  until they get the same treatment.
+</p>
+
+<script>
+const SLOTS = [
+  {label:"Launch",   color:"#6EF0FF", icon:'<path d="M3 10.5 12 4l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path d="M9 21v-7h6v7"/>'},
+  {label:"Instance", color:"#7CFFCB", icon:'<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>'},
+  {label:"Mods",     color:"#A78BFA", icon:'<path d="M12 3v18M3 12h18"/><rect x="7.5" y="7.5" width="9" height="9" rx="2.5"/>'},
+  {label:"Control",  color:"#6EF0FF", icon:'<rect x="2" y="7" width="20" height="12" rx="6"/><path d="M7 12h3M7 15h2"/><circle cx="16" cy="12.5" r="1.4" fill="currentColor" stroke="none"/>'},
+  {label:"Settings", color:"#7CFFCB", icon:'<line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/><circle cx="9" cy="7" r="2.2" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="2.2" fill="currentColor" stroke="none"/>'},
+  {label:"Video",    color:"#FF8AB0", icon:'<rect x="2" y="4" width="20" height="13" rx="3"/><path d="M8 21h8M12 17v4"/>'},
+  {label:"Input",    color:"#7CFFCB", icon:'<path d="M8 13V5a2 2 0 0 1 4 0v6"/><path d="M12 11V9.5a2 2 0 0 1 4 0V13"/><path d="M16 13v-1.5a2 2 0 0 1 4 0V15a6 6 0 0 1-6 6h-2a6 6 0 0 1-6-6v-1"/>'},
+  {label:"Java",     color:"#FFC77A", icon:'<path d="M8 3v7a4 4 0 0 0 8 0V3"/><path d="M12 14v7"/><path d="M3 21h18"/>'},
+  {label:"Misc",     color:"#6EF0FF", icon:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1"/>'},
+  {label:"Labs",     color:"#A78BFA", icon:'<path d="M9 2v7L4.5 20a2 2 0 0 0 1.8 3h11.4a2 2 0 0 0 1.8-3L15 9V2"/><path d="M8 2h8"/>'}
+];
+
+const dock = document.getElementById('dock');
+dock.innerHTML = SLOTS.map((s, i) => `
+  <div class="slot${i === 0 ? ' on' : ''}" style="color:${s.color}">
+    <span class="dot"></span><span class="pill"></span>
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="${s.color}" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${s.icon}</svg>
+    <label>${s.label}</label>
+  </div>`).join('');
+
+dock.querySelectorAll('.slot').forEach(slot => {
+  slot.addEventListener('click', () => {
+    dock.querySelectorAll('.slot').forEach(s => s.classList.remove('on'));
+    slot.classList.add('on');
+  });
+});
+</script>
+</body>
+</html>
