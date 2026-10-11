@@ -44,6 +44,8 @@ import net.kdt.pojavlaunch.fragments.InstanceListFragment;
 import net.kdt.pojavlaunch.fragments.ForgeInstallFragment;
 import net.kdt.pojavlaunch.fragments.InstanceEditorFragment;
 import net.kdt.pojavlaunch.fragments.MainMenuFragment;
+import net.kdt.pojavlaunch.fragments.ElyByLoginFragment;
+import net.kdt.pojavlaunch.fragments.LocalLoginFragment;
 import net.kdt.pojavlaunch.fragments.MicrosoftLoginFragment;
 import net.kdt.pojavlaunch.fragments.ModVersionListFragment;
 import net.kdt.pojavlaunch.fragments.NeoforgeInstallFragment;
