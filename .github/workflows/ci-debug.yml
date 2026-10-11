@@ -1,0 +1,70 @@
+name: CI debug
+
+# Temporary scratch workflow: builds the launcher and, when it fails, files an
+# issue with the tail of the Gradle output so the error can be read from the
+# API. Delete once the build is green again.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    env:
+      CURSEFORGE_API_KEY: ${{ secrets.CURSEFORGE_API_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Get LTW
+        uses: dawidd6/action-download-artifact@v6
+        continue-on-error: true
+        with:
+          repo: MojoLauncher/LTW
+          workflow: android.yml
+          workflow_conclusion: success
+          name: output-aar
+          path: app_pojavlauncher/libs
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.14.3"
+
+      - name: Build Debug .apk (Full)
+        run: |
+          gradle :app_pojavlauncher:assembleFullDebug 2>&1 | tee build.log
+          exit ${PIPESTATUS[0]}
+
+      - name: Report the failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          {
+            echo "### Errors"
+            grep -nE "error:|FAILED|What went wrong|^> Task .* FAILED|Execution failed" build.log | head -60
+            echo
+            echo "### Tail"
+            tail -60 build.log
+          } > err.txt
+          gh issue create \
+            --title "CI debug: build errors on $(git rev-parse --short HEAD)" \
+            --body-file err.txt
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build.log
