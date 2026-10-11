@@ -64,6 +64,7 @@
             android:name="net.kdt.pojavlaunch.LauncherActivity"
             android:label="@string/app_short_name"
             android:theme="@style/MojoLauncher.Liquid"
+            android:screenOrientation="sensorLandscape"
             android:windowSoftInputMode="adjustResize"/>
         <activity
             android:name="net.kdt.pojavlaunch.ImportControlActivity"
