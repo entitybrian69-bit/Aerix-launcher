@@ -27,7 +27,7 @@
         <item name="android:spinnerStyle">@style/Mirai.Spinner</item>
         <item name="android:seekBarStyle">@style/Mirai.SeekBar</item>
         <item name="seekBarStyle">@style/Mirai.SeekBar</item>
-        <item name="mineButtonBackground">@drawable/mirai_button</item>
+        <item name="mineButtonBackground">@drawable/glass_button</item>
         <item name="preferenceTheme">@style/Mirai.PreferenceTheme</item>
         <item name="android:colorBackground">@color/mirai_page_background</item>
         <item name="android:alertDialogTheme">@style/Mirai.Dialog</item>
