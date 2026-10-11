@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="@dimen/mirai_content_column"
     android:layout_height="match_parent"
-    android:background="@drawable/mirai_card"
+    android:background="@drawable/glass_panel"
     android:paddingHorizontal="@dimen/fragment_padding_medium" android:layout_gravity="center_horizontal">
     <androidx.constraintlayout.widget.ConstraintLayout
         xmlns:tools="http://schemas.android.com/tools"

@@ -1,207 +1,509 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Home, Mirai style: instance and quick actions on the left, launch on the right.
-     Every id the main menu binds is kept. -->
+<!-- Home, Mirai's arrangement: hero and play panel on top, four quick tiles
+     across the middle, recent instances and quick tools underneath. Every id
+     the main menu binds is kept, so nothing that worked before is lost. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:baselineAligned="false"
-    android:orientation="horizontal"
-    android:padding="@dimen/mirai_space_xxl">
+    android:orientation="vertical"
+    android:padding="@dimen/mirai_gap_lg">
 
     <LinearLayout
-        android:layout_width="0dp"
-        android:layout_height="match_parent"
-        android:layout_marginEnd="@dimen/mirai_space_xl"
-        android:layout_weight="1"
-        android:orientation="vertical">
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="0.57"
+        android:orientation="horizontal">
 
+        <!-- Hero: the selected instance, and the way to change it -->
         <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:background="@drawable/mirai_card"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:padding="@dimen/mirai_space_lg">
-
-            <ImageView
-                android:id="@+id/liquid_instance_icon"
-                android:layout_width="56dp"
-                android:layout_height="56dp"
-                android:background="@drawable/mirai_rail_pill"
-                android:contentDescription="@string/liquid_selected_instance"
-                android:padding="16dp"
-                android:src="@drawable/ic_px_home"/>
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_marginEnd="@dimen/mirai_gap_sm_plus"
+            android:layout_weight="1.55"
+            android:background="@drawable/glass_panel"
+            android:orientation="vertical"
+            android:padding="@dimen/mirai_gap_lg">
 
             <LinearLayout
-                android:layout_width="0dp"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="@dimen/mirai_space_lg"
-                android:layout_weight="1"
-                android:orientation="vertical">
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
 
-                <com.kdt.mcgui.mcVersionSpinner
-                    android:id="@+id/mc_version_spinner"
-                    android:layout_width="match_parent"
-                    android:layout_height="40dp"
-                    android:background="@android:color/transparent"
-                    android:drawablePadding="@dimen/mirai_space_xs"
-                    android:drawableEnd="@drawable/ic_expand_more"
-                    android:gravity="center_vertical"
-                    android:textColor="?attr/miraiOnSurface"
-                    android:textSize="16sp"/>
+                <ImageButton
+                    android:id="@+id/news_button"
+                    android:layout_width="@dimen/mirai_shell_action"
+                    android:layout_height="@dimen/mirai_shell_action"
+                    android:background="@drawable/glass_pill"
+                    android:contentDescription="@string/mcl_tab_wiki"
+                    android:padding="@dimen/mirai_gap_xs"
+                    android:src="@drawable/ic_public"/>
 
-                <TextView
-                    android:id="@+id/liquid_instance_detail"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/liquid_instance_default"
-                    android:textColor="?attr/miraiOnSurfaceVariant"
-                    android:textSize="12sp"/>
+                <ImageButton
+                    android:id="@+id/social_media_button"
+                    android:layout_width="@dimen/mirai_shell_action"
+                    android:layout_height="@dimen/mirai_shell_action"
+                    android:layout_marginStart="@dimen/mirai_gap_sm"
+                    android:background="@drawable/glass_pill"
+                    android:contentDescription="@string/mcl_button_social_media"
+                    android:padding="@dimen/mirai_gap_xs"
+                    android:src="@drawable/ic_person_outlined"/>
+
+                <Space
+                    android:layout_width="0dp"
+                    android:layout_height="1dp"
+                    android:layout_weight="1"/>
+
+                <ImageButton
+                    android:id="@+id/edit_profile_button"
+                    android:layout_width="@dimen/mirai_shell_action"
+                    android:layout_height="@dimen/mirai_shell_action"
+                    android:background="@drawable/glass_pill"
+                    android:contentDescription="@string/global_edit"
+                    android:padding="@dimen/mirai_gap_xs"
+                    android:src="@drawable/ic_settings_filled"/>
 
             </LinearLayout>
 
-            <ImageButton
-                android:id="@+id/edit_profile_button"
-                android:layout_width="@dimen/mirai_shell_action_height"
-                android:layout_height="@dimen/mirai_shell_action_height"
-                android:background="@drawable/mirai_button_outline"
-                android:contentDescription="@string/global_edit"
-                android:padding="8dp"
-                android:src="@drawable/ic_px_edit"/>
+            <com.kdt.mcgui.mcVersionSpinner
+                android:id="@+id/mc_version_spinner"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/mirai_gap_md"
+                android:background="@android:color/transparent"
+                android:drawableEnd="@drawable/ic_arrow_right_rounded"
+                android:drawablePadding="@dimen/mirai_gap_sm"
+                android:textColor="@color/mirai_text_primary"
+                android:textSize="26sp"
+                android:textStyle="bold"/>
+
+            <TextView
+                android:id="@+id/liquid_instance_detail"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/mirai_gap_xs"
+                android:text="@string/liquid_instance_default"
+                android:textColor="@color/mirai_text_secondary"
+                android:textSize="13sp"/>
+
+            <Space
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"/>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/home_create_instance"
+                    android:layout_width="0dp"
+                    android:layout_height="@dimen/mirai_shell_action"
+                    android:layout_marginEnd="@dimen/mirai_gap_sm"
+                    android:layout_weight="1"
+                    android:background="@drawable/glass_outline_button"
+                    android:drawableStart="@drawable/ic_add"
+                    android:drawablePadding="@dimen/mirai_gap_xs"
+                    android:text="@string/mirai_home_create_instance"
+                    android:textColor="@color/mirai_text_primary"
+                    android:textSize="13sp"/>
+
+                <Button
+                    android:id="@+id/home_manage_versions"
+                    android:layout_width="0dp"
+                    android:layout_height="@dimen/mirai_shell_action"
+                    android:layout_weight="1"
+                    android:background="@drawable/glass_outline_button"
+                    android:drawableStart="@drawable/ic_dashboard_filled"
+                    android:drawablePadding="@dimen/mirai_gap_xs"
+                    android:text="@string/mirai_home_manage_versions"
+                    android:textColor="@color/mirai_text_primary"
+                    android:textSize="13sp"/>
+
+            </LinearLayout>
 
         </LinearLayout>
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/mirai_space_xxl"
-            android:layout_marginBottom="@dimen/mirai_space_md"
-            android:letterSpacing="0.08"
-            android:text="@string/liquid_quick_actions"
-            android:textAllCaps="true"
-            android:textColor="?attr/miraiOutline"
-            android:textSize="11sp"
-            android:textStyle="bold"/>
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="0.85"
+            android:orientation="vertical">
+
+            <!-- Active world: the launch panel -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:background="@drawable/glass_panel"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:padding="@dimen/mirai_gap_md">
+
+                <FrameLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center">
+
+                    <ImageView
+                        android:id="@+id/liquid_launch_ring"
+                        android:layout_width="150dp"
+                        android:layout_height="150dp"
+                        android:layout_gravity="center"
+                        android:contentDescription="@null"
+                        android:src="@drawable/mirai_launch_glow"/>
+
+                    <ImageButton
+                        android:id="@+id/play_button"
+                        android:layout_width="96dp"
+                        android:layout_height="96dp"
+                        android:layout_gravity="center"
+                        android:background="@drawable/glass_avatar"
+                        android:contentDescription="@string/mirai_launch"
+                        android:padding="@dimen/mirai_gap_xl"
+                        android:src="@drawable/ic_play_arrow_filled"/>
+
+                </FrameLayout>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/mirai_gap_md"
+                    android:text="@string/mirai_home_play"
+                    android:textColor="@color/mirai_text_primary"
+                    android:textSize="16sp"
+                    android:textStyle="bold"/>
+
+            </LinearLayout>
+
+            <!-- Running tasks -->
+            <LinearLayout
+                android:id="@+id/home_tasks"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/mirai_task_strip_height"
+                android:layout_marginTop="@dimen/mirai_gap_sm_plus"
+                android:background="@drawable/glass_panel"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="@dimen/mirai_gap_md"
+                android:paddingEnd="@dimen/mirai_gap_md">
+
+                <ImageView
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_download_2_filled"/>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="@dimen/mirai_gap_md"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/mirai_home_tasks"
+                        android:textColor="@color/mirai_text_primary"
+                        android:textSize="14sp"
+                        android:textStyle="bold"/>
+
+                    <TextView
+                        android:id="@+id/home_tasks_detail"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/mirai_home_tasks_idle"
+                        android:textColor="@color/mirai_text_secondary"
+                        android:textSize="12sp"/>
+
+                </LinearLayout>
+
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_arrow_right_rounded"/>
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <!-- Quick actions -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/mirai_quick_tile_height"
+        android:layout_marginTop="@dimen/mirai_gap_sm_plus"
+        android:orientation="horizontal">
 
         <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal">
+            android:id="@+id/home_tile_create"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_marginEnd="@dimen/mirai_gap_sm"
+            android:layout_weight="1"
+            android:background="@drawable/glass_panel"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="@dimen/mirai_gap_md">
 
-            <Button
-                android:id="@+id/custom_control_button"
-                style="@style/Mirai.Button.Outline"
-                android:layout_width="0dp"
-                android:layout_height="@dimen/mirai_quick_action_height"
-                android:layout_marginEnd="@dimen/mirai_space_sm"
-                android:layout_weight="1"
-                android:drawableTop="@drawable/ic_px_gamepad"
-                android:text="@string/mcl_option_customcontrol"/>
+            <ImageView
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_add"/>
 
-            <Button
-                android:id="@+id/install_jar_button"
-                style="@style/Mirai.Button.Outline"
-                android:layout_width="0dp"
-                android:layout_height="@dimen/mirai_quick_action_height"
-                android:layout_marginStart="@dimen/mirai_space_sm"
-                android:layout_marginEnd="@dimen/mirai_space_sm"
-                android:layout_weight="1"
-                android:drawableTop="@drawable/ic_px_java_run"
-                android:text="@string/main_install_jar_file"/>
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/mirai_gap_md"
+                android:orientation="vertical">
 
-            <Button
-                android:id="@+id/share_logs_button"
-                style="@style/Mirai.Button.Outline"
-                android:layout_width="0dp"
-                android:layout_height="@dimen/mirai_quick_action_height"
-                android:layout_marginStart="@dimen/mirai_space_sm"
-                android:layout_weight="1"
-                android:drawableTop="@drawable/ic_px_sharelog"
-                android:text="@string/main_share_logs"/>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/mirai_home_create_instance"
+                    android:textColor="@color/mirai_text_primary"
+                    android:textSize="13sp"
+                    android:textStyle="bold"/>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/mirai_home_tile_create_sub"
+                    android:textColor="@color/mirai_text_secondary"
+                    android:textSize="11sp"/>
+
+            </LinearLayout>
 
         </LinearLayout>
 
         <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/mirai_space_md"
-            android:orientation="horizontal">
+            android:id="@+id/home_tile_explore"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_marginEnd="@dimen/mirai_gap_sm"
+            android:layout_weight="1"
+            android:background="@drawable/glass_panel"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="@dimen/mirai_gap_md">
 
-            <Button
-                android:id="@+id/open_files_button"
-                style="@style/Mirai.Button.Outline"
-                android:layout_width="0dp"
-                android:layout_height="@dimen/mirai_quick_action_height"
-                android:layout_marginEnd="@dimen/mirai_space_sm"
-                android:layout_weight="1"
-                android:drawableTop="@drawable/ic_px_folder"
-                android:text="@string/mcl_button_open_directory"/>
+            <ImageView
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_search"/>
 
-            <Button
-                android:id="@+id/news_button"
-                style="@style/Mirai.Button.Outline"
-                android:layout_width="0dp"
-                android:layout_height="@dimen/mirai_quick_action_height"
-                android:layout_marginStart="@dimen/mirai_space_sm"
-                android:layout_marginEnd="@dimen/mirai_space_sm"
-                android:layout_weight="1"
-                android:drawableTop="@drawable/ic_px_book"
-                android:text="@string/mcl_tab_wiki"/>
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/mirai_gap_md"
+                android:orientation="vertical">
 
-            <Button
-                android:id="@+id/social_media_button"
-                style="@style/Mirai.Button.Outline"
-                android:layout_width="0dp"
-                android:layout_height="@dimen/mirai_quick_action_height"
-                android:layout_marginStart="@dimen/mirai_space_sm"
-                android:layout_weight="1"
-                android:drawableTop="@drawable/ic_social_media"
-                android:text="@string/mcl_button_social_media"/>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/mirai_home_tile_explore"
+                    android:textColor="@color/mirai_text_primary"
+                    android:textSize="13sp"
+                    android:textStyle="bold"/>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/mirai_home_tile_explore_sub"
+                    android:textColor="@color/mirai_text_secondary"
+                    android:textSize="11sp"/>
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/home_tile_library"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_marginEnd="@dimen/mirai_gap_sm"
+            android:layout_weight="1"
+            android:background="@drawable/glass_panel"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="@dimen/mirai_gap_md">
+
+            <ImageView
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_dashboard_filled"/>
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/mirai_gap_md"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/mirai_home_tile_library"
+                    android:textColor="@color/mirai_text_primary"
+                    android:textSize="13sp"
+                    android:textStyle="bold"/>
+
+                <TextView
+                    android:id="@+id/home_tile_library_sub"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/mirai_home_tile_library_sub"
+                    android:textColor="@color/mirai_text_secondary"
+                    android:textSize="11sp"/>
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/open_files_button"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@drawable/glass_panel"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="@dimen/mirai_gap_md">
+
+            <ImageView
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_folder_outlined"/>
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/mirai_gap_md"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/mirai_home_tile_files"
+                    android:textColor="@color/mirai_text_primary"
+                    android:textSize="13sp"
+                    android:textStyle="bold"/>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/mirai_home_tile_files_sub"
+                    android:textColor="@color/mirai_text_secondary"
+                    android:textSize="11sp"/>
+
+            </LinearLayout>
 
         </LinearLayout>
 
     </LinearLayout>
 
     <LinearLayout
-        android:layout_width="0dp"
-        android:layout_height="match_parent"
-        android:layout_weight="1"
-        android:background="@drawable/mirai_card"
-        android:gravity="center"
-        android:orientation="vertical"
-        android:padding="@dimen/mirai_space_xxl">
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="@dimen/mirai_gap_sm_plus"
+        android:layout_weight="0.43"
+        android:orientation="horizontal">
 
-        <ImageView
-            android:id="@+id/liquid_launch_ring"
-            android:layout_width="190dp"
-            android:layout_height="190dp"
-            android:layout_marginBottom="-140dp"
-            android:contentDescription="@null"
-            android:src="@drawable/mirai_launch_glow"/>
+        <!-- Recent instances -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_marginEnd="@dimen/mirai_gap_sm_plus"
+            android:layout_weight="1.7"
+            android:background="@drawable/glass_panel"
+            android:orientation="vertical"
+            android:padding="@dimen/mirai_gap_md">
 
-        <Button
-            android:id="@+id/play_button"
-            android:layout_width="280dp"
-            android:layout_height="72dp"
-            android:background="@drawable/mirai_button"
-            android:drawableStart="@drawable/ic_px_home"
-            android:drawablePadding="@dimen/mirai_space_md"
-            android:paddingStart="@dimen/mirai_space_xl"
-            android:paddingEnd="@dimen/mirai_space_xl"
-            android:text="@string/liquid_launch"
-            android:textColor="?attr/miraiOnPrimary"
-            android:textSize="20sp"
-            android:textStyle="bold"
-            tools:ignore="TextContrastCheck"/>
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="@dimen/mirai_gap_sm"
+                android:text="@string/mirai_home_recent"
+                android:textColor="@color/mirai_text_secondary"
+                android:textSize="12sp"
+                android:textStyle="bold"/>
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/mirai_space_lg"
-            android:text="@string/liquid_launch_hint"
-            android:textColor="?attr/miraiOnSurfaceVariant"
-            android:textSize="13sp"/>
+            <ListView
+                android:id="@+id/home_recent_list"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:divider="@null"
+                android:scrollbars="none"/>
+
+        </LinearLayout>
+
+        <!-- Quick tools -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="0.72"
+            android:background="@drawable/glass_panel"
+            android:orientation="vertical"
+            android:padding="@dimen/mirai_gap_md">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="@dimen/mirai_gap_sm"
+                android:text="@string/mirai_home_tools"
+                android:textColor="@color/mirai_text_secondary"
+                android:textSize="12sp"
+                android:textStyle="bold"/>
+
+            <Button
+                android:id="@+id/custom_control_button"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/mirai_shell_action"
+                android:layout_marginBottom="@dimen/mirai_gap_sm"
+                android:background="@drawable/glass_outline_button"
+                android:drawableStart="@drawable/ic_videogame_asset_outlined"
+                android:drawablePadding="@dimen/mirai_gap_sm"
+                android:gravity="center_vertical"
+                android:paddingStart="@dimen/mirai_gap_md"
+                android:text="@string/mcl_option_customcontrol"
+                android:textColor="@color/mirai_text_primary"
+                android:textSize="13sp"/>
+
+            <Button
+                android:id="@+id/install_jar_button"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/mirai_shell_action"
+                android:layout_marginBottom="@dimen/mirai_gap_sm"
+                android:background="@drawable/glass_outline_button"
+                android:drawableStart="@drawable/ic_add"
+                android:drawablePadding="@dimen/mirai_gap_sm"
+                android:gravity="center_vertical"
+                android:paddingStart="@dimen/mirai_gap_md"
+                android:text="@string/main_install_jar_file"
+                android:textColor="@color/mirai_text_primary"
+                android:textSize="13sp"/>
+
+            <Button
+                android:id="@+id/share_logs_button"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/mirai_shell_action"
+                android:background="@drawable/glass_outline_button"
+                android:drawableStart="@drawable/ic_download_2_filled"
+                android:drawablePadding="@dimen/mirai_gap_sm"
+                android:gravity="center_vertical"
+                android:paddingStart="@dimen/mirai_gap_md"
+                android:text="@string/main_share_logs"
+                android:textColor="@color/mirai_text_primary"
+                android:textSize="13sp"/>
+
+        </LinearLayout>
 
     </LinearLayout>
 

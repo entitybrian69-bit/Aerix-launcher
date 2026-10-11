@@ -1,52 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- One Mirai rail destination: icon in a pill, label underneath. -->
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
-    android:id="@+id/rail_slot_root"
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:layout_marginBottom="@dimen/mirai_space_sm"
-    android:background="?attr/selectableItemBackground"
+<!-- One Mirai rail entry: a glass tile with an icon, accent filled when selected. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="@dimen/mirai_rail_item_width"
+    android:layout_height="@dimen/mirai_rail_item_height"
+    android:layout_marginBottom="@dimen/mirai_gap_sm"
+    android:background="@drawable/glass_item"
     android:clickable="true"
-    android:focusable="true"
-    android:gravity="center_horizontal"
-    android:orientation="vertical"
-    android:paddingTop="@dimen/mirai_space_sm"
-    android:paddingBottom="@dimen/mirai_space_sm">
+    android:focusable="true">
 
-    <FrameLayout
-        android:layout_width="match_parent"
-        android:layout_height="@dimen/mirai_shell_action_height">
+    <ImageView
+        android:id="@+id/rail_slot_icon"
+        android:layout_width="22dp"
+        android:layout_height="22dp"
+        android:layout_gravity="center"
+        android:duplicateParentState="true"
+        android:src="@drawable/ic_home_filled"/>
 
-        <View
-            android:id="@+id/rail_slot_pill"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:layout_marginStart="@dimen/mirai_space_xs"
-            android:layout_marginEnd="@dimen/mirai_space_xs"
-            android:background="@drawable/mirai_rail_pill"
-            android:visibility="gone"
-            tools:visibility="visible"/>
-
-        <ImageView
-            android:id="@+id/rail_slot_icon"
-            android:layout_width="@dimen/mirai_rail_icon"
-            android:layout_height="@dimen/mirai_rail_icon"
-            android:layout_gravity="center"
-            tools:src="@drawable/ic_px_home"/>
-
-    </FrameLayout>
-
-    <TextView
-        android:id="@+id/rail_slot_label"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="@dimen/mirai_space_xxs"
-        android:ellipsize="end"
-        android:gravity="center"
-        android:singleLine="true"
-        android:textColor="?attr/miraiOnSurfaceVariant"
-        android:textSize="10sp"
-        tools:text="Home"/>
-
-</LinearLayout>
+</FrameLayout>

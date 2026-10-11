@@ -10,8 +10,10 @@ import android.view.View;
 import android.view.animation.Animation;
 import android.view.animation.LinearInterpolator;
 import android.view.animation.RotateAnimation;
+import android.view.ViewGroup;
+import android.widget.BaseAdapter;
 import android.widget.Button;
-import android.widget.ImageButton;
+import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -31,15 +33,26 @@ import net.kdt.pojavlaunch.Tools;
 import net.kdt.pojavlaunch.contracts.OpenDocumentWithExtension;
 import net.kdt.pojavlaunch.extra.ExtraConstants;
 import net.kdt.pojavlaunch.extra.ExtraCore;
+import net.kdt.pojavlaunch.instances.DisplayInstance;
 import net.kdt.pojavlaunch.instances.Instance;
 import net.kdt.pojavlaunch.instances.Instances;
 import net.kdt.pojavlaunch.progresskeeper.ProgressKeeper;
+import net.kdt.pojavlaunch.progresskeeper.TaskCountListener;
 import net.kdt.pojavlaunch.utils.FileUtils;
 import net.kdt.pojavlaunch.utils.jre.GameRunner;
 
 import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 public class MainMenuFragment extends Fragment {
+
+    /* The recent instances shown on the home screen, and the views that list them. */
+    private final List<DisplayInstance> mRecent = new ArrayList<>();
+    private ListView mRecentList;
+    private TextView mTasksDetail;
+    private TextView mInstanceCount;
     public static final String TAG = "MainMenuFragment";
 
     private mcVersionSpinner mVersionSpinner;
@@ -56,17 +69,17 @@ public class MainMenuFragment extends Fragment {
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-        Button mNewsButton = view.findViewById(R.id.news_button);
-        Button mDiscordButton = view.findViewById(R.id.social_media_button);
+        View mNewsButton = view.findViewById(R.id.news_button);
+        View mDiscordButton = view.findViewById(R.id.social_media_button);
         Button mCustomControlButton = view.findViewById(R.id.custom_control_button);
         Button mInstallJarButton = view.findViewById(R.id.install_jar_button);
         Button mShareLogsButton = view.findViewById(R.id.share_logs_button);
-        Button mOpenDirectoryButton = view.findViewById(R.id.open_files_button);
+        View mOpenDirectoryButton = view.findViewById(R.id.open_files_button);
 
         mInstanceDetail = view.findViewById(R.id.liquid_instance_detail);
         startRingSweep(view.findViewById(R.id.liquid_launch_ring));
-        ImageButton mEditProfileButton = view.findViewById(R.id.edit_profile_button);
-        Button mPlayButton = view.findViewById(R.id.play_button);
+        View mEditProfileButton = view.findViewById(R.id.edit_profile_button);
+        View mPlayButton = view.findViewById(R.id.play_button);
         mVersionSpinner = view.findViewById(R.id.mc_version_spinner);
 
         if (mNewsButton != null) {
@@ -134,7 +147,115 @@ public class MainMenuFragment extends Fragment {
         if (mOpenDirectoryButton != null) {
             mOpenDirectoryButton.setOnClickListener((v)-> openGameDirectory(v.getContext()));
         }
+
+        bindHomeTiles(view);
     }
+
+    /* Wires the panels Mirai's home screen adds on top of the old buttons. */
+    private void bindHomeTiles(@NonNull View view) {
+        View createInstance = view.findViewById(R.id.home_create_instance);
+        if (createInstance != null) {
+            createInstance.setOnClickListener(v -> Tools.swapFragment(requireActivity(),
+                    ProfileTypeSelectFragment.class, ProfileTypeSelectFragment.TAG, null));
+        }
+        View manageVersions = view.findViewById(R.id.home_manage_versions);
+        if (manageVersions != null) {
+            manageVersions.setOnClickListener(v -> Tools.swapFragment(requireActivity(),
+                    InstanceListFragment.class, InstanceListFragment.TAG, null));
+        }
+        View tasks = view.findViewById(R.id.home_tasks);
+        if (tasks != null) {
+            tasks.setOnClickListener(v -> {
+                View progress = requireActivity().findViewById(R.id.progress_layout);
+                if (progress == null) return;
+                progress.setVisibility(progress.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE);
+            });
+        }
+        View tileCreate = view.findViewById(R.id.home_tile_create);
+        if (tileCreate != null) {
+            tileCreate.setOnClickListener(v -> Tools.swapFragment(requireActivity(),
+                    ProfileTypeSelectFragment.class, ProfileTypeSelectFragment.TAG, null));
+        }
+        View tileExplore = view.findViewById(R.id.home_tile_explore);
+        if (tileExplore != null) {
+            tileExplore.setOnClickListener(v -> Tools.swapFragment(requireActivity(),
+                    SearchModFragment.class, SearchModFragment.TAG, null));
+        }
+        View tileLibrary = view.findViewById(R.id.home_tile_library);
+        if (tileLibrary != null) {
+            tileLibrary.setOnClickListener(v -> Tools.swapFragment(requireActivity(),
+                    InstanceListFragment.class, InstanceListFragment.TAG, null));
+        }
+
+        mRecentList = view.findViewById(R.id.home_recent_list);
+        if (mRecentList != null) {
+            mRecentList.setAdapter(mRecentAdapter);
+            mRecentList.setOnItemClickListener((parent, row, position, id) -> {
+                DisplayInstance instance = mRecent.get(position);
+                PojavApplication.sExecutorService.execute(() -> {
+                    Instances.setSelectedInstance(instance);
+                    Tools.runOnUiThread(() -> {
+                        ExtraCore.setValue(ExtraConstants.REFRESH_VERSION_SPINNER, true);
+                        refreshInstanceDetail();
+                        refreshRecent();
+                    });
+                });
+            });
+        }
+        mTasksDetail = view.findViewById(R.id.home_tasks_detail);
+        mInstanceCount = view.findViewById(R.id.home_tile_library_sub);
+
+        refreshRecent();
+        ProgressKeeper.addTaskCountListener(mTaskCountListener);
+    }
+
+    private void refreshRecent() {
+        PojavApplication.sExecutorService.execute(() -> {
+            try {
+                Instances loaded = Instances.loadDisplay();
+                List<DisplayInstance> recent = loaded.list.size() > 4
+                        ? new ArrayList<>(loaded.list.subList(0, 4))
+                        : new ArrayList<>(loaded.list);
+                Tools.runOnUiThread(() -> {
+                    mRecent.clear();
+                    mRecent.addAll(recent);
+                    mRecentAdapter.notifyDataSetChanged();
+                    if (mInstanceCount != null) {
+                        mInstanceCount.setText(getResources().getQuantityString(
+                                R.plurals.mirai_home_instance_count, loaded.list.size(), loaded.list.size()));
+                    }
+                });
+            } catch (IOException e) {
+                // A broken instance file should not take the home screen down.
+            }
+        });
+    }
+
+    private final BaseAdapter mRecentAdapter = new BaseAdapter() {
+        @Override public int getCount() { return mRecent.size(); }
+        @Override public Object getItem(int position) { return mRecent.get(position); }
+        @Override public long getItemId(int position) { return position; }
+
+        @Override public View getView(int position, View convertView, ViewGroup parent) {
+            TextView row = convertView instanceof TextView ? (TextView) convertView
+                    : new TextView(parent.getContext());
+            DisplayInstance instance = mRecent.get(position);
+            row.setText(instance.name != null ? instance.name : instance.versionId);
+            row.setTextColor(getResources().getColor(R.color.mirai_text_primary, requireContext().getTheme()));
+            row.setTextSize(14);
+            row.setPadding(0, 12, 0, 12);
+            row.setSingleLine(true);
+            return row;
+        }
+    };
+
+    private final TaskCountListener mTaskCountListener = taskCount -> {
+        if (mTasksDetail == null) return !isAdded();
+        Tools.runOnUiThread(() -> mTasksDetail.setText(taskCount > 0
+                ? getString(R.string.mirai_home_tasks_running, taskCount)
+                : getString(R.string.mirai_home_tasks_idle)));
+        return false;
+    };
 
     private void openGameDirectory(Context context) {
         Instance instance = Instances.loadSelectedInstance();

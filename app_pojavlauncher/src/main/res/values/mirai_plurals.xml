@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="mirai_home_instance_count">
+        <item quantity="one">%1$d installed profile</item>
+        <item quantity="other">%1$d installed profiles</item>
+    </plurals>
+</resources>

@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Mirai shell: the backdrop, the rail, and whatever screen is open. -->
+<!-- Mirai shell: backdrop, rail, and whatever screen is open. There is no
+     global top bar; every page owns its own header and runs to the top edge. -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@android:color/transparent">
+    android:background="?attr/miraiBackground">
 
     <net.kdt.pojavlaunch.ui.MiraiBackdropView
         android:id="@+id/mirai_backdrop"
@@ -26,8 +27,6 @@
             android:background="@android:color/transparent"
             android:orientation="vertical">
 
-            <include layout="@layout/view_mirai_header"/>
-
             <androidx.fragment.app.FragmentContainerView
                 android:id="@+id/container_fragment"
                 android:name="net.kdt.pojavlaunch.fragments.MainMenuFragment"
@@ -45,5 +44,20 @@
         </LinearLayout>
 
     </LinearLayout>
+
+    <!-- Mirai shows a small badge while tasks run; tapping it opens the tasks. -->
+    <TextView
+        android:id="@+id/mirai_task_badge"
+        android:layout_width="@dimen/mirai_gap_xxl"
+        android:layout_height="@dimen/mirai_gap_xxl"
+        android:layout_gravity="top|end"
+        android:layout_marginTop="@dimen/mirai_gap_sm"
+        android:layout_marginEnd="@dimen/mirai_gap_sm"
+        android:background="@drawable/glass_avatar"
+        android:gravity="center"
+        android:textColor="@color/mirai_accent"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:visibility="gone"/>
 
 </FrameLayout>

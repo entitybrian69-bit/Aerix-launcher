@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- A dark veil over the animated backdrop, so text stays readable while
-     the aurora keeps moving behind the panels. -->
-<shape xmlns:android="http://schemas.android.com/apk/res/android"
-    android:shape="rectangle">
-    <solid android:color="#B00A0710"/>
-</shape>

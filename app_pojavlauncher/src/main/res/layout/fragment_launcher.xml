@@ -16,7 +16,7 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="@drawable/mirai_card"
+            android:background="@drawable/glass_panel"
             android:gravity="center_vertical"
             android:orientation="horizontal"
             android:padding="@dimen/mirai_space_lg">
@@ -25,7 +25,7 @@
                 android:id="@+id/liquid_instance_icon"
                 android:layout_width="56dp"
                 android:layout_height="56dp"
-                android:background="@drawable/mirai_rail_pill"
+                android:background="@drawable/glass_pill"
                 android:contentDescription="@string/liquid_selected_instance"
                 android:padding="16dp"
                 android:src="@drawable/ic_px_home"/>
@@ -45,7 +45,7 @@
                     android:drawablePadding="@dimen/mirai_space_xs"
                     android:drawableEnd="@drawable/ic_expand_more"
                     android:gravity="center_vertical"
-                    android:textColor="?attr/miraiOnSurface"
+                    android:textColor="@color/mirai_text_primary"
                     android:textSize="16sp"/>
 
                 <TextView
@@ -62,7 +62,7 @@
                 android:id="@+id/edit_profile_button"
                 android:layout_width="@dimen/mirai_shell_action_height"
                 android:layout_height="@dimen/mirai_shell_action_height"
-                android:background="@drawable/mirai_button_outline"
+                android:background="@drawable/glass_outline_button"
                 android:contentDescription="@string/global_edit"
                 android:padding="8dp"
                 android:src="@drawable/ic_px_edit"/>
@@ -73,7 +73,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/mirai_space_lg"
-            android:background="@drawable/mirai_card"
+            android:background="@drawable/glass_panel"
             android:gravity="center"
             android:orientation="vertical"
             android:padding="@dimen/mirai_space_xxl">
@@ -90,7 +90,7 @@
                 android:id="@+id/play_button"
                 android:layout_width="match_parent"
                 android:layout_height="72dp"
-                android:background="@drawable/mirai_button"
+                android:background="@drawable/glass_button"
                 android:drawableStart="@drawable/ic_px_home"
                 android:drawablePadding="@dimen/mirai_space_md"
                 android:paddingStart="@dimen/mirai_space_xl"

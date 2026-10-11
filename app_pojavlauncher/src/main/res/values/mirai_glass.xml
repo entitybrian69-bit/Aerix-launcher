@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Mirai's glass system, taken from AerixSurface.kt / AerixSpacing / AerixRadii.
+     These are the colours the launcher actually paints with: dark blue glass
+     panels, icy hairline borders, a mint accent and a faint aurora behind all
+     of it. The Material palettes in mirai_colors.xml stay underneath as the
+     scheme, the glass is what you see. -->
+<resources>
+
+    <!-- What every page sits on: near black, so the glass reads as glass. -->
+    <color name="mirai_page_background">#FF0D0F14</color>
+
+    <!-- Glass surfaces -->
+    <color name="mirai_panel">#9D172B3A</color>
+    <color name="mirai_panel_raised">#B0223B4E</color>
+    <color name="mirai_panel_track">#68344F63</color>
+    <color name="mirai_panel_glass_tint">#7D22445A</color>
+    <color name="mirai_glass_tint">#FF2B5063</color>
+
+    <!-- Borders -->
+    <color name="mirai_border">#78E6FAFF</color>
+    <color name="mirai_border_soft">#48E6FAFF</color>
+    <color name="mirai_border_highlight">#E0E6FCFF</color>
+
+    <!-- Accent family -->
+    <color name="mirai_accent">#FF8DEFE0</color>
+    <color name="mirai_accent_secondary">#FFC1B5FF</color>
+    <color name="mirai_accent_glow">#668DEFE0</color>
+    <color name="mirai_accent_container">#5539C8C1</color>
+    <color name="mirai_on_accent">#FF06201D</color>
+    <color name="mirai_glass_blue">#FF91E9FF</color>
+    <color name="mirai_glass_violet">#FFB7A9FF</color>
+    <color name="mirai_glass_rose">#FFF3A9D9</color>
+
+    <!-- Aurora behind everything -->
+    <color name="mirai_aurora_cyan">#FF37DCEC</color>
+    <color name="mirai_aurora_violet">#FF7A71F5</color>
+
+    <!-- Text -->
+    <color name="mirai_text_primary">#FFF1F6FA</color>
+    <color name="mirai_text_secondary">#FFA8B9C5</color>
+    <color name="mirai_text_muted">#FF7D909D</color>
+
+    <!-- Shadows and scrims -->
+    <color name="mirai_scrim_soft">#33000000</color>
+    <color name="mirai_shadow_soft">#3A000000</color>
+    <color name="mirai_shadow_subtle">#1A000000</color>
+    <color name="mirai_glass_shadow">#66000610</color>
+
+    <!-- Status -->
+    <color name="mirai_success">#FF73E5B0</color>
+    <color name="mirai_warning">#FFFFC777</color>
+    <color name="mirai_danger">#FFFF7189</color>
+    <color name="mirai_danger_container">#FF3B1A1E</color>
+    <color name="mirai_warning_container">#FF3A2E16</color>
+
+    <!-- Spacing: AerixSpacing -->
+    <dimen name="mirai_gap_zero">0dp</dimen>
+    <dimen name="mirai_gap_hairline">1dp</dimen>
+    <dimen name="mirai_gap_xxs">2dp</dimen>
+    <dimen name="mirai_gap_tiny">3dp</dimen>
+    <dimen name="mirai_gap_xs">4dp</dimen>
+    <dimen name="mirai_gap_xs_plus">5dp</dimen>
+    <dimen name="mirai_gap_sm_compact">6dp</dimen>
+    <dimen name="mirai_gap_sm_tight">7dp</dimen>
+    <dimen name="mirai_gap_sm">8dp</dimen>
+    <dimen name="mirai_gap_sm_narrow">9dp</dimen>
+    <dimen name="mirai_gap_sm_plus">10dp</dimen>
+    <dimen name="mirai_gap_md_tight">11dp</dimen>
+    <dimen name="mirai_gap_md">12dp</dimen>
+    <dimen name="mirai_gap_md_plus">14dp</dimen>
+    <dimen name="mirai_gap_lg">16dp</dimen>
+    <dimen name="mirai_gap_lg_plus">18dp</dimen>
+    <dimen name="mirai_gap_xl">20dp</dimen>
+    <dimen name="mirai_gap_xl_plus">22dp</dimen>
+    <dimen name="mirai_gap_xxl">24dp</dimen>
+    <dimen name="mirai_gap_xxxl">32dp</dimen>
+    <dimen name="mirai_gap_section">40dp</dimen>
+
+    <!-- Radii: AerixRadii -->
+    <dimen name="mirai_radius_tiny">4dp</dimen>
+    <dimen name="mirai_radius_micro">6dp</dimen>
+    <dimen name="mirai_radius_compact">8dp</dimen>
+    <dimen name="mirai_radius_control_small">10dp</dimen>
+    <dimen name="mirai_radius_control">12dp</dimen>
+    <dimen name="mirai_radius_card_small">16dp</dimen>
+    <dimen name="mirai_radius_card">18dp</dimen>
+    <dimen name="mirai_radius_card_large">20dp</dimen>
+    <dimen name="mirai_radius_panel_small">22dp</dimen>
+    <dimen name="mirai_radius_panel">24dp</dimen>
+    <dimen name="mirai_radius_dialog">28dp</dimen>
+    <dimen name="mirai_radius_hero">32dp</dimen>
+    <dimen name="mirai_radius_pill">50dp</dimen>
+
+    <!-- Metrics: AerixMetrics -->
+    <dimen name="mirai_rail_width">68dp</dimen>
+    <dimen name="mirai_rail_width_expanded">78dp</dimen>
+    <dimen name="mirai_rail_item_width">44dp</dimen>
+    <dimen name="mirai_rail_item_height">42dp</dimen>
+    <dimen name="mirai_rail_item_width_expanded">64dp</dimen>
+    <dimen name="mirai_rail_item_height_expanded">54dp</dimen>
+    <dimen name="mirai_rail_item_compact">36dp</dimen>
+    <dimen name="mirai_rail_mark">38dp</dimen>
+    <dimen name="mirai_rail_divider_width">28dp</dimen>
+    <dimen name="mirai_quick_tile_height">78dp</dimen>
+    <dimen name="mirai_task_strip_height">74dp</dimen>
+    <dimen name="mirai_shell_action">40dp</dimen>
+    <dimen name="mirai_shell_action_compact">36dp</dimen>
+
+</resources>

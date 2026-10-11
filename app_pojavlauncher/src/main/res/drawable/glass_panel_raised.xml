@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="@color/mirai_panel_raised"/>
+            <corners android:radius="@dimen/mirai_radius_card"/>
+            <stroke android:width="@dimen/mirai_gap_hairline" android:color="@color/mirai_border"/>
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <gradient android:type="linear" android:angle="270"
+                android:startColor="#1AFFFFFF" android:endColor="#00FFFFFF"/>
+            <corners android:radius="@dimen/mirai_radius_card"/>
+        </shape>
+    </item>
+</layer-list>

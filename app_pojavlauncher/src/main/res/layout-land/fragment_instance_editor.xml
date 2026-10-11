@@ -5,7 +5,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="@dimen/mirai_content_column"
     android:layout_height="match_parent"
-    android:background="@drawable/mirai_card"
+    android:background="@drawable/glass_panel"
     android:orientation="vertical"
      android:layout_gravity="center_horizontal">
     <ScrollView

@@ -81,27 +81,27 @@ public class LauncherActivity extends BaseActivity {
     public static final String SETTING_FRAGMENT_TAG = "SETTINGS_FRAGMENT";
 
     private FragmentContainerView mFragmentView;
-    private ImageButton mSettingsButton;
     private ProgressLayout mProgressLayout;
     private ProgressServiceKeeper mProgressServiceKeeper;
     private NotificationManager mNotificationManager;
     private static ActivityResultLauncher<String> mRequestPermissionLauncher;
 
-    /* Mirai's rail: six destinations down the left edge */
+    /* Mirai's rail: monogram, the five sections, then settings and account */
     private static final int[] RAIL_SLOTS = {
             R.id.rail_home, R.id.rail_new_instance, R.id.rail_library,
             R.id.rail_discover, R.id.rail_wallpapers, R.id.rail_settings
     };
     private static final int[] RAIL_ICONS = {
-            R.drawable.ic_px_home, R.drawable.ic_px_edit, R.drawable.ic_px_folder,
-            R.drawable.ic_px_dynamic, R.drawable.ic_px_image, R.drawable.ic_px_sliders
+            R.drawable.ic_home_filled, R.drawable.ic_add, R.drawable.ic_dashboard_filled,
+            R.drawable.ic_public, R.drawable.ic_format_paint_outlined, R.drawable.ic_settings_filled
     };
+    /** The account avatar is the last rail entry, it is not a page fragment. */
+    private static final int RAIL_ACCOUNTS = 6;
+
     private static final int[] RAIL_LABELS = {
             R.string.mirai_rail_home, R.string.mirai_rail_new_instance, R.string.mirai_rail_library,
             R.string.mirai_rail_discover, R.string.mirai_rail_wallpapers, R.string.mirai_rail_settings
     };
-
-    private TextView mTitleView;
 
     private final View.OnClickListener[] mRailActions = new View.OnClickListener[] {
             // HOME
@@ -125,10 +125,23 @@ public class LauncherActivity extends BaseActivity {
     private final FragmentManager.FragmentLifecycleCallbacks mFragmentCallbackListener = new FragmentManager.FragmentLifecycleCallbacks() {
         @Override
         public void onFragmentResumed(@NonNull FragmentManager fm, @NonNull Fragment f) {
-            mSettingsButton.setImageDrawable(ContextCompat.getDrawable(getBaseContext(), f instanceof MainMenuFragment
-                    ? R.drawable.ic_px_sliders : R.drawable.ic_px_home));
             highlightRail(f);
         }
+    };
+
+    /* Mirai shows a small badge while tasks run; tapping it reveals them. */
+    private final TaskCountListener mTaskBadgeListener = taskCount -> {
+        TextView badge = findViewById(R.id.mirai_task_badge);
+        if (badge == null) return false;
+        Tools.runOnUiThread(() -> {
+            if (taskCount > 0) {
+                badge.setText(String.valueOf(taskCount));
+                badge.setVisibility(View.VISIBLE);
+            } else {
+                badge.setVisibility(View.GONE);
+            }
+        });
+        return false;
     };
 
     /* Listener for the back button in settings */
@@ -257,8 +270,8 @@ public class LauncherActivity extends BaseActivity {
         ProgressKeeper.addTaskCountListener(mDoubleLaunchPreventionListener);
         ProgressKeeper.addTaskCountListener((mProgressServiceKeeper = new ProgressServiceKeeper(this)));
 
-        mSettingsButton.setOnClickListener(mSettingButtonListener);
         ProgressKeeper.addTaskCountListener(mProgressLayout);
+        ProgressKeeper.addTaskCountListener(mTaskBadgeListener);
         ExtraCore.addExtraListener(ExtraConstants.BACK_PREFERENCE, mBackPreferenceListener);
         ExtraCore.addExtraListener(ExtraConstants.SELECT_AUTH_METHOD, mSelectAuthMethod);
 
@@ -281,42 +294,60 @@ public class LauncherActivity extends BaseActivity {
             View slot = findViewById(RAIL_SLOTS[i]);
             if (slot == null) continue;
             ImageView iconView = slot.findViewById(R.id.rail_slot_icon);
-            TextView label = slot.findViewById(R.id.rail_slot_label);
-            if (iconView != null) iconView.setImageResource(RAIL_ICONS[i]);
-            if (label != null) label.setText(RAIL_LABELS[i]);
+            if (iconView != null) {
+                iconView.setImageResource(RAIL_ICONS[i]);
+                iconView.setContentDescription(getString(RAIL_LABELS[i]));
+            }
             slot.setOnClickListener(mRailActions[i]);
         }
-        mTitleView = findViewById(R.id.mirai_title);
-        View settingsButton = findViewById(R.id.setting_button);
-        if (settingsButton != null) {
-            settingsButton.setOnClickListener(v -> Tools.swapFragment(this,
-                    LauncherPreferenceFragment.class, SETTING_FRAGMENT_TAG, null));
+
+        // The monogram goes home, the same as Mirai.
+        View mark = findViewById(R.id.rail_mark);
+        if (mark != null) mark.setOnClickListener(v -> Tools.backToMainMenu(this));
+
+        TextView badge = findViewById(R.id.mirai_task_badge);
+        if (badge != null) {
+            badge.setOnClickListener(v -> {
+                View progress = findViewById(R.id.progress_layout);
+                if (progress == null) return;
+                progress.setVisibility(progress.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE);
+            });
+        }
+
+        // The avatar opens the account panel, exactly like the old spinner did.
+        View account = findViewById(R.id.rail_account);
+        if (account != null) {
+            account.setOnClickListener(v ->
+                    ExtraCore.setValue(ExtraConstants.SELECT_AUTH_METHOD, true));
         }
     }
 
-    /* Marks the destination that is on screen. */
+    /* Marks the destination that is on screen: accent fill, dark icon. */
     private void highlightRail(@NonNull Fragment fragment) {
         int index = railIndexFor(fragment);
-        if (mTitleView != null) {
-            mTitleView.setText(index < 0 ? R.string.app_name : RAIL_LABELS[index]);
-        }
+        int accent = getResources().getColor(R.color.mirai_accent, getTheme());
+        int onAccent = getResources().getColor(R.color.mirai_on_accent, getTheme());
+        int idle = getResources().getColor(R.color.mirai_text_secondary, getTheme());
         for (int i = 0; i < RAIL_SLOTS.length; i++) {
             View slot = findViewById(RAIL_SLOTS[i]);
             if (slot == null) continue;
-            View pill = slot.findViewById(R.id.rail_slot_pill);
-            ImageView iconView = slot.findViewById(R.id.rail_slot_icon);
-            TextView label = slot.findViewById(R.id.rail_slot_label);
             boolean active = i == index;
-            if (pill != null) pill.setVisibility(active ? View.VISIBLE : View.GONE);
-            int colour = resolveColour(active
-                    ? R.attr.miraiOnPrimaryContainer
-                    : R.attr.miraiOnSurfaceVariant);
+            slot.setSelected(active);
+            ImageView iconView = slot.findViewById(R.id.rail_slot_icon);
             if (iconView != null) {
-                ImageViewCompat.setImageTintList(iconView, ColorStateList.valueOf(colour));
+                ImageViewCompat.setImageTintList(iconView,
+                        ColorStateList.valueOf(active ? onAccent : idle));
             }
-            if (label != null) {
-                label.setTextColor(colour);
-                label.setTypeface(label.getTypeface(), active ? Typeface.BOLD : Typeface.NORMAL);
+        }
+        View mark = findViewById(R.id.rail_mark);
+        if (mark != null) mark.setSelected(false);
+        View account = findViewById(R.id.rail_account);
+        if (account != null) {
+            account.setSelected(index == RAIL_ACCOUNTS);
+            ImageView avatar = account.findViewById(R.id.rail_account_icon);
+            if (avatar != null) {
+                ImageViewCompat.setImageTintList(avatar,
+                        ColorStateList.valueOf(index == RAIL_ACCOUNTS ? onAccent : idle));
             }
         }
     }
@@ -340,14 +371,11 @@ public class LauncherActivity extends BaseActivity {
                 || fragmentClass == LauncherPreferenceJavaFragment.class
                 || fragmentClass == LauncherPreferenceMiscellaneousFragment.class
                 || fragmentClass == LauncherPreferenceExperimentalFragment.class) return 5;
+        if (fragmentClass == SelectAuthFragment.class
+                || fragmentClass == LocalLoginFragment.class
+                || fragmentClass == MicrosoftLoginFragment.class
+                || fragmentClass == ElyByLoginFragment.class) return RAIL_ACCOUNTS;
         return -1;
-    }
-
-    /* Reads a colour out of the palette that is currently applied. */
-    private int resolveColour(int attr) {
-        TypedValue value = new TypedValue();
-        if (getTheme().resolveAttribute(attr, value, true)) return value.data;
-        return Color.WHITE;
     }
 
     /* Restores the wallpaper the user picked, if any. */
@@ -491,7 +519,6 @@ public class LauncherActivity extends BaseActivity {
     /** Stuff all the view boilerplate here */
     private void bindViews(){
         mFragmentView = findViewById(R.id.container_fragment);
-        mSettingsButton = findViewById(R.id.setting_button);
         mProgressLayout = findViewById(R.id.progress_layout);
     }
 }

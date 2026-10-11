@@ -1,26 +1,81 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Mirai's left navigation rail. Six destinations, account on top. -->
+<!-- Mirai's rail: a glass capsule floating beside the content, monogram on top,
+     account at the bottom. Mirai has no global top bar, so this is the only
+     permanent chrome on the screen. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/mirai_rail"
-    android:layout_width="@dimen/mirai_navigation_rail_width"
+    android:layout_width="@dimen/mirai_rail_width"
     android:layout_height="match_parent"
-    android:background="@drawable/mirai_rail_bg"
-    android:gravity="center_horizontal"
+    android:background="@android:color/transparent"
     android:orientation="vertical"
-    android:paddingTop="@dimen/mirai_space_md"
-    android:paddingBottom="@dimen/mirai_space_md">
+    android:paddingStart="@dimen/mirai_gap_xs"
+    android:paddingEnd="@dimen/mirai_gap_xs"
+    android:paddingTop="@dimen/mirai_gap_sm_plus"
+    android:paddingBottom="@dimen/mirai_gap_sm_plus">
 
-    <include android:id="@+id/rail_home" layout="@layout/item_mirai_rail"/>
-    <include android:id="@+id/rail_new_instance" layout="@layout/item_mirai_rail"/>
-    <include android:id="@+id/rail_library" layout="@layout/item_mirai_rail"/>
-    <include android:id="@+id/rail_discover" layout="@layout/item_mirai_rail"/>
-    <include android:id="@+id/rail_wallpapers" layout="@layout/item_mirai_rail"/>
-
-    <View
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"/>
+        android:layout_height="match_parent"
+        android:background="@drawable/glass_rail"
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
+        android:paddingTop="@dimen/mirai_gap_sm_plus"
+        android:paddingBottom="@dimen/mirai_gap_sm_plus">
 
-    <include android:id="@+id/rail_settings" layout="@layout/item_mirai_rail"/>
+        <FrameLayout
+            android:id="@+id/rail_mark"
+            android:layout_width="@dimen/mirai_rail_mark"
+            android:layout_height="@dimen/mirai_rail_mark"
+            android:layout_marginBottom="@dimen/mirai_gap_xs"
+            android:background="@drawable/glass_mark"
+            android:clickable="true"
+            android:focusable="true">
+
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_gravity="center"
+                android:contentDescription="@string/app_name"
+                android:src="@drawable/ic_aerix_mark"/>
+
+        </FrameLayout>
+
+        <Space
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/mirai_gap_xs"/>
+
+        <include android:id="@+id/rail_home" layout="@layout/item_mirai_rail"/>
+        <include android:id="@+id/rail_new_instance" layout="@layout/item_mirai_rail"/>
+        <include android:id="@+id/rail_library" layout="@layout/item_mirai_rail"/>
+        <include android:id="@+id/rail_discover" layout="@layout/item_mirai_rail"/>
+        <include android:id="@+id/rail_wallpapers" layout="@layout/item_mirai_rail"/>
+
+        <View
+            android:layout_width="@dimen/mirai_rail_divider_width"
+            android:layout_height="@dimen/mirai_gap_hairline"
+            android:layout_marginTop="@dimen/mirai_gap_xxs"
+            android:layout_marginBottom="@dimen/mirai_gap_xxs"
+            android:background="@color/mirai_border_soft"/>
+
+        <include android:id="@+id/rail_settings" layout="@layout/item_mirai_rail"/>
+
+        <FrameLayout
+            android:id="@+id/rail_account"
+            android:layout_width="@dimen/mirai_rail_item_width"
+            android:layout_height="@dimen/mirai_rail_item_height"
+            android:background="@drawable/glass_item"
+            android:clickable="true"
+            android:focusable="true">
+
+            <ImageView
+                android:id="@+id/rail_account_icon"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_gravity="center"
+                android:duplicateParentState="true"
+                android:src="@drawable/ic_person_outlined"/>
+
+        </FrameLayout>
+
+    </LinearLayout>
 
 </LinearLayout>

@@ -10,7 +10,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="@string/mirai_wallpaper_title"
-        android:textColor="?attr/miraiOnSurface"
+        android:textColor="@color/mirai_text_primary"
         android:textSize="22sp"
         android:textStyle="bold"/>
 
@@ -34,7 +34,7 @@
             android:layout_height="@dimen/mirai_shell_action_height"
             android:layout_marginEnd="@dimen/mirai_space_sm"
             android:layout_weight="1"
-            android:background="@drawable/mirai_button"
+            android:background="@drawable/glass_button"
             android:text="@string/mirai_wallpaper_pick"
             android:textColor="?attr/miraiOnPrimary"/>
 
@@ -44,9 +44,9 @@
             android:layout_height="@dimen/mirai_shell_action_height"
             android:layout_marginStart="@dimen/mirai_space_sm"
             android:layout_weight="1"
-            android:background="@drawable/mirai_button_outline"
+            android:background="@drawable/glass_outline_button"
             android:text="@string/mirai_wallpaper_none"
-            android:textColor="?attr/miraiOnSurface"/>
+            android:textColor="@color/mirai_text_primary"/>
 
     </LinearLayout>
 
@@ -56,7 +56,7 @@
         android:layout_height="0dp"
         android:layout_marginTop="@dimen/mirai_space_xl"
         android:layout_weight="1"
-        android:background="@drawable/mirai_card"
+        android:background="@drawable/glass_panel"
         android:contentDescription="@string/mirai_wallpaper_title"
         android:padding="@dimen/mirai_space_xs"
         android:scaleType="centerCrop"/>

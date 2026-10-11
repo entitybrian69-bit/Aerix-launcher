@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The rail capsule: a tall rounded pill floating beside the content. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="@color/mirai_glass_tint"/>
+    <corners android:radius="@dimen/mirai_radius_pill"/>
+    <stroke android:width="@dimen/mirai_gap_hairline" android:color="@color/mirai_border_soft"/>
+</shape>

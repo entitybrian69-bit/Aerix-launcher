@@ -12,7 +12,7 @@
         android:id="@+id/instance_row_icon"
         android:layout_width="40dp"
         android:layout_height="40dp"
-        android:background="@drawable/mirai_rail_pill"
+        android:background="@drawable/glass_pill"
         android:contentDescription="@string/liquid_selected_instance"
         android:padding="10dp"
         android:src="@drawable/ic_px_home"/>
@@ -30,7 +30,7 @@
             android:layout_height="wrap_content"
             android:ellipsize="end"
             android:singleLine="true"
-            android:textColor="?attr/miraiOnSurface"
+            android:textColor="@color/mirai_text_primary"
             android:textSize="15sp"
             tools:text="1.21.4 Fabric"/>
 

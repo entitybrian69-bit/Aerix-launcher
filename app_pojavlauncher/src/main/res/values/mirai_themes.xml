@@ -7,12 +7,21 @@
         <item name="windowNoTitle">true</item>
         <item name="windowActionBar">false</item>
         <item name="android:windowContentOverlay">@null</item>
-        <item name="android:listDivider">@drawable/mirai_divider</item>
-        <item name="android:divider">@drawable/mirai_divider</item>
+        <item name="android:textColorPrimary">@color/mirai_text_primary</item>
+        <item name="android:textColorSecondary">@color/mirai_text_secondary</item>
+        <item name="android:textColorTertiary">@color/mirai_text_muted</item>
+        <item name="android:textColorHint">@color/mirai_text_muted</item>
+        <item name="colorAccent">@color/mirai_accent</item>
+        <item name="android:colorAccent">@color/mirai_accent</item>
+        <item name="miraiAccent">@color/mirai_accent</item>
+        <item name="android:listDivider">@drawable/glass_divider</item>
+        <item name="android:divider">@drawable/glass_divider</item>
         <item name="android:listChoiceBackgroundIndicator">@drawable/mirai_choice</item>
-        <item name="android:scrollbarThumbVertical">@drawable/mirai_scrollbar</item>
-        <item name="android:scrollbarThumbHorizontal">@drawable/mirai_scrollbar</item>
+        <item name="android:listSelector">@drawable/mirai_choice</item>
+        <item name="android:scrollbarThumbVertical">@drawable/glass_pill</item>
+        <item name="android:scrollbarThumbHorizontal">@drawable/glass_pill</item>
         <item name="android:buttonStyle">@style/Mirai.Button</item>
+        <item name="android:windowBackground">@color/mirai_page_background</item>
         <item name="buttonStyle">@style/Mirai.Button</item>
         <item name="android:editTextStyle">@style/Mirai.EditText</item>
         <item name="android:spinnerStyle">@style/Mirai.Spinner</item>
@@ -20,6 +29,7 @@
         <item name="seekBarStyle">@style/Mirai.SeekBar</item>
         <item name="mineButtonBackground">@drawable/mirai_button</item>
         <item name="preferenceTheme">@style/Mirai.PreferenceTheme</item>
+        <item name="android:colorBackground">@color/mirai_page_background</item>
         <item name="android:alertDialogTheme">@style/Mirai.Dialog</item>
         <item name="alertDialogTheme">@style/Mirai.Dialog</item>
         <item name="android:dialogTheme">@style/Mirai.Dialog</item>
@@ -351,29 +361,29 @@
     </style>
 
     <style name="Mirai.Button.Outline" parent="Widget.AppCompat.Button">
-        <item name="android:background">@drawable/mirai_button_outline</item>
-        <item name="android:textColor">?attr/miraiOnSurface</item>
+        <item name="android:background">@drawable/glass_outline_button</item>
+        <item name="android:textColor">@color/mirai_text_primary</item>
         <item name="android:minHeight">@dimen/mirai_shell_action_height</item>
         <item name="android:gravity">center</item>
         <item name="android:maxLines">2</item>
     </style>
 
     <style name="Mirai.Button" parent="Widget.AppCompat.Button">
-        <item name="android:background">@drawable/mirai_button</item>
-        <item name="android:textColor">?attr/miraiOnPrimary</item>
+        <item name="android:background">@drawable/glass_button</item>
+        <item name="android:textColor">@color/mirai_on_accent</item>
         <item name="android:minHeight">@dimen/mirai_shell_action_height</item>
         <item name="android:gravity">center</item>
     </style>
 
     <style name="Mirai.EditText" parent="Widget.AppCompat.EditText">
-        <item name="android:background">@drawable/mirai_field</item>
-        <item name="android:textColor">?attr/miraiOnSurface</item>
-        <item name="android:textColorHint">?attr/miraiOutline</item>
+        <item name="android:background">@drawable/glass_field</item>
+        <item name="android:textColor">@color/mirai_text_primary</item>
+        <item name="android:textColorHint">@color/mirai_text_muted</item>
     </style>
 
     <style name="Mirai.Spinner" parent="Widget.AppCompat.Spinner">
-        <item name="android:background">@drawable/mirai_field</item>
-        <item name="android:popupBackground">@drawable/mirai_dialog_bg</item>
+        <item name="android:background">@drawable/glass_field</item>
+        <item name="android:popupBackground">@drawable/glass_panel_raised</item>
     </style>
 
     <style name="Mirai.SeekBar" parent="Widget.AppCompat.SeekBar">
@@ -383,15 +393,15 @@
     </style>
 
     <style name="Mirai.PopupMenu" parent="Widget.AppCompat.PopupMenu">
-        <item name="android:popupBackground">@drawable/mirai_dialog_bg</item>
+        <item name="android:popupBackground">@drawable/glass_panel_raised</item>
     </style>
 
     <style name="Mirai.Dialog" parent="Theme.AppCompat.Dialog.Alert">
-        <item name="android:windowBackground">@drawable/mirai_dialog_bg</item>
-        <item name="android:background">?attr/miraiSurfaceContainerHigh</item>
-        <item name="android:textColorPrimary">?attr/miraiOnSurface</item>
-        <item name="android:textColorSecondary">?attr/miraiOnSurfaceVariant</item>
-        <item name="colorAccent">?attr/miraiPrimary</item>
+        <item name="android:windowBackground">@drawable/glass_panel_raised</item>
+        <item name="android:background">@color/mirai_panel_raised</item>
+        <item name="android:textColorPrimary">@color/mirai_text_primary</item>
+        <item name="android:textColorSecondary">@color/mirai_text_secondary</item>
+        <item name="colorAccent">@color/mirai_accent</item>
     </style>
 
     <style name="Mirai.PreferenceTheme" parent="PreferenceThemeOverlay.v14.Material">
@@ -400,7 +410,7 @@
 
     <style name="MiraiPreferenceList">
         <item name="android:background">@android:color/transparent</item>
-        <item name="android:divider">@drawable/mirai_divider</item>
+        <item name="android:divider">@drawable/glass_divider</item>
         <item name="android:dividerHeight">1dp</item>
         <item name="android:scrollbars">none</item>
     </style>
