@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The halo that turns slowly behind the launch button. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="ring"
+    android:innerRadiusRatio="2.4"
+    android:thicknessRatio="9"
+    android:useLevel="false">
+    <gradient
+        android:type="sweep"
+        android:startColor="#00FFFFFF"
+        android:centerColor="?attr/miraiPrimary"
+        android:centerY="0.5"
+        android:centerX="0.5"
+        android:endColor="#00FFFFFF"/>
+</shape>

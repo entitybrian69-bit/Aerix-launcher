@@ -78,6 +78,14 @@
             android:orientation="vertical"
             android:padding="@dimen/mirai_space_xxl">
 
+            <ImageView
+                android:id="@+id/liquid_launch_ring"
+                android:layout_width="150dp"
+                android:layout_height="150dp"
+                android:layout_gravity="center"
+                android:contentDescription="@null"
+                android:src="@drawable/mirai_launch_glow"/>
+
             <Button
                 android:id="@+id/play_button"
                 android:layout_width="match_parent"

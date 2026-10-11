@@ -1,5 +1,6 @@
 package net.kdt.pojavlaunch.fragments;
 
+import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
@@ -79,10 +80,13 @@ public class WallpaperFragment extends Fragment {
     }
 
     private void importWallpaper(@NonNull Uri uri) {
+        // Hold the application context: the screen may be gone by the time the
+        // copy finishes.
+        Context context = requireContext().getApplicationContext();
         PojavApplication.sExecutorService.execute(() -> {
-            File target = new File(requireContext().getFilesDir(), WALLPAPER_FILE);
+            File target = new File(context.getFilesDir(), WALLPAPER_FILE);
             boolean copied = false;
-            try (InputStream in = requireContext().getContentResolver().openInputStream(uri);
+            try (InputStream in = context.getContentResolver().openInputStream(uri);
                  OutputStream out = new FileOutputStream(target)) {
                 if (in != null) {
                     byte[] buffer = new byte[8192];
@@ -95,6 +99,7 @@ public class WallpaperFragment extends Fragment {
             }
             final boolean ok = copied;
             Tools.runOnUiThread(() -> {
+                if (!isAdded()) return;
                 if (ok) {
                     apply(target.getAbsolutePath());
                 } else {
