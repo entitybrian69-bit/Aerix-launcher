@@ -6,7 +6,7 @@
  *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/ui/screens/content/download/DownloadResourcePackScreen.kt
  *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/ui/screens/content/download/DownloadShadersScreen.kt
  *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/ui/screens/content/download/DownloadSavesScreen.kt
- *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/ui/screens/content/download/assets/search/*Screen.kt
+ *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/ui/screens/content/download/assets/search/SearchModScreen.kt, SearchResourcePackScreen.kt, SearchShadersScreen.kt, SearchSavesScreen.kt
  * HTTP goes through Pojav's ApiHandler and files through Pojav's DownloadUtils (SHA-1 verified).
  * Files land in the selected instance's folders, the same ones PojavContentBridge manages.
  * Zalith Launcher 2 Copyright (C) 2025 MovTery <movtery228@qq.com> and contributors
