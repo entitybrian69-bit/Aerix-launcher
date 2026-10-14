@@ -2,13 +2,19 @@
  * Aerix Launcher UI layer for PojavLauncher.
  * Ported from mirai-launcher- (Zalith Launcher 2 fork):
  *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/ui/screens/content/SettingsScreen.kt
- *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/ui/screens/content/settings/LauncherSettingsScreen.kt
  *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/ui/screens/content/settings/RendererSettingsScreen.kt
- *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/ui/screens/content/settings/ControlSettingsScreen.kt
  *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/ui/screens/content/settings/GameSettingsScreen.kt
+ *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/ui/screens/content/settings/JavaManageScreen.kt
+ *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/ui/screens/content/settings/LauncherSettingsScreen.kt
+ *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/ui/screens/content/settings/ControlSettingsScreen.kt
+ *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/ui/screens/content/settings/ControlManageScreen.kt
+ *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/ui/screens/content/settings/GamepadSettingsScreen.kt
+ *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/ui/screens/content/settings/AboutInfoScreen.kt
  *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/ui/screens/content/settings/layouts/(all .kt files)
- * Appearance rows write AerixPreferences; every other row is a PojavSetting from PojavSettingsBridge
- * and writes the PojavLauncher key it names. Each category links to the original Pojav screen.
+ * Top bar is Mirai's AerixPillTabRow with the 9 settings tabs (Renderer, Game, Java, Wallpapers,
+ * Launcher, Controls, Controls, Gamepad, About) and no page title above it; settings rows are
+ * grouped in Mirai's SettingsCardColumn (32dp outer corners, 4dp inner seams, DefaultSwitch with
+ * check/close thumb icons). Every setting writes PojavLauncher preferences or AerixPreferences.
  * Zalith Launcher 2 Copyright (C) 2025 MovTery <movtery228@qq.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
@@ -27,36 +33,60 @@
 
 package net.kdt.pojavlaunch.aerix.ui.screens
 
+import android.content.Intent
 import android.content.res.Configuration
+import android.net.Uri
+import android.os.Build
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.DrawableRes
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -65,85 +95,989 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.fragment.app.FragmentActivity
+import net.kdt.pojavlaunch.Architecture
+import net.kdt.pojavlaunch.BuildConfig
+import net.kdt.pojavlaunch.ImportControlActivity
+import net.kdt.pojavlaunch.NewJREUtil
+import net.kdt.pojavlaunch.PojavApplication
 import net.kdt.pojavlaunch.R
 import net.kdt.pojavlaunch.Tools
 import net.kdt.pojavlaunch.aerix.bridge.AerixColorTheme
-import net.kdt.pojavlaunch.aerix.ui.AerixNav
 import net.kdt.pojavlaunch.aerix.bridge.AerixPreferences
+import net.kdt.pojavlaunch.aerix.bridge.AerixRendererPlugin
 import net.kdt.pojavlaunch.aerix.bridge.AerixTransitionType
+import net.kdt.pojavlaunch.aerix.bridge.AssetPlatform
+import net.kdt.pojavlaunch.aerix.bridge.PojavDeviceBridge
 import net.kdt.pojavlaunch.aerix.bridge.PojavNavigator
+import net.kdt.pojavlaunch.aerix.bridge.PojavPluginBridge
 import net.kdt.pojavlaunch.aerix.bridge.PojavSetting
 import net.kdt.pojavlaunch.aerix.bridge.PojavSettingCategory
 import net.kdt.pojavlaunch.aerix.bridge.PojavSettingsBridge
-import net.kdt.pojavlaunch.aerix.components.ActionSettingRow
-import net.kdt.pojavlaunch.aerix.components.PillTabs
-import net.kdt.pojavlaunch.aerix.components.SliderSettingRow
-import net.kdt.pojavlaunch.aerix.components.SwitchSettingRow
-import net.kdt.pojavlaunch.aerix.components.TextSettingRow
-import net.kdt.pojavlaunch.aerix.bridge.AssetPlatform
-import net.kdt.pojavlaunch.aerix.theme.AerixLayoutDefaults
+import net.kdt.pojavlaunch.aerix.components.AerixGhostButton
+import net.kdt.pojavlaunch.aerix.components.AerixPillTab
+import net.kdt.pojavlaunch.aerix.components.AerixPillTabRow
+import net.kdt.pojavlaunch.aerix.components.AerixPrimaryButton
+import net.kdt.pojavlaunch.aerix.components.CardPosition
+import net.kdt.pojavlaunch.aerix.components.DefaultSwitch
+import net.kdt.pojavlaunch.aerix.components.ModrinthMetaPill
+import net.kdt.pojavlaunch.aerix.components.SettingsCardColumn
+import net.kdt.pojavlaunch.aerix.components.liquidGlass
+import net.kdt.pojavlaunch.aerix.components.rememberSettingsCardShape
+import net.kdt.pojavlaunch.aerix.theme.AerixMetrics
+import net.kdt.pojavlaunch.aerix.theme.AerixRadii
 import net.kdt.pojavlaunch.aerix.theme.AerixSpacing
 import net.kdt.pojavlaunch.aerix.theme.AerixSurface
 import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
+import net.kdt.pojavlaunch.aerix.ui.AerixNav
+import net.kdt.pojavlaunch.aerix.ui.LauncherSection
+import net.kdt.pojavlaunch.contracts.OpenDocumentWithExtension
+import net.kdt.pojavlaunch.game.renderer.def.Renderers
+import net.kdt.pojavlaunch.mobileglues.MainActivity as MobileGluesActivity
+import net.kdt.pojavlaunch.multirt.MultiRTUtils
+import net.kdt.pojavlaunch.multirt.Runtime
+import net.kdt.pojavlaunch.prefs.LauncherPreferences
+import net.kdt.pojavlaunch.progresskeeper.ProgressKeeper
+import net.kdt.pojavlaunch.tasks.DataMigrator
+import net.kdt.pojavlaunch.utils.jre.RuntimeSelectionException
+import java.io.File
+import kotlin.math.roundToInt
+
+private data class SettingTabItem(
+    val key: String,
+    @DrawableRes val iconRes: Int,
+    val label: String
+)
+
+private val settingTabItems = listOf(
+    SettingTabItem(AerixNav.TAB_RENDERER, R.drawable.aerix_ic_video_settings, "Renderer"),
+    SettingTabItem(AerixNav.TAB_GAME, R.drawable.aerix_ic_rocket_launch_filled, "Game"),
+    SettingTabItem(AerixNav.TAB_JAVA, R.drawable.aerix_ic_java, "Java"),
+    SettingTabItem(AerixNav.TAB_WALLPAPERS, R.drawable.aerix_ic_format_paint_outlined, "Wallpapers"),
+    SettingTabItem(AerixNav.TAB_LAUNCHER, R.drawable.aerix_ic_setting_launcher, "Launcher"),
+    SettingTabItem(AerixNav.TAB_CONTROLS, R.drawable.aerix_ic_videogame_asset_outlined, "Controls"),
+    SettingTabItem(AerixNav.TAB_CONTROL_MANAGER, R.drawable.aerix_ic_videogame_asset_outlined, "Controls"),
+    SettingTabItem(AerixNav.TAB_GAMEPAD, R.drawable.aerix_ic_sports_esports_outlined, "Gamepad"),
+    SettingTabItem(AerixNav.TAB_ABOUT, R.drawable.aerix_ic_info_outlined, "About")
+)
+
+private data class RendererStackOption(
+    val keyMatch: String,
+    val title: String,
+    val badge: String,
+    val rendererId: String
+)
+
+private val rendererStackOptions = listOf(
+    RendererStackOption("AUTO", "Auto (Smart Pick)", "RECOMMENDED", Renderers.LTW_RENDERER),
+    RendererStackOption("VGPU_FAST", "vgpu - (up to 1.16.5, fast)", "1.16.5 FAST", Renderers.NGGL4ES_RENDERER),
+    RendererStackOption("VGPU_1368", "VGPU 1.3.6\u03B2", "SHADERCONV", Renderers.SFPEW_RENDERER),
+    RendererStackOption("LTW", "LTW (1.17+ Core)", "1.17+", Renderers.LTW_RENDERER),
+    RendererStackOption("Legacy", "LTW Legacy (1.8\u20131.16.5)", "1.8\u20131.16.5", Renderers.GL4ES_RENDERER),
+    RendererStackOption("Zink", "Kopper Zink (Vulkan)", "VULKAN", Renderers.ZINK_RENDERER),
+    RendererStackOption("MOBILEGLUES", "MobileGlues (1.17+)", "MODERN", Renderers.MOBILEGLUES_RENDERER)
+)
 
 @Composable
 fun SettingsScreen(activity: FragmentActivity, tabKey: String, onTabChanged: (String) -> Unit) {
-    val categories = PojavSettingsBridge.categories
-    // Appearance, every Pojav preference category, then Wallpapers as mirai's settings tabs do.
-    val tabIds = listOf(AerixNav.TAB_APPEARANCE) + categories.map { it.id } + listOf(AerixNav.TAB_WALLPAPERS)
-    val tabTitles = listOf(stringResource(R.string.aerix_settings_cat_appearance)) +
-        categories.map { stringResource(it.titleRes) } +
-        listOf(stringResource(R.string.aerix_wallpaper_title))
-    val selectedIndex = tabIds.indexOf(tabKey).coerceAtLeast(0)
+    val activeKey = if (settingTabItems.any { it.key == tabKey }) tabKey else AerixNav.TAB_RENDERER
 
-    val tabs: @Composable () -> Unit = {
-        PillTabs(
-            tabs = tabTitles,
-            selected = selectedIndex,
-            onSelect = { onTabChanged(tabIds[it]) },
-            modifier = Modifier.horizontalScroll(rememberScrollState())
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = AerixSpacing.md, vertical = AerixSpacing.sm),
+        verticalArrangement = Arrangement.spacedBy(AerixSpacing.md)
+    ) {
+        AerixPillTabRow(modifier = Modifier.fillMaxWidth()) {
+            settingTabItems.forEach { item ->
+                val selected = activeKey == item.key
+                AerixPillTab(
+                    selected = selected,
+                    onClick = { onTabChanged(item.key) }
+                ) {
+                    Icon(
+                        painter = painterResource(item.iconRes),
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Text(
+                        text = item.label,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+        ) {
+            when (activeKey) {
+                AerixNav.TAB_RENDERER -> RendererTabContent(activity)
+                AerixNav.TAB_GAME -> GameTabContent(activity)
+                AerixNav.TAB_JAVA -> JavaManageTabContent(activity)
+                AerixNav.TAB_WALLPAPERS -> WallpapersScreen(modifier = Modifier.fillMaxSize())
+                AerixNav.TAB_LAUNCHER -> LauncherTabContent(activity)
+                AerixNav.TAB_CONTROLS -> ControlsTabContent(activity)
+                AerixNav.TAB_CONTROL_MANAGER -> ControlManagerTabContent(activity)
+                AerixNav.TAB_GAMEPAD -> GamepadTabContent(activity)
+                AerixNav.TAB_ABOUT -> AboutInfoTabContent(activity)
+                else -> RendererTabContent(activity)
+            }
+        }
+    }
+}
+
+// ============================================================================================
+// 1. Renderer tab (Mirai RendererSettingsScreen.kt)
+// ============================================================================================
+
+@Composable
+private fun RendererTabContent(activity: FragmentActivity) {
+    val revision = PojavSettingsBridge.revision
+    val compatible = remember(revision) { PojavSettingsBridge.renderers(activity) }
+    val plugins = remember(revision) { PojavPluginBridge.loadPlugins(activity) }
+    val currentRenderer = remember(revision) { LauncherPreferences.PREF_RENDERER ?: Renderers.GL4ES_RENDERER }
+    var autoSelected by remember { mutableStateOf(false) }
+    var showRendererDialog by remember { mutableStateOf(false) }
+
+    val runtimes = remember(revision) { runCatching { MultiRTUtils.getRuntimes() }.getOrDefault(emptyList()) }
+    val defaultJre = remember(revision) { LauncherPreferences.PREF_DEFAULT_RUNTIME ?: "" }
+    val maxAllocMb = remember { PojavSettingsBridge.maxRam(activity).coerceAtLeast(1024) }
+    val totalRamMb = remember { Tools.getTotalDeviceMemory(activity).coerceAtLeast(2048) }
+    var ramAlloc by remember(revision) { mutableIntStateOf(LauncherPreferences.PREF_RAM_ALLOCATION.coerceIn(256, maxAllocMb)) }
+
+    if (showRendererDialog) {
+        ChoiceDialog(
+            title = stringResource(R.string.mcl_setting_category_renderer),
+            entries = compatible,
+            current = currentRenderer,
+            onDismiss = { showRendererDialog = false },
+            onPick = { id ->
+                autoSelected = false
+                PojavSettingsBridge.writeString(activity, "renderer", id)
+                showRendererDialog = false
+            }
         )
     }
 
-    if (tabKey == AerixNav.TAB_WALLPAPERS) {
-        // The Wallpapers tab is the Mirai WallpaperPage: tab bar, then the page's own control bar.
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(AerixLayoutDefaults.pagePadding()),
-            verticalArrangement = Arrangement.spacedBy(AerixSpacing.md)
-        ) {
-            tabs()
-            WallpapersScreen()
-        }
-        return
-    }
-
-    AerixPage(
-        title = stringResource(R.string.aerix_settings_title),
-        subtitle = stringResource(R.string.aerix_settings_subtitle)
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = AerixSpacing.xs, vertical = AerixSpacing.xxs),
+        contentPadding = PaddingValues(bottom = AerixSpacing.xxl),
+        verticalArrangement = Arrangement.spacedBy(AerixSpacing.md)
     ) {
-        tabs()
-        if (tabKey == AerixNav.TAB_APPEARANCE) {
-            AppearanceSettings(activity)
-        } else {
-            val category = categories.firstOrNull { it.id == tabKey } ?: categories.first()
-            PojavCategorySettings(activity, category)
+        // 1. Renderer Backend 2-column grid (Mirai RendererSettingsScreen lines 210-322)
+        item {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
+            ) {
+                Text(
+                    text = "Renderer Backend",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color.White
+                )
+
+                rendererStackOptions.chunked(2).forEach { rowOptions ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
+                    ) {
+                        rowOptions.forEach { option ->
+                            val isSelected = when (option.keyMatch) {
+                                "AUTO" -> autoSelected
+                                else -> !autoSelected && currentRenderer == option.rendererId
+                            }
+                            val selectOption = {
+                                autoSelected = option.keyMatch == "AUTO"
+                                val targetId = if (compatible.any { it.first == option.rendererId }) {
+                                    option.rendererId
+                                } else {
+                                    compatible.firstOrNull()?.first ?: Renderers.GL4ES_RENDERER
+                                }
+                                PojavSettingsBridge.writeString(activity, "renderer", targetId)
+                            }
+                            val borderColor by animateColorAsState(
+                                targetValue = if (isSelected) AerixThemeManager.currentAccent() else AerixSurface.panelRaised,
+                                animationSpec = tween(160),
+                                label = "rendererOptionBorder"
+                            )
+                            val cardBg by animateColorAsState(
+                                targetValue = if (isSelected) AerixSurface.accentContainer else AerixSurface.panel,
+                                animationSpec = tween(160),
+                                label = "rendererOptionBg"
+                            )
+
+                            Surface(
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(AerixRadii.control),
+                                color = cardBg,
+                                border = BorderStroke(if (isSelected) 1.5.dp else AerixSpacing.hairline, borderColor),
+                                onClick = selectOption
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = AerixSpacing.smPlus, vertical = AerixSpacing.smPlus),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(AerixSpacing.smCompact)
+                                ) {
+                                    RadioButton(
+                                        selected = isSelected,
+                                        onClick = selectOption,
+                                        colors = RadioButtonDefaults.colors(
+                                            selectedColor = AerixThemeManager.currentAccent(),
+                                            unselectedColor = AerixSurface.textSecondary
+                                        ),
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Text(
+                                        text = option.title,
+                                        style = MaterialTheme.typography.labelLarge,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White,
+                                        modifier = Modifier.weight(1f),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    ModrinthMetaPill(
+                                        text = option.badge,
+                                        highlighted = isSelected || option.keyMatch == "AUTO"
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Installed FCL / Zalith renderer plugin APKs discovered by PojavPluginBridge
+                if (plugins.isNotEmpty()) {
+                    plugins.chunked(2).forEach { rowPlugins ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
+                        ) {
+                            rowPlugins.forEach { plugin ->
+                                RendererPluginCard(
+                                    plugin = plugin,
+                                    selected = !autoSelected && currentRenderer == plugin.pluginTag,
+                                    onSelect = {
+                                        autoSelected = false
+                                        PojavSettingsBridge.writeString(activity, "renderer", plugin.pluginTag)
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2. Memory Allocation & Java Runtime card (Mirai RendererSettingsScreen lines 325-425)
+        item {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(AerixSpacing.smCompact)
+            ) {
+                Text(
+                    text = "Memory Allocation & Java Runtime",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color.White
+                )
+
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(AerixRadii.cardSmall),
+                    color = AerixSurface.panel,
+                    border = BorderStroke(AerixSpacing.hairline, AerixSurface.border)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = AerixSpacing.mdPlus, vertical = AerixSpacing.smPlus),
+                        verticalArrangement = Arrangement.spacedBy(AerixSpacing.smCompact)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "RAM Allocation",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                            Text(
+                                text = "$ramAlloc MB / $totalRamMb MB",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = AerixThemeManager.currentAccent()
+                            )
+                        }
+
+                        Slider(
+                            value = ramAlloc.toFloat(),
+                            onValueChange = { ramAlloc = (it / 8f).roundToInt() * 8 },
+                            onValueChangeFinished = {
+                                PojavSettingsBridge.writeInt(activity, "allocation", ramAlloc)
+                            },
+                            valueRange = 256f..maxAllocMb.toFloat(),
+                            colors = SliderDefaults.colors(
+                                thumbColor = AerixThemeManager.currentAccent(),
+                                activeTrackColor = AerixThemeManager.currentAccent(),
+                                inactiveTrackColor = AerixSurface.panelTrack
+                            )
+                        )
+
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
+                        ) {
+                            Text(
+                                text = "Default JRE:",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = AerixSurface.textSecondary
+                            )
+
+                            AerixPillTabRow(modifier = Modifier.fillMaxWidth()) {
+                                AerixPillTab(
+                                    selected = defaultJre.isEmpty(),
+                                    onClick = {
+                                        LauncherPreferences.PREF_DEFAULT_RUNTIME = ""
+                                        PojavSettingsBridge.writeString(activity, "defaultRuntime", "")
+                                    }
+                                ) {
+                                    Text("Auto", style = MaterialTheme.typography.labelSmall)
+                                }
+                                runtimes.forEach { runtime ->
+                                    val selected = defaultJre == runtime.name
+                                    AerixPillTab(
+                                        selected = selected,
+                                        onClick = {
+                                            LauncherPreferences.PREF_DEFAULT_RUNTIME = runtime.name
+                                            PojavSettingsBridge.writeString(activity, "defaultRuntime", runtime.name)
+                                        }
+                                    ) {
+                                        Text(
+                                            text = if (runtime.javaVersion > 0) "JRE ${runtime.javaVersion}" else runtime.name,
+                                            style = MaterialTheme.typography.labelSmall
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 3. Compact Footer Updater Card (Mirai RendererSettingsScreen lines 428-469)
+        item {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(AerixRadii.control),
+                color = AerixSurface.panel,
+                border = BorderStroke(AerixSpacing.hairline, AerixSurface.border)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = AerixSpacing.mdPlus, vertical = AerixSpacing.sm),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "Aerix Launcher v1.6 \u2022 Built by entitybrian",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = AerixSurface.textPrimary
+                    )
+
+                    Button(
+                        onClick = {
+                            PojavNavigator.openUrl(activity, "https://github.com/entitybrian69-bit/Aerix-launcher/releases")
+                        },
+                        shape = RoundedCornerShape(AerixRadii.card),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = AerixThemeManager.currentAccent(),
+                            contentColor = AerixSurface.onAccent
+                        ),
+                        contentPadding = PaddingValues(horizontal = AerixSpacing.mdPlus, vertical = AerixSpacing.smCompact)
+                    ) {
+                        Text(
+                            text = "Check for Updates",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                    }
+                }
+            }
+        }
+
+        // 4. Detailed Renderer, Resolution & Fullscreen SettingsCardColumn
+        item {
+            val currentRendererLabel = compatible.firstOrNull { it.first == currentRenderer }?.second ?: currentRenderer
+            val showMgSettings = currentRenderer == Renderers.MOBILEGLUES_RENDERER
+            SettingsCardColumn(modifier = Modifier.fillMaxWidth()) {
+                MiraiActionSettingsCard(
+                    position = CardPosition.Top,
+                    title = "Global Renderer",
+                    summary = "$currentRendererLabel \u2022 ${plugins.size} renderer plugin(s) loaded",
+                    value = currentRendererLabel,
+                    onClick = { showRendererDialog = true },
+                    trailingIcon = {
+                        IconButton(onClick = {
+                            PojavPluginBridge.loadPlugins(activity, force = true)
+                            PojavSettingsBridge.touch()
+                            Toast.makeText(activity, "Found ${PojavPluginBridge.plugins.size} renderer plugin(s)", Toast.LENGTH_SHORT).show()
+                        }) {
+                            Icon(painterResource(R.drawable.aerix_ic_refresh), contentDescription = "Rescan plugins", tint = AerixSurface.textSecondary)
+                        }
+                    }
+                )
+                if (showMgSettings) {
+                    MiraiActionSettingsCard(
+                        position = CardPosition.Middle,
+                        title = stringResource(R.string.mcl_setting_title_renderer_settings),
+                        summary = stringResource(R.string.aerix_settings_renderer_settings_sub),
+                        value = "Configure",
+                        onClick = { activity.startActivity(Intent(activity, MobileGluesActivity::class.java)) }
+                    )
+                }
+                MiraiSliderSettingsCard(
+                    position = CardPosition.Middle,
+                    title = stringResource(R.string.mcl_setting_title_resolution_scaler),
+                    summary = stringResource(R.string.mcl_setting_subtitle_resolution_scaler),
+                    value = PojavSettingsBridge.resolutionPercent(),
+                    range = 25..100,
+                    step = 5,
+                    suffix = " %",
+                    onValueChange = { PojavSettingsBridge.writeInt(activity, "resolutionRatio", it) }
+                )
+                MiraiSwitchSettingsCard(
+                    position = CardPosition.Bottom,
+                    title = stringResource(R.string.mcl_setting_title_ignore_notch),
+                    summary = stringResource(R.string.mcl_setting_subtitle_ignore_notch),
+                    checked = LauncherPreferences.PREF_IGNORE_NOTCH,
+                    onCheckedChange = { PojavSettingsBridge.writeBoolean(activity, "ignoreNotch", it) }
+                )
+            }
+        }
+
+        // 5. Switch cards group (Screenshot 4: Sustained Performance Mode, Use System Vulkan Driver, Zink Vsync, Use SurfaceView Rendering, Shader Dump)
+        item {
+            SettingsCardColumn(modifier = Modifier.fillMaxWidth()) {
+                MiraiSwitchSettingsCard(
+                    position = CardPosition.Top,
+                    title = "Sustained Performance Mode",
+                    summary = "When enabled, the system provides more stable performance for the game, suitable for long play sessions, but may slightly reduce device responsiveness to prevent overheating",
+                    checked = LauncherPreferences.PREF_SUSTAINED_PERFORMANCE,
+                    onCheckedChange = { PojavSettingsBridge.writeBoolean(activity, "sustainedPerformance", it) }
+                )
+                MiraiSwitchSettingsCard(
+                    position = CardPosition.Middle,
+                    title = "Use System Vulkan Driver",
+                    summary = "When enabled, the launcher will force the use of the system's built-in Vulkan driver (for Adreno GPUs) instead of the default Turnip driver. This setting only affects the Zink backend and related mods that use Vulkan rendering",
+                    checked = LauncherPreferences.PREF_ZINK_PREFER_SYSTEM_DRIVER,
+                    onCheckedChange = { PojavSettingsBridge.writeBoolean(activity, "zinkPreferSystemDriver", it) }
+                )
+                MiraiSwitchSettingsCard(
+                    position = CardPosition.Middle,
+                    title = "Zink Vsync",
+                    summary = "Enable vertical sync for the Zink renderer via the system interface",
+                    checked = LauncherPreferences.PREF_FORCE_VSYNC,
+                    onCheckedChange = { PojavSettingsBridge.writeBoolean(activity, "force_vsync", it) }
+                )
+                MiraiSwitchSettingsCard(
+                    position = CardPosition.Middle,
+                    title = "Use SurfaceView Rendering",
+                    summary = stringResource(R.string.mcl_setting_subtitle_use_surface_view),
+                    checked = LauncherPreferences.PREF_USE_ALTERNATE_SURFACE,
+                    onCheckedChange = { PojavSettingsBridge.writeBoolean(activity, "alternate_surface", it) }
+                )
+                MiraiSwitchSettingsCard(
+                    position = CardPosition.Bottom,
+                    title = stringResource(R.string.preference_shader_dump_title),
+                    summary = stringResource(R.string.preference_shader_dump_description),
+                    checked = LauncherPreferences.PREF_DUMP_SHADERS,
+                    onCheckedChange = { PojavSettingsBridge.writeBoolean(activity, "dump_shaders", it) }
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun AppearanceSettings(activity: FragmentActivity) {
+private fun RendererPluginCard(
+    plugin: AerixRendererPlugin,
+    selected: Boolean,
+    onSelect: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val borderColor by animateColorAsState(
+        targetValue = if (selected) AerixThemeManager.currentAccent() else AerixSurface.panelRaised,
+        animationSpec = tween(160),
+        label = "pluginBorder"
+    )
+    val cardBg by animateColorAsState(
+        targetValue = if (selected) AerixSurface.accentContainer else AerixSurface.panel,
+        animationSpec = tween(160),
+        label = "pluginBg"
+    )
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(AerixRadii.control),
+        color = cardBg,
+        border = BorderStroke(if (selected) 1.5.dp else AerixSpacing.hairline, borderColor),
+        onClick = onSelect
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = AerixSpacing.smPlus, vertical = AerixSpacing.smPlus),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(AerixSpacing.smCompact)
+        ) {
+            RadioButton(
+                selected = selected,
+                onClick = onSelect,
+                colors = RadioButtonDefaults.colors(
+                    selectedColor = AerixThemeManager.currentAccent(),
+                    unselectedColor = AerixSurface.textSecondary
+                ),
+                modifier = Modifier.size(20.dp)
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = plugin.displayName,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = plugin.packageName,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = AerixSurface.textSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            ModrinthMetaPill(text = "PLUGIN", highlighted = selected)
+        }
+    }
+}
+
+// ============================================================================================
+// 2. Game tab (Mirai GameSettingsScreen.kt: integrity checks, Java memory/args, log settings, experimental)
+// ============================================================================================
+
+@Composable
+private fun GameTabContent(activity: FragmentActivity) {
+    val revision = PojavSettingsBridge.revision
+    val migrateLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri: Uri? ->
+        if (uri != null) {
+            android.app.AlertDialog.Builder(activity)
+                .setTitle(R.string.migration_progress_warning_title)
+                .setMessage(R.string.migration_progress_warning_summary)
+                .setPositiveButton(android.R.string.ok) { _, _ -> DataMigrator(activity, uri).migrateData() }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+        }
+    }
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = AerixSpacing.xs, vertical = AerixSpacing.xxs),
+        contentPadding = PaddingValues(bottom = AerixSpacing.xxl),
+        verticalArrangement = Arrangement.spacedBy(AerixSpacing.md)
+    ) {
+        item {
+            SettingsCardColumn(modifier = Modifier.fillMaxWidth()) {
+                MiraiSwitchSettingsCard(
+                    position = CardPosition.Top,
+                    title = stringResource(R.string.preference_verify_game_files_title),
+                    summary = stringResource(R.string.preference_verify_game_files_description),
+                    checked = remember(revision) { LauncherPreferences.PREF_VERIFY_FILES },
+                    onCheckedChange = { PojavSettingsBridge.writeBoolean(activity, "checkGameFiles", it) }
+                )
+                MiraiSwitchSettingsCard(
+                    position = CardPosition.Middle,
+                    title = stringResource(R.string.preference_go_vroom_title),
+                    summary = stringResource(R.string.preference_go_vroom_description),
+                    checked = remember(revision) { LauncherPreferences.PREF_RAPID_START },
+                    onCheckedChange = { PojavSettingsBridge.writeBoolean(activity, "fastStartupCheck", it) }
+                )
+                MiraiSwitchSettingsCard(
+                    position = CardPosition.Middle,
+                    title = stringResource(R.string.preference_verify_manifest_title),
+                    summary = stringResource(R.string.preference_verify_manifest_description),
+                    checked = remember(revision) { LauncherPreferences.PREF_VERIFY_MANIFEST },
+                    onCheckedChange = { PojavSettingsBridge.writeBoolean(activity, "verifyManifest", it) }
+                )
+                MiraiSwitchSettingsCard(
+                    position = CardPosition.Bottom,
+                    title = stringResource(R.string.preference_show_memory_warning_title),
+                    summary = stringResource(R.string.preference_show_memory_warning_summary),
+                    checked = remember(revision) { LauncherPreferences.PREF_SHOW_MEMORY_WARNING_DIALOG },
+                    onCheckedChange = { PojavSettingsBridge.writeBoolean(activity, "showMemoryWarning", it) }
+                )
+            }
+        }
+
+        item {
+            val maxRam = remember { PojavSettingsBridge.maxRam(activity) }
+            SettingsCardColumn(modifier = Modifier.fillMaxWidth()) {
+                MiraiSliderSettingsCard(
+                    position = CardPosition.Top,
+                    title = stringResource(R.string.mcl_memory_allocation),
+                    summary = stringResource(R.string.mcl_memory_allocation_subtitle),
+                    value = remember(revision) { LauncherPreferences.PREF_RAM_ALLOCATION.coerceIn(256, maxRam) },
+                    range = 256..maxRam,
+                    step = 8,
+                    suffix = " MB",
+                    onValueChange = { PojavSettingsBridge.writeInt(activity, "allocation", it) }
+                )
+                MiraiTextSettingsCard(
+                    position = CardPosition.Middle,
+                    title = stringResource(R.string.mcl_setting_title_javaargs),
+                    summary = stringResource(R.string.mcl_setting_subtitle_javaargs),
+                    value = remember(revision) { LauncherPreferences.PREF_CUSTOM_JAVA_ARGS ?: "" },
+                    onValueChange = { PojavSettingsBridge.writeString(activity, "javaArgs", it) }
+                )
+                MiraiSwitchSettingsCard(
+                    position = CardPosition.Bottom,
+                    title = stringResource(R.string.mcl_setting_java_sandbox),
+                    summary = stringResource(R.string.mcl_setting_java_sandbox_subtitle),
+                    checked = remember(revision) { LauncherPreferences.PREF_JAVA_SANDBOX },
+                    onCheckedChange = { PojavSettingsBridge.writeBoolean(activity, "java_sandbox", it) }
+                )
+            }
+        }
+
+        item {
+            SettingsCardColumn(modifier = Modifier.fillMaxWidth()) {
+                MiraiSliderSettingsCard(
+                    position = CardPosition.Top,
+                    title = stringResource(R.string.aerix_logs_text_size),
+                    summary = stringResource(R.string.aerix_logs_text_size_sub),
+                    value = AerixPreferences.logTextSize,
+                    range = 5..20,
+                    step = 1,
+                    suffix = " sp",
+                    onValueChange = { AerixPreferences.saveLogTextSize(it) }
+                )
+                MiraiSliderSettingsCard(
+                    position = CardPosition.Middle,
+                    title = stringResource(R.string.aerix_settings_log_flush),
+                    summary = stringResource(R.string.aerix_settings_log_flush_sub),
+                    value = AerixPreferences.logBufferFlushInterval,
+                    range = 100..1000,
+                    step = 100,
+                    suffix = " ms",
+                    onValueChange = { AerixPreferences.saveLogBufferFlushInterval(it) }
+                )
+                MiraiActionSettingsCard(
+                    position = CardPosition.Bottom,
+                    title = stringResource(R.string.aerix_logs_title),
+                    summary = stringResource(R.string.aerix_logs_subtitle),
+                    value = "Open",
+                    onClick = { AerixNav.navigate(LauncherSection.LOGS) }
+                )
+            }
+        }
+
+        item {
+            SettingsCardColumn(modifier = Modifier.fillMaxWidth()) {
+                MiraiSwitchSettingsCard(
+                    position = CardPosition.Top,
+                    title = stringResource(R.string.preference_force_big_core_title),
+                    summary = stringResource(R.string.preference_force_big_core_desc),
+                    checked = remember(revision) { LauncherPreferences.PREF_BIG_CORE_AFFINITY },
+                    onCheckedChange = { PojavSettingsBridge.writeBoolean(activity, "bigCoreAffinity", it) }
+                )
+                MiraiSwitchSettingsCard(
+                    position = CardPosition.Middle,
+                    title = stringResource(R.string.preference_sysmem_title),
+                    summary = stringResource(R.string.preference_sysmem_summary),
+                    checked = remember(revision) { LauncherPreferences.PREF_FREEDRENO_SYSMEM },
+                    onCheckedChange = { PojavSettingsBridge.writeBoolean(activity, "freedrenoSysmem", it) }
+                )
+                MiraiSwitchSettingsCard(
+                    position = CardPosition.Middle,
+                    title = stringResource(R.string.preference_alsoft_opensl_title),
+                    summary = stringResource(R.string.preference_alsoft_opensl_summary),
+                    checked = remember(revision) { LauncherPreferences.PREF_ALSOFT_FORCE_OPENSL },
+                    onCheckedChange = { PojavSettingsBridge.writeBoolean(activity, "alsoftForceOpenSL", it) }
+                )
+                MiraiSwitchSettingsCard(
+                    position = CardPosition.Middle,
+                    title = stringResource(R.string.preference_ubwc_title),
+                    summary = stringResource(R.string.preference_ubwc_summary),
+                    checked = remember(revision) { LauncherPreferences.PREF_UBWC_WORKAROUND },
+                    onCheckedChange = { PojavSettingsBridge.writeBoolean(activity, "ubwcWorkaround", it) }
+                )
+                MiraiActionSettingsCard(
+                    position = CardPosition.Bottom,
+                    title = stringResource(R.string.preference_data_migration_title),
+                    summary = stringResource(R.string.preference_data_migration_summary),
+                    value = "Import",
+                    onClick = {
+                        if (ProgressKeeper.getTaskCount() > 0) {
+                            Toast.makeText(activity, R.string.tasks_ongoing, Toast.LENGTH_SHORT).show()
+                        } else {
+                            migrateLauncher.launch(null)
+                        }
+                    }
+                )
+            }
+        }
+    }
+}
+
+// ============================================================================================
+// 3. Java tab (Mirai JavaManageScreen.kt over Pojav's MultiRTUtils / NewJREUtil)
+// ============================================================================================
+
+@Composable
+private fun JavaManageTabContent(activity: FragmentActivity) {
+    var refreshTick by remember { mutableIntStateOf(0) }
+    val installed = remember(refreshTick, PojavSettingsBridge.revision) {
+        runCatching { MultiRTUtils.getRuntimes() }.getOrDefault(emptyList())
+    }
+    val downloadable = remember(refreshTick, PojavSettingsBridge.revision) {
+        runCatching { MultiRTUtils.getRuntimesToDownload() }.getOrDefault(emptyList())
+    }
+    var downloadingName by remember { mutableStateOf<String?>(null) }
+    val defaultName = remember(refreshTick, PojavSettingsBridge.revision) {
+        LauncherPreferences.PREF_DEFAULT_RUNTIME ?: ""
+    }
+
+    val importJreLauncher = rememberLauncherForActivityResult(OpenDocumentWithExtension("xz")) { uri ->
+        if (uri != null) {
+            Tools.installRuntimeFromUri(activity, uri)
+            Toast.makeText(activity, R.string.global_installing, Toast.LENGTH_SHORT).show()
+            refreshTick++
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = AerixSpacing.xs, vertical = AerixSpacing.xxs),
+        verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.multirt_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color.White
+                )
+                Text(
+                    text = stringResource(R.string.multirt_subtitle),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = AerixSurface.textSecondary
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(AerixSpacing.sm)) {
+                AerixGhostButton(
+                    text = "",
+                    iconRes = R.drawable.aerix_ic_refresh,
+                    onClick = { refreshTick++ }
+                )
+                AerixPrimaryButton(
+                    text = "Import .tar.xz",
+                    iconRes = R.drawable.aerix_ic_add,
+                    onClick = { importJreLauncher.launch(null) }
+                )
+            }
+        }
+
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(bottom = AerixSpacing.xxl),
+            verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
+        ) {
+            items(installed.size, key = { "inst_${installed[it].name}" }) { index ->
+                val runtime: Runtime = installed[index]
+                val isDefault = runtime.name == defaultName
+                val compatible = runtime.versionString != null &&
+                    Tools.DEVICE_ARCHITECTURE == Architecture.archAsInt(runtime.arch)
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(AerixRadii.card),
+                    color = AerixSurface.panel,
+                    border = BorderStroke(
+                        if (isDefault) 1.5.dp else AerixSpacing.hairline,
+                        if (isDefault) AerixThemeManager.currentAccent() else AerixSurface.borderSoft
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = AerixSpacing.mdPlus, vertical = AerixSpacing.smPlus),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(AerixSpacing.md)
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.aerix_ic_java),
+                            contentDescription = null,
+                            tint = if (compatible) AerixThemeManager.currentAccent() else AerixSurface.danger,
+                            modifier = Modifier.size(26.dp)
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = runtime.name.replace(".tar.xz", "").replace("-", " "),
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                            Text(
+                                text = when {
+                                    runtime.versionString == null -> stringResource(R.string.multirt_runtime_corrupt)
+                                    !compatible -> stringResource(R.string.multirt_runtime_incompatiblearch, runtime.arch)
+                                    else -> "${runtime.versionString} \u2022 ${runtime.arch}"
+                                },
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (compatible) AerixSurface.textSecondary else AerixSurface.danger
+                            )
+                        }
+                        if (compatible) {
+                            AerixGhostButton(
+                                text = stringResource(
+                                    if (isDefault) R.string.multirt_config_setdefault_already
+                                    else R.string.multirt_config_setdefault
+                                ),
+                                iconRes = if (isDefault) R.drawable.aerix_ic_check else null,
+                                onClick = {
+                                    if (!isDefault) {
+                                        LauncherPreferences.PREF_DEFAULT_RUNTIME = runtime.name
+                                        PojavSettingsBridge.writeString(activity, "defaultRuntime", runtime.name)
+                                        refreshTick++
+                                    }
+                                }
+                            )
+                        }
+                        if (installed.size > 1) {
+                            IconButton(onClick = {
+                                PojavApplication.sExecutorService.execute {
+                                    runCatching { MultiRTUtils.removeRuntimeNamed(runtime.name) }
+                                    Tools.runOnUiThread { refreshTick++ }
+                                }
+                            }) {
+                                Icon(
+                                    painter = painterResource(R.drawable.aerix_ic_delete_outlined),
+                                    contentDescription = stringResource(R.string.global_remove),
+                                    tint = AerixSurface.danger
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            items(downloadable.size, key = { "dl_${downloadable[it].name}" }) { index ->
+                val ext: NewJREUtil.ExternalRuntime = downloadable[index]
+                val busy = downloadingName != null || ext.isDownloading
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(AerixRadii.card),
+                    color = AerixSurface.panel,
+                    border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = AerixSpacing.mdPlus, vertical = AerixSpacing.smPlus),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(AerixSpacing.md)
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.aerix_ic_download),
+                            contentDescription = null,
+                            tint = AerixSurface.textSecondary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = ext.name.replace(".tar.xz", "").replace("-", " "),
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                            Text(
+                                text = stringResource(R.string.global_not_installed),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = AerixSurface.textSecondary
+                            )
+                        }
+                        AerixPrimaryButton(
+                            text = stringResource(if (busy) R.string.global_installing else R.string.global_download),
+                            iconRes = R.drawable.aerix_ic_download,
+                            enabled = !busy,
+                            onClick = {
+                                downloadingName = ext.name
+                                ext.isDownloading = true
+                                PojavApplication.sExecutorService.execute {
+                                    try {
+                                        ext.downloadRuntime(activity.assets)
+                                    } catch (e: RuntimeSelectionException) {
+                                        Tools.showError(activity, e)
+                                    } finally {
+                                        ext.isDownloading = false
+                                        Tools.runOnUiThread {
+                                            downloadingName = null
+                                            refreshTick++
+                                        }
+                                    }
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ============================================================================================
+// 4. Launcher tab (Mirai LauncherSettingsScreen.kt)
+// ============================================================================================
+
+@Composable
+private fun LauncherTabContent(activity: FragmentActivity) {
+    val revision = PojavSettingsBridge.revision
     var showColorPicker by remember { mutableStateOf(false) }
     var showThemeChoice by remember { mutableStateOf(false) }
     var showTransitionChoice by remember { mutableStateOf(false) }
     var showPlatformChoice by remember { mutableStateOf(false) }
+    var showDownloadSourceChoice by remember { mutableStateOf(false) }
+
     val platformLabels = listOf(
         AssetPlatform.MODRINTH.name to stringResource(R.string.aerix_download_platform_modrinth),
         AssetPlatform.CURSEFORGE.name to stringResource(R.string.aerix_download_platform_curseforge)
@@ -156,6 +1090,9 @@ private fun AppearanceSettings(activity: FragmentActivity) {
     )
     val aerixLabel = stringResource(R.string.aerix_settings_theme_aerix)
     val customLabel = stringResource(R.string.aerix_settings_theme_custom)
+    val downloadSourceSetting = remember {
+        PojavSettingsBridge.misc.settings.filterIsInstance<PojavSetting.Choice>().firstOrNull { it.key == "downloadSource" }
+    }
 
     if (showThemeChoice) {
         ChoiceDialog(
@@ -193,6 +1130,18 @@ private fun AppearanceSettings(activity: FragmentActivity) {
             }
         )
     }
+    if (showDownloadSourceChoice && downloadSourceSetting != null) {
+        ChoiceDialog(
+            title = stringResource(downloadSourceSetting.titleRes),
+            entries = remember { downloadSourceSetting.entries(activity) },
+            current = downloadSourceSetting.current(),
+            onDismiss = { showDownloadSourceChoice = false },
+            onPick = {
+                PojavSettingsBridge.writeString(activity, downloadSourceSetting.key, it)
+                showDownloadSourceChoice = false
+            }
+        )
+    }
     if (showColorPicker) {
         HsvColorDialog(
             initial = Color(AerixPreferences.customColor),
@@ -205,288 +1154,1085 @@ private fun AppearanceSettings(activity: FragmentActivity) {
         )
     }
 
-    SettingsList {
-        item {
-            ActionSettingRow(
-                title = stringResource(R.string.aerix_settings_color_theme),
-                summary = stringResource(R.string.aerix_settings_color_theme_sub),
-                onClick = { showThemeChoice = true },
-                iconRes = R.drawable.aerix_ic_style_outlined,
-                value = if (AerixPreferences.colorTheme == AerixColorTheme.CUSTOM) customLabel else aerixLabel
-            )
-        }
-        item {
-            ActionSettingRow(
-                title = stringResource(R.string.aerix_settings_custom_color),
-                summary = stringResource(R.string.aerix_settings_custom_color_sub),
-                onClick = { showColorPicker = true },
-                iconRes = R.drawable.aerix_ic_format_paint_outlined,
-                value = "#%06X".format(AerixPreferences.customColor and 0xFFFFFF)
-            )
-        }
-        item {
-            SliderSettingRow(
-                title = stringResource(R.string.aerix_settings_bg_opacity),
-                summary = stringResource(R.string.aerix_settings_bg_opacity_sub),
-                value = AerixPreferences.backgroundOpacity,
-                range = 20..100,
-                step = 1,
-                suffix = " %",
-                onValueChange = { AerixPreferences.saveBackgroundOpacity(it) },
-                iconRes = R.drawable.aerix_ic_wallpaper
-            )
-        }
-        item {
-            SliderSettingRow(
-                title = stringResource(R.string.aerix_settings_bg_blur),
-                summary = stringResource(R.string.aerix_settings_bg_blur_sub),
-                value = AerixPreferences.backgroundBlur,
-                range = 0..20,
-                step = 1,
-                suffix = " dp",
-                onValueChange = { AerixPreferences.saveBackgroundBlur(it) },
-                iconRes = R.drawable.aerix_ic_photo_library_outlined
-            )
-        }
-        item {
-            SwitchSettingRow(
-                title = stringResource(R.string.aerix_settings_fullscreen),
-                summary = stringResource(R.string.aerix_settings_fullscreen_sub),
-                checked = AerixPreferences.fullScreen,
-                onCheckedChange = { value ->
-                    AerixPreferences.saveFullScreen(value)
-                    // Same call BaseActivity makes; LauncherActivity ignores the notch in portrait only.
-                    val portrait = activity.resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT
-                    Tools.setInsetsMode(activity, value, portrait)
-                },
-                iconRes = R.drawable.aerix_ic_video_settings
-            )
-        }
-        item {
-            SliderSettingRow(
-                title = stringResource(R.string.aerix_settings_animate_speed),
-                summary = stringResource(R.string.aerix_settings_animate_speed_sub),
-                value = AerixPreferences.animateSpeed,
-                range = 0..10,
-                step = 1,
-                suffix = "",
-                onValueChange = { AerixPreferences.saveAnimateSpeed(it) },
-                iconRes = R.drawable.aerix_ic_rocket_launch_filled
-            )
-        }
-        item {
-            ActionSettingRow(
-                title = stringResource(R.string.aerix_settings_transition),
-                summary = stringResource(R.string.aerix_settings_transition_sub),
-                onClick = { showTransitionChoice = true },
-                iconRes = R.drawable.aerix_ic_style_outlined,
-                value = transitionLabels.first { it.first == AerixPreferences.swapAnimateType.name }.second
-            )
-        }
-        item {
-            SliderSettingRow(
-                title = stringResource(R.string.aerix_settings_animate_extent),
-                summary = stringResource(R.string.aerix_settings_animate_extent_sub),
-                value = AerixPreferences.animateExtent,
-                range = 0..10,
-                step = 1,
-                suffix = "",
-                onValueChange = { AerixPreferences.saveAnimateExtent(it) },
-                iconRes = R.drawable.aerix_ic_touch_app_outlined
-            )
-        }
-        item {
-            SwitchSettingRow(
-                title = stringResource(R.string.aerix_settings_festival),
-                summary = stringResource(R.string.aerix_settings_festival_sub),
-                checked = AerixPreferences.festivalEffects,
-                onCheckedChange = { AerixPreferences.saveFestivalEffects(it) },
-                iconRes = R.drawable.aerix_ic_schedule_outlined
-            )
-        }
-        item {
-            SliderSettingRow(
-                title = stringResource(R.string.aerix_logs_text_size),
-                summary = stringResource(R.string.aerix_logs_text_size_sub),
-                value = AerixPreferences.logTextSize,
-                range = 5..20,
-                step = 1,
-                suffix = " sp",
-                onValueChange = { AerixPreferences.saveLogTextSize(it) },
-                iconRes = R.drawable.aerix_ic_terminal_outlined
-            )
-        }
-        item {
-            SliderSettingRow(
-                title = stringResource(R.string.aerix_settings_log_flush),
-                summary = stringResource(R.string.aerix_settings_log_flush_sub),
-                value = AerixPreferences.logBufferFlushInterval,
-                range = 100..1000,
-                step = 100,
-                suffix = " ms",
-                onValueChange = { AerixPreferences.saveLogBufferFlushInterval(it) },
-                iconRes = R.drawable.aerix_ic_terminal_outlined
-            )
-        }
-        item {
-            SliderSettingRow(
-                title = stringResource(R.string.aerix_settings_log_retention),
-                summary = stringResource(R.string.aerix_settings_log_retention_sub),
-                value = AerixPreferences.logRetentionDays,
-                range = 1..14,
-                step = 1,
-                suffix = " d",
-                onValueChange = { AerixPreferences.saveLogRetentionDays(it) },
-                iconRes = R.drawable.aerix_ic_schedule_outlined
-            )
-        }
-        item {
-            ActionSettingRow(
-                title = stringResource(R.string.aerix_settings_asset_platform),
-                summary = stringResource(R.string.aerix_settings_asset_platform_sub),
-                onClick = { showPlatformChoice = true },
-                iconRes = R.drawable.aerix_ic_download,
-                value = platformLabels.first { it.first == AerixPreferences.assetPlatformSource.name }.second
-            )
-        }
-        item {
-            TextSettingRow(
-                title = stringResource(R.string.aerix_settings_curseforge_key),
-                summary = stringResource(R.string.aerix_settings_curseforge_key_sub),
-                value = AerixPreferences.curseForgeApiKey,
-                onValueChange = { AerixPreferences.saveCurseForgeApiKey(it) },
-                iconRes = R.drawable.aerix_ic_link
-            )
-        }
-        item {
-            ActionSettingRow(
-                title = stringResource(R.string.aerix_settings_classic_all),
-                summary = stringResource(R.string.aerix_settings_classic_all_sub),
-                onClick = { PojavNavigator.openClassicSettings(activity) },
-                iconRes = R.drawable.aerix_ic_settings_filled
-            )
-        }
-        item {
-            ActionSettingRow(
-                title = stringResource(R.string.aerix_settings_classic_home),
-                summary = stringResource(R.string.aerix_settings_classic_home_sub),
-                onClick = { PojavNavigator.openClassicHome(activity) },
-                iconRes = R.drawable.aerix_ic_home_filled
-            )
-        }
-    }
-}
-
-@Composable
-private fun PojavCategorySettings(activity: FragmentActivity, category: PojavSettingCategory) {
-    // Reading the revision here makes every row re-read its PREF_* value after a write.
-    val revision = PojavSettingsBridge.revision
-    val visible = remember(category, revision) { category.settings.filter { it.visible(activity) } }
-    var choice by remember { mutableStateOf<PojavSetting.Choice?>(null) }
-
-    choice?.let { setting ->
-        ChoiceDialog(
-            title = stringResource(setting.titleRes),
-            entries = remember(setting) { setting.entries(activity) },
-            current = setting.current(),
-            onDismiss = { choice = null },
-            onPick = {
-                PojavSettingsBridge.writeString(activity, setting.key, it)
-                choice = null
-            }
-        )
-    }
-
-    SettingsList {
-        items(visible, key = { "${category.id}:${it.key}" }) { setting ->
-            PojavSettingRow(activity, setting, revision) { choice = it }
-        }
-        item {
-            ActionSettingRow(
-                title = stringResource(R.string.aerix_settings_open_classic),
-                summary = stringResource(R.string.aerix_settings_open_classic_sub),
-                onClick = { PojavSettingsBridge.openClassic(activity, category) },
-                iconRes = category.iconRes
-            )
-        }
-    }
-}
-
-@Composable
-private fun PojavSettingRow(
-    activity: FragmentActivity,
-    setting: PojavSetting,
-    @Suppress("UNUSED_PARAMETER") revision: Int,
-    onChoice: (PojavSetting.Choice) -> Unit
-) {
-    val title = stringResource(setting.titleRes)
-    val summary = setting.summaryRes?.let { stringResource(it) }
-    when (setting) {
-        is PojavSetting.Toggle -> SwitchSettingRow(
-            title = title,
-            summary = summary,
-            checked = setting.current(),
-            onCheckedChange = { PojavSettingsBridge.writeBoolean(activity, setting.key, it) }
-        )
-
-        is PojavSetting.Slider -> {
-            val min = setting.min(activity)
-            val max = maxOf(min, setting.max(activity))
-            val value = setting.current().coerceIn(min, max)
-            val fullSummary = if (setting.key == "allocation") {
-                val total = Tools.getTotalDeviceMemory(activity)
-                val free = PojavSettingsBridge.freeMemoryMb(activity)
-                buildString {
-                    if (summary != null) append(summary).append('\n')
-                    append(stringResource(R.string.aerix_settings_memory_info, total, free))
-                    if (value > free) append('\n').append(stringResource(R.string.setting_java_memory_exceeded))
-                }
-            } else summary
-            SliderSettingRow(
-                title = title,
-                summary = fullSummary,
-                value = value,
-                range = min..max,
-                step = setting.step,
-                suffix = setting.suffix,
-                onValueChange = { PojavSettingsBridge.writeInt(activity, setting.key, it) }
-            )
-        }
-
-        is PojavSetting.Text -> TextSettingRow(
-            title = title,
-            summary = summary,
-            value = setting.current(),
-            onValueChange = { PojavSettingsBridge.writeString(activity, setting.key, it) }
-        )
-
-        is PojavSetting.Choice -> {
-            val entries = remember(setting) { setting.entries(activity) }
-            val current = setting.current()
-            ActionSettingRow(
-                title = title,
-                summary = summary,
-                onClick = { onChoice(setting) },
-                value = entries.firstOrNull { it.first == current }?.second ?: current
-            )
-        }
-
-        is PojavSetting.Action -> ActionSettingRow(
-            title = title,
-            summary = summary,
-            onClick = { setting.run.invoke(activity) }
-        )
-    }
-}
-
-@Composable
-private fun SettingsList(content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit) {
     LazyColumn(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = AerixSpacing.xs, vertical = AerixSpacing.xxs),
         contentPadding = PaddingValues(bottom = AerixSpacing.xxl),
-        verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm),
-        content = content
-    )
+        verticalArrangement = Arrangement.spacedBy(AerixSpacing.md)
+    ) {
+        // Group 1: Color theme, custom color, festival effects, full screen (Mirai LauncherSettingsScreen)
+        item {
+            SettingsCardColumn(modifier = Modifier.fillMaxWidth()) {
+                MiraiActionSettingsCard(
+                    position = CardPosition.Top,
+                    title = stringResource(R.string.aerix_settings_color_theme),
+                    summary = stringResource(R.string.aerix_settings_color_theme_sub),
+                    value = if (AerixPreferences.colorTheme == AerixColorTheme.CUSTOM) customLabel else aerixLabel,
+                    onClick = { showThemeChoice = true }
+                )
+                MiraiActionSettingsCard(
+                    position = CardPosition.Middle,
+                    title = stringResource(R.string.aerix_settings_custom_color),
+                    summary = stringResource(R.string.aerix_settings_custom_color_sub),
+                    value = "#%06X".format(AerixPreferences.customColor and 0xFFFFFF),
+                    onClick = { showColorPicker = true }
+                )
+                MiraiSwitchSettingsCard(
+                    position = CardPosition.Middle,
+                    title = stringResource(R.string.aerix_settings_festival),
+                    summary = stringResource(R.string.aerix_settings_festival_sub),
+                    checked = AerixPreferences.festivalEffects,
+                    onCheckedChange = { AerixPreferences.saveFestivalEffects(it) }
+                )
+                MiraiSwitchSettingsCard(
+                    position = CardPosition.Bottom,
+                    title = stringResource(R.string.aerix_settings_fullscreen),
+                    summary = stringResource(R.string.aerix_settings_fullscreen_sub),
+                    checked = AerixPreferences.fullScreen,
+                    onCheckedChange = { value ->
+                        AerixPreferences.saveFullScreen(value)
+                        val portrait = activity.resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT
+                        Tools.setInsetsMode(activity, value, portrait)
+                    }
+                )
+            }
+        }
+
+        // Group 2: Background opacity & blur
+        item {
+            SettingsCardColumn(modifier = Modifier.fillMaxWidth()) {
+                MiraiSliderSettingsCard(
+                    position = CardPosition.Top,
+                    title = stringResource(R.string.aerix_settings_bg_opacity),
+                    summary = stringResource(R.string.aerix_settings_bg_opacity_sub),
+                    value = AerixPreferences.backgroundOpacity,
+                    range = 20..100,
+                    step = 1,
+                    suffix = " %",
+                    onValueChange = { AerixPreferences.saveBackgroundOpacity(it) }
+                )
+                MiraiSliderSettingsCard(
+                    position = CardPosition.Bottom,
+                    title = stringResource(R.string.aerix_settings_bg_blur),
+                    summary = stringResource(R.string.aerix_settings_bg_blur_sub),
+                    value = AerixPreferences.backgroundBlur,
+                    range = 0..20,
+                    step = 1,
+                    suffix = " dp",
+                    onValueChange = { AerixPreferences.saveBackgroundBlur(it) }
+                )
+            }
+        }
+
+        // Group 3: Animation speed, extent & swap transition type
+        item {
+            SettingsCardColumn(modifier = Modifier.fillMaxWidth()) {
+                MiraiSliderSettingsCard(
+                    position = CardPosition.Top,
+                    title = stringResource(R.string.aerix_settings_animate_speed),
+                    summary = stringResource(R.string.aerix_settings_animate_speed_sub),
+                    value = AerixPreferences.animateSpeed,
+                    range = 0..10,
+                    step = 1,
+                    suffix = "",
+                    onValueChange = { AerixPreferences.saveAnimateSpeed(it) }
+                )
+                MiraiSliderSettingsCard(
+                    position = CardPosition.Middle,
+                    title = stringResource(R.string.aerix_settings_animate_extent),
+                    summary = stringResource(R.string.aerix_settings_animate_extent_sub),
+                    value = AerixPreferences.animateExtent,
+                    range = 0..10,
+                    step = 1,
+                    suffix = "",
+                    onValueChange = { AerixPreferences.saveAnimateExtent(it) }
+                )
+                MiraiActionSettingsCard(
+                    position = CardPosition.Bottom,
+                    title = stringResource(R.string.aerix_settings_transition),
+                    summary = stringResource(R.string.aerix_settings_transition_sub),
+                    value = transitionLabels.first { it.first == AerixPreferences.swapAnimateType.name }.second,
+                    onClick = { showTransitionChoice = true }
+                )
+            }
+        }
+
+        // Group 4: Mirror source, asset platform, log retention, CurseForge API key, log share, force English
+        item {
+            SettingsCardColumn(modifier = Modifier.fillMaxWidth()) {
+                if (downloadSourceSetting != null) {
+                    MiraiActionSettingsCard(
+                        position = CardPosition.Top,
+                        title = stringResource(downloadSourceSetting.titleRes),
+                        summary = downloadSourceSetting.summaryRes?.let { stringResource(it) },
+                        value = remember(revision) { PojavSettingsBridge.describe(activity, downloadSourceSetting) },
+                        onClick = { showDownloadSourceChoice = true }
+                    )
+                }
+                MiraiActionSettingsCard(
+                    position = if (downloadSourceSetting != null) CardPosition.Middle else CardPosition.Top,
+                    title = stringResource(R.string.aerix_settings_asset_platform),
+                    summary = stringResource(R.string.aerix_settings_asset_platform_sub),
+                    value = platformLabels.first { it.first == AerixPreferences.assetPlatformSource.name }.second,
+                    onClick = { showPlatformChoice = true }
+                )
+                MiraiSliderSettingsCard(
+                    position = CardPosition.Middle,
+                    title = stringResource(R.string.aerix_settings_log_retention),
+                    summary = stringResource(R.string.aerix_settings_log_retention_sub),
+                    value = AerixPreferences.logRetentionDays,
+                    range = 1..14,
+                    step = 1,
+                    suffix = " d",
+                    onValueChange = { AerixPreferences.saveLogRetentionDays(it) }
+                )
+                MiraiTextSettingsCard(
+                    position = CardPosition.Middle,
+                    title = stringResource(R.string.aerix_settings_curseforge_key),
+                    summary = stringResource(R.string.aerix_settings_curseforge_key_sub),
+                    value = AerixPreferences.curseForgeApiKey,
+                    onValueChange = { AerixPreferences.saveCurseForgeApiKey(it) }
+                )
+                MiraiSwitchSettingsCard(
+                    position = CardPosition.Middle,
+                    title = stringResource(R.string.preference_force_english_title),
+                    summary = stringResource(R.string.preference_force_english_description),
+                    checked = remember(revision) { LauncherPreferences.PREF_FORCE_ENGLISH },
+                    onCheckedChange = { PojavSettingsBridge.writeBoolean(activity, "force_english", it) }
+                )
+                MiraiActionSettingsCard(
+                    position = CardPosition.Bottom,
+                    title = stringResource(R.string.main_share_logs),
+                    summary = stringResource(R.string.aerix_logs_subtitle),
+                    value = "Share",
+                    onClick = { PojavNavigator.shareLogs(activity) }
+                )
+            }
+        }
+    }
+}
+
+// ============================================================================================
+// 5. Controls tab (Mirai ControlSettingsScreen.kt: mouse, touch gestures, gyroscope)
+// ============================================================================================
+
+@Composable
+private fun ControlsTabContent(activity: FragmentActivity) {
+    val revision = PojavSettingsBridge.revision
+    val gyroEnabled = remember(revision) { LauncherPreferences.PREF_ENABLE_GYRO }
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = AerixSpacing.xs, vertical = AerixSpacing.xxs),
+        contentPadding = PaddingValues(bottom = AerixSpacing.xxl),
+        verticalArrangement = Arrangement.spacedBy(AerixSpacing.md)
+    ) {
+        // Mouse group
+        item {
+            SettingsCardColumn(modifier = Modifier.fillMaxWidth()) {
+                MiraiSwitchSettingsCard(
+                    position = CardPosition.Top,
+                    title = stringResource(R.string.preference_mouse_start_title),
+                    summary = stringResource(R.string.preference_mouse_start_description),
+                    checked = remember(revision) { LauncherPreferences.PREF_VIRTUAL_MOUSE_START },
+                    onCheckedChange = { PojavSettingsBridge.writeBoolean(activity, "mouse_start", it) }
+                )
+                MiraiSliderSettingsCard(
+                    position = CardPosition.Middle,
+                    title = stringResource(R.string.mcl_setting_title_mousescale),
+                    summary = stringResource(R.string.mcl_setting_subtitle_mousescale),
+                    value = remember(revision) { (LauncherPreferences.PREF_MOUSESCALE * 100).roundToInt() },
+                    range = 25..300,
+                    step = 5,
+                    suffix = " %",
+                    onValueChange = { PojavSettingsBridge.writeInt(activity, "mousescale", it) }
+                )
+                MiraiSliderSettingsCard(
+                    position = CardPosition.Bottom,
+                    title = stringResource(R.string.mcl_setting_title_mousespeed),
+                    summary = stringResource(R.string.mcl_setting_subtitle_mousespeed),
+                    value = remember(revision) { (LauncherPreferences.PREF_MOUSESPEED * 100).roundToInt() },
+                    range = 25..300,
+                    step = 5,
+                    suffix = " %",
+                    onValueChange = { PojavSettingsBridge.writeInt(activity, "mousespeed", it) }
+                )
+            }
+        }
+
+        // Gestures & on-screen buttons group
+        item {
+            SettingsCardColumn(modifier = Modifier.fillMaxWidth()) {
+                MiraiSwitchSettingsCard(
+                    position = CardPosition.Top,
+                    title = stringResource(R.string.mcl_disable_gestures),
+                    summary = stringResource(R.string.mcl_disable_gestures_subtitle),
+                    checked = remember(revision) { LauncherPreferences.PREF_DISABLE_GESTURES },
+                    onCheckedChange = { PojavSettingsBridge.writeBoolean(activity, "disableGestures", it) }
+                )
+                MiraiSwitchSettingsCard(
+                    position = CardPosition.Middle,
+                    title = stringResource(R.string.mcl_disable_swap_hand),
+                    summary = stringResource(R.string.mcl_disable_swap_hand_subtitle),
+                    checked = remember(revision) { LauncherPreferences.PREF_DISABLE_SWAP_HAND },
+                    onCheckedChange = { PojavSettingsBridge.writeBoolean(activity, "disableDoubleTap", it) }
+                )
+                MiraiSliderSettingsCard(
+                    position = CardPosition.Middle,
+                    title = stringResource(R.string.mcl_setting_title_longpresstrigger),
+                    summary = stringResource(R.string.mcl_setting_subtitle_longpresstrigger),
+                    value = remember(revision) { LauncherPreferences.PREF_LONGPRESS_TRIGGER },
+                    range = 100..1000,
+                    step = 10,
+                    suffix = " ms",
+                    onValueChange = { PojavSettingsBridge.writeInt(activity, "timeLongPressTrigger", it) }
+                )
+                MiraiSliderSettingsCard(
+                    position = CardPosition.Middle,
+                    title = stringResource(R.string.mcl_setting_title_buttonscale),
+                    summary = stringResource(R.string.mcl_setting_subtitle_buttonscale),
+                    value = remember(revision) { LauncherPreferences.PREF_BUTTONSIZE.toInt() },
+                    range = 50..250,
+                    step = 5,
+                    suffix = " %",
+                    onValueChange = { PojavSettingsBridge.writeInt(activity, "buttonscale", it) }
+                )
+                MiraiSliderSettingsCard(
+                    position = CardPosition.Middle,
+                    title = stringResource(R.string.preference_button_transparency),
+                    summary = stringResource(R.string.preference_button_transparency_summary),
+                    value = remember(revision) { LauncherPreferences.PREF_BUTTON_TRANSPARENCY.toInt() },
+                    range = 0..100,
+                    step = 1,
+                    suffix = " %",
+                    onValueChange = { PojavSettingsBridge.writeInt(activity, "buttonTransparency", it) }
+                )
+                MiraiSwitchSettingsCard(
+                    position = CardPosition.Middle,
+                    title = stringResource(R.string.mcl_setting_title_buttonallcaps),
+                    summary = stringResource(R.string.mcl_setting_subtitle_buttonallcaps),
+                    checked = remember(revision) { LauncherPreferences.PREF_BUTTON_ALL_CAPS },
+                    onCheckedChange = { PojavSettingsBridge.writeBoolean(activity, "buttonAllCaps", it) }
+                )
+                MiraiSwitchSettingsCard(
+                    position = CardPosition.Bottom,
+                    title = stringResource(R.string.preference_keyboard_autopan_title),
+                    summary = stringResource(R.string.preference_keyboard_autopan_summary),
+                    checked = remember(revision) { LauncherPreferences.PREF_KEYBOARD_AUTOPANNING },
+                    onCheckedChange = { PojavSettingsBridge.writeBoolean(activity, "keyboardAutoPanning", it) }
+                )
+            }
+        }
+
+        // Gyroscope group
+        item {
+            SettingsCardColumn(modifier = Modifier.fillMaxWidth()) {
+                MiraiSwitchSettingsCard(
+                    position = if (gyroEnabled) CardPosition.Top else CardPosition.Single,
+                    title = stringResource(R.string.preference_enable_gyro_title),
+                    summary = stringResource(R.string.preference_enable_gyro_description),
+                    checked = gyroEnabled,
+                    onCheckedChange = { PojavSettingsBridge.writeBoolean(activity, "enableGyro", it) }
+                )
+                if (gyroEnabled) {
+                    MiraiSliderSettingsCard(
+                        position = CardPosition.Middle,
+                        title = stringResource(R.string.preference_gyro_sensitivity_title),
+                        summary = stringResource(R.string.preference_gyro_sensitivity_description),
+                        value = remember(revision) { (LauncherPreferences.PREF_GYRO_SENSITIVITY * 100).roundToInt() },
+                        range = 25..300,
+                        step = 5,
+                        suffix = " %",
+                        onValueChange = { PojavSettingsBridge.writeInt(activity, "gyroSensitivity", it) }
+                    )
+                    MiraiSliderSettingsCard(
+                        position = CardPosition.Middle,
+                        title = stringResource(R.string.preference_gyro_sample_rate_title),
+                        summary = stringResource(R.string.preference_gyro_sample_rate_description),
+                        value = remember(revision) { LauncherPreferences.PREF_GYRO_SAMPLE_RATE },
+                        range = 5..50,
+                        step = 1,
+                        suffix = " ms",
+                        onValueChange = { PojavSettingsBridge.writeInt(activity, "gyroSampleRate", it) }
+                    )
+                    MiraiSwitchSettingsCard(
+                        position = CardPosition.Middle,
+                        title = stringResource(R.string.preference_gyro_smoothing_title),
+                        summary = stringResource(R.string.preference_gyro_smoothing_description),
+                        checked = remember(revision) { LauncherPreferences.PREF_GYRO_SMOOTHING },
+                        onCheckedChange = { PojavSettingsBridge.writeBoolean(activity, "gyroSmoothing", it) }
+                    )
+                    MiraiSwitchSettingsCard(
+                        position = CardPosition.Middle,
+                        title = stringResource(R.string.preference_gyro_invert_x_axis),
+                        summary = stringResource(R.string.preference_gyro_invert_x_axis_description),
+                        checked = remember(revision) { LauncherPreferences.PREF_GYRO_INVERT_X },
+                        onCheckedChange = { PojavSettingsBridge.writeBoolean(activity, "gyroInvertX", it) }
+                    )
+                    MiraiSwitchSettingsCard(
+                        position = CardPosition.Bottom,
+                        title = stringResource(R.string.preference_gyro_invert_y_axis),
+                        summary = stringResource(R.string.preference_gyro_invert_y_axis_description),
+                        checked = remember(revision) { LauncherPreferences.PREF_GYRO_INVERT_Y },
+                        onCheckedChange = { PojavSettingsBridge.writeBoolean(activity, "gyroInvertY", it) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ============================================================================================
+// 6. Control Manager tab (Mirai ControlManageScreen.kt over Tools.CTRLMAP_PATH)
+// ============================================================================================
+
+@Composable
+private fun ControlManagerTabContent(activity: FragmentActivity) {
+    var refreshTick by remember { mutableIntStateOf(0) }
+    val ctrlDir = remember { File(Tools.CTRLMAP_PATH).also { it.mkdirs() } }
+    val files = remember(refreshTick) {
+        ctrlDir.listFiles { f -> f.isFile && f.name.endsWith(".json", ignoreCase = true) }
+            ?.sortedBy { it.name.lowercase() }
+            ?: emptyList()
+    }
+    val defaultPath = remember(refreshTick, PojavSettingsBridge.revision) {
+        LauncherPreferences.PREF_DEFAULTCTRL_PATH ?: Tools.CTRLDEF_FILE
+    }
+
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            val intent = Intent(activity, ImportControlActivity::class.java).apply {
+                action = Intent.ACTION_VIEW
+                data = uri
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            activity.startActivity(intent)
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = AerixSpacing.xs, vertical = AerixSpacing.xxs),
+        verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.preference_edit_controls_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color.White
+                )
+                Text(
+                    text = stringResource(R.string.preference_edit_controls_summary),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = AerixSurface.textSecondary
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(AerixSpacing.sm)) {
+                AerixGhostButton(
+                    text = "",
+                    iconRes = R.drawable.aerix_ic_refresh,
+                    onClick = { refreshTick++ }
+                )
+                AerixGhostButton(
+                    text = "Import",
+                    iconRes = R.drawable.aerix_ic_add,
+                    onClick = { importLauncher.launch(arrayOf("application/json", "*/*")) }
+                )
+                AerixPrimaryButton(
+                    text = stringResource(R.string.mcl_option_customcontrol),
+                    iconRes = R.drawable.aerix_ic_edit_outlined,
+                    onClick = { PojavNavigator.openCustomControls(activity) }
+                )
+            }
+        }
+
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(bottom = AerixSpacing.xxl),
+            verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
+        ) {
+            items(files.size, key = { files[it].absolutePath }) { index ->
+                val file = files[index]
+                val isDefault = file.absolutePath == defaultPath || defaultPath.endsWith("/${file.name}")
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(AerixRadii.card),
+                    color = AerixSurface.panel,
+                    border = BorderStroke(
+                        if (isDefault) 1.5.dp else AerixSpacing.hairline,
+                        if (isDefault) AerixThemeManager.currentAccent() else AerixSurface.borderSoft
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = AerixSpacing.mdPlus, vertical = AerixSpacing.smPlus),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(AerixSpacing.md)
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.aerix_ic_videogame_asset_outlined),
+                            contentDescription = null,
+                            tint = if (isDefault) AerixThemeManager.currentAccent() else AerixSurface.textSecondary,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = file.nameWithoutExtension,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                            Text(
+                                text = file.name,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = AerixSurface.textSecondary
+                            )
+                        }
+                        AerixGhostButton(
+                            text = if (isDefault) "Default" else "Set default",
+                            iconRes = if (isDefault) R.drawable.aerix_ic_check else null,
+                            onClick = {
+                                LauncherPreferences.PREF_DEFAULTCTRL_PATH = file.absolutePath
+                                PojavSettingsBridge.writeString(activity, "defaultCtrl", file.absolutePath)
+                                refreshTick++
+                            }
+                        )
+                        IconButton(onClick = {
+                            LauncherPreferences.PREF_DEFAULTCTRL_PATH = file.absolutePath
+                            PojavSettingsBridge.writeString(activity, "defaultCtrl", file.absolutePath)
+                            PojavNavigator.openCustomControls(activity)
+                        }) {
+                            Icon(
+                                painter = painterResource(R.drawable.aerix_ic_edit_outlined),
+                                contentDescription = "Edit",
+                                tint = AerixSurface.textSecondary
+                            )
+                        }
+                        if (file.name != "default.json") {
+                            IconButton(onClick = {
+                                file.delete()
+                                refreshTick++
+                            }) {
+                                Icon(
+                                    painter = painterResource(R.drawable.aerix_ic_delete_outlined),
+                                    contentDescription = stringResource(R.string.global_remove),
+                                    tint = AerixSurface.danger
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ============================================================================================
+// 7. Gamepad tab (Mirai GamepadSettingsScreen.kt)
+// ============================================================================================
+
+@Composable
+private fun GamepadTabContent(activity: FragmentActivity) {
+    val revision = PojavSettingsBridge.revision
+    val deadzoneSetting = remember {
+        PojavSettingsBridge.controls.settings.filterIsInstance<PojavSetting.Slider>().firstOrNull { it.key == "gamepad_deadzone_scale" }
+    }
+    val wipeSetting = remember {
+        PojavSettingsBridge.controls.settings.filterIsInstance<PojavSetting.Action>().firstOrNull { it.key == "wipe_controller" }
+    }
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = AerixSpacing.xs, vertical = AerixSpacing.xxs),
+        contentPadding = PaddingValues(bottom = AerixSpacing.xxl),
+        verticalArrangement = Arrangement.spacedBy(AerixSpacing.md)
+    ) {
+        item {
+            SettingsCardColumn(modifier = Modifier.fillMaxWidth()) {
+                MiraiActionSettingsCard(
+                    position = CardPosition.Top,
+                    title = stringResource(R.string.preference_remap_controller_title),
+                    summary = stringResource(R.string.preference_remap_controller_description),
+                    value = "Open",
+                    onClick = { PojavNavigator.openGamepadMapper(activity) }
+                )
+                MiraiActionSettingsCard(
+                    position = CardPosition.Middle,
+                    title = stringResource(R.string.preference_wipe_controller_title),
+                    summary = stringResource(R.string.preference_wipe_controller_description),
+                    value = "Reset",
+                    onClick = { wipeSetting?.run?.invoke(activity) }
+                )
+                if (deadzoneSetting != null) {
+                    val min = deadzoneSetting.min(activity)
+                    val max = maxOf(min, deadzoneSetting.max(activity))
+                    MiraiSliderSettingsCard(
+                        position = CardPosition.Bottom,
+                        title = stringResource(deadzoneSetting.titleRes),
+                        summary = deadzoneSetting.summaryRes?.let { stringResource(it) },
+                        value = remember(revision) { deadzoneSetting.current().coerceIn(min, max) },
+                        range = min..max,
+                        step = deadzoneSetting.step,
+                        suffix = deadzoneSetting.suffix,
+                        onValueChange = { PojavSettingsBridge.writeInt(activity, deadzoneSetting.key, it) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ============================================================================================
+// 8. About tab (Mirai AboutInfoScreen.kt — Screenshot 5)
+// ============================================================================================
+
+@Composable
+private fun AboutInfoTabContent(activity: FragmentActivity) {
+    val accent = AerixThemeManager.currentAccent()
+    var report by remember { mutableStateOf(PojavDeviceBridge.report) }
+    LaunchedEffect(Unit) {
+        if (report == null) report = PojavDeviceBridge.load(activity)
+    }
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = AerixSpacing.xs, vertical = AerixSpacing.xxs),
+        contentPadding = PaddingValues(bottom = AerixSpacing.xxl),
+        verticalArrangement = Arrangement.spacedBy(AerixSpacing.md)
+    ) {
+        // Card 1: Aerix Launcher + entitybrian + Discord (Screenshot 5 top card)
+        item {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(AerixRadii.hero),
+                color = AerixSurface.panel,
+                border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(AerixSpacing.mdPlus),
+                    verticalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus)
+                ) {
+                    AboutRowCard(
+                        iconRes = R.drawable.ic_aerix_mark,
+                        iconTint = Color.Unspecified,
+                        title = "Aerix Launcher",
+                        subtitle = "Launcher Version: 1.6",
+                        actions = {
+                            AboutPillButton("Check for Updates", accent) {
+                                PojavNavigator.openUrl(activity, "https://github.com/entitybrian69-bit/Aerix-launcher/releases")
+                            }
+                            AboutPillButton("Project Link", accent) {
+                                PojavNavigator.openUrl(activity, "https://github.com/entitybrian69-bit/Aerix-launcher")
+                            }
+                            AboutPillButton("Discord", accent) {
+                                PojavNavigator.openDiscord(activity)
+                            }
+                        }
+                    )
+
+                    AboutRowCard(
+                        iconRes = R.drawable.aerix_img_avatar_entitybrian,
+                        iconTint = Color.Unspecified,
+                        title = "entitybrian",
+                        subtitle = "Owner and maintainer of Aerix Launcher.",
+                        actions = {
+                            AboutPillButton("GitHub profile", accent) {
+                                PojavNavigator.openUrl(activity, "https://github.com/entitybrian69-bit")
+                            }
+                        }
+                    )
+                }
+            }
+        }
+
+        // Card 2: Acknowledgements (Screenshot 5 bottom card)
+        item {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(AerixRadii.hero),
+                color = AerixSurface.panel,
+                border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = AerixSpacing.mdPlus),
+                    verticalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus)
+                ) {
+                    Text(
+                        text = "Acknowledgements",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        modifier = Modifier.padding(horizontal = AerixSpacing.lg)
+                    )
+                    HorizontalDivider(color = AerixSurface.borderSoft)
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = AerixSpacing.mdPlus),
+                        verticalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus)
+                    ) {
+                        AboutRowCard(
+                            iconRes = R.drawable.aerix_img_avatar_bangbang93,
+                            iconTint = Color.Unspecified,
+                            title = "bangbang93",
+                            subtitle = "Aerix uses the BMCL API mirror source",
+                            actions = {
+                                AboutPillButton("Sponsorship Support", accent) {
+                                    PojavNavigator.openUrl(activity, "https://afdian.com/a/bangbang93")
+                                }
+                            }
+                        )
+                        AboutRowCard(
+                            iconRes = R.drawable.aerix_img_launcher_fcl,
+                            iconTint = Color.Unspecified,
+                            title = "Fold Craft Launcher",
+                            subtitle = "Aerix incorporates code from FCL and references parts of its implementation",
+                            actions = {
+                                AboutPillButton("Project Link", accent) {
+                                    PojavNavigator.openUrl(activity, "https://github.com/FCL-Team/FoldCraftLauncher")
+                                }
+                            }
+                        )
+                        AboutRowCard(
+                            iconRes = R.drawable.aerix_img_launcher_hmcl,
+                            iconTint = Color.Unspecified,
+                            title = "Hello Minecraft! Launcher",
+                            subtitle = "Aerix incorporates code from HMCL and references parts of its implementation",
+                            actions = {
+                                AboutPillButton("Project Link", accent) {
+                                    PojavNavigator.openUrl(activity, "https://github.com/HMCL-dev/HMCL")
+                                }
+                            }
+                        )
+                        AboutRowCard(
+                            iconRes = R.drawable.aerix_img_platform_mcmod,
+                            iconTint = Color.Unspecified,
+                            title = "MCMod (mcmod.cn)",
+                            subtitle = "Aerix uses Simplified Chinese translations of mods and modpacks from MCMod",
+                            actions = {
+                                AboutPillButton("Open", accent) {
+                                    PojavNavigator.openUrl(activity, "https://www.mcmod.cn/")
+                                }
+                            }
+                        )
+                        AboutRowCard(
+                            iconRes = R.drawable.aerix_img_avatar_mcim,
+                            iconTint = Color.Unspecified,
+                            title = "mcmod-info-mirror",
+                            subtitle = "Aerix uses the MCIM mirror source",
+                            actions = {
+                                AboutPillButton("Sponsorship Support", accent) {
+                                    PojavNavigator.openUrl(activity, "https://afdian.com/a/vels")
+                                }
+                            }
+                        )
+                        AboutRowCard(
+                            iconRes = R.drawable.aerix_img_launcher_pcl2,
+                            iconTint = Color.Unspecified,
+                            title = "Plain Craft Launcher 2",
+                            subtitle = "Aerix references parts of the implementation from PCL2",
+                            actions = {}
+                        )
+                        AboutRowCard(
+                            iconRes = R.drawable.aerix_img_launcher_pojav,
+                            iconTint = Color.Unspecified,
+                            title = "PojavLauncher",
+                            subtitle = "Aerix uses the launch backend from PojavLauncher / MojoLauncher",
+                            actions = {
+                                AboutPillButton("Project Link", accent) {
+                                    PojavNavigator.openUrl(activity, "https://github.com/PojavLauncherTeam/PojavLauncher")
+                                }
+                            }
+                        )
+                        AboutRowCard(
+                            iconRes = R.drawable.aerix_ic_github,
+                            iconTint = Color.White,
+                            title = "GitHub Community",
+                            subtitle = "All issue reporters and contributors from the GitHub community",
+                            actions = {
+                                AboutPillButton("Contributors", accent) {
+                                    PojavNavigator.openUrl(activity, "https://github.com/entitybrian69-bit/Aerix-launcher/graphs/contributors")
+                                }
+                            }
+                        )
+                        AboutRowCard(
+                            iconRes = R.drawable.aerix_img_platform_weblate,
+                            iconTint = Color.Unspecified,
+                            title = "Weblate Community",
+                            subtitle = "All translators who participated in community language localization",
+                            actions = {
+                                AboutPillButton("Weblate", accent) {
+                                    PojavNavigator.openUrl(activity, "https://hosted.weblate.org/projects/zalithlauncher2")
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AboutRowCard(
+    @DrawableRes iconRes: Int,
+    iconTint: Color,
+    title: String,
+    subtitle: String,
+    actions: @Composable () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(AerixRadii.card),
+        color = AerixSurface.panelRaised.copy(alpha = 0.72f),
+        border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = AerixSpacing.mdPlus, vertical = AerixSpacing.smPlus),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(AerixSpacing.md)
+        ) {
+            if (iconTint == Color.Unspecified) {
+                Image(
+                    painter = painterResource(iconRes),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(RoundedCornerShape(AerixRadii.controlSmall))
+                )
+            } else {
+                Icon(
+                    painter = painterResource(iconRes),
+                    contentDescription = null,
+                    tint = iconTint,
+                    modifier = Modifier.size(34.dp)
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = AerixSurface.textSecondary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(AerixSpacing.sm)) {
+                actions()
+            }
+        }
+    }
+}
+
+@Composable
+private fun AboutPillButton(text: String, accent: Color, onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        shape = CircleShape,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = accent,
+            contentColor = AerixSurface.onAccent
+        ),
+        contentPadding = PaddingValues(horizontal = AerixSpacing.lg, vertical = AerixSpacing.smCompact)
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.ExtraBold
+        )
+    }
+}
+
+// ============================================================================================
+// Mirai SettingsCard layouts (SwitchSettingsCard, SliderSettingsCard, ActionSettingsCard, TextSettingsCard)
+// ============================================================================================
+
+@Composable
+private fun MiraiSwitchSettingsCard(
+    position: CardPosition,
+    title: String,
+    summary: String?,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    val shape = rememberSettingsCardShape(position)
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .liquidGlass(shape = shape, tint = AerixSurface.glassTint, strength = 0.9f, elevation = AerixSpacing.zero),
+        shape = shape,
+        color = AerixSurface.panel,
+        contentColor = AerixSurface.textPrimary,
+        border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft),
+        onClick = { onCheckedChange(!checked) }
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(all = AerixSpacing.lg),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(end = AerixSpacing.lg),
+                verticalArrangement = Arrangement.spacedBy(AerixSpacing.xxs)
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                if (!summary.isNullOrEmpty()) {
+                    Text(
+                        text = summary,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = AerixSurface.textSecondary,
+                        lineHeight = 16.sp
+                    )
+                }
+            }
+            DefaultSwitch(
+                checked = checked,
+                onCheckedChange = onCheckedChange
+            )
+        }
+    }
+}
+
+@Composable
+private fun MiraiSliderSettingsCard(
+    position: CardPosition,
+    title: String,
+    summary: String?,
+    value: Int,
+    range: IntRange,
+    step: Int,
+    suffix: String,
+    onValueChange: (Int) -> Unit
+) {
+    val shape = rememberSettingsCardShape(position)
+    var dragValue by remember(value) { mutableFloatStateOf(value.toFloat()) }
+    val steps = if (step > 0) ((range.last - range.first) / step - 1).coerceAtLeast(0) else 0
+    val accent = AerixThemeManager.currentAccent()
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .liquidGlass(shape = shape, tint = AerixSurface.glassTint, strength = 0.9f, elevation = AerixSpacing.zero),
+        shape = shape,
+        color = AerixSurface.panel,
+        contentColor = AerixSurface.textPrimary,
+        border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(all = AerixSpacing.lg),
+            verticalArrangement = Arrangement.spacedBy(AerixSpacing.xs)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                    if (!summary.isNullOrEmpty()) {
+                        Text(
+                            text = summary,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = AerixSurface.textSecondary
+                        )
+                    }
+                }
+                Text(
+                    text = "${dragValue.roundToInt()}$suffix",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = accent
+                )
+            }
+            Slider(
+                value = dragValue.coerceIn(range.first.toFloat(), range.last.toFloat()),
+                onValueChange = { dragValue = it },
+                onValueChangeFinished = {
+                    val snapped = if (step > 0) {
+                        (range.first + ((dragValue - range.first) / step).roundToInt() * step).coerceIn(range.first, range.last)
+                    } else dragValue.roundToInt()
+                    dragValue = snapped.toFloat()
+                    onValueChange(snapped)
+                },
+                valueRange = range.first.toFloat()..range.last.toFloat(),
+                steps = if (steps in 1..200) steps else 0,
+                colors = SliderDefaults.colors(
+                    thumbColor = accent,
+                    activeTrackColor = accent,
+                    inactiveTrackColor = AerixSurface.panelTrack
+                )
+            )
+        }
+    }
+}
+
+@Composable
+private fun MiraiActionSettingsCard(
+    position: CardPosition,
+    title: String,
+    summary: String?,
+    value: String,
+    onClick: () -> Unit,
+    trailingIcon: (@Composable () -> Unit)? = null
+) {
+    val shape = rememberSettingsCardShape(position)
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .liquidGlass(shape = shape, tint = AerixSurface.glassTint, strength = 0.9f, elevation = AerixSpacing.zero),
+        shape = shape,
+        color = AerixSurface.panel,
+        contentColor = AerixSurface.textPrimary,
+        border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft),
+        onClick = onClick
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(all = AerixSpacing.lg),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(AerixSpacing.xxs)
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                if (!summary.isNullOrEmpty()) {
+                    Text(
+                        text = summary,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = AerixSurface.textSecondary
+                    )
+                }
+            }
+            trailingIcon?.invoke()
+            Text(
+                text = value,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                color = AerixThemeManager.currentAccent(),
+                maxLines = 1
+            )
+        }
+    }
+}
+
+@Composable
+private fun MiraiTextSettingsCard(
+    position: CardPosition,
+    title: String,
+    summary: String?,
+    value: String,
+    onValueChange: (String) -> Unit
+) {
+    val shape = rememberSettingsCardShape(position)
+    var text by remember(value) { mutableStateOf(value) }
+    val accent = AerixThemeManager.currentAccent()
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .liquidGlass(shape = shape, tint = AerixSurface.glassTint, strength = 0.9f, elevation = AerixSpacing.zero),
+        shape = shape,
+        color = AerixSurface.panel,
+        contentColor = AerixSurface.textPrimary,
+        border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(all = AerixSpacing.lg),
+            verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = Color.White
+            )
+            if (!summary.isNullOrEmpty()) {
+                Text(
+                    text = summary,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = AerixSurface.textSecondary
+                )
+            }
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = accent,
+                    unfocusedBorderColor = AerixSurface.borderSoft,
+                    focusedTextColor = AerixSurface.textPrimary,
+                    unfocusedTextColor = AerixSurface.textPrimary,
+                    cursorColor = accent
+                ),
+                trailingIcon = {
+                    if (text != value) {
+                        Text(
+                            text = "SAVE",
+                            color = accent,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier
+                                .clip(CircleShape)
+                                .clickable { onValueChange(text) }
+                                .padding(AerixSpacing.sm)
+                        )
+                    }
+                }
+            )
+        }
+    }
 }
 
 @Composable
@@ -530,7 +2276,7 @@ private fun ChoiceDialog(
     )
 }
 
-/** Hue / saturation / brightness picker for the custom accent (replaces com.movtery.colorpicker). */
+/** Hue / saturation / brightness picker for the custom accent. */
 @Composable
 private fun HsvColorDialog(initial: Color, onDismiss: () -> Unit, onApply: (Color) -> Unit) {
     val hsv = remember {
@@ -576,11 +2322,11 @@ private fun HsvColorDialog(initial: Color, onDismiss: () -> Unit, onApply: (Colo
 private fun ColorSlider(label: String, value: Float, range: ClosedFloatingPointRange<Float>, onChange: (Float) -> Unit) {
     Column {
         Text(label, color = AerixSurface.textSecondary, fontSize = 11.sp)
-        androidx.compose.material3.Slider(
+        Slider(
             value = value,
             onValueChange = onChange,
             valueRange = range,
-            colors = androidx.compose.material3.SliderDefaults.colors(
+            colors = SliderDefaults.colors(
                 thumbColor = AerixSurface.textPrimary,
                 activeTrackColor = AerixThemeManager.currentAccent(),
                 inactiveTrackColor = AerixSurface.panelTrack

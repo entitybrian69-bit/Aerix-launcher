@@ -128,6 +128,7 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
             return;
         }
         mGameRenderer = new GameRenderer(instance.getLaunchRenderer());
+        net.kdt.pojavlaunch.aerix.bridge.PojavPluginBridge.applyLaunchOverride(this, mGameRenderer, instance.getLaunchRenderer());
 
         if(GpuUtils.getGlInfo().isAdreno() && !PREF_ZINK_PREFER_SYSTEM_DRIVER) {
             mGameRenderer.overrideVulkanDriver();

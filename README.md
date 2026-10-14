@@ -1,183 +1,220 @@
-<h1 align="center">PojavLauncher (a.k.a. Pojav Reborn)</h1>
+<div align="center">
 
-<a href="./README_RU.md">Readme на русском</a>
+<img src="assets/aerix-logo.png" alt="Aerix Launcher logo" width="160" />
 
-<a href="./README_BN.md">Readme বাংলা ভাষায়</a>
+# ✨ 🚀 AERIX LAUNCHER
+### Minecraft: Java Edition on Android
 
-<img src="https://github.com/PojavLauncherTeam/PojavLauncher/blob/v3_openjdk/app_pojavlauncher/src/main/assets/pojavlauncher.png" align="left" width="130" height="150" alt="PojavLauncher logo">
+**Hand-built. Privately kept. Tested on real phones. Maintained by its owners.**
 
-[![Android CI](https://github.com/TeamPojavLauncher/PojavLauncher/workflows/Android%20CI/badge.svg)](https://github.com/TeamPojavLauncher/PojavLauncher/actions)
-[![Github commit activity](https://img.shields.io/github/commit-activity/m/TeamPojavLauncher/PojavLauncher.svg?style=flat)](https://github.com/TeamPojavLauncher/PojavLauncher/graphs/commit-activity)
-[![Crowdin](https://badges.crowdin.net/pojavlauncher/localized.svg)](https://crowdin.com/project/pojavlauncher)
-[![Discord](https://img.shields.io/discord/1355213558631366897?color=5865F2&logo=discord&logoColor=white&label=&style=flat)](https://discord.gg/2HYpzs4gZT)
-[![License: LGPL v3](https://img.shields.io/badge/License-LGPL%20v3-blue)](https://github.com/PojavLauncherTeam/PojavLauncher/blob/v3_openjdk/LICENSE)
-[![Twitter Follow](https://img.shields.io/twitter/follow/PLaunchTeam.svg?style=social)](https://x.com/PLaunchTeam)
+[![Platform](https://img.shields.io/badge/Platform-Android%208.0%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/entitybrian69-bit/Aerix-launcher/releases)
+[![Human Made](https://img.shields.io/badge/100%25-Human%20Made-7C3AED?style=for-the-badge)](https://github.com/entitybrian69-bit/Aerix-launcher)
+[![Team](https://img.shields.io/badge/Maintained%20by-entitybrian-F59E0B?style=for-the-badge)](https://github.com/entitybrian69-bit)
+[![Privacy](https://img.shields.io/badge/Privacy-No%20Trackers-111827?style=for-the-badge)](https://github.com/entitybrian69-bit/Aerix-launcher)
+[![License](https://img.shields.io/badge/License-GPL--3.0-blue?style=for-the-badge)](LICENSE)
+[![Discord](https://img.shields.io/badge/Discord-Community%20%26%20suggestions-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/RS7q9KaCm6)
 
-*From [Boardwalk](https://github.com/zhuowei/Boardwalk)'s ashes here comes PojavLauncher!*
+▶ Play &nbsp;·&nbsp; 🔍 Discover &nbsp;·&nbsp; ⚙️ Settings &nbsp;·&nbsp; 👤 Offline accounts & capes &nbsp;·&nbsp; 🔒 Private by design
 
-PojavLauncher is a launcher that allows you to play Minecraft: Java Edition on your Android and [iOS](https://github.com/PojavLauncherTeam/PojavLauncher_iOS) devices.
+</div>
 
-For more details, check out our [wiki](https://pojavlauncher.app/)!
+---
 
-> [!IMPORTANT]
-> This is not the original PojavLauncher. This project is based on [MojoLauncher](https://github.com/MojoLauncher/MojoLauncher). For more details, please see [DISCLAIMER.md](DISCLAIMER.md).
+## 📸 Screenshots
 
-## Table of Contents
+**Home** — no top bar: the page starts at the top of the screen, with Create a World, Open Library and PLAY one touch away.
+![Home](assets/screenshots/shot-home.jpg)
 
-* [Introduction](#introduction)
-* [Getting PojavLauncher](#getting-pojavlauncher)
-* [Building](#building)
-    * [Quick Build (Recommended)](#quick-build-recommended)
-    * [Detailed Build](#detailed-build)
-* [Current Roadmap](#current-roadmap)
-* [Known Issues](#known-issues)
-* [FAQ](#faq)
-* [Contributing](#contributing)
-* [Support](#support)
-* [License](#license)
-* [Credits & Dependencies](#credits--dependencies)
-* [Roadmap](#roadmap)
+**Create New Instance** — the Minecraft version list owns the left column, the selected version is outlined with a check mark, and the modloader grid sits beside it.
+![Create New Instance](assets/screenshots/shot-instances.jpg)
 
-## Introduction
+**Discover** — browse and install mods, modpacks, shaders and resource packs, with filters for platform, category, game version and loader.
+![Discover](assets/screenshots/shot-discover.jpg)
 
-* PojavLauncher is a Minecraft: Java Edition launcher for Android and iOS based on [Boardwalk](https://github.com/zhuowei/Boardwalk)
-* This launcher can launch almost all available Minecraft versions ranging from rd-132211 to 26.x snapshots (including Combat Test versions)
-* Modding via Forge and Fabric are also supported.
-* This repository contains source code for Android. For iOS/iPadOS, check out [PojavLauncher_iOS](https://github.com/PojavLauncherTeam/PojavLauncher_iOS).
+**Wallpapers** — 25 built-in HD Minecraft wallpapers, each with its own accent theme, plus dim control and custom imports.
+![Wallpapers](assets/screenshots/shot-wallpapers.jpg)
 
-## Getting PojavLauncher
+**Renderers** — renderer, Vulkan driver and graphics API, chosen per version with a recommended default.
+![Renderers](assets/screenshots/shot-renderer.jpg)
 
-You can get PojavLauncher via five methods:
+**Accounts & skins** — add Microsoft, offline or auth-server accounts, then browse a searchable three-column skin library and install a skin in one tap.
+![Accounts and skins](assets/screenshots/shot-accounts.jpg)
 
-1. **Releases:** Download the latest release.apk from our [stable releases](https://github.com/TeamPojavLauncher/PojavLauncher/releases).
-2. **Google Play (Deprecated):** Get it from Google Play by clicking on this badge: [![Google Play](https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png)](https://play.google.com/store/apps/details?id=net.kdt.pojavlaunch)
-3. **Nightly.link:** Get the latest pre-built app from [nightly.link](https://nightly.link/TeamPojavLauncher/PojavLauncher/workflows/android/v3_openjdk?preview)
-4. **Automated builds:** Download the latest debug.apk from [automatic builds](https://github.com/TeamPojavLauncher/PojavLauncher/actions).
-5. **Build from Source:** Follow the [building instructions](#building) below.
+---
 
-## Building
+## 🏆 Why Aerix
 
-### Quick Build (Recommended)
+Aerix Launcher brings Minecraft: Java Edition instances, renderers, accounts, and launcher tools together on Android.
 
-The easiest way to build PojavLauncher is to use the pre-built JREs provided by our CI.
+It is not a generated app. It is not a team product with a tracker bolted on. It is a **well-developed, frequently updated** launcher, written and tested by **its owners** on more than one phone, so the thing that ships is the thing that actually runs in a hand.
 
-1. Clone the repository: `git clone https://github.com/TeamPojavLauncher/PojavLauncher.git`
-2. Build the launcher: `./gradlew :app_pojavlauncher:assembleDebug` (Use `gradlew.bat` on Windows)
+> ✨ One developer. Zero AI. Real devices. Private by default.
 
-The built APK will be located in `app_pojavlauncher/build/outputs/apk/debug/`.
+---
 
-### Detailed Build
+## ⚙️ Tools for your setup
 
-If you need more control over the build process, follow these steps:
+Aerix keeps launcher controls, renderer options, and instance management in one place.
 
-1. **Java Runtime Environment (JRE):** Download the `jre8-pojav` artifact from our [CI auto builds](https://github.com/MojoLauncher/android-openjdk-build-multiarch/actions).  This package contains pre-built JREs for all supported architectures.  If you need to build the JRE yourself, follow the instructions in the [android-openjdk-build-multiarch](https://github.com/MojoLauncher/android-openjdk-build-multiarch) repository.
+- ⚡ **Quick access** — recent worlds and instances stay one tap away.
+- 🧩 **Serious render stack** — choose the renderer that fits the device. LTW and LTW Legacy are built from source in this repository and cover Minecraft 1.17+ and 1.8–1.16.5 respectively, alongside GL4ES, VirGL, Zink-class, and Mesa options. Aerix also bundles **MobileGlues** for Minecraft 1.17+, two **VGPU** options for 1.16.5 and older, and selects the right renderer for each version automatically.
+- 🧮 **RAM that you control** — a global memory slider, plus per-instance overrides when a pack needs more.
+- 📱 **Checked across devices** — layouts, accounts, skins, and launch flow are tested beyond a single handset.
+- 🛠️ **Updated often** — fixes and polish land on a regular cadence, with a built-in update check against GitHub Releases.
 
-2. **LWJGL:** The build instructions for the custom LWJGL are available over the [LWJGL repository](https://github.com/MojoLauncher/lwjgl3).
+---
 
-3. **Language List:** Because languages are auto-added by Crowdin, you need to run the language list generator before building. In the project directory, run:
-   * Linux/macOS:
-     ```bash
-     chmod +x scripts/languagelist_updater.sh
-     bash scripts/languagelist_updater.sh
-     ```
-   * Windows:
-     ```batch
-     scripts\languagelist_updater.bat
-     ```
+## 🛡️ Private. On purpose.
 
-4. **Build GLFW stub:** `./gradlew :jre_lwjgl3glfw:build`
+Aerix keeps your launcher private.
 
-5. **Build the launcher:** `./gradlew :app_pojavlauncher:assembleDebug`
-   * If you are building on Windows:
-     * Replace `./gradlew` with `.\gradlew.bat`
-     * Make sure `mojoexec`, `sdl`, `glfw` are symlinked into `app_pojavlauncher/src/main/jni/`
+- 🚫 **No ads**
+- 🚫 **No telemetry**
+- 🚫 **No account resale, no profile harvesting**
+- 🔒 Accounts, skins, and capes stay on the device unless you choose a login that needs the network
+- 📦 Open source under **GPL-3.0**, so the behavior is inspectable
 
-## Current Roadmap
+Your worlds are yours. Your accounts are yours. Aerix does not take a cut of either.
 
-- [x] OpenJDK 8 Mobile port: ARM32, ARM64, x86, x86_64
-- [x] OpenJDK 17 Mobile port: ARM32, ARM64, x86, x86_64
-- [x] OpenJDK 21 Mobile port: ARM32, ARM64, x86, x86_64
-- [x] Headless mod installer
-- [x] Mod installer with GUI
-- [x] OpenGL in OpenJDK environment
-- [x] OpenAL (works on most devices)
-- [x] Support for Minecraft 1.12.2 and below
-- [x] Support for Minecraft 1.13 and above
-- [x] Support for Minecraft 1.17 (22w13a) and above
-- [x] Game surface zooming
-- [x] New input pipe rewritten to native code
-- [x] Rewritten entire controls system
-- [x] Instance system in favor of profiles
-- [x] Out-of-the-box 1.21.5 support
-- [x] mrpack/CurseForge zip import
-- [x] LTW: enable compute shader/image extensions
-- [ ] LTW: resolve issues with Create
-- [ ] LTW: switch to a color-renderable format for framebuffers
-- [ ] Add [MobileGL](https://github.com/MobileGL-Dev/MobileGL) for Mali devices
-- [ ] Modpack/mod management tool
-- [ ] MMC-compatible instance import
-- [ ] Vintage Story support
-- [ ] Implement common native library standard
-- [ ] Patch-on-dlopen for mod native libraries
-- [ ] More to come!
+---
 
-## Known Issues
+## 👤 Accounts, skins, and capes
 
-See our [issue tracker](https://github.com/TeamPojavLauncher/PojavLauncher/issues) for a list of known issues and their current status.
+- 👤 **Offline accounts** — create a local username and select it. The radio stays selected. Worldwide. No region lock.
+- 👕 **Equip a skin** on that offline account.
+- 🧥 **Equip a cape** on that offline account.
+- 🌐 **Microsoft login** for Java Edition accounts that own the game.
+- 🔑 **Yggdrasil / auth-server login** for third-party servers.
+- 🖼️ **3D skin preview** so you can see the skin and cape before you launch.
 
-## FAQ
+---
 
-See our [wiki](https://pojav.ru/) for more information. (Currently an outdated wiki.) 
+## 📋 Full feature list
 
-## Contributing
+### ▶ Play
+- Unified Play hub for recent worlds and your library
+- Launch, edit, duplicate, delete, and manage instances
+- Instance icons — color, symbol, or emoji
+- Instance groups, so modpacks and survival worlds stay sorted
+- Version install and version settings
+- Per-instance and global game options
 
-Contributions are welcome! We welcome any type of contribution, not only code. For example, you can help improve the [wiki](https://pojavlauncherteam.github.io/), contribute to the [translations](https://crowdin.com/project/pojavlauncher), or submit bug reports and feature requests.
+### 🔍 Discover
+- Browse and install **modpacks, mods, resource packs, shaders, and saves**
+- Search, filters, and favorites
+- Downloads that land in the right instance, not in a random folder
 
-Any code change should be submitted as a pull request. The description should explain what the code does and give steps to execute it.
+### ⚙️ Settings
+- Material 3 interface, dark and light
+- Theme and accent control
+- Renderer selection
+- Global and per-instance RAM
+- Background and launcher appearance
+- Language support
+- About page — owner: **entitybrian**
+- Update checker via the GitHub Releases API
 
-## Support
+### 🎮 In game and around it
+- Touch control editor, including custom layouts
+- Gamepad support and remapping
+- File manager inside the launcher — configs, mods, worlds, backups
+- Server list per instance, with quick connect
+- Log viewer when something goes wrong
+- Modpack import
+- License and credits screens kept reachable — nothing useful is stripped out to look “simpler”
 
-For support, please join our [Discord server](https://discord.gg/2HYpzs4gZT).
+### 🛡️ Quality bar
+- **100% human-made. Non-AI.** Every screen is developed, not generated.
+- **Owner maintenance** — the people who own the bugs are the people who fix them.
+- **Real-phone testing** on more than one device before a build is treated as good.
+- **Frequent updates**, with Debug CI on push and pull request so broken builds do not silently ship.
 
-## License
+---
 
-PojavLauncher is licensed under [GNU LGPLv3](https://github.com/PojavLauncherTeam/PojavLauncher/blob/v3_openjdk/LICENSE).
+## 🧰 Aerix at a glance
 
-## Credits & Dependencies
+Aerix brings Minecraft version and instance management, renderer options, account tools, content discovery, and launcher settings together in one Android app. Its source is available under GPL-3.0, and the feature details above describe what is included without making device-wide performance comparisons.
 
-- [Boardwalk](https://github.com/zhuowei/Boardwalk) (JVM Launcher): Unknown License / [Apache License 2.0](https://github.com/zhuowei/Boardwalk/blob/master/LICENSE) or [GNU GPLv2](https://github.com/zhuowei/Boardwalk/blob/master/LICENSE)
-- [PojavLauncher](https://github.com/PojavLauncherTeam/PojavLauncher): [GNU LGPLv3 License](https://github.com/PojavLauncherTeam/PojavLauncher/blob/v3_openjdk/LICENSE)
-- [MojoLauncher](https://github.com/MojoLauncher/MojoLauncher): [GNU LGPLv3 License](https://github.com/MojoLauncher/MojoLauncher/blob/v3_openjdk/LICENSE)
-- [Amethyst](https://github.com/AngelAuraMC/Amethyst-Android): [GNU LGPLv3 License](https://github.com/AngelAuraMC/Amethyst-Android/blob/v3_openjdk/LICENSE)
-- Android Support Libraries: [Apache License 2.0](https://android.googlesource.com/platform/prebuilts/maven_repo/android/+/master/NOTICE.txt)
-- [OpenJDK](https://github.com/PojavLauncherTeam/openjdk-multiarch-jdk8u): [GNU GPLv2 License](https://openjdk.java.net/legal/gplv2+ce.html)
-- [GL4ES](https://github.com/PojavLauncherTeam/gl4es): [MIT License](https://github.com/ptitSeb/gl4es/blob/master/LICENSE)
-- [Holy GL4ES](https://github.com/PojavLauncherTeam/holy-gl4es): [MIT License](https://github.com/PojavLauncherTeam/holy-gl4es/blob/main/LICENSE)
-- [MobileGlues](https://github.com/MobileGL-Dev/MobileGlues): [LGPL-2.1 License](https://github.com/MobileGL-Dev/MobileGlues/blob/dev-es/LICENSE)
-- [Krypton Wrapper](https://github.com/BZLZHH/NG-GL4ES): [MIT License](https://github.com/BZLZHH/NG-GL4ES/blob/main/LICENSE)
-- [SimpleFPEWrapper](https://github.com/MobileGL-Dev/SimpleFPEWrapper): [GNU LGPLv3 License](https://github.com/MobileGL-Dev/SimpleFPEWrapper/blob/main/LICENSE)
-- [Mesa 3D Graphics Library](https://gitlab.freedesktop.org/mesa/mesa): [MIT License](https://docs.mesa3d.org/license.html)
-- [LWJGL3](https://github.com/MojoLauncher/lwjgl3): [BSD-3 License](https://github.com/LWJGL/lwjgl3/blob/master/LICENSE.md)
-- [GLFW](https://github.com/MojoLauncher/glfw): [zlib license](https://github.com/MojoLauncher/glfw/blob/glfw34/LICENSE.md)
-- [SDL](https://github.com/MojoLauncher/MojoSDL): [zlib license](https://github.com/MojoLauncher/MojoSDL/blob/main/LICENSE.txt)
-- [LWJGL2-GLFW](https://github.com/MojoLauncher/lwjgl2-glfw): 3-Clause BSD license
-- [mojoexec](https://github.com/MojoLauncher/mojoexec): [MIT License](https://github.com/MojoLauncher/mojoexec/blob/master/LICENSE)
-- [pro-grade](https://github.com/pro-grade/pro-grade) (Java sandboxing security manager): [Apache License 2.0](https://github.com/pro-grade/pro-grade/blob/master/LICENSE.txt)
-- [bhook](https://github.com/bytedance/bhook) (Exit code trapping): [MIT License](https://github.com/bytedance/bhook/blob/main/LICENSE)
-- [Authlib-Injector](https://github.com/yushijinhun/authlib-injector) (Authorization via ely.by): [AGPL-3.0](https://github.com/yushijinhun/authlib-injector/blob/develop/LICENSE)
-- [OpenAL-Soft](https://github.com/kcat/openal-soft): [GNU LIBRARY GENERAL PUBLIC LICENSE](https://github.com/kcat/openal-soft/blob/master/COPYING) and [modified PFFFT](https://github.com/kcat/openal-soft/blob/master/LICENSE-pffft)
-- [oboe](https://github.com/google/oboe): [Apache License 2.0](https://github.com/google/oboe/blob/main/LICENSE)
-- Thanks to [Mineskin](https://mineskin.eu/) and [MCHeads](https://mc-heads.net) for providing Minecraft avatars
+---
 
-## Roadmap
+## 👥 The team
 
-We are currently focusing on:
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <img src="assets/team/entitybrian.jpg" width="140" alt="entitybrian"><br>
+      <strong>entitybrian</strong><br>
+      <sub>Owner</sub>
+    </td>
+  </tr>
+</table>
 
-* Exploring new rendering technologies.
+entitybrian designs, writes, tests, and ships Aerix Launcher.
 
-Future plans include:
+No studio. No outsourced UI. No AI pass that “fills in the screens.”
 
-* Improving stability and performance.
-* Enhancing the mod installation experience.
+That is why the product stays coherent: the people who add offline capes are the people who check them on another phone, and who cut a release when it is actually ready.
 
-We welcome community feedback and suggestions for our roadmap. Please feel free to open a feature request in our [issue tracker](https://github.com/TeamPojavLauncher/PojavLauncher/issues).
+---
+
+## 📥 Install
+
+1. Download the latest APK from [Releases](https://github.com/entitybrian69-bit/Aerix-launcher/releases).
+2. Allow install from this source in Android settings.
+3. Open Aerix, add an offline account or sign in with Microsoft, equip a skin and cape, and play.
+
+**Requires Android 8.0+.** Best on 4 GB RAM or more.
+
+Debug builds from CI are for testing. Release builds are the ones to keep.
+
+🌐 **Website:** <https://entitybrian69-bit.github.io/Aerix-launcher/> — screenshots, the full renderer lineup, a setup guide and an FAQ.
+
+---
+
+## 🔄 Updates
+
+Settings → About → Check for update.
+
+Aerix asks the GitHub Releases API, compares your build, and points you at the newest APK. No mystery JSON. No dead link.
+
+---
+
+## 🤝 Contributing
+
+This is a small project. Help is still welcome.
+
+- ⭐ Star the repo
+- 🐛 Open a clear bug report
+- 💡 Suggest a feature
+- 🌍 Help translate
+
+---
+
+## 💬 Community and suggestions
+
+**Discord channel** — join to talk with other Aerix users, report a problem, and suggest what
+should land next.
+
+[![Discord](https://img.shields.io/badge/Discord-Join%20the%20channel-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/RS7q9KaCm6)
+
+**Invite link:** <https://discord.gg/RS7q9KaCm6>
+
+---
+
+## 📜 License
+
+GPL-3.0. See [LICENSE](LICENSE).
+
+Minecraft is a trademark of Mojang Synergies AB. Aerix Launcher is an independent project and is not affiliated with, endorsed by, or associated with Mojang or Microsoft.
+
+---
+
+<div align="center">
+
+### 🎮 Minecraft: Java Edition, in your pocket.
+
+**Configurable renderers. Private by design. Offline accounts and capes. Updated with care.**
+
+🌐 **[Website](https://entitybrian69-bit.github.io/Aerix-launcher/)** · 💬 **[Discord](https://discord.gg/RS7q9KaCm6)** · ⭐ [Star Aerix](https://github.com/entitybrian69-bit/Aerix-launcher) · 📦 [Get the APK](https://github.com/entitybrian69-bit/Aerix-launcher/releases)
+
+</div>

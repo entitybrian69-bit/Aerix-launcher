@@ -104,6 +104,7 @@ object PojavInstanceEditorBridge {
 
     /** RendererCache.getCompatibleRenderers plus the trailing "global default" entry of the Pojav spinner. */
     fun rendererChoices(context: Context): List<AerixRendererChoice> {
+        PojavPluginBridge.loadPlugins(context)
         val cache = RendererCache.getCompatibleRenderers(context)
         val result = ArrayList<AerixRendererChoice>(cache.rendererIds.size + 1)
         cache.rendererIds.forEachIndexed { index, id ->

@@ -454,4 +454,12 @@
     <string name="aerix_account_default_skin">Default skin</string>
     <string name="aerix_account_classic">Open the original account pages</string>
     <string name="aerix_account_classic_sub">Microsoft, Ely.by and offline forms as PojavLauncher draws them</string>
+    <string name="aerix_plugin_renderer_fallback">Renderer Plugin</string>
+    <string name="aerix_content_screenshots">Screenshots</string>
+    <string name="aerix_download_error">Unable to reach the platform</string>
+    <string name="aerix_library_refresh">Refresh</string>
+    <string name="aerix_download_prev">Previous page</string>
+    <string name="aerix_download_next">Next page</string>
+    <string name="aerix_download_no_files">No versions match this filter</string>
+    <string name="aerix_editor_jvm_args_hint">Custom JVM arguments</string>
 </resources>

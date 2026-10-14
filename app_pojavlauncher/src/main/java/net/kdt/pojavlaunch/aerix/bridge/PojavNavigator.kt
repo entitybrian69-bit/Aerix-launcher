@@ -91,7 +91,9 @@ object PojavNavigator {
 
     fun openWebsite(activity: FragmentActivity) = openUrl(activity, Tools.URL_HOME)
 
-    fun openDiscord(activity: FragmentActivity) = openUrl(activity, activity.getString(R.string.social_media_invite))
+    const val DISCORD_INVITE = "https://discord.gg/RS7q9KaCm6"
+
+    fun openDiscord(activity: FragmentActivity) = openUrl(activity, DISCORD_INVITE)
 
     /** Guard used before the .jar picker, same as MainMenuFragment.runInstallerWithConfirmation. */
     fun canRunJar(context: Context): Boolean {

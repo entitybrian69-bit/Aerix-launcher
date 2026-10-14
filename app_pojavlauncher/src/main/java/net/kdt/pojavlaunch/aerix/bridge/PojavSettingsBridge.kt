@@ -215,6 +215,7 @@ object PojavSettingsBridge {
     }.getOrDefault(false)
 
     fun renderers(context: Context): List<Pair<String, String>> {
+        PojavPluginBridge.loadPlugins(context)
         val cache = RendererCache.getCompatibleRenderers(context)
         return cache.rendererIds.mapIndexed { i, id -> id to (cache.rendererDisplayNames.getOrNull(i) ?: id) }
     }

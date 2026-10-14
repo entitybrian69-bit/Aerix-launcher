@@ -2,9 +2,10 @@
  * Aerix Launcher UI layer for PojavLauncher.
  * Ported from mirai-launcher- (Zalith Launcher 2 fork):
  *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/ui/screens/main/MiraiNavigationRail.kt
- * Changes: account face comes from PojavAccountBridge; an About item is added for the Pojav
- * website / Discord / license entries that lived on Pojav's main menu.
+ *     (LauncherSection, MiraiNavigationRail, RailIconItem, AccountAvatarRailButton)
+ * Account state comes from PojavAccountBridge instead of AccountsManager.currentAccountFlow.
  * Zalith Launcher 2 Copyright (C) 2025 MovTery <movtery228@qq.com> and contributors
+ * Copyright (C) 2026 Aerix Launcher contributors.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -170,15 +171,9 @@ fun AerixNavigationRail(
                 RailIconItem(R.drawable.aerix_ic_add, stringResource(R.string.create_instance),
                     selectedSection == LauncherSection.CREATE_INSTANCE, activeAccent, expandedRail, compactRail, onCreateInstance)
                 RailIconItem(R.drawable.aerix_ic_dashboard_filled, stringResource(R.string.aerix_nav_library),
-                    (selectedSection == LauncherSection.LIBRARY || selectedSection == LauncherSection.INSTANCE_EDITOR), activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.LIBRARY) }
+                    librarySelected(selectedSection), activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.LIBRARY) }
                 RailIconItem(R.drawable.aerix_ic_public, stringResource(R.string.aerix_nav_discover),
-                    selectedSection == LauncherSection.DISCOVER, activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.DISCOVER) }
-                RailIconItem(R.drawable.aerix_ic_download, stringResource(R.string.aerix_nav_downloads),
-                    selectedSection == LauncherSection.DOWNLOADS, activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.DOWNLOADS) }
-                RailIconItem(R.drawable.aerix_ic_extension_outlined, stringResource(R.string.aerix_nav_content),
-                    selectedSection == LauncherSection.CONTENT, activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.CONTENT) }
-                RailIconItem(R.drawable.aerix_ic_folder_outlined, stringResource(R.string.aerix_nav_files),
-                    selectedSection == LauncherSection.FILES, activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.FILES) }
+                    discoverSelected(selectedSection), activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.DISCOVER) }
                 RailIconItem(R.drawable.aerix_ic_format_paint_outlined, stringResource(R.string.aerix_nav_wallpapers),
                     wallpapersSelected(selectedSection), activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.WALLPAPERS) }
 
@@ -186,10 +181,6 @@ fun AerixNavigationRail(
 
                 RailIconItem(R.drawable.aerix_ic_settings_filled, stringResource(R.string.aerix_nav_settings),
                     settingsSelected(selectedSection), activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.SETTINGS) }
-                RailIconItem(R.drawable.aerix_ic_terminal_outlined, stringResource(R.string.aerix_nav_logs),
-                    selectedSection == LauncherSection.LOGS, activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.LOGS) }
-                RailIconItem(R.drawable.aerix_ic_info_outlined, stringResource(R.string.aerix_nav_about),
-                    selectedSection == LauncherSection.ABOUT, activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.ABOUT) }
 
                 AccountAvatarRailButton(
                     account = account,
@@ -203,6 +194,12 @@ fun AerixNavigationRail(
     }
 }
 
+private fun librarySelected(section: LauncherSection): Boolean =
+    section == LauncherSection.LIBRARY || section == LauncherSection.INSTANCE_EDITOR || section == LauncherSection.CONTENT
+
+private fun discoverSelected(section: LauncherSection): Boolean =
+    section == LauncherSection.DISCOVER || section == LauncherSection.DOWNLOADS
+
 /**
  * The Wallpapers entry is the Wallpapers tab of the settings page, so its highlight follows the
  * settings tab; the Settings entry stays highlighted for every other tab. Same pairing as mirai's
@@ -213,7 +210,8 @@ private fun wallpapersSelected(section: LauncherSection): Boolean =
         (section == LauncherSection.SETTINGS && AerixNav.settingsTab == AerixNav.TAB_WALLPAPERS)
 
 private fun settingsSelected(section: LauncherSection): Boolean =
-    section == LauncherSection.SETTINGS && AerixNav.settingsTab != AerixNav.TAB_WALLPAPERS
+    (section == LauncherSection.SETTINGS && AerixNav.settingsTab != AerixNav.TAB_WALLPAPERS) ||
+        section == LauncherSection.ABOUT || section == LauncherSection.LOGS
 
 @Composable
 private fun RailIconItem(
@@ -311,7 +309,7 @@ private fun AccountAvatarRailButton(
         ) {
             AerixImageWell(
                 image = account?.face,
-                fallback = R.drawable.aerix_ic_person_outlined,
+                fallback = R.drawable.aerix_head_steve,
                 size = if (compact) 26.dp else 30.dp,
                 radius = 15.dp
             )

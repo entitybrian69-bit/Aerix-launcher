@@ -29,22 +29,33 @@ import net.kdt.pojavlaunch.Tools
 import net.kdt.pojavlaunch.aerix.bridge.AerixPreferences
 
 object AerixNav {
-    /** Settings tab id shown while the Wallpapers rail entry is active (mirai NormalNavKey.Settings.Wallpapers). */
+    /** Settings tab ids (mirai NormalNavKey.Settings.*). */
+    const val TAB_RENDERER = "renderer"
+    const val TAB_GAME = "game"
+    const val TAB_JAVA = "java"
     const val TAB_WALLPAPERS = "wallpapers"
-    const val TAB_APPEARANCE = "appearance"
+    const val TAB_LAUNCHER = "launcher"
+    const val TAB_CONTROLS = "controls"
+    const val TAB_CONTROL_MANAGER = "control_manager"
+    const val TAB_GAMEPAD = "gamepad"
+    const val TAB_ABOUT = "about"
+    /** Kept as an alias so existing callers open the Launcher tab. */
+    const val TAB_APPEARANCE = TAB_LAUNCHER
 
     private val pageSections = setOf(
         LauncherSection.CREATE_INSTANCE,
         LauncherSection.INSTANCE_EDITOR,
         LauncherSection.ADD_ACCOUNT,
-        LauncherSection.OFFLINE_ACCOUNT
+        LauncherSection.OFFLINE_ACCOUNT,
+        LauncherSection.FILES,
+        LauncherSection.LOGS
     )
 
     var section by mutableStateOf(LauncherSection.HOME)
         private set
 
     /** Last Settings tab other than Wallpapers, restored when the Settings rail entry is pressed. */
-    var settingsTab by mutableStateOf(TAB_APPEARANCE)
+    var settingsTab by mutableStateOf(TAB_RENDERER)
 
     private val stack = ArrayList<LauncherSection>()
     private var initialized = false
@@ -97,6 +108,7 @@ object AerixNav {
         LauncherSection.OFFLINE_ACCOUNT -> LauncherSection.ADD_ACCOUNT
         LauncherSection.ADD_ACCOUNT -> LauncherSection.ACCOUNTS
         LauncherSection.INSTANCE_EDITOR -> LauncherSection.LIBRARY
+        LauncherSection.LOGS -> LauncherSection.SETTINGS
         else -> LauncherSection.HOME
     }
 }

@@ -58,6 +58,10 @@ object AerixPreferences {
     const val KEY_ASSET_PLATFORM = "assetPlatformSource"
     const val KEY_LOG_RETENTION_DAYS = "launcherLogRetentionDays"
     const val KEY_CURSEFORGE_API_KEY = "curseForgeApiKey"
+    /** JSON array of favorite Discover projects (mirai download/assets/favorites). */
+    const val KEY_FAVORITES = "aerixFavoriteProjects"
+    /** JSON array of pinned instance names (mirai VersionsManageScreen "Pinned" tab). */
+    const val KEY_PINNED_INSTANCES = "aerixPinnedInstances"
 
     const val DEFAULT_CUSTOM_COLOR = 0xFF8DEFE0.toInt()
     const val DEFAULT_BACKGROUND_OPACITY = 60
@@ -118,6 +122,14 @@ object AerixPreferences {
     var curseForgeApiKey by mutableStateOf("")
         private set
 
+    /** Favorite projects as a JSON array of {platform,id,title,description,author,iconUrl,downloads,type}. */
+    var favoritesJson by mutableStateOf("[]")
+        private set
+
+    /** Pinned instance names as a JSON array of strings. */
+    var pinnedJson by mutableStateOf("[]")
+        private set
+
     fun init(context: Context) {
         val p = context.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
         prefs = p
@@ -143,6 +155,18 @@ object AerixPreferences {
         }.getOrDefault(AssetPlatform.MODRINTH)
         curseForgeApiKey = p.getString(KEY_CURSEFORGE_API_KEY, "") ?: ""
         logRetentionDays = p.getInt(KEY_LOG_RETENTION_DAYS, 7).coerceIn(1, 14)
+        favoritesJson = p.getString(KEY_FAVORITES, "[]") ?: "[]"
+        pinnedJson = p.getString(KEY_PINNED_INSTANCES, "[]") ?: "[]"
+    }
+
+    fun saveFavoritesJson(value: String) {
+        favoritesJson = value
+        edit { putString(KEY_FAVORITES, value) }
+    }
+
+    fun savePinnedJson(value: String) {
+        pinnedJson = value
+        edit { putString(KEY_PINNED_INSTANCES, value) }
     }
 
     private fun edit(block: SharedPreferences.Editor.() -> Unit) {

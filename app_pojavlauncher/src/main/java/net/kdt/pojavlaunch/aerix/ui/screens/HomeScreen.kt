@@ -1,11 +1,12 @@
 /*
  * Aerix Launcher UI layer for PojavLauncher.
  * Ported from mirai-launcher- (Zalith Launcher 2 fork):
+ *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/ui/screens/content/LauncherScreen.kt
+ *     (LauncherScreen, ActionMenuCardContent, VersionsContent)
  *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/ui/screens/content/home/MiraiHomeDashboard.kt
  *     (MiraiHomeDashboard, WideHomeDashboard, CompactHomeDashboard, LiquidHomeHero, ActiveWorldPanel,
  *      TaskSummaryPanel, RecentWorldsPanel, RecentWorldRow, QuickToolsPanel, HomeToolAction)
- * Data comes from PojavInstanceBridge / PojavTaskBridge; PLAY goes through PojavLaunchBridge.
- * The quick tools carry the Pojav main-menu actions (custom controls, .jar, logs, directory, gamepad).
+ * Data comes from PojavInstanceBridge / PojavAccountBridge / PojavTaskBridge; PLAY goes through PojavLaunchBridge.
  * Zalith Launcher 2 Copyright (C) 2025 MovTery <movtery228@qq.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
@@ -30,6 +31,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -42,6 +45,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -51,13 +55,21 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -65,6 +77,8 @@ import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -74,26 +88,45 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.fragment.app.FragmentActivity
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.launch
 import net.kdt.pojavlaunch.R
 import net.kdt.pojavlaunch.aerix.bridge.AerixInstance
-import net.kdt.pojavlaunch.aerix.bridge.PojavInstaller
+import net.kdt.pojavlaunch.aerix.bridge.PojavAccountBridge
 import net.kdt.pojavlaunch.aerix.bridge.PojavInstanceBridge
 import net.kdt.pojavlaunch.aerix.bridge.PojavLaunchBridge
 import net.kdt.pojavlaunch.aerix.bridge.PojavNavigator
 import net.kdt.pojavlaunch.aerix.bridge.PojavTaskBridge
 import net.kdt.pojavlaunch.aerix.components.AerixImageWell
+import net.kdt.pojavlaunch.aerix.components.AerixSkinPreview3D
 import net.kdt.pojavlaunch.aerix.components.MetaPill
 import net.kdt.pojavlaunch.aerix.components.QuickActionTile
 import net.kdt.pojavlaunch.aerix.components.QuietEmptyState
 import net.kdt.pojavlaunch.aerix.components.liquidGlass
-import net.kdt.pojavlaunch.aerix.ui.AerixNav
 import net.kdt.pojavlaunch.aerix.theme.AerixMetrics
 import net.kdt.pojavlaunch.aerix.theme.AerixRadii
 import net.kdt.pojavlaunch.aerix.theme.AerixSpacing
 import net.kdt.pojavlaunch.aerix.theme.AerixSurface
 import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
+import net.kdt.pojavlaunch.aerix.ui.AerixNav
 import net.kdt.pojavlaunch.aerix.ui.LauncherSection
 import net.kdt.pojavlaunch.contracts.OpenDocumentWithExtension
+import kotlin.math.abs
+import kotlin.math.exp
+import kotlin.math.roundToInt
+
+private const val ContentWeight = 7.4f
+private const val ActionMenuWeight = 2.6f
+private val ActionMenuOuterPadding = 12.dp
+
+/** Degrees of doll rotation per pixel of horizontal drag (mirai LauncherScreen). */
+private const val DOLL_DRAG_DEG_PER_PX = 0.45f
+private const val DOLL_FLING_FRICTION = 5f
+private const val DOLL_FLING_MIN_VELOCITY = 60f
+private const val DOLL_FLING_STOP_VELOCITY = 20f
+
+private val mcVersionRegex = Regex("""(\d+\.\d+(?:\.\d+)?)""")
 
 private class HomeActions(
     val play: () -> Unit,
@@ -111,7 +144,8 @@ private class HomeActions(
     val content: () -> Unit,
     val downloads: () -> Unit,
     val fileManager: () -> Unit,
-    val logs: () -> Unit
+    val logs: () -> Unit,
+    val accounts: () -> Unit
 )
 
 @Composable
@@ -142,21 +176,293 @@ fun HomeScreen(activity: FragmentActivity, navigate: (LauncherSection) -> Unit) 
         runJar = { if (PojavNavigator.canRunJar(activity)) jarLauncher.launch(null) },
         shareLogs = { PojavNavigator.shareLogs(activity) },
         gamepad = { PojavNavigator.openGamepadMapper(activity) },
-        content = { navigate(LauncherSection.CONTENT) },
-        downloads = { navigate(LauncherSection.DOWNLOADS) },
+        content = {
+            selected?.let { PojavInstanceBridge.edit(activity, it) } ?: navigate(LauncherSection.LIBRARY)
+        },
+        downloads = { navigate(LauncherSection.DISCOVER) },
         fileManager = { navigate(LauncherSection.FILES) },
-        logs = { navigate(LauncherSection.LOGS) }
+        logs = { navigate(LauncherSection.LOGS) },
+        accounts = { navigate(LauncherSection.ACCOUNTS) }
     )
 
-    BoxWithConstraints(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(start = AerixSpacing.mdPlus, end = AerixSpacing.smCompact, top = AerixSpacing.smPlus)
+    // Mirai LauncherScreen: content dashboard on the left (weight 7.4f) and the docked 3D skin
+    // ActionMenu card on the right (weight 2.6f) whenever maxWidth >= 500.dp.
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val showActionMenu = maxWidth >= 500.dp
+        Row(modifier = Modifier.fillMaxSize()) {
+            BoxWithConstraints(
+                modifier = Modifier
+                    .weight(if (showActionMenu) ContentWeight else 1f)
+                    .fillMaxHeight()
+                    .padding(start = AerixSpacing.mdPlus, end = AerixSpacing.smCompact, top = AerixSpacing.smPlus)
+            ) {
+                if (maxWidth >= 720.dp && maxWidth > maxHeight) {
+                    WideHomeDashboard(selected, recent, instances.size, accent, taskCount, actions)
+                } else {
+                    CompactHomeDashboard(selected, recent, instances.size, accent, taskCount, actions)
+                }
+            }
+            if (showActionMenu) {
+                ActionMenuCard(
+                    selected = selected,
+                    instances = instances,
+                    actions = actions,
+                    modifier = Modifier
+                        .weight(ActionMenuWeight)
+                        .fillMaxHeight()
+                        .padding(
+                            top = ActionMenuOuterPadding,
+                            bottom = ActionMenuOuterPadding,
+                            end = ActionMenuOuterPadding
+                        )
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Right-hand ActionMenu card from Mirai's LauncherScreen.kt: 3D rotatable skin stage on a dark
+ * pedestal with the username pill, the two-line instance selector pill and the PLAY button.
+ */
+@Composable
+private fun ActionMenuCard(
+    selected: AerixInstance?,
+    instances: List<AerixInstance>,
+    actions: HomeActions,
+    modifier: Modifier = Modifier
+) {
+    val account = PojavAccountBridge.current
+    val accent = AerixThemeManager.currentAccent()
+    val vanilla = stringResource(R.string.aerix_home_vanilla)
+    var dollAzimuth by remember(account?.username) { mutableFloatStateOf(28f) }
+    val flingScope = rememberCoroutineScope()
+    val dollVelocityTracker = remember(account?.username) { VelocityTracker() }
+    var dollFlingJob by remember(account?.username) { mutableStateOf<Job?>(null) }
+    var showInstanceMenu by remember { mutableStateOf(false) }
+
+    val versionSubtitle = remember(selected, vanilla) {
+        if (selected == null) "Select Instance"
+        else {
+            val loader = loaderLabel(selected.versionId, vanilla)
+            val mcVer = mcVersionRegex.find(selected.versionId)?.value ?: selected.versionId
+            if (loader == vanilla) "Minecraft $mcVer" else "$loader $mcVer"
+        }
+    }
+
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(AerixRadii.card),
+        color = AerixSurface.panel,
+        border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft)
     ) {
-        if (maxWidth >= 720.dp && maxWidth > maxHeight) {
-            WideHomeDashboard(selected, recent, instances.size, accent, taskCount, actions)
-        } else {
-            CompactHomeDashboard(selected, recent, instances.size, accent, taskCount, actions)
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            // 3D Skin & Cape Stage on Dark Pedestal (Mirai LauncherScreen ActionMenuCardContent)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .padding(top = AerixSpacing.smCompact, start = AerixSpacing.sm, end = AerixSpacing.sm)
+                    .clip(RoundedCornerShape(AerixRadii.control))
+                    .pointerInput(actions) {
+                        detectTapGestures(onTap = { actions.accounts() })
+                    }
+                    .pointerInput(account?.username) {
+                        detectHorizontalDragGestures(
+                            onDragStart = {
+                                dollFlingJob?.cancel()
+                                dollFlingJob = null
+                                dollVelocityTracker.resetTracking()
+                            },
+                            onDragEnd = {
+                                val releaseVelocity = dollVelocityTracker.calculateVelocity().x * DOLL_DRAG_DEG_PER_PX
+                                dollFlingJob?.cancel()
+                                if (abs(releaseVelocity) < DOLL_FLING_MIN_VELOCITY) {
+                                    dollFlingJob = null
+                                    return@detectHorizontalDragGestures
+                                }
+                                dollFlingJob = flingScope.launch {
+                                    var velocity = releaseVelocity
+                                    var lastFrame = withFrameNanos { it }
+                                    while (abs(velocity) > DOLL_FLING_STOP_VELOCITY) {
+                                        ensureActive()
+                                        val now = withFrameNanos { it }
+                                        val dt = ((now - lastFrame) / 1_000_000_000f).coerceIn(0f, 0.05f)
+                                        lastFrame = now
+                                        dollAzimuth = (dollAzimuth + velocity * dt).mod(360f)
+                                        velocity *= exp(-DOLL_FLING_FRICTION * dt)
+                                    }
+                                    dollFlingJob = null
+                                }
+                            },
+                            onDragCancel = {
+                                dollFlingJob?.cancel()
+                                dollFlingJob = null
+                            },
+                            onHorizontalDrag = { change, dragAmount ->
+                                dollVelocityTracker.addPosition(change.uptimeMillis, change.position)
+                                dollAzimuth = (dollAzimuth + dragAmount * DOLL_DRAG_DEG_PER_PX).mod(360f)
+                            }
+                        )
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                AerixSkinPreview3D(
+                    account = account,
+                    azimuth = dollAzimuth.roundToInt(),
+                    interactionEnabled = false,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(bottom = AerixSpacing.mdPlus)
+                )
+
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .offset(y = (-4).dp),
+                    shape = RoundedCornerShape(AerixRadii.compact),
+                    color = AerixSurface.canvas,
+                    border = BorderStroke(AerixSpacing.hairline, accent.copy(alpha = 0.45f))
+                ) {
+                    Text(
+                        text = account?.username ?: "+ Add Account",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = if (account != null) Color.White else accent,
+                        maxLines = 1,
+                        modifier = Modifier.padding(horizontal = AerixSpacing.smPlus, vertical = AerixSpacing.tiny)
+                    )
+                }
+            }
+
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
+            ) {
+                // Compact 2-line Instance Selector Pill (Mirai VersionsContent)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = AerixSpacing.smPlus)
+                ) {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(AerixRadii.cardSmall),
+                        color = AerixSurface.panel,
+                        border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft),
+                        onClick = {
+                            if (instances.isNotEmpty()) showInstanceMenu = true else actions.library()
+                        }
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = AerixSpacing.smPlus, vertical = AerixSpacing.smTight),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(AerixSpacing.xxs)
+                        ) {
+                            Text(
+                                text = selected?.name ?: stringResource(R.string.aerix_home_no_active_world),
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = versionSubtitle,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = accent,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+
+                    DropdownMenu(
+                        expanded = showInstanceMenu,
+                        onDismissRequest = { showInstanceMenu = false }
+                    ) {
+                        instances.forEach { instance ->
+                            DropdownMenuItem(
+                                text = {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
+                                    ) {
+                                        AerixImageWell(
+                                            image = instance.icon,
+                                            fallback = R.drawable.aerix_ic_videogame_asset_outlined,
+                                            size = 24.dp,
+                                            radius = AerixRadii.tiny
+                                        )
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(instance.name, fontWeight = FontWeight.Bold, maxLines = 1)
+                                            Text(instance.versionId, style = MaterialTheme.typography.labelSmall, color = AerixSurface.textSecondary, maxLines = 1)
+                                        }
+                                    }
+                                },
+                                onClick = {
+                                    actions.select(instance)
+                                    showInstanceMenu = false
+                                }
+                            )
+                        }
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    text = "Manage All Instances...",
+                                    color = accent,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            },
+                            onClick = {
+                                showInstanceMenu = false
+                                actions.library()
+                            }
+                        )
+                    }
+                }
+
+                // Vibrant Pill PLAY Button (Mirai VersionsContent)
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = AerixSpacing.smPlus)
+                        .padding(bottom = AerixSpacing.smPlus)
+                        .height(42.dp),
+                    shape = RoundedCornerShape(AerixRadii.panel),
+                    color = accent,
+                    contentColor = AerixSurface.onAccent,
+                    onClick = if (selected != null) actions.play else actions.create
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = "PLAY",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = AerixSurface.onAccent
+                        )
+                        Spacer(Modifier.width(AerixSpacing.xs))
+                        Icon(
+                            painter = painterResource(R.drawable.aerix_ic_play_arrow_filled),
+                            contentDescription = stringResource(R.string.aerix_home_play),
+                            tint = AerixSurface.onAccent,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -242,7 +548,7 @@ private fun QuickTiles(count: Int, accent: Color, actions: HomeActions, modifier
             Triple(R.drawable.aerix_ic_add, stringResource(R.string.aerix_home_quick_create) to stringResource(R.string.aerix_home_quick_create_sub), accent to actions.create),
             Triple(R.drawable.aerix_ic_search, stringResource(R.string.aerix_home_quick_explore) to stringResource(R.string.aerix_home_quick_explore_sub), AerixSurface.glassBlue to actions.explore),
             Triple(R.drawable.aerix_ic_dashboard_filled, stringResource(R.string.aerix_home_quick_library) to stringResource(R.string.aerix_home_quick_library_sub, count), AerixSurface.glassViolet to actions.library),
-            Triple(R.drawable.aerix_ic_folder_outlined, stringResource(R.string.aerix_home_quick_files) to stringResource(R.string.aerix_home_quick_files_sub), AerixSurface.glassRose to actions.files)
+            Triple(R.drawable.aerix_ic_folder_outlined, stringResource(R.string.aerix_home_quick_files) to stringResource(R.string.aerix_home_quick_files_sub), AerixSurface.glassRose to actions.fileManager)
         )
         tiles.forEach { (icon, texts, style) ->
             QuickActionTile(
@@ -487,7 +793,7 @@ private fun ActiveWorldPanel(selected: AerixInstance?, accent: Color, actions: H
                     }
                 }
                 IconButton(
-                    onClick = { selected?.let(actions.edit) },
+                    onClick = { selected?.let { actions.edit(it) } },
                     enabled = selected != null,
                     modifier = Modifier
                         .size(40.dp)

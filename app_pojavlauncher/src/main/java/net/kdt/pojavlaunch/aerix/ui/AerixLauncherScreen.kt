@@ -2,9 +2,9 @@
  * Aerix Launcher UI layer for PojavLauncher.
  * Ported from mirai-launcher- (Zalith Launcher 2 fork):
  *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/ui/screens/main/MainScreen.kt
- *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/ui/screens/main/LauncherScreen.kt
+ *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/ui/screens/content/LauncherScreen.kt
  * The Navigation3 back stack is replaced by a section state + AnimatedContent; nested Pojav screens
- * (installers, instance editor, login, classic preferences) are pushed on the fragment back stack.
+ * (installers, login, gamepad remapper) are pushed on the fragment back stack.
  * Zalith Launcher 2 Copyright (C) 2025 MovTery <movtery228@qq.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
@@ -23,6 +23,7 @@
 
 package net.kdt.pojavlaunch.aerix.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.ContentTransform
@@ -37,47 +38,42 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.togetherWith
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.activity.compose.BackHandler
+import androidx.compose.ui.unit.IntOffset
 import androidx.fragment.app.FragmentActivity
 import net.kdt.pojavlaunch.aerix.bridge.AerixPreferences
 import net.kdt.pojavlaunch.aerix.bridge.AerixTransitionType
-import net.kdt.pojavlaunch.aerix.festivals.FestivalEffectsHost
-import net.kdt.pojavlaunch.aerix.festivals.FestivalTitleText
-import net.kdt.pojavlaunch.aerix.festivals.rememberTodayFestivals
 import net.kdt.pojavlaunch.aerix.bridge.PojavAccountBridge
 import net.kdt.pojavlaunch.aerix.bridge.PojavInstanceEditorBridge
 import net.kdt.pojavlaunch.aerix.components.AerixBackground
+import net.kdt.pojavlaunch.aerix.festivals.FestivalEffectsHost
+import net.kdt.pojavlaunch.aerix.festivals.FestivalTitleText
+import net.kdt.pojavlaunch.aerix.festivals.rememberTodayFestivals
 import net.kdt.pojavlaunch.aerix.theme.AerixSpacing
 import net.kdt.pojavlaunch.aerix.theme.AerixSurface
 import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
 import net.kdt.pojavlaunch.aerix.ui.screens.AboutScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.AccountsScreen
-import net.kdt.pojavlaunch.aerix.ui.screens.ContentScreen
-import net.kdt.pojavlaunch.aerix.ui.screens.DownloadScreen
-import net.kdt.pojavlaunch.aerix.ui.screens.FileManagerScreen
-import net.kdt.pojavlaunch.aerix.ui.screens.LogScreen
-import net.kdt.pojavlaunch.aerix.ui.screens.DiscoverScreen
-import net.kdt.pojavlaunch.aerix.ui.screens.HomeScreen
-import net.kdt.pojavlaunch.aerix.ui.screens.LibraryScreen
-import net.kdt.pojavlaunch.aerix.ui.screens.SettingsScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.AddAccountScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.CreateInstanceScreen
+import net.kdt.pojavlaunch.aerix.ui.screens.DiscoverScreen
+import net.kdt.pojavlaunch.aerix.ui.screens.FileManagerScreen
+import net.kdt.pojavlaunch.aerix.ui.screens.HomeScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.InstanceEditorScreen
+import net.kdt.pojavlaunch.aerix.ui.screens.LibraryScreen
+import net.kdt.pojavlaunch.aerix.ui.screens.LogScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.OfflineAccountScreen
+import net.kdt.pojavlaunch.aerix.ui.screens.SettingsScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.WallpapersScreen
 
 @Composable
@@ -92,9 +88,15 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
                 AerixNav.navigate(LauncherSection.SETTINGS)
             }
             LauncherSection.SETTINGS -> {
-                if (AerixNav.settingsTab == AerixNav.TAB_WALLPAPERS) AerixNav.settingsTab = AerixNav.TAB_APPEARANCE
+                if (AerixNav.settingsTab == AerixNav.TAB_WALLPAPERS) AerixNav.settingsTab = AerixNav.TAB_RENDERER
                 AerixNav.navigate(LauncherSection.SETTINGS)
             }
+            LauncherSection.ABOUT -> {
+                AerixNav.settingsTab = AerixNav.TAB_ABOUT
+                AerixNav.navigate(LauncherSection.SETTINGS)
+            }
+            LauncherSection.DOWNLOADS -> AerixNav.navigate(LauncherSection.DISCOVER)
+            LauncherSection.CONTENT -> AerixNav.navigate(LauncherSection.INSTANCE_EDITOR)
             else -> AerixNav.navigate(target)
         }
     }
@@ -126,9 +128,7 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
                     when (target) {
                         LauncherSection.HOME -> HomeScreen(activity, navigate)
                         LauncherSection.LIBRARY -> LibraryScreen(activity)
-                        LauncherSection.DISCOVER -> DiscoverScreen(activity, navigate)
-                        LauncherSection.DOWNLOADS -> DownloadScreen(activity)
-                        LauncherSection.CONTENT -> ContentScreen(activity, navigate)
+                        LauncherSection.DISCOVER, LauncherSection.DOWNLOADS -> DiscoverScreen(activity, navigate)
                         LauncherSection.FILES -> FileManagerScreen(activity)
                         LauncherSection.LOGS -> LogScreen(activity)
                         LauncherSection.WALLPAPERS -> WallpapersScreen()
@@ -142,7 +142,7 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
                         LauncherSection.CREATE_INSTANCE -> CreateInstanceScreen(activity) {
                             AerixNav.finishTo(LauncherSection.LIBRARY)
                         }
-                        LauncherSection.INSTANCE_EDITOR -> InstanceEditorScreen(activity) {
+                        LauncherSection.INSTANCE_EDITOR, LauncherSection.CONTENT -> InstanceEditorScreen(activity) {
                             PojavInstanceEditorBridge.close()
                             AerixNav.finishTo(LauncherSection.LIBRARY)
                         }

@@ -107,11 +107,6 @@ fun AddAccountScreen(activity: FragmentActivity, onClose: () -> Unit, onOffline:
                     fontSize = 12.sp
                 )
             }
-            AerixGhostButton(
-                text = stringResource(R.string.aerix_account_classic),
-                iconRes = R.drawable.aerix_ic_login,
-                onClick = { PojavAuthBridge.openClassicChooser(activity) }
-            )
         }
 
         Row(

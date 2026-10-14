@@ -202,11 +202,6 @@ fun CreateInstanceScreen(activity: FragmentActivity, onClose: () -> Unit) {
                     fontSize = 12.sp
                 )
             }
-            AerixGhostButton(
-                text = stringResource(R.string.aerix_create_classic),
-                iconRes = R.drawable.aerix_ic_add,
-                onClick = { PojavNavigator.openInstaller(activity, PojavInstaller.PROFILE_TYPE) }
-            )
         }
 
         Row(
