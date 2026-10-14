@@ -1,6 +1,7 @@
 name: Aerix release
 
-# Publishes the debug APKs of a finished Android CI run as a GitHub pre-release.
+# Commits the debug APKs of a finished Android CI run into apk/ on the Aerix branch
+# (Git LFS, because the full APK is larger than GitHub's 100 MB file limit).
 # Runs when this file changes on the Aerix branch; RUN_ID / BUILD_SHA select the CI run.
 on:
   push:
@@ -19,6 +20,12 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout Aerix branch
+        uses: actions/checkout@v4
+        with:
+          ref: arena/5d11b9a3-aerix-launcher
+          fetch-depth: 1
+
       - name: Download full APK
         uses: actions/download-artifact@v4
         with:
@@ -35,21 +42,17 @@ jobs:
           run-id: ${{ env.RUN_ID }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Create pre-release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_REPO: ${{ github.repository }}
+      - name: Commit APKs to apk/
         run: |
           SHORT=${BUILD_SHA:0:7}
-          TAG="aerix-ui-$SHORT"
-          mv out/app-debug-full.apk "out/Aerix-Launcher-$SHORT-full-debug.apk"
-          mv out/app-debug-noruntime.apk "out/Aerix-Launcher-$SHORT-noruntime-debug.apk"
-          # The release and tag are created beforehand (tags on commits that touch workflow files
-          # need the "workflows" scope, which GITHUB_TOKEN lacks); this job attaches the APKs.
-          if gh release view "$TAG" > /dev/null 2>&1; then
-            gh release upload "$TAG" out/*.apk --clobber
-          else
-            gh release create "$TAG" out/*.apk --target "$BUILD_SHA" --prerelease \
-              --title "Aerix Launcher UI build $SHORT" \
-              --notes "Debug build of the Aerix UI port on PojavLauncher (commit $BUILD_SHA, CI run $RUN_ID)."
-          fi
+          mkdir -p apk
+          git rm -q --ignore-unmatch apk/*.apk
+          cp out/app-debug-full.apk "apk/Aerix-Launcher-$SHORT-full-debug.apk"
+          cp out/app-debug-noruntime.apk "apk/Aerix-Launcher-$SHORT-noruntime-debug.apk"
+          git lfs install --local
+          git lfs track "apk/*.apk"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .gitattributes apk
+          git commit -m "Build: Aerix APKs $SHORT (CI run $RUN_ID) [skip ci]"
+          git push origin HEAD:arena/5d11b9a3-aerix-launcher
