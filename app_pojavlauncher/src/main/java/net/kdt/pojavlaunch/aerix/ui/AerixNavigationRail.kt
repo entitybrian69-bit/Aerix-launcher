@@ -79,6 +79,7 @@ enum class LauncherSection {
     HOME,
     LIBRARY,
     DISCOVER,
+    DOWNLOADS,
     CONTENT,
     WALLPAPERS,
     LOGS,
@@ -166,6 +167,8 @@ fun AerixNavigationRail(
                     selectedSection == LauncherSection.LIBRARY, activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.LIBRARY) }
                 RailIconItem(R.drawable.aerix_ic_public, stringResource(R.string.aerix_nav_discover),
                     selectedSection == LauncherSection.DISCOVER, activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.DISCOVER) }
+                RailIconItem(R.drawable.aerix_ic_download, stringResource(R.string.aerix_nav_downloads),
+                    selectedSection == LauncherSection.DOWNLOADS, activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.DOWNLOADS) }
                 RailIconItem(R.drawable.aerix_ic_extension_outlined, stringResource(R.string.aerix_nav_content),
                     selectedSection == LauncherSection.CONTENT, activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.CONTENT) }
                 RailIconItem(R.drawable.aerix_ic_format_paint_outlined, stringResource(R.string.aerix_nav_wallpapers),

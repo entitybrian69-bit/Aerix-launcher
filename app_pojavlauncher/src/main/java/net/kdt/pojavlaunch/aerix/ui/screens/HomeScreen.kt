@@ -108,6 +108,7 @@ private class HomeActions(
     val shareLogs: () -> Unit,
     val gamepad: () -> Unit,
     val content: () -> Unit,
+    val downloads: () -> Unit,
     val logs: () -> Unit
 )
 
@@ -140,6 +141,7 @@ fun HomeScreen(activity: FragmentActivity, navigate: (LauncherSection) -> Unit) 
         shareLogs = { PojavNavigator.shareLogs(activity) },
         gamepad = { PojavNavigator.openGamepadMapper(activity) },
         content = { navigate(LauncherSection.CONTENT) },
+        downloads = { navigate(LauncherSection.DOWNLOADS) },
         logs = { navigate(LauncherSection.LOGS) }
     )
 
@@ -657,6 +659,7 @@ private fun QuickToolsPanel(accent: Color, actions: HomeActions, modifier: Modif
             verticalArrangement = Arrangement.spacedBy(AerixSpacing.xs)
         ) {
             HomeSectionLabel(stringResource(R.string.aerix_home_quick_tools), null)
+            HomeToolAction(stringResource(R.string.aerix_download_title), R.drawable.aerix_ic_download, AerixSurface.modrinthBrand, actions.downloads)
             HomeToolAction(stringResource(R.string.aerix_content_title), R.drawable.aerix_ic_extension_outlined, AerixSurface.success, actions.content)
             HomeToolAction(stringResource(R.string.mcl_option_customcontrol), R.drawable.aerix_ic_touch_app_outlined, accent, actions.controls)
             HomeToolAction(stringResource(R.string.main_install_jar_file), R.drawable.aerix_ic_java, AerixSurface.glassBlue, actions.runJar)

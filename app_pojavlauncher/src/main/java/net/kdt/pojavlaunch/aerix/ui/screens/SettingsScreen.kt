@@ -86,6 +86,7 @@ import net.kdt.pojavlaunch.aerix.components.PillTabs
 import net.kdt.pojavlaunch.aerix.components.SliderSettingRow
 import net.kdt.pojavlaunch.aerix.components.SwitchSettingRow
 import net.kdt.pojavlaunch.aerix.components.TextSettingRow
+import net.kdt.pojavlaunch.aerix.bridge.AssetPlatform
 import net.kdt.pojavlaunch.aerix.theme.AerixSpacing
 import net.kdt.pojavlaunch.aerix.theme.AerixSurface
 import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
@@ -119,6 +120,11 @@ private fun AppearanceSettings(activity: FragmentActivity) {
     var showColorPicker by remember { mutableStateOf(false) }
     var showThemeChoice by remember { mutableStateOf(false) }
     var showTransitionChoice by remember { mutableStateOf(false) }
+    var showPlatformChoice by remember { mutableStateOf(false) }
+    val platformLabels = listOf(
+        AssetPlatform.MODRINTH.name to stringResource(R.string.aerix_download_platform_modrinth),
+        AssetPlatform.CURSEFORGE.name to stringResource(R.string.aerix_download_platform_curseforge)
+    )
     val transitionLabels = listOf(
         AerixTransitionType.CLOSE.name to stringResource(R.string.aerix_settings_transition_close),
         AerixTransitionType.JELLY_BOUNCE.name to stringResource(R.string.aerix_settings_transition_jelly),
@@ -149,6 +155,18 @@ private fun AppearanceSettings(activity: FragmentActivity) {
             onPick = {
                 AerixPreferences.saveSwapAnimateType(AerixTransitionType.valueOf(it))
                 showTransitionChoice = false
+            }
+        )
+    }
+    if (showPlatformChoice) {
+        ChoiceDialog(
+            title = stringResource(R.string.aerix_settings_asset_platform),
+            entries = platformLabels,
+            current = AerixPreferences.assetPlatformSource.name,
+            onDismiss = { showPlatformChoice = false },
+            onPick = {
+                AerixPreferences.saveAssetPlatformSource(AssetPlatform.valueOf(it))
+                showPlatformChoice = false
             }
         )
     }
@@ -273,6 +291,24 @@ private fun AppearanceSettings(activity: FragmentActivity) {
                 suffix = " sp",
                 onValueChange = { AerixPreferences.saveLogTextSize(it) },
                 iconRes = R.drawable.aerix_ic_terminal_outlined
+            )
+        }
+        item {
+            ActionSettingRow(
+                title = stringResource(R.string.aerix_settings_asset_platform),
+                summary = stringResource(R.string.aerix_settings_asset_platform_sub),
+                onClick = { showPlatformChoice = true },
+                iconRes = R.drawable.aerix_ic_download,
+                value = platformLabels.first { it.first == AerixPreferences.assetPlatformSource.name }.second
+            )
+        }
+        item {
+            TextSettingRow(
+                title = stringResource(R.string.aerix_settings_curseforge_key),
+                summary = stringResource(R.string.aerix_settings_curseforge_key_sub),
+                value = AerixPreferences.curseForgeApiKey,
+                onValueChange = { AerixPreferences.saveCurseForgeApiKey(it) },
+                iconRes = R.drawable.aerix_ic_link
             )
         }
         item {

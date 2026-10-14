@@ -69,6 +69,7 @@ import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
 import net.kdt.pojavlaunch.aerix.ui.screens.AboutScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.AccountsScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.ContentScreen
+import net.kdt.pojavlaunch.aerix.ui.screens.DownloadScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.LogScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.DiscoverScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.HomeScreen
@@ -111,8 +112,9 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
                     when (target) {
                         LauncherSection.HOME -> HomeScreen(activity, navigate)
                         LauncherSection.LIBRARY -> LibraryScreen(activity)
-                        LauncherSection.DISCOVER -> DiscoverScreen(activity)
-                        LauncherSection.CONTENT -> ContentScreen(activity)
+                        LauncherSection.DISCOVER -> DiscoverScreen(activity, navigate)
+                        LauncherSection.DOWNLOADS -> DownloadScreen(activity)
+                        LauncherSection.CONTENT -> ContentScreen(activity, navigate)
                         LauncherSection.LOGS -> LogScreen(activity)
                         LauncherSection.WALLPAPERS -> WallpapersScreen()
                         LauncherSection.SETTINGS -> SettingsScreen(activity)

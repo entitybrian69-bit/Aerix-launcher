@@ -225,4 +225,37 @@
     <string name="aerix_festivals_halloween">Happy Halloween!</string>
     <string name="aerix_festivals_valentines">Happy Valentine\'s Day!</string>
     <string name="aerix_festivals_christmas">Merry Christmas!</string>
+
+    <!-- In-launcher downloads (mirai ui/screens/content/download) -->
+    <string name="aerix_nav_downloads">Download</string>
+    <string name="aerix_download_title">Download</string>
+    <string name="aerix_download_subtitle">Installs into %1$s</string>
+    <string name="aerix_download_platform_modrinth">Modrinth</string>
+    <string name="aerix_download_platform_curseforge">CurseForge</string>
+    <string name="aerix_download_match_instance">Match instance</string>
+    <string name="aerix_download_search">Search projects</string>
+    <string name="aerix_download_no_platform">No platform offers this content. Worlds need a CurseForge API key (Settings, Appearance).</string>
+    <string name="aerix_download_failed">Unable to reach the platform</string>
+    <string name="aerix_download_retry">Retry</string>
+    <string name="aerix_download_empty">No projects found</string>
+    <string name="aerix_download_load_more">Load more</string>
+    <string name="aerix_download_by">by %1$s</string>
+    <string name="aerix_download_show_all">Show all versions</string>
+    <string name="aerix_download_no_versions">No version matches this instance</string>
+    <string name="aerix_download_unavailable">The author disabled third-party downloads for this file</string>
+    <string name="aerix_download_install">Download</string>
+    <string name="aerix_download_installed">%1$s installed</string>
+    <string name="aerix_download_install_failed">Download failed</string>
+    <string name="aerix_discover_dl_mods">Mods</string>
+    <string name="aerix_discover_dl_mods_sub">Browse Modrinth and CurseForge mods</string>
+    <string name="aerix_discover_dl_resourcepacks">Resource packs</string>
+    <string name="aerix_discover_dl_resourcepacks_sub">Textures, sounds and UI packs</string>
+    <string name="aerix_discover_dl_shaders">Shader packs</string>
+    <string name="aerix_discover_dl_shaders_sub">Iris and OptiFine shaders</string>
+    <string name="aerix_discover_dl_worlds">Worlds</string>
+    <string name="aerix_discover_dl_worlds_sub">Maps and saves from CurseForge</string>
+    <string name="aerix_settings_asset_platform">Download platform</string>
+    <string name="aerix_settings_asset_platform_sub">Platform preselected on the download screen</string>
+    <string name="aerix_settings_curseforge_key">CurseForge API key</string>
+    <string name="aerix_settings_curseforge_key_sub">Overrides the key built into the app; leave empty to use the built-in key</string>
 </resources>

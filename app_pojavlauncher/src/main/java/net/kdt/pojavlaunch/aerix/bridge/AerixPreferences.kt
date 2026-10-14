@@ -54,6 +54,8 @@ object AerixPreferences {
     const val KEY_ANIMATE_EXTENT = "launcherAnimateExtent"
     const val KEY_FESTIVAL_EFFECTS = "launcherFestivalEffects"
     const val KEY_LOG_TEXT_SIZE = "logTextSize"
+    const val KEY_ASSET_PLATFORM = "assetPlatformSource"
+    const val KEY_CURSEFORGE_API_KEY = "curseForgeApiKey"
 
     const val DEFAULT_CUSTOM_COLOR = 0xFF8DEFE0.toInt()
     const val DEFAULT_BACKGROUND_OPACITY = 60
@@ -97,6 +99,14 @@ object AerixPreferences {
     var logTextSize by mutableIntStateOf(15)
         private set
 
+    /** Aerix "assetPlatformSource": platform preselected in the download screens. */
+    var assetPlatformSource by mutableStateOf(AssetPlatform.MODRINTH)
+        private set
+
+    /** Aerix "curseForgeApiKey": user key that overrides the key baked into the build. */
+    var curseForgeApiKey by mutableStateOf("")
+        private set
+
     fun init(context: Context) {
         val p = context.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
         prefs = p
@@ -116,10 +126,24 @@ object AerixPreferences {
         animateExtent = p.getInt(KEY_ANIMATE_EXTENT, 3).coerceIn(0, 10)
         festivalEffects = p.getBoolean(KEY_FESTIVAL_EFFECTS, false)
         logTextSize = p.getInt(KEY_LOG_TEXT_SIZE, 15).coerceIn(5, 20)
+        assetPlatformSource = runCatching {
+            AssetPlatform.valueOf(p.getString(KEY_ASSET_PLATFORM, AssetPlatform.MODRINTH.name)!!)
+        }.getOrDefault(AssetPlatform.MODRINTH)
+        curseForgeApiKey = p.getString(KEY_CURSEFORGE_API_KEY, "") ?: ""
     }
 
     private fun edit(block: SharedPreferences.Editor.() -> Unit) {
         prefs?.edit()?.apply { block(); apply() }
+    }
+
+    fun saveAssetPlatformSource(value: AssetPlatform) {
+        assetPlatformSource = value
+        edit { putString(KEY_ASSET_PLATFORM, value.name) }
+    }
+
+    fun saveCurseForgeApiKey(value: String) {
+        curseForgeApiKey = value.trim()
+        edit { putString(KEY_CURSEFORGE_API_KEY, curseForgeApiKey) }
     }
 
     fun saveColorTheme(value: AerixColorTheme) {

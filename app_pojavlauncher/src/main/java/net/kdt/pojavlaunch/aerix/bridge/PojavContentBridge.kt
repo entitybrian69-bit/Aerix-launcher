@@ -38,8 +38,10 @@ import net.kdt.pojavlaunch.Tools
 import net.kdt.pojavlaunch.instances.Instances
 import org.apache.commons.io.FileUtils
 import java.io.File
+import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.IOException
+import java.io.InputStream
 import java.util.zip.ZipInputStream
 
 enum class ContentKind(
@@ -177,9 +179,19 @@ object PojavContentBridge {
      * becomes the world; otherwise the archive name is used. Entries escaping the target are rejected.
      */
     private fun extractWorld(context: Context, uri: Uri, savesDir: File, archiveName: String) {
+        extractWorldStreams(savesDir, archiveName) {
+            context.contentResolver.openInputStream(uri) ?: throw IOException("Unable to open $uri")
+        }
+    }
+
+    /** Extracts a downloaded world archive [zipFile] into [savesDir] (used by PojavAssetBridge). */
+    fun extractWorldFile(zipFile: File, savesDir: File, archiveName: String) {
+        extractWorldStreams(savesDir, archiveName) { FileInputStream(zipFile) }
+    }
+
+    private fun extractWorldStreams(savesDir: File, archiveName: String, open: () -> InputStream) {
         val entries = ArrayList<String>()
-        context.contentResolver.openInputStream(uri).use { input ->
-            if (input == null) throw IOException("Unable to open $uri")
+        open().use { input ->
             ZipInputStream(input).use { zip ->
                 while (true) {
                     val entry = zip.nextEntry ?: break
@@ -193,8 +205,7 @@ object PojavContentBridge {
         if (!worldDir.mkdirs()) throw IOException("Unable to create ${worldDir.absolutePath}")
         val canonicalRoot = worldDir.canonicalPath + File.separator
 
-        context.contentResolver.openInputStream(uri).use { input ->
-            if (input == null) throw IOException("Unable to open $uri")
+        open().use { input ->
             ZipInputStream(input).use { zip ->
                 while (true) {
                     val entry = zip.nextEntry ?: break

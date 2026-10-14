@@ -76,6 +76,7 @@ import androidx.compose.ui.unit.sp
 import androidx.fragment.app.FragmentActivity
 import kotlinx.coroutines.launch
 import net.kdt.pojavlaunch.R
+import net.kdt.pojavlaunch.aerix.bridge.AssetType
 import net.kdt.pojavlaunch.aerix.bridge.ContentEntry
 import net.kdt.pojavlaunch.aerix.bridge.ContentKind
 import net.kdt.pojavlaunch.aerix.bridge.PojavContentBridge
@@ -88,10 +89,11 @@ import net.kdt.pojavlaunch.aerix.theme.AerixRadii
 import net.kdt.pojavlaunch.aerix.theme.AerixSpacing
 import net.kdt.pojavlaunch.aerix.theme.AerixSurface
 import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
+import net.kdt.pojavlaunch.aerix.ui.LauncherSection
 import java.util.Date
 
 @Composable
-fun ContentScreen(activity: FragmentActivity) {
+fun ContentScreen(activity: FragmentActivity, navigate: (LauncherSection) -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val kinds = ContentKind.entries
@@ -154,6 +156,9 @@ fun ContentScreen(activity: FragmentActivity) {
             Row(horizontalArrangement = Arrangement.spacedBy(AerixSpacing.sm)) {
                 AerixGhostButton(stringResource(R.string.mcl_button_open_directory), R.drawable.aerix_ic_folder_outlined, {
                     PojavContentBridge.openFolder(activity, kind)
+                })
+                AerixGhostButton(stringResource(R.string.aerix_download_install), R.drawable.aerix_ic_download, {
+                    AerixDownloadRequest.open(AssetType.entries.first { it.folder == kind }, navigate)
                 })
                 AerixPrimaryButton(stringResource(R.string.aerix_content_import), R.drawable.aerix_ic_add, {
                     picker.launch(kind.importMimeTypes)

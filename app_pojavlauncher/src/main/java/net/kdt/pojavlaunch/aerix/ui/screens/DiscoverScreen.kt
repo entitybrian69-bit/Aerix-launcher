@@ -43,6 +43,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
 import net.kdt.pojavlaunch.R
+import net.kdt.pojavlaunch.aerix.bridge.AssetType
 import net.kdt.pojavlaunch.aerix.bridge.PojavInstaller
 import net.kdt.pojavlaunch.aerix.bridge.PojavInstanceBridge
 import net.kdt.pojavlaunch.aerix.bridge.PojavNavigator
@@ -51,6 +52,7 @@ import net.kdt.pojavlaunch.aerix.components.QuickActionTile
 import net.kdt.pojavlaunch.aerix.theme.AerixSpacing
 import net.kdt.pojavlaunch.aerix.theme.AerixSurface
 import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
+import net.kdt.pojavlaunch.aerix.ui.LauncherSection
 import net.kdt.pojavlaunch.contracts.OpenDocumentWithExtension
 
 private class DiscoverEntry(
@@ -62,7 +64,7 @@ private class DiscoverEntry(
 )
 
 @Composable
-fun DiscoverScreen(activity: FragmentActivity) {
+fun DiscoverScreen(activity: FragmentActivity, navigate: (LauncherSection) -> Unit) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
     val accent = AerixThemeManager.currentAccent()
     val jarLauncher = rememberLauncherForActivityResult(OpenDocumentWithExtension("jar")) { uri ->
@@ -88,6 +90,18 @@ fun DiscoverScreen(activity: FragmentActivity) {
         DiscoverEntry(R.drawable.aerix_ic_rocket_launch_filled, R.string.aerix_discover_bta, R.string.aerix_discover_bta_sub, AerixSurface.success) { open(PojavInstaller.BTA) }
     )
     val content = listOf(
+        DiscoverEntry(R.drawable.aerix_ic_extension_outlined, R.string.aerix_discover_dl_mods, R.string.aerix_discover_dl_mods_sub, AerixSurface.modrinthBrand) {
+            AerixDownloadRequest.open(AssetType.MOD, navigate)
+        },
+        DiscoverEntry(R.drawable.aerix_ic_photo_library_outlined, R.string.aerix_discover_dl_resourcepacks, R.string.aerix_discover_dl_resourcepacks_sub, AerixSurface.glassBlue) {
+            AerixDownloadRequest.open(AssetType.RESOURCE_PACK, navigate)
+        },
+        DiscoverEntry(R.drawable.aerix_ic_wallpaper, R.string.aerix_discover_dl_shaders, R.string.aerix_discover_dl_shaders_sub, AerixSurface.glassViolet) {
+            AerixDownloadRequest.open(AssetType.SHADER_PACK, navigate)
+        },
+        DiscoverEntry(R.drawable.aerix_ic_videogame_asset_outlined, R.string.aerix_discover_dl_worlds, R.string.aerix_discover_dl_worlds_sub, AerixSurface.curseForgeBrand) {
+            AerixDownloadRequest.open(AssetType.WORLD, navigate)
+        },
         DiscoverEntry(R.drawable.aerix_ic_package_2_outlined, R.string.aerix_discover_modpack, R.string.aerix_discover_modpack_sub, AerixSurface.modrinthBrand) { open(PojavInstaller.MODPACK) },
         DiscoverEntry(R.drawable.aerix_ic_java, R.string.aerix_discover_jar, R.string.aerix_discover_jar_sub, AerixSurface.glassBlue) {
             if (PojavNavigator.canRunJar(activity)) jarLauncher.launch(null)
