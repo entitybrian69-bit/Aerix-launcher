@@ -150,7 +150,7 @@ object PojavContentBridge {
         if (dir.isDirectory || dir.mkdirs()) Tools.openPath(context, dir, false)
     }
 
-    private fun displayName(context: Context, uri: Uri): String? {
+    internal fun displayName(context: Context, uri: Uri): String? {
         context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
             if (cursor.moveToFirst()) {
                 val value = cursor.getString(0)
@@ -160,7 +160,7 @@ object PojavContentBridge {
         return uri.lastPathSegment?.let { File(it).name }
     }
 
-    private fun uniqueFile(dir: File, name: String): File {
+    internal fun uniqueFile(dir: File, name: String): File {
         var candidate = File(dir, name)
         if (!candidate.exists()) return candidate
         val dot = name.lastIndexOf('.').takeIf { it > 0 } ?: name.length

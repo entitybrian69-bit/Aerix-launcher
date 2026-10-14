@@ -109,6 +109,7 @@ private class HomeActions(
     val gamepad: () -> Unit,
     val content: () -> Unit,
     val downloads: () -> Unit,
+    val fileManager: () -> Unit,
     val logs: () -> Unit
 )
 
@@ -142,6 +143,7 @@ fun HomeScreen(activity: FragmentActivity, navigate: (LauncherSection) -> Unit) 
         gamepad = { PojavNavigator.openGamepadMapper(activity) },
         content = { navigate(LauncherSection.CONTENT) },
         downloads = { navigate(LauncherSection.DOWNLOADS) },
+        fileManager = { navigate(LauncherSection.FILES) },
         logs = { navigate(LauncherSection.LOGS) }
     )
 
@@ -665,6 +667,7 @@ private fun QuickToolsPanel(accent: Color, actions: HomeActions, modifier: Modif
             HomeToolAction(stringResource(R.string.main_install_jar_file), R.drawable.aerix_ic_java, AerixSurface.glassBlue, actions.runJar)
             HomeToolAction(stringResource(R.string.aerix_logs_title), R.drawable.aerix_ic_terminal_outlined, AerixSurface.warning, actions.logs)
             HomeToolAction(stringResource(R.string.main_share_logs), R.drawable.aerix_ic_share_filled, AerixSurface.glassViolet, actions.shareLogs)
+            HomeToolAction(stringResource(R.string.aerix_files_title), R.drawable.aerix_ic_folder_filled, AerixSurface.glassBlue, actions.fileManager)
             HomeToolAction(stringResource(R.string.mcl_button_open_directory), R.drawable.aerix_ic_folder_outlined, AerixSurface.glassRose, actions.files)
             HomeToolAction(stringResource(R.string.preference_remap_controller_title), R.drawable.aerix_ic_sports_esports_outlined, AerixSurface.auroraCyan, actions.gamepad)
         }
