@@ -62,8 +62,17 @@ jobs:
       - name: Build Debug .apk (Full)
         run: |
           # Build the launcher
-          gradle :app_pojavlauncher:assembleFullDebug
+          set -o pipefail
+          gradle :app_pojavlauncher:assembleFullDebug 2>&1 | tee build.log
           mv app_pojavlauncher/build/outputs/apk/full/debug/app_pojavlauncher-full-debug.apk out/app-debug-full.apk
+
+      - name: Report build errors
+        if: failure()
+        run: |
+          grep -E "^e: |error:|ERROR:|What went wrong" -A 3 build.log | head -c 60000 > err.txt || true
+          [ -s err.txt ] || tail -c 6000 build.log > err.txt
+          split -b 3500 err.txt part_
+          for f in part_*; do printf '::error title=%s::%s\n' "$f" "$(sed ':a;N;$!ba;s/%/%25/g;s/\r/%0D/g;s/\n/%0A/g' "$f")"; done
 
       - name: Build Debug .apk (No runtime)
         run: |
