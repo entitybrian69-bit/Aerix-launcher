@@ -31,6 +31,9 @@ import net.kdt.pojavlaunch.prefs.LauncherPreferences
 /** Color theme types kept from Zalith/Aerix. Only AERIX and CUSTOM are reachable from the port. */
 enum class AerixColorTheme { AERIX, CUSTOM }
 
+/** Page transition types, from mirai utils/animation/TransitionAnimationType.kt. */
+enum class AerixTransitionType { CLOSE, JELLY_BOUNCE, BOUNCE, SLICE_IN }
+
 /**
  * Stores the Aerix launcher appearance settings in their own SharedPreferences file so they never
  * collide with Pojav keys. Keys whose meaning overlaps a Pojav setting are written through to
@@ -47,6 +50,10 @@ object AerixPreferences {
     const val KEY_SELECTED_WALLPAPER = "selected_wallpaper_id"
     const val KEY_LAST_SECTION = "aerixLastSection"
     const val KEY_BACKGROUND_BLUR = "backgroundBlur"
+    const val KEY_SWAP_ANIMATE_TYPE = "launcherSwapAnimateType"
+    const val KEY_ANIMATE_EXTENT = "launcherAnimateExtent"
+    const val KEY_FESTIVAL_EFFECTS = "launcherFestivalEffects"
+    const val KEY_LOG_TEXT_SIZE = "logTextSize"
 
     const val DEFAULT_CUSTOM_COLOR = 0xFF8DEFE0.toInt()
     const val DEFAULT_BACKGROUND_OPACITY = 60
@@ -74,6 +81,22 @@ object AerixPreferences {
     var backgroundBlur by mutableIntStateOf(0)
         private set
 
+    /** Aerix "launcherSwapAnimateType": section transition style. */
+    var swapAnimateType by mutableStateOf(AerixTransitionType.JELLY_BOUNCE)
+        private set
+
+    /** Aerix "launcherAnimateExtent" (0..10, 5 = base amplitude). */
+    var animateExtent by mutableIntStateOf(3)
+        private set
+
+    /** Aerix "launcherFestivalEffects": persistent festival particle layer. */
+    var festivalEffects by mutableStateOf(false)
+        private set
+
+    /** Aerix "logTextSize" (5..20 sp) used by the log viewer. */
+    var logTextSize by mutableIntStateOf(15)
+        private set
+
     fun init(context: Context) {
         val p = context.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
         prefs = p
@@ -87,6 +110,12 @@ object AerixPreferences {
         selectedWallpaper = p.getString(KEY_SELECTED_WALLPAPER, DEFAULT_WALLPAPER) ?: DEFAULT_WALLPAPER
         lastSection = p.getString(KEY_LAST_SECTION, "HOME") ?: "HOME"
         backgroundBlur = p.getInt(KEY_BACKGROUND_BLUR, 0).coerceIn(0, 20)
+        swapAnimateType = runCatching {
+            AerixTransitionType.valueOf(p.getString(KEY_SWAP_ANIMATE_TYPE, AerixTransitionType.JELLY_BOUNCE.name)!!)
+        }.getOrDefault(AerixTransitionType.JELLY_BOUNCE)
+        animateExtent = p.getInt(KEY_ANIMATE_EXTENT, 3).coerceIn(0, 10)
+        festivalEffects = p.getBoolean(KEY_FESTIVAL_EFFECTS, false)
+        logTextSize = p.getInt(KEY_LOG_TEXT_SIZE, 15).coerceIn(5, 20)
     }
 
     private fun edit(block: SharedPreferences.Editor.() -> Unit) {
@@ -136,6 +165,32 @@ object AerixPreferences {
         backgroundBlur = value.coerceIn(0, 20)
         edit { putInt(KEY_BACKGROUND_BLUR, backgroundBlur) }
     }
+
+    fun saveSwapAnimateType(value: AerixTransitionType) {
+        swapAnimateType = value
+        edit { putString(KEY_SWAP_ANIMATE_TYPE, value.name) }
+    }
+
+    fun saveAnimateExtent(value: Int) {
+        animateExtent = value.coerceIn(0, 10)
+        edit { putInt(KEY_ANIMATE_EXTENT, animateExtent) }
+    }
+
+    fun saveFestivalEffects(value: Boolean) {
+        festivalEffects = value
+        edit { putBoolean(KEY_FESTIVAL_EFFECTS, value) }
+    }
+
+    fun saveLogTextSize(value: Int) {
+        logTextSize = value.coerceIn(5, 20)
+        edit { putInt(KEY_LOG_TEXT_SIZE, logTextSize) }
+    }
+
+    /**
+     * Amplitude multiplier from mirai AnimationUtils.getTargetValueByAmplitude:
+     * extent 0 -> 0.5x, 5 -> 1.0x, 10 -> 1.5x.
+     */
+    fun extentScale(): Float = 0.5f + animateExtent.coerceIn(0, 10) / 10f
 
     /** Animation length used by section transitions, derived from the Aerix speed slider (0..10). */
     fun transitionMillis(): Int = if (animateSpeed == 0) 0 else 120 + (10 - animateSpeed) * 40

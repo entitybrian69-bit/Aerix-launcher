@@ -76,6 +76,7 @@ import net.kdt.pojavlaunch.R
 import net.kdt.pojavlaunch.Tools
 import net.kdt.pojavlaunch.aerix.bridge.AerixColorTheme
 import net.kdt.pojavlaunch.aerix.bridge.AerixPreferences
+import net.kdt.pojavlaunch.aerix.bridge.AerixTransitionType
 import net.kdt.pojavlaunch.aerix.bridge.PojavNavigator
 import net.kdt.pojavlaunch.aerix.bridge.PojavSetting
 import net.kdt.pojavlaunch.aerix.bridge.PojavSettingCategory
@@ -117,6 +118,13 @@ fun SettingsScreen(activity: FragmentActivity) {
 private fun AppearanceSettings(activity: FragmentActivity) {
     var showColorPicker by remember { mutableStateOf(false) }
     var showThemeChoice by remember { mutableStateOf(false) }
+    var showTransitionChoice by remember { mutableStateOf(false) }
+    val transitionLabels = listOf(
+        AerixTransitionType.CLOSE.name to stringResource(R.string.aerix_settings_transition_close),
+        AerixTransitionType.JELLY_BOUNCE.name to stringResource(R.string.aerix_settings_transition_jelly),
+        AerixTransitionType.BOUNCE.name to stringResource(R.string.aerix_settings_transition_bounce),
+        AerixTransitionType.SLICE_IN.name to stringResource(R.string.aerix_settings_transition_slice)
+    )
     val aerixLabel = stringResource(R.string.aerix_settings_theme_aerix)
     val customLabel = stringResource(R.string.aerix_settings_theme_custom)
 
@@ -129,6 +137,18 @@ private fun AppearanceSettings(activity: FragmentActivity) {
             onPick = {
                 AerixPreferences.saveColorTheme(AerixColorTheme.valueOf(it))
                 showThemeChoice = false
+            }
+        )
+    }
+    if (showTransitionChoice) {
+        ChoiceDialog(
+            title = stringResource(R.string.aerix_settings_transition),
+            entries = transitionLabels,
+            current = AerixPreferences.swapAnimateType.name,
+            onDismiss = { showTransitionChoice = false },
+            onPick = {
+                AerixPreferences.saveSwapAnimateType(AerixTransitionType.valueOf(it))
+                showTransitionChoice = false
             }
         )
     }
@@ -211,6 +231,48 @@ private fun AppearanceSettings(activity: FragmentActivity) {
                 suffix = "",
                 onValueChange = { AerixPreferences.saveAnimateSpeed(it) },
                 iconRes = R.drawable.aerix_ic_rocket_launch_filled
+            )
+        }
+        item {
+            ActionSettingRow(
+                title = stringResource(R.string.aerix_settings_transition),
+                summary = stringResource(R.string.aerix_settings_transition_sub),
+                onClick = { showTransitionChoice = true },
+                iconRes = R.drawable.aerix_ic_style_outlined,
+                value = transitionLabels.first { it.first == AerixPreferences.swapAnimateType.name }.second
+            )
+        }
+        item {
+            SliderSettingRow(
+                title = stringResource(R.string.aerix_settings_animate_extent),
+                summary = stringResource(R.string.aerix_settings_animate_extent_sub),
+                value = AerixPreferences.animateExtent,
+                range = 0..10,
+                step = 1,
+                suffix = "",
+                onValueChange = { AerixPreferences.saveAnimateExtent(it) },
+                iconRes = R.drawable.aerix_ic_touch_app_outlined
+            )
+        }
+        item {
+            SwitchSettingRow(
+                title = stringResource(R.string.aerix_settings_festival),
+                summary = stringResource(R.string.aerix_settings_festival_sub),
+                checked = AerixPreferences.festivalEffects,
+                onCheckedChange = { AerixPreferences.saveFestivalEffects(it) },
+                iconRes = R.drawable.aerix_ic_schedule_outlined
+            )
+        }
+        item {
+            SliderSettingRow(
+                title = stringResource(R.string.aerix_logs_text_size),
+                summary = stringResource(R.string.aerix_logs_text_size_sub),
+                value = AerixPreferences.logTextSize,
+                range = 5..20,
+                step = 1,
+                suffix = " sp",
+                onValueChange = { AerixPreferences.saveLogTextSize(it) },
+                iconRes = R.drawable.aerix_ic_terminal_outlined
             )
         }
         item {

@@ -106,7 +106,9 @@ private class HomeActions(
     val controls: () -> Unit,
     val runJar: () -> Unit,
     val shareLogs: () -> Unit,
-    val gamepad: () -> Unit
+    val gamepad: () -> Unit,
+    val content: () -> Unit,
+    val logs: () -> Unit
 )
 
 @Composable
@@ -136,7 +138,9 @@ fun HomeScreen(activity: FragmentActivity, navigate: (LauncherSection) -> Unit) 
         controls = { PojavNavigator.openCustomControls(activity) },
         runJar = { if (PojavNavigator.canRunJar(activity)) jarLauncher.launch(null) },
         shareLogs = { PojavNavigator.shareLogs(activity) },
-        gamepad = { PojavNavigator.openGamepadMapper(activity) }
+        gamepad = { PojavNavigator.openGamepadMapper(activity) },
+        content = { navigate(LauncherSection.CONTENT) },
+        logs = { navigate(LauncherSection.LOGS) }
     )
 
     BoxWithConstraints(
@@ -653,8 +657,10 @@ private fun QuickToolsPanel(accent: Color, actions: HomeActions, modifier: Modif
             verticalArrangement = Arrangement.spacedBy(AerixSpacing.xs)
         ) {
             HomeSectionLabel(stringResource(R.string.aerix_home_quick_tools), null)
+            HomeToolAction(stringResource(R.string.aerix_content_title), R.drawable.aerix_ic_extension_outlined, AerixSurface.success, actions.content)
             HomeToolAction(stringResource(R.string.mcl_option_customcontrol), R.drawable.aerix_ic_touch_app_outlined, accent, actions.controls)
             HomeToolAction(stringResource(R.string.main_install_jar_file), R.drawable.aerix_ic_java, AerixSurface.glassBlue, actions.runJar)
+            HomeToolAction(stringResource(R.string.aerix_logs_title), R.drawable.aerix_ic_terminal_outlined, AerixSurface.warning, actions.logs)
             HomeToolAction(stringResource(R.string.main_share_logs), R.drawable.aerix_ic_share_filled, AerixSurface.glassViolet, actions.shareLogs)
             HomeToolAction(stringResource(R.string.mcl_button_open_directory), R.drawable.aerix_ic_folder_outlined, AerixSurface.glassRose, actions.files)
             HomeToolAction(stringResource(R.string.preference_remap_controller_title), R.drawable.aerix_ic_sports_esports_outlined, AerixSurface.auroraCyan, actions.gamepad)

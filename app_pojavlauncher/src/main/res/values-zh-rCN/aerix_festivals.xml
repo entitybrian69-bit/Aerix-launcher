@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- From mirai-launcher- res/values-zh-rCN/strings.xml. -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:ignore="MissingTranslation">
+    <string name="aerix_festivals_new_year">新年快乐！</string>
+    <string name="aerix_festivals_april_fools">愚人节快乐！</string>
+    <string name="aerix_festivals_halloween">万圣节快乐！</string>
+    <string name="aerix_festivals_valentines">情人节快乐！</string>
+    <string name="aerix_festivals_christmas">圣诞节快乐！</string>
+</resources>

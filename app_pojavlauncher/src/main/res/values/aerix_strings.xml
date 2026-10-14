@@ -174,4 +174,55 @@
     <string name="aerix_about_website">Website</string>
     <string name="aerix_about_source">Source code</string>
     <string name="aerix_about_ui_source">Aerix interface source</string>
+
+    <!-- Navigation additions -->
+    <string name="aerix_nav_content">Content</string>
+    <string name="aerix_nav_logs">Logs</string>
+
+    <!-- Instance content managers -->
+    <string name="aerix_content_title">Instance content</string>
+    <string name="aerix_content_subtitle">Mods, resource packs, shader packs and worlds of %1$s</string>
+    <string name="aerix_content_mods">Mods</string>
+    <string name="aerix_content_resourcepacks">Resource packs</string>
+    <string name="aerix_content_shaderpacks">Shader packs</string>
+    <string name="aerix_content_saves">Worlds</string>
+    <string name="aerix_content_search">Search this folder</string>
+    <string name="aerix_content_empty">Nothing here yet. Import files or open the folder.</string>
+    <string name="aerix_content_import">Import</string>
+    <string name="aerix_content_imported">Imported</string>
+    <string name="aerix_content_failed">The operation failed</string>
+    <string name="aerix_content_delete">Delete</string>
+    <string name="aerix_content_delete_confirm">Delete %1$s from this instance?</string>
+
+    <!-- Log viewer -->
+    <string name="aerix_logs_title">Game log</string>
+    <string name="aerix_logs_subtitle">latestlog.txt and crash reports of the selected instance</string>
+    <string name="aerix_logs_latest">Latest log</string>
+    <string name="aerix_logs_refresh">Refresh</string>
+    <string name="aerix_logs_copy">Copy</string>
+    <string name="aerix_logs_copied">Log copied</string>
+    <string name="aerix_logs_search">Filter lines</string>
+    <string name="aerix_logs_empty">No log yet. Launch the game once to create latestlog.txt.</string>
+    <string name="aerix_logs_auto_refresh">Auto refresh</string>
+    <string name="aerix_logs_text_size">Log font size</string>
+    <string name="aerix_logs_text_size_sub">Text size on the log screen</string>
+
+    <!-- Animation and festival settings -->
+    <string name="aerix_settings_transition">Transition animation</string>
+    <string name="aerix_settings_transition_sub">Page transition style of the launcher</string>
+    <string name="aerix_settings_transition_close">Off</string>
+    <string name="aerix_settings_transition_jelly">Jelly bounce</string>
+    <string name="aerix_settings_transition_bounce">Bounce</string>
+    <string name="aerix_settings_transition_slice">Slice in</string>
+    <string name="aerix_settings_animate_extent">Animation intensity</string>
+    <string name="aerix_settings_animate_extent_sub">Travel distance of the launcher animations</string>
+    <string name="aerix_settings_festival">Festival easter eggs</string>
+    <string name="aerix_settings_festival_sub">Persistent effects on festival days (snow, fireworks, hearts, bats, rain, fireflies)</string>
+
+    <!-- Festivals -->
+    <string name="aerix_festivals_new_year">Happy New Year!</string>
+    <string name="aerix_festivals_april_fools">Happy April Fools\' Day!</string>
+    <string name="aerix_festivals_halloween">Happy Halloween!</string>
+    <string name="aerix_festivals_valentines">Happy Valentine\'s Day!</string>
+    <string name="aerix_festivals_christmas">Merry Christmas!</string>
 </resources>

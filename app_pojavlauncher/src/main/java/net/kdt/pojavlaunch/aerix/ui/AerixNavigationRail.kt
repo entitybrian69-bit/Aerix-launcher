@@ -79,7 +79,9 @@ enum class LauncherSection {
     HOME,
     LIBRARY,
     DISCOVER,
+    CONTENT,
     WALLPAPERS,
+    LOGS,
     SETTINGS,
     ACCOUNTS,
     ABOUT
@@ -164,6 +166,8 @@ fun AerixNavigationRail(
                     selectedSection == LauncherSection.LIBRARY, activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.LIBRARY) }
                 RailIconItem(R.drawable.aerix_ic_public, stringResource(R.string.aerix_nav_discover),
                     selectedSection == LauncherSection.DISCOVER, activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.DISCOVER) }
+                RailIconItem(R.drawable.aerix_ic_extension_outlined, stringResource(R.string.aerix_nav_content),
+                    selectedSection == LauncherSection.CONTENT, activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.CONTENT) }
                 RailIconItem(R.drawable.aerix_ic_format_paint_outlined, stringResource(R.string.aerix_nav_wallpapers),
                     selectedSection == LauncherSection.WALLPAPERS, activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.WALLPAPERS) }
 
@@ -171,6 +175,8 @@ fun AerixNavigationRail(
 
                 RailIconItem(R.drawable.aerix_ic_settings_filled, stringResource(R.string.aerix_nav_settings),
                     selectedSection == LauncherSection.SETTINGS, activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.SETTINGS) }
+                RailIconItem(R.drawable.aerix_ic_terminal_outlined, stringResource(R.string.aerix_nav_logs),
+                    selectedSection == LauncherSection.LOGS, activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.LOGS) }
                 RailIconItem(R.drawable.aerix_ic_info_outlined, stringResource(R.string.aerix_nav_about),
                     selectedSection == LauncherSection.ABOUT, activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.ABOUT) }
 

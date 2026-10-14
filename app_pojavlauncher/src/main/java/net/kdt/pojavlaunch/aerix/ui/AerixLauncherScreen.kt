@@ -24,11 +24,20 @@
 package net.kdt.pojavlaunch.aerix.ui
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -46,6 +55,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.fragment.app.FragmentActivity
 import net.kdt.pojavlaunch.aerix.bridge.AerixPreferences
+import net.kdt.pojavlaunch.aerix.bridge.AerixTransitionType
+import net.kdt.pojavlaunch.aerix.festivals.FestivalEffectsHost
+import net.kdt.pojavlaunch.aerix.festivals.FestivalTitleText
+import net.kdt.pojavlaunch.aerix.festivals.rememberTodayFestivals
 import net.kdt.pojavlaunch.aerix.bridge.PojavAccountBridge
 import net.kdt.pojavlaunch.aerix.bridge.PojavInstaller
 import net.kdt.pojavlaunch.aerix.bridge.PojavNavigator
@@ -55,6 +68,8 @@ import net.kdt.pojavlaunch.aerix.theme.AerixSurface
 import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
 import net.kdt.pojavlaunch.aerix.ui.screens.AboutScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.AccountsScreen
+import net.kdt.pojavlaunch.aerix.ui.screens.ContentScreen
+import net.kdt.pojavlaunch.aerix.ui.screens.LogScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.DiscoverScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.HomeScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.LibraryScreen
@@ -71,8 +86,12 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
         AerixPreferences.saveLastSection(target.name)
     }
     val duration = AerixPreferences.transitionMillis()
+    val transitionType = AerixPreferences.swapAnimateType
+    val extent = AerixPreferences.extentScale()
+    val festivals = rememberTodayFestivals()
 
     AerixBackground {
+      FestivalEffectsHost(festivals = festivals, modifier = Modifier.fillMaxSize()) {
         Row(modifier = Modifier.fillMaxSize()) {
             AerixNavigationRail(
                 selectedSection = section,
@@ -86,20 +105,15 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
             ) {
                 AnimatedContent(
                     targetState = section,
-                    transitionSpec = {
-                        if (duration == 0) {
-                            fadeIn(tween(0)) togetherWith fadeOut(tween(0))
-                        } else {
-                            (fadeIn(tween(duration)) + slideInVertically(tween(duration)) { it / 24 }) togetherWith
-                                fadeOut(tween(duration / 2))
-                        }
-                    },
+                    transitionSpec = { sectionTransition(transitionType, duration, extent) },
                     label = "aerixSection"
                 ) { target ->
                     when (target) {
                         LauncherSection.HOME -> HomeScreen(activity, navigate)
                         LauncherSection.LIBRARY -> LibraryScreen(activity)
                         LauncherSection.DISCOVER -> DiscoverScreen(activity)
+                        LauncherSection.CONTENT -> ContentScreen(activity)
+                        LauncherSection.LOGS -> LogScreen(activity)
                         LauncherSection.WALLPAPERS -> WallpapersScreen()
                         LauncherSection.SETTINGS -> SettingsScreen(activity)
                         LauncherSection.ACCOUNTS -> AccountsScreen(activity)
@@ -122,5 +136,46 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
                 }
             }
         }
+
+        FestivalTitleText(
+            festivals = festivals,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(top = AerixSpacing.xs, end = AerixSpacing.lg)
+        )
+      }
+    }
+}
+
+/**
+ * Section transition for the Aerix "launcherSwapAnimateType" setting
+ * (mirai utils/animation/TransitionAnimationType.kt, ui/screens/_Navigation.kt):
+ * CLOSE snaps, JELLY_BOUNCE scales in on a low-stiffness spring, BOUNCE rises on a bouncy spring,
+ * SLICE_IN slides in from the side. "launcherAnimateExtent" scales the travel distance.
+ */
+private fun AnimatedContentTransitionScope<LauncherSection>.sectionTransition(
+    type: AerixTransitionType,
+    duration: Int,
+    extent: Float
+): ContentTransform {
+    if (duration == 0 || type == AerixTransitionType.CLOSE) {
+        return fadeIn(snap()) togetherWith fadeOut(snap())
+    }
+    val exit = fadeOut(tween((duration * 0.75f).toInt().coerceAtLeast(80), easing = FastOutSlowInEasing))
+    val forward = targetState.ordinal >= initialState.ordinal
+    return when (type) {
+        AerixTransitionType.JELLY_BOUNCE -> (fadeIn(tween(duration)) +
+            scaleIn(spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow),
+                initialScale = 1f - 0.08f * extent)) togetherWith exit
+        AerixTransitionType.BOUNCE -> (fadeIn(tween(duration)) +
+            slideInVertically(spring<IntOffset>(dampingRatio = Spring.DampingRatioHighBouncy, stiffness = Spring.StiffnessLow)) {
+                (it / 10 * extent).toInt()
+            }) togetherWith exit
+        AerixTransitionType.SLICE_IN -> (fadeIn(tween(duration)) +
+            slideInHorizontally(tween(duration, easing = FastOutSlowInEasing)) {
+                val distance = (it / 6 * extent).toInt()
+                if (forward) distance else -distance
+            }) togetherWith exit
+        AerixTransitionType.CLOSE -> fadeIn(snap()) togetherWith fadeOut(snap())
     }
 }
