@@ -4,7 +4,7 @@
  *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/ui/components/AerixComponents.kt
  *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/ui/screens/content/home/MiraiHomeDashboard.kt
  *     (QuickActionTile, HeroMetaPill, HomeSectionLabel, QuietEmptyState)
- *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/ui/screens/content/settings/layouts/*.kt
+ *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/ui/screens/content/settings/layouts/(all .kt files)
  * Zalith Launcher 2 Copyright (C) 2025 MovTery <movtery228@qq.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify

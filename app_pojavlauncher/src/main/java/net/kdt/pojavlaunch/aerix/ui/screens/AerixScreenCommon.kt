@@ -1,7 +1,7 @@
 /*
  * Aerix Launcher UI layer for PojavLauncher.
  * Shared page scaffold and helpers for the Aerix screens, following the page layout of mirai-launcher-
- *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/ui/screens/content/elements/*.kt
+ *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/ui/screens/content/elements/(all .kt files)
  *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/ui/theme/AerixSurface.kt (AerixLayoutDefaults)
  *
  * This program is free software: you can redistribute it and/or modify

@@ -7,10 +7,10 @@
  *
  * Aerix (Zalith) setting sources mapped here, see mirai-launcher-
  *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/setting/AllSettings.kt
- *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/ui/screens/content/settings/*.kt
+ *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/ui/screens/content/settings/(all .kt files)
  * Pojav sources mirrored here:
  *   app_pojavlauncher/src/main/res/xml/pref_{video,control,java,misc,experimental,main}.xml
- *   app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/prefs/screens/*.java
+ *   app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/prefs/screens/(all .java files)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by

@@ -6,7 +6,7 @@
  *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/ui/screens/content/settings/RendererSettingsScreen.kt
  *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/ui/screens/content/settings/ControlSettingsScreen.kt
  *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/ui/screens/content/settings/GameSettingsScreen.kt
- *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/ui/screens/content/settings/layouts/*.kt
+ *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/ui/screens/content/settings/layouts/(all .kt files)
  * Appearance rows write AerixPreferences; every other row is a PojavSetting from PojavSettingsBridge
  * and writes the PojavLauncher key it names. Each category links to the original Pojav screen.
  * Zalith Launcher 2 Copyright (C) 2025 MovTery <movtery228@qq.com> and contributors

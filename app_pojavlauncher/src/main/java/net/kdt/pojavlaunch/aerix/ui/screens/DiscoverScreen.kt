@@ -2,7 +2,7 @@
  * Aerix Launcher UI layer for PojavLauncher.
  * Ported from mirai-launcher- (Zalith Launcher 2 fork):
  *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/ui/screens/content/DownloadScreen.kt
- *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/ui/screens/content/download/*.kt (tab layout)
+ *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/ui/screens/content/download/(all .kt files) (tab layout)
  * Every entry opens the Pojav installer that owns it (Pojav fragments, unchanged): vanilla instance,
  * profile type picker, OptiFine, Fabric, Forge, NeoForge, Quilt, Legacy Fabric, BTA, modpack search,
  * and the .jar runner.
