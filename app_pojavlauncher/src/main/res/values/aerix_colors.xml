@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Aerix glass palette, ported from mirai-launcher- ui/theme/AerixSurface.kt -->
+<resources>
+    <color name="aerix_canvas">#FF07131D</color>
+    <color name="aerix_panel">#9D172B3A</color>
+    <color name="aerix_panel_raised">#B0223B4E</color>
+    <color name="aerix_panel_solid">#FF0F2130</color>
+    <color name="aerix_panel_raised_solid">#FF1B3243</color>
+    <color name="aerix_border">#78E6FAFF</color>
+    <color name="aerix_border_soft">#48E6FAFF</color>
+    <color name="aerix_accent">#FF8DEFE0</color>
+    <color name="aerix_action">#FF2A9D92</color>
+    <color name="aerix_on_accent">#FF06201D</color>
+    <color name="aerix_glass_blue">#FF91E9FF</color>
+    <color name="aerix_glass_violet">#FFB7A9FF</color>
+    <color name="aerix_text_primary">#FFF1F6FA</color>
+    <color name="aerix_text_secondary">#FFA8B9C5</color>
+    <color name="aerix_text_muted">#FF7D909D</color>
+    <color name="aerix_success">#FF73E5B0</color>
+    <color name="aerix_warning">#FFFFC777</color>
+    <color name="aerix_danger">#FFFF7189</color>
+</resources>

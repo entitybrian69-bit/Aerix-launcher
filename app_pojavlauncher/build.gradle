@@ -124,8 +124,9 @@ android {
             shrinkResources false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             signingConfig signingConfigs.customDebug
-            resValue "string", "app_name", "PojavLauncher (Debug)"
+            resValue "string", "app_name", "Aerix Launcher (Debug)"
             resValue "string", "app_short_name", "PojavLauncher (Debug)"
+            resValue "string", "aerix_app_label", "Aerix Launcher (Debug)"
             resValue 'string', 'application_package', 'net.kdt.pojavlaunch.debug'
             resValue 'string', 'storageProviderAuthorities', 'net.kdt.pojavlaunch.scoped.gamefolder.debug'
         }
@@ -145,8 +146,9 @@ android {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
             signingConfig signingConfigs.customRelease
-            resValue "string", "app_name", "PojavLauncher (Minecraft: Java Edition for Android)"
+            resValue "string", "app_name", "Aerix Launcher"
             resValue "string", "app_short_name", "PojavLauncher"
+            resValue "string", "aerix_app_label", "Aerix Launcher"
             resValue 'string', 'application_package', 'net.kdt.pojavlaunch'
             resValue 'string', 'storageProviderAuthorities', 'net.kdt.pojavlaunch.scoped.gamefolder'
         }
@@ -159,8 +161,9 @@ android {
             initWith release
             signingConfig signingConfigs.customDebug // WIP, changeme
             applicationIdSuffix '.pub'
-            resValue "string", "app_name", "PojavLauncher (Nightly)"
+            resValue "string", "app_name", "Aerix Launcher (Nightly)"
             resValue "string", "app_short_name", "PojavLauncher (Nightly)"
+            resValue "string", "aerix_app_label", "Aerix Launcher (Nightly)"
             resValue 'string', 'application_package', 'net.kdt.pojavlaunch.pub'
             resValue 'string', 'storageProviderAuthorities', 'net.kdt.pojavlaunch.pub.scoped.gamefolder'
             matchingFallbacks += List.of("release")
