@@ -1,7 +1,8 @@
 name: Aerix release
 
-# Commits the debug APKs of a finished Android CI run into apk/ on the Aerix branch
-# (Git LFS, because the full APK is larger than GitHub's 100 MB file limit).
+# Commits the no-runtime debug APK of a finished Android CI run into apk/ on the Aerix branch.
+# The full APK (128 MB) is over GitHub's 100 MB file limit and LFS uploads are refused on forks;
+# the no-runtime APK downloads every Java runtime on demand through NewJREUtil.
 # Runs when this file changes on the Aerix branch; RUN_ID / BUILD_SHA select the CI run.
 on:
   push:
@@ -26,14 +27,6 @@ jobs:
           ref: arena/5d11b9a3-aerix-launcher
           fetch-depth: 1
 
-      - name: Download full APK
-        uses: actions/download-artifact@v4
-        with:
-          name: app-debug
-          path: out
-          run-id: ${{ env.RUN_ID }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Download no-runtime APK
         uses: actions/download-artifact@v4
         with:
@@ -55,12 +48,9 @@ jobs:
           SHORT=${BUILD_SHA:0:7}
           mkdir -p apk
           git rm -q --ignore-unmatch apk/*.apk
-          cp out/app-debug-full.apk "apk/Aerix-Launcher-$SHORT-full-debug.apk"
-          cp out/app-debug-noruntime.apk "apk/Aerix-Launcher-$SHORT-noruntime-debug.apk"
-          git lfs install --local
-          git lfs track "apk/*.apk"
+          cp out/app-debug-noruntime.apk "apk/Aerix-Launcher-$SHORT-debug.apk"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .gitattributes apk
-          git commit -m "Build: Aerix APKs $SHORT (CI run $RUN_ID) [skip ci]"
+          git add apk
+          git commit -m "Build: Aerix APK $SHORT (CI run $RUN_ID) [skip ci]"
           git push origin HEAD:arena/5d11b9a3-aerix-launcher
