@@ -44,9 +44,12 @@ jobs:
           TAG="aerix-ui-$SHORT"
           mv out/app-debug-full.apk "out/Aerix-Launcher-$SHORT-full-debug.apk"
           mv out/app-debug-noruntime.apk "out/Aerix-Launcher-$SHORT-noruntime-debug.apk"
-          gh release delete "$TAG" --yes --cleanup-tag || true
-          gh release create "$TAG" out/*.apk \
-            --target "$BUILD_SHA" \
-            --prerelease \
-            --title "Aerix Launcher UI build $SHORT" \
-            --notes "Debug build of the Aerix UI port on PojavLauncher (branch arena/5d11b9a3-aerix-launcher, commit $BUILD_SHA, CI run $RUN_ID). full = bundled Java runtimes (install this one); noruntime = runtimes downloaded separately. Package net.kdt.pojavlaunch: uninstall any differently signed PojavLauncher build first."
+          # The release and tag are created beforehand (tags on commits that touch workflow files
+          # need the "workflows" scope, which GITHUB_TOKEN lacks); this job attaches the APKs.
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" out/*.apk --clobber
+          else
+            gh release create "$TAG" out/*.apk --target "$BUILD_SHA" --prerelease \
+              --title "Aerix Launcher UI build $SHORT" \
+              --notes "Debug build of the Aerix UI port on PojavLauncher (commit $BUILD_SHA, CI run $RUN_ID)."
+          fi
