@@ -111,10 +111,10 @@ object PojavFileBridge {
                 )
             }
         val comparator: Comparator<FileItem> = when (sort.field) {
-            FileSortField.NAME -> compareBy(String.CASE_INSENSITIVE_ORDER) { it.name }
+            FileSortField.NAME -> compareBy<FileItem, String>(String.CASE_INSENSITIVE_ORDER) { it.name }
             FileSortField.SIZE -> compareBy<FileItem> { it.size }.thenBy(String.CASE_INSENSITIVE_ORDER) { it.name }
             FileSortField.DATE -> compareBy<FileItem> { it.lastModified }.thenBy(String.CASE_INSENSITIVE_ORDER) { it.name }
-            FileSortField.TYPE -> compareBy<FileItem>(String.CASE_INSENSITIVE_ORDER) { it.file.extension }.thenBy(String.CASE_INSENSITIVE_ORDER) { it.name }
+            FileSortField.TYPE -> compareBy<FileItem, String>(String.CASE_INSENSITIVE_ORDER) { it.file.extension }.thenBy(String.CASE_INSENSITIVE_ORDER) { it.name }
         }
         val ordered = if (sort.descending) comparator.reversed() else comparator
         if (sort.foldersFirst) items.sortedWith(compareBy<FileItem> { !it.isDirectory }.then(ordered))
