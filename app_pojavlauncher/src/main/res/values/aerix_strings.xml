@@ -331,4 +331,24 @@
         <item quantity="one">%1$d line</item>
         <item quantity="other">%1$d lines</item>
     </plurals>
+
+    <!-- Device compatibility (mirai ui/vulkan_checker) -->
+    <string name="aerix_device_title">Device compatibility</string>
+    <string name="aerix_device_probing">Probing graphics drivers…</string>
+    <string name="aerix_device_model">Device</string>
+    <string name="aerix_device_soc">SoC</string>
+    <string name="aerix_device_android">Android</string>
+    <string name="aerix_device_abi">ABIs</string>
+    <string name="aerix_device_32bit">32-bit only</string>
+    <string name="aerix_device_ram">Memory</string>
+    <string name="aerix_device_ram_value">%1$d MB total, %2$d MB free</string>
+    <string name="aerix_device_gles">OpenGL ES</string>
+    <string name="aerix_device_vulkan">Vulkan</string>
+    <string name="aerix_device_vulkan_none">Not reported by this device</string>
+    <string name="aerix_device_vulkan_level">level %1$d</string>
+    <string name="aerix_device_vulkan_baseline">Vulkan 1.2 baseline</string>
+    <string name="aerix_device_vulkan_ok">Met</string>
+    <string name="aerix_device_vulkan_low">Below 1.2, Vulkan-based renderers may fail</string>
+    <string name="aerix_device_current_renderer">Selected renderer</string>
+    <string name="aerix_device_renderers">Renderers available on this device</string>
 </resources>

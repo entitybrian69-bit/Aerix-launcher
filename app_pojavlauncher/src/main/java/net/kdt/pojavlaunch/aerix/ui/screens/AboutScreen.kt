@@ -34,6 +34,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
@@ -44,7 +46,11 @@ import androidx.compose.ui.unit.sp
 import androidx.fragment.app.FragmentActivity
 import net.kdt.pojavlaunch.BuildConfig
 import net.kdt.pojavlaunch.R
+import net.kdt.pojavlaunch.aerix.bridge.DeviceReport
+import net.kdt.pojavlaunch.aerix.bridge.PojavDeviceBridge
 import net.kdt.pojavlaunch.aerix.bridge.PojavNavigator
+import net.kdt.pojavlaunch.aerix.components.MetaPill
+import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
 import net.kdt.pojavlaunch.aerix.components.AerixGhostButton
 import net.kdt.pojavlaunch.aerix.components.GlassPanel
 import net.kdt.pojavlaunch.aerix.components.SectionLabel
@@ -78,6 +84,7 @@ fun AboutScreen(activity: FragmentActivity) {
                     }
                 }
             }
+            DeviceReportPanel(activity)
             GlassPanel(modifier = Modifier.fillMaxWidth()) {
                 SectionLabel(title = stringResource(R.string.aerix_about_license))
                 Text(
@@ -100,5 +107,64 @@ fun AboutScreen(activity: FragmentActivity) {
                 }
             }
         }
+    }
+}
+
+/**
+ * Device and graphics compatibility (mirai ui/vulkan_checker/VulkanChecker.kt result card):
+ * SoC, ABIs, RAM, GLES driver, Vulkan version/level and the renderers Pojav allows on this device.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun DeviceReportPanel(activity: FragmentActivity) {
+    val report by produceState<DeviceReport?>(initialValue = null) { value = PojavDeviceBridge.report(activity) }
+    val accent = AerixThemeManager.currentAccent()
+    GlassPanel(modifier = Modifier.fillMaxWidth()) {
+        SectionLabel(title = stringResource(R.string.aerix_device_title))
+        val r = report
+        if (r == null) {
+            Text(stringResource(R.string.aerix_device_probing), color = AerixSurface.textSecondary, fontSize = 12.sp)
+            return@GlassPanel
+        }
+        DeviceLine(stringResource(R.string.aerix_device_model), "${r.manufacturer} ${r.model}")
+        DeviceLine(stringResource(R.string.aerix_device_soc), r.soc)
+        DeviceLine(stringResource(R.string.aerix_device_android), "${r.androidRelease} (API ${r.sdk})")
+        DeviceLine(
+            stringResource(R.string.aerix_device_abi),
+            r.abis.joinToString(", ") + " · " + r.architecture +
+                if (r.is32BitOnly) " · " + stringResource(R.string.aerix_device_32bit) else ""
+        )
+        DeviceLine(stringResource(R.string.aerix_device_ram), stringResource(R.string.aerix_device_ram_value, r.totalRamMb, r.freeRamMb))
+        DeviceLine(stringResource(R.string.aerix_device_gles), "${r.glVendor} ${r.glRenderer} · GLES ${r.glesMajor}")
+        val vk = r.vulkan
+        if (vk == null) {
+            DeviceLine(stringResource(R.string.aerix_device_vulkan), stringResource(R.string.aerix_device_vulkan_none), AerixSurface.warning)
+        } else {
+            val levelText = if (vk.level >= 0) " · " + stringResource(R.string.aerix_device_vulkan_level, vk.level) else ""
+            val deqpText = vk.deqpDate?.let { " · dEQP $it" } ?: ""
+            DeviceLine(stringResource(R.string.aerix_device_vulkan), vk.versionString + levelText + deqpText)
+            DeviceLine(
+                stringResource(R.string.aerix_device_vulkan_baseline),
+                stringResource(if (vk.meetsBaseline) R.string.aerix_device_vulkan_ok else R.string.aerix_device_vulkan_low),
+                if (vk.meetsBaseline) AerixSurface.success else AerixSurface.warning
+            )
+        }
+        DeviceLine(stringResource(R.string.aerix_device_current_renderer), r.currentRenderer, accent)
+        Text(stringResource(R.string.aerix_device_renderers), color = AerixSurface.textSecondary, fontSize = 12.sp)
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(AerixSpacing.xs),
+            verticalArrangement = Arrangement.spacedBy(AerixSpacing.xs)
+        ) {
+            r.compatibleRenderers.forEach { MetaPill(it) }
+        }
+    }
+}
+
+@Composable
+private fun DeviceLine(label: String, value: String, valueColor: androidx.compose.ui.graphics.Color = AerixSurface.textPrimary) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(AerixSpacing.md)) {
+        Text(label, color = AerixSurface.textMuted, fontSize = 12.sp, modifier = Modifier.weight(0.35f))
+        Text(value.ifBlank { "—" }, color = valueColor, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(0.65f))
     }
 }
