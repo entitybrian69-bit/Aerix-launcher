@@ -153,6 +153,40 @@ object PojavSettingsBridge {
         commit(context)
     }
 
+    /**
+     * Current value of [setting] as display text, computed exactly like the Aerix settings row draws it
+     * (choice entries resolved to their label, sliders with their suffix, allocation with its summary).
+     */
+    fun describe(context: Context, setting: PojavSetting): String = when (setting) {
+        is PojavSetting.Toggle -> context.getString(if (setting.current()) R.string.aerix_settings_value_on else R.string.aerix_settings_value_off)
+        is PojavSetting.Slider -> setting.current().toString() + setting.suffix
+        is PojavSetting.Text -> setting.current().ifEmpty { context.getString(R.string.aerix_settings_value_none) }
+        is PojavSetting.Choice -> {
+            val current = setting.current()
+            setting.entries(context).firstOrNull { it.first == current }?.second ?: current
+        }
+        is PojavSetting.Action -> ""
+    }
+
+    /** Writes [value] into [setting] through the same keys and the same rules the settings page uses. */
+    fun writeInto(activity: FragmentActivity, setting: PojavSetting, value: Any) {
+        when (setting) {
+            is PojavSetting.Toggle -> writeBoolean(activity, setting.key, value as Boolean)
+            is PojavSetting.Slider -> writeInt(activity, setting.key, (value as Number).toInt())
+            is PojavSetting.Text -> writeString(activity, setting.key, value as String)
+            is PojavSetting.Choice -> writeString(activity, setting.key, value as String)
+            is PojavSetting.Action -> setting.run(activity)
+        }
+    }
+
+    /** The Java category's "allocation" row, shared by the settings page and the instance page. */
+    val memoryAllocation: PojavSetting.Slider
+        get() = java.settings.filterIsInstance<PojavSetting.Slider>().first { it.key == "allocation" }
+
+    /** The Java category's "javaArgs" row, shared by the settings page and the instance page. */
+    val javaArguments: PojavSetting.Text
+        get() = java.settings.filterIsInstance<PojavSetting.Text>().first { it.key == "javaArgs" }
+
     // ---- helpers mirrored from the Pojav preference fragments -----------------------------
 
     /** LauncherPreferenceJavaFragment max RAM computation. */

@@ -81,6 +81,13 @@ object AerixSurface {
     val warning = Color(0xFFFFC777)
     val danger = Color(0xFFFF7189)
     val glassShine = Color(0x48FFFFFF)
+    /** Log box surfaces and syntax tokens, values from mirai-launcher- ui/theme/AerixSurface.kt. */
+    val logInfoSurface = Color(0xFF447152)
+    val logDebugSurface = Color(0xFF43698D)
+    val logWarningSurface = Color(0xFF656E76)
+    val syntaxMuted = Color(0xFF6E7C83)
+    val syntaxString = Color(0xFF6AAB73)
+    val syntaxAccent = Color(0xFFC67CBA)
 }
 
 const val AERIX_COMPACT_HEIGHT_THRESHOLD_DP = 520

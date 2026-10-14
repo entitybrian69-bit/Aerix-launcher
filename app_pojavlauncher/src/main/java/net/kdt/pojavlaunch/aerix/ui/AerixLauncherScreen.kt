@@ -46,13 +46,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.activity.compose.BackHandler
 import androidx.fragment.app.FragmentActivity
 import net.kdt.pojavlaunch.aerix.bridge.AerixPreferences
 import net.kdt.pojavlaunch.aerix.bridge.AerixTransitionType
@@ -60,8 +59,7 @@ import net.kdt.pojavlaunch.aerix.festivals.FestivalEffectsHost
 import net.kdt.pojavlaunch.aerix.festivals.FestivalTitleText
 import net.kdt.pojavlaunch.aerix.festivals.rememberTodayFestivals
 import net.kdt.pojavlaunch.aerix.bridge.PojavAccountBridge
-import net.kdt.pojavlaunch.aerix.bridge.PojavInstaller
-import net.kdt.pojavlaunch.aerix.bridge.PojavNavigator
+import net.kdt.pojavlaunch.aerix.bridge.PojavInstanceEditorBridge
 import net.kdt.pojavlaunch.aerix.components.AerixBackground
 import net.kdt.pojavlaunch.aerix.theme.AerixSpacing
 import net.kdt.pojavlaunch.aerix.theme.AerixSurface
@@ -76,21 +74,36 @@ import net.kdt.pojavlaunch.aerix.ui.screens.DiscoverScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.HomeScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.LibraryScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.SettingsScreen
+import net.kdt.pojavlaunch.aerix.ui.screens.AddAccountScreen
+import net.kdt.pojavlaunch.aerix.ui.screens.CreateInstanceScreen
+import net.kdt.pojavlaunch.aerix.ui.screens.InstanceEditorScreen
+import net.kdt.pojavlaunch.aerix.ui.screens.OfflineAccountScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.WallpapersScreen
 
 @Composable
 fun AerixLauncherScreen(activity: FragmentActivity) {
-    var section by rememberSaveable {
-        mutableStateOf(runCatching { LauncherSection.valueOf(AerixPreferences.lastSection) }.getOrDefault(LauncherSection.HOME))
-    }
+    AerixNav.init()
+    val section = AerixNav.section
     val navigate: (LauncherSection) -> Unit = { target ->
-        section = target
-        AerixPreferences.saveLastSection(target.name)
+        when (target) {
+            // The Wallpapers rail entry is the Wallpapers tab of the settings page, as in mirai's rail.
+            LauncherSection.WALLPAPERS -> {
+                AerixNav.settingsTab = AerixNav.TAB_WALLPAPERS
+                AerixNav.navigate(LauncherSection.SETTINGS)
+            }
+            LauncherSection.SETTINGS -> {
+                if (AerixNav.settingsTab == AerixNav.TAB_WALLPAPERS) AerixNav.settingsTab = AerixNav.TAB_APPEARANCE
+                AerixNav.navigate(LauncherSection.SETTINGS)
+            }
+            else -> AerixNav.navigate(target)
+        }
     }
     val duration = AerixPreferences.transitionMillis()
     val transitionType = AerixPreferences.swapAnimateType
     val extent = AerixPreferences.extentScale()
     val festivals = rememberTodayFestivals()
+
+    BackHandler(enabled = AerixNav.canGoBack) { AerixNav.back() }
 
     AerixBackground {
       FestivalEffectsHost(festivals = festivals, modifier = Modifier.fillMaxSize()) {
@@ -98,7 +111,7 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
             AerixNavigationRail(
                 selectedSection = section,
                 onNavigate = navigate,
-                onCreateInstance = { PojavNavigator.openInstaller(activity, PojavInstaller.PROFILE_TYPE) }
+                onCreateInstance = { AerixNav.navigate(LauncherSection.CREATE_INSTANCE) }
             )
             Box(
                 modifier = Modifier
@@ -119,9 +132,30 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
                         LauncherSection.FILES -> FileManagerScreen(activity)
                         LauncherSection.LOGS -> LogScreen(activity)
                         LauncherSection.WALLPAPERS -> WallpapersScreen()
-                        LauncherSection.SETTINGS -> SettingsScreen(activity)
+                        LauncherSection.SETTINGS -> SettingsScreen(
+                            activity = activity,
+                            tabKey = AerixNav.settingsTab,
+                            onTabChanged = { AerixNav.settingsTab = it }
+                        )
                         LauncherSection.ACCOUNTS -> AccountsScreen(activity)
                         LauncherSection.ABOUT -> AboutScreen(activity)
+                        LauncherSection.CREATE_INSTANCE -> CreateInstanceScreen(activity) {
+                            AerixNav.finishTo(LauncherSection.LIBRARY)
+                        }
+                        LauncherSection.INSTANCE_EDITOR -> InstanceEditorScreen(activity) {
+                            PojavInstanceEditorBridge.close()
+                            AerixNav.finishTo(LauncherSection.LIBRARY)
+                        }
+                        LauncherSection.ADD_ACCOUNT -> AddAccountScreen(
+                            activity = activity,
+                            onClose = { AerixNav.finishTo(LauncherSection.ACCOUNTS) },
+                            onOffline = { AerixNav.navigate(LauncherSection.OFFLINE_ACCOUNT) }
+                        )
+                        LauncherSection.OFFLINE_ACCOUNT -> OfflineAccountScreen(
+                            activity = activity,
+                            onClose = { AerixNav.navigate(LauncherSection.ADD_ACCOUNT) },
+                            onCreated = { AerixNav.finishTo(LauncherSection.ACCOUNTS) }
+                        )
                     }
                 }
 

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Aerix Launcher artwork (GPL-3.0), drawn for the Aerix UI layer of PojavLauncher. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path android:fillColor="#FF8B5A2B" android:pathData="M2,7L12,12L12,22L2,17Z"/>
+    <path android:fillColor="#FF6E4520" android:pathData="M22,7L22,17L12,22L12,12Z"/>
+    <path android:fillColor="#FF6DBB3C" android:pathData="M12,2L22,7L12,12L2,7Z"/>
+    <path android:fillColor="#FF4E9A2A" android:pathData="M2,7L12,12L12,14.6L2,9.6Z"/>
+    <path android:fillColor="#FF3F7F22" android:pathData="M22,7L22,9.6L12,14.6L12,12Z"/>
+    <path android:fillColor="#FF7FCB4B" android:pathData="M7,4.5L9,5.5L7,6.5L5,5.5Z"/>
+    <path android:fillColor="#FF5AA532" android:pathData="M15,8L17,9L15,10L13,9Z"/>
+    <path android:fillColor="#FF6B4421" android:pathData="M4,12L6,13L6,15L4,14Z"/>
+    <path android:fillColor="#FF573719" android:pathData="M17,15L19,14L19,16L17,17Z"/>
+</vector>

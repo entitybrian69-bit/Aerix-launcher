@@ -86,7 +86,12 @@ enum class LauncherSection {
     LOGS,
     SETTINGS,
     ACCOUNTS,
-    ABOUT
+    ABOUT,
+    /** Pages opened on top of a section (Mirai "Create New Instance", instance settings, account sign-in). */
+    CREATE_INSTANCE,
+    INSTANCE_EDITOR,
+    ADD_ACCOUNT,
+    OFFLINE_ACCOUNT
 }
 
 @Composable
@@ -163,9 +168,9 @@ fun AerixNavigationRail(
                 RailIconItem(R.drawable.aerix_ic_home_filled, stringResource(R.string.aerix_nav_home),
                     selectedSection == LauncherSection.HOME, activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.HOME) }
                 RailIconItem(R.drawable.aerix_ic_add, stringResource(R.string.create_instance),
-                    false, activeAccent, expandedRail, compactRail, onCreateInstance)
+                    selectedSection == LauncherSection.CREATE_INSTANCE, activeAccent, expandedRail, compactRail, onCreateInstance)
                 RailIconItem(R.drawable.aerix_ic_dashboard_filled, stringResource(R.string.aerix_nav_library),
-                    selectedSection == LauncherSection.LIBRARY, activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.LIBRARY) }
+                    (selectedSection == LauncherSection.LIBRARY || selectedSection == LauncherSection.INSTANCE_EDITOR), activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.LIBRARY) }
                 RailIconItem(R.drawable.aerix_ic_public, stringResource(R.string.aerix_nav_discover),
                     selectedSection == LauncherSection.DISCOVER, activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.DISCOVER) }
                 RailIconItem(R.drawable.aerix_ic_download, stringResource(R.string.aerix_nav_downloads),
@@ -175,12 +180,12 @@ fun AerixNavigationRail(
                 RailIconItem(R.drawable.aerix_ic_folder_outlined, stringResource(R.string.aerix_nav_files),
                     selectedSection == LauncherSection.FILES, activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.FILES) }
                 RailIconItem(R.drawable.aerix_ic_format_paint_outlined, stringResource(R.string.aerix_nav_wallpapers),
-                    selectedSection == LauncherSection.WALLPAPERS, activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.WALLPAPERS) }
+                    wallpapersSelected(selectedSection), activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.WALLPAPERS) }
 
                 HorizontalDivider(modifier = Modifier.width(28.dp).padding(vertical = AerixSpacing.xxs), color = AerixSurface.borderSoft)
 
                 RailIconItem(R.drawable.aerix_ic_settings_filled, stringResource(R.string.aerix_nav_settings),
-                    selectedSection == LauncherSection.SETTINGS, activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.SETTINGS) }
+                    settingsSelected(selectedSection), activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.SETTINGS) }
                 RailIconItem(R.drawable.aerix_ic_terminal_outlined, stringResource(R.string.aerix_nav_logs),
                     selectedSection == LauncherSection.LOGS, activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.LOGS) }
                 RailIconItem(R.drawable.aerix_ic_info_outlined, stringResource(R.string.aerix_nav_about),
@@ -188,7 +193,7 @@ fun AerixNavigationRail(
 
                 AccountAvatarRailButton(
                     account = account,
-                    selected = selectedSection == LauncherSection.ACCOUNTS,
+                    selected = selectedSection == LauncherSection.ACCOUNTS || selectedSection == LauncherSection.ADD_ACCOUNT || selectedSection == LauncherSection.OFFLINE_ACCOUNT,
                     expanded = expandedRail,
                     compact = compactRail,
                     onClick = { onNavigate(LauncherSection.ACCOUNTS) }
@@ -197,6 +202,18 @@ fun AerixNavigationRail(
         }
     }
 }
+
+/**
+ * The Wallpapers entry is the Wallpapers tab of the settings page, so its highlight follows the
+ * settings tab; the Settings entry stays highlighted for every other tab. Same pairing as mirai's
+ * MiraiNavigationRail.kt LauncherSection.WALLPAPERS / SETTINGS handling.
+ */
+private fun wallpapersSelected(section: LauncherSection): Boolean =
+    section == LauncherSection.WALLPAPERS ||
+        (section == LauncherSection.SETTINGS && AerixNav.settingsTab == AerixNav.TAB_WALLPAPERS)
+
+private fun settingsSelected(section: LauncherSection): Boolean =
+    section == LauncherSection.SETTINGS && AerixNav.settingsTab != AerixNav.TAB_WALLPAPERS
 
 @Composable
 private fun RailIconItem(

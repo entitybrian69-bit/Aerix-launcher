@@ -33,6 +33,8 @@ import net.kdt.pojavlaunch.extra.ExtraListener;
 import net.kdt.pojavlaunch.fragments.MainMenuFragment;
 import net.kdt.pojavlaunch.fragments.MicrosoftLoginFragment;
 import net.kdt.pojavlaunch.fragments.SelectAuthFragment;
+import net.kdt.pojavlaunch.aerix.ui.AerixNav;
+import net.kdt.pojavlaunch.aerix.ui.LauncherSection;
 import net.kdt.pojavlaunch.instances.Instance;
 import net.kdt.pojavlaunch.instances.InstanceInstaller;
 import net.kdt.pojavlaunch.instances.Instances;
@@ -76,7 +78,12 @@ public class LauncherActivity extends BaseActivity {
         if(!value || manager.isStateSaved()) return false;
         Fragment fragment = manager.findFragmentById(mFragmentView.getId());
         // Allow starting the add account only from the Aerix shell or the classic main menu
-        if(!(fragment instanceof AerixMainFragment) && !(fragment instanceof MainMenuFragment)) return false;
+        if(fragment instanceof AerixMainFragment) {
+            // The Aerix shell shows its own Add Account page (Microsoft / Ely.by / Offline)
+            AerixNav.INSTANCE.navigate(LauncherSection.ADD_ACCOUNT);
+            return false;
+        }
+        if(!(fragment instanceof MainMenuFragment)) return false;
 
         Tools.swapFragment(this, SelectAuthFragment.class, SelectAuthFragment.TAG, null);
         return false;

@@ -86,6 +86,7 @@ import net.kdt.pojavlaunch.aerix.components.MetaPill
 import net.kdt.pojavlaunch.aerix.components.QuickActionTile
 import net.kdt.pojavlaunch.aerix.components.QuietEmptyState
 import net.kdt.pojavlaunch.aerix.components.liquidGlass
+import net.kdt.pojavlaunch.aerix.ui.AerixNav
 import net.kdt.pojavlaunch.aerix.theme.AerixMetrics
 import net.kdt.pojavlaunch.aerix.theme.AerixRadii
 import net.kdt.pojavlaunch.aerix.theme.AerixSpacing
@@ -133,7 +134,7 @@ fun HomeScreen(activity: FragmentActivity, navigate: (LauncherSection) -> Unit) 
         },
         select = { PojavInstanceBridge.select(it) },
         edit = { PojavInstanceBridge.edit(activity, it) },
-        create = { PojavNavigator.openInstaller(activity, PojavInstaller.PROFILE_TYPE) },
+        create = { AerixNav.navigate(LauncherSection.CREATE_INSTANCE) },
         explore = { navigate(LauncherSection.DISCOVER) },
         library = { navigate(LauncherSection.LIBRARY) },
         files = { PojavInstanceBridge.openGameDirectory(activity) },

@@ -3,7 +3,7 @@
  * Ported from mirai-launcher- (Zalith Launcher 2 fork):
  *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/ui/screens/content/VersionsManageScreen.kt
  *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/ui/screens/content/versions/elements/VersionItem.kt
- * Instances come from PojavInstanceBridge; editing opens Pojav's InstanceEditorFragment, which owns
+ * Instances come from PojavInstanceBridge. Editing opens the Aerix instance settings page, which owns
  * rename / icon / version / renderer / runtime / JVM args / control layout / delete.
  * Zalith Launcher 2 Copyright (C) 2025 MovTery <movtery228@qq.com> and contributors
  *
@@ -74,6 +74,8 @@ import net.kdt.pojavlaunch.aerix.components.AerixPrimaryButton
 import net.kdt.pojavlaunch.aerix.components.MetaPill
 import net.kdt.pojavlaunch.aerix.components.QuietEmptyState
 import net.kdt.pojavlaunch.aerix.components.liquidGlass
+import net.kdt.pojavlaunch.aerix.ui.AerixNav
+import net.kdt.pojavlaunch.aerix.ui.LauncherSection
 import net.kdt.pojavlaunch.aerix.theme.AerixRadii
 import net.kdt.pojavlaunch.aerix.theme.AerixSpacing
 import net.kdt.pojavlaunch.aerix.theme.AerixSurface
@@ -98,7 +100,7 @@ fun LibraryScreen(activity: FragmentActivity) {
                 AerixPrimaryButton(
                     text = stringResource(R.string.create_instance),
                     iconRes = R.drawable.aerix_ic_add,
-                    onClick = { PojavNavigator.openInstaller(activity, PojavInstaller.PROFILE_TYPE) }
+                    onClick = { AerixNav.navigate(LauncherSection.CREATE_INSTANCE) }
                 )
             }
         }

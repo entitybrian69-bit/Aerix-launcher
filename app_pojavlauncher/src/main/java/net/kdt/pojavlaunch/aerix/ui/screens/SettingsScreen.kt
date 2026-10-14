@@ -57,10 +57,8 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -75,6 +73,7 @@ import androidx.fragment.app.FragmentActivity
 import net.kdt.pojavlaunch.R
 import net.kdt.pojavlaunch.Tools
 import net.kdt.pojavlaunch.aerix.bridge.AerixColorTheme
+import net.kdt.pojavlaunch.aerix.ui.AerixNav
 import net.kdt.pojavlaunch.aerix.bridge.AerixPreferences
 import net.kdt.pojavlaunch.aerix.bridge.AerixTransitionType
 import net.kdt.pojavlaunch.aerix.bridge.PojavNavigator
@@ -87,30 +86,54 @@ import net.kdt.pojavlaunch.aerix.components.SliderSettingRow
 import net.kdt.pojavlaunch.aerix.components.SwitchSettingRow
 import net.kdt.pojavlaunch.aerix.components.TextSettingRow
 import net.kdt.pojavlaunch.aerix.bridge.AssetPlatform
+import net.kdt.pojavlaunch.aerix.theme.AerixLayoutDefaults
 import net.kdt.pojavlaunch.aerix.theme.AerixSpacing
 import net.kdt.pojavlaunch.aerix.theme.AerixSurface
 import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
 
 @Composable
-fun SettingsScreen(activity: FragmentActivity) {
-    var tab by rememberSaveable { mutableIntStateOf(0) }
+fun SettingsScreen(activity: FragmentActivity, tabKey: String, onTabChanged: (String) -> Unit) {
     val categories = PojavSettingsBridge.categories
-    val tabTitles = listOf(stringResource(R.string.aerix_settings_cat_appearance)) + categories.map { stringResource(it.titleRes) }
+    // Appearance, every Pojav preference category, then Wallpapers as mirai's settings tabs do.
+    val tabIds = listOf(AerixNav.TAB_APPEARANCE) + categories.map { it.id } + listOf(AerixNav.TAB_WALLPAPERS)
+    val tabTitles = listOf(stringResource(R.string.aerix_settings_cat_appearance)) +
+        categories.map { stringResource(it.titleRes) } +
+        listOf(stringResource(R.string.aerix_wallpaper_title))
+    val selectedIndex = tabIds.indexOf(tabKey).coerceAtLeast(0)
+
+    val tabs: @Composable () -> Unit = {
+        PillTabs(
+            tabs = tabTitles,
+            selected = selectedIndex,
+            onSelect = { onTabChanged(tabIds[it]) },
+            modifier = Modifier.horizontalScroll(rememberScrollState())
+        )
+    }
+
+    if (tabKey == AerixNav.TAB_WALLPAPERS) {
+        // The Wallpapers tab is the Mirai WallpaperPage: tab bar, then the page's own control bar.
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(AerixLayoutDefaults.pagePadding()),
+            verticalArrangement = Arrangement.spacedBy(AerixSpacing.md)
+        ) {
+            tabs()
+            WallpapersScreen()
+        }
+        return
+    }
 
     AerixPage(
         title = stringResource(R.string.aerix_settings_title),
         subtitle = stringResource(R.string.aerix_settings_subtitle)
     ) {
-        PillTabs(
-            tabs = tabTitles,
-            selected = tab,
-            onSelect = { tab = it },
-            modifier = Modifier.horizontalScroll(rememberScrollState())
-        )
-        if (tab == 0) {
+        tabs()
+        if (tabKey == AerixNav.TAB_APPEARANCE) {
             AppearanceSettings(activity)
         } else {
-            PojavCategorySettings(activity, categories[tab - 1])
+            val category = categories.firstOrNull { it.id == tabKey } ?: categories.first()
+            PojavCategorySettings(activity, category)
         }
     }
 }
@@ -290,6 +313,18 @@ private fun AppearanceSettings(activity: FragmentActivity) {
                 step = 1,
                 suffix = " sp",
                 onValueChange = { AerixPreferences.saveLogTextSize(it) },
+                iconRes = R.drawable.aerix_ic_terminal_outlined
+            )
+        }
+        item {
+            SliderSettingRow(
+                title = stringResource(R.string.aerix_settings_log_flush),
+                summary = stringResource(R.string.aerix_settings_log_flush_sub),
+                value = AerixPreferences.logBufferFlushInterval,
+                range = 100..1000,
+                step = 100,
+                suffix = " ms",
+                onValueChange = { AerixPreferences.saveLogBufferFlushInterval(it) },
                 iconRes = R.drawable.aerix_ic_terminal_outlined
             )
         }

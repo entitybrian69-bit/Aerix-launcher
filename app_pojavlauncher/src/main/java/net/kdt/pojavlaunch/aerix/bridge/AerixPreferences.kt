@@ -54,6 +54,7 @@ object AerixPreferences {
     const val KEY_ANIMATE_EXTENT = "launcherAnimateExtent"
     const val KEY_FESTIVAL_EFFECTS = "launcherFestivalEffects"
     const val KEY_LOG_TEXT_SIZE = "logTextSize"
+    const val KEY_LOG_BUFFER_FLUSH_INTERVAL = "logBufferFlushInterval"
     const val KEY_ASSET_PLATFORM = "assetPlatformSource"
     const val KEY_LOG_RETENTION_DAYS = "launcherLogRetentionDays"
     const val KEY_CURSEFORGE_API_KEY = "curseForgeApiKey"
@@ -62,6 +63,8 @@ object AerixPreferences {
     const val DEFAULT_BACKGROUND_OPACITY = 60
     const val DEFAULT_ANIMATE_SPEED = 3
     const val DEFAULT_WALLPAPER = "wp_01_lush_caves"
+    /** Mirai AllSettings.logBufferFlushInterval default. */
+    const val DEFAULT_LOG_BUFFER_FLUSH_INTERVAL = 200
 
     private var prefs: SharedPreferences? = null
 
@@ -98,6 +101,9 @@ object AerixPreferences {
 
     /** Aerix "logTextSize" (5..20 sp) used by the log viewer. */
     var logTextSize by mutableIntStateOf(15)
+
+    /** Aerix "logBufferFlushInterval" (100..1000 ms) used by the in-game log box. */
+    var logBufferFlushInterval by mutableIntStateOf(DEFAULT_LOG_BUFFER_FLUSH_INTERVAL)
         private set
 
     /** Aerix "launcherLogRetentionDays" (1..14): crash reports older than this are removed at startup. */
@@ -131,6 +137,7 @@ object AerixPreferences {
         animateExtent = p.getInt(KEY_ANIMATE_EXTENT, 3).coerceIn(0, 10)
         festivalEffects = p.getBoolean(KEY_FESTIVAL_EFFECTS, false)
         logTextSize = p.getInt(KEY_LOG_TEXT_SIZE, 15).coerceIn(5, 20)
+        logBufferFlushInterval = p.getInt(KEY_LOG_BUFFER_FLUSH_INTERVAL, DEFAULT_LOG_BUFFER_FLUSH_INTERVAL).coerceIn(100, 1000)
         assetPlatformSource = runCatching {
             AssetPlatform.valueOf(p.getString(KEY_ASSET_PLATFORM, AssetPlatform.MODRINTH.name)!!)
         }.getOrDefault(AssetPlatform.MODRINTH)
@@ -219,6 +226,12 @@ object AerixPreferences {
     fun saveLogTextSize(value: Int) {
         logTextSize = value.coerceIn(5, 20)
         edit { putInt(KEY_LOG_TEXT_SIZE, logTextSize) }
+    }
+
+    /** Aerix "logBufferFlushInterval": how often buffered log lines reach the in-game log box. */
+    fun saveLogBufferFlushInterval(value: Int) {
+        logBufferFlushInterval = value.coerceIn(100, 1000)
+        edit { putInt(KEY_LOG_BUFFER_FLUSH_INTERVAL, logBufferFlushInterval) }
     }
 
     /**

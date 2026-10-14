@@ -3,8 +3,9 @@
  * Ported from mirai-launcher- (Zalith Launcher 2 fork):
  *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/ui/screens/content/AccountManageScreen.kt
  *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/ui/screens/content/elements/AccountItem.kt
- * Accounts come from PojavAccountBridge. "Add account" raises ExtraConstants.SELECT_AUTH_METHOD, which
- * opens Pojav's SelectAuthFragment (Microsoft / Ely.by / offline login fragments, unchanged).
+ * Accounts come from PojavAccountBridge. "Add account" opens the Aerix Add Account page, which starts the
+ * PojavLauncher login fragments (Microsoft / Ely.by) and the Aerix offline form; the original
+ * SelectAuthFragment chooser stays reachable from that page.
  * Zalith Launcher 2 Copyright (C) 2025 MovTery <movtery228@qq.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
@@ -61,6 +62,8 @@ import androidx.fragment.app.FragmentActivity
 import net.kdt.pojavlaunch.R
 import net.kdt.pojavlaunch.aerix.bridge.AerixAccount
 import net.kdt.pojavlaunch.aerix.bridge.PojavAccountBridge
+import net.kdt.pojavlaunch.aerix.ui.AerixNav
+import net.kdt.pojavlaunch.aerix.ui.LauncherSection
 import net.kdt.pojavlaunch.aerix.components.AerixImageWell
 import net.kdt.pojavlaunch.aerix.components.AerixPrimaryButton
 import net.kdt.pojavlaunch.aerix.components.MetaPill
@@ -105,7 +108,7 @@ fun AccountsScreen(@Suppress("UNUSED_PARAMETER") activity: FragmentActivity) {
             AerixPrimaryButton(
                 text = stringResource(R.string.aerix_accounts_add),
                 iconRes = R.drawable.aerix_ic_login,
-                onClick = { PojavAccountBridge.requestAddAccount() }
+                onClick = { AerixNav.navigate(LauncherSection.ADD_ACCOUNT) }
             )
         }
     ) {

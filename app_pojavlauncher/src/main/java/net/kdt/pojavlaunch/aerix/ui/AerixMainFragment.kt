@@ -38,7 +38,11 @@ import androidx.lifecycle.setViewTreeViewModelStoreOwner
 import androidx.savedstate.findViewTreeSavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import net.kdt.pojavlaunch.aerix.bridge.AerixPreferences
+import net.kdt.pojavlaunch.aerix.bridge.AerixIconCropper
 import net.kdt.pojavlaunch.aerix.bridge.PojavAccountBridge
+import net.kdt.pojavlaunch.aerix.bridge.PojavCreateInstanceBridge
+import net.kdt.pojavlaunch.aerix.bridge.PojavInstanceEditorBridge
+import net.kdt.pojavlaunch.utils.CropperUtils
 import net.kdt.pojavlaunch.aerix.bridge.PojavFileBridge
 import net.kdt.pojavlaunch.aerix.bridge.PojavInstanceBridge
 import net.kdt.pojavlaunch.aerix.bridge.PojavSettingsBridge
@@ -52,6 +56,9 @@ class AerixMainFragment : Fragment() {
         const val TAG = "AerixMainFragment"
     }
 
+    // Registered at construction like InstanceEditorFragment.mCropperLauncher; used by the Compose instance pages.
+    private val cropperLauncher = CropperUtils.registerCropper(this, AerixIconCropper)
+
     override fun onAttach(context: Context) {
         super.onAttach(context)
         AerixPreferences.init(context)
@@ -60,6 +67,14 @@ class AerixMainFragment : Fragment() {
         PojavTaskBridge.attach()
         PojavInstanceBridge.attach(context)
         PojavAccountBridge.attach(context)
+        PojavCreateInstanceBridge.attach()
+        AerixNav.init()
+        AerixIconCropper.launcher = cropperLauncher
+    }
+
+    override fun onDestroy() {
+        if (AerixIconCropper.launcher === cropperLauncher) AerixIconCropper.launcher = null
+        super.onDestroy()
     }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
@@ -87,6 +102,7 @@ class AerixMainFragment : Fragment() {
         super.onResume()
         PojavInstanceBridge.reload()
         PojavSettingsBridge.touch()
+        PojavInstanceEditorBridge.consumeFileSelectorResult()
         // Same signal MainMenuFragment.onResume raised for AccountSpinner.
         ExtraCore.setValue(ExtraConstants.REFRESH_ACCOUNT_SPINNER, true)
     }

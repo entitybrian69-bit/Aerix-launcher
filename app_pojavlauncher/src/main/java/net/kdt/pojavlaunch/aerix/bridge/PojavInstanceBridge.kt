@@ -34,6 +34,8 @@ import net.kdt.pojavlaunch.PojavApplication
 import net.kdt.pojavlaunch.R
 import net.kdt.pojavlaunch.Tools
 import net.kdt.pojavlaunch.aerix.components.toAerixBitmap
+import net.kdt.pojavlaunch.aerix.ui.AerixNav
+import net.kdt.pojavlaunch.aerix.ui.LauncherSection
 import net.kdt.pojavlaunch.extra.ExtraConstants
 import net.kdt.pojavlaunch.extra.ExtraCore
 import net.kdt.pojavlaunch.extra.ExtraListener
@@ -125,18 +127,24 @@ object PojavInstanceBridge {
         selectedIndex = instances.indexOf(instance)
     }
 
-    /** Opens Pojav's InstanceEditorFragment for the given instance (rename, icon, version, renderer, JVM args, delete). */
+    /** Opens the Aerix instance settings page (rename, icon, version, renderer, runtime, controls, JVM args, delete). */
     fun edit(activity: FragmentActivity, instance: AerixInstance) {
         select(instance)
+        if (PojavInstanceEditorBridge.open(activity)) AerixNav.navigate(LauncherSection.INSTANCE_EDITOR)
+    }
+
+    /** Pojav's original InstanceEditorFragment for the given instance, kept reachable from the Aerix page. */
+    fun editClassic(activity: FragmentActivity) {
         Tools.swapFragment(activity, InstanceEditorFragment::class.java, InstanceEditorFragment.TAG, null)
     }
 
-    /** Creates a vanilla instance and opens the editor, exactly like ProfileTypeSelectFragment's vanilla button. */
+    /** Creates a vanilla instance and opens its settings, exactly like ProfileTypeSelectFragment's vanilla button. */
     fun createVanilla(activity: FragmentActivity) {
         try {
             val instance = Instances.createDefaultInstance()
             Instances.setSelectedInstance(instance)
-            Tools.swapFragment(activity, InstanceEditorFragment::class.java, InstanceEditorFragment.TAG, Bundle(1))
+            reload()
+            if (PojavInstanceEditorBridge.open(activity)) AerixNav.navigate(LauncherSection.INSTANCE_EDITOR)
         } catch (e: Exception) {
             Toast.makeText(activity, activity.getString(R.string.aerix_discover_create_failed, e.message ?: e.javaClass.simpleName), Toast.LENGTH_LONG).show()
         }

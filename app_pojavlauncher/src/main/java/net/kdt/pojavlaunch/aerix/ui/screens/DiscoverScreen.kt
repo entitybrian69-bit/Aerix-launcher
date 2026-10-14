@@ -49,6 +49,7 @@ import net.kdt.pojavlaunch.aerix.bridge.PojavInstanceBridge
 import net.kdt.pojavlaunch.aerix.bridge.PojavNavigator
 import net.kdt.pojavlaunch.aerix.components.PillTabs
 import net.kdt.pojavlaunch.aerix.components.QuickActionTile
+import net.kdt.pojavlaunch.aerix.ui.AerixNav
 import net.kdt.pojavlaunch.aerix.theme.AerixSpacing
 import net.kdt.pojavlaunch.aerix.theme.AerixSurface
 import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
@@ -77,7 +78,7 @@ fun DiscoverScreen(activity: FragmentActivity, navigate: (LauncherSection) -> Un
             PojavInstanceBridge.createVanilla(activity)
         },
         DiscoverEntry(R.drawable.aerix_ic_add, R.string.aerix_discover_custom, R.string.aerix_discover_custom_sub, AerixSurface.glassBlue) {
-            open(PojavInstaller.PROFILE_TYPE)
+            AerixNav.navigate(LauncherSection.CREATE_INSTANCE)
         }
     )
     val loaders = listOf(
