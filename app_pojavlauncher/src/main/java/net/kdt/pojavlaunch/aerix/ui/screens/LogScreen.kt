@@ -4,7 +4,9 @@
  *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/ui/screens/content/LogViewScreen.kt
  * Reads Pojav's latestlog.txt (Tools.shareLog uses the same file) and the crash reports of the
  * selected instance. The 8 MiB tail window of the original is kept; lines are coloured by log
- * level and filtered by a search field. Text size is the Aerix "logTextSize" setting.
+ * level and filtered by a search field. Lines are rendered by the same highlighter the in-game log box
+ * uses (net.kdt.pojavlaunch.aerix.log.LogHighlighter, ported from mirai's log_parser package), so both
+ * log surfaces share Mirai's colours. Text size is the Aerix "logTextSize" setting.
  * Zalith Launcher 2 Copyright (C) 2025 MovTery <movtery228@qq.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
@@ -70,6 +72,7 @@ import kotlinx.coroutines.withContext
 import net.kdt.pojavlaunch.R
 import net.kdt.pojavlaunch.Tools
 import net.kdt.pojavlaunch.aerix.bridge.AerixPreferences
+import net.kdt.pojavlaunch.aerix.log.LogHighlighter
 import net.kdt.pojavlaunch.aerix.bridge.PojavNavigator
 import net.kdt.pojavlaunch.aerix.components.AerixGhostButton
 import net.kdt.pojavlaunch.aerix.components.PillTabs
@@ -121,13 +124,6 @@ private fun collectSources(context: Context): List<LogSource> {
     return sources
 }
 
-private fun levelColor(line: String): Color = when {
-    line.contains("FATAL") || line.contains("/ERROR]") || line.contains("[ERROR]") ||
-        line.startsWith("Exception") || line.contains("Exception in thread") || line.trimStart().startsWith("at ") -> AerixSurface.danger
-    line.contains("/WARN]") || line.contains("[WARN]") || line.contains("WARNING") -> AerixSurface.warning
-    line.contains("/DEBUG]") || line.contains("[DEBUG]") -> AerixSurface.textMuted
-    else -> AerixSurface.textPrimary
-}
 
 @Composable
 fun LogScreen(activity: FragmentActivity) {
@@ -167,6 +163,7 @@ fun LogScreen(activity: FragmentActivity) {
         if (query.isBlank()) all else all.filter { it.contains(query, ignoreCase = true) }
     }
     val accent = AerixThemeManager.currentAccent()
+    val logHighlighter = remember { LogHighlighter() }
 
     AerixPage(
         title = stringResource(R.string.aerix_logs_title),
@@ -250,9 +247,9 @@ fun LogScreen(activity: FragmentActivity) {
                     contentPadding = PaddingValues(AerixSpacing.smPlus)
                 ) {
                     itemsIndexed(shown) { _, line ->
+                        val highlighted = remember(line) { logHighlighter.highlight(line) }
                         Text(
-                            text = line,
-                            color = levelColor(line),
+                            text = highlighted,
                             fontFamily = FontFamily.Monospace,
                             fontSize = textSize,
                             lineHeight = textSize * 1.3f
