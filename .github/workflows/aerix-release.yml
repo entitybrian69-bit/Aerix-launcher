@@ -46,8 +46,9 @@ jobs:
           trap report ERR
           set -e
           SHORT=${BUILD_SHA:0:7}
-          mkdir -p apk
           git rm -q --ignore-unmatch apk/*.apk
+          # git rm drops the directory once its last file is gone; recreate it before copying.
+          mkdir -p apk
           cp out/app-debug-noruntime.apk "apk/Aerix-Launcher-$SHORT-debug.apk"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
