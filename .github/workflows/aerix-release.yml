@@ -1,0 +1,52 @@
+name: Aerix release
+
+# Publishes the debug APKs of a finished Android CI run as a GitHub pre-release.
+# Runs when this file changes on the Aerix branch; RUN_ID / BUILD_SHA select the CI run.
+on:
+  push:
+    branches: [ "arena/5d11b9a3-aerix-launcher" ]
+    paths: [ ".github/workflows/aerix-release.yml" ]
+
+permissions:
+  contents: write
+  actions: read
+
+env:
+  RUN_ID: "38591229804"
+  BUILD_SHA: "63054816357b54adfd3141df2232a876badab87f"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download full APK
+        uses: actions/download-artifact@v4
+        with:
+          name: app-debug
+          path: out
+          run-id: ${{ env.RUN_ID }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download no-runtime APK
+        uses: actions/download-artifact@v4
+        with:
+          name: app-debug-noruntime
+          path: out
+          run-id: ${{ env.RUN_ID }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create pre-release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          SHORT=${BUILD_SHA:0:7}
+          TAG="aerix-ui-$SHORT"
+          mv out/app-debug-full.apk "out/Aerix-Launcher-$SHORT-full-debug.apk"
+          mv out/app-debug-noruntime.apk "out/Aerix-Launcher-$SHORT-noruntime-debug.apk"
+          gh release delete "$TAG" --yes --cleanup-tag || true
+          gh release create "$TAG" out/*.apk \
+            --target "$BUILD_SHA" \
+            --prerelease \
+            --title "Aerix Launcher UI build $SHORT" \
+            --notes "Debug build of the Aerix UI port on PojavLauncher (branch arena/5d11b9a3-aerix-launcher, commit $BUILD_SHA, CI run $RUN_ID). full = bundled Java runtimes (install this one); noruntime = runtimes downloaded separately. Package net.kdt.pojavlaunch: uninstall any differently signed PojavLauncher build first."
