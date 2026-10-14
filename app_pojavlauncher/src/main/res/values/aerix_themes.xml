@@ -12,6 +12,7 @@
          Tools.setInsetsMode() from LauncherActivity.setFullscreen() (Aerix "launcherFullScreen"). -->
     <style name="Aerix.Launcher" parent="MojoLauncher.AppTheme">
         <item name="android:windowBackground">@color/aerix_canvas</item>
+        <item name="android:windowFullscreen">true</item>
         <item name="android:windowContentOverlay">@null</item>
     </style>
 </resources>

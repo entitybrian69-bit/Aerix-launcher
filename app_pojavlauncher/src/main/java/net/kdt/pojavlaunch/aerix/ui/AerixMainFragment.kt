@@ -28,7 +28,15 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
+import androidx.activity.findViewTreeOnBackPressedDispatcherOwner
+import androidx.activity.setViewTreeOnBackPressedDispatcherOwner
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.findViewTreeLifecycleOwner
+import androidx.lifecycle.findViewTreeViewModelStoreOwner
+import androidx.lifecycle.setViewTreeLifecycleOwner
+import androidx.lifecycle.setViewTreeViewModelStoreOwner
+import androidx.savedstate.findViewTreeSavedStateRegistryOwner
+import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import net.kdt.pojavlaunch.aerix.bridge.AerixPreferences
 import net.kdt.pojavlaunch.aerix.bridge.PojavAccountBridge
 import net.kdt.pojavlaunch.aerix.bridge.PojavFileBridge
@@ -56,6 +64,15 @@ class AerixMainFragment : Fragment() {
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         val activity = requireActivity()
+        // Compose installs its window recomposer on the content root and looks the owners up from
+        // there. AppCompat versions before 1.3 do not set them in setContentView, which crashed with
+        // "ViewTreeLifecycleOwner not found"; set them on the decor view the same way ComponentActivity does.
+        activity.window.decorView.let { decor ->
+            if (decor.findViewTreeLifecycleOwner() == null) decor.setViewTreeLifecycleOwner(activity)
+            if (decor.findViewTreeViewModelStoreOwner() == null) decor.setViewTreeViewModelStoreOwner(activity)
+            if (decor.findViewTreeSavedStateRegistryOwner() == null) decor.setViewTreeSavedStateRegistryOwner(activity)
+            if (decor.findViewTreeOnBackPressedDispatcherOwner() == null) decor.setViewTreeOnBackPressedDispatcherOwner(activity)
+        }
         return ComposeView(requireContext()).apply {
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
             setContent {
