@@ -294,6 +294,18 @@ private fun AppearanceSettings(activity: FragmentActivity) {
             )
         }
         item {
+            SliderSettingRow(
+                title = stringResource(R.string.aerix_settings_log_retention),
+                summary = stringResource(R.string.aerix_settings_log_retention_sub),
+                value = AerixPreferences.logRetentionDays,
+                range = 1..14,
+                step = 1,
+                suffix = " d",
+                onValueChange = { AerixPreferences.saveLogRetentionDays(it) },
+                iconRes = R.drawable.aerix_ic_schedule_outlined
+            )
+        }
+        item {
             ActionSettingRow(
                 title = stringResource(R.string.aerix_settings_asset_platform),
                 summary = stringResource(R.string.aerix_settings_asset_platform_sub),

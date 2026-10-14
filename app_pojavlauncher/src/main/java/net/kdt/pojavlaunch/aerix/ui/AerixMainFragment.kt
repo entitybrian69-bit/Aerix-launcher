@@ -31,6 +31,7 @@ import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.fragment.app.Fragment
 import net.kdt.pojavlaunch.aerix.bridge.AerixPreferences
 import net.kdt.pojavlaunch.aerix.bridge.PojavAccountBridge
+import net.kdt.pojavlaunch.aerix.bridge.PojavFileBridge
 import net.kdt.pojavlaunch.aerix.bridge.PojavInstanceBridge
 import net.kdt.pojavlaunch.aerix.bridge.PojavSettingsBridge
 import net.kdt.pojavlaunch.aerix.bridge.PojavTaskBridge
@@ -46,6 +47,8 @@ class AerixMainFragment : Fragment() {
     override fun onAttach(context: Context) {
         super.onAttach(context)
         AerixPreferences.init(context)
+        val retentionDays = AerixPreferences.logRetentionDays
+        Thread({ runCatching { PojavFileBridge.pruneOldLogs(retentionDays) } }, "AerixLogPrune").start()
         PojavTaskBridge.attach()
         PojavInstanceBridge.attach(context)
         PojavAccountBridge.attach(context)

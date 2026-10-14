@@ -351,4 +351,7 @@
     <string name="aerix_device_vulkan_low">Below 1.2, Vulkan-based renderers may fail</string>
     <string name="aerix_device_current_renderer">Selected renderer</string>
     <string name="aerix_device_renderers">Renderers available on this device</string>
+
+    <string name="aerix_settings_log_retention">Log retention</string>
+    <string name="aerix_settings_log_retention_sub">Crash reports and trashed files older than this are removed when the launcher starts</string>
 </resources>

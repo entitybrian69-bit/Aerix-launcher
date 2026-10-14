@@ -55,6 +55,7 @@ object AerixPreferences {
     const val KEY_FESTIVAL_EFFECTS = "launcherFestivalEffects"
     const val KEY_LOG_TEXT_SIZE = "logTextSize"
     const val KEY_ASSET_PLATFORM = "assetPlatformSource"
+    const val KEY_LOG_RETENTION_DAYS = "launcherLogRetentionDays"
     const val KEY_CURSEFORGE_API_KEY = "curseForgeApiKey"
 
     const val DEFAULT_CUSTOM_COLOR = 0xFF8DEFE0.toInt()
@@ -99,6 +100,10 @@ object AerixPreferences {
     var logTextSize by mutableIntStateOf(15)
         private set
 
+    /** Aerix "launcherLogRetentionDays" (1..14): crash reports older than this are removed at startup. */
+    var logRetentionDays by mutableIntStateOf(7)
+        private set
+
     /** Aerix "assetPlatformSource": platform preselected in the download screens. */
     var assetPlatformSource by mutableStateOf(AssetPlatform.MODRINTH)
         private set
@@ -130,6 +135,7 @@ object AerixPreferences {
             AssetPlatform.valueOf(p.getString(KEY_ASSET_PLATFORM, AssetPlatform.MODRINTH.name)!!)
         }.getOrDefault(AssetPlatform.MODRINTH)
         curseForgeApiKey = p.getString(KEY_CURSEFORGE_API_KEY, "") ?: ""
+        logRetentionDays = p.getInt(KEY_LOG_RETENTION_DAYS, 7).coerceIn(1, 14)
     }
 
     private fun edit(block: SharedPreferences.Editor.() -> Unit) {
@@ -203,6 +209,11 @@ object AerixPreferences {
     fun saveFestivalEffects(value: Boolean) {
         festivalEffects = value
         edit { putBoolean(KEY_FESTIVAL_EFFECTS, value) }
+    }
+
+    fun saveLogRetentionDays(value: Int) {
+        logRetentionDays = value.coerceIn(1, 14)
+        edit { putInt(KEY_LOG_RETENTION_DAYS, logRetentionDays) }
     }
 
     fun saveLogTextSize(value: Int) {

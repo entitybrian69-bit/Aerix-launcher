@@ -339,6 +339,23 @@ object PojavFileBridge {
         runCatching { FileUtils.sizeOfDirectory(dir) }.getOrDefault(0L)
     }
 
+    /**
+     * Aerix "launcherLogRetentionDays": removes crash reports in Tools.DIR_HOME_CRASH and
+     * Aerix trash slots older than [days]. Blocking; call from a background thread.
+     */
+    fun pruneOldLogs(days: Int) {
+        val cutoff = System.currentTimeMillis() - days * 24L * 60 * 60 * 1000
+        Tools.DIR_HOME_CRASH?.let { dir ->
+            File(dir).listFiles()?.forEach { file ->
+                if (file.isFile && file.lastModified() < cutoff) file.delete()
+            }
+        }
+        trashDir().listFiles()?.forEach { slot ->
+            val deletedAt = slot.name.substringBefore('_').toLongOrNull() ?: slot.lastModified()
+            if (deletedAt < cutoff) runCatching { FileUtils.deleteDirectory(slot) }
+        }
+    }
+
     fun open(context: Context, file: File, share: Boolean) {
         Tools.openPath(context, file, share)
     }
