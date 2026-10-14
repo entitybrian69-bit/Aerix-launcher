@@ -69,10 +69,12 @@ import androidx.compose.ui.unit.TextUnitType
 import androidx.compose.ui.unit.dp
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.findViewTreeLifecycleOwner
 import androidx.lifecycle.findViewTreeViewModelStoreOwner
 import androidx.lifecycle.setViewTreeLifecycleOwner
 import androidx.lifecycle.setViewTreeViewModelStoreOwner
+import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.findViewTreeSavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import kotlinx.coroutines.CancellationException
@@ -345,13 +347,17 @@ object AerixLogHost {
     private fun ensureViewTreeOwners(view: View) {
         val activity = view.context.findActivity() ?: return
         val decor = activity.window?.decorView ?: return
-        val lifecycleOwner = activity as? LifecycleOwner ?: return
-        if (decor.findViewTreeLifecycleOwner() == null) decor.setViewTreeLifecycleOwner(lifecycleOwner)
-        if (decor.findViewTreeViewModelStoreOwner() == null) decor.setViewTreeViewModelStoreOwner(lifecycleOwner)
-        if (decor.findViewTreeSavedStateRegistryOwner() == null) decor.setViewTreeSavedStateRegistryOwner(lifecycleOwner)
-        if (decor.findViewTreeOnBackPressedDispatcherOwner() == null &&
-            lifecycleOwner is OnBackPressedDispatcherOwner) {
-            decor.setViewTreeOnBackPressedDispatcherOwner(lifecycleOwner)
+        if (decor.findViewTreeLifecycleOwner() == null && activity is LifecycleOwner) {
+            decor.setViewTreeLifecycleOwner(activity)
+        }
+        if (decor.findViewTreeViewModelStoreOwner() == null && activity is ViewModelStoreOwner) {
+            decor.setViewTreeViewModelStoreOwner(activity)
+        }
+        if (decor.findViewTreeSavedStateRegistryOwner() == null && activity is SavedStateRegistryOwner) {
+            decor.setViewTreeSavedStateRegistryOwner(activity)
+        }
+        if (decor.findViewTreeOnBackPressedDispatcherOwner() == null && activity is OnBackPressedDispatcherOwner) {
+            decor.setViewTreeOnBackPressedDispatcherOwner(activity)
         }
     }
 
