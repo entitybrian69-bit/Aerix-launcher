@@ -114,7 +114,6 @@ import net.kdt.pojavlaunch.aerix.bridge.AerixPreferences
 import net.kdt.pojavlaunch.aerix.bridge.AerixRendererPlugin
 import net.kdt.pojavlaunch.aerix.bridge.AerixTransitionType
 import net.kdt.pojavlaunch.aerix.bridge.AssetPlatform
-import net.kdt.pojavlaunch.aerix.bridge.PojavDeviceBridge
 import net.kdt.pojavlaunch.aerix.bridge.PojavNavigator
 import net.kdt.pojavlaunch.aerix.bridge.PojavPluginBridge
 import net.kdt.pojavlaunch.aerix.bridge.PojavSetting
@@ -1700,10 +1699,6 @@ private fun GamepadTabContent(activity: FragmentActivity) {
 @Composable
 private fun AboutInfoTabContent(activity: FragmentActivity) {
     val accent = AerixThemeManager.currentAccent()
-    var report by remember { mutableStateOf(PojavDeviceBridge.report) }
-    LaunchedEffect(Unit) {
-        if (report == null) report = PojavDeviceBridge.load(activity)
-    }
 
     LazyColumn(
         modifier = Modifier

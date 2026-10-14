@@ -34,7 +34,7 @@ import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.os.Bundle
-import git.artdeell.mojo.MojoExec
+import git.artdeell.mojoexec.MojoExec
 import net.kdt.pojavlaunch.R
 import net.kdt.pojavlaunch.game.renderer.GameRenderer
 import net.kdt.pojavlaunch.game.renderer.RenderSpec

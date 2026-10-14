@@ -134,7 +134,7 @@ import net.kdt.pojavlaunch.aerix.theme.AerixSpacing
 import net.kdt.pojavlaunch.aerix.theme.AerixSurface
 import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
 import net.kdt.pojavlaunch.aerix.ui.AerixNav
-import net.kdt.pojavlaunch.dialogs.VersionSelectorDialog
+import net.kdt.pojavlaunch.profiles.VersionSelectorDialog
 import net.kdt.pojavlaunch.instances.Instance
 import net.kdt.pojavlaunch.prefs.LauncherPreferences
 import java.util.Date
@@ -1627,9 +1627,11 @@ private fun ArgsDialog(
     val accent = AerixThemeManager.currentAccent()
     var text by remember { mutableStateOf(draftArgs) }
     var mode by remember { mutableIntStateOf(draftMode) }
-    val modes = remember {
-        activity.resources.getStringArray(R.array.menu_custom_arguments_Formatting).toList()
-    }
+    val modes = listOf(
+        stringResource(R.string.aerix_editor_arg_mode_instance),
+        stringResource(R.string.aerix_editor_arg_mode_default_first),
+        stringResource(R.string.aerix_editor_arg_mode_instance_first)
+    )
 
     AlertDialog(
         onDismissRequest = onDismiss,
