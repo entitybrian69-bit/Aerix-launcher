@@ -10,6 +10,7 @@ import android.util.AttributeSet;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewConfiguration;
+import android.view.ViewParent;
 
 import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
@@ -145,8 +146,10 @@ public class DrawerPullButton extends View {
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         // The parent is the control layout, which would otherwise read the gesture as a button
-        // press of the game controls.
+        // press of the game controls. requestDisallowInterceptTouchEvent belongs to ViewParent,
+        // while the bounds used to keep the button on screen come from the View.
         View parent = (View) getParent();
+        ViewParent touchParent = getParent();
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
                 mDragging = false;
@@ -154,7 +157,7 @@ public class DrawerPullButton extends View {
                 mTouchDownY = event.getRawY();
                 mDragStartX = getTranslationX();
                 mDragStartY = getTranslationY();
-                if (parent != null) parent.requestDisallowInterceptTouchEvent(true);
+                if (touchParent != null) touchParent.requestDisallowInterceptTouchEvent(true);
                 return true;
             case MotionEvent.ACTION_MOVE: {
                 float dx = event.getRawX() - mTouchDownX;
@@ -172,12 +175,12 @@ public class DrawerPullButton extends View {
                 } else {
                     performClick();
                 }
-                if (parent != null) parent.requestDisallowInterceptTouchEvent(false);
+                if (touchParent != null) touchParent.requestDisallowInterceptTouchEvent(false);
                 mDragging = false;
                 return true;
             case MotionEvent.ACTION_CANCEL:
                 if (mDragging) savePosition();
-                if (parent != null) parent.requestDisallowInterceptTouchEvent(false);
+                if (touchParent != null) touchParent.requestDisallowInterceptTouchEvent(false);
                 mDragging = false;
                 return true;
             default:
