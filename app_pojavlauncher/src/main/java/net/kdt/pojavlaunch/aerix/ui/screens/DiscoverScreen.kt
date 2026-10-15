@@ -40,6 +40,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -104,6 +105,8 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -390,9 +393,10 @@ private fun SearchAssetsContent(
     }
 
     var showPlatformMenu by remember { mutableStateOf(false) }
-    var showCategoryMenu by remember { mutableStateOf(false) }
-    var showMcMenu by remember { mutableStateOf(false) }
-    var mcQuery by remember { mutableStateOf("") }
+    // The two long lists - every version of the game, every category of the source - are picked in
+    // a dialog, not in a dropdown menu: see FacetPicker for why.
+    var showCategoryPicker by remember { mutableStateOf(false) }
+    var showVersionPicker by remember { mutableStateOf(false) }
     var showLoaderMenu by remember { mutableStateOf(false) }
     var showSortMenu by remember { mutableStateOf(false) }
 
@@ -506,124 +510,19 @@ private fun SearchAssetsContent(
                 }
             }
 
-            // Category Dropdown Pill ("Category: All ▾"), fed by the source of the moment.
+            // Category pill. The list is the source's own and can be a couple of hundred entries.
             if (categories.isNotEmpty()) {
-                Box {
-                    val catLabel = categories.firstOrNull { it.id == category }?.label ?: "All"
-                    DiscoverFilterDropdownPill(
-                        label = "Category: $catLabel",
-                        onClick = { showCategoryMenu = true }
-                    )
-                    DropdownMenu(
-                        expanded = showCategoryMenu,
-                        onDismissRequest = { showCategoryMenu = false }
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("All Categories") },
-                            onClick = {
-                                showCategoryMenu = false
-                                category = null
-                                pageIndex = 1
-                            }
-                        )
-                        Box(modifier = Modifier.heightIn(max = 360.dp)) {
-                            LazyColumn {
-                                items(categories, key = { it.id }) { facet ->
-                                    DropdownMenuItem(
-                                        text = { Text(facet.label) },
-                                        onClick = {
-                                            showCategoryMenu = false
-                                            category = facet.id
-                                            pageIndex = 1
-                                        }
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
+                DiscoverFilterDropdownPill(
+                    label = "Category: ${categories.firstOrNull { it.id == category }?.label ?: "All"}",
+                    onClick = { showCategoryPicker = true }
+                )
             }
 
-            // MC Version Dropdown Pill ("MC: All ▾")
-            Box {
-                DiscoverFilterDropdownPill(
-                    label = "MC: ${mcVersion ?: "All"}",
-                    onClick = {
-                        mcQuery = ""
-                        showMcMenu = true
-                    }
-                )
-                DropdownMenu(
-                    expanded = showMcMenu,
-                    onDismissRequest = { showMcMenu = false }
-                ) {
-                    DropdownMenuItem(
-                        text = { Text("All Versions") },
-                        onClick = {
-                            showMcMenu = false
-                            mcVersion = null
-                            pageIndex = 1
-                        }
-                    )
-                    // The list is every version of the game the source knows - several hundred,
-                    // releases and snapshots alike - so it gets a search box of its own and is laid
-                    // out lazily inside a bounded box instead of all at once.
-                    Column(modifier = Modifier.widthIn(min = 220.dp)) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(AerixSurface.panelTrack)
-                                .padding(horizontal = 10.dp, vertical = 8.dp)
-                        ) {
-                            if (mcQuery.isEmpty()) {
-                                Text(
-                                    text = "Search versions...",
-                                    fontSize = 12.sp,
-                                    color = AerixSurface.textMuted
-                                )
-                            }
-                            BasicTextField(
-                                value = mcQuery,
-                                onValueChange = { mcQuery = it },
-                                singleLine = true,
-                                textStyle = TextStyle(color = AerixSurface.textPrimary, fontSize = 12.sp),
-                                cursorBrush = SolidColor(accent),
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(6.dp))
-                        val matches = remember(versions, mcQuery) {
-                            if (mcQuery.isBlank()) versions
-                            else versions.filter { it.label.contains(mcQuery.trim(), ignoreCase = true) }
-                        }
-                        if (matches.isEmpty()) {
-                            Text(
-                                text = "No version matches",
-                                fontSize = 12.sp,
-                                color = AerixSurface.textMuted,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
-                            )
-                        } else {
-                            Box(modifier = Modifier.heightIn(max = 320.dp)) {
-                                LazyColumn {
-                                    items(matches, key = { it.id }) { facet ->
-                                        DropdownMenuItem(
-                                            text = { Text(facet.label) },
-                                            onClick = {
-                                                showMcMenu = false
-                                                mcVersion = facet.id
-                                                pageIndex = 1
-                                            }
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+            // MC Version pill. The list is every version of the game the source knows.
+            DiscoverFilterDropdownPill(
+                label = "MC: ${mcVersion ?: "All"}",
+                onClick = { showVersionPicker = true }
+            )
 
             // Loader Dropdown Pill ("Loader: All ▾")
             if (type.supportsLoaderFilter) {
@@ -681,6 +580,36 @@ private fun SearchAssetsContent(
                     }
                 }
             }
+        }
+
+        // Outside the scrolling pill row, because a dialog is a window of its own.
+        if (showVersionPicker) {
+            FacetPicker(
+                title = "Minecraft version",
+                allLabel = "All Versions",
+                facets = versions,
+                selectedId = mcVersion,
+                onPick = {
+                    mcVersion = it
+                    pageIndex = 1
+                    showVersionPicker = false
+                },
+                onDismiss = { showVersionPicker = false }
+            )
+        }
+        if (showCategoryPicker) {
+            FacetPicker(
+                title = "Category",
+                allLabel = "All Categories",
+                facets = categories,
+                selectedId = category,
+                onPick = {
+                    category = it
+                    pageIndex = 1
+                    showCategoryPicker = false
+                },
+                onDismiss = { showCategoryPicker = false }
+            )
         }
 
         // Results area
@@ -1706,6 +1635,151 @@ private fun LinksRail(activity: FragmentActivity, details: AssetProjectDetails) 
             details.discordUrl?.let { url ->
                 AerixGhostButton("Discord", R.drawable.aerix_ic_link, { PojavNavigator.openUrl(activity, url) })
             }
+        }
+    }
+}
+
+/**
+ * The picker for the two long filter lists of this screen - every Minecraft version the source
+ * knows, and every category it has.
+ *
+ * It is a dialog and not a dropdown menu on purpose. A dropdown menu measures its content for the
+ * intrinsic size it sizes itself by, and a lazy list cannot answer that: the framework threw
+ * "Asking for intrinsic measurements of SubcomposeLayout layouts is not supported" the moment one
+ * was opened, which took the app down. A dialog measures its content the ordinary way, so a list of
+ * several hundred entries can be laid out lazily inside it and searched.
+ */
+@Composable
+private fun FacetPicker(
+    title: String,
+    allLabel: String,
+    facets: List<AssetFacet>,
+    selectedId: String?,
+    onPick: (String?) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val accent = AerixThemeManager.currentAccent()
+    var filterText by remember { mutableStateOf("") }
+    val matches = remember(facets, filterText) {
+        if (filterText.isBlank()) facets
+        else facets.filter { it.label.contains(filterText.trim(), ignoreCase = true) }
+    }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.5f))
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
+                ) { onDismiss() },
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                modifier = Modifier
+                    .widthIn(min = 300.dp, max = 460.dp)
+                    .clip(RoundedCornerShape(AerixRadii.dialog))
+                    .background(AerixSurface.panelRaised)
+                    // Swallows the taps that land on the panel instead of the scrim.
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) { }
+                    .padding(vertical = AerixSpacing.smCompact)
+            ) {
+                Text(
+                    text = title.uppercase(),
+                    color = accent,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    modifier = Modifier.padding(horizontal = AerixSpacing.md, vertical = AerixSpacing.xxs)
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = AerixSpacing.md, vertical = AerixSpacing.smCompact)
+                        .clip(RoundedCornerShape(AerixRadii.control))
+                        .background(AerixSurface.panelTrack)
+                        .padding(horizontal = AerixSpacing.smTight, vertical = AerixSpacing.smCompact)
+                ) {
+                    if (filterText.isEmpty()) {
+                        Text(
+                            text = "Search...",
+                            fontSize = 12.sp,
+                            color = AerixSurface.textMuted
+                        )
+                    }
+                    BasicTextField(
+                        value = filterText,
+                        onValueChange = { filterText = it },
+                        singleLine = true,
+                        textStyle = TextStyle(color = AerixSurface.textPrimary, fontSize = 12.sp),
+                        cursorBrush = SolidColor(accent),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+                FacetPickerRow(
+                    label = allLabel,
+                    selected = selectedId == null,
+                    accent = accent,
+                    onClick = { onPick(null) }
+                )
+                HorizontalDivider(color = AerixSurface.borderSoft)
+                if (matches.isEmpty()) {
+                    Text(
+                        text = "Nothing matches",
+                        fontSize = 12.sp,
+                        color = AerixSurface.textMuted,
+                        modifier = Modifier.padding(horizontal = AerixSpacing.md, vertical = AerixSpacing.smTight)
+                    )
+                } else {
+                    LazyColumn(modifier = Modifier.heightIn(max = 340.dp)) {
+                        items(matches, key = { it.id }) { facet ->
+                            FacetPickerRow(
+                                label = facet.label,
+                                selected = facet.id == selectedId,
+                                accent = accent,
+                                onClick = { onPick(facet.id) }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** One row of [FacetPicker]: the label, and the accent and a tick when it is the picked one. */
+@Composable
+private fun FacetPickerRow(label: String, selected: Boolean, accent: Color, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .background(if (selected) accent.copy(alpha = 0.14f) else Color.Transparent)
+            .padding(horizontal = AerixSpacing.md, vertical = AerixSpacing.smTight),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(AerixSpacing.xs)
+    ) {
+        Text(
+            text = label,
+            color = if (selected) accent else AerixSurface.textPrimary,
+            fontSize = 13.sp,
+            modifier = Modifier.weight(1f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        if (selected) {
+            Icon(
+                painter = painterResource(R.drawable.aerix_ic_check),
+                contentDescription = null,
+                tint = accent,
+                modifier = Modifier.size(14.dp)
+            )
         }
     }
 }
