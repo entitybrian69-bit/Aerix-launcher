@@ -168,9 +168,8 @@ private val settingTabItems = listOf(
     SettingTabItem(AerixNav.TAB_WALLPAPERS, R.drawable.aerix_ic_format_paint_outlined, "Wallpapers"),
     SettingTabItem(AerixNav.TAB_LAUNCHER, R.drawable.aerix_ic_setting_launcher, "Launcher"),
     SettingTabItem(AerixNav.TAB_CONTROLS, R.drawable.aerix_ic_videogame_asset_outlined, "Controls"),
-    SettingTabItem(AerixNav.TAB_CONTROL_MANAGER, R.drawable.aerix_ic_videogame_asset_outlined, "Controls"),
-    SettingTabItem(AerixNav.TAB_GAMEPAD, R.drawable.aerix_ic_sports_esports_outlined, "Gamepad"),
-    SettingTabItem(AerixNav.TAB_ABOUT, R.drawable.aerix_ic_info_outlined, "About")
+    SettingTabItem(AerixNav.TAB_CONTROL_MANAGER, R.drawable.aerix_ic_videogame_asset_outlined, "Control manager"),
+    SettingTabItem(AerixNav.TAB_GAMEPAD, R.drawable.aerix_ic_sports_esports_outlined, "Gamepad")
 )
 
 private data class RendererStackOption(
@@ -229,7 +228,6 @@ fun SettingsScreen(activity: FragmentActivity, tabKey: String, onTabChanged: (St
                 AerixNav.TAB_CONTROLS -> ControlsTabContent(activity)
                 AerixNav.TAB_CONTROL_MANAGER -> ControlManagerTabContent(activity)
                 AerixNav.TAB_GAMEPAD -> GamepadTabContent(activity)
-                AerixNav.TAB_ABOUT -> AboutInfoTabContent(activity)
                 else -> RendererTabContent(activity)
             }
         }
@@ -1417,11 +1415,18 @@ private fun LauncherTabContent(activity: FragmentActivity) {
                     onCheckedChange = { PojavSettingsBridge.writeBoolean(activity, "force_english", it) }
                 )
                 MiraiActionSettingsCard(
-                    position = CardPosition.Bottom,
+                    position = CardPosition.Middle,
                     title = stringResource(R.string.main_share_logs),
                     summary = stringResource(R.string.aerix_logs_subtitle),
                     value = "Share",
                     onClick = { PojavNavigator.shareLogs(activity) }
+                )
+                MiraiActionSettingsCard(
+                    position = CardPosition.Bottom,
+                    title = stringResource(R.string.aerix_settings_about),
+                    summary = stringResource(R.string.aerix_settings_about_sub),
+                    value = stringResource(R.string.aerix_settings_about_version, BuildConfig.VERSION_NAME),
+                    onClick = { PojavNavigator.openUrl(activity, "https://github.com/entitybrian69-bit/Aerix-launcher/releases") }
                 )
             }
         }
@@ -1810,279 +1815,6 @@ private fun GamepadTabContent(activity: FragmentActivity) {
 
 // ============================================================================================
 // 8. About tab (Mirai AboutInfoScreen.kt — Screenshot 5)
-// ============================================================================================
-
-@Composable
-private fun AboutInfoTabContent(activity: FragmentActivity) {
-    val accent = AerixThemeManager.currentAccent()
-
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = AerixSpacing.xs, vertical = AerixSpacing.xxs),
-        contentPadding = PaddingValues(bottom = AerixSpacing.xxl),
-        verticalArrangement = Arrangement.spacedBy(AerixSpacing.md)
-    ) {
-        // Card 1: Aerix Launcher + entitybrian + Discord (Screenshot 5 top card)
-        item {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(AerixRadii.hero),
-                color = AerixSurface.panel,
-                border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(AerixSpacing.mdPlus),
-                    verticalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus)
-                ) {
-                    AboutRowCard(
-                        iconRes = R.drawable.ic_aerix_mark,
-                        iconTint = Color.Unspecified,
-                        title = "Aerix Launcher",
-                        subtitle = "Launcher Version: 1.6",
-                        actions = {
-                            AboutPillButton("Check for Updates", accent) {
-                                PojavNavigator.openUrl(activity, "https://github.com/entitybrian69-bit/Aerix-launcher/releases")
-                            }
-                            AboutPillButton("Project Link", accent) {
-                                PojavNavigator.openUrl(activity, "https://github.com/entitybrian69-bit/Aerix-launcher")
-                            }
-                            AboutPillButton("Discord", accent) {
-                                PojavNavigator.openDiscord(activity)
-                            }
-                        }
-                    )
-
-                    AboutRowCard(
-                        iconRes = R.drawable.aerix_img_avatar_entitybrian,
-                        iconTint = Color.Unspecified,
-                        title = "entitybrian",
-                        subtitle = "Owner and maintainer of Aerix Launcher.",
-                        actions = {
-                            AboutPillButton("GitHub profile", accent) {
-                                PojavNavigator.openUrl(activity, "https://github.com/entitybrian69-bit")
-                            }
-                        }
-                    )
-                }
-            }
-        }
-
-        // Card 2: Acknowledgements (Screenshot 5 bottom card)
-        item {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(AerixRadii.hero),
-                color = AerixSurface.panel,
-                border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = AerixSpacing.mdPlus),
-                    verticalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus)
-                ) {
-                    Text(
-                        text = "Acknowledgements",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        modifier = Modifier.padding(horizontal = AerixSpacing.lg)
-                    )
-                    HorizontalDivider(color = AerixSurface.borderSoft)
-
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = AerixSpacing.mdPlus),
-                        verticalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus)
-                    ) {
-                        AboutRowCard(
-                            iconRes = R.drawable.aerix_img_avatar_bangbang93,
-                            iconTint = Color.Unspecified,
-                            title = "bangbang93",
-                            subtitle = "Aerix uses the BMCL API mirror source",
-                            actions = {
-                                AboutPillButton("Sponsorship Support", accent) {
-                                    PojavNavigator.openUrl(activity, "https://afdian.com/a/bangbang93")
-                                }
-                            }
-                        )
-                        AboutRowCard(
-                            iconRes = R.drawable.aerix_img_launcher_fcl,
-                            iconTint = Color.Unspecified,
-                            title = "Fold Craft Launcher",
-                            subtitle = "Aerix incorporates code from FCL and references parts of its implementation",
-                            actions = {
-                                AboutPillButton("Project Link", accent) {
-                                    PojavNavigator.openUrl(activity, "https://github.com/FCL-Team/FoldCraftLauncher")
-                                }
-                            }
-                        )
-                        AboutRowCard(
-                            iconRes = R.drawable.aerix_img_launcher_hmcl,
-                            iconTint = Color.Unspecified,
-                            title = "Hello Minecraft! Launcher",
-                            subtitle = "Aerix incorporates code from HMCL and references parts of its implementation",
-                            actions = {
-                                AboutPillButton("Project Link", accent) {
-                                    PojavNavigator.openUrl(activity, "https://github.com/HMCL-dev/HMCL")
-                                }
-                            }
-                        )
-                        AboutRowCard(
-                            iconRes = R.drawable.aerix_img_platform_mcmod,
-                            iconTint = Color.Unspecified,
-                            title = "MCMod (mcmod.cn)",
-                            subtitle = "Aerix uses Simplified Chinese translations of mods and modpacks from MCMod",
-                            actions = {
-                                AboutPillButton("Open", accent) {
-                                    PojavNavigator.openUrl(activity, "https://www.mcmod.cn/")
-                                }
-                            }
-                        )
-                        AboutRowCard(
-                            iconRes = R.drawable.aerix_img_avatar_mcim,
-                            iconTint = Color.Unspecified,
-                            title = "mcmod-info-mirror",
-                            subtitle = "Aerix uses the MCIM mirror source",
-                            actions = {
-                                AboutPillButton("Sponsorship Support", accent) {
-                                    PojavNavigator.openUrl(activity, "https://afdian.com/a/vels")
-                                }
-                            }
-                        )
-                        AboutRowCard(
-                            iconRes = R.drawable.aerix_img_launcher_pcl2,
-                            iconTint = Color.Unspecified,
-                            title = "Plain Craft Launcher 2",
-                            subtitle = "Aerix references parts of the implementation from PCL2",
-                            actions = {}
-                        )
-                        AboutRowCard(
-                            iconRes = R.drawable.aerix_img_launcher_pojav,
-                            iconTint = Color.Unspecified,
-                            title = "PojavLauncher",
-                            subtitle = "Aerix uses the launch backend from PojavLauncher / MojoLauncher",
-                            actions = {
-                                AboutPillButton("Project Link", accent) {
-                                    PojavNavigator.openUrl(activity, "https://github.com/PojavLauncherTeam/PojavLauncher")
-                                }
-                            }
-                        )
-                        AboutRowCard(
-                            iconRes = R.drawable.aerix_ic_github,
-                            iconTint = Color.White,
-                            title = "GitHub Community",
-                            subtitle = "All issue reporters and contributors from the GitHub community",
-                            actions = {
-                                AboutPillButton("Contributors", accent) {
-                                    PojavNavigator.openUrl(activity, "https://github.com/entitybrian69-bit/Aerix-launcher/graphs/contributors")
-                                }
-                            }
-                        )
-                        AboutRowCard(
-                            iconRes = R.drawable.aerix_img_platform_weblate,
-                            iconTint = Color.Unspecified,
-                            title = "Weblate Community",
-                            subtitle = "All translators who participated in community language localization",
-                            actions = {
-                                AboutPillButton("Weblate", accent) {
-                                    PojavNavigator.openUrl(activity, "https://hosted.weblate.org/projects/zalithlauncher2")
-                                }
-                            }
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun AboutRowCard(
-    @DrawableRes iconRes: Int,
-    iconTint: Color,
-    title: String,
-    subtitle: String,
-    actions: @Composable () -> Unit
-) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(AerixRadii.card),
-        color = AerixSurface.panelRaised.copy(alpha = 0.72f),
-        border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = AerixSpacing.mdPlus, vertical = AerixSpacing.smPlus),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(AerixSpacing.md)
-        ) {
-            if (iconTint == Color.Unspecified) {
-                Image(
-                    painter = painterResource(iconRes),
-                    contentDescription = null,
-                    modifier = Modifier
-                        .size(38.dp)
-                        .clip(RoundedCornerShape(AerixRadii.controlSmall))
-                )
-            } else {
-                Icon(
-                    painter = painterResource(iconRes),
-                    contentDescription = null,
-                    tint = iconTint,
-                    modifier = Modifier.size(34.dp)
-                )
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = AerixSurface.textSecondary,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(AerixSpacing.sm)) {
-                actions()
-            }
-        }
-    }
-}
-
-@Composable
-private fun AboutPillButton(text: String, accent: Color, onClick: () -> Unit) {
-    Button(
-        onClick = onClick,
-        shape = CircleShape,
-        colors = ButtonDefaults.buttonColors(
-            containerColor = accent,
-            contentColor = AerixSurface.onAccent
-        ),
-        contentPadding = PaddingValues(horizontal = AerixSpacing.lg, vertical = AerixSpacing.smCompact)
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.ExtraBold
-        )
-    }
-}
-
-// ============================================================================================
-// Mirai SettingsCard layouts (SwitchSettingsCard, SliderSettingsCard, ActionSettingsCard, TextSettingsCard)
 // ============================================================================================
 
 @Composable

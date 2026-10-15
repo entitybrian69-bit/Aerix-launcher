@@ -34,8 +34,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -50,7 +48,11 @@ import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
 private var wallpaperCacheKey: String? = null
 private var wallpaperCacheBitmap: ImageBitmap? = null
 
-private fun decodeWallpaper(context: Context, id: String): ImageBitmap? {
+/**
+ * Decodes the wallpaper. [maxSize] is the longest side the picture may have; a small size gives a
+ * picture that is blurred by the scaling of the screen instead of by an expensive shader.
+ */
+private fun decodeWallpaper(context: Context, id: String, maxSize: Int): ImageBitmap? {
     val bytes: ByteArray? = when (id) {
         AerixThemeManager.WALLPAPER_NONE -> null
         AerixThemeManager.WALLPAPER_CUSTOM -> {
@@ -65,8 +67,7 @@ private fun decodeWallpaper(context: Context, id: String): ImageBitmap? {
     if (bytes == null) return null
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
-    val metrics = context.resources.displayMetrics
-    val target = maxOf(metrics.widthPixels, metrics.heightPixels).coerceAtLeast(1)
+    val target = maxSize.coerceAtLeast(1)
     var sample = 1
     while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= target) sample *= 2
     val options = BitmapFactory.Options().apply { inSampleSize = sample }
@@ -82,27 +83,34 @@ fun AerixBackground(modifier: Modifier = Modifier, content: @Composable BoxScope
     val context = LocalContext.current
     val id = AerixPreferences.selectedWallpaper
     val revision = AerixThemeManager.wallpaperRevision
-    val cacheKey = "$id|$revision"
+    val blur = AerixPreferences.backgroundBlur
+    // A blurred wallpaper is drawn from a small picture: a full screen blur shader costs a lot of
+    // graphics power on every frame, the scaled up small picture looks the same and is free.
+    val blurred = blur > 0
+    val cacheKey = "$id|$revision|${if (blurred) "blur" else "sharp"}"
     var image by remember(cacheKey) { mutableStateOf(wallpaperCacheBitmap.takeIf { wallpaperCacheKey == cacheKey }) }
     LaunchedEffect(cacheKey) {
         if (wallpaperCacheKey != cacheKey || wallpaperCacheBitmap == null) {
-            val decoded = withContext(Dispatchers.IO) { runCatching { decodeWallpaper(context, id) }.getOrNull() }
+            val metrics = context.resources.displayMetrics
+            val screen = maxOf(metrics.widthPixels, metrics.heightPixels).coerceAtLeast(1)
+            val wanted = if (blurred) screen / 14 else screen
+            val decoded = withContext(Dispatchers.IO) { runCatching { decodeWallpaper(context, id, wanted) }.getOrNull() }
             wallpaperCacheKey = cacheKey
             wallpaperCacheBitmap = decoded
             image = decoded
         }
     }
+    val scrim = AerixThemeManager.screenScrim()
     Box(modifier.fillMaxSize().background(AerixSurface.canvas)) {
         val bitmap = image
         if (bitmap != null) {
-            val blur = AerixPreferences.backgroundBlur
             Image(
                 bitmap = bitmap,
                 contentDescription = null,
-                modifier = if (blur > 0) Modifier.fillMaxSize().blur(blur.dp) else Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop
             )
-            Box(Modifier.fillMaxSize().background(AerixThemeManager.screenScrim()))
+            Box(Modifier.fillMaxSize().background(scrim))
         } else {
             Box(
                 Modifier

@@ -57,6 +57,7 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -99,6 +100,23 @@ fun WallpapersScreen(modifier: Modifier = Modifier) {
     val selectedId = AerixPreferences.selectedWallpaper
     val selectedPreset = remember(selectedId) { AerixThemeManager.wallpapers.firstOrNull { it.id == selectedId } }
     val opacitySetting = AerixPreferences.backgroundOpacity
+
+    // The small pictures of the cards are decoded in the background before the grid is scrolled,
+    // so a card that appears while scrolling is drawn right away.
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) {
+            AerixThemeManager.wallpapers.forEach { preset ->
+                if (!thumbnailCache.containsKey(preset.assetPath)) {
+                    runCatching {
+                        context.assets.open(preset.assetPath).use { stream ->
+                            BitmapFactory.decodeStream(stream, null, BitmapFactory.Options().apply { inSampleSize = 8 })
+                                ?.asImageBitmap()
+                        }
+                    }.getOrNull()?.let { thumbnailCache[preset.assetPath] = it }
+                }
+            }
+        }
+    }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
@@ -272,19 +290,24 @@ fun WallpapersScreen(modifier: Modifier = Modifier) {
     }
 }
 
+/** Thumbnails of the wallpaper cards, they are small and are used again and again. */
+private val thumbnailCache = java.util.concurrent.ConcurrentHashMap<String, ImageBitmap>()
+
 @Composable
 private fun WallpaperPresetCard(preset: AerixWallpaperPreset, isSelected: Boolean, onClick: () -> Unit) {
     val context = LocalContext.current
     // Same thumbnail policy as the Mirai page: decoded from the bundled asset at card size.
+    // The pictures stay in a cache, a card that scrolls out of the list and back does not decode
+    // its picture a second time.
     val thumbnail by produceState<ImageBitmap?>(initialValue = null, preset.assetPath) {
-        value = withContext(Dispatchers.IO) {
+        value = thumbnailCache[preset.assetPath] ?: withContext(Dispatchers.IO) {
             runCatching {
                 context.assets.open(preset.assetPath).use { stream ->
                     BitmapFactory.decodeStream(stream, null, BitmapFactory.Options().apply { inSampleSize = 8 })
                         ?.asImageBitmap()
                 }
             }.getOrNull()
-        }
+        }?.also { thumbnailCache[preset.assetPath] = it }
     }
 
     Surface(

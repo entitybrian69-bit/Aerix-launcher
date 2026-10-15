@@ -4,7 +4,6 @@ import static net.kdt.pojavlaunch.prefs.LauncherPreferences.PREF_ZINK_PREFER_SYS
 
 import android.util.ArrayMap;
 import android.content.Context;
-import android.content.Intent;
 import android.util.Log;
 import android.widget.Toast;
 
@@ -15,7 +14,6 @@ import net.kdt.pojavlaunch.Architecture;
 import net.kdt.pojavlaunch.JVersionList;
 import net.kdt.pojavlaunch.Logger;
 import net.kdt.pojavlaunch.Tools;
-import net.kdt.pojavlaunch.aerix.bridge.PojavMobileGluesCheck;
 import net.kdt.pojavlaunch.authenticator.accounts.Account;
 import net.kdt.pojavlaunch.game.renderer.def.Renderers;
 import net.kdt.pojavlaunch.game.renderer.impl.GLESRenderSpec;
@@ -46,7 +44,6 @@ import java.util.List;
 import java.util.Map;
 
 import net.kdt.pojavlaunch.R;
-import net.kdt.pojavlaunch.mobileglues.MainActivity;
 
 public class GameRunner {
     /**
@@ -180,30 +177,6 @@ public class GameRunner {
         }
     }
 
-    /**
-     * Tells the user which MobileGlues option keeps the game from starting. The dialog can open
-     * the MobileGlues settings page, the launch is cancelled when it does.
-     */
-    private static boolean showMobileGluesDialog(AppCompatActivity activity, PojavMobileGluesCheck.Report report) throws InterruptedException {
-        StringBuilder message = new StringBuilder();
-        for (PojavMobileGluesCheck.Problem problem : report.getProblems()) {
-            if (message.length() > 0) message.append("\n\n");
-            message.append(problem.getTitle()).append("\n").append(problem.getDetail());
-        }
-        final boolean[] openSettings = new boolean[]{false};
-        boolean lifecycleEnded = LifecycleAwareAlertDialog.haltOnDialog(activity.getLifecycle(), activity, (dialog, builder) ->
-                builder.setTitle(activity.getString(R.string.aerix_mobileglues_dialog_title))
-                        .setMessage(message.toString())
-                        .setPositiveButton(R.string.aerix_mobileglues_dialog_settings, (d, w) -> openSettings[0] = true)
-                        .setNegativeButton(R.string.aerix_mobileglues_dialog_start, (d, w) -> {
-                        }));
-        if (openSettings[0]) {
-            activity.startActivity(new Intent(activity, MainActivity.class));
-            return true;
-        }
-        return lifecycleEnded;
-    }
-
     public static void launchGame(final AppCompatActivity activity, Account account,
                                   Instance instance, String versionId, File[] classpath, GameRenderer gameRenderer) throws Throwable {
         int freeDeviceMemory = Tools.getFreeDeviceMemory(activity);
@@ -265,25 +238,6 @@ public class GameRunner {
             // Switch renderer to LTW when running 1.21.5
             if(!isGl4esCompatible(versionInfo) && isGl4es) {
                 switchRendererIfSupported(ltwSupported, ltw, gameRenderer, instance, activity, R.string.compat_sodium_not_supported);
-            }
-        }
-
-        // MobileGlues needs a setting of its own for Minecraft 26.3 and newer: the option that
-        // ignores shader and program errors, without it the game stops with "Failed to load
-        // required shader programs". The launcher switches that one option on, the rest of the
-        // settings of MobileGlues stay as they are.
-        PojavMobileGluesCheck.Report mobileGluesReport = PojavMobileGluesCheck.check(
-                activity, versionId, gameRenderer.getCurrentRenderer().tag());
-        if (mobileGluesReport != null) {
-            Logger.appendToLog("[Aerix] " + mobileGluesReport.getSummary());
-            for (String applied : mobileGluesReport.getAppliedSettings()) {
-                Logger.appendToLog("[Aerix] MobileGlues option switched on for this version: " + applied);
-            }
-            for (PojavMobileGluesCheck.Problem problem : mobileGluesReport.getProblems()) {
-                Logger.appendToLog("[Aerix] " + problem.getTitle() + " - " + problem.getDetail());
-            }
-            if (!mobileGluesReport.getProblems().isEmpty() && showMobileGluesDialog(activity, mobileGluesReport)) {
-                return;
             }
         }
 

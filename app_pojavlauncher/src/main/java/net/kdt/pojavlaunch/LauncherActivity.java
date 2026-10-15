@@ -147,8 +147,10 @@ public class LauncherActivity extends BaseActivity {
     };
     @Override
     protected boolean shouldIgnoreNotch() {
-        // The Aerix launcher is landscape-only; follow Pojav's "Ignore notch" preference like the game does.
-        return LauncherPreferences.PREF_IGNORE_NOTCH;
+        // The launcher draws its wallpaper over the whole screen, so the window has to reach into
+        // the cutout area; otherwise the system letterboxes the app and a black bar shows up on
+        // the edge of the screen. The Compose shell keeps the buttons out of the cutout itself.
+        return true;
     }
 
     @Override

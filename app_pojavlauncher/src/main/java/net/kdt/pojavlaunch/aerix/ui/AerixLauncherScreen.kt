@@ -37,6 +37,9 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -88,10 +91,7 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
                 if (AerixNav.settingsTab == AerixNav.TAB_WALLPAPERS) AerixNav.settingsTab = AerixNav.TAB_RENDERER
                 AerixNav.navigate(LauncherSection.SETTINGS)
             }
-            LauncherSection.ABOUT -> {
-                AerixNav.settingsTab = AerixNav.TAB_ABOUT
-                AerixNav.navigate(LauncherSection.SETTINGS)
-            }
+            LauncherSection.ABOUT -> AerixNav.navigate(LauncherSection.ABOUT)
             LauncherSection.DOWNLOADS -> AerixNav.navigate(LauncherSection.DISCOVER)
             LauncherSection.CONTENT -> AerixNav.navigate(LauncherSection.INSTANCE_EDITOR)
             else -> AerixNav.navigate(target)
@@ -106,7 +106,13 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
 
     AerixBackground {
       FestivalEffectsHost(festivals = festivals, modifier = Modifier.fillMaxSize()) {
-        Row(modifier = Modifier.fillMaxSize()) {
+        // The window reaches into the display cutout so the wallpaper covers the whole screen.
+        // The buttons keep out of the cutout, the background does not.
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .windowInsetsPadding(WindowInsets.displayCutout)
+        ) {
             AerixNavigationRail(
                 selectedSection = section,
                 onNavigate = navigate,
@@ -160,18 +166,9 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
                 AerixDownloadOverlay(modifier = Modifier.align(Alignment.TopStart))
 
                 // Login progress bar, the Aerix replacement for the bar drawn under Pojav's AccountSpinner.
-                val progress = PojavAccountBridge.loginProgress
-                if (progress < 1f) {
-                    LinearProgressIndicator(
-                        progress = { progress },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .align(Alignment.TopCenter)
-                            .padding(horizontal = AerixSpacing.lg),
-                        color = if (PojavAccountBridge.loginError) AerixSurface.danger else AerixThemeManager.currentAccent(),
-                        trackColor = Color.Transparent
-                    )
-                }
+                // It lives in its own composable: the login reports its progress many times a
+                // second and only this bar may redraw, not the whole page.
+                AerixLoginProgress(modifier = Modifier.align(Alignment.TopCenter))
             }
         }
 
@@ -231,5 +228,20 @@ private fun AnimatedContentTransitionScope<LauncherSection>.sectionTransition(
         targetContentEnter = enterWith,
         initialContentExit = exit,
         sizeTransform = null
+    )
+}
+
+/** The bar that shows how far the login is; it hides itself when the login is done. */
+@Composable
+private fun AerixLoginProgress(modifier: Modifier = Modifier) {
+    val progress = PojavAccountBridge.loginProgress
+    if (progress >= 1f) return
+    LinearProgressIndicator(
+        progress = { progress },
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = AerixSpacing.lg),
+        color = if (PojavAccountBridge.loginError) AerixSurface.danger else AerixThemeManager.currentAccent(),
+        trackColor = Color.Transparent
     )
 }
