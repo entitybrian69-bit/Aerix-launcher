@@ -234,6 +234,130 @@ object PojavAccountBridge : LoginListener {
         ExtraCore.setValue(ExtraConstants.SELECT_AUTH_METHOD, true)
     }
 
+    /** Creates an offline account directly from the Account Manage screen (+ Offline pill). */
+    fun createOfflineAccount(username: String) {
+        val trimmed = username.trim()
+        if (trimmed.isEmpty()) return
+        ExtraCore.setValue(ExtraConstants.MOJANG_LOGIN_TODO, arrayOf(trimmed, ""))
+    }
+
+    /** Downloads a skin PNG from the first working URL in [candidateUrls], saves it to skins/, and equips it. */
+    fun equipOnlineSkin(
+        context: Context,
+        account: AerixAccount,
+        skinName: String,
+        candidateUrls: List<String>,
+        isSlim: Boolean,
+        onDone: (Boolean) -> Unit = {}
+    ) {
+        val appCtx = context.applicationContext
+        PojavApplication.sExecutorService.execute {
+            val safeStem = skinName.replace(Regex("[^A-Za-z0-9._-]"), "_").ifBlank { "Skin" }
+            val cachedFile = File(skinsDirectory(), "$safeStem.png")
+            val ok = runCatching {
+                var bytes: ByteArray? = null
+                for (url in candidateUrls) {
+                    bytes = runCatching {
+                        val conn = (java.net.URL(url).openConnection() as java.net.HttpURLConnection).apply {
+                            connectTimeout = 8000
+                            readTimeout = 8000
+                            instanceFollowRedirects = true
+                            setRequestProperty("User-Agent", "AerixLauncher/1.6")
+                        }
+                        try {
+                            if (conn.responseCode in 200..299) {
+                                conn.inputStream.use { it.readBytes() }
+                            } else null
+                        } finally {
+                            conn.disconnect()
+                        }
+                    }.getOrNull()
+                    if (bytes != null && bytes.isNotEmpty()) break
+                }
+                if (bytes == null && cachedFile.isFile && cachedFile.length() > 0) {
+                    bytes = cachedFile.readBytes()
+                }
+                val finalBytes = bytes ?: return@runCatching false
+                val decoded = BitmapFactory.decodeByteArray(finalBytes, 0, finalBytes.size)
+                    ?: return@runCatching false
+                cachedFile.writeBytes(finalBytes)
+                applySkinBytesToAccount(appCtx, account.source, finalBytes, decoded, safeStem)
+                decoded.recycle()
+                true
+            }.getOrDefault(false)
+            Tools.runOnUiThread {
+                if (ok) {
+                    setSlimModel(appCtx, account, isSlim)
+                    wardrobeRevision++
+                    reload()
+                    Toast.makeText(appCtx, "Equipped skin: $skinName", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(appCtx, "Unable to download skin: $skinName", Toast.LENGTH_SHORT).show()
+                }
+                onDone(ok)
+            }
+        }
+    }
+
+    /** Loads or downloads a 2D pixel face preview for a SkinLibrary entry. */
+    fun loadSkinFacePreview(
+        cacheKey: String,
+        localFile: File?,
+        avatarUrl: String?
+    ): ImageBitmap? {
+        if (localFile != null && localFile.isFile && localFile.length() > 0) {
+            runCatching {
+                val decoded = BitmapFactory.decodeFile(localFile.absolutePath)
+                if (decoded != null) {
+                    val face = (renderSkinFace(decoded) ?: decoded).asImageBitmap()
+                    if (decoded.width > 16) decoded.recycle()
+                    return face
+                }
+            }
+        }
+        val safeKey = cacheKey.replace(Regex("[^A-Za-z0-9._-]"), "_")
+        val cacheFile = File(Tools.DIR_CACHE, "aerix-skinlib-face-$safeKey.png")
+        if (cacheFile.isFile && cacheFile.length() > 0) {
+            runCatching { BitmapFactory.decodeFile(cacheFile.absolutePath)?.asImageBitmap() }
+                .getOrNull()
+                ?.let { return it }
+        }
+        if (!avatarUrl.isNullOrBlank()) {
+            val bytes = runCatching {
+                val conn = (java.net.URL(avatarUrl).openConnection() as java.net.HttpURLConnection).apply {
+                    connectTimeout = 6000
+                    readTimeout = 6000
+                    instanceFollowRedirects = true
+                    setRequestProperty("User-Agent", "AerixLauncher/1.6")
+                }
+                try {
+                    if (conn.responseCode in 200..299) {
+                        conn.inputStream.use { it.readBytes() }
+                    } else null
+                } finally {
+                    conn.disconnect()
+                }
+            }.getOrNull()
+            if (bytes != null && bytes.isNotEmpty()) {
+                val decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                if (decoded != null) {
+                    val faceBmp = if (decoded.width >= 64 && decoded.height >= 32 && decoded.width != decoded.height) {
+                        renderSkinFace(decoded) ?: decoded
+                    } else {
+                        decoded
+                    }
+                    runCatching {
+                        FileOutputStream(cacheFile).use { out ->
+                            faceBmp.compress(Bitmap.CompressFormat.PNG, 100, out)
+                        }
+                    }
+                    return faceBmp.asImageBitmap()
+                }
+            }
+        }
+        return null
+    }
+
     override fun onLoginDone(account: Account) {
         Tools.runOnUiThread {
             loginProgress = 1f

@@ -125,10 +125,16 @@ import net.kdt.pojavlaunch.aerix.components.AerixPillTabRow
 import net.kdt.pojavlaunch.aerix.components.AerixPrimaryButton
 import net.kdt.pojavlaunch.aerix.components.CardPosition
 import net.kdt.pojavlaunch.aerix.components.DefaultSwitch
+import net.kdt.pojavlaunch.aerix.components.MiraiIntSliderSettingsCard
+import net.kdt.pojavlaunch.aerix.components.MiraiListSettingsCard
+import net.kdt.pojavlaunch.aerix.components.MiraiRendererSummaryLayout
 import net.kdt.pojavlaunch.aerix.components.ModrinthMetaPill
 import net.kdt.pojavlaunch.aerix.components.SettingsCardColumn
+import net.kdt.pojavlaunch.aerix.components.getMiraiGlobalRendererId
 import net.kdt.pojavlaunch.aerix.components.liquidGlass
+import net.kdt.pojavlaunch.aerix.components.miraiRendererEntries
 import net.kdt.pojavlaunch.aerix.components.rememberSettingsCardShape
+import net.kdt.pojavlaunch.aerix.components.setMiraiGlobalRenderer
 import net.kdt.pojavlaunch.aerix.theme.AerixMetrics
 import net.kdt.pojavlaunch.aerix.theme.AerixRadii
 import net.kdt.pojavlaunch.aerix.theme.AerixSpacing
@@ -247,28 +253,33 @@ private fun RendererTabContent(activity: FragmentActivity) {
     val compatible = remember(revision) { PojavSettingsBridge.renderers(activity) }
     val plugins = remember(revision) { PojavPluginBridge.loadPlugins(activity) }
     val currentRenderer = remember(revision) { LauncherPreferences.PREF_RENDERER ?: Renderers.GL4ES_RENDERER }
+    val rendererEntries = remember(revision) { miraiRendererEntries(activity, includeFollowGlobal = false) }
+    var currentMiraiRendererId by remember(revision) { mutableStateOf(getMiraiGlobalRendererId(activity)) }
     var autoSelected by remember { mutableStateOf(false) }
-    var showRendererDialog by remember { mutableStateOf(false) }
+    var globalVulkanDriver by remember(revision) {
+        mutableStateOf(
+            LauncherPreferences.DEFAULT_PREF.getString("aerix_global_vulkan_driver", "default driver")
+                ?: "default driver"
+        )
+    }
+    var globalGraphicsApi by remember(revision) {
+        mutableStateOf(
+            LauncherPreferences.DEFAULT_PREF.getString("aerix_global_graphics_api", "DEFAULT")
+                ?: "DEFAULT"
+        )
+    }
+    var resolutionMode by remember(revision) {
+        mutableStateOf(
+            LauncherPreferences.DEFAULT_PREF.getString("aerix_resolution_mode", "SCALE")
+                ?: "SCALE"
+        )
+    }
 
     val runtimes = remember(revision) { runCatching { MultiRTUtils.getRuntimes() }.getOrDefault(emptyList()) }
     val defaultJre = remember(revision) { LauncherPreferences.PREF_DEFAULT_RUNTIME ?: "" }
     val maxAllocMb = remember { PojavSettingsBridge.maxRam(activity).coerceAtLeast(1024) }
     val totalRamMb = remember { Tools.getTotalDeviceMemory(activity).coerceAtLeast(2048) }
     var ramAlloc by remember(revision) { mutableIntStateOf(LauncherPreferences.PREF_RAM_ALLOCATION.coerceIn(256, maxAllocMb)) }
-
-    if (showRendererDialog) {
-        ChoiceDialog(
-            title = stringResource(R.string.mcl_setting_category_renderer),
-            entries = compatible,
-            current = currentRenderer,
-            onDismiss = { showRendererDialog = false },
-            onPick = { id ->
-                autoSelected = false
-                PojavSettingsBridge.writeString(activity, "renderer", id)
-                showRendererDialog = false
-            }
-        )
-    }
 
     LazyColumn(
         modifier = Modifier
@@ -530,25 +541,65 @@ private fun RendererTabContent(activity: FragmentActivity) {
             }
         }
 
-        // 4. Detailed Renderer, Resolution & Fullscreen SettingsCardColumn
+        // 4. Detailed Renderer, Vulkan Driver, Graphics API, Resolution & Fullscreen SettingsCardColumn (Mirai RendererSettingsScreen — Photos 1 & 2)
         item {
-            val currentRendererLabel = compatible.firstOrNull { it.first == currentRenderer }?.second ?: currentRenderer
-            val showMgSettings = currentRenderer == Renderers.MOBILEGLUES_RENDERER
+            val showMgSettings = currentRenderer == Renderers.MOBILEGLUES_RENDERER || currentMiraiRendererId == "opengles3_mobileglues"
+            val vulkanDrivers = remember {
+                listOf(
+                    "default driver" to "default driver",
+                    "turnip" to "Turnip (Adreno)",
+                    "freedreno" to "Freedreno (KGSL)"
+                )
+            }
+            val graphicsApis = remember {
+                listOf(
+                    "DEFAULT" to "Default",
+                    "DEFAULT_GL" to "Default (OpenGL)",
+                    "OPENGL_ES_3" to "OpenGL ES 3",
+                    "VULKAN" to "Vulkan"
+                )
+            }
+            val resolutionModes = remember {
+                listOf(
+                    "SCALE" to "Follow Screen Percentage",
+                    "CUSTOM" to "Custom Resolution"
+                )
+            }
+
             SettingsCardColumn(modifier = Modifier.fillMaxWidth()) {
-                MiraiActionSettingsCard(
+                MiraiListSettingsCard(
                     position = CardPosition.Top,
+                    items = rendererEntries,
+                    currentId = currentMiraiRendererId,
+                    defaultId = rendererEntries.firstOrNull()?.uniqueId ?: "opengles3",
                     title = "Global Renderer",
-                    summary = "$currentRendererLabel \u2022 ${plugins.size} renderer plugin(s) loaded",
-                    value = currentRendererLabel,
-                    onClick = { showRendererDialog = true },
+                    summary = "Define the global renderer used by the game",
+                    getItemText = { it.displayName },
+                    getItemId = { it.uniqueId },
+                    getItemSummary = { item ->
+                        MiraiRendererSummaryLayout(renderer = item)
+                    },
                     trailingIcon = {
-                        IconButton(onClick = {
-                            PojavPluginBridge.loadPlugins(activity, force = true)
-                            PojavSettingsBridge.touch()
-                            Toast.makeText(activity, "Found ${PojavPluginBridge.plugins.size} renderer plugin(s)", Toast.LENGTH_SHORT).show()
-                        }) {
-                            Icon(painterResource(R.drawable.aerix_ic_refresh), contentDescription = "Rescan plugins", tint = AerixSurface.textSecondary)
+                        IconButton(
+                            onClick = {
+                                PojavNavigator.openUrl(
+                                    activity,
+                                    "https://github.com/Vera-Firefly/MobileGlues-release/releases"
+                                )
+                            }
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.aerix_ic_download_2_outlined),
+                                contentDescription = "Download Renderer Plugin",
+                                tint = Color.White
+                            )
                         }
+                    },
+                    onValueChange = { entry ->
+                        autoSelected = false
+                        currentMiraiRendererId = entry.uniqueId
+                        setMiraiGlobalRenderer(entry)
+                        PojavSettingsBridge.touch()
                     }
                 )
                 if (showMgSettings) {
@@ -560,6 +611,75 @@ private fun RendererTabContent(activity: FragmentActivity) {
                         onClick = { activity.startActivity(Intent(activity, MobileGluesActivity::class.java)) }
                     )
                 }
+                MiraiListSettingsCard(
+                    position = CardPosition.Middle,
+                    items = vulkanDrivers,
+                    currentId = globalVulkanDriver,
+                    defaultId = "default driver",
+                    title = "Global Vulkan Driver",
+                    summary = "Define the Vulkan driver to be used globally",
+                    getItemText = { it.second },
+                    getItemId = { it.first },
+                    trailingIcon = {
+                        IconButton(
+                            onClick = {
+                                PojavNavigator.openUrl(
+                                    activity,
+                                    "https://github.com/K11MCH1/AdrenoToolsDrivers/releases"
+                                )
+                            }
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.aerix_ic_download_2_outlined),
+                                contentDescription = "Download Vulkan Driver",
+                                tint = Color.White
+                            )
+                        }
+                    },
+                    onValueChange = { item ->
+                        globalVulkanDriver = item.first
+                        LauncherPreferences.DEFAULT_PREF.edit()
+                            .putString("aerix_global_vulkan_driver", item.first)
+                            .apply()
+                        PojavSettingsBridge.writeBoolean(
+                            activity,
+                            "zinkPreferSystemDriver",
+                            item.first == "default driver"
+                        )
+                    }
+                )
+                MiraiListSettingsCard(
+                    position = CardPosition.Middle,
+                    items = graphicsApis,
+                    currentId = globalGraphicsApi,
+                    defaultId = "DEFAULT",
+                    title = "Graphics API",
+                    summary = "Specify the graphics API used by the game",
+                    getItemText = { it.second },
+                    getItemId = { it.first },
+                    onValueChange = { item ->
+                        globalGraphicsApi = item.first
+                        LauncherPreferences.DEFAULT_PREF.edit()
+                            .putString("aerix_global_graphics_api", item.first)
+                            .apply()
+                    }
+                )
+                MiraiListSettingsCard(
+                    position = CardPosition.Middle,
+                    items = resolutionModes,
+                    currentId = resolutionMode,
+                    defaultId = "SCALE",
+                    title = "Resolution Mode",
+                    summary = "Choose whether the game window resolution follows a percentage of the screen size or uses a custom resolution",
+                    getItemText = { it.second },
+                    getItemId = { it.first },
+                    onValueChange = { item ->
+                        resolutionMode = item.first
+                        LauncherPreferences.DEFAULT_PREF.edit()
+                            .putString("aerix_resolution_mode", item.first)
+                            .apply()
+                    }
+                )
                 MiraiSliderSettingsCard(
                     position = CardPosition.Middle,
                     title = stringResource(R.string.mcl_setting_title_resolution_scaler),
@@ -567,7 +687,7 @@ private fun RendererTabContent(activity: FragmentActivity) {
                     value = PojavSettingsBridge.resolutionPercent(),
                     range = 25..100,
                     step = 5,
-                    suffix = " %",
+                    suffix = "%",
                     onValueChange = { PojavSettingsBridge.writeInt(activity, "resolutionRatio", it) }
                 )
                 MiraiSwitchSettingsCard(
@@ -1072,10 +1192,6 @@ private fun JavaManageTabContent(activity: FragmentActivity) {
 private fun LauncherTabContent(activity: FragmentActivity) {
     val revision = PojavSettingsBridge.revision
     var showColorPicker by remember { mutableStateOf(false) }
-    var showThemeChoice by remember { mutableStateOf(false) }
-    var showTransitionChoice by remember { mutableStateOf(false) }
-    var showPlatformChoice by remember { mutableStateOf(false) }
-    var showDownloadSourceChoice by remember { mutableStateOf(false) }
 
     val platformLabels = listOf(
         AssetPlatform.MODRINTH.name to stringResource(R.string.aerix_download_platform_modrinth),
@@ -1089,58 +1205,20 @@ private fun LauncherTabContent(activity: FragmentActivity) {
     )
     val aerixLabel = stringResource(R.string.aerix_settings_theme_aerix)
     val customLabel = stringResource(R.string.aerix_settings_theme_custom)
+    val themeEntries = listOf(
+        AerixColorTheme.AERIX.name to aerixLabel,
+        AerixColorTheme.CUSTOM.name to customLabel
+    )
     val downloadSourceSetting = remember {
         PojavSettingsBridge.misc.settings.filterIsInstance<PojavSetting.Choice>().firstOrNull { it.key == "downloadSource" }
     }
+    val downloadSourceEntries = remember(downloadSourceSetting) {
+        downloadSourceSetting?.entries(activity) ?: emptyList()
+    }
+    var currentDownloadSource by remember(revision, downloadSourceSetting) {
+        mutableStateOf(downloadSourceSetting?.current() ?: "default")
+    }
 
-    if (showThemeChoice) {
-        ChoiceDialog(
-            title = stringResource(R.string.aerix_settings_color_theme),
-            entries = listOf(AerixColorTheme.AERIX.name to aerixLabel, AerixColorTheme.CUSTOM.name to customLabel),
-            current = AerixPreferences.colorTheme.name,
-            onDismiss = { showThemeChoice = false },
-            onPick = {
-                AerixPreferences.saveColorTheme(AerixColorTheme.valueOf(it))
-                showThemeChoice = false
-            }
-        )
-    }
-    if (showTransitionChoice) {
-        ChoiceDialog(
-            title = stringResource(R.string.aerix_settings_transition),
-            entries = transitionLabels,
-            current = AerixPreferences.swapAnimateType.name,
-            onDismiss = { showTransitionChoice = false },
-            onPick = {
-                AerixPreferences.saveSwapAnimateType(AerixTransitionType.valueOf(it))
-                showTransitionChoice = false
-            }
-        )
-    }
-    if (showPlatformChoice) {
-        ChoiceDialog(
-            title = stringResource(R.string.aerix_settings_asset_platform),
-            entries = platformLabels,
-            current = AerixPreferences.assetPlatformSource.name,
-            onDismiss = { showPlatformChoice = false },
-            onPick = {
-                AerixPreferences.saveAssetPlatformSource(AssetPlatform.valueOf(it))
-                showPlatformChoice = false
-            }
-        )
-    }
-    if (showDownloadSourceChoice && downloadSourceSetting != null) {
-        ChoiceDialog(
-            title = stringResource(downloadSourceSetting.titleRes),
-            entries = remember { downloadSourceSetting.entries(activity) },
-            current = downloadSourceSetting.current(),
-            onDismiss = { showDownloadSourceChoice = false },
-            onPick = {
-                PojavSettingsBridge.writeString(activity, downloadSourceSetting.key, it)
-                showDownloadSourceChoice = false
-            }
-        )
-    }
     if (showColorPicker) {
         HsvColorDialog(
             initial = Color(AerixPreferences.customColor),
@@ -1163,12 +1241,18 @@ private fun LauncherTabContent(activity: FragmentActivity) {
         // Group 1: Color theme, custom color, festival effects, full screen (Mirai LauncherSettingsScreen)
         item {
             SettingsCardColumn(modifier = Modifier.fillMaxWidth()) {
-                MiraiActionSettingsCard(
+                MiraiListSettingsCard(
                     position = CardPosition.Top,
+                    items = themeEntries,
+                    currentId = AerixPreferences.colorTheme.name,
+                    defaultId = AerixColorTheme.AERIX.name,
                     title = stringResource(R.string.aerix_settings_color_theme),
                     summary = stringResource(R.string.aerix_settings_color_theme_sub),
-                    value = if (AerixPreferences.colorTheme == AerixColorTheme.CUSTOM) customLabel else aerixLabel,
-                    onClick = { showThemeChoice = true }
+                    getItemText = { it.second },
+                    getItemId = { it.first },
+                    onValueChange = { item ->
+                        AerixPreferences.saveColorTheme(AerixColorTheme.valueOf(item.first))
+                    }
                 )
                 MiraiActionSettingsCard(
                     position = CardPosition.Middle,
@@ -1247,12 +1331,18 @@ private fun LauncherTabContent(activity: FragmentActivity) {
                     suffix = "",
                     onValueChange = { AerixPreferences.saveAnimateExtent(it) }
                 )
-                MiraiActionSettingsCard(
+                MiraiListSettingsCard(
                     position = CardPosition.Bottom,
+                    items = transitionLabels,
+                    currentId = AerixPreferences.swapAnimateType.name,
+                    defaultId = AerixTransitionType.JELLY_BOUNCE.name,
                     title = stringResource(R.string.aerix_settings_transition),
                     summary = stringResource(R.string.aerix_settings_transition_sub),
-                    value = transitionLabels.first { it.first == AerixPreferences.swapAnimateType.name }.second,
-                    onClick = { showTransitionChoice = true }
+                    getItemText = { it.second },
+                    getItemId = { it.first },
+                    onValueChange = { item ->
+                        AerixPreferences.saveSwapAnimateType(AerixTransitionType.valueOf(item.first))
+                    }
                 )
             }
         }
@@ -1260,21 +1350,34 @@ private fun LauncherTabContent(activity: FragmentActivity) {
         // Group 4: Mirror source, asset platform, log retention, CurseForge API key, log share, force English
         item {
             SettingsCardColumn(modifier = Modifier.fillMaxWidth()) {
-                if (downloadSourceSetting != null) {
-                    MiraiActionSettingsCard(
+                if (downloadSourceSetting != null && downloadSourceEntries.isNotEmpty()) {
+                    MiraiListSettingsCard(
                         position = CardPosition.Top,
+                        items = downloadSourceEntries,
+                        currentId = currentDownloadSource,
+                        defaultId = downloadSourceEntries.first().first,
                         title = stringResource(downloadSourceSetting.titleRes),
                         summary = downloadSourceSetting.summaryRes?.let { stringResource(it) },
-                        value = remember(revision) { PojavSettingsBridge.describe(activity, downloadSourceSetting) },
-                        onClick = { showDownloadSourceChoice = true }
+                        getItemText = { it.second },
+                        getItemId = { it.first },
+                        onValueChange = { item ->
+                            currentDownloadSource = item.first
+                            PojavSettingsBridge.writeString(activity, downloadSourceSetting.key, item.first)
+                        }
                     )
                 }
-                MiraiActionSettingsCard(
-                    position = if (downloadSourceSetting != null) CardPosition.Middle else CardPosition.Top,
+                MiraiListSettingsCard(
+                    position = if (downloadSourceSetting != null && downloadSourceEntries.isNotEmpty()) CardPosition.Middle else CardPosition.Top,
+                    items = platformLabels,
+                    currentId = AerixPreferences.assetPlatformSource.name,
+                    defaultId = AssetPlatform.MODRINTH.name,
                     title = stringResource(R.string.aerix_settings_asset_platform),
                     summary = stringResource(R.string.aerix_settings_asset_platform_sub),
-                    value = platformLabels.first { it.first == AerixPreferences.assetPlatformSource.name }.second,
-                    onClick = { showPlatformChoice = true }
+                    getItemText = { it.second },
+                    getItemId = { it.first },
+                    onValueChange = { item ->
+                        AerixPreferences.saveAssetPlatformSource(AssetPlatform.valueOf(item.first))
+                    }
                 )
                 MiraiSliderSettingsCard(
                     position = CardPosition.Middle,
@@ -2034,72 +2137,22 @@ private fun MiraiSliderSettingsCard(
     suffix: String,
     onValueChange: (Int) -> Unit
 ) {
-    val shape = rememberSettingsCardShape(position)
-    var dragValue by remember(value) { mutableFloatStateOf(value.toFloat()) }
-    val steps = if (step > 0) ((range.last - range.first) / step - 1).coerceAtLeast(0) else 0
-    val accent = AerixThemeManager.currentAccent()
-
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .liquidGlass(shape = shape, tint = AerixSurface.glassTint, strength = 0.9f, elevation = AerixSpacing.zero),
-        shape = shape,
-        color = AerixSurface.panel,
-        contentColor = AerixSurface.textPrimary,
-        border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(all = AerixSpacing.lg),
-            verticalArrangement = Arrangement.spacedBy(AerixSpacing.xs)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                    if (!summary.isNullOrEmpty()) {
-                        Text(
-                            text = summary,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = AerixSurface.textSecondary
-                        )
-                    }
-                }
-                Text(
-                    text = "${dragValue.roundToInt()}$suffix",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = accent
-                )
-            }
-            Slider(
-                value = dragValue.coerceIn(range.first.toFloat(), range.last.toFloat()),
-                onValueChange = { dragValue = it },
-                onValueChangeFinished = {
-                    val snapped = if (step > 0) {
-                        (range.first + ((dragValue - range.first) / step).roundToInt() * step).coerceIn(range.first, range.last)
-                    } else dragValue.roundToInt()
-                    dragValue = snapped.toFloat()
-                    onValueChange(snapped)
-                },
-                valueRange = range.first.toFloat()..range.last.toFloat(),
-                steps = if (steps in 1..200) steps else 0,
-                colors = SliderDefaults.colors(
-                    thumbColor = accent,
-                    activeTrackColor = accent,
-                    inactiveTrackColor = AerixSurface.panelTrack
-                )
-            )
+    MiraiIntSliderSettingsCard(
+        value = value.coerceIn(range),
+        title = title,
+        position = position,
+        summary = summary,
+        valueRange = range,
+        suffix = suffix,
+        fineTuningControl = true,
+        fineTuningStep = step.coerceAtLeast(1),
+        onValueFinished = { nextVal ->
+            val snapped = if (step > 0) {
+                (range.first + ((nextVal - range.first).toFloat() / step).roundToInt() * step).coerceIn(range.first, range.last)
+            } else nextVal.coerceIn(range.first, range.last)
+            onValueChange(snapped)
         }
-    }
+    )
 }
 
 @Composable

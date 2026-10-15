@@ -42,6 +42,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -52,17 +54,27 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -71,13 +83,16 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -88,8 +103,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.fragment.app.FragmentActivity
+import com.google.gson.JsonParser
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.net.HttpURLConnection
+import java.net.URL
+import java.net.URLEncoder
 import net.kdt.pojavlaunch.R
 import net.kdt.pojavlaunch.Tools
 import net.kdt.pojavlaunch.aerix.bridge.AerixAccount
@@ -109,8 +129,10 @@ import net.kdt.pojavlaunch.aerix.ui.AerixNav
 import net.kdt.pojavlaunch.aerix.ui.LauncherSection
 import net.kdt.pojavlaunch.authenticator.AuthType
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AccountsScreen(activity: FragmentActivity) {
+    val accent = AerixThemeManager.currentAccent()
     val accounts = PojavAccountBridge.accounts
     val current = PojavAccountBridge.current
     val focusedKey = PojavAccountBridge.focusedAccountKey
@@ -118,6 +140,113 @@ fun AccountsScreen(activity: FragmentActivity) {
         if (focusedKey == null) null else accounts.firstOrNull { it.key == focusedKey }
     }
     var pendingDelete by remember { mutableStateOf<AerixAccount?>(null) }
+    var showOfflineDialog by remember { mutableStateOf(false) }
+    var offlineUsername by remember { mutableStateOf("") }
+    var skinPickerAccount by remember { mutableStateOf<AerixAccount?>(null) }
+    var pendingSkinUri by remember { mutableStateOf<Pair<AerixAccount, Uri>?>(null) }
+
+    val skinFilePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        val target = skinPickerAccount ?: current ?: accounts.firstOrNull()
+        if (uri != null && target != null) {
+            pendingSkinUri = target to uri
+        }
+    }
+
+    val capeFilePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        val target = current ?: accounts.firstOrNull()
+        if (uri != null && target != null) {
+            PojavAccountBridge.equipCapeFromUri(activity, target, uri)
+        }
+    }
+
+    if (showOfflineDialog) {
+        AlertDialog(
+            onDismissRequest = { showOfflineDialog = false },
+            containerColor = AerixSurface.panelRaised,
+            title = { Text("Add Offline Account", color = Color.White) },
+            text = {
+                OutlinedTextField(
+                    value = offlineUsername,
+                    onValueChange = { offlineUsername = it },
+                    singleLine = true,
+                    label = { Text("Username", color = AerixSurface.textSecondary) },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedBorderColor = accent,
+                        unfocusedBorderColor = AerixSurface.borderSoft,
+                        cursorColor = accent
+                    )
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val clean = offlineUsername.trim()
+                        if (clean.isNotEmpty()) {
+                            PojavAccountBridge.createOfflineAccount(clean)
+                            offlineUsername = ""
+                            showOfflineDialog = false
+                        }
+                    }
+                ) {
+                    Text("Create", color = accent, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showOfflineDialog = false }) {
+                    Text(stringResource(R.string.aerix_settings_cancel), color = AerixSurface.textSecondary)
+                }
+            }
+        )
+    }
+
+    pendingSkinUri?.let { (targetAccount, uri) ->
+        AlertDialog(
+            onDismissRequest = { pendingSkinUri = null },
+            containerColor = AerixSurface.panelRaised,
+            title = { Text("Select Skin Model", color = Color.White) },
+            text = {
+                Text(
+                    "Choose the arm model for ${targetAccount.username}'s custom skin:",
+                    color = AerixSurface.textSecondary
+                )
+            },
+            confirmButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(
+                        onClick = {
+                            PojavAccountBridge.setSlimModel(activity, targetAccount, false)
+                            PojavAccountBridge.equipSkinFromUri(activity, targetAccount, uri)
+                            pendingSkinUri = null
+                        }
+                    ) {
+                        Text("Classic (4px)", color = accent, fontWeight = FontWeight.Bold)
+                    }
+                    TextButton(
+                        onClick = {
+                            PojavAccountBridge.setSlimModel(activity, targetAccount, true)
+                            PojavAccountBridge.equipSkinFromUri(activity, targetAccount, uri)
+                            pendingSkinUri = null
+                        }
+                    ) {
+                        Text("Slim (3px)", color = accent, fontWeight = FontWeight.Bold)
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingSkinUri = null }) {
+                    Text(stringResource(R.string.aerix_settings_cancel), color = AerixSurface.textSecondary)
+                }
+            }
+        )
+    }
 
     pendingDelete?.let { account ->
         AlertDialog(
@@ -153,45 +282,682 @@ fun AccountsScreen(activity: FragmentActivity) {
         return
     }
 
-    AerixPage(
-        title = stringResource(R.string.aerix_accounts_title),
-        subtitle = "Tap an account card to open its Skin Wardrobe and equip a .png skin from internal storage",
-        trailing = {
-            AerixPrimaryButton(
-                text = stringResource(R.string.aerix_accounts_add),
-                iconRes = R.drawable.aerix_ic_login,
-                onClick = { AerixNav.navigate(LauncherSection.ADD_ACCOUNT) }
+    // Mirai AccountManageScreen + SkinLibraryPanel layout (Photo 6)
+    Surface(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(all = 12.dp),
+        shape = RoundedCornerShape(22.dp),
+        color = AerixSurface.panel,
+        border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(all = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            // 1. Top row of pill buttons: + Microsoft, + Offline, + Auth Server, and + Equip Cape (from internal storage)
+            FlowRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                MiraiTopAccountPill(
+                    text = "Microsoft",
+                    onClick = { AerixNav.navigate(LauncherSection.ADD_ACCOUNT) }
+                )
+                MiraiTopAccountPill(
+                    text = "Offline",
+                    onClick = { showOfflineDialog = true }
+                )
+                MiraiTopAccountPill(
+                    text = "Auth Server",
+                    onClick = { AerixNav.navigate(LauncherSection.ADD_ACCOUNT) }
+                )
+                MiraiTopAccountPill(
+                    text = "Equip Cape",
+                    highlighted = true,
+                    onClick = {
+                        val target = current ?: accounts.firstOrNull()
+                        if (target == null) {
+                            Toast.makeText(activity, "Add or select an account first", Toast.LENGTH_SHORT).show()
+                        } else {
+                            runCatching {
+                                capeFilePicker.launch(arrayOf("image/png", "image/*"))
+                            }.onFailure {
+                                Toast.makeText(activity, "Unable to open file picker", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    }
+                )
+            }
+
+            // 2. Accounts list (Mirai AccountItem cards — Photo 6)
+            if (accounts.isEmpty()) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    shape = RoundedCornerShape(18.dp),
+                    color = AerixSurface.panelRaised.copy(alpha = 0.7f),
+                    border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = stringResource(R.string.aerix_accounts_empty),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = AerixSurface.textSecondary
+                        )
+                    }
+                }
+            } else {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    accounts.forEach { account ->
+                        val isCurrent = account == current
+                        MiraiAccountItemRow(
+                            account = account,
+                            isCurrent = isCurrent,
+                            onSelect = { PojavAccountBridge.select(account) },
+                            onOpenWardrobe = { PojavAccountBridge.openDetail(account) },
+                            onChangeSkin = {
+                                skinPickerAccount = account
+                                runCatching {
+                                    skinFilePicker.launch(arrayOf("image/png", "image/*"))
+                                }.onFailure {
+                                    Toast.makeText(activity, "Unable to open file picker", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            onRefresh = {
+                                if (account.authType.requiresLogin()) {
+                                    PojavAccountBridge.forceRefresh(account)
+                                } else {
+                                    PojavAccountBridge.reload()
+                                    Toast.makeText(activity, "Refreshed ${account.username}", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            onCopyUuid = {
+                                val clipboard = activity.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                                clipboard?.setPrimaryClip(ClipData.newPlainText("Minecraft UUID", account.displayUuid))
+                                Toast.makeText(activity, "Copied UUID: ${account.displayUuid}", Toast.LENGTH_SHORT).show()
+                            },
+                            onDelete = { pendingDelete = account }
+                        )
+                    }
+                }
+            }
+
+            // 3. SkinLibraryPanel (Search skins from MC Skin... + 3-column skin grid — Photo 6)
+            MiraiSkinLibraryPanel(
+                activity = activity,
+                currentAccount = current ?: accounts.firstOrNull()
             )
         }
+    }
+}
+
+@Composable
+private fun MiraiTopAccountPill(
+    text: String,
+    highlighted: Boolean = false,
+    onClick: () -> Unit
+) {
+    val accent = AerixThemeManager.currentAccent()
+    Surface(
+        shape = CircleShape,
+        color = if (highlighted) accent.copy(alpha = 0.22f) else AerixSurface.panelRaised,
+        border = BorderStroke(
+            width = 1.dp,
+            color = if (highlighted) accent.copy(alpha = 0.65f) else AerixSurface.borderSoft
+        ),
+        onClick = onClick
     ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            if (accounts.isEmpty()) {
-                QuietEmptyState(
-                    R.drawable.aerix_ic_person_outlined,
-                    stringResource(R.string.aerix_accounts_empty),
-                    Modifier.align(Alignment.Center)
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Icon(
+                painter = painterResource(R.drawable.aerix_ic_add),
+                contentDescription = text,
+                tint = if (highlighted) accent else Color.White,
+                modifier = Modifier.size(16.dp)
+            )
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+                color = Color.White
+            )
+        }
+    }
+}
+
+@Composable
+private fun MiraiAccountItemRow(
+    account: AerixAccount,
+    isCurrent: Boolean,
+    onSelect: () -> Unit,
+    onOpenWardrobe: () -> Unit,
+    onChangeSkin: () -> Unit,
+    onRefresh: () -> Unit,
+    onCopyUuid: () -> Unit,
+    onDelete: () -> Unit
+) {
+    val accent = AerixThemeManager.currentAccent()
+    val typeLabel = when (account.authType) {
+        AuthType.MICROSOFT -> "Microsoft"
+        AuthType.ELY_BY -> "Auth Server"
+        AuthType.LOCAL -> "Offline"
+    }
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        color = AerixSurface.panelRaised.copy(alpha = 0.85f),
+        border = BorderStroke(
+            width = if (isCurrent) 1.dp else AerixSpacing.hairline,
+            color = if (isCurrent) accent.copy(alpha = 0.45f) else AerixSurface.borderSoft
+        ),
+        onClick = onSelect
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 8.dp, end = 12.dp, top = 10.dp, bottom = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            RadioButton(
+                selected = isCurrent,
+                onClick = onSelect,
+                colors = RadioButtonDefaults.colors(
+                    selectedColor = accent,
+                    unselectedColor = Color.White.copy(alpha = 0.70f)
                 )
-            } else {
-                LazyVerticalGrid(
-                    columns = GridCells.Adaptive(minSize = 280.dp),
-                    contentPadding = PaddingValues(bottom = AerixSpacing.xxl),
-                    horizontalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus),
-                    verticalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus)
+            )
+            AerixImageWell(
+                image = account.face,
+                fallback = R.drawable.aerix_ic_person_outlined,
+                size = 36.dp,
+                radius = 6.dp,
+                modifier = Modifier.clickable(onClick = onOpenWardrobe)
+            )
+            Spacer(modifier = Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = account.username,
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                    color = Color.White,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = typeLabel,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = AerixSurface.textSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onChangeSkin) {
+                    Icon(
+                        painter = painterResource(R.drawable.aerix_ic_styler_outlined),
+                        contentDescription = "Equip Skin from Storage",
+                        tint = Color.White,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+                IconButton(onClick = onRefresh) {
+                    Icon(
+                        painter = painterResource(R.drawable.aerix_ic_refresh),
+                        contentDescription = "Refresh Account",
+                        tint = Color.White,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+                IconButton(onClick = onCopyUuid) {
+                    Icon(
+                        painter = painterResource(R.drawable.aerix_ic_content_copy_filled),
+                        contentDescription = "Copy UUID",
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                IconButton(onClick = onDelete) {
+                    Icon(
+                        painter = painterResource(R.drawable.aerix_ic_delete_outlined),
+                        contentDescription = "Delete Account",
+                        tint = Color.White,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+private data class MiraiSkinLibraryEntry(
+    val id: String,
+    val name: String,
+    val modelType: String,
+    val isSlim: Boolean,
+    val avatarUrl: String?,
+    val skinUrls: List<String>,
+    val localPreset: AerixSkinPreset? = null
+)
+
+private val defaultMcSkinEntries = listOf(
+    MiraiSkinLibraryEntry(
+        id = "notch",
+        name = "Notch",
+        modelType = "Classic",
+        isSlim = false,
+        avatarUrl = "https://mc-heads.net/avatar/069a79f444e94726a5befca90e38aaf5/64",
+        skinUrls = listOf(
+            "https://mc-heads.net/skin/069a79f444e94726a5befca90e38aaf5",
+            "https://minotar.net/skin/Notch",
+            "https://crafatar.com/skins/069a79f444e94726a5befca90e38aaf5"
+        )
+    ),
+    MiraiSkinLibraryEntry(
+        id = "jeb_",
+        name = "jeb_",
+        modelType = "Classic",
+        isSlim = false,
+        avatarUrl = "https://mc-heads.net/avatar/853c80ef3c3749fdaa49938b674adae6/64",
+        skinUrls = listOf(
+            "https://mc-heads.net/skin/853c80ef3c3749fdaa49938b674adae6",
+            "https://minotar.net/skin/jeb_",
+            "https://crafatar.com/skins/853c80ef3c3749fdaa49938b674adae6"
+        )
+    ),
+    MiraiSkinLibraryEntry(
+        id = "dinnerbone",
+        name = "Dinnerbone",
+        modelType = "Classic",
+        isSlim = false,
+        avatarUrl = "https://mc-heads.net/avatar/61699b2ed3274a019f1e0ea8c3f06bc6/64",
+        skinUrls = listOf(
+            "https://mc-heads.net/skin/61699b2ed3274a019f1e0ea8c3f06bc6",
+            "https://minotar.net/skin/Dinnerbone",
+            "https://crafatar.com/skins/61699b2ed3274a019f1e0ea8c3f06bc6"
+        )
+    ),
+    MiraiSkinLibraryEntry(
+        id = "technoblade",
+        name = "Technoblade",
+        modelType = "Classic",
+        isSlim = false,
+        avatarUrl = "https://mc-heads.net/avatar/b876ec32e396476ba1158438d83c67d4/64",
+        skinUrls = listOf(
+            "https://mc-heads.net/skin/b876ec32e396476ba1158438d83c67d4",
+            "https://minotar.net/skin/Technoblade"
+        )
+    ),
+    MiraiSkinLibraryEntry(
+        id = "dream",
+        name = "Dream",
+        modelType = "Classic",
+        isSlim = false,
+        avatarUrl = "https://mc-heads.net/avatar/ec70bcaf702f4bb8b48d276fa52a780c/64",
+        skinUrls = listOf(
+            "https://mc-heads.net/skin/ec70bcaf702f4bb8b48d276fa52a780c",
+            "https://minotar.net/skin/Dream"
+        )
+    ),
+    MiraiSkinLibraryEntry(
+        id = "ph1lza",
+        name = "Ph1LzA",
+        modelType = "Classic",
+        isSlim = false,
+        avatarUrl = "https://mc-heads.net/avatar/334b65f7055a4b1f97409f635116220b/64",
+        skinUrls = listOf(
+            "https://mc-heads.net/skin/334b65f7055a4b1f97409f635116220b",
+            "https://minotar.net/skin/Ph1LzA"
+        )
+    ),
+    MiraiSkinLibraryEntry(
+        id = "grian",
+        name = "Grian",
+        modelType = "Classic",
+        isSlim = false,
+        avatarUrl = "https://mc-heads.net/avatar/5f8eb73b25be4c5aa50fd27d65e30ca0/64",
+        skinUrls = listOf(
+            "https://mc-heads.net/skin/5f8eb73b25be4c5aa50fd27d65e30ca0",
+            "https://minotar.net/skin/Grian"
+        )
+    ),
+    MiraiSkinLibraryEntry(
+        id = "mumbo",
+        name = "Mumbo",
+        modelType = "Classic",
+        isSlim = false,
+        avatarUrl = "https://mc-heads.net/avatar/c7da90d56a054217b94a7d427cbbcad8/64",
+        skinUrls = listOf(
+            "https://mc-heads.net/skin/c7da90d56a054217b94a7d427cbbcad8",
+            "https://minotar.net/skin/Mumbo"
+        )
+    ),
+    MiraiSkinLibraryEntry(
+        id = "alex",
+        name = "Alex",
+        modelType = "Slim",
+        isSlim = true,
+        avatarUrl = "https://mc-heads.net/avatar/ec561538f3fd461daff5086b22154bce/64",
+        skinUrls = listOf(
+            "https://mc-heads.net/skin/ec561538f3fd461daff5086b22154bce",
+            "https://minotar.net/skin/MHF_Alex"
+        )
+    )
+)
+
+@Composable
+private fun MiraiSkinLibraryPanel(
+    activity: FragmentActivity,
+    currentAccount: AerixAccount?
+) {
+    val accent = AerixThemeManager.currentAccent()
+    val scope = rememberCoroutineScope()
+    val revision = PojavAccountBridge.wardrobeRevision
+    var query by remember { mutableStateOf("") }
+    var isSearching by remember { mutableStateOf(false) }
+    var localPresets by remember { mutableStateOf<List<AerixSkinPreset>>(emptyList()) }
+    var searchResults by remember { mutableStateOf<List<MiraiSkinLibraryEntry>?>(null) }
+
+    LaunchedEffect(revision) {
+        localPresets = withContext(Dispatchers.IO) {
+            PojavAccountBridge.loadSavedSkinPresets(activity)
+        }
+    }
+
+    val displayedEntries = remember(searchResults, localPresets) {
+        searchResults ?: buildList {
+            addAll(defaultMcSkinEntries)
+            localPresets.filter { it.file != null }.forEach { preset ->
+                add(
+                    MiraiSkinLibraryEntry(
+                        id = "local_${preset.id}",
+                        name = preset.name,
+                        modelType = "Classic",
+                        isSlim = false,
+                        avatarUrl = null,
+                        skinUrls = emptyList(),
+                        localPreset = preset
+                    )
+                )
+            }
+        }
+    }
+
+    fun triggerSearch() {
+        val trimmed = query.trim()
+        if (trimmed.isEmpty()) {
+            searchResults = null
+            return
+        }
+        isSearching = true
+        scope.launch {
+            val found = withContext(Dispatchers.IO) {
+                searchMcSkinsOnline(trimmed)
+            }
+            searchResults = found
+            isSearching = false
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            OutlinedTextField(
+                value = query,
+                onValueChange = {
+                    query = it
+                    if (it.isBlank()) searchResults = null
+                },
+                placeholder = {
+                    Text(
+                        text = "Search skins from MC Skin...",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White.copy(alpha = 0.65f)
+                    )
+                },
+                singleLine = true,
+                shape = RoundedCornerShape(16.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White,
+                    focusedBorderColor = accent,
+                    unfocusedBorderColor = AerixSurface.borderSoft,
+                    cursorColor = accent
+                ),
+                modifier = Modifier.weight(1f)
+            )
+            Button(
+                onClick = { triggerSearch() },
+                enabled = !isSearching,
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = accent,
+                    contentColor = AerixSurface.onAccent
+                ),
+                contentPadding = PaddingValues(horizontal = 22.dp, vertical = 14.dp)
+            ) {
+                if (isSearching) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = AerixSurface.onAccent
+                    )
+                } else {
+                    Text(
+                        text = "Search",
+                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
+                    )
+                }
+            }
+        }
+
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            displayedEntries.chunked(3).forEach { rowItems ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(accounts, key = { it.key }) { account ->
-                        AccountCard(
-                            account = account,
-                            isCurrent = account == current,
-                            onOpenWardrobe = { PojavAccountBridge.openDetail(account) },
-                            onUse = { PojavAccountBridge.select(account) },
-                            onRefresh = { PojavAccountBridge.forceRefresh(account) },
-                            onRemove = { pendingDelete = account }
+                    rowItems.forEach { entry ->
+                        MiraiSkinLibraryCard(
+                            entry = entry,
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                if (currentAccount == null) {
+                                    Toast.makeText(activity, "Add or select an account first", Toast.LENGTH_SHORT).show()
+                                } else if (entry.localPreset != null) {
+                                    PojavAccountBridge.equipSkinPreset(activity, currentAccount, entry.localPreset)
+                                } else {
+                                    PojavAccountBridge.equipOnlineSkin(
+                                        context = activity,
+                                        account = currentAccount,
+                                        skinName = entry.name,
+                                        candidateUrls = entry.skinUrls,
+                                        isSlim = entry.isSlim
+                                    )
+                                }
+                            }
+                        )
+                    }
+                    repeat(3 - rowItems.size) {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MiraiSkinLibraryCard(
+    entry: MiraiSkinLibraryEntry,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    var faceBitmap by remember(entry.id) { mutableStateOf<ImageBitmap?>(null) }
+
+    LaunchedEffect(entry.id) {
+        faceBitmap = withContext(Dispatchers.IO) {
+            PojavAccountBridge.loadSkinFacePreview(
+                cacheKey = entry.id,
+                localFile = entry.localPreset?.file,
+                avatarUrl = entry.avatarUrl ?: entry.skinUrls.firstOrNull()
+            )
+        }
+    }
+
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        color = AerixSurface.panelRaised.copy(alpha = 0.85f),
+        border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft),
+        onClick = onClick
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(all = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            AerixImageWell(
+                image = faceBitmap,
+                fallback = R.drawable.aerix_ic_person_outlined,
+                size = 36.dp,
+                radius = 6.dp
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = entry.name,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                    color = Color.White,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = entry.modelType,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = AerixSurface.textSecondary,
+                    maxLines = 1
+                )
+            }
+        }
+    }
+}
+
+private fun searchMcSkinsOnline(query: String): List<MiraiSkinLibraryEntry> {
+    val results = ArrayList<MiraiSkinLibraryEntry>()
+    val cleanQuery = query.trim()
+
+    // 1. Direct player name match via MC-Heads / Minotar
+    if (cleanQuery.matches(Regex("^[A-Za-z0-9_]{2,16}$"))) {
+        results.add(
+            MiraiSkinLibraryEntry(
+                id = "player_${cleanQuery.lowercase()}",
+                name = cleanQuery,
+                modelType = "Classic",
+                isSlim = false,
+                avatarUrl = "https://mc-heads.net/avatar/$cleanQuery/64",
+                skinUrls = listOf(
+                    "https://mc-heads.net/skin/$cleanQuery",
+                    "https://minotar.net/skin/$cleanQuery"
+                )
+            )
+        )
+    }
+
+    // 2. LittleSkin public skin library keyword search (same backend as Mirai SkinLibrary.kt)
+    runCatching {
+        val encoded = URLEncoder.encode(cleanQuery, "UTF-8")
+        val url = "https://littleskin.cn/skinlib/list?filter=skin&sort=likes&page=1&keyword=$encoded"
+        val conn = (URL(url).openConnection() as HttpURLConnection).apply {
+            connectTimeout = 6000
+            readTimeout = 6000
+            setRequestProperty("Accept", "application/json")
+            setRequestProperty("User-Agent", "AerixLauncher/1.6")
+        }
+        val body = try {
+            if (conn.responseCode in 200..299) {
+                conn.inputStream.bufferedReader().use { it.readText() }
+            } else null
+        } finally {
+            conn.disconnect()
+        }
+        if (!body.isNullOrBlank()) {
+            val root = JsonParser.parseString(body).asJsonObject
+            val data = root.getAsJsonArray("data")
+            if (data != null) {
+                for (i in 0 until minOf(data.size(), 12)) {
+                    val item = data[i].asJsonObject
+                    val tid = item.get("tid")?.asInt ?: continue
+                    val name = item.get("name")?.asString ?: "Skin #$tid"
+                    val type = item.get("type")?.asString ?: "steve"
+                    val isSlim = type.equals("alex", ignoreCase = true)
+                    val hash = runCatching {
+                        val infoConn = (URL("https://littleskin.cn/skinlib/info/$tid").openConnection() as HttpURLConnection).apply {
+                            connectTimeout = 4000
+                            readTimeout = 4000
+                            setRequestProperty("Accept", "application/json")
+                        }
+                        try {
+                            if (infoConn.responseCode in 200..299) {
+                                val infoText = infoConn.inputStream.bufferedReader().use { it.readText() }
+                                JsonParser.parseString(infoText).asJsonObject.get("hash")?.asString
+                            } else null
+                        } finally {
+                            infoConn.disconnect()
+                        }
+                    }.getOrNull()
+                    if (!hash.isNullOrBlank()) {
+                        val texUrl = "https://littleskin.cn/textures/$hash"
+                        results.add(
+                            MiraiSkinLibraryEntry(
+                                id = "ls_$tid",
+                                name = name,
+                                modelType = if (isSlim) "Slim" else "Classic",
+                                isSlim = isSlim,
+                                avatarUrl = texUrl,
+                                skinUrls = listOf(texUrl)
+                            )
                         )
                     }
                 }
             }
         }
     }
+
+    if (results.isEmpty()) {
+        results.addAll(
+            defaultMcSkinEntries.filter { it.name.contains(cleanQuery, ignoreCase = true) }
+        )
+    }
+    return results
 }
 
 @Composable

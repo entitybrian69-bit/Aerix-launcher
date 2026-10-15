@@ -125,10 +125,24 @@ import net.kdt.pojavlaunch.aerix.components.ActionSettingRow
 import net.kdt.pojavlaunch.aerix.components.AerixGhostButton
 import net.kdt.pojavlaunch.aerix.components.AerixImageWell
 import net.kdt.pojavlaunch.aerix.components.AerixPrimaryButton
+import net.kdt.pojavlaunch.aerix.components.CardPosition
+import net.kdt.pojavlaunch.aerix.components.MiraiEnumSettingsCard
+import net.kdt.pojavlaunch.aerix.components.MiraiFollowGlobalState
+import net.kdt.pojavlaunch.aerix.components.MiraiListSettingsCard
+import net.kdt.pojavlaunch.aerix.components.MiraiRendererSummaryLayout
+import net.kdt.pojavlaunch.aerix.components.MiraiSettingsCard
+import net.kdt.pojavlaunch.aerix.components.MiraiStatefulDropdownMenuFollowGlobal
+import net.kdt.pojavlaunch.aerix.components.MiraiTextInputSettingsCard
+import net.kdt.pojavlaunch.aerix.components.MiraiTitleAndSummary
+import net.kdt.pojavlaunch.aerix.components.MiraiToggleableIntSliderSettingsCard
 import net.kdt.pojavlaunch.aerix.components.ModrinthMetaPill
 import net.kdt.pojavlaunch.aerix.components.QuietEmptyState
+import net.kdt.pojavlaunch.aerix.components.SettingsCardColumn
 import net.kdt.pojavlaunch.aerix.components.SliderSettingRow
 import net.kdt.pojavlaunch.aerix.components.SwitchSettingRow
+import net.kdt.pojavlaunch.aerix.components.getMiraiInstanceRendererId
+import net.kdt.pojavlaunch.aerix.components.miraiRendererEntries
+import net.kdt.pojavlaunch.aerix.components.saveMiraiInstanceRendererId
 import net.kdt.pojavlaunch.aerix.theme.AerixRadii
 import net.kdt.pojavlaunch.aerix.theme.AerixSpacing
 import net.kdt.pojavlaunch.aerix.theme.AerixSurface
@@ -137,6 +151,7 @@ import net.kdt.pojavlaunch.aerix.ui.AerixNav
 import net.kdt.pojavlaunch.profiles.VersionSelectorDialog
 import net.kdt.pojavlaunch.instances.Instance
 import net.kdt.pojavlaunch.prefs.LauncherPreferences
+import java.io.File
 import java.util.Date
 
 private data class InstanceSubTab(
@@ -289,38 +304,47 @@ fun InstanceEditorScreen(activity: FragmentActivity, onClose: () -> Unit) {
         }
 
         // Right content pane
-        Surface(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxHeight(),
-            shape = RoundedCornerShape(AerixRadii.panel),
-            color = AerixSurface.panel,
-            border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft)
-        ) {
-            when (activeTab) {
-                "mods" -> InstanceModsPane(activity = activity)
-                "packs" -> InstanceContentPane(activity = activity, kind = ContentKind.RESOURCE_PACKS, assetType = AssetType.RESOURCE_PACK)
-                "shaders" -> InstanceContentPane(activity = activity, kind = ContentKind.SHADER_PACKS, assetType = AssetType.SHADER_PACK)
-                "worlds" -> InstanceContentPane(activity = activity, kind = ContentKind.SAVES, assetType = AssetType.WORLD)
-                "shots" -> InstanceContentPane(activity = activity, kind = ContentKind.SCREENSHOTS, assetType = null)
-                "settings" -> InstanceSettingsPane(
+        if (activeTab == "settings") {
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+            ) {
+                InstanceSettingsPane(
                     activity = activity,
                     draft = draft,
                     onDelete = { showDeleteDialog = true },
                     onExport = { showExportDialog = true },
                     onSaved = onClose
                 )
-                "overview" -> InstanceOverviewPane(
-                    activity = activity,
-                    draft = draft,
-                    onSelectTab = {
-                        activeTab = it
-                        PojavInstanceBridge.requestedSubTab = it
-                    },
-                    onExport = { showExportDialog = true }
-                )
-                "loader" -> InstanceLoaderPane(activity = activity, draft = draft)
-                else -> InstanceModsPane(activity = activity)
+            }
+        } else {
+            Surface(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight(),
+                shape = RoundedCornerShape(AerixRadii.panel),
+                color = AerixSurface.panel,
+                border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft)
+            ) {
+                when (activeTab) {
+                    "mods" -> InstanceModsPane(activity = activity)
+                    "packs" -> InstanceContentPane(activity = activity, kind = ContentKind.RESOURCE_PACKS, assetType = AssetType.RESOURCE_PACK)
+                    "shaders" -> InstanceContentPane(activity = activity, kind = ContentKind.SHADER_PACKS, assetType = AssetType.SHADER_PACK)
+                    "worlds" -> InstanceContentPane(activity = activity, kind = ContentKind.SAVES, assetType = AssetType.WORLD)
+                    "shots" -> InstanceContentPane(activity = activity, kind = ContentKind.SCREENSHOTS, assetType = null)
+                    "overview" -> InstanceOverviewPane(
+                        activity = activity,
+                        draft = draft,
+                        onSelectTab = {
+                            activeTab = it
+                            PojavInstanceBridge.requestedSubTab = it
+                        },
+                        onExport = { showExportDialog = true }
+                    )
+                    "loader" -> InstanceLoaderPane(activity = activity, draft = draft)
+                    else -> InstanceModsPane(activity = activity)
+                }
             }
         }
     }
@@ -1149,8 +1173,28 @@ private fun InstanceContentPane(
 }
 
 // ============================================================================================
-// Settings sub-screen (Instance configuration: Name, Icon, Version, Shared Data, Renderer, JRE, Controls, Memory, JVM Args)
+// Settings sub-screen (Mirai VersionConfigScreen.kt — Photos 3, 4 & 5)
 // ============================================================================================
+
+private val xmxRegex = Regex("""-Xmx(\d+)([MmGg])""")
+
+private fun extractCustomRamMb(jvmArgs: String): Int {
+    val match = xmxRegex.find(jvmArgs) ?: return -1
+    val num = match.groupValues[1].toIntOrNull() ?: return -1
+    val unit = match.groupValues[2].uppercase()
+    return if (unit == "G") num * 1024 else num
+}
+
+private fun applyCustomRamToJvmArgs(jvmArgs: String, ramMb: Int): String {
+    val stripped = jvmArgs.replace(xmxRegex, "").replace(Regex("""\s+"""), " ").trim()
+    return if (ramMb <= 0) {
+        stripped
+    } else if (stripped.isEmpty()) {
+        "-Xmx${ramMb}M"
+    } else {
+        "-Xmx${ramMb}M $stripped"
+    }
+}
 
 @Composable
 private fun InstanceSettingsPane(
@@ -1161,191 +1205,394 @@ private fun InstanceSettingsPane(
     onSaved: () -> Unit
 ) {
     val accent = AerixThemeManager.currentAccent()
-    var showRenderer by remember { mutableStateOf(false) }
-    var showRuntime by remember { mutableStateOf(false) }
-    var showMemory by remember { mutableStateOf(false) }
-    var showArgs by remember { mutableStateOf(false) }
+    val instanceKey = remember(draft.instance) { draft.instance.name ?: draft.versionId }
+    val prefs = LauncherPreferences.DEFAULT_PREF
 
-    if (showRenderer) {
-        val choices = remember { PojavInstanceEditorBridge.rendererChoices(activity) }
-        InstanceChoiceDialog(
-            title = stringResource(R.string.aerix_editor_renderer),
-            labels = choices.map { it.label },
-            selectedIndex = choices.indexOfFirst { it.id == draft.renderer },
-            onDismiss = { showRenderer = false },
-            onPick = { index ->
-                draft.renderer = choices[index].id
-                showRenderer = false
+    val rendererEntries = remember { miraiRendererEntries(activity, includeFollowGlobal = true) }
+    var currentMiraiRendererId by remember(draft.renderer) {
+        mutableStateOf(getMiraiInstanceRendererId(activity, instanceKey, draft.renderer))
+    }
+
+    val runtimeChoices = remember {
+        buildList {
+            add("" to "Follow Global")
+            PojavInstanceEditorBridge.runtimeChoices(activity).forEach { choice ->
+                if (choice.name != null) {
+                    add(choice.name to choice.label)
+                }
             }
-        )
+        }
     }
 
-    if (showRuntime) {
-        val choices = remember { PojavInstanceEditorBridge.runtimeChoices(activity) }
-        InstanceChoiceDialog(
-            title = stringResource(R.string.aerix_editor_runtime),
-            labels = choices.map { it.label },
-            selectedIndex = choices.indexOfFirst { it.name == draft.runtime },
-            onDismiss = { showRuntime = false },
-            onPick = { index ->
-                draft.runtime = choices[index].name
-                showRuntime = false
+    var controlRefreshTick by remember { mutableIntStateOf(0) }
+    val controlEntries = remember(controlRefreshTick) {
+        val dir = File(Tools.CTRLMAP_PATH)
+        val files = dir.listFiles { f -> f.isFile && f.name.endsWith(".json", ignoreCase = true) }
+            ?.sortedBy { it.name.lowercase() }
+            .orEmpty()
+        buildList {
+            add("" to "Follow Global")
+            files.forEach { file ->
+                add(file.name to file.name.removeSuffix(".json"))
             }
+        }
+    }
+
+    val vulkanDriverEntries = remember {
+        listOf(
+            "" to "Follow Global",
+            "default driver" to "default driver",
+            "turnip" to "Turnip (Adreno)",
+            "freedreno" to "Freedreno (KGSL)"
+        )
+    }
+    var vulkanDriver by remember(instanceKey) {
+        mutableStateOf(prefs.getString("aerix_inst_vulkan_$instanceKey", "") ?: "")
+    }
+
+    val graphicsApiEntries = remember {
+        listOf(
+            "" to "Follow Global",
+            "DEFAULT" to "Default",
+            "DEFAULT_GL" to "Default (OpenGL)",
+            "OPENGL_ES_3" to "OpenGL ES 3",
+            "VULKAN" to "Vulkan"
+        )
+    }
+    var graphicsApi by remember(instanceKey) {
+        mutableStateOf(prefs.getString("aerix_inst_gapi_$instanceKey", "") ?: "")
+    }
+
+    var skipIntegrityState by remember(instanceKey) {
+        val raw = prefs.getString("aerix_inst_skip_integrity_$instanceKey", MiraiFollowGlobalState.FOLLOW_GLOBAL.name)
+        mutableStateOf(
+            runCatching { MiraiFollowGlobalState.valueOf(raw ?: MiraiFollowGlobalState.FOLLOW_GLOBAL.name) }
+                .getOrDefault(MiraiFollowGlobalState.FOLLOW_GLOBAL)
         )
     }
 
-    if (showMemory) {
-        MemoryDialog(activity = activity, onDismiss = { showMemory = false })
+    var customInfo by remember(instanceKey) {
+        mutableStateOf(prefs.getString("aerix_inst_custom_info_$instanceKey", "") ?: "")
     }
-
-    if (showArgs) {
-        ArgsDialog(
-            activity = activity,
-            draftArgs = draft.jvmArgs,
-            draftMode = draft.argsMode,
-            onApply = { args, mode ->
-                draft.jvmArgs = args
-                draft.argsMode = mode
-                showArgs = false
-            },
-            onDismiss = { showArgs = false }
+    var programArgs by remember(instanceKey) {
+        mutableStateOf(prefs.getString("aerix_inst_program_args_$instanceKey", "") ?: "")
+    }
+    var serverIp by remember(instanceKey) {
+        mutableStateOf(prefs.getString("aerix_inst_server_ip_$instanceKey", "") ?: "")
+    }
+    var touchVibrateState by remember(instanceKey) {
+        val raw = prefs.getString("aerix_inst_vibrate_state_$instanceKey", MiraiFollowGlobalState.FOLLOW_GLOBAL.name)
+        mutableStateOf(
+            runCatching { MiraiFollowGlobalState.valueOf(raw ?: MiraiFollowGlobalState.FOLLOW_GLOBAL.name) }
+                .getOrDefault(MiraiFollowGlobalState.FOLLOW_GLOBAL)
         )
     }
+    var vibrateDuration by remember(instanceKey) {
+        mutableIntStateOf(prefs.getInt("aerix_inst_vibrate_duration_$instanceKey", -1))
+    }
+
+    val maxRamMb = remember { PojavSettingsBridge.maxRam(activity).coerceAtLeast(1024) }
+    val globalRamMb = remember { LauncherPreferences.PREF_RAM_ALLOCATION.coerceIn(256, maxRamMb) }
+    var customRamMb by remember(draft.jvmArgs) {
+        mutableIntStateOf(extractCustomRamMb(draft.jvmArgs))
+    }
+
+    val isolationState = if (!draft.sharedData) MiraiFollowGlobalState.ENABLE else MiraiFollowGlobalState.DISABLE
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(AerixSpacing.md),
-        verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
+            .verticalScroll(rememberScrollState())
+            .padding(
+                start = AerixSpacing.xs,
+                end = AerixSpacing.xs,
+                top = AerixSpacing.xs,
+                bottom = AerixSpacing.xxl
+            ),
+        verticalArrangement = Arrangement.spacedBy(AerixSpacing.md)
     ) {
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(AerixSpacing.md)
-            ) {
-                Box {
-                    AerixImageWell(
-                        image = draft.icon,
-                        fallback = R.drawable.aerix_loader_vanilla,
-                        size = 48.dp,
-                        modifier = Modifier.clickable(role = Role.Button) {
-                            AerixIconCropper.start(activity) { PojavInstanceEditorBridge.applyIcon(it) }
-                        }
-                    )
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .size(18.dp)
-                            .clip(CircleShape)
-                            .background(accent),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            painter = painterResource(R.drawable.aerix_ic_edit_outlined),
-                            contentDescription = null,
-                            tint = AerixSurface.onAccent,
-                            modifier = Modifier.size(11.dp)
-                        )
+        // ====================================================================================
+        // Section 1: Version-Specific Settings (Photos 3 & 5)
+        // ====================================================================================
+        SettingsCardColumn(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                modifier = Modifier.padding(horizontal = AerixSpacing.xs, vertical = 4.dp),
+                text = "Version-Specific Settings",
+                color = accent,
+                style = MaterialTheme.typography.labelLarge
+            )
+
+            MiraiStatefulDropdownMenuFollowGlobal(
+                position = CardPosition.Top,
+                title = "Version Isolation",
+                summary = "Isolate the current version so that its data does not interfere with any other versions",
+                currentState = isolationState,
+                onValueChange = { state ->
+                    draft.sharedData = (state == MiraiFollowGlobalState.DISABLE)
+                    PojavInstanceEditorBridge.save(activity)
+                }
+            )
+
+            MiraiStatefulDropdownMenuFollowGlobal(
+                position = CardPosition.Middle,
+                title = "Skip Integrity Check",
+                summary = "When launching the game, mismatched game files will not be re-downloaded",
+                currentState = skipIntegrityState,
+                onValueChange = { state ->
+                    skipIntegrityState = state
+                    prefs.edit().putString("aerix_inst_skip_integrity_$instanceKey", state.name).apply()
+                    when (state) {
+                        MiraiFollowGlobalState.ENABLE -> PojavSettingsBridge.writeBoolean(activity, "checkGameFiles", false)
+                        MiraiFollowGlobalState.DISABLE -> PojavSettingsBridge.writeBoolean(activity, "checkGameFiles", true)
+                        MiraiFollowGlobalState.FOLLOW_GLOBAL -> {}
                     }
                 }
-                OutlinedTextField(
-                    value = draft.name,
-                    onValueChange = { draft.name = it },
-                    modifier = Modifier.weight(1f),
-                    singleLine = true,
-                    label = { Text(stringResource(R.string.aerix_editor_name_label), fontSize = 12.sp) },
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = AerixSurface.textPrimary,
-                        unfocusedTextColor = AerixSurface.textPrimary,
-                        focusedBorderColor = accent,
-                        unfocusedBorderColor = AerixSurface.borderSoft,
-                        cursorColor = accent
-                    )
-                )
-            }
+            )
 
-            ActionSettingRow(
-                title = stringResource(R.string.aerix_editor_version, draft.versionId.ifEmpty { stringResource(R.string.unnamed) }),
-                summary = null,
-                onClick = {
-                    VersionSelectorDialog.open(activity, false) { id, _ -> draft.versionId = id }
+            MiraiListSettingsCard(
+                position = CardPosition.Middle,
+                items = rendererEntries,
+                currentId = currentMiraiRendererId,
+                defaultId = "",
+                title = "Renderer",
+                getItemText = { it.displayName },
+                getItemId = { it.uniqueId },
+                getItemSummary = { item ->
+                    MiraiRendererSummaryLayout(renderer = item)
                 },
-                iconRes = R.drawable.aerix_ic_videogame_asset_outlined,
-                value = stringResource(R.string.aerix_editor_change)
+                onValueChange = { entry ->
+                    currentMiraiRendererId = entry.uniqueId
+                    draft.renderer = entry.backendRendererId
+                    saveMiraiInstanceRendererId(instanceKey, entry)
+                    PojavInstanceEditorBridge.save(activity)
+                }
             )
 
-            SwitchSettingRow(
-                title = stringResource(R.string.aerix_editor_shared_data),
-                summary = stringResource(R.string.aerix_editor_shared_data_sub),
-                checked = draft.sharedData,
-                onCheckedChange = { draft.sharedData = it }
+            MiraiListSettingsCard(
+                position = CardPosition.Middle,
+                items = vulkanDriverEntries,
+                currentId = vulkanDriver,
+                defaultId = "",
+                title = "Vulkan Driver",
+                getItemText = { it.second },
+                getItemId = { it.first },
+                onValueChange = { item ->
+                    vulkanDriver = item.first
+                    prefs.edit().putString("aerix_inst_vulkan_$instanceKey", item.first).apply()
+                }
             )
 
-            ActionSettingRow(
-                title = stringResource(R.string.aerix_editor_renderer),
-                summary = null,
-                onClick = { showRenderer = true },
-                iconRes = R.drawable.aerix_ic_video_settings,
-                value = PojavInstanceEditorBridge.rendererLabel(activity, draft.renderer)
+            MiraiListSettingsCard(
+                position = CardPosition.Middle,
+                items = graphicsApiEntries,
+                currentId = graphicsApi,
+                defaultId = "",
+                title = "Graphics API",
+                summary = "Specify the graphics API used by the game",
+                getItemText = { it.second },
+                getItemId = { it.first },
+                onValueChange = { item ->
+                    graphicsApi = item.first
+                    prefs.edit().putString("aerix_inst_gapi_$instanceKey", item.first).apply()
+                }
             )
-            ActionSettingRow(
-                title = stringResource(R.string.aerix_editor_runtime),
-                summary = null,
-                onClick = { showRuntime = true },
-                iconRes = R.drawable.aerix_ic_java,
-                value = PojavInstanceEditorBridge.runtimeLabel(activity, draft.runtime)
-            )
-            ActionSettingRow(
-                title = stringResource(R.string.aerix_editor_control_layout),
-                summary = null,
-                onClick = { PojavInstanceEditorBridge.pickControlLayout(activity) },
-                iconRes = R.drawable.aerix_ic_touch_app_outlined,
-                value = PojavInstanceEditorBridge.controlLayoutLabel(activity, draft.controlLayout)
-            )
-            ActionSettingRow(
-                title = stringResource(R.string.aerix_editor_memory),
-                summary = null,
-                onClick = { showMemory = true },
-                iconRes = R.drawable.aerix_ic_java,
-                value = PojavInstanceEditorBridge.memoryLabel(activity)
-            )
-            ActionSettingRow(
-                title = stringResource(R.string.aerix_editor_jvm_args),
-                summary = null,
-                onClick = { showArgs = true },
-                iconRes = R.drawable.aerix_ic_terminal_outlined,
-                value = draft.jvmArgs.ifEmpty { stringResource(R.string.aerix_settings_value_none) }
-            )
-            ActionSettingRow(
-                title = "Export Modpack",
-                summary = "Package this instance as Modrinth (.mrpack), CurseForge (.zip) or MultiMC (.zip)",
-                onClick = onExport,
-                iconRes = R.drawable.aerix_ic_upload,
-                value = "Export"
+
+            MiraiListSettingsCard(
+                position = CardPosition.Bottom,
+                items = controlEntries,
+                currentId = draft.controlLayout ?: "",
+                defaultId = "",
+                title = "Control Layout",
+                getItemText = { it.second },
+                getItemId = { it.first },
+                trailingIcon = {
+                    IconButton(onClick = { controlRefreshTick++ }) {
+                        Icon(
+                            painter = painterResource(R.drawable.aerix_ic_refresh),
+                            contentDescription = "Refresh Controls",
+                            tint = Color.White
+                        )
+                    }
+                },
+                onValueChange = { item ->
+                    draft.controlLayout = item.first.ifEmpty { null }
+                    PojavInstanceEditorBridge.save(activity)
+                }
             )
         }
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
-        ) {
-            DeleteButton(onClick = onDelete)
-            Spacer(Modifier.weight(1f))
-            AerixGhostButton(
-                text = stringResource(R.string.aerix_editor_open_folder),
-                iconRes = R.drawable.aerix_ic_folder_outlined,
-                onClick = { PojavInstanceEditorBridge.openFolder(activity) }
+        // ====================================================================================
+        // Section 2: Game Settings (Photo 4)
+        // ====================================================================================
+        SettingsCardColumn(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                modifier = Modifier.padding(horizontal = AerixSpacing.xs, vertical = 4.dp),
+                text = "Game Settings",
+                color = accent,
+                style = MaterialTheme.typography.labelLarge
             )
-            AerixPrimaryButton(
-                text = stringResource(R.string.aerix_editor_save),
-                iconRes = R.drawable.aerix_ic_check,
-                onClick = { if (PojavInstanceEditorBridge.save(activity)) onSaved() }
+
+            MiraiListSettingsCard(
+                position = CardPosition.Top,
+                items = runtimeChoices,
+                currentId = draft.runtime ?: "",
+                defaultId = "",
+                title = "Java Runtime",
+                summary = "Specify the Java environment used by the current version",
+                getItemText = { it.second },
+                getItemId = { it.first },
+                onValueChange = { item ->
+                    draft.runtime = item.first.ifEmpty { null }
+                    PojavInstanceEditorBridge.save(activity)
+                }
+            )
+
+            MiraiToggleableIntSliderSettingsCard(
+                position = CardPosition.Middle,
+                currentValue = customRamMb,
+                defaultValue = globalRamMb,
+                title = "Memory Allocation",
+                summary = "Adjust Minecraft's memory usage",
+                valueRange = 256..maxRamMb,
+                suffix = "MB",
+                fineTuningControl = true,
+                onValueChange = { ram ->
+                    customRamMb = ram
+                },
+                onValueFinished = { ram ->
+                    customRamMb = ram
+                    draft.jvmArgs = applyCustomRamToJvmArgs(draft.jvmArgs, ram)
+                    PojavInstanceEditorBridge.save(activity)
+                }
+            )
+
+            MiraiTextInputSettingsCard(
+                position = CardPosition.Middle,
+                value = customInfo,
+                title = "Custom Version Info",
+                summary = "Custom info is shown at the bottom-left of the main menu and top-left of the F3 debug screen. It may not work for special versions or external account logins. You can add the [zl_version] tag, which will be replaced with the current version number automatically",
+                label = "Follow global if left blank",
+                onValueChange = { value ->
+                    customInfo = value
+                    prefs.edit().putString("aerix_inst_custom_info_$instanceKey", value).apply()
+                }
+            )
+
+            MiraiTextInputSettingsCard(
+                position = CardPosition.Middle,
+                value = programArgs,
+                title = "Program Arguments",
+                summary = "Additional arguments passed directly to the Minecraft game client",
+                label = "Disabled if left blank",
+                onValueChange = { value ->
+                    programArgs = value
+                    prefs.edit().putString("aerix_inst_program_args_$instanceKey", value).apply()
+                }
+            )
+
+            MiraiTextInputSettingsCard(
+                position = CardPosition.Middle,
+                value = draft.jvmArgs,
+                title = "JVM Arguments",
+                summary = "Custom arguments passed to the Java Virtual Machine when launching the game",
+                label = "Follow global if left blank",
+                onValueChange = { value ->
+                    draft.jvmArgs = value
+                    PojavInstanceEditorBridge.save(activity)
+                }
+            )
+
+            MiraiTextInputSettingsCard(
+                position = CardPosition.Bottom,
+                value = serverIp,
+                title = "Auto-Join Server IP",
+                summary = "Automatically connect to this server address when the game starts",
+                label = "Disabled if left blank",
+                onValueChange = { value ->
+                    serverIp = value
+                    prefs.edit().putString("aerix_inst_server_ip_$instanceKey", value).apply()
+                }
+            )
+        }
+
+        // ====================================================================================
+        // Section 3: Support Settings
+        // ====================================================================================
+        SettingsCardColumn(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                modifier = Modifier.padding(horizontal = AerixSpacing.xs, vertical = 4.dp),
+                text = "Support Settings",
+                color = accent,
+                style = MaterialTheme.typography.labelLarge
+            )
+
+            MiraiTextInputSettingsCard(
+                position = CardPosition.Top,
+                value = draft.name,
+                title = stringResource(R.string.aerix_editor_name_label),
+                summary = "Rename this instance or tap the icon below to customize its badge",
+                label = "Instance Name",
+                onValueChange = { value ->
+                    draft.name = value
+                    PojavInstanceEditorBridge.save(activity)
+                }
+            )
+
+            MiraiSettingsCard(
+                position = CardPosition.Middle,
+                innerPadding = PaddingValues(all = AerixSpacing.lg),
+                onClick = {
+                    AerixIconCropper.start(activity) {
+                        PojavInstanceEditorBridge.applyIcon(it)
+                        PojavInstanceEditorBridge.save(activity)
+                    }
+                }
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    MiraiTitleAndSummary(
+                        title = "Instance Icon",
+                        summary = "Tap to choose and crop a custom icon for this instance",
+                        modifier = Modifier.weight(1f)
+                    )
+                    AerixImageWell(
+                        image = draft.icon,
+                        fallback = R.drawable.aerix_loader_vanilla,
+                        size = 40.dp
+                    )
+                }
+            }
+
+            MiraiEnumSettingsCard(
+                position = CardPosition.Middle,
+                items = MiraiFollowGlobalState.entries,
+                currentValue = touchVibrateState,
+                title = "Touch Vibration Feedback",
+                summary = "Configure haptic feedback when pressing on-screen controls in this instance",
+                getItemText = { it.label },
+                onValueChange = { state ->
+                    touchVibrateState = state
+                    prefs.edit().putString("aerix_inst_vibrate_state_$instanceKey", state.name).apply()
+                }
+            )
+
+            MiraiToggleableIntSliderSettingsCard(
+                position = CardPosition.Bottom,
+                currentValue = vibrateDuration,
+                defaultValue = 100,
+                title = "Vibration Duration",
+                summary = "Adjust touch vibration feedback duration in milliseconds",
+                valueRange = 80..500,
+                suffix = "ms",
+                fineTuningControl = true,
+                onValueChange = { vibrateDuration = it },
+                onValueFinished = {
+                    vibrateDuration = it
+                    prefs.edit().putInt("aerix_inst_vibrate_duration_$instanceKey", it).apply()
+                }
             )
         }
     }
