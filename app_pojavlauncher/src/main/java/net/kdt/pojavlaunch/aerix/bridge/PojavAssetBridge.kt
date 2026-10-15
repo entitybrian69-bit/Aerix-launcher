@@ -206,19 +206,26 @@ object PojavAssetBridge {
     const val PAGE_SIZE = 30
     private val mcVersionPattern = Regex("""(\d+\.\d+(?:\.\d+)?)""")
 
-    private val modrinth = ApiHandler("https://api.modrinth.com/v2")
+    private const val MODRINTH_OFFICIAL_API = "https://api.modrinth.com/v2"
+    private const val MODRINTH_MIRROR_API = "https://mod.mcimirror.top/modrinth/v2"
+    private const val CURSEFORGE_OFFICIAL_API = "https://api.curseforge.com/v1"
+    private const val CURSEFORGE_MIRROR_API = "https://mod.mcimirror.top/curseforge/v1"
+
+    private val modrinthOfficial = ApiHandler(MODRINTH_OFFICIAL_API)
+    private val modrinthMirror = ApiHandler(MODRINTH_MIRROR_API)
+    private val curseForgeMirror = ApiHandler(CURSEFORGE_MIRROR_API)
 
     /** User key (Aerix "curseForgeApiKey") first, then the key baked into the build. */
     fun curseForgeKey(context: Context): String? {
-        val user = AerixPreferences.curseForgeApiKey.trim()
-        if (user.isNotEmpty()) return user
-        val built = context.getString(R.string.curseforge_api_key).trim()
+        val user = runCatching { AerixPreferences.curseForgeApiKey.trim() }.getOrDefault("")
+        if (user.isNotEmpty() && user != "DUMMY") return user
+        val built = runCatching { context.getString(R.string.curseforge_api_key).trim() }.getOrDefault("")
         return built.takeIf { it.isNotEmpty() && it != "DUMMY" }
     }
 
-    fun platforms(context: Context, type: AssetType): List<AssetPlatform> = buildList {
+    fun platforms(@Suppress("UNUSED_PARAMETER") context: Context, type: AssetType): List<AssetPlatform> = buildList {
         if (type.modrinthType != null) add(AssetPlatform.MODRINTH)
-        if (curseForgeKey(context) != null) add(AssetPlatform.CURSEFORGE)
+        add(AssetPlatform.CURSEFORGE)
     }
 
     suspend fun instanceTarget(): InstanceTarget = withContext(Dispatchers.IO) {
@@ -273,7 +280,7 @@ object PojavAssetBridge {
         runCatching {
             when (platform) {
                 AssetPlatform.MODRINTH -> searchModrinth(type, query, mcVersion, loader, category, sort, offset)
-                AssetPlatform.CURSEFORGE -> searchCurseForge(context, type, query, mcVersion, loader, sort, offset)
+                AssetPlatform.CURSEFORGE -> searchCurseForge(context, type, query, mcVersion, loader, category, sort, offset)
             }
         }.getOrNull()
     }
@@ -320,13 +327,24 @@ object PojavAssetBridge {
             val api = if (project.platform == AssetPlatform.MODRINTH) {
                 ModrinthApi()
             } else {
-                val key = curseForgeKey(context) ?: return@withContext false
-                CurseforgeApi(key)
+                createCurseForgeModpackApi(context)
             }
             api.handleModpackInstallation(context.applicationContext, detail, 0)
             return@withContext true
         }
         install(project.type, file)
+    }
+
+    private fun createCurseForgeModpackApi(context: Context): CurseforgeApi {
+        val key = curseForgeKey(context)
+        if (key != null) return CurseforgeApi(key)
+        val cfApi = CurseforgeApi("DUMMY")
+        runCatching {
+            val field = CurseforgeApi::class.java.getDeclaredField("mApiHandler")
+            field.isAccessible = true
+            field.set(cfApi, curseForgeMirror)
+        }
+        return cfApi
     }
 
     suspend fun install(type: AssetType, file: AssetFile): Boolean = withContext(Dispatchers.IO) {
@@ -369,7 +387,7 @@ object PojavAssetBridge {
                 author = obj.string("author") ?: "",
                 iconUrl = obj.string("iconUrl"),
                 downloads = obj.long("downloads"),
-                loaders = obj.getAsJsonArray("loaders").strings()
+                loaders = obj.arr("loaders").strings()
             )
         }
     }.getOrDefault(emptyList())
@@ -408,6 +426,20 @@ object PojavAssetBridge {
 
     private val knownLoaders = setOf("fabric", "forge", "neoforge", "quilt")
 
+    private fun <T> modrinthGet(endpoint: String, params: HashMap<String, Any>?, tClass: Class<T>): T? {
+        val primary = if (params != null) {
+            runCatching { modrinthOfficial.get(endpoint, params, tClass) }.getOrNull()
+        } else {
+            runCatching { modrinthOfficial.get(endpoint, tClass) }.getOrNull()
+        }
+        if (primary != null) return primary
+        return if (params != null) {
+            runCatching { modrinthMirror.get(endpoint, params, tClass) }.getOrNull()
+        } else {
+            runCatching { modrinthMirror.get(endpoint, tClass) }.getOrNull()
+        }
+    }
+
     private fun searchModrinth(
         type: AssetType,
         query: String,
@@ -429,12 +461,13 @@ object PojavAssetBridge {
         params["limit"] = PAGE_SIZE
         params["offset"] = offset
         params["index"] = sort.modrinthIndex
-        val response = modrinth.get("search", params, JsonObject::class.java) ?: return null
-        val hits = response.getAsJsonArray("hits") ?: return null
+        val response = modrinthGet("search", params, JsonObject::class.java) ?: return null
+        val hits = response.arr("hits") ?: return null
         val projects = hits.mapNotNull { element ->
+            if (!element.isJsonObject) return@mapNotNull null
             val hit = element.asJsonObject
-            val cats = hit.getAsJsonArray("display_categories").strings()
-                .ifEmpty { hit.getAsJsonArray("categories").strings() }
+            val cats = hit.arr("display_categories").strings()
+                .ifEmpty { hit.arr("categories").strings() }
             val loaders = cats.filter { it.lowercase() in knownLoaders }.map { displayLoader(it) }.distinct()
             AssetProject(
                 platform = AssetPlatform.MODRINTH,
@@ -448,17 +481,18 @@ object PojavAssetBridge {
                 loaders = loaders
             )
         }
-        return AssetPage(projects, response.get("total_hits")?.asInt ?: projects.size)
+        return AssetPage(projects, response.int("total_hits").takeIf { it > 0 } ?: projects.size)
     }
 
     private fun modrinthDetails(project: AssetProject): AssetProjectDetails? {
-        val obj = modrinth.get("project/${project.id}", JsonObject::class.java) ?: return null
-        val gallery = obj.getAsJsonArray("gallery")?.mapNotNull { elem ->
+        val obj = modrinthGet("project/${project.id}", null, JsonObject::class.java) ?: return null
+        val gallery = obj.arr("gallery")?.mapNotNull { elem ->
+            if (!elem.isJsonObject) return@mapNotNull null
             val g = elem.asJsonObject
             val url = g.string("url")?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
             AssetScreenshot(url, g.string("title"), g.string("description"))
         } ?: emptyList()
-        val loaders = obj.getAsJsonArray("loaders").strings().map { displayLoader(it) }.distinct()
+        val loaders = obj.arr("loaders").strings().map { displayLoader(it) }.distinct()
         val updated = AssetProject(
             platform = project.platform,
             type = project.type,
@@ -482,33 +516,60 @@ object PojavAssetBridge {
     }
 
     private fun modrinthFiles(projectId: String): List<AssetFile>? {
-        val versions = modrinth.get("project/$projectId/version", JsonArray::class.java) ?: return null
+        val versions = modrinthGet("project/$projectId/version", null, JsonArray::class.java) ?: return null
         return versions.mapNotNull { element ->
+            if (!element.isJsonObject) return@mapNotNull null
             val version = element.asJsonObject
-            val files = version.getAsJsonArray("files") ?: return@mapNotNull null
+            val files = version.arr("files") ?: return@mapNotNull null
             if (files.size() == 0) return@mapNotNull null
-            val primary = files.firstOrNull { it.asJsonObject.get("primary")?.asBoolean == true }?.asJsonObject
-                ?: files[0].asJsonObject
+            val primary = files.firstOrNull { it.isJsonObject && it.asJsonObject.get("primary")?.takeIf { !it.isJsonNull }?.asBoolean == true }?.asJsonObject
+                ?: files[0].takeIf { it.isJsonObject }?.asJsonObject
+                ?: return@mapNotNull null
             val verNum = version.string("version_number") ?: ""
             AssetFile(
                 name = version.string("name") ?: verNum,
                 versionNumber = verNum,
                 fileName = primary.string("filename") ?: return@mapNotNull null,
                 url = primary.string("url"),
-                sha1 = primary.getAsJsonObject("hashes")?.string("sha1"),
+                sha1 = primary.obj("hashes")?.string("sha1"),
                 sizeBytes = primary.long("size"),
                 releaseType = version.string("version_type") ?: "release",
                 datePublished = (version.string("date_published") ?: "").take(10),
-                gameVersions = version.getAsJsonArray("game_versions").strings(),
-                loaders = version.getAsJsonArray("loaders").strings()
+                gameVersions = version.arr("game_versions").strings(),
+                loaders = version.arr("loaders").strings()
             )
         }
     }
 
     // ---- CurseForge --------------------------------------------------------------------------
 
-    private fun curseForge(context: Context): ApiHandler? =
-        curseForgeKey(context)?.let { ApiHandler("https://api.curseforge.com/v1", it) }
+    /**
+     * Queries CurseForge via the user/build API key when present, falling back to Mirai's MCIM
+     * CurseForge mirror (`https://mod.mcimirror.top/curseforge/v1`) when no key is set or when the
+     * primary request fails.
+     */
+    private fun <T> curseForgeGet(
+        context: Context,
+        endpoint: String,
+        params: HashMap<String, Any>?,
+        tClass: Class<T>
+    ): T? {
+        val key = curseForgeKey(context)
+        if (key != null) {
+            val official = ApiHandler(CURSEFORGE_OFFICIAL_API, key)
+            val res = if (params != null) {
+                runCatching { official.get(endpoint, params, tClass) }.getOrNull()
+            } else {
+                runCatching { official.get(endpoint, tClass) }.getOrNull()
+            }
+            if (res != null) return res
+        }
+        return if (params != null) {
+            runCatching { curseForgeMirror.get(endpoint, params, tClass) }.getOrNull()
+        } else {
+            runCatching { curseForgeMirror.get(endpoint, tClass) }.getOrNull()
+        }
+    }
 
     private fun searchCurseForge(
         context: Context,
@@ -516,10 +577,10 @@ object PojavAssetBridge {
         query: String,
         mcVersion: String?,
         loader: String?,
+        category: String?,
         sort: AssetSort,
         offset: Int
     ): AssetPage? {
-        val api = curseForge(context) ?: return null
         val params = HashMap<String, Any>()
         params["gameId"] = CURSEFORGE_GAME_ID
         params["classId"] = type.curseForgeClassId
@@ -530,13 +591,16 @@ object PojavAssetBridge {
         params["index"] = offset
         if (!mcVersion.isNullOrBlank()) params["gameVersion"] = mcVersion
         if (type.supportsLoaderFilter) curseForgeLoaderType(loader)?.let { params["modLoaderType"] = it }
-        val response = api.get("mods/search", params, JsonObject::class.java) ?: return null
-        val data = response.getAsJsonArray("data") ?: return null
+        curseForgeCategoryId(type, category)?.let { params["categoryId"] = it }
+        val response = curseForgeGet(context, "mods/search", params, JsonObject::class.java) ?: return null
+        val data = response.arr("data") ?: return null
         val projects = data.mapNotNull { element ->
+            if (!element.isJsonObject) return@mapNotNull null
             val mod = element.asJsonObject
-            val loaders = mod.getAsJsonArray("latestFilesIndexes")
+            val loaders = mod.arr("latestFilesIndexes")
                 ?.mapNotNull { idx ->
-                    when (idx.asJsonObject.get("modLoader")?.takeIf { !it.isJsonNull }?.asInt) {
+                    if (!idx.isJsonObject) return@mapNotNull null
+                    when (idx.asJsonObject.int("modLoader")) {
                         1 -> "Forge"
                         4 -> "Fabric"
                         5 -> "Quilt"
@@ -544,34 +608,42 @@ object PojavAssetBridge {
                         else -> null
                     }
                 }?.distinct() ?: emptyList()
+            val modId = mod.get("id")?.takeIf { !it.isJsonNull }?.asString ?: return@mapNotNull null
+            val firstAuthor = mod.arr("authors")
+                ?.firstOrNull { it.isJsonObject }
+                ?.asJsonObject
+                ?.string("name") ?: ""
+            val logoObj = mod.obj("logo")
+            val iconUrl = logoObj?.string("thumbnailUrl")?.takeIf { it.isNotBlank() }
+                ?: logoObj?.string("url")?.takeIf { it.isNotBlank() }
             AssetProject(
                 platform = AssetPlatform.CURSEFORGE,
                 type = type,
-                id = mod.get("id")?.asString ?: return@mapNotNull null,
+                id = modId,
                 title = mod.string("name") ?: "",
                 description = mod.string("summary") ?: "",
-                author = mod.getAsJsonArray("authors")?.firstOrNull()?.asJsonObject?.string("name") ?: "",
-                iconUrl = mod.getAsJsonObject("logo")?.string("thumbnailUrl"),
+                author = firstAuthor,
+                iconUrl = iconUrl,
                 downloads = mod.long("downloadCount"),
                 loaders = loaders
             )
         }
-        val total = response.getAsJsonObject("pagination")?.get("totalCount")?.asInt ?: projects.size
+        val total = response.obj("pagination")?.int("totalCount")?.takeIf { it > 0 } ?: projects.size
         return AssetPage(projects, minOf(total, 10000 - PAGE_SIZE))
     }
 
     private fun curseForgeDetails(context: Context, project: AssetProject): AssetProjectDetails? {
-        val api = curseForge(context) ?: return null
-        val response = api.get("mods/${project.id}", JsonObject::class.java) ?: return null
-        val mod = response.getAsJsonObject("data") ?: return null
-        val screenshots = mod.getAsJsonArray("screenshots")?.mapNotNull { elem ->
+        val response = curseForgeGet(context, "mods/${project.id}", null, JsonObject::class.java) ?: return null
+        val mod = response.obj("data") ?: return null
+        val screenshots = mod.arr("screenshots")?.mapNotNull { elem ->
+            if (!elem.isJsonObject) return@mapNotNull null
             val s = elem.asJsonObject
             val url = s.string("url")?.takeIf { it.isNotBlank() }
                 ?: s.string("thumbnailUrl")?.takeIf { it.isNotBlank() }
                 ?: return@mapNotNull null
             AssetScreenshot(url, s.string("title"), s.string("description"))
         } ?: emptyList()
-        val links = mod.getAsJsonObject("links")
+        val links = mod.obj("links")
         return AssetProjectDetails(
             project = project,
             followers = null,
@@ -591,20 +663,90 @@ object PojavAssetBridge {
         else -> null
     }
 
+    /** Maps Aerix category slugs to CurseForge categoryId integers (from Mirai _CurseForgeCategories.kt). */
+    private fun curseForgeCategoryId(type: AssetType, slug: String?): Int? {
+        if (slug.isNullOrBlank()) return null
+        return when (type) {
+            AssetType.MODPACK -> when (slug) {
+                "adventure" -> 4475
+                "optimization", "lightweight" -> 4481
+                "technology" -> 4472
+                "magic" -> 4473
+                "quests" -> 4478
+                "kitchen-sink" -> 4482
+                "multiplayer" -> 4483
+                else -> null
+            }
+            AssetType.MOD -> when (slug) {
+                "optimization" -> 6814
+                "utility" -> 5191
+                "library" -> 421
+                "worldgen" -> 406
+                "technology" -> 412
+                "magic" -> 419
+                "adventure" -> 422
+                "storage" -> 420
+                "equipment" -> 434
+                "mobs" -> 411
+                "food" -> 436
+                "decoration" -> 408
+                else -> null
+            }
+            AssetType.RESOURCE_PACK -> when (slug) {
+                "16x" -> 393
+                "32x" -> 394
+                "64x" -> 395
+                "realistic" -> 397
+                "simplistic" -> 401
+                "tweaks" -> 403
+                "vanilla-like" -> 400
+                else -> null
+            }
+            AssetType.SHADER_PACK -> when (slug) {
+                "realistic" -> 6554
+                "vanilla-like" -> 6555
+                "fantasy" -> 6553
+                else -> null
+            }
+            AssetType.WORLD -> when (slug) {
+                "adventure" -> 248
+                "survival" -> 249
+                "creation" -> 250
+                "parkour" -> 252
+                "puzzle" -> 251
+                else -> null
+            }
+        }
+    }
+
+    /**
+     * Resolves a CurseForge file download URL, falling back to CurseForge's edge CDN
+     * (`https://edge.forgecdn.net/files/{id/1000}/{id%1000}/{fileName}`) when 3rd-party distribution
+     * leaves `downloadUrl` null (same as Mirai CurseForgeFile.fixedFileUrl).
+     */
+    private fun curseForgeDownloadUrl(file: JsonObject, fileName: String): String? {
+        val direct = file.string("downloadUrl")
+        if (!direct.isNullOrBlank()) return direct
+        val id = file.int("id")
+        if (id <= 0 || fileName.isBlank()) return null
+        return "https://edge.forgecdn.net/files/${id / 1000}/${id % 1000}/$fileName"
+    }
+
     private fun curseForgeFiles(context: Context, modId: String): List<AssetFile>? {
-        val api = curseForge(context) ?: return null
         val result = ArrayList<AssetFile>()
         var index = 0
         while (true) {
             val params = HashMap<String, Any>()
             params["index"] = index
             params["pageSize"] = 50
-            val response = api.get("mods/$modId/files", params, JsonObject::class.java) ?: return if (result.isEmpty()) null else result
-            val data = response.getAsJsonArray("data") ?: break
+            val response = curseForgeGet(context, "mods/$modId/files", params, JsonObject::class.java)
+                ?: return if (result.isEmpty()) null else result
+            val data = response.arr("data") ?: break
             data.forEach { element ->
+                if (!element.isJsonObject) return@forEach
                 val file = element.asJsonObject
-                val versions = file.getAsJsonArray("gameVersions").strings()
-                val relType = when (file.get("releaseType")?.takeIf { !it.isJsonNull }?.asInt) {
+                val versions = file.arr("gameVersions").strings()
+                val relType = when (file.int("releaseType")) {
                     2 -> "beta"
                     3 -> "alpha"
                     else -> "release"
@@ -615,9 +757,9 @@ object PojavAssetBridge {
                         name = file.string("displayName") ?: fileName,
                         versionNumber = fileName,
                         fileName = fileName,
-                        url = file.string("downloadUrl"),
-                        sha1 = file.getAsJsonArray("hashes")
-                            ?.firstOrNull { it.asJsonObject.get("algo")?.asInt == 1 }
+                        url = curseForgeDownloadUrl(file, fileName),
+                        sha1 = file.arr("hashes")
+                            ?.firstOrNull { it.isJsonObject && it.asJsonObject.int("algo") == 1 }
                             ?.asJsonObject?.string("value"),
                         sizeBytes = file.long("fileLength"),
                         releaseType = relType,
@@ -629,7 +771,7 @@ object PojavAssetBridge {
                 )
             }
             index += data.size()
-            val total = response.getAsJsonObject("pagination")?.get("totalCount")?.asInt ?: index
+            val total = response.obj("pagination")?.int("totalCount") ?: index
             if (data.size() == 0 || index >= total || index >= 1000) break
         }
         return result
@@ -645,16 +787,31 @@ object PojavAssetBridge {
 
     // ---- JSON helpers ------------------------------------------------------------------------
 
+    private fun JsonObject.obj(key: String): JsonObject? {
+        val element: JsonElement = get(key) ?: return null
+        return if (element.isJsonObject) element.asJsonObject else null
+    }
+
+    private fun JsonObject.arr(key: String): JsonArray? {
+        val element: JsonElement = get(key) ?: return null
+        return if (element.isJsonArray) element.asJsonArray else null
+    }
+
     private fun JsonObject.string(key: String): String? {
         val element: JsonElement = get(key) ?: return null
-        return if (element.isJsonNull) null else element.asString
+        return if (element.isJsonPrimitive) runCatching { element.asString }.getOrNull() else null
+    }
+
+    private fun JsonObject.int(key: String): Int {
+        val element = get(key) ?: return 0
+        return if (element.isJsonPrimitive) runCatching { element.asInt }.getOrDefault(0) else 0
     }
 
     private fun JsonObject.long(key: String): Long {
         val element = get(key) ?: return 0L
-        return if (element.isJsonNull) 0L else runCatching { element.asLong }.getOrDefault(0L)
+        return if (element.isJsonPrimitive) runCatching { element.asLong }.getOrDefault(0L) else 0L
     }
 
     private fun JsonArray?.strings(): List<String> =
-        this?.mapNotNull { if (it.isJsonNull) null else it.asString } ?: emptyList()
+        this?.mapNotNull { if (it == null || it.isJsonNull || !it.isJsonPrimitive) null else runCatching { it.asString }.getOrNull() } ?: emptyList()
 }

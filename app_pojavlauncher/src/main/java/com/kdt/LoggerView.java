@@ -20,6 +20,7 @@ import net.kdt.pojavlaunch.aerix.log.AerixLogHost;
  */
 public class LoggerView extends ConstraintLayout {
     private boolean mLogVisible;
+    private boolean mAttached;
 
     public LoggerView(@NonNull Context context) {
         this(context, null);
@@ -32,10 +33,15 @@ public class LoggerView extends ConstraintLayout {
 
     @Override
     public void setVisibility(int visibility) {
+        if (visibility == VISIBLE && !mAttached) {
+            mAttached = true;
+            AerixLogHost.attach(this);
+        }
         super.setVisibility(visibility);
         mLogVisible = visibility == VISIBLE;
-        // Starts and stops the log box (and with it the JNI log listener) together with the view.
-        AerixLogHost.setVisible(mLogVisible);
+        if (mAttached) {
+            AerixLogHost.setVisible(mLogVisible);
+        }
     }
 
     public boolean isLogVisible() {
@@ -43,11 +49,10 @@ public class LoggerView extends ConstraintLayout {
     }
 
     /**
-     * Build the Aerix log box. The box draws the log area, the close / clear / auto-scroll / jump-to-end
-     * controls and the highlighted log lines; the view tree owners are installed by the host.
+     * Defer ComposeView creation until the user opens the in-game log view (visibility == VISIBLE),
+     * avoiding an eager ComposeView/Recomposer attachment during GameActivity / AWTActivity startup.
      */
     private void init() {
-        AerixLogHost.attach(this);
-        setVisibility(GONE);
+        super.setVisibility(GONE);
     }
 }

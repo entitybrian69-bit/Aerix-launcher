@@ -59,6 +59,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import net.kdt.pojavlaunch.Tools
 import net.kdt.pojavlaunch.aerix.bridge.AerixAccount
+import net.kdt.pojavlaunch.aerix.bridge.PojavAccountBridge
 import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
 import org.apache.commons.io.IOUtils
 import java.io.File
@@ -119,12 +120,22 @@ class AerixPlayerSkin(private val context: Context) {
         return view
     }
 
-    fun loadSkinBytes(bytes: ByteArray?) {
+    fun loadSkinBytes(bytes: ByteArray?, model: String = "auto-detect") {
+        val safeModel = if (model == "slim" || model == "default") model else "auto-detect"
         if (bytes != null && bytes.isNotEmpty()) {
             val dataUrl = "data:image/png;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP)
-            webview?.evaluateJavascript("loadSkin('$dataUrl', 'auto-detect')", null)
+            webview?.evaluateJavascript("loadSkin('$dataUrl', '$safeModel')", null)
         } else {
-            webview?.evaluateJavascript("loadSkin('$defaultSkinUrl', 'auto-detect')", null)
+            webview?.evaluateJavascript("loadSkin('$defaultSkinUrl', '$safeModel')", null)
+        }
+    }
+
+    fun loadCapeBytes(bytes: ByteArray?) {
+        if (bytes != null && bytes.isNotEmpty()) {
+            val dataUrl = "data:image/png;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP)
+            webview?.evaluateJavascript("loadCape('$dataUrl')", null)
+        } else {
+            webview?.evaluateJavascript("loadCape(null)", null)
         }
     }
 
@@ -213,10 +224,18 @@ fun AerixSkinPreview3D(
             if (!pageFinished) return@LaunchedEffect
             playerSkin.setInteractionEnabled(interactionEnabled && isVisible)
         }
-        LaunchedEffect(pageFinished, account?.username, account?.authType) {
+        val wardrobeRevision = PojavAccountBridge.wardrobeRevision
+        LaunchedEffect(pageFinished, account?.username, account?.authType, wardrobeRevision) {
             if (!pageFinished) return@LaunchedEffect
-            val bytes = withContext(Dispatchers.IO) { resolveSkinBytes(account) }
-            playerSkin.loadSkinBytes(bytes)
+            val (skinBytes, capeBytes, model) = withContext(Dispatchers.IO) {
+                Triple(
+                    resolveSkinBytes(account),
+                    PojavAccountBridge.resolveCapeBytes(account),
+                    if (PojavAccountBridge.isSlimModel(account)) "slim" else "default"
+                )
+            }
+            playerSkin.loadSkinBytes(skinBytes, model)
+            playerSkin.loadCapeBytes(capeBytes)
         }
 
         if (!pageFinished) {
@@ -233,6 +252,7 @@ fun AerixSkinPreview3D(
 
 private fun resolveSkinBytes(account: AerixAccount?): ByteArray? {
     if (account == null) return null
+    PojavAccountBridge.resolveCustomSkinBytes(account)?.let { return it }
     val template = account.authType.skinUrl ?: return null
     val cacheFile = File(Tools.DIR_CACHE, "aerix-skin-${account.source.profileId}-${account.authType.name}.png")
     if (cacheFile.isFile && cacheFile.length() > 0) {

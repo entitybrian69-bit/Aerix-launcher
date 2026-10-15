@@ -127,7 +127,7 @@ fun AerixLogBox(
     LaunchedEffect(enableLog) {
         if (enableLog) {
             scrollChannel.value = Channel(capacity = 100)
-            Logger.setLogListener(nativeListener)
+            runCatching { Logger.setLogListener(nativeListener) }
 
             launch(Dispatchers.Default) {
                 val mutex = Mutex()
@@ -172,7 +172,7 @@ fun AerixLogBox(
             }
         } else {
             scrollChannel.value = null
-            Logger.setLogListener(null)
+            runCatching { Logger.setLogListener(null) }
             logList.clear()
             buffer.clear()
         }
@@ -313,8 +313,10 @@ object AerixLogHost {
     /** Adds the log box to [host] and returns the view that draws it. */
     @JvmStatic
     fun attach(host: ViewGroup): View {
+        runCatching { AerixPreferences.init(host.context.applicationContext) }
         ensureViewTreeOwners(host)
         val composeView = ComposeView(host.context)
+        ensureViewTreeOwners(composeView)
         composeView.setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
         composeView.setContent {
             AerixLauncherTheme {
@@ -346,18 +348,21 @@ object AerixLogHost {
      */
     private fun ensureViewTreeOwners(view: View) {
         val activity = view.context.findActivity() ?: return
-        val decor = activity.window?.decorView ?: return
-        if (decor.findViewTreeLifecycleOwner() == null && activity is LifecycleOwner) {
-            decor.setViewTreeLifecycleOwner(activity)
-        }
-        if (decor.findViewTreeViewModelStoreOwner() == null && activity is ViewModelStoreOwner) {
-            decor.setViewTreeViewModelStoreOwner(activity)
-        }
-        if (decor.findViewTreeSavedStateRegistryOwner() == null && activity is SavedStateRegistryOwner) {
-            decor.setViewTreeSavedStateRegistryOwner(activity)
-        }
-        if (decor.findViewTreeOnBackPressedDispatcherOwner() == null && activity is OnBackPressedDispatcherOwner) {
-            decor.setViewTreeOnBackPressedDispatcherOwner(activity)
+        val decor = activity.window?.decorView
+        val targets = if (decor != null && decor !== view) listOf(decor, view) else listOf(view)
+        for (target in targets) {
+            if (target.findViewTreeLifecycleOwner() == null && activity is LifecycleOwner) {
+                target.setViewTreeLifecycleOwner(activity)
+            }
+            if (target.findViewTreeViewModelStoreOwner() == null && activity is ViewModelStoreOwner) {
+                target.setViewTreeViewModelStoreOwner(activity)
+            }
+            if (target.findViewTreeSavedStateRegistryOwner() == null && activity is SavedStateRegistryOwner) {
+                target.setViewTreeSavedStateRegistryOwner(activity)
+            }
+            if (target.findViewTreeOnBackPressedDispatcherOwner() == null && activity is OnBackPressedDispatcherOwner) {
+                target.setViewTreeOnBackPressedDispatcherOwner(activity)
+            }
         }
     }
 
