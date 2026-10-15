@@ -110,7 +110,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import net.kdt.pojavlaunch.R
+import net.kdt.pojavlaunch.aerix.bridge.AerixDownloadSession
 import net.kdt.pojavlaunch.aerix.bridge.AerixPreferences
+import net.kdt.pojavlaunch.aerix.bridge.AssetDependency
+import net.kdt.pojavlaunch.aerix.bridge.AssetInstallTarget
 import net.kdt.pojavlaunch.aerix.bridge.AssetFile
 import net.kdt.pojavlaunch.aerix.bridge.AssetPage
 import net.kdt.pojavlaunch.aerix.bridge.AssetPlatform
@@ -172,7 +175,7 @@ internal fun rememberRemoteBitmap(url: String?, targetMinEdgePx: Int = 96): Imag
     return state.value
 }
 
-private fun formatDownloadCount(count: Long): String = when {
+internal fun formatDownloadCount(count: Long): String = when {
     count >= 1_000_000_000L -> "%.1fB".format(count / 1_000_000_000.0)
     count >= 1_000_000L -> {
         val m = count / 1_000_000.0
@@ -1013,7 +1016,9 @@ private class VersionGroup(
     val gameVersion: String,
     val loaderLabel: String?,
     val isAdapted: Boolean,
-    val files: List<AssetFile>
+    val files: List<AssetFile>,
+    /** True when the group matches the instance the launcher found. */
+    val isDetected: Boolean = false
 )
 
 @Composable
@@ -1031,9 +1036,13 @@ private fun AssetDetailContent(
     var files by remember(project.id) { mutableStateOf<List<AssetFile>?>(null) }
     var target by remember { mutableStateOf(InstanceTarget(null, null)) }
     var loadingFiles by remember(project.id) { mutableStateOf(true) }
-    var installingFile by remember { mutableStateOf<String?>(null) }
+    var installingFile by remember(project.id) { mutableStateOf<String?>(null) }
     var showOnlyReleases by remember { mutableStateOf(true) }
     var searchMcVersion by remember { mutableStateOf("") }
+    var detectedId by remember { mutableStateOf<String?>(null) }
+    var installRequest by remember(project.id) { mutableStateOf<AssetFile?>(null) }
+    var installTargets by remember(project.id) { mutableStateOf<List<AssetInstallTarget>>(emptyList()) }
+    var installDependencies by remember(project.id) { mutableStateOf<List<AssetDependency>>(emptyList()) }
 
     val installedToast = stringResource(R.string.aerix_download_installed)
     val failedToast = stringResource(R.string.aerix_download_failed)
@@ -1041,6 +1050,7 @@ private fun AssetDetailContent(
     LaunchedEffect(project.id, project.platform) {
         loadingFiles = true
         target = PojavAssetBridge.instanceTarget()
+        detectedId = PojavInstanceBridge.selected?.let { it.source.instanceRoot?.absolutePath }
         launch { details = PojavAssetBridge.details(context, project) }
         files = PojavAssetBridge.files(context, project)
         loadingFiles = false
@@ -1063,7 +1073,7 @@ private fun AssetDetailContent(
             val (gv, ldr) = key
             val adapted = (target.mcVersion == null || gv == target.mcVersion) &&
                 (target.loader == null || ldr == null || ldr.equals(target.loader, ignoreCase = true))
-            VersionGroup(gv, ldr, adapted, list)
+            VersionGroup(gv, ldr, adapted, list, adapted && target.mcVersion != null)
         }.sortedWith(compareByDescending<VersionGroup> { it.isAdapted })
     }
 
@@ -1074,151 +1084,192 @@ private fun AssetDetailContent(
     }
 
     val runInstall: (AssetFile) -> Unit = { file ->
-        if (installingFile == null) {
+        if (installRequest == null) {
             installingFile = file.fileName
             scope.launch {
-                val ok = PojavAssetBridge.install(context, project, file)
+                if (project.type == AssetType.MODPACK) {
+                    // A modpack becomes an instance of its own, there is no folder to install into.
+                    val ok = PojavAssetBridge.install(context, project, file)
+                    installingFile = null
+                    Toast.makeText(
+                        context,
+                        if (ok) installedToast.format(file.fileName) else failedToast,
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    return@launch
+                }
+                installTargets = PojavAssetBridge.installTargets()
+                installDependencies = PojavAssetBridge.dependencies(project, file)
                 installingFile = null
-                Toast.makeText(
-                    context,
-                    if (ok) installedToast.format(file.fileName) else failedToast,
-                    Toast.LENGTH_SHORT
-                ).show()
+                installRequest = file
             }
         }
     }
 
     val screenshots = details?.screenshots.orEmpty()
 
-    LazyColumn(
-        modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = AerixSpacing.xxl),
-        verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
-    ) {
-        // 1. Hero Header Card (Mirai DownloadHeroCard)
-        item(key = "detail_hero") {
-            DownloadHeroCard(
-                project = details?.project ?: project,
-                followers = details?.followers,
-                latestFile = latestFile,
-                installing = installingFile != null,
-                onBack = onBack,
-                onDownloadLatest = { latestFile?.let(runInstall) }
-            )
-        }
-
-        // 2. Screenshots Carousel between hero and version list (Screenshot 7: Mirai ScreenshotsRail)
-        if (screenshots.isNotEmpty()) {
-            item(key = "detail_screenshots") {
-                ScreenshotsRail(screenshots = screenshots)
-            }
-        }
-
-        // 3. Filter Row (Show only Minecraft release versions + Search MC versions...)
-        item(key = "detail_filters") {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(AerixSpacing.xs)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(AerixSpacing.md)
-                ) {
-                    Surface(
-                        shape = RoundedCornerShape(AerixRadii.controlSmall),
-                        color = if (showOnlyReleases) accent.copy(alpha = 0.18f) else AerixSurface.panel,
-                        border = BorderStroke(AerixSpacing.hairline, if (showOnlyReleases) accent else AerixSurface.borderSoft),
-                        onClick = { showOnlyReleases = !showOnlyReleases }
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .height(36.dp)
-                                .padding(horizontal = AerixSpacing.smPlus),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(AerixSpacing.xs)
-                        ) {
-                            Icon(
-                                painter = painterResource(R.drawable.aerix_ic_check),
-                                contentDescription = null,
-                                tint = if (showOnlyReleases) accent else AerixSurface.textSecondary,
-                                modifier = Modifier.size(15.dp)
-                            )
-                            Text(
-                                text = "Show only Minecraft release versions",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = if (showOnlyReleases) accent else AerixSurface.textPrimary
-                            )
-                        }
-                    }
-
-                    Row(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(36.dp)
-                            .clip(RoundedCornerShape(AerixRadii.controlSmall))
-                            .background(AerixSurface.panel)
-                            .border(AerixSpacing.hairline, AerixSurface.borderSoft, RoundedCornerShape(AerixRadii.controlSmall))
-                            .padding(horizontal = AerixSpacing.smPlus),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
-                            if (searchMcVersion.isEmpty()) {
-                                Text(
-                                    text = "Search MC versions...",
-                                    fontSize = 12.sp,
-                                    color = AerixSurface.textMuted
-                                )
-                            }
-                            BasicTextField(
-                                value = searchMcVersion,
-                                onValueChange = { searchMcVersion = it },
-                                singleLine = true,
-                                textStyle = TextStyle(color = Color.White, fontSize = 12.sp),
-                                cursorBrush = SolidColor(accent),
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
-                    }
-                }
-                HorizontalDivider(color = AerixSurface.borderSoft)
-            }
-        }
-
-        // 4. Grouped Version Items (Mirai AssetsVersionItemLayout)
-        when {
-            loadingFiles -> item(key = "detail_loading") {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(AerixSpacing.xxl),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator(color = accent)
-                }
-            }
-            groups.isEmpty() -> item(key = "detail_empty") {
-                QuietEmptyState(R.drawable.aerix_ic_warning_outlined, stringResource(R.string.aerix_download_no_files))
-            }
-            else -> items(
-                items = groups,
-                key = { "${it.gameVersion}_${it.loaderLabel ?: "any"}" }
-            ) { group ->
-                VersionGroupCard(
-                    group = group,
-                    installingFile = installingFile,
-                    onInstallFile = runInstall
+    Box(modifier = modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(bottom = AerixSpacing.xxl),
+            verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
+        ) {
+            // 1. Hero Header Card (Mirai DownloadHeroCard)
+            item(key = "detail_hero") {
+                DownloadHeroCard(
+                    project = details?.project ?: project,
+                    followers = details?.followers,
+                    latestFile = latestFile,
+                    installing = installingFile != null,
+                    onBack = onBack,
+                    onDownloadLatest = { latestFile?.let(runInstall) }
                 )
             }
+
+            // 2. The instance the launcher found for this project
+            item(key = "detail_detected") {
+                DetectedInstanceBar(
+                    target = target,
+                    selectedName = PojavInstanceBridge.selected?.name
+                )
+            }
+
+            // 3. Screenshots Carousel between hero and version list (Screenshot 7: Mirai ScreenshotsRail)
+            if (screenshots.isNotEmpty()) {
+                item(key = "detail_screenshots") {
+                    ScreenshotsRail(screenshots = screenshots)
+                }
+            }
+
+            // 3. Filter Row (Show only Minecraft release versions + Search MC versions...)
+            item(key = "detail_filters") {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(AerixSpacing.xs)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(AerixSpacing.md)
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(AerixRadii.controlSmall),
+                            color = if (showOnlyReleases) accent.copy(alpha = 0.18f) else AerixSurface.panel,
+                            border = BorderStroke(AerixSpacing.hairline, if (showOnlyReleases) accent else AerixSurface.borderSoft),
+                            onClick = { showOnlyReleases = !showOnlyReleases }
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .height(36.dp)
+                                    .padding(horizontal = AerixSpacing.smPlus),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(AerixSpacing.xs)
+                            ) {
+                                Icon(
+                                    painter = painterResource(R.drawable.aerix_ic_check),
+                                    contentDescription = null,
+                                    tint = if (showOnlyReleases) accent else AerixSurface.textSecondary,
+                                    modifier = Modifier.size(15.dp)
+                                )
+                                Text(
+                                    text = "Show only Minecraft release versions",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (showOnlyReleases) accent else AerixSurface.textPrimary
+                                )
+                            }
+                        }
+
+                        Row(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(36.dp)
+                                .clip(RoundedCornerShape(AerixRadii.controlSmall))
+                                .background(AerixSurface.panel)
+                                .border(AerixSpacing.hairline, AerixSurface.borderSoft, RoundedCornerShape(AerixRadii.controlSmall))
+                                .padding(horizontal = AerixSpacing.smPlus),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
+                                if (searchMcVersion.isEmpty()) {
+                                    Text(
+                                        text = "Search MC versions...",
+                                        fontSize = 12.sp,
+                                        color = AerixSurface.textMuted
+                                    )
+                                }
+                                BasicTextField(
+                                    value = searchMcVersion,
+                                    onValueChange = { searchMcVersion = it },
+                                    singleLine = true,
+                                    textStyle = TextStyle(color = Color.White, fontSize = 12.sp),
+                                    cursorBrush = SolidColor(accent),
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                        }
+                    }
+                    HorizontalDivider(color = AerixSurface.borderSoft)
+                }
+            }
+
+            // 4. Grouped Version Items (Mirai AssetsVersionItemLayout)
+            when {
+                loadingFiles -> item(key = "detail_loading") {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(AerixSpacing.xxl),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(color = accent)
+                    }
+                }
+                groups.isEmpty() -> item(key = "detail_empty") {
+                    QuietEmptyState(R.drawable.aerix_ic_warning_outlined, stringResource(R.string.aerix_download_no_files))
+                }
+                else -> items(
+                    items = groups,
+                    key = { "${it.gameVersion}_${it.loaderLabel ?: "any"}" }
+                ) { group ->
+                    VersionGroupCard(
+                        group = group,
+                        installingFile = installingFile,
+                        onInstallFile = runInstall
+                    )
+                }
+            }
+
+            // 5. Related Links Rail
+            val d = details
+            if (d != null && listOfNotNull(d.sourceUrl, d.issuesUrl, d.wikiUrl, d.discordUrl).isNotEmpty()) {
+                item(key = "detail_links") {
+                    LinksRail(activity = activity, details = d)
+                }
+            }
         }
 
-        // 5. Related Links Rail
-        val d = details
-        if (d != null && listOfNotNull(d.sourceUrl, d.issuesUrl, d.wikiUrl, d.discordUrl).isNotEmpty()) {
-            item(key = "detail_links") {
-                LinksRail(activity = activity, details = d)
-            }
+        // 6. The window that opens before something is downloaded.
+        val requested = installRequest
+        if (requested != null) {
+            AssetInstallDialog(
+                project = project,
+                file = requested,
+                targets = installTargets,
+                dependencies = installDependencies,
+                detectedId = detectedId,
+                onDismiss = { installRequest = null },
+                onInstall = { pickedTargets, pickedDependencies ->
+                    installRequest = null
+                    AerixDownloadSession.start(
+                        type = project.type,
+                        project = project,
+                        file = requested,
+                        dependencies = pickedDependencies,
+                        targets = pickedTargets
+                    )
+                }
+            )
         }
     }
 }
@@ -1366,6 +1417,54 @@ private fun DownloadHeroCard(
  * Mirai ScreenshotsRail + ScreenshotItemLayout (DownloadAssetsScreen.kt line 917,
  * DownloadAssetsElements.kt line 541): horizontal carousel of 260dp project screenshots.
  */
+/**
+ * The instance the launcher detected for this project. The version that matches it is marked in
+ * the list below and it is the one the install window starts with.
+ */
+@Composable
+private fun DetectedInstanceBar(target: InstanceTarget, selectedName: String?) {
+    if (target.mcVersion == null && selectedName == null) return
+    val accent = AerixThemeManager.currentAccent()
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(AerixRadii.controlSmall),
+        color = accent.copy(alpha = 0.12f),
+        border = BorderStroke(AerixSpacing.hairline, accent.copy(alpha = 0.45f))
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = AerixSpacing.mdPlus, vertical = AerixSpacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
+        ) {
+            Icon(
+                painter = painterResource(R.drawable.aerix_ic_check),
+                contentDescription = null,
+                tint = accent,
+                modifier = Modifier.size(16.dp)
+            )
+            Text(
+                text = buildString {
+                    append("Detected: ")
+                    append(selectedName ?: "instance")
+                    target.mcVersion?.let {
+                        append("  \u2022  ")
+                        append(it)
+                    }
+                    target.loader?.let {
+                        append("  \u2022  ")
+                        append(it.replaceFirstChar { c -> c.uppercase() })
+                    }
+                },
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = accent,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
 @Composable
 private fun ScreenshotsRail(screenshots: List<AssetScreenshot>) {
     LazyRow(
@@ -1494,6 +1593,9 @@ private fun VersionGroupCard(
                 )
                 group.loaderLabel?.let { ldr ->
                     ModrinthMetaPill(text = ldr, highlighted = group.isAdapted)
+                }
+                if (group.isDetected) {
+                    ModrinthMetaPill(text = "Detected", highlighted = true)
                 }
                 Spacer(Modifier.weight(1f))
                 Text(

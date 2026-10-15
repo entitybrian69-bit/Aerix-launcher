@@ -33,6 +33,7 @@ import com.google.gson.JsonParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import net.kdt.pojavlaunch.R
+import net.kdt.pojavlaunch.Tools
 import net.kdt.pojavlaunch.instances.Instances
 import net.kdt.pojavlaunch.modloaders.modpacks.api.ApiHandler
 import net.kdt.pojavlaunch.modloaders.modpacks.api.CurseforgeApi
@@ -184,7 +185,9 @@ class AssetFile(
     val releaseType: String,
     val datePublished: String,
     val gameVersions: List<String>,
-    val loaders: List<String>
+    val loaders: List<String>,
+    /** Id of the version this file belongs to, used to read the dependencies of that version. */
+    val remoteVersionId: String? = null
 ) {
     constructor(
         name: String,
@@ -201,10 +204,53 @@ class AssetPage(val projects: List<AssetProject>, val total: Int)
 /** Minecraft version and loader of the selected instance, used as default search filters. */
 class InstanceTarget(val mcVersion: String?, val loader: String?)
 
+/** An instance an asset can be installed into. */
+class AssetInstallTarget(
+    /** Path of the instance folder; two instances never share one. */
+    val id: String,
+    val name: String,
+    val versionId: String,
+    val mcVersion: String?,
+    val loader: String?,
+    val loaderVersion: String?,
+    val gameDirectory: File
+)
+
+/** Kind of dependency a mod file declares. */
+enum class AssetDependencyType {
+    REQUIRED,
+    OPTIONAL,
+    EMBEDDED,
+    INCOMPATIBLE
+}
+
+/** A dependency of a mod file, with the versions that can be installed. */
+class AssetDependency(
+    val projectId: String,
+    val type: AssetDependencyType,
+    val title: String,
+    val description: String,
+    val iconUrl: String?,
+    val downloads: Long,
+    /** Version the mod asks for, null when any version is fine. */
+    val requiredVersionId: String?,
+    /** Versions the user can pick from. */
+    val versions: List<AssetFile>
+) {
+    val isRequired: Boolean get() = type == AssetDependencyType.REQUIRED
+
+    /** Version that matches the one the mod asks for, or the newest one. */
+    fun preferredVersion(): AssetFile? =
+        versions.firstOrNull { it.remoteVersionId == requiredVersionId } ?: versions.firstOrNull()
+}
+
 object PojavAssetBridge {
     private const val CURSEFORGE_GAME_ID = 432
     const val PAGE_SIZE = 30
     private val mcVersionPattern = Regex("""(\d+\.\d+(?:\.\d+)?)""")
+    private val loaderVersionPattern = Regex("""(?i)(?:fabric|quilt|neoforge|forge)[-_ ]*loader?[-_ ]*(\d+(?:\.\d+)*)""")
+    private val mcVersionPartPattern = Regex("""\d+\.\d+(?:\.\d+)?""")
+    private val loaderNames = setOf("fabric", "quilt", "neoforge", "forge")
 
     private const val MODRINTH_OFFICIAL_API = "https://api.modrinth.com/v2"
     private const val MODRINTH_MIRROR_API = "https://mod.mcimirror.top/modrinth/v2"
@@ -231,15 +277,59 @@ object PojavAssetBridge {
     suspend fun instanceTarget(): InstanceTarget = withContext(Dispatchers.IO) {
         val versionId = runCatching { Instances.loadSelectedInstance()?.versionId }.getOrNull()
             ?: return@withContext InstanceTarget(null, null)
+        InstanceTarget(mcVersionOf(versionId), loaderOf(versionId))
+    }
+
+    /**
+     * Minecraft version of a version id. The loader can stand in front of the version, as in
+     * "neoforge-21.1.72-1.20.1", or behind it, as in "26.3-fabric-0.19.5".
+     */
+    fun mcVersionOf(versionId: String): String? {
+        val parts = versionId.split('-').filter { it.isNotBlank() }
+        if (parts.isEmpty()) return null
+        val first = parts[0].lowercase()
+        val candidate = if (loaderNames.any { first.startsWith(it) }) {
+            parts.lastOrNull { it.matches(mcVersionPartPattern) }
+        } else {
+            parts.firstOrNull { it.matches(mcVersionPartPattern) }
+        }
+        return candidate
+    }
+
+    /** Loader name of a version id, e.g. "26.3-fabric" gives "fabric". */
+    fun loaderOf(versionId: String): String? {
         val id = versionId.lowercase()
-        val loader = when {
+        return when {
             id.contains("neoforge") -> "neoforge"
             id.contains("fabric") -> "fabric"
             id.contains("quilt") -> "quilt"
             id.contains("forge") -> "forge"
             else -> null
         }
-        InstanceTarget(mcVersionPattern.find(versionId)?.value, loader)
+    }
+
+    /** Loader version of a version id, e.g. "fabric-loader-0.19.5-26.3" gives "0.19.5". */
+    fun loaderVersionOf(versionId: String): String? {
+        val match = loaderVersionPattern.find(versionId) ?: return null
+        return match.groupValues.getOrNull(1)
+    }
+
+    /** Every installed instance, with the version and loader it runs. */
+    suspend fun installTargets(): List<AssetInstallTarget> = withContext(Dispatchers.IO) {
+        runCatching {
+            Instances.loadAllInstances().map { instance ->
+                val versionId = instance.versionId ?: ""
+                AssetInstallTarget(
+                    id = instance.instanceRoot?.absolutePath ?: instance.gameDirectory.absolutePath,
+                    name = instance.name?.takeIf { it.isNotBlank() } ?: versionId.ifBlank { "instance" },
+                    versionId = versionId,
+                    mcVersion = mcVersionOf(versionId),
+                    loader = loaderOf(versionId),
+                    loaderVersion = loaderVersionOf(versionId),
+                    gameDirectory = instance.gameDirectory
+                )
+            }
+        }.getOrDefault(emptyList())
     }
 
     /** Names of files currently in the selected instance's folder for [type], lowercased. */
@@ -368,6 +458,93 @@ object PojavAssetBridge {
                 DownloadUtils.ensureSha1(target, file.sha1) { DownloadUtils.downloadFile(url, target) }
             }
         }.isSuccess
+    }
+
+    // ---- Install targets, dependencies and downloads ------------------------------------------
+
+    /**
+     * Dependencies declared by the version of [file]. Modrinth publishes them on the version
+     * itself, CurseForge does not, so CurseForge files have no dependency list.
+     */
+    suspend fun dependencies(project: AssetProject, file: AssetFile): List<AssetDependency> = withContext(Dispatchers.IO) {
+        if (project.platform != AssetPlatform.MODRINTH) return@withContext emptyList()
+        val versionId = file.remoteVersionId ?: return@withContext emptyList()
+        val version = modrinthGet("version/$versionId", null, JsonObject::class.java) ?: return@withContext emptyList()
+        val declared = version.arr("dependencies") ?: return@withContext emptyList()
+        val result = ArrayList<AssetDependency>()
+        for (element in declared) {
+            if (!element.isJsonObject) continue
+            val entry = element.asJsonObject
+            val type = when (entry.string("dependency_type")?.lowercase()) {
+                "required" -> AssetDependencyType.REQUIRED
+                "optional" -> AssetDependencyType.OPTIONAL
+                "embedded" -> AssetDependencyType.EMBEDDED
+                "incompatible" -> AssetDependencyType.INCOMPATIBLE
+                else -> continue
+            }
+            val projectId = entry.string("project_id") ?: continue
+            val info = modrinthGet("project/$projectId", null, JsonObject::class.java)
+            val title = if (info == null) projectId else (info.string("title") ?: projectId)
+            val description = if (info == null) "" else (info.string("description") ?: "")
+            val iconUrl = if (info == null) null else info.string("icon_url")?.takeIf { it.isNotBlank() }
+            val downloads = if (info == null) 0L else info.long("downloads")
+            result.add(
+                AssetDependency(
+                    projectId = projectId,
+                    type = type,
+                    title = title,
+                    description = description,
+                    iconUrl = iconUrl,
+                    downloads = downloads,
+                    requiredVersionId = entry.string("version_id"),
+                    versions = modrinthFiles(projectId) ?: emptyList()
+                )
+            )
+        }
+        result
+    }
+
+    /**
+     * Downloads [file] into the folder of [target]. The progress of the download is reported to
+     * [feedback] as the number of bytes written and the size of the file.
+     */
+    suspend fun installInto(
+        target: AssetInstallTarget,
+        type: AssetType,
+        file: AssetFile,
+        feedback: ((Int, Int) -> Unit)? = null
+    ): Boolean = withContext(Dispatchers.IO) {
+        val url = file.url ?: return@withContext false
+        val folder = type.folder ?: return@withContext false
+        val dir = File(target.gameDirectory, folder.directoryName)
+        if (!dir.isDirectory && !dir.mkdirs()) return@withContext false
+        val safeName = File(file.fileName).name.ifBlank { return@withContext false }
+        runCatching {
+            if (type == AssetType.WORLD) {
+                val temp = File.createTempFile("aerix_world", ".zip", dir.parentFile)
+                try {
+                    temp.delete()
+                    DownloadUtils.ensureSha1(temp, file.sha1) {
+                        DownloadUtils.downloadFileMonitored(url, temp, null, feedback.toDownloaderFeedback())
+                    }
+                    PojavContentBridge.extractWorldFile(temp, dir, safeName.removeSuffix(".zip"))
+                } finally {
+                    temp.delete()
+                }
+            } else {
+                val destination = File(dir, safeName)
+                DownloadUtils.ensureSha1(destination, file.sha1) {
+                    DownloadUtils.downloadFileMonitored(url, destination, null, feedback.toDownloaderFeedback())
+                }
+            }
+        }.isSuccess
+    }
+
+    private fun ((Int, Int) -> Unit)?.toDownloaderFeedback(): Tools.DownloaderFeedback {
+        val callback = this
+        return Tools.DownloaderFeedback { current, max ->
+            callback?.invoke(current, max)
+        }
     }
 
     // ---- Favorites (persisted in AerixPreferences.favoritesJson) -----------------------------
@@ -536,7 +713,8 @@ object PojavAssetBridge {
                 releaseType = version.string("version_type") ?: "release",
                 datePublished = (version.string("date_published") ?: "").take(10),
                 gameVersions = version.arr("game_versions").strings(),
-                loaders = version.arr("loaders").strings()
+                loaders = version.arr("loaders").strings(),
+                remoteVersionId = version.string("id")
             )
         }
     }

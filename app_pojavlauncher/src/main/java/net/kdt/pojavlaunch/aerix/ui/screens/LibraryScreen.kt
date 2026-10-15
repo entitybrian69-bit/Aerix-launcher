@@ -445,7 +445,7 @@ fun LibraryScreen(activity: FragmentActivity) {
             ) {
                 items(
                     items = displayedInstances,
-                    key = { "${it.name}_${it.versionId}" }
+                    key = { it.key }
                 ) { instance ->
                     val isSelected = instance == selectedInstance
                     val isActive = instance == activeInstance

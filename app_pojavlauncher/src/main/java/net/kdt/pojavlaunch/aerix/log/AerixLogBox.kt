@@ -90,11 +90,86 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import net.kdt.pojavlaunch.Logger
 import net.kdt.pojavlaunch.R
+import net.kdt.pojavlaunch.Tools
 import net.kdt.pojavlaunch.aerix.bridge.AerixPreferences
 import net.kdt.pojavlaunch.aerix.theme.AerixLauncherTheme
 import net.kdt.pojavlaunch.aerix.theme.AerixSpacing
+import java.io.File
+import java.io.RandomAccessFile
 import java.util.Collections
 import kotlin.time.Duration.Companion.milliseconds
+
+/** Size of the window read from the end of the log file when the box opens. */
+private const val LOG_TAIL_BYTES = 512L * 1024
+
+/** Number of lines shown when the box opens; older lines stay in the file only. */
+private const val LOG_SEED_LINES = 2000
+
+/**
+ * Reads the tail of the log file the native logger writes. The native logger only streams to the
+ * listener while a listener is attached, so everything printed before the box was opened exists
+ * in the file only.
+ */
+private fun readLatestLogTail(): List<String> {
+    return try {
+        val file = File(Tools.DIR_GAME_HOME, "latestlog.txt")
+        if (!file.isFile) return emptyList()
+        val size = file.length()
+        if (size <= 0L) return emptyList()
+        val start = if (size > LOG_TAIL_BYTES) size - LOG_TAIL_BYTES else 0L
+        val text = RandomAccessFile(file, "r").use { raf ->
+            raf.seek(start)
+            val bytes = ByteArray((size - start).toInt())
+            raf.readFully(bytes)
+            String(bytes, Charsets.UTF_8)
+        }
+        val raw = text.split('\n').map { it.removeSuffix("\r") }
+        // The window may start in the middle of a line, that first line is dropped.
+        val complete = if (start > 0L) raw.drop(1) else raw
+        val filled = complete.filter { it.isNotEmpty() }
+        if (filled.size > LOG_SEED_LINES) filled.subList(filled.size - LOG_SEED_LINES, filled.size) else filled
+    } catch (_: Exception) {
+        emptyList()
+    }
+}
+
+/**
+ * Keeps track of the lines that were read back from the log file, so the live copy of such a line
+ * is shown once only.
+ */
+private class LogSeed {
+    private val lock = Any()
+    private val counts = HashMap<String, Int>()
+
+    /** Lines the native logger delivered while the file was being read. */
+    val pending = ArrayList<String>()
+
+    /** False until the file tail was read. */
+    @Volatile
+    var ready = false
+
+    fun begin() = synchronized(lock) {
+        counts.clear()
+        ready = false
+    }
+
+    fun finish(lines: List<String>) = synchronized(lock) {
+        for (line in lines) counts[line] = (counts[line] ?: 0) + 1
+        ready = true
+    }
+
+    fun clearCounts() = synchronized(lock) {
+        counts.clear()
+    }
+
+    /** True when [line] was already shown as part of the file tail. */
+    fun isDuplicate(line: String): Boolean = synchronized(lock) {
+        val count = counts[line] ?: return false
+        if (count <= 0) return false
+        counts[line] = count - 1
+        true
+    }
+}
 
 /**
  * Mirai's LogBox. [enableLog] is the visibility of the log box: it starts and stops the NativeLogger
@@ -110,6 +185,7 @@ fun AerixLogBox(
 
     val logList = remember { mutableStateListOf<AnnotatedString>() }
     val buffer = remember { Collections.synchronizedList(mutableListOf<AnnotatedString>()) }
+    val seed = remember { LogSeed() }
     val scrollChannel = remember { mutableStateOf<Channel<Unit>?>(null) }
 
     val logHighlighter = remember { LogHighlighter() }
@@ -118,6 +194,12 @@ fun AerixLogBox(
     // Held strongly for the lifetime of the effect: the native logger keeps only a weak reference.
     val nativeListener = remember {
         Logger.eventLogListener { log ->
+            if (!seed.ready) {
+                // The file is still being read, the line is checked against it afterwards.
+                synchronized(seed.pending) { seed.pending.add(log) }
+                return@eventLogListener
+            }
+            if (seed.isDuplicate(log)) return@eventLogListener
             synchronized(buffer) {
                 buffer.add(logHighlighter.highlight(log))
             }
@@ -127,7 +209,27 @@ fun AerixLogBox(
     LaunchedEffect(enableLog) {
         if (enableLog) {
             scrollChannel.value = Channel(capacity = 100)
+            seed.begin()
             runCatching { Logger.setLogListener(nativeListener) }
+
+            // Everything printed before the box was opened is only in the log file.
+            val tail = withContext(Dispatchers.IO) { readLatestLogTail() }
+            seed.finish(tail)
+            if (tail.isNotEmpty()) {
+                val shown = tail.map { logHighlighter.highlight(it) }
+                logList.addAll(shown)
+                if (autoScrollDown) scrollChannel.value?.trySend(Unit)
+            }
+            val waiting = synchronized(seed.pending) {
+                val copy = ArrayList(seed.pending)
+                seed.pending.clear()
+                copy
+            }
+            val fresh = waiting.filterNot { seed.isDuplicate(it) }
+            if (fresh.isNotEmpty()) {
+                logList.addAll(fresh.map { logHighlighter.highlight(it) })
+                if (autoScrollDown) scrollChannel.value?.trySend(Unit)
+            }
 
             launch(Dispatchers.Default) {
                 val mutex = Mutex()
@@ -175,6 +277,7 @@ fun AerixLogBox(
             runCatching { Logger.setLogListener(null) }
             logList.clear()
             buffer.clear()
+            seed.begin()
         }
     }
 
@@ -238,6 +341,7 @@ fun AerixLogBox(
                                 logList.clear()
                                 buffer.clear()
                             }
+                            seed.clearCounts()
                         },
                         toggle = false
                     ) {

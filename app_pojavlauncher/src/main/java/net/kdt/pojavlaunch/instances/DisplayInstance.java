@@ -19,6 +19,14 @@ public class DisplayInstance {
         return new File(mInstanceRoot, "icon.webp");
     }
 
+    /**
+     * Root folder of the instance. Two instances can share a name and a version, the folder is
+     * what tells them apart.
+     */
+    public File getInstanceRoot() {
+        return mInstanceRoot;
+    }
+
     private void sanitizeIcon() {
         if(!InstanceIconProvider.hasStaticIcon(icon)) {
             icon = InstanceIconProvider.FALLBACK_ICON_NAME;

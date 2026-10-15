@@ -58,7 +58,12 @@ class AerixInstance(
     val source: DisplayInstance,
     val name: String,
     val versionId: String,
-    val icon: ImageBitmap?
+    val icon: ImageBitmap?,
+    /**
+     * Identity of the instance. Two instances can carry the same name and the same version, the
+     * list that shows them needs a key that is unique.
+     */
+    val key: String
 )
 
 enum class ModpackExportFormat(val label: String, val extension: String, val description: String) {
@@ -106,7 +111,7 @@ object PojavInstanceBridge {
         PojavApplication.sExecutorService.execute {
             val result = runCatching {
                 val display = Instances.loadDisplay()
-                val rows = display.list.map { instance ->
+                val rows = display.list.mapIndexed { index, instance ->
                     val icon = runCatching {
                         InstanceIconProvider.fetchIcon(context.resources, instance).toAerixBitmap()
                     }.getOrNull()
@@ -114,7 +119,8 @@ object PojavInstanceBridge {
                         source = instance,
                         name = displayName(context, instance),
                         versionId = instance.versionId ?: "",
-                        icon = icon
+                        icon = icon,
+                        key = instance.instanceRoot?.absolutePath ?: "instance_$index"
                     )
                 }
                 rows to display.selectedIndex

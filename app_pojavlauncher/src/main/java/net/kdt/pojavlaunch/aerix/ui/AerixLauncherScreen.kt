@@ -56,6 +56,7 @@ import net.kdt.pojavlaunch.aerix.bridge.AerixTransitionType
 import net.kdt.pojavlaunch.aerix.bridge.PojavAccountBridge
 import net.kdt.pojavlaunch.aerix.bridge.PojavInstanceEditorBridge
 import net.kdt.pojavlaunch.aerix.components.AerixBackground
+import net.kdt.pojavlaunch.aerix.components.AerixDownloadOverlay
 import net.kdt.pojavlaunch.aerix.festivals.FestivalEffectsHost
 import net.kdt.pojavlaunch.aerix.festivals.FestivalTitleText
 import net.kdt.pojavlaunch.aerix.festivals.rememberTodayFestivals
@@ -158,6 +159,9 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
                         )
                     }
                 }
+
+                // The download that is running, it can be minimized to a small progress bar.
+                AerixDownloadOverlay(modifier = Modifier.align(Alignment.TopStart))
 
                 // Login progress bar, the Aerix replacement for the bar drawn under Pojav's AccountSpinner.
                 val progress = PojavAccountBridge.loginProgress

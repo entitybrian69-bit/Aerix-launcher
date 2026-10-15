@@ -1054,7 +1054,7 @@ private fun JavaManageTabContent(activity: FragmentActivity) {
             contentPadding = PaddingValues(bottom = AerixSpacing.xxl),
             verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
         ) {
-            items(installed.size, key = { "inst_${installed[it].name}" }) { index ->
+            items(installed.size, key = { "inst_${installed[it].name}_$it" }) { index ->
                 val runtime: Runtime = installed[index]
                 val isDefault = runtime.name == defaultName
                 val compatible = runtime.versionString != null &&
@@ -1132,7 +1132,7 @@ private fun JavaManageTabContent(activity: FragmentActivity) {
                 }
             }
 
-            items(downloadable.size, key = { "dl_${downloadable[it].name}" }) { index ->
+            items(downloadable.size, key = { "dl_${downloadable[it].name}_$it" }) { index ->
                 val ext: NewJREUtil.ExternalRuntime = downloadable[index]
                 val busy = downloadingName != null || ext.isDownloading
                 Surface(
