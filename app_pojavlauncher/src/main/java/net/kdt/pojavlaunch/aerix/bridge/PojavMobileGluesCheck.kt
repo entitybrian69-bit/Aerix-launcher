@@ -171,9 +171,11 @@ object PojavMobileGluesCheck {
             if (temp.renameTo(target)) {
                 true
             } else {
-                val written = target.writeText(config.toString())
+                // Some file systems cannot rename onto an existing file, then it is written
+                // straight away.
+                target.writeText(config.toString())
                 temp.delete()
-                written
+                true
             }
         } catch (_: Exception) {
             false
