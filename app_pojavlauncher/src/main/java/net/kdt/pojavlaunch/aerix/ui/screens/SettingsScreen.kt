@@ -179,14 +179,17 @@ private data class RendererStackOption(
     val rendererId: String
 )
 
-private val rendererStackOptions = listOf(
-    RendererStackOption("AUTO", "Auto (Smart Pick)", "RECOMMENDED", Renderers.LTW_RENDERER),
+/**
+ * Tiles of the renderer grid. "AUTO" stands for the renderer the launcher uses by default,
+ * every other tile names a backend renderer directly.
+ */
+private fun defaultRendererStackOptions(defaultRendererId: String): List<RendererStackOption> = listOf(
+    RendererStackOption("AUTO", "Auto (Smart Pick)", "RECOMMENDED", defaultRendererId),
     RendererStackOption("VGPU_FAST", "vgpu - (up to 1.16.5, fast)", "1.16.5 FAST", Renderers.NGGL4ES_RENDERER),
     RendererStackOption("VGPU_1368", "VGPU 1.3.6\u03B2", "SHADERCONV", Renderers.SFPEW_RENDERER),
     RendererStackOption("LTW", "LTW (1.17+ Core)", "1.17+", Renderers.LTW_RENDERER),
     RendererStackOption("Legacy", "LTW Legacy (1.8\u20131.16.5)", "1.8\u20131.16.5", Renderers.GL4ES_RENDERER),
-    RendererStackOption("Zink", "Kopper Zink (Vulkan)", "VULKAN", Renderers.ZINK_RENDERER),
-    RendererStackOption("MOBILEGLUES", "MobileGlues (1.17+)", "MODERN", Renderers.MOBILEGLUES_RENDERER)
+    RendererStackOption("Zink", "Kopper Zink (Vulkan)", "VULKAN", Renderers.ZINK_RENDERER)
 )
 
 @Composable
@@ -253,9 +256,12 @@ private fun RendererTabContent(activity: FragmentActivity) {
     val compatible = remember(revision) { PojavSettingsBridge.renderers(activity) }
     val plugins = remember(revision) { PojavPluginBridge.loadPlugins(activity) }
     val currentRenderer = remember(revision) { LauncherPreferences.PREF_RENDERER ?: Renderers.GL4ES_RENDERER }
+    // Renderer the launcher falls back to while nothing was picked in the settings.
+    val defaultRendererId = remember(revision) { LauncherPreferences.defaultRendererId(activity) }
+    val rendererStackOptions = remember(revision) { defaultRendererStackOptions(defaultRendererId) }
     val rendererEntries = remember(revision) { miraiRendererEntries(activity, includeFollowGlobal = false) }
     var currentMiraiRendererId by remember(revision) { mutableStateOf(getMiraiGlobalRendererId(activity)) }
-    var autoSelected by remember { mutableStateOf(false) }
+    var autoSelected by remember(revision) { mutableStateOf(currentRenderer == defaultRendererId) }
     var globalVulkanDriver by remember(revision) {
         mutableStateOf(
             LauncherPreferences.DEFAULT_PREF.getString("aerix_global_vulkan_driver", "default driver")
@@ -543,7 +549,8 @@ private fun RendererTabContent(activity: FragmentActivity) {
 
         // 4. Detailed Renderer, Vulkan Driver, Graphics API, Resolution & Fullscreen SettingsCardColumn (Mirai RendererSettingsScreen — Photos 1 & 2)
         item {
-            val showMgSettings = currentRenderer == Renderers.MOBILEGLUES_RENDERER || currentMiraiRendererId == "opengles3_mobileglues"
+            val showMgSettings = currentRenderer == Renderers.MOBILEGLUES_RENDERER ||
+                currentMiraiRendererId == Renderers.MOBILEGLUES_RENDERER
             val vulkanDrivers = remember {
                 listOf(
                     "default driver" to "default driver",
@@ -571,7 +578,7 @@ private fun RendererTabContent(activity: FragmentActivity) {
                     position = CardPosition.Top,
                     items = rendererEntries,
                     currentId = currentMiraiRendererId,
-                    defaultId = rendererEntries.firstOrNull()?.uniqueId ?: "opengles3",
+                    defaultId = rendererEntries.firstOrNull()?.uniqueId ?: defaultRendererId,
                     title = "Global Renderer",
                     summary = "Define the global renderer used by the game",
                     getItemText = { it.displayName },

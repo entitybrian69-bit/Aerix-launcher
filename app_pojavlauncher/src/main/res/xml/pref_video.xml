@@ -5,10 +5,11 @@
     <net.kdt.pojavlaunch.prefs.BackButtonPreference/>
 
     <PreferenceCategory android:title="@string/preference_category_video" >
+        <!-- No android:defaultValue here: the default renderer is device dependent
+             (LauncherPreferences.defaultRendererId) and is applied by the fragment below. -->
         <androidx.preference.ListPreference
             android:title="@string/mcl_setting_category_renderer"
             android:key="renderer"
-            android:defaultValue="opengles2"
             android:icon="@drawable/ic_px_image_renderer"
             app2:useSimpleSummaryProvider="true"/>
 

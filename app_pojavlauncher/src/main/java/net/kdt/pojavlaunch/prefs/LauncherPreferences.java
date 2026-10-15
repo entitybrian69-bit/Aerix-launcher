@@ -13,10 +13,12 @@ import android.util.DisplayMetrics;
 import android.util.Log;
 
 import net.kdt.pojavlaunch.*;
+import net.kdt.pojavlaunch.game.renderer.def.Renderers;
 import net.kdt.pojavlaunch.multirt.MultiRTUtils;
 import net.kdt.pojavlaunch.utils.GpuUtils;
 import net.kdt.pojavlaunch.utils.JREUtils;
 
+import java.io.File;
 import java.io.IOException;
 
 import net.kdt.pojavlaunch.R;
@@ -83,7 +85,7 @@ public class LauncherPreferences {
         Tools.initStorageConstants(ctx);
         boolean isDevicePowerful = isDevicePowerful(ctx);
 
-        PREF_RENDERER = DEFAULT_PREF.getString("renderer", "opengles2");
+        PREF_RENDERER = DEFAULT_PREF.getString("renderer", defaultRendererId(ctx));
         PREF_BUTTONSIZE = DEFAULT_PREF.getInt("buttonscale", 100);
         PREF_MOUSESCALE = DEFAULT_PREF.getInt("mousescale", 100)/100f;
         PREF_MOUSESPEED = ((float)DEFAULT_PREF.getInt("mousespeed",100))/100f;
@@ -145,6 +147,24 @@ public class LauncherPreferences {
             PREF_DEFAULT_RUNTIME = MultiRTUtils.getRuntimes().get(0).name;
             LauncherPreferences.DEFAULT_PREF.edit().putString("defaultRuntime",LauncherPreferences.PREF_DEFAULT_RUNTIME).apply();
         }
+    }
+
+    /**
+     * Renderer used until one is picked in the settings.
+     * MobileGlues is the default one, devices that cannot run it fall back to GL4ES.
+     * @param ctx Context needed to read the graphics capabilities of the device.
+     * @return The renderer id to use when nothing was picked yet.
+     */
+    public static String defaultRendererId(Context ctx){
+        try {
+            if(GpuUtils.getGlInfo().glesMajorVersion >= 3
+                    && new File(Tools.NATIVE_LIB_DIR, "libmobileglues.so").exists()) {
+                return Renderers.MOBILEGLUES_RENDERER;
+            }
+        } catch (Throwable ignored) {
+            // Keep GL4ES as the fallback when the device cannot be queried.
+        }
+        return Renderers.GL4ES_RENDERER;
     }
 
     /**
