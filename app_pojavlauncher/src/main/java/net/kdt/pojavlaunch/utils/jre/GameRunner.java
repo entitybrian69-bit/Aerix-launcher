@@ -268,12 +268,17 @@ public class GameRunner {
             }
         }
 
-        // MobileGlues needs a setting of its own for Minecraft 26.3 and newer. The launcher does
-        // not write that setting, the dialog names the option that is missing.
+        // MobileGlues needs a setting of its own for Minecraft 26.3 and newer: the option that
+        // ignores shader and program errors, without it the game stops with "Failed to load
+        // required shader programs". The launcher switches that one option on, the rest of the
+        // settings of MobileGlues stay as they are.
         PojavMobileGluesCheck.Report mobileGluesReport = PojavMobileGluesCheck.check(
                 activity, versionId, gameRenderer.getCurrentRenderer().tag());
         if (mobileGluesReport != null) {
             Logger.appendToLog("[Aerix] " + mobileGluesReport.getSummary());
+            for (String applied : mobileGluesReport.getAppliedSettings()) {
+                Logger.appendToLog("[Aerix] MobileGlues option switched on for this version: " + applied);
+            }
             for (PojavMobileGluesCheck.Problem problem : mobileGluesReport.getProblems()) {
                 Logger.appendToLog("[Aerix] " + problem.getTitle() + " - " + problem.getDetail());
             }

@@ -28,16 +28,13 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.snap
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -49,7 +46,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.IntOffset
 import androidx.fragment.app.FragmentActivity
 import net.kdt.pojavlaunch.aerix.bridge.AerixPreferences
 import net.kdt.pojavlaunch.aerix.bridge.AerixTransitionType
@@ -192,8 +188,12 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
 /**
  * Section transition for the Aerix "launcherSwapAnimateType" setting
  * (mirai utils/animation/TransitionAnimationType.kt, ui/screens/_Navigation.kt):
- * CLOSE snaps, JELLY_BOUNCE scales in on a low-stiffness spring, BOUNCE rises on a bouncy spring,
- * SLICE_IN slides in from the side. "launcherAnimateExtent" scales the travel distance.
+ * CLOSE snaps, FADE crosses over, JELLY_BOUNCE scales in, BOUNCE rises, SLICE_IN slides in from
+ * the side. "launcherAnimateExtent" scales the travel distance.
+ *
+ * Every style runs on a plain tween: a spring that overshoots makes the page wobble and the
+ * outgoing page is measured again on every frame, which is what made the launcher feel busy.
+ * The size of the pages is not animated, both pages are full size anyway.
  */
 private fun AnimatedContentTransitionScope<LauncherSection>.sectionTransition(
     type: AerixTransitionType,
@@ -201,23 +201,35 @@ private fun AnimatedContentTransitionScope<LauncherSection>.sectionTransition(
     extent: Float
 ): ContentTransform {
     if (duration == 0 || type == AerixTransitionType.CLOSE) {
-        return fadeIn(snap()) togetherWith fadeOut(snap())
+        return ContentTransform(
+            targetContentEnter = fadeIn(snap()),
+            initialContentExit = fadeOut(snap()),
+            sizeTransform = null
+        )
     }
-    val exit = fadeOut(tween((duration * 0.75f).toInt().coerceAtLeast(80), easing = FastOutSlowInEasing))
+    val enter = fadeIn(tween(duration, easing = FastOutSlowInEasing))
+    val exit = fadeOut(tween((duration * 0.5f).toInt().coerceAtLeast(60), easing = FastOutSlowInEasing))
     val forward = targetState.ordinal >= initialState.ordinal
-    return when (type) {
-        AerixTransitionType.JELLY_BOUNCE -> (fadeIn(tween(duration)) +
-            scaleIn(spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow),
-                initialScale = 1f - 0.08f * extent)) togetherWith exit
-        AerixTransitionType.BOUNCE -> (fadeIn(tween(duration)) +
-            slideInVertically(spring<IntOffset>(dampingRatio = Spring.DampingRatioHighBouncy, stiffness = Spring.StiffnessLow)) {
-                (it / 10 * extent).toInt()
-            }) togetherWith exit
-        AerixTransitionType.SLICE_IN -> (fadeIn(tween(duration)) +
-            slideInHorizontally(tween(duration, easing = FastOutSlowInEasing)) {
-                val distance = (it / 6 * extent).toInt()
-                if (forward) distance else -distance
-            }) togetherWith exit
-        AerixTransitionType.CLOSE -> fadeIn(snap()) togetherWith fadeOut(snap())
+    val enterWith = when (type) {
+        AerixTransitionType.FADE -> enter
+        AerixTransitionType.JELLY_BOUNCE -> enter + scaleIn(
+            tween(duration, easing = FastOutSlowInEasing),
+            initialScale = 1f - 0.06f * extent
+        )
+        AerixTransitionType.BOUNCE -> enter + slideInVertically(
+            tween(duration, easing = FastOutSlowInEasing)
+        ) { (it / 10 * extent).toInt() }
+        AerixTransitionType.SLICE_IN -> enter + slideInHorizontally(
+            tween(duration, easing = FastOutSlowInEasing)
+        ) {
+            val distance = (it / 6 * extent).toInt()
+            if (forward) distance else -distance
+        }
+        AerixTransitionType.CLOSE -> fadeIn(snap())
     }
+    return ContentTransform(
+        targetContentEnter = enterWith,
+        initialContentExit = exit,
+        sizeTransform = null
+    )
 }

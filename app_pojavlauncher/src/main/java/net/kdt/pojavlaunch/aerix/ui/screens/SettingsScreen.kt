@@ -1211,6 +1211,7 @@ private fun LauncherTabContent(activity: FragmentActivity) {
     )
     val transitionLabels = listOf(
         AerixTransitionType.CLOSE.name to stringResource(R.string.aerix_settings_transition_close),
+        AerixTransitionType.FADE.name to stringResource(R.string.aerix_settings_transition_fade),
         AerixTransitionType.JELLY_BOUNCE.name to stringResource(R.string.aerix_settings_transition_jelly),
         AerixTransitionType.BOUNCE.name to stringResource(R.string.aerix_settings_transition_bounce),
         AerixTransitionType.SLICE_IN.name to stringResource(R.string.aerix_settings_transition_slice)
@@ -1347,7 +1348,7 @@ private fun LauncherTabContent(activity: FragmentActivity) {
                     position = CardPosition.Bottom,
                     items = transitionLabels,
                     currentId = AerixPreferences.swapAnimateType.name,
-                    defaultId = AerixTransitionType.JELLY_BOUNCE.name,
+                    defaultId = AerixTransitionType.FADE.name,
                     title = stringResource(R.string.aerix_settings_transition),
                     summary = stringResource(R.string.aerix_settings_transition_sub),
                     getItemText = { it.second },

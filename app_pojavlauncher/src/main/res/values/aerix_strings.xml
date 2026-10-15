@@ -218,6 +218,7 @@
     <string name="aerix_settings_transition">Transition animation</string>
     <string name="aerix_settings_transition_sub">Page transition style of the launcher</string>
     <string name="aerix_settings_transition_close">Off</string>
+    <string name="aerix_settings_transition_fade">Fade</string>
     <string name="aerix_settings_transition_jelly">Jelly bounce</string>
     <string name="aerix_settings_transition_bounce">Bounce</string>
     <string name="aerix_settings_transition_slice">Slice in</string>
@@ -272,8 +273,6 @@
     <string name="aerix_mobileglues_dialog_start">Start anyway</string>
     <string name="aerix_mobileglues_ignore_error_title">Ignoring shader errors is off</string>
     <string name="aerix_mobileglues_ignore_error_detail">MobileGlues only runs Minecraft %1$s and newer when \"Ignore shader/program error\" is on. Turn it on in the MobileGlues settings, then start the game again.</string>
-    <string name="aerix_mobileglues_gl_auto_title">MobileGlues picks the OpenGL version on its own</string>
-    <string name="aerix_mobileglues_gl_auto_detail">Minecraft %1$s needs OpenGL 3.3 or newer. MobileGlues only reports 3.2 when the target version is left on automatic. Set the custom target OpenGL version in the MobileGlues settings to 3.3 or higher.</string>
     <string name="aerix_mobileglues_gl_version_title">MobileGlues is limited to OpenGL 3.2</string>
     <string name="aerix_mobileglues_gl_version_detail">Minecraft %1$s needs OpenGL 3.3 or newer. Set the custom target OpenGL version in the MobileGlues settings to 3.3 or higher.</string>
     <string name="aerix_mobileglues_config_missing">MobileGlues runs with its own defaults, no configuration file was found.</string>

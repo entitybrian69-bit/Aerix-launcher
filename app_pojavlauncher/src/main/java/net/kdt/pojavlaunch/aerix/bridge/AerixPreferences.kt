@@ -32,7 +32,7 @@ import net.kdt.pojavlaunch.prefs.LauncherPreferences
 enum class AerixColorTheme { AERIX, CUSTOM }
 
 /** Page transition types, from mirai utils/animation/TransitionAnimationType.kt. */
-enum class AerixTransitionType { CLOSE, JELLY_BOUNCE, BOUNCE, SLICE_IN }
+enum class AerixTransitionType { CLOSE, FADE, JELLY_BOUNCE, BOUNCE, SLICE_IN }
 
 /**
  * Stores the Aerix launcher appearance settings in their own SharedPreferences file so they never
@@ -62,6 +62,8 @@ object AerixPreferences {
     const val KEY_FAVORITES = "aerixFavoriteProjects"
     /** JSON array of pinned instance names (mirai VersionsManageScreen "Pinned" tab). */
     const val KEY_PINNED_INSTANCES = "aerixPinnedInstances"
+    /** Marks that the bouncing transition was replaced by the calm one. */
+    const val KEY_CALM_TRANSITION = "aerixCalmTransition"
 
     const val DEFAULT_CUSTOM_COLOR = 0xFF8DEFE0.toInt()
     const val DEFAULT_BACKGROUND_OPACITY = 60
@@ -92,7 +94,7 @@ object AerixPreferences {
         private set
 
     /** Aerix "launcherSwapAnimateType": section transition style. */
-    var swapAnimateType by mutableStateOf(AerixTransitionType.JELLY_BOUNCE)
+    var swapAnimateType by mutableStateOf(AerixTransitionType.FADE)
         private set
 
     /** Aerix "launcherAnimateExtent" (0..10, 5 = base amplitude). */
@@ -143,9 +145,26 @@ object AerixPreferences {
         selectedWallpaper = p.getString(KEY_SELECTED_WALLPAPER, DEFAULT_WALLPAPER) ?: DEFAULT_WALLPAPER
         lastSection = p.getString(KEY_LAST_SECTION, "HOME") ?: "HOME"
         backgroundBlur = p.getInt(KEY_BACKGROUND_BLUR, 0).coerceIn(0, 20)
-        swapAnimateType = runCatching {
-            AerixTransitionType.valueOf(p.getString(KEY_SWAP_ANIMATE_TYPE, AerixTransitionType.JELLY_BOUNCE.name)!!)
-        }.getOrDefault(AerixTransitionType.JELLY_BOUNCE)
+        val storedTransition = runCatching {
+            AerixTransitionType.valueOf(p.getString(KEY_SWAP_ANIMATE_TYPE, AerixTransitionType.FADE.name)!!)
+        }.getOrDefault(AerixTransitionType.FADE)
+        if (!p.getBoolean(KEY_CALM_TRANSITION, false)) {
+            // The bouncing transition was the default before, it wobbled on every page change.
+            // The calm one takes its place, the other styles stay in the settings.
+            swapAnimateType = if (storedTransition == AerixTransitionType.JELLY_BOUNCE ||
+                storedTransition == AerixTransitionType.BOUNCE
+            ) {
+                AerixTransitionType.FADE
+            } else {
+                storedTransition
+            }
+            edit {
+                putString(KEY_SWAP_ANIMATE_TYPE, swapAnimateType.name)
+                putBoolean(KEY_CALM_TRANSITION, true)
+            }
+        } else {
+            swapAnimateType = storedTransition
+        }
         animateExtent = p.getInt(KEY_ANIMATE_EXTENT, 3).coerceIn(0, 10)
         festivalEffects = p.getBoolean(KEY_FESTIVAL_EFFECTS, false)
         logTextSize = p.getInt(KEY_LOG_TEXT_SIZE, 15).coerceIn(5, 20)
@@ -265,7 +284,7 @@ object AerixPreferences {
     fun extentScale(): Float = 0.5f + animateExtent.coerceIn(0, 10) / 10f
 
     /** Animation length used by section transitions, derived from the Aerix speed slider (0..10). */
-    fun transitionMillis(): Int = if (animateSpeed == 0) 0 else 120 + (10 - animateSpeed) * 40
+    fun transitionMillis(): Int = if (animateSpeed == 0) 0 else 90 + (10 - animateSpeed) * 22
 
     /** Pojav notch handling, exposed here so the Aerix launcher settings page can show it. */
     fun ignoreNotch(): Boolean = LauncherPreferences.PREF_IGNORE_NOTCH

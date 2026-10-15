@@ -1,8 +1,10 @@
 /*
  * Aerix Launcher UI layer for PojavLauncher.
  * Tells the user which option of the MobileGlues settings keeps Minecraft 26.3 and newer from
- * starting. The file is only read, never written: the defaults of MobileGlues belong to
- * MobileGlues and the launcher does not change them.
+ * starting, and switches on the option that the version needs.
+ *
+ * The settings of MobileGlues belong to MobileGlues. Only the one option that a version cannot
+ * run without is written, every other key of the file stays as it is.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -21,7 +23,6 @@
 package net.kdt.pojavlaunch.aerix.bridge
 
 import android.content.Context
-import android.os.Environment
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import net.kdt.pojavlaunch.R
@@ -30,9 +31,9 @@ import net.kdt.pojavlaunch.game.renderer.def.Renderers
 import java.io.File
 
 /**
- * Reads the settings of the MobileGlues library and names the options that a version of
- * Minecraft needs. Nothing is written: the file belongs to MobileGlues and the launcher only
- * tells the user what is missing.
+ * Reads the settings of the MobileGlues library and knows which option a version of Minecraft
+ * needs. The option that a version cannot run without is switched on, the rest of the file is
+ * left alone.
  */
 object PojavMobileGluesCheck {
 
@@ -46,7 +47,9 @@ object PojavMobileGluesCheck {
         /** False when the MobileGlues app never wrote a configuration file. */
         val configFound: Boolean,
         /** Short description of the settings, written to the game log. */
-        val summary: String
+        val summary: String,
+        /** Settings that the launcher switched on for this version. */
+        val appliedSettings: List<String>
     )
 
     /** `enableNoError` values of the MobileGlues settings. */
@@ -64,29 +67,37 @@ object PojavMobileGluesCheck {
         rendererTag == Renderers.MOBILEGLUES_RENDERER || rendererTag == Renderers.SFPEW_RENDERER
 
     /**
-     * Reads the MobileGlues settings and names the options that keep the game from starting.
-     * Returns null when the renderer does not use MobileGlues.
+     * Reads the MobileGlues settings and switches on the option that the version needs. Returns
+     * null when the renderer does not use MobileGlues.
+     *
+     * Minecraft 26.3 and newer use shaders that the shader compiler of MobileGlues cannot build.
+     * The game then stops with "Failed to load required shader programs", so the option that
+     * ignores such errors has to be on before the game starts. Nothing else is written.
      */
     @JvmStatic
     fun check(context: Context, versionId: String, rendererTag: String?): Report? {
         if (!usesMobileGlues(rendererTag)) return null
 
-        val config = readConfig()
-        val problems = ArrayList<Problem>()
         val version = PojavAssetBridge.mcVersionOf(versionId) ?: versionId
-        val major = version.substringBefore('.').toIntOrNull() ?: 0
-        val minor = version.substringAfter('.', "").takeWhile { it.isDigit() }.toIntOrNull() ?: 0
-        val needsModern = major > MODERN_MAJOR || (major == MODERN_MAJOR && minor >= MODERN_MINOR)
+        var config = readConfig()
+        val problems = ArrayList<Problem>()
+        val applied = ArrayList<String>()
 
-        if (needsModern) {
+        if (needsModern(version)) {
             val noError = config.intOrNull("enableNoError") ?: NO_ERROR_AUTO
             if (noError != NO_ERROR_IGNORE_PROGRAM && noError != NO_ERROR_IGNORE_PROGRAM_FRAMEBUFFER) {
-                problems.add(
-                    Problem(
-                        title = context.getString(R.string.aerix_mobileglues_ignore_error_title),
-                        detail = context.getString(R.string.aerix_mobileglues_ignore_error_detail, version)
+                val written = writeNoError(NO_ERROR_IGNORE_PROGRAM)
+                if (written) {
+                    applied.add("enableNoError=$NO_ERROR_IGNORE_PROGRAM")
+                    config = readConfig()
+                } else {
+                    problems.add(
+                        Problem(
+                            title = context.getString(R.string.aerix_mobileglues_ignore_error_title),
+                            detail = context.getString(R.string.aerix_mobileglues_ignore_error_detail, version)
+                        )
                     )
-                )
+                }
             }
             val glVersion = config.intOrNull("customGLVersion") ?: 0
             if (glVersion in 1..32) {
@@ -95,15 +106,6 @@ object PojavMobileGluesCheck {
                     Problem(
                         title = context.getString(R.string.aerix_mobileglues_gl_version_title),
                         detail = context.getString(R.string.aerix_mobileglues_gl_version_detail, version)
-                    )
-                )
-            } else if (glVersion == 0) {
-                // The target version is left on automatic, then the version of the device decides
-                // and that one is often 3.2.
-                problems.add(
-                    Problem(
-                        title = context.getString(R.string.aerix_mobileglues_gl_auto_title),
-                        detail = context.getString(R.string.aerix_mobileglues_gl_auto_detail, version)
                     )
                 )
             }
@@ -121,38 +123,60 @@ object PojavMobileGluesCheck {
             }
         }
 
-        return Report(versionId, problems, config != null, summary)
+        return Report(versionId, problems, config != null, summary, applied)
     }
 
-    /** The configuration file the MobileGlues library reads when the game starts. */
+    /** True when the version needs the options of the newer Minecraft releases. */
+    private fun needsModern(version: String): Boolean {
+        val major = version.substringBefore('.').toIntOrNull() ?: 0
+        val minor = version.substringAfter('.', "").takeWhile { it.isDigit() }.toIntOrNull() ?: 0
+        return major > MODERN_MAJOR || (major == MODERN_MAJOR && minor >= MODERN_MINOR)
+    }
+
+    /** Switches the option that ignores shader and program errors on. */
+    private fun writeNoError(value: Int): Boolean {
+        val config = readConfig() ?: JsonObject()
+        config.addProperty("enableNoError", value)
+        return writeConfig(config)
+    }
+
+    /**
+     * The configuration file the MobileGlues library reads when the game starts. The path is the
+     * one the renderer hands to the library, so this is the file the game sees.
+     */
+    private fun configFile(): File = File(Tools.DIR_DATA, "MobileGlues/config.json")
+
+    /** The content of the configuration file, null when the library never wrote one. */
     private fun readConfig(): JsonObject? {
-        for (file in configFiles()) {
-            val config = readObject(file)
-            if (config != null) return config
-        }
-        return null
-    }
-
-    /** The places the configuration file can be, the private one first. */
-    private fun configFiles(): List<File> {
-        val files = ArrayList<File>()
-        files.add(File(Tools.DIR_DATA, "MobileGlues/config.json"))
-        try {
-            // The folder the user gave access to, when the settings use the shared storage.
-            val external = Environment.getExternalStorageDirectory()
-            if (external != null) files.add(File(external, "MG/config.json"))
-        } catch (_: Exception) {
-            // Without the permission the folder cannot be read, the private one is enough.
-        }
-        return files
-    }
-
-    private fun readObject(file: File): JsonObject? {
         return try {
+            val file = configFile()
             if (!file.isFile) return null
             JsonParser.parseString(file.readText()).asJsonObject
         } catch (_: Exception) {
             null
+        }
+    }
+
+    /**
+     * Writes the configuration file the way the MobileGlues app does it: into a temporary file
+     * that is renamed afterwards, so the game never reads half a file.
+     */
+    private fun writeConfig(config: JsonObject): Boolean {
+        return try {
+            val target = configFile()
+            val dir = target.parentFile ?: return false
+            if (!dir.isDirectory && !dir.mkdirs()) return false
+            val temp = File(dir, "config.json.tmp")
+            temp.writeText(config.toString())
+            if (temp.renameTo(target)) {
+                true
+            } else {
+                val written = target.writeText(config.toString())
+                temp.delete()
+                written
+            }
+        } catch (_: Exception) {
+            false
         }
     }
 
