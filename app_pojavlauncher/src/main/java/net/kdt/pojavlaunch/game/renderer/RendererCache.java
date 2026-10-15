@@ -1,15 +1,6 @@
 package net.kdt.pojavlaunch.game.renderer;
 
-import static net.kdt.pojavlaunch.game.renderer.def.Renderers.FREEDRENO_RENDERER;
-import static net.kdt.pojavlaunch.game.renderer.def.Renderers.GL4ES_RENDERER;
-import static net.kdt.pojavlaunch.game.renderer.def.Renderers.LEGACYZINK_RENDERER;
-import static net.kdt.pojavlaunch.game.renderer.def.Renderers.LTW_RENDERER;
-import static net.kdt.pojavlaunch.game.renderer.def.Renderers.MESA_RENDERER;
-import static net.kdt.pojavlaunch.game.renderer.def.Renderers.MESA_RENDERER_EXT;
-import static net.kdt.pojavlaunch.game.renderer.def.Renderers.ZINK_RENDERER;
-import static net.kdt.pojavlaunch.game.renderer.def.Renderers.NGGL4ES_RENDERER;
-import static net.kdt.pojavlaunch.game.renderer.def.Renderers.MOBILEGLUES_RENDERER;
-import static net.kdt.pojavlaunch.game.renderer.def.Renderers.SFPEW_RENDERER;
+import net.kdt.pojavlaunch.game.renderer.def.Renderers;
 
 import android.content.Context;
 import android.content.res.Resources;
@@ -42,9 +33,7 @@ public class RendererCache {
         if (sCompatibleRenderers != null) return sCompatibleRenderers;
         Resources resources = context.getResources();
         // This is the list that controls em all!
-        String[] renderers = {
-                GL4ES_RENDERER, NGGL4ES_RENDERER, ZINK_RENDERER, LTW_RENDERER, MOBILEGLUES_RENDERER, SFPEW_RENDERER, FREEDRENO_RENDERER, MESA_RENDERER, MESA_RENDERER_EXT, LEGACYZINK_RENDERER
-        };
+        String[] renderers = Renderers.ALL_RENDERERS;
         ArrayList<String> rendererIds = new ArrayList<>(renderers.length);
         ArrayList<String> rendererNames = new ArrayList<>(rendererIds);
         for (String renderer : renderers) {

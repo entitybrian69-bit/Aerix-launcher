@@ -1208,7 +1208,9 @@ private fun InstanceSettingsPane(
     val instanceKey = remember(draft.instance) { draft.instance.name ?: draft.versionId }
     val prefs = LauncherPreferences.DEFAULT_PREF
 
-    val rendererEntries = remember { miraiRendererEntries(activity, includeFollowGlobal = true) }
+    val rendererEntries = remember(draft.renderer) {
+        miraiRendererEntries(activity, includeFollowGlobal = true, extraRendererId = draft.renderer)
+    }
     var currentMiraiRendererId by remember(draft.renderer) {
         mutableStateOf(getMiraiInstanceRendererId(activity, instanceKey, draft.renderer))
     }

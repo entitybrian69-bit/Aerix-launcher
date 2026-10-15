@@ -108,7 +108,8 @@ object PojavInstanceEditorBridge {
         val cache = RendererCache.getCompatibleRenderers(context)
         val result = ArrayList<AerixRendererChoice>(cache.rendererIds.size + 1)
         cache.rendererIds.forEachIndexed { index, id ->
-            result.add(AerixRendererChoice(id, cache.rendererDisplayNames.getOrElse(index) { id }))
+            val label = AerixRendererCatalog.displayName(id, cache.rendererDisplayNames.getOrElse(index) { id })
+            result.add(AerixRendererChoice(id, label))
         }
         result.add(AerixRendererChoice(null, context.getString(R.string.global_default)))
         return result

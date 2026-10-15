@@ -57,7 +57,7 @@ It is not a generated app. It is not a team product with a tracker bolted on. It
 Aerix keeps launcher controls, renderer options, and instance management in one place.
 
 - ⚡ **Quick access** — recent worlds and instances stay one tap away.
-- 🧩 **Serious render stack** — choose the renderer that fits the device. LTW and LTW Legacy are built from source in this repository and cover Minecraft 1.17+ and 1.8–1.16.5 respectively, alongside GL4ES, VirGL, Zink-class, and Mesa options. Aerix also bundles **MobileGlues** for Minecraft 1.17+, two **VGPU** options for 1.16.5 and older, and selects the right renderer for each version automatically.
+- 🧩 **Serious render stack** — choose the renderer that fits the device. The launcher ships **GL4ES**, **OpenLTW** for Minecraft 1.17+, **Krypton Wrapper**, **MobileGlues** and **SFPEW**, together with the Mesa3D family: **Zink**, **Legacy Zink**, **Freedreno** and **Mesa**. Only the renderers your device can run are listed, and external renderer plugins are picked up as well.
 - 🧮 **RAM that you control** — a global memory slider, plus per-instance overrides when a pack needs more.
 - 📱 **Checked across devices** — layouts, accounts, skins, and launch flow are tested beyond a single handset.
 - 🛠️ **Updated often** — fixes and polish land on a regular cadence, with a built-in update check against GitHub Releases.

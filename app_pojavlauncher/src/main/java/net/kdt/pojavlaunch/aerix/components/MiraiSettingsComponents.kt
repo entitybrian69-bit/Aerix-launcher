@@ -108,12 +108,14 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import net.kdt.pojavlaunch.R
+import net.kdt.pojavlaunch.aerix.bridge.AerixRendererCatalog
 import net.kdt.pojavlaunch.aerix.bridge.PojavPluginBridge
 import net.kdt.pojavlaunch.aerix.theme.AerixMetrics
 import net.kdt.pojavlaunch.aerix.theme.AerixRadii
 import net.kdt.pojavlaunch.aerix.theme.AerixSpacing
 import net.kdt.pojavlaunch.aerix.theme.AerixSurface
 import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
+import net.kdt.pojavlaunch.game.renderer.RendererCache
 import net.kdt.pojavlaunch.game.renderer.def.Renderers
 import net.kdt.pojavlaunch.prefs.LauncherPreferences
 import kotlin.math.roundToInt
@@ -1121,9 +1123,11 @@ fun <E> MiraiEnumSettingsCard(
 }
 
 /**
- * Built-in renderer metadata ported from mirai-launcher- (Renderers.kt)
- * matching Photos 1, 2, and 5 (Krypton Wrapper, MobileGlues, GL4ES, vgpu - (up to 1.16.5, fast),
- * VGPU 1.3.6β, LTW Legacy, LTW (Large Thin Wrapper), Kopper Zink, VirGLRenderer, Freedreno (Adreno)).
+ * A renderer the launcher can actually run.
+ *
+ * The entries are built from the launcher's own renderer list, so every option maps to a
+ * backend implemented in [net.kdt.pojavlaunch.game.renderer] and is offered only when the
+ * current device supports it.
  */
 data class MiraiRendererEntry(
     val uniqueId: String,
@@ -1131,107 +1135,92 @@ data class MiraiRendererEntry(
     val backendRendererId: String?,
     val summary: String? = null,
     val minVer: String? = null,
-    val maxVer: String? = null
+    val maxVer: String? = null,
+    val compatible: Boolean = true
 )
+
+/**
+ * Version range of a renderer, as shown next to its name.
+ */
+fun MiraiRendererEntry.versionBadge(): String {
+    val min = minVer
+    val max = maxVer
+    return when {
+        min != null && max != null -> "$min - $max"
+        min != null -> "$min+"
+        max != null -> "<= $max"
+        else -> "all versions"
+    }
+}
 
 private const val PREF_MIRAI_GLOBAL_RENDERER_ID = "aerix_mirai_global_renderer_id"
 private const val PREF_MIRAI_INSTANCE_RENDERER_PREFIX = "aerix_mirai_instance_renderer_"
 
-fun miraiRendererEntries(context: Context, includeFollowGlobal: Boolean): List<MiraiRendererEntry> {
+/**
+ * Every renderer the launcher implements, plus the external renderer plugins that are installed.
+ *
+ * @param includeFollowGlobal add the "Follow Global" entry used by the per instance list
+ * @param extraRendererId renderer that has to stay listed even when the device does not
+ *        support it anymore, so a saved choice is never lost
+ */
+fun miraiRendererEntries(
+    context: Context,
+    includeFollowGlobal: Boolean,
+    extraRendererId: String? = null
+): List<MiraiRendererEntry> {
     val list = ArrayList<MiraiRendererEntry>()
     if (includeFollowGlobal) {
         list.add(
             MiraiRendererEntry(
                 uniqueId = "",
                 displayName = "Follow Global",
-                backendRendererId = null
+                backendRendererId = null,
+                summary = "Uses the renderer picked in the global settings"
             )
         )
     }
-    list.addAll(
-        listOf(
+    val plugins = runCatching { PojavPluginBridge.loadPlugins(context) }.getOrDefault(emptyList())
+    val pluginTags = plugins.map { it.pluginTag }.toSet()
+    val supported = RendererCache.getCompatibleRenderers(context).rendererIds.toSet()
+    Renderers.ALL_RENDERERS.forEach { rendererId ->
+        if (rendererId in pluginTags) return@forEach
+        val info = AerixRendererCatalog.info(rendererId)
+        list.add(
             MiraiRendererEntry(
-                uniqueId = "opengles3",
-                displayName = "Krypton Wrapper",
-                backendRendererId = Renderers.NGGL4ES_RENDERER,
-                minVer = "1.17",
-                maxVer = "26.2"
-            ),
-            MiraiRendererEntry(
-                uniqueId = "opengles3_mobileglues",
-                displayName = "MobileGlues",
-                backendRendererId = Renderers.MOBILEGLUES_RENDERER,
-                minVer = "1.17",
-                maxVer = "26.3"
-            ),
-            MiraiRendererEntry(
-                uniqueId = "opengles2",
-                displayName = "GL4ES",
-                backendRendererId = Renderers.GL4ES_RENDERER,
-                maxVer = "1.16.5"
-            ),
-            MiraiRendererEntry(
-                uniqueId = "opengles2_vgpu",
-                displayName = "vgpu - (up to 1.16.5, fast)",
-                backendRendererId = Renderers.SFPEW_RENDERER,
-                summary = "( Performative and balance for version above 1.16.5)",
-                maxVer = "1.16.5"
-            ),
-            MiraiRendererEntry(
-                uniqueId = "opengles2_vgpu_1",
-                displayName = "VGPU 1.3.6\u03B2",
-                backendRendererId = Renderers.SFPEW_RENDERER,
-                summary = "(Compat with all version and very reliable)",
-                maxVer = "1.16.5"
-            ),
-            MiraiRendererEntry(
-                uniqueId = "opengles2_ltwlegacy",
-                displayName = "LTW Legacy",
-                backendRendererId = Renderers.GL4ES_RENDERER,
-                summary = "OpenGL 1.x/2.1 translation layer for Minecraft 1.8 - 1.16.5, built from source.",
-                minVer = "1.8",
-                maxVer = "1.16.5"
-            ),
-            MiraiRendererEntry(
-                uniqueId = "opengles3_ltw",
-                displayName = "LTW (Large Thin Wrapper)",
-                backendRendererId = Renderers.LTW_RENDERER,
-                summary = "Incomplete OpenGL 3.2 core wrapper on OpenGL ES 3; game, mod, and device compatibility varies.",
-                minVer = "1.17"
-            ),
-            MiraiRendererEntry(
-                uniqueId = "opengles3_desktopgl_zink_kopper",
-                displayName = "Kopper Zink",
-                backendRendererId = Renderers.ZINK_RENDERER,
-                maxVer = "26.2"
-            ),
-            MiraiRendererEntry(
-                uniqueId = "gallium_virgl",
-                displayName = "VirGLRenderer",
-                backendRendererId = Renderers.LEGACYZINK_RENDERER,
-                maxVer = "26.2"
-            ),
-            MiraiRendererEntry(
-                uniqueId = "gallium_freedreno",
-                displayName = "Freedreno (Adreno)",
-                backendRendererId = Renderers.FREEDRENO_RENDERER,
-                maxVer = "26.2"
+                uniqueId = rendererId,
+                displayName = info?.displayName ?: rendererId,
+                backendRendererId = rendererId,
+                summary = info?.summary,
+                minVer = info?.minVer,
+                maxVer = info?.maxVer,
+                compatible = rendererId in supported
             )
         )
-    )
-    runCatching { PojavPluginBridge.loadPlugins(context) }.getOrDefault(emptyList()).forEach { plugin ->
-        if (list.none { it.uniqueId == plugin.pluginTag }) {
-            list.add(
-                MiraiRendererEntry(
-                    uniqueId = plugin.pluginTag,
-                    displayName = plugin.displayName,
-                    backendRendererId = plugin.pluginTag,
-                    summary = plugin.summary.ifBlank { "External Renderer Plugin (${plugin.packageName})" },
-                    minVer = plugin.minMCVer,
-                    maxVer = plugin.maxMCVer
-                )
+    }
+    plugins.forEach { plugin ->
+        list.add(
+            MiraiRendererEntry(
+                uniqueId = plugin.pluginTag,
+                displayName = plugin.displayName,
+                backendRendererId = plugin.pluginTag,
+                summary = plugin.summary.ifBlank { "External Renderer Plugin (${plugin.packageName})" },
+                minVer = plugin.minMCVer,
+                maxVer = plugin.maxMCVer
             )
-        }
+        )
+    }
+    if (!extraRendererId.isNullOrEmpty() && list.none { it.backendRendererId == extraRendererId }) {
+        val info = AerixRendererCatalog.info(extraRendererId)
+        list.add(
+            MiraiRendererEntry(
+                uniqueId = extraRendererId,
+                displayName = info?.displayName ?: extraRendererId,
+                backendRendererId = extraRendererId,
+                summary = info?.summary ?: "Renderer of an uninstalled plugin",
+                minVer = info?.minVer,
+                maxVer = info?.maxVer
+            )
+        )
     }
     return list
 }
@@ -1244,11 +1233,12 @@ fun getMiraiGlobalRendererId(context: Context): String {
     }
     val backend = LauncherPreferences.PREF_RENDERER
     return entries.firstOrNull { it.backendRendererId == backend }?.uniqueId
-        ?: entries.first().uniqueId
+        ?: entries.firstOrNull()?.uniqueId
+        ?: backend
 }
 
 fun setMiraiGlobalRenderer(entry: MiraiRendererEntry) {
-    val backend = entry.backendRendererId ?: Renderers.NGGL4ES_RENDERER
+    val backend = entry.backendRendererId ?: Renderers.GL4ES_RENDERER
     LauncherPreferences.PREF_RENDERER = backend
     LauncherPreferences.DEFAULT_PREF.edit()
         .putString("renderer", backend)
@@ -1293,9 +1283,16 @@ fun MiraiRendererSummaryLayout(renderer: MiraiRendererEntry) {
                 color = Color.White
             )
         }
+        if (!renderer.compatible) {
+            Text(
+                text = "Not supported on this device",
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White
+            )
+        }
         val minVer = renderer.minVer
         val maxVer = renderer.maxVer
-        if (minVer != null || maxVer != null) {
+        if (renderer.backendRendererId != null) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -1315,6 +1312,13 @@ fun MiraiRendererSummaryLayout(renderer: MiraiRendererEntry) {
                 if (maxVer != null) {
                     Text(
                         text = "<= $maxVer",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White
+                    )
+                }
+                if (minVer == null && maxVer == null) {
+                    Text(
+                        text = "all versions",
                         style = MaterialTheme.typography.labelSmall,
                         color = Color.White
                     )

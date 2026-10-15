@@ -11,4 +11,10 @@ public final class Renderers {
     public static final String MOBILEGLUES_RENDERER = "opengles_mobileglues";
     public static final String NGGL4ES_RENDERER = "opengles_nggl4es";
     public static final String SFPEW_RENDERER = "opengles_sfpew";
-    }
+
+    /** Every renderer the launcher implements, in the order they are listed in the settings. */
+    public static final String[] ALL_RENDERERS = {
+            GL4ES_RENDERER, NGGL4ES_RENDERER, ZINK_RENDERER, LTW_RENDERER, MOBILEGLUES_RENDERER,
+            SFPEW_RENDERER, FREEDRENO_RENDERER, MESA_RENDERER, MESA_RENDERER_EXT, LEGACYZINK_RENDERER
+    };
+}

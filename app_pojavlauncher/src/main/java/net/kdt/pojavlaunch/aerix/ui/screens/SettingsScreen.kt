@@ -135,6 +135,7 @@ import net.kdt.pojavlaunch.aerix.components.liquidGlass
 import net.kdt.pojavlaunch.aerix.components.miraiRendererEntries
 import net.kdt.pojavlaunch.aerix.components.rememberSettingsCardShape
 import net.kdt.pojavlaunch.aerix.components.setMiraiGlobalRenderer
+import net.kdt.pojavlaunch.aerix.components.versionBadge
 import net.kdt.pojavlaunch.aerix.theme.AerixMetrics
 import net.kdt.pojavlaunch.aerix.theme.AerixRadii
 import net.kdt.pojavlaunch.aerix.theme.AerixSpacing
@@ -179,15 +180,7 @@ private data class RendererStackOption(
     val rendererId: String
 )
 
-private val rendererStackOptions = listOf(
-    RendererStackOption("AUTO", "Auto (Smart Pick)", "RECOMMENDED", Renderers.LTW_RENDERER),
-    RendererStackOption("VGPU_FAST", "vgpu - (up to 1.16.5, fast)", "1.16.5 FAST", Renderers.NGGL4ES_RENDERER),
-    RendererStackOption("VGPU_1368", "VGPU 1.3.6\u03B2", "SHADERCONV", Renderers.SFPEW_RENDERER),
-    RendererStackOption("LTW", "LTW (1.17+ Core)", "1.17+", Renderers.LTW_RENDERER),
-    RendererStackOption("Legacy", "LTW Legacy (1.8\u20131.16.5)", "1.8\u20131.16.5", Renderers.GL4ES_RENDERER),
-    RendererStackOption("Zink", "Kopper Zink (Vulkan)", "VULKAN", Renderers.ZINK_RENDERER),
-    RendererStackOption("MOBILEGLUES", "MobileGlues (1.17+)", "MODERN", Renderers.MOBILEGLUES_RENDERER)
-)
+private const val RENDERER_STACK_AUTO = "AUTO"
 
 @Composable
 fun SettingsScreen(activity: FragmentActivity, tabKey: String, onTabChanged: (String) -> Unit) {
@@ -254,6 +247,20 @@ private fun RendererTabContent(activity: FragmentActivity) {
     val plugins = remember(revision) { PojavPluginBridge.loadPlugins(activity) }
     val currentRenderer = remember(revision) { LauncherPreferences.PREF_RENDERER ?: Renderers.GL4ES_RENDERER }
     val rendererEntries = remember(revision) { miraiRendererEntries(activity, includeFollowGlobal = false) }
+    val pluginTags = remember(revision) { plugins.map { it.pluginTag }.toSet() }
+    val rendererStackOptions = remember(revision) {
+        val builtinEntries = rendererEntries.filter { it.uniqueId !in pluginTags }
+        listOf(
+            RendererStackOption(RENDERER_STACK_AUTO, "Auto (Smart Pick)", "RECOMMENDED", Renderers.LTW_RENDERER)
+        ) + builtinEntries.map { entry ->
+            RendererStackOption(
+                keyMatch = entry.uniqueId,
+                title = entry.displayName,
+                badge = if (entry.compatible) entry.versionBadge().uppercase() else "UNSUPPORTED",
+                rendererId = entry.backendRendererId ?: entry.uniqueId
+            )
+        }
+    }
     var currentMiraiRendererId by remember(revision) { mutableStateOf(getMiraiGlobalRendererId(activity)) }
     var autoSelected by remember { mutableStateOf(false) }
     var globalVulkanDriver by remember(revision) {
@@ -308,15 +315,19 @@ private fun RendererTabContent(activity: FragmentActivity) {
                     ) {
                         rowOptions.forEach { option ->
                             val isSelected = when (option.keyMatch) {
-                                "AUTO" -> autoSelected
+                                RENDERER_STACK_AUTO -> autoSelected
                                 else -> !autoSelected && currentRenderer == option.rendererId
                             }
                             val selectOption = {
-                                autoSelected = option.keyMatch == "AUTO"
-                                val targetId = if (compatible.any { it.first == option.rendererId }) {
-                                    option.rendererId
+                                autoSelected = option.keyMatch == RENDERER_STACK_AUTO
+                                val targetId = if (option.keyMatch == RENDERER_STACK_AUTO) {
+                                    if (compatible.any { it.first == option.rendererId }) {
+                                        option.rendererId
+                                    } else {
+                                        compatible.firstOrNull()?.first ?: Renderers.GL4ES_RENDERER
+                                    }
                                 } else {
-                                    compatible.firstOrNull()?.first ?: Renderers.GL4ES_RENDERER
+                                    option.rendererId
                                 }
                                 PojavSettingsBridge.writeString(activity, "renderer", targetId)
                             }
@@ -365,7 +376,7 @@ private fun RendererTabContent(activity: FragmentActivity) {
                                     )
                                     ModrinthMetaPill(
                                         text = option.badge,
-                                        highlighted = isSelected || option.keyMatch == "AUTO"
+                                        highlighted = isSelected || option.keyMatch == RENDERER_STACK_AUTO
                                     )
                                 }
                             }
@@ -543,7 +554,8 @@ private fun RendererTabContent(activity: FragmentActivity) {
 
         // 4. Detailed Renderer, Vulkan Driver, Graphics API, Resolution & Fullscreen SettingsCardColumn (Mirai RendererSettingsScreen — Photos 1 & 2)
         item {
-            val showMgSettings = currentRenderer == Renderers.MOBILEGLUES_RENDERER || currentMiraiRendererId == "opengles3_mobileglues"
+            val showMgSettings = currentRenderer == Renderers.MOBILEGLUES_RENDERER ||
+                currentMiraiRendererId == Renderers.MOBILEGLUES_RENDERER
             val vulkanDrivers = remember {
                 listOf(
                     "default driver" to "default driver",
@@ -571,7 +583,7 @@ private fun RendererTabContent(activity: FragmentActivity) {
                     position = CardPosition.Top,
                     items = rendererEntries,
                     currentId = currentMiraiRendererId,
-                    defaultId = rendererEntries.firstOrNull()?.uniqueId ?: "opengles3",
+                    defaultId = rendererEntries.firstOrNull()?.uniqueId ?: Renderers.GL4ES_RENDERER,
                     title = "Global Renderer",
                     summary = "Define the global renderer used by the game",
                     getItemText = { it.displayName },
