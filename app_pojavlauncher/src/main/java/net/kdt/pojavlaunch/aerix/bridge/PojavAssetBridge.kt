@@ -296,56 +296,51 @@ object PojavAssetBridge {
     /**
      * The Minecraft versions and the categories a source offers for [type].
      *
-     * Modrinth answers both from its tag endpoints, CurseForge from its game version list and from
-     * the categories of the class the content type belongs to. A source that does not answer gives
-     * back what the type ships with, so the filters are never empty.
+     * Modrinth answers both from its tag endpoints. CurseForge answers its categories from the class
+     * the content type belongs to, by the ids CurseForge itself uses; its game version list is only
+     * reachable with an API key, so when that stays silent the full Modrinth tag list stands in -
+     * the same Minecraft versions, all of them - and the version table the launcher already holds
+     * after that. A filter may end up with the short list the type ships with only when the device
+     * has neither a network nor a downloaded version table, never because one endpoint failed.
      */
     suspend fun facets(context: Context, platform: AssetPlatform, type: AssetType): AssetFacets =
         withContext(Dispatchers.IO) {
+            val fallbackCategories = type.categories.map { (id, label) -> AssetFacet(id, label) }
             runCatching {
-                when (platform) {
-                    AssetPlatform.MODRINTH -> AssetFacets(modrinthVersions(), modrinthCategories(type))
-                    AssetPlatform.CURSEFORGE -> {
-                        val classId = type.curseForgeClassId
-                        AssetFacets(curseForgeVersions(context, classId), curseForgeCategories(context, classId))
-                    }
-                }
-            }.getOrElse {
-                AssetFacets(emptyList(), type.categories.map { (id, label) -> AssetFacet(id, label) })
-            }
+                val versions = when (platform) {
+                    AssetPlatform.MODRINTH -> modrinthVersions()
+                    AssetPlatform.CURSEFORGE -> curseForgeVersions(context).ifEmpty { modrinthVersions() }
+                }.ifEmpty { localVersions() }
+                val categories = when (platform) {
+                    AssetPlatform.MODRINTH -> modrinthCategories(type)
+                    AssetPlatform.CURSEFORGE -> curseForgeCategories(context, type.curseForgeClassId)
+                }.ifEmpty { fallbackCategories }
+                AssetFacets(versions, categories)
+            }.getOrElse { AssetFacets(localVersions(), fallbackCategories) }
         }
 
-    // ---- Modrinth facets ---------------------------------------------------------------------
+    // ---- Version lists -----------------------------------------------------------------------
 
+    /**
+     * Every game version Modrinth knows, newest first. This is the whole history of the game -
+     * releases, snapshots, pre-releases, betas and alphas - and it needs no key, which is why it is
+     * the list a source that cannot answer its own falls back to.
+     */
     private fun modrinthVersions(): List<AssetFacet> {
         val array = modrinthGet("tag/game_version", null, JsonArray::class.java) ?: return emptyList()
-        return array.mapNotNull { element ->
+        val dated = array.mapNotNull { element ->
             if (!element.isJsonObject) return@mapNotNull null
-            val version = element.asJsonObject.string("version") ?: return@mapNotNull null
-            AssetFacet(version, version)
+            val version = element.asJsonObject
+            val id = version.string("version") ?: return@mapNotNull null
+            // ISO-8601 timestamps compare as text, so no date parsing is needed.
+            (version.string("date") ?: "") to id
         }
+        // Distinct ids: the dropdowns key their lazy rows by id, and a repeated key is a crash.
+        return dated.sortedByDescending { it.first }.map { AssetFacet(it.second, it.second) }.distinctBy { it.id }
     }
 
-    private fun modrinthCategories(type: AssetType): List<AssetFacet> {
-        val array = modrinthGet("tag/category", null, JsonArray::class.java) ?: return emptyList()
-        val projectType = type.modrinthType
-        return array.mapNotNull { element ->
-            if (!element.isJsonObject) return@mapNotNull null
-            val category = element.asJsonObject
-            // The tag endpoint answers for every kind of project at once; the header of the search
-            // is what puts a category on a resource pack rather than on a mod.
-            val categoryType = category.string("project_type") ?: category.string("header")
-            if (projectType != null && categoryType != null && categoryType != projectType) {
-                return@mapNotNull null
-            }
-            val name = category.string("name") ?: return@mapNotNull null
-            AssetFacet(name, name.replaceFirstChar { it.uppercase() })
-        }
-    }
-
-    // ---- CurseForge facets -------------------------------------------------------------------
-
-    private fun curseForgeVersions(context: Context, classId: Int): List<AssetFacet> {
+    /** CurseForge's own game version list, empty when the key of the moment cannot reach it. */
+    private fun curseForgeVersions(context: Context): List<AssetFacet> {
         val array = curseForgeGet(
             context, "minecraft/version",
             hashMapOf<String, Any>("gameId" to CURSEFORGE_GAME_ID), JsonArray::class.java
@@ -354,24 +349,94 @@ object PojavAssetBridge {
             if (!element.isJsonObject) return@mapNotNull null
             val version = element.asJsonObject.string("versionString") ?: return@mapNotNull null
             AssetFacet(version, version)
-        }
+        }.distinctBy { it.id }
     }
 
+    /**
+     * The version table the launcher itself works from: what is installed plus the whole Mojang
+     * manifest behind the version list on the create screen. Offline and complete, so a version
+     * filter is never left with a handful of entries.
+     */
+    private fun localVersions(): List<AssetFacet> = runCatching {
+        PojavCreateInstanceBridge.gameVersions().map { AssetFacet(it.id, it.id) }.distinctBy { it.id }
+    }.getOrDefault(emptyList())
+
+    // ---- Modrinth facets ---------------------------------------------------------------------
+
+    private fun modrinthCategories(type: AssetType): List<AssetFacet> {
+        val projectType = type.modrinthType ?: return emptyList()
+        val array = modrinthGet("tag/category", null, JsonArray::class.java) ?: return emptyList()
+        val rows = array.mapNotNull { element ->
+            if (!element.isJsonObject) return@mapNotNull null
+            val category = element.asJsonObject
+            // The endpoint answers for every kind of project at once; the project type is what puts
+            // a category on a mod rather than on a shader pack.
+            if (category.string("project_type") != projectType) return@mapNotNull null
+            val slug = category.string("name") ?: return@mapNotNull null
+            val header = category.string("header") ?: "categories"
+            Triple(header, slug, categoryLabel(slug))
+        }
+        // The plain categories come first, the way the site orders its filter, then the rest, each
+        // alphabetically.
+        return rows.sortedWith(compareBy({ if (it.first == "categories") 0 else 1 }, { it.second }))
+            .map { AssetFacet(it.second, it.third) }.distinctBy { it.id }
+    }
+
+    // ---- CurseForge facets -------------------------------------------------------------------
+
+    /**
+     * The categories CurseForge has for [classId]: the parents first, each followed by the
+     * sub-categories that belong to it and labelled "Parent - Child". The website shows the parents
+     * and reveals the sub-categories under them; a sub-category is a filter of its own on the site,
+     * so the list carries them all. The ids travel unchanged - they are the ids the search wants.
+     */
     private fun curseForgeCategories(context: Context, classId: Int): List<AssetFacet> {
         val array = curseForgeGet(
             context, "categories",
             hashMapOf<String, Any>("gameId" to CURSEFORGE_GAME_ID, "classId" to classId),
             JsonArray::class.java
         ) ?: return emptyList()
-        return array.mapNotNull { element ->
+        data class Row(val id: String, val name: String, val parent: String?, val index: Int)
+        val rows = array.mapNotNull { element ->
             if (!element.isJsonObject) return@mapNotNull null
             val category = element.asJsonObject
             val id = category.get("id")?.takeIf { !it.isJsonNull }?.asString ?: return@mapNotNull null
+            if (id == classId.toString()) return@mapNotNull null
+            if (category.get("isClass")?.takeIf { !it.isJsonNull }?.asBoolean == true) return@mapNotNull null
             val name = category.string("name") ?: return@mapNotNull null
-            // The id is passed to the search, so it travels in the id field of the facet.
-            AssetFacet(id, name)
+            val parentId = category.get("parentCategoryId")?.takeIf { !it.isJsonNull }?.asString
+            Row(id, name, parentId?.takeIf { it != id && it != classId.toString() }, category.int("displayIndex"))
         }
+        val names = rows.associate { it.id to it.name }
+        val order = compareBy<Row>({ it.index }, { it.name })
+        val children = rows.filter { it.parent != null && it.parent in names }.groupBy { it.parent }
+        val result = ArrayList<AssetFacet>(rows.size)
+        rows.filter { it.parent == null || it.parent !in names }.sortedWith(order).forEach { parent ->
+            result.add(AssetFacet(parent.id, parent.name))
+            children[parent.id]?.sortedWith(order)?.forEach { child ->
+                result.add(AssetFacet(child.id, "${parent.name} - ${child.name}"))
+            }
+        }
+        return result.distinctBy { it.id }
     }
+
+    /** "vanilla-like" reads as "Vanilla Like", "16x" stays "16x", "pbr" becomes "PBR". */
+    private fun categoryLabel(slug: String): String =
+        slug.split('-', '_').joinToString(" ") { word ->
+            when (word.lowercase()) {
+                "pbr" -> "PBR"
+                "gui" -> "GUI"
+                "hud" -> "HUD"
+                "rpg" -> "RPG"
+                "qol" -> "QoL"
+                "api" -> "API"
+                "mmo" -> "MMO"
+                "pvp" -> "PvP"
+                "pve" -> "PvE"
+                "3d" -> "3D"
+                else -> word.replaceFirstChar { it.uppercase() }
+            }
+        }
 
     suspend fun details(context: Context, project: AssetProject): AssetProjectDetails = withContext(Dispatchers.IO) {
         runCatching {

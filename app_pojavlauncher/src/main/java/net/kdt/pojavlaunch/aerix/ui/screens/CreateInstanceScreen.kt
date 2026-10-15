@@ -481,6 +481,17 @@ fun CreateInstanceScreen(activity: FragmentActivity, onClose: () -> Unit) {
                             }
                         }
 
+                        // Vanilla has nothing to choose, so the pane says so instead of leaving
+                        // the empty space where every other loader lists its builds.
+                        if (loader.usesGameVersion && !loader.hasBuilds) {
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = stringResource(R.string.aerix_create_vanilla_hint),
+                                color = AerixSurface.textSecondary,
+                                fontSize = 11.sp
+                            )
+                        }
+
                         // 3. Inline Loader Version List when a mod loader is selected. Vanilla has
                         // nothing to choose - there is one Minecraft version and nothing on top of
                         // it - so the list, its switch and its loading line are left out.

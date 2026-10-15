@@ -57,6 +57,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -124,6 +125,7 @@ import net.kdt.pojavlaunch.aerix.bridge.AssetSort
 import net.kdt.pojavlaunch.aerix.bridge.AssetType
 import net.kdt.pojavlaunch.aerix.bridge.InstanceTarget
 import net.kdt.pojavlaunch.aerix.bridge.PojavAssetBridge
+import net.kdt.pojavlaunch.aerix.bridge.PojavCreateInstanceBridge
 import net.kdt.pojavlaunch.aerix.bridge.PojavInstanceBridge
 import net.kdt.pojavlaunch.aerix.bridge.PojavNavigator
 import net.kdt.pojavlaunch.aerix.components.AerixGhostButton
@@ -344,7 +346,16 @@ private fun SearchAssetsContent(
     val fallbackCategories = remember(type) {
         type.categories.map { (id, label) -> AssetFacet(id, label) }
     }
-    val versions = remember(facets, platform) { facets.versions.ifEmpty { commonMcVersions.map { AssetFacet(it, it) } } }
+    // Before the source answers - and if it never does - the versions are the ones the launcher
+    // already has: the table behind the create screen, complete and offline. The short list is
+    // only there for a fresh install that has not downloaded that table yet.
+    val localVersions = remember {
+        runCatching { PojavCreateInstanceBridge.gameVersions().map { AssetFacet(it.id, it.id) } }
+            .getOrDefault(emptyList())
+    }
+    val versions = remember(facets, localVersions) {
+        facets.versions.ifEmpty { localVersions.ifEmpty { commonMcVersions.map { AssetFacet(it, it) } } }
+    }
     val categories = remember(facets, fallbackCategories) { facets.categories.ifEmpty { fallbackCategories } }
 
     val selectedInstance = PojavInstanceBridge.selected
@@ -381,6 +392,7 @@ private fun SearchAssetsContent(
     var showPlatformMenu by remember { mutableStateOf(false) }
     var showCategoryMenu by remember { mutableStateOf(false) }
     var showMcMenu by remember { mutableStateOf(false) }
+    var mcQuery by remember { mutableStateOf("") }
     var showLoaderMenu by remember { mutableStateOf(false) }
     var showSortMenu by remember { mutableStateOf(false) }
 
@@ -536,7 +548,10 @@ private fun SearchAssetsContent(
             Box {
                 DiscoverFilterDropdownPill(
                     label = "MC: ${mcVersion ?: "All"}",
-                    onClick = { showMcMenu = true }
+                    onClick = {
+                        mcQuery = ""
+                        showMcMenu = true
+                    }
                 )
                 DropdownMenu(
                     expanded = showMcMenu,
@@ -550,19 +565,60 @@ private fun SearchAssetsContent(
                             pageIndex = 1
                         }
                     )
-                    // The list is every version the source knows, which is several hundred long,
-                    // so it is laid out lazily inside a bounded box instead of all at once.
-                    Box(modifier = Modifier.heightIn(max = 360.dp)) {
-                        LazyColumn {
-                            items(versions, key = { it.id }) { facet ->
-                                DropdownMenuItem(
-                                    text = { Text(facet.label) },
-                                    onClick = {
-                                        showMcMenu = false
-                                        mcVersion = facet.id
-                                        pageIndex = 1
-                                    }
+                    // The list is every version of the game the source knows - several hundred,
+                    // releases and snapshots alike - so it gets a search box of its own and is laid
+                    // out lazily inside a bounded box instead of all at once.
+                    Column(modifier = Modifier.widthIn(min = 220.dp)) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(AerixSurface.panelTrack)
+                                .padding(horizontal = 10.dp, vertical = 8.dp)
+                        ) {
+                            if (mcQuery.isEmpty()) {
+                                Text(
+                                    text = "Search versions...",
+                                    fontSize = 12.sp,
+                                    color = AerixSurface.textMuted
                                 )
+                            }
+                            BasicTextField(
+                                value = mcQuery,
+                                onValueChange = { mcQuery = it },
+                                singleLine = true,
+                                textStyle = TextStyle(color = AerixSurface.textPrimary, fontSize = 12.sp),
+                                cursorBrush = SolidColor(accent),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        val matches = remember(versions, mcQuery) {
+                            if (mcQuery.isBlank()) versions
+                            else versions.filter { it.label.contains(mcQuery.trim(), ignoreCase = true) }
+                        }
+                        if (matches.isEmpty()) {
+                            Text(
+                                text = "No version matches",
+                                fontSize = 12.sp,
+                                color = AerixSurface.textMuted,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                            )
+                        } else {
+                            Box(modifier = Modifier.heightIn(max = 320.dp)) {
+                                LazyColumn {
+                                    items(matches, key = { it.id }) { facet ->
+                                        DropdownMenuItem(
+                                            text = { Text(facet.label) },
+                                            onClick = {
+                                                showMcMenu = false
+                                                mcVersion = facet.id
+                                                pageIndex = 1
+                                            }
+                                        )
+                                    }
+                                }
                             }
                         }
                     }

@@ -438,6 +438,7 @@
     <string name="aerix_create_loader_empty">No %1$s build for Minecraft %2$s</string>
     <string name="aerix_create_loader_loading">Loading builds</string>
     <string name="aerix_create_only_stable">Stable only</string>
+    <string name="aerix_create_vanilla_hint">No loader build to pick - Create &amp; Install makes the instance straight away.</string>
     <string name="aerix_create_import_modpack">Import modpack</string>
     <string name="aerix_create_import_modpack_sub">Modrinth / CurseForge / .mrpack</string>
     <string name="aerix_create_install">Create &amp; Install Instance</string>
