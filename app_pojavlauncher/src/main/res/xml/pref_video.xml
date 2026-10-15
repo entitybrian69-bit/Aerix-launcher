@@ -61,6 +61,13 @@
             android:icon="@drawable/ic_mat_force_vsync"
             />
         <androidx.preference.SwitchPreferenceCompat
+            android:defaultValue="true"
+            android:key="show_fps"
+            android:summary="@string/preference_show_fps_description"
+            android:title="@string/preference_show_fps_title"
+            android:icon="@drawable/ic_px_fps"
+            />
+        <androidx.preference.SwitchPreferenceCompat
             android:defaultValue="false"
             android:key="use_angle"
             android:summary="@string/preference_use_angle_description"

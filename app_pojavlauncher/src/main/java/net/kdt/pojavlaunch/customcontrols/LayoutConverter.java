@@ -1,6 +1,8 @@
 package net.kdt.pojavlaunch.customcontrols;
 
+import android.content.Context;
 import android.graphics.Point;
+import android.util.Log;
 import android.view.KeyEvent;
 
 import com.google.gson.JsonSyntaxException;
@@ -17,17 +19,72 @@ import java.io.IOException;
 import java.util.ArrayList;
 
 public class LayoutConverter {
+    private static final String TAG = "LayoutConverter";
 
-    private static final int TARGET_VERSION = 9;
+    /** Version of the layout model this launcher writes and understands natively. */
+    public static final int TARGET_VERSION = 9;
 
     public static CustomControls loadAndConvertIfNecessary(Point size, String jsonPath) throws IOException, JsonSyntaxException{
+        return loadAndConvertIfNecessary(null, size, jsonPath);
+    }
+
+    /**
+     * Load a control layout, converting it when it was written by another launcher.
+     *
+     * Layouts of this launcher, PojavLauncher and MojoLauncher are read as before. Layouts of the
+     * Zalith Launcher 2 editor and of Fold Craft Launcher are converted into this launcher's model.
+     * A file that cannot be used at all raises an IOException, which the caller turns into falling
+     * back to the default layout, instead of failing while the game is starting.
+     *
+     * @param context used to convert sizes, may be null
+     * @param size size of the control layout view, in pixels
+     * @param jsonPath path of the layout file
+     * @return the loaded layout
+     */
+    public static CustomControls loadAndConvertIfNecessary(Context context, Point size, String jsonPath) throws IOException, JsonSyntaxException{
         File jsonFile = new File(jsonPath);
         LayoutBitmaps.ControlsContainer container = LayoutBitmaps.load(jsonFile);
         LayoutBitmaps layoutBitmaps = container.mLayoutZip;
-        CustomControls controls = internalLoad(size, container.mControlsJson);
+        CustomControls controls = loadFromString(context, size, container.mControlsJson);
         if(controls == null) throw new IOException("Unsupported control layout version");
         controls.mLayoutBitmaps = layoutBitmaps;
         return controls;
+    }
+
+    /**
+     * Load a control layout from its JSON text, converting it when it comes from another launcher.
+     *
+     * @param context used to convert sizes, may be null
+     * @param size size of the control layout view, in pixels
+     * @param jsonLayoutData content of the layout file
+     * @return the loaded layout
+     * @throws IOException when the file is not a control layout that can be used here
+     */
+    public static CustomControls loadFromString(Context context, Point size, String jsonLayoutData) throws IOException {
+        JSONObject layoutJobj;
+        try {
+            layoutJobj = new JSONObject(jsonLayoutData);
+        } catch (JSONException e) {
+            throw new IOException("The control layout is not valid JSON", e);
+        }
+
+        ControlLayoutImporter.Format format = ControlLayoutImporter.detectFormat(layoutJobj);
+        if (format == ControlLayoutImporter.Format.ZALITH || format == ControlLayoutImporter.Format.FCL) {
+            ControlLayoutImporter.Result result;
+            try {
+                result = ControlLayoutImporter.convert(context, size, layoutJobj, format);
+            } catch (Throwable e) {
+                throw new IOException("Failed to convert the " + format + " control layout", e);
+            }
+            if (result == null) throw new IOException("The " + format + " control layout has no buttons");
+            if (result.wasModified()) {
+                Log.w(TAG, "Converted a " + format + " layout: " + result.skippedEntries
+                        + " entries skipped, " + result.inertButtons + " buttons without an action");
+            }
+            return result.controls;
+        }
+
+        return internalLoad(size, jsonLayoutData);
     }
 
     public static CustomControls internalLoad(Point size, String jsonLayoutData) throws JsonSyntaxException {
@@ -50,8 +107,14 @@ public class LayoutConverter {
 
             CustomControls layout = Tools.GLOBAL_GSON.fromJson(jsonLayoutData, CustomControls.class);
 
-            if(layout.version > TARGET_VERSION)
-                throw new JsonSyntaxException("Layout version " +layout.version+ " is too new, only up to "+TARGET_VERSION +" is supported");
+            if(layout.version > TARGET_VERSION) {
+                // Refuse the whole layout instead of the version: a file written by a newer
+                // launcher still holds buttons this one can display, and the sanitizer drops
+                // the ones that cannot be converted.
+                Log.w(TAG, "Layout version " + layout.version + " is newer than " + TARGET_VERSION
+                        + ", loading it as version " + TARGET_VERSION);
+                layout.version = TARGET_VERSION;
+            }
 
             if(layout.version == 3 || layout.version == 4 || layout.version == 5)
                 LayoutConverter.convertV3_4Layout(layout);
@@ -62,12 +125,28 @@ public class LayoutConverter {
             if(layout.version == 8)
                 convertV8Layout(layout);
 
+            normalizeLists(layout);
+
             return layout;
 
 
         } catch (JSONException e) {
             throw new JsonSyntaxException("Failed to load the layout. Maybe it's corrupted?", e);
+        } catch (Throwable e) {
+            // A layout written by another launcher may not carry the fields this one expects.
+            // Report it as a broken layout instead of letting it reach the game.
+            throw new JsonSyntaxException("Failed to read the layout", e);
         }
+    }
+
+    /**
+     * Give every button list of a layout an empty list instead of null, so a partially filled
+     * layout can be displayed instead of crashing while the buttons are added to the screen.
+     */
+    private static void normalizeLists(CustomControls layout) {
+        if (layout.mControlDataList == null) layout.mControlDataList = new ArrayList<>();
+        if (layout.mDrawerDataList == null) layout.mDrawerDataList = new ArrayList<>();
+        if (layout.mJoystickDataList == null) layout.mJoystickDataList = new ArrayList<>();
     }
 
 
@@ -261,7 +340,14 @@ public class LayoutConverter {
         return (int) ((maxSize / 2) * (widthInPercent / 100));
     }
 
-    private static int keyCodeFromGLFW(int keycode){
+    /**
+     * Translate a GLFW keycode, as written in a layout file, into the keycode the launcher works
+     * with.
+     *
+     * @param keycode a GLFW keycode
+     * @return the matching keycode, or {@link KeyEvent#KEYCODE_UNKNOWN} when there is none
+     */
+    static int keyCodeFromGLFW(int keycode){
         switch (keycode) {
             case LwjglGlfwKeycode.GLFW_KEY_SPACE: return KeyEvent.KEYCODE_SPACE;
             case LwjglGlfwKeycode.GLFW_KEY_APOSTROPHE: return KeyEvent.KEYCODE_APOSTROPHE;

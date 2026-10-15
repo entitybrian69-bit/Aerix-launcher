@@ -482,6 +482,7 @@ private fun WideHomeDashboard(
             .padding(bottom = AerixSpacing.smPlus),
         verticalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus)
     ) {
+        AetheriumHint(accent, actions.explore)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -526,6 +527,7 @@ private fun CompactHomeDashboard(
         contentPadding = PaddingValues(bottom = AerixSpacing.xxl),
         verticalArrangement = Arrangement.spacedBy(AerixSpacing.md)
     ) {
+        item { AetheriumHint(accent, actions.explore) }
         item { LiquidHomeHero(selected, count, accent, actions, Modifier.fillMaxWidth().height(312.dp)) }
         item {
             Column(verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm)) {
@@ -537,6 +539,52 @@ private fun CompactHomeDashboard(
         item { TaskSummaryPanel(taskCount, accent, Modifier.fillMaxWidth().height(74.dp)) }
         item { RecentWorldsPanel(recent, selected, accent, actions, Modifier.fillMaxWidth(), lazy = false) }
         item { QuickToolsPanel(accent, actions, Modifier.fillMaxWidth(), scrollable = false) }
+    }
+}
+
+/**
+ * One line hint pointing at the Aetherium mod. It is deliberately small: it names the mod and
+ * nothing else, so it never competes with the play button above it.
+ */
+@Composable
+private fun AetheriumHint(accent: Color, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(AerixRadii.control)
+    Row(
+        modifier = Modifier
+            .clip(shape)
+            .background(accent.copy(alpha = 0.12f))
+            .border(BorderStroke(AerixSpacing.hairline, accent.copy(alpha = 0.35f)), shape)
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(horizontal = AerixSpacing.smPlus, vertical = AerixSpacing.smCompact),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
+    ) {
+        Text(
+            text = stringResource(R.string.aerix_home_aetherium_tag).uppercase(),
+            color = AerixSurface.canvas,
+            fontSize = 8.sp,
+            letterSpacing = 0.8.sp,
+            fontWeight = FontWeight.ExtraBold,
+            modifier = Modifier
+                .clip(RoundedCornerShape(AerixRadii.tiny))
+                .background(accent)
+                .padding(horizontal = AerixSpacing.xs, vertical = 1.dp)
+        )
+        Text(
+            text = stringResource(R.string.aerix_home_aetherium_hint),
+            color = AerixSurface.textSecondary,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false)
+        )
+        Icon(
+            painter = painterResource(R.drawable.aerix_ic_chevron_right),
+            contentDescription = null,
+            tint = AerixSurface.textMuted,
+            modifier = Modifier.size(13.dp)
+        )
     }
 }
 

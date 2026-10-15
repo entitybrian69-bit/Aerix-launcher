@@ -97,6 +97,7 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     private DrawerLayout drawerLayout;
     private ListView navDrawer;
     private View mDrawerPullButton;
+    private FpsView mFpsView;
     private GyroControl mGyroControl = null;
     private ControlLayout mControlLayout;
     private HotbarView mHotbarView;
@@ -325,6 +326,7 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         loggerView = findViewById(R.id.mainLoggerView);
         touchCharInput = findViewById(R.id.mainTouchCharInput);
         mDrawerPullButton = findViewById(R.id.drawer_button);
+        mFpsView = findViewById(R.id.main_fps_view);
         mHotbarView = findViewById(R.id.hotbar_view);
         mLoadingScreen = findViewById(R.id.main_loading_screen);
     }
@@ -335,6 +337,14 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         ContextExecutor.setActivity(this);
         if(PREF_ENABLE_GYRO) mGyroControl.enable();
         PLATFORM.setHovered(true);
+        // The readout is only shown once the game itself is on screen.
+        if(mLoadingScreen == null) updateFpsViewVisibility();
+    }
+
+    /** Show the frame rate readout only when the player asked for it. */
+    private void updateFpsViewVisibility() {
+        if (mFpsView == null) return;
+        mFpsView.setVisibility(LauncherPreferences.PREF_SHOW_FPS ? View.VISIBLE : View.GONE);
     }
 
     @Override
@@ -537,6 +547,7 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
 
     public void hideLoadingScreen(){
         if(mLoadingScreen == null) return;
+        updateFpsViewVisibility();
         ((TextView) mLoadingScreen.findViewById(R.id.main_loading_screen_text)).setText(getString(R.string.loading_screen_booted, PLATFORM.backendName()));
         mLoadingScreen.animate()
                 .alpha(0f)

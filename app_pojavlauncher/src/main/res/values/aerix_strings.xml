@@ -36,6 +36,8 @@
     <string name="aerix_home_recent">Recent worlds</string>
     <string name="aerix_home_view_all">View all</string>
     <string name="aerix_home_quick_tools">Quick tools</string>
+    <string name="aerix_home_aetherium_hint">Try the Aetherium mod</string>
+    <string name="aerix_home_aetherium_tag">New</string>
     <string name="aerix_home_quick_create">Create instance</string>
     <string name="aerix_home_quick_create_sub">Vanilla or modded</string>
     <string name="aerix_home_quick_explore">Explore content</string>

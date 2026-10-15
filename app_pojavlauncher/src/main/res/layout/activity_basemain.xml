@@ -50,13 +50,14 @@
 				android:inputType="textFilter|textImeMultiLine|textAutoComplete|textAutoCorrect"
 				tools:ignore="TouchTargetSizeCheck" />
 
+			<!-- Size and position are driven by DrawerPullButton itself, so the button keeps the
+			     place the player dragged it to. -->
 			<net.kdt.pojavlaunch.customcontrols.handleview.DrawerPullButton
 				android:id="@+id/drawer_button"
-				android:layout_width="40dp"
-				android:layout_height="20dp"
-				android:padding="8dp"
+				android:layout_width="wrap_content"
+				android:layout_height="wrap_content"
 				android:elevation="10dp"
-				android:layout_gravity="center_horizontal"/>
+				android:layout_gravity="top|start"/>
 			<net.kdt.pojavlaunch.customcontrols.mouse.HotbarView
 				android:id="@+id/hotbar_view"
 				android:layout_width="0px"
@@ -103,6 +104,19 @@
 					android:textSize="12sp" />
 			</LinearLayout>
 		</FrameLayout>
+
+		<net.kdt.pojavlaunch.game.FpsView
+			android:id="@+id/main_fps_view"
+			android:layout_width="wrap_content"
+			android:layout_height="wrap_content"
+			android:layout_gravity="top|start"
+			android:layout_marginStart="8dp"
+			android:layout_marginTop="6dp"
+			android:paddingStart="7dp"
+			android:paddingEnd="7dp"
+			android:paddingTop="2dp"
+			android:paddingBottom="2dp"
+			android:visibility="gone" />
 
 		<com.kdt.LoggerView
 			android:id="@+id/mainLoggerView"
