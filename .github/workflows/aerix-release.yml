@@ -6,7 +6,7 @@ name: Aerix release
 # Runs when this file changes on the Aerix branch; RUN_ID / BUILD_SHA select the CI run.
 on:
   push:
-    branches: [ "arena/5d11b9a3-aerix-launcher" ]
+    branches: [ "arena/68d5e5c9-aerix-launcher" ]
     paths: [ ".github/workflows/aerix-release.yml" ]
 
 permissions:
@@ -14,8 +14,8 @@ permissions:
   actions: read
 
 env:
-  RUN_ID: "38670604839"
-  BUILD_SHA: "822150482e735571b68c163f3743111b500e9273"
+  RUN_ID: "38673475350"
+  BUILD_SHA: "93fc6e0421dbe6ca8c0d9c9fb03c3cb7fcec1ad2"
 
 jobs:
   publish:
@@ -24,7 +24,7 @@ jobs:
       - name: Checkout Aerix branch
         uses: actions/checkout@v4
         with:
-          ref: arena/5d11b9a3-aerix-launcher
+          ref: arena/68d5e5c9-aerix-launcher
           fetch-depth: 1
 
       - name: Download no-runtime APK
@@ -54,5 +54,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add apk
           git commit -m "Build: Aerix APK $SHORT (CI run $RUN_ID) [skip ci]"
-          git push origin HEAD:arena/5d11b9a3-aerix-launcher
+          git push origin HEAD:arena/68d5e5c9-aerix-launcher
 
