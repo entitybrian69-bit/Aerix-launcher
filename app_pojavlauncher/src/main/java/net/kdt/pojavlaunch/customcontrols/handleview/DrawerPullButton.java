@@ -51,9 +51,9 @@ public class DrawerPullButton extends View {
     private final Paint mBorderPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final RectF mBackgroundRect = new RectF();
 
-    private final Drawable mDrawable;
+    private Drawable mDrawable;
 
-    private final int mTouchSlop;
+    private int mTouchSlop;
     private boolean mPositionRestored = false;
     private boolean mDragging = false;
     private float mTouchDownX;
