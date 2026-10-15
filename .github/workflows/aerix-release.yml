@@ -44,10 +44,10 @@ permissions:
 # accessible by integration" even with contents: write - but it can upload the assets of one that
 # exists. Create the release itself (empty) next to the branch, then set RUN_ID / TAG here and push.
 env:
-  RUN_ID: "38759048958"
+  RUN_ID: "38762308660"
   BUILD_SHA: ""
-  TAG: "aerix-80afff6"
-  NOTES: "Every Minecraft version and every real category in the content browser, and vanilla instances can finally be created."
+  TAG: "aerix-6f9ce88"
+  NOTES: "The content browser opens its long filter lists in a dialog, and its version filter is the whole game."
 
 
 jobs:
