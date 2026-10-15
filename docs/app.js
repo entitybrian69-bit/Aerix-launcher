@@ -1,13 +1,16 @@
 /* ============================================================================
    Aerix Launcher — website script
 
-   Two jobs, both small:
-     1. keep the download button pointing at the newest GitHub release, so the
-        page never hands out a stale APK, and
-     2. reveal sections as they scroll in, and run the mobile menu.
+   Three jobs, all small:
+     1. keep the download button pointing at the newest APK, so the page never
+        hands out a stale file,
+     2. acknowledge the tap, because a 112 MB download takes a moment to start,
+     3. reveal sections as they scroll in, and run the mobile menu.
 
-   No dependencies, no build step. If the Releases API cannot be reached the
-   markup already points at /releases/latest, which GitHub keeps current anyway.
+   No dependencies and no build step. The markup already carries GitHub's own
+   permalink to the newest release's APK (releases/latest/download/<name>), which
+   downloads straight away with no page in between — so the button works even if
+   this file never runs, or runs before the network answers.
    ============================================================================ */
 
 (function () {
@@ -15,7 +18,7 @@
 
   var REPO = 'entitybrian69-bit/Aerix-launcher';
   var RELEASES = 'https://github.com/' + REPO + '/releases';
-  var API = 'https://api.github.com/repos/' + REPO + '/releases/latest';
+  var API = 'https://api.github.com/repos/' + REPO + '/releases?per_page=15';
   var CACHE_KEY = 'aerix.latest-release';
   var CACHE_TTL = 10 * 60 * 1000; // the page can be open for a while; ten minutes is plenty
 
@@ -40,42 +43,97 @@
     return { full: full, light: light };
   }
 
-  /* ── the live download button ──────────────────────────────────────────── */
+  /*
+   * The newest published build that actually has an APK on it.
+   *
+   * The list is used rather than the single "latest" endpoint because this project
+   * publishes signed release builds under both kinds of tag - v1.0.0 and the
+   * aerix-<sha> builds - and whichever was published last is the one to install.
+   * Prereleases count: they are the same release-signed builds, just tagged that way.
+   */
+  function newestWithApk(releases) {
+    var usable = (releases || []).filter(function (release) {
+      if (!release || release.draft) return false;
+      return !!pickAssets(release.assets).full;
+    });
+    usable.sort(function (a, b) {
+      var at = Date.parse(b.published_at || b.created_at || 0) || 0;
+      var bt = Date.parse(a.published_at || a.created_at || 0) || 0;
+      return at - bt;
+    });
+    return usable[0] || null;
+  }
+
+  /* ── the download button ───────────────────────────────────────────────── */
 
   function applyRelease(release) {
+    if (!release) return;
     var chipText = $('releaseChipText');
     var button = $('downloadBtn');
     var meta = $('downloadMeta');
     var alt = $('downloadAlt');
-    if (!release) return;
 
-    var tag = (release.tag_name || '').replace(/^v/i, '');
+    // "v1.0.0" stays "v1.0.0"; a build tag such as "aerix-9b26f17" is shown as it is, so the
+    // label never invents a "v" in front of something that is not a version.
+    var raw = (release.tag_name || '').trim();
+    var tag = /^\d/.test(raw) ? 'v' + raw : raw;
     var assets = pickAssets(release.assets);
 
     if (chipText && tag) {
-      chipText.textContent = 'v' + tag + ' · latest release';
+      chipText.textContent = tag + ' · latest release';
     }
 
     if (button && assets.full && assets.full.browser_download_url) {
+      // The direct file: tapping this downloads the APK, no GitHub page in between.
       button.href = assets.full.browser_download_url;
-      var label = 'Download ' + (tag ? 'v' + tag + ' ' : 'the latest ') + 'APK';
+      button.setAttribute('download', assets.full.name || '');
+      button.setAttribute('data-asset', assets.full.name || '');
+      var label = 'Download' + (tag ? ' ' + tag : ' the latest') + ' APK';
       button.innerHTML = '<span class="btn-ico" aria-hidden="true">↓</span>' + label;
     }
 
-    if (meta) {
-      var size = assets.full ? megabytes(assets.full.size) : null;
-      meta.innerHTML = (size ? size + ' · ' : '') +
-        'Android 8.0+ · release build, signed with the project key' +
-        ' · <a href="' + RELEASES + '" target="_blank" rel="noopener">all releases</a>';
+    if (meta && assets.full) {
+      var size = megabytes(assets.full.size);
+      meta.textContent = (size ? size + ' · ' : '') +
+        'Android 8.0+ · release build, signed with the project key';
     }
 
     if (alt && assets.light && assets.light.browser_download_url) {
       var lightSize = megabytes(assets.light.size);
       alt.hidden = false;
       alt.innerHTML = 'Smaller download: <a href="' + assets.light.browser_download_url +
-        '">' + assets.light.name + (lightSize ? ' (' + lightSize + ')' : '') +
+        '" download>' + assets.light.name + (lightSize ? ' (' + lightSize + ')' : '') +
         '</a> — the same build without the bundled Java runtime.';
     }
+  }
+
+  /*
+   * A tap on a 112 MB file looks like nothing happening for a second or two, so the
+   * button says so. The navigation is left alone: the browser is already fetching the
+   * APK from the link itself, and a download also survives this page being closed.
+   */
+  function wireDownload() {
+    var button = $('downloadBtn');
+    if (!button) return;
+
+    button.addEventListener('click', function () {
+      if (button.classList.contains('is-starting')) return;
+      button.classList.add('is-starting');
+      button.setAttribute('aria-live', 'polite');
+
+      var note = $('downloadNote');
+      if (!note) {
+        note = document.createElement('p');
+        note.id = 'downloadNote';
+        note.className = 'meta small download-note';
+        (button.parentNode.parentNode || button.parentNode).appendChild(note);
+      }
+      note.textContent = 'Starting your download… if nothing happens, tap the button again.';
+
+      window.setTimeout(function () {
+        button.classList.remove('is-starting');
+      }, 4000);
+    });
   }
 
   function loadRelease() {
@@ -85,22 +143,23 @@
       return;
     }
 
-    if (!window.fetch) return; // the markup already links to /releases/latest
+    if (!window.fetch) return; // the markup's permalink already points at the newest APK
 
     fetch(API, { headers: { Accept: 'application/vnd.github+json' } })
       .then(function (res) {
         if (!res.ok) throw new Error('HTTP ' + res.status);
         return res.json();
       })
-      .then(function (release) {
-        if (release && !release.prerelease && release.tag_name) {
-          writeCache(release);
-          applyRelease(release);
+      .then(function (releases) {
+        var newest = newestWithApk(releases);
+        if (newest) {
+          writeCache(newest);
+          applyRelease(newest);
         }
       })
       .catch(function () {
-        /* Offline, rate-limited or blocked: the static link stays, and it still
-           points at the newest release because that is what /releases/latest is. */
+        /* Offline, rate-limited or blocked: the markup already carries GitHub's own
+           permalink to the newest release's APK, so nothing needs to change. */
       });
   }
 
@@ -183,6 +242,7 @@
 
   function start() {
     loadRelease();
+    wireDownload();
     wireMenu();
     wireReveals();
   }

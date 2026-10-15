@@ -151,15 +151,21 @@ jobs:
             exit 1
           fi
           cp "$full" "dist/Aerix-Launcher-$version.apk"
+          # The same file under a name that never changes, so
+          # /releases/latest/download/Aerix-Launcher.apk is a permanent link to the
+          # newest build: the website's download button uses it and downloads the APK
+          # directly, with no visit to a GitHub page and no JavaScript needed.
+          cp "$full" "dist/Aerix-Launcher.apk"
           {
             echo "full=Aerix-Launcher-$version.apk"
             echo "size=$(du -h "$full" | cut -f1)"
           } >> "$GITHUB_OUTPUT"
-          assets="dist/Aerix-Launcher-$version.apk"
+          assets="dist/Aerix-Launcher-$version.apk dist/Aerix-Launcher.apk"
           notes_extra=""
           if [ -n "$noruntime" ] && [ "${DISPATCH_SKIP_NORUNTIME:-}" != "true" ]; then
             cp "$noruntime" "dist/Aerix-Launcher-$version-noruntime.apk"
-            assets="$assets dist/Aerix-Launcher-$version-noruntime.apk"
+            cp "$noruntime" "dist/Aerix-Launcher-noruntime.apk"
+            assets="$assets dist/Aerix-Launcher-$version-noruntime.apk dist/Aerix-Launcher-noruntime.apk"
             notes_extra="noruntime"
           fi
           echo "assets=$assets" >> "$GITHUB_OUTPUT"
@@ -188,6 +194,8 @@ jobs:
               echo "| \`Aerix-Launcher-$version-noruntime.apk\` | The same build without the bundled runtime, for a smaller download. |"
             fi
             echo ""
+            echo "Permanent link to the newest APK: \`https://github.com/$GITHUB_REPOSITORY/releases/latest/download/Aerix-Launcher.apk\`"
+            echo ""
             echo "Release build, signed with the release key of this project - not a debug build."
             echo "Android may ask to allow installing apps from unknown sources the first time."
             echo ""
@@ -213,8 +221,17 @@ jobs:
           echo "tag=$tag sha=$sha assets=${assets[*]}"
           ls -la "${assets[@]}"
           if ! gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target "$sha" \
-              --title "Aerix Launcher $tag" --prerelease --notes-file notes.md
+            # A version tag (v1.0.0) is a real release, so /releases/latest tracks it and the
+            # website's permanent download link keeps resolving. A build tag (aerix-<sha>) stays
+            # a pre-release, which is what it is.
+            case "$tag" in
+              v[0-9]*)
+                gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target "$sha" \
+                  --title "Aerix Launcher $version" --latest --notes-file notes.md ;;
+              *)
+                gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target "$sha" \
+                  --title "Aerix Launcher $tag" --prerelease --notes-file notes.md ;;
+            esac
           fi
           gh release upload "$tag" "${assets[@]}" --repo "$GITHUB_REPOSITORY" --clobber
           gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --notes-file notes.md
