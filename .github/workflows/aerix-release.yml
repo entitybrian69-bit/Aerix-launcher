@@ -140,7 +140,7 @@ jobs:
           short="${{ steps.run.outputs.short }}"
           run_url="${{ steps.run.outputs.url }}"
           {
-            echo "**Build \`$short\`** - [Android CI run]($run_url) - `$GITHUB_REF_NAME`"
+            echo "**Build \`$short\`** - [Android CI run]($run_url) - branch \`$GITHUB_REF_NAME\`"
             echo ""
             if [ -n "${DISPATCH_NOTES:-${NOTES:-}}" ]; then
               echo "${DISPATCH_NOTES:-${NOTES:-}}"
