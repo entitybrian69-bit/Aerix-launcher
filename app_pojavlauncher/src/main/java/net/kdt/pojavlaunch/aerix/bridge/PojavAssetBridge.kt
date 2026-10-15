@@ -198,6 +198,22 @@ class AssetFile(
 
 class AssetPage(val projects: List<AssetProject>, val total: Int)
 
+/**
+ * One choice of a filter: the id a search is asked for, or the id of a category; [label] is what
+ * the player reads.
+ */
+class AssetFacet(val id: String, val label: String)
+
+/**
+ * The filter lists of one source: every Minecraft version it knows and the categories of the
+ * content type. Both come from the source itself - the platform decides what it offers - so a
+ * category that only CurseForge has is only shown there, and vice versa.
+ */
+class AssetFacets(
+    val versions: List<AssetFacet> = emptyList(),
+    val categories: List<AssetFacet> = emptyList()
+)
+
 /** Minecraft version and loader of the selected instance, used as default search filters. */
 class InstanceTarget(val mcVersion: String?, val loader: String?)
 
@@ -275,6 +291,86 @@ object PojavAssetBridge {
                 AssetPlatform.CURSEFORGE -> searchCurseForge(context, type, query, mcVersion, loader, category, sort, offset)
             }
         }.getOrNull()
+    }
+
+    /**
+     * The Minecraft versions and the categories a source offers for [type].
+     *
+     * Modrinth answers both from its tag endpoints, CurseForge from its game version list and from
+     * the categories of the class the content type belongs to. A source that does not answer gives
+     * back what the type ships with, so the filters are never empty.
+     */
+    suspend fun facets(context: Context, platform: AssetPlatform, type: AssetType): AssetFacets =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                when (platform) {
+                    AssetPlatform.MODRINTH -> AssetFacets(modrinthVersions(), modrinthCategories(type))
+                    AssetPlatform.CURSEFORGE -> {
+                        val classId = type.curseForgeClassId
+                        AssetFacets(curseForgeVersions(context, classId), curseForgeCategories(context, classId))
+                    }
+                }
+            }.getOrElse {
+                AssetFacets(emptyList(), type.categories.map { (id, label) -> AssetFacet(id, label) })
+            }
+        }
+
+    // ---- Modrinth facets ---------------------------------------------------------------------
+
+    private fun modrinthVersions(): List<AssetFacet> {
+        val array = modrinthGet("tag/game_version", null, JsonArray::class.java) ?: return emptyList()
+        return array.mapNotNull { element ->
+            if (!element.isJsonObject) return@mapNotNull null
+            val version = element.asJsonObject.string("version") ?: return@mapNotNull null
+            AssetFacet(version, version)
+        }
+    }
+
+    private fun modrinthCategories(type: AssetType): List<AssetFacet> {
+        val array = modrinthGet("tag/category", null, JsonArray::class.java) ?: return emptyList()
+        val projectType = type.modrinthType
+        return array.mapNotNull { element ->
+            if (!element.isJsonObject) return@mapNotNull null
+            val category = element.asJsonObject
+            // The tag endpoint answers for every kind of project at once; the header of the search
+            // is what puts a category on a resource pack rather than on a mod.
+            val categoryType = category.string("project_type") ?: category.string("header")
+            if (projectType != null && categoryType != null && categoryType != projectType) {
+                return@mapNotNull null
+            }
+            val name = category.string("name") ?: return@mapNotNull null
+            AssetFacet(name, name.replaceFirstChar { it.uppercase() })
+        }
+    }
+
+    // ---- CurseForge facets -------------------------------------------------------------------
+
+    private fun curseForgeVersions(context: Context, classId: Int): List<AssetFacet> {
+        val array = curseForgeGet(
+            context, "minecraft/version",
+            hashMapOf<String, Any>("gameId" to CURSEFORGE_GAME_ID), JsonArray::class.java
+        ) ?: return emptyList()
+        return array.mapNotNull { element ->
+            if (!element.isJsonObject) return@mapNotNull null
+            val version = element.asJsonObject.string("versionString") ?: return@mapNotNull null
+            AssetFacet(version, version)
+        }
+    }
+
+    private fun curseForgeCategories(context: Context, classId: Int): List<AssetFacet> {
+        val array = curseForgeGet(
+            context, "categories",
+            hashMapOf<String, Any>("gameId" to CURSEFORGE_GAME_ID, "classId" to classId),
+            JsonArray::class.java
+        ) ?: return emptyList()
+        return array.mapNotNull { element ->
+            if (!element.isJsonObject) return@mapNotNull null
+            val category = element.asJsonObject
+            val id = category.get("id")?.takeIf { !it.isJsonNull }?.asString ?: return@mapNotNull null
+            val name = category.string("name") ?: return@mapNotNull null
+            // The id is passed to the search, so it travels in the id field of the facet.
+            AssetFacet(id, name)
+        }
     }
 
     suspend fun details(context: Context, project: AssetProject): AssetProjectDetails = withContext(Dispatchers.IO) {
@@ -658,6 +754,9 @@ object PojavAssetBridge {
     /** Maps Aerix category slugs to CurseForge categoryId integers (from Mirai _CurseForgeCategories.kt). */
     private fun curseForgeCategoryId(type: AssetType, slug: String?): Int? {
         if (slug.isNullOrBlank()) return null
+        // The category filter of the UI carries the id CurseForge itself uses once the lists come
+        // from its API, so it can be used as it is.
+        slug.toIntOrNull()?.let { return it }
         return when (type) {
             AssetType.MODPACK -> when (slug) {
                 "adventure" -> 4475

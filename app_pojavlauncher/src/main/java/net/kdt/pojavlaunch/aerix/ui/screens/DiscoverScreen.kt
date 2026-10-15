@@ -53,6 +53,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -113,6 +114,8 @@ import net.kdt.pojavlaunch.R
 import net.kdt.pojavlaunch.aerix.bridge.AerixPreferences
 import net.kdt.pojavlaunch.aerix.bridge.AssetFile
 import net.kdt.pojavlaunch.aerix.bridge.AssetPage
+import net.kdt.pojavlaunch.aerix.bridge.AssetFacet
+import net.kdt.pojavlaunch.aerix.bridge.AssetFacets
 import net.kdt.pojavlaunch.aerix.bridge.AssetPlatform
 import net.kdt.pojavlaunch.aerix.bridge.AssetProject
 import net.kdt.pojavlaunch.aerix.bridge.AssetProjectDetails
@@ -333,10 +336,26 @@ private fun SearchAssetsContent(
     var reloadNonce by remember { mutableIntStateOf(0) }
     var installedFingerprints by remember { mutableStateOf<Set<String>>(emptySet()) }
 
+    // The filters of the source: every Minecraft version it knows, and the categories of the
+    // content type as that source names them. They follow the platform switch, because the two
+    // sources do not offer the same ones - CurseForge has categories Modrinth never had, and the
+    // other way round. The lists the type ships with stand in until the answer arrives.
+    var facets by remember(type) { mutableStateOf(AssetFacets()) }
+    val fallbackCategories = remember(type) {
+        type.categories.map { (id, label) -> AssetFacet(id, label) }
+    }
+    val versions = remember(facets, platform) { facets.versions.ifEmpty { commonMcVersions.map { AssetFacet(it, it) } } }
+    val categories = remember(facets, fallbackCategories) { facets.categories.ifEmpty { fallbackCategories } }
+
     val selectedInstance = PojavInstanceBridge.selected
 
     LaunchedEffect(type, selectedInstance?.source) {
         installedFingerprints = PojavAssetBridge.installedFingerprints(type)
+    }
+
+    LaunchedEffect(type, platform) {
+        facets = AssetFacets()
+        facets = PojavAssetBridge.facets(context, platform, type)
     }
 
     LaunchedEffect(type, platform, submittedQuery, category, mcVersion, loader, sort, pageIndex, reloadNonce) {
@@ -463,7 +482,10 @@ private fun SearchAssetsContent(
                                 if (platform != p) {
                                     platform = p
                                     AerixPreferences.saveAssetPlatformSource(p)
+                                    // The categories and the version list belong to the source that
+                                    // answered them, so both are cleared for the new one.
                                     category = null
+                                    mcVersion = null
                                     pageIndex = 1
                                 }
                             }
@@ -472,10 +494,10 @@ private fun SearchAssetsContent(
                 }
             }
 
-            // Category Dropdown Pill ("Category: All ▾")
-            if (type.categories.isNotEmpty()) {
+            // Category Dropdown Pill ("Category: All ▾"), fed by the source of the moment.
+            if (categories.isNotEmpty()) {
                 Box {
-                    val catLabel = type.categories.firstOrNull { it.first == category }?.second ?: "All"
+                    val catLabel = categories.firstOrNull { it.id == category }?.label ?: "All"
                     DiscoverFilterDropdownPill(
                         label = "Category: $catLabel",
                         onClick = { showCategoryMenu = true }
@@ -492,15 +514,19 @@ private fun SearchAssetsContent(
                                 pageIndex = 1
                             }
                         )
-                        type.categories.forEach { (id, label) ->
-                            DropdownMenuItem(
-                                text = { Text(label) },
-                                onClick = {
-                                    showCategoryMenu = false
-                                    category = id
-                                    pageIndex = 1
+                        Box(modifier = Modifier.heightIn(max = 360.dp)) {
+                            LazyColumn {
+                                items(categories, key = { it.id }) { facet ->
+                                    DropdownMenuItem(
+                                        text = { Text(facet.label) },
+                                        onClick = {
+                                            showCategoryMenu = false
+                                            category = facet.id
+                                            pageIndex = 1
+                                        }
+                                    )
                                 }
-                            )
+                            }
                         }
                     }
                 }
@@ -524,15 +550,21 @@ private fun SearchAssetsContent(
                             pageIndex = 1
                         }
                     )
-                    commonMcVersions.forEach { ver ->
-                        DropdownMenuItem(
-                            text = { Text(ver) },
-                            onClick = {
-                                showMcMenu = false
-                                mcVersion = ver
-                                pageIndex = 1
+                    // The list is every version the source knows, which is several hundred long,
+                    // so it is laid out lazily inside a bounded box instead of all at once.
+                    Box(modifier = Modifier.heightIn(max = 360.dp)) {
+                        LazyColumn {
+                            items(versions, key = { it.id }) { facet ->
+                                DropdownMenuItem(
+                                    text = { Text(facet.label) },
+                                    onClick = {
+                                        showMcMenu = false
+                                        mcVersion = facet.id
+                                        pageIndex = 1
+                                    }
+                                )
                             }
-                        )
+                        }
                     }
                 }
             }

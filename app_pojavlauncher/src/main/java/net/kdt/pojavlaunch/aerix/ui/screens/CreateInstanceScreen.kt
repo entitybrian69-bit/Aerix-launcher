@@ -178,9 +178,11 @@ fun CreateInstanceScreen(activity: FragmentActivity, onClose: () -> Unit) {
         if (!nameEdited) name = suggestedName
     }
 
+    // Vanilla has no builds to choose, so it is ready as soon as a Minecraft version is picked;
+    // every other loader also needs the build of the loader itself.
     val canInstall = !PojavCreateInstanceBridge.installing &&
         selectedVersion != null &&
-        (!loader.usesGameVersion || loaderBuild != null)
+        (!loader.usesGameVersion || !loader.hasBuilds || loaderBuild != null)
 
     Column(
         modifier = Modifier
@@ -479,8 +481,10 @@ fun CreateInstanceScreen(activity: FragmentActivity, onClose: () -> Unit) {
                             }
                         }
 
-                        // 3. Inline Loader Version List when a mod loader is selected
-                        if (loader.usesGameVersion) {
+                        // 3. Inline Loader Version List when a mod loader is selected. Vanilla has
+                        // nothing to choose - there is one Minecraft version and nothing on top of
+                        // it - so the list, its switch and its loading line are left out.
+                        if (loader.usesGameVersion && loader.hasBuilds) {
                             Spacer(modifier = Modifier.height(4.dp))
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
