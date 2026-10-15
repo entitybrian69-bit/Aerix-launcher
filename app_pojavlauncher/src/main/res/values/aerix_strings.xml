@@ -85,7 +85,7 @@
     <string name="aerix_loader_failed">Could not load the version list. Check your connection and try again.</string>
     <string name="aerix_loader_retry">Retry</string>
     <string name="aerix_loader_nothing_here">Nothing here</string>
-    <string name="aerix_loader_own_page">%1$s installs through its own page, which opened on this screen.</string>
+    <string name="aerix_loader_own_page">%1$s keeps its own install page, which just opened.</string>
     <string name="aerix_ingame_download_empty_any">Nothing found. Try other words, or the other download source.</string>
     <string name="aerix_ingame_download_version_relaxed">Nothing is tagged for Minecraft %1$s, so the newest content is shown instead.</string>
     <string name="aerix_ingame_download_key_error">CurseForge did not answer. Setting an API key in the launcher settings can help.</string>

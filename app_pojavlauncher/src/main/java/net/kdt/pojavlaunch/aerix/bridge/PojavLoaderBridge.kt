@@ -15,8 +15,9 @@ import java.io.IOException
  * The loaders the Aerix loader screen offers.
  *
  * Fabric, Quilt, NeoForge, Forge and Legacy Fabric are installed from here, through the same
- * utilities Pojav's own installer screens use. OptiFine keeps its own screen: its versions are
- * scraped from the OptiFine website, which is a flow of its own, so its entry opens that page.
+ * utilities Pojav's own installer screens use. OptiFine and BTA keep their own screens: their
+ * versions come from a scrape of a website and from the BTA version list, both of which are flows
+ * of their own, so those entries open those pages instead.
  */
 enum class LoaderKind(
     val title: String,
@@ -36,7 +37,8 @@ enum class LoaderKind(
         null,
         null
     ),
-    OPTIFINE("OptiFine", R.drawable.aerix_loader_optifine, null, null, PojavInstaller.OPTIFINE);
+    OPTIFINE("OptiFine", R.drawable.aerix_loader_optifine, null, null, PojavInstaller.OPTIFINE),
+    BTA("BTA", R.drawable.aerix_loader_bta, null, null, PojavInstaller.BTA);
 
     /** True when this loader installs from this screen instead of its own page. */
     val installsHere: Boolean get() = ownInstaller == null

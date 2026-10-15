@@ -1713,6 +1713,9 @@ private fun InstanceLoaderPane(activity: FragmentActivity, draft: AerixInstanceD
             metaFailed = true
             builds = emptyList()
         } else {
+            // A loader that has no stable build at all, today or for the newest version, would
+            // leave both benches empty under the switch; dropping the filter opens them.
+            if (stableOnly && versions.none { it.stable }) stableOnly = false
             val current = draft.versionId.takeIf { it.isNotBlank() }
             mcVersion = versions.firstOrNull { it.value == current }?.value ?: versions.first().value
         }
@@ -1722,8 +1725,12 @@ private fun InstanceLoaderPane(activity: FragmentActivity, draft: AerixInstanceD
     LaunchedEffect(kind, mcVersion, reload) {
         val version = mcVersion ?: return@LaunchedEffect
         metaLoading = true
-        builds = PojavLoaderBridge.builds(kind, version)
-        build = builds.firstOrNull { !stableOnly || it.stable }
+        val found = PojavLoaderBridge.builds(kind, version)
+        // Same for the builds of a single version: a version that only has beta builds still has
+        // to be installable, so the switch gives way instead of the list staying empty.
+        if (stableOnly && found.none { it.stable }) stableOnly = false
+        builds = found
+        build = found.firstOrNull { !stableOnly || it.stable }
         metaLoading = false
     }
 
