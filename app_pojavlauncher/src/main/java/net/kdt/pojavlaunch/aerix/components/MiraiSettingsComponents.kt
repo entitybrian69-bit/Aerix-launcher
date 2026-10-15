@@ -1121,9 +1121,9 @@ fun <E> MiraiEnumSettingsCard(
 }
 
 /**
- * Built-in renderer metadata ported from `/home/user/mirai` (`Renderers.kt` + `renderers/*.kt`)
- * matching Photos 1, 2, and 5 (`Krypton Wrapper`, `MobileGlues`, `GL4ES`, `vgpu - (up to 1.16.5, fast)`,
- * `VGPU 1.3.6β`, `LTW Legacy`, `LTW (Large Thin Wrapper)`, `Kopper Zink`, `VirGLRenderer`, `Freedreno (Adreno)`).
+ * Built-in renderer metadata ported from mirai-launcher- (Renderers.kt)
+ * matching Photos 1, 2, and 5 (Krypton Wrapper, MobileGlues, GL4ES, vgpu - (up to 1.16.5, fast),
+ * VGPU 1.3.6β, LTW Legacy, LTW (Large Thin Wrapper), Kopper Zink, VirGLRenderer, Freedreno (Adreno)).
  */
 data class MiraiRendererEntry(
     val uniqueId: String,
