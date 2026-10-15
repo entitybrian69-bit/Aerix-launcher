@@ -1,0 +1,46 @@
+name: Website
+
+# Publishes docs/ as the project website. GitHub Pages serves it at
+# https://entitybrian69-bit.github.io/Aerix-launcher/ for free, with no server to run.
+#
+# The first run enables Pages itself (enablement: true); after that every push that touches docs/
+# redeploys in about a minute.
+
+on:
+  push:
+    branches: [ "arena/96c87123-aerix-launcher" ]
+    paths: [ "docs/**", ".github/workflows/pages.yml" ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Upload the site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
