@@ -61,39 +61,47 @@ object PojavLoaderBridge {
 
     /** Minecraft versions a loader has builds for. */
     suspend fun gameVersions(kind: LoaderKind): List<LoaderVersion> = withContext(Dispatchers.IO) {
-        val fabricLike = kind.fabricLike
-        if (fabricLike != null) {
-            val versions = runCatching { fabricLike.downloadGameVersions() }.getOrNull()
-            return@withContext versions.orEmpty().map { LoaderVersion(it.version, it.version, it.stable) }
-        }
-        val forgeLike = kind.forgeLike ?: return@withContext emptyList()
-        val all = runCatching { forgeLike.downloadVersions() }.getOrNull().orEmpty()
-        all.filterNot { forgeLike.shouldSkipVersion(it) }
-            .map { forgeLike.processVersionString(it) }
-            .distinct()
-            .map { LoaderVersion(it, it, isRelease(it)) }
+        // Nothing thrown from here reaches the screen as a crash: an unreachable source is an
+        // empty list, which the screen shows as "could not load, retry".
+        runCatching {
+            val fabricLike = kind.fabricLike
+            if (fabricLike != null) {
+                val versions = runCatching { fabricLike.downloadGameVersions() }.getOrNull()
+                return@runCatching versions.orEmpty()
+                    .map { LoaderVersion(it.version, it.version, it.stable) }
+            }
+            val forgeLike = kind.forgeLike ?: return@runCatching emptyList()
+            val all = runCatching { forgeLike.downloadVersions() }.getOrNull().orEmpty()
+            all.filterNot { forgeLike.shouldSkipVersion(it) }
+                .map { forgeLike.processVersionString(it) }
+                .distinct()
+                .map { LoaderVersion(it, it, isRelease(it)) }
+        }.getOrDefault(emptyList())
     }
 
     /** Builds of [kind] for [mcVersion], newest first. */
-    suspend fun builds(kind: LoaderKind, mcVersion: String): List<LoaderVersion> = withContext(Dispatchers.IO) {
-        val fabricLike = kind.fabricLike
-        if (fabricLike != null) {
-            val versions = runCatching { fabricLike.downloadLoaderVersions(mcVersion) }.getOrNull()
-            return@withContext versions.orEmpty()
-                .map { LoaderVersion(it.version, it.version, it.stable) }
-                .newestFirst()
+    suspend fun builds(kind: LoaderKind, mcVersion: String): List<LoaderVersion> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val fabricLike = kind.fabricLike
+                if (fabricLike != null) {
+                    val versions = runCatching { fabricLike.downloadLoaderVersions(mcVersion) }.getOrNull()
+                    return@runCatching versions.orEmpty()
+                        .map { LoaderVersion(it.version, it.version, it.stable) }
+                        .newestFirst()
+                }
+                val forgeLike = kind.forgeLike ?: return@runCatching emptyList()
+                val all = runCatching { forgeLike.downloadVersions() }.getOrNull().orEmpty()
+                all.filterNot { forgeLike.shouldSkipVersion(it) }
+                    .filter { forgeLike.processVersionString(it) == mcVersion }
+                    .map { full ->
+                        // A Forge version is "<minecraft>-<forge>", NeoForge's is its own number.
+                        val label = if (kind == LoaderKind.FORGE) full.substringAfter('-', full) else full
+                        LoaderVersion(full, label, !full.contains("beta", true))
+                    }
+                    .newestFirst()
+            }.getOrDefault(emptyList())
         }
-        val forgeLike = kind.forgeLike ?: return@withContext emptyList()
-        val all = runCatching { forgeLike.downloadVersions() }.getOrNull().orEmpty()
-        all.filterNot { forgeLike.shouldSkipVersion(it) }
-            .filter { forgeLike.processVersionString(it) == mcVersion }
-            .map { full ->
-                // A Forge version is "<minecraft>-<forge>", a NeoForge version is its own number.
-                val label = if (kind == LoaderKind.FORGE) full.substringAfter('-', full) else full
-                LoaderVersion(full, label, !full.contains("beta", true))
-            }
-            .newestFirst()
-    }
 
     /**
      * Install the picked loader and create an instance for it, exactly as Pojav's installer screens
@@ -131,11 +139,27 @@ object PojavLoaderBridge {
     private fun isRelease(version: String): Boolean =
         Regex("^\\d+\\.\\d+(\\.\\d+)?$").matches(version)
 
-    /** Newest first: by version number where that can be compared, by the source order otherwise. */
+    /**
+     * Newest first.
+     *
+     * The order has to be total: a comparator that answers 0 for two versions it cannot parse
+     * while ordering them both against a third one makes TimSort throw "Comparison method violates
+     * its general contract". The position in the source list is therefore the last word of every
+     * tie, which keeps the order consistent, and the two comparisons above it are only used when
+     * both sides can be compared at all.
+     */
     private fun List<LoaderVersion>.newestFirst(): List<LoaderVersion> =
-        sortedWith(Comparator { a, b ->
-            val left = ComparableVersionString.parse(a.label)
-            val right = ComparableVersionString.parse(b.label)
-            if (left.isValid() && right.isValid()) right.compareTo(left) else 0
-        })
+        mapIndexed { index, version -> version to index }
+            .sortedWith(Comparator { left, right ->
+                val a = ComparableVersionString.parse(left.first.label)
+                val b = ComparableVersionString.parse(right.first.label)
+                val byVersion = when {
+                    a.isValid && b.isValid -> b.compareTo(a)
+                    a.isValid -> -1
+                    b.isValid -> 1
+                    else -> 0
+                }
+                if (byVersion != 0) byVersion else left.second.compareTo(right.second)
+            })
+            .map { it.first }
 }

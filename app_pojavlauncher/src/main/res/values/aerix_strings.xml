@@ -71,7 +71,7 @@
     <string name="aerix_ingame_download_retry">Retry</string>
     <string name="aerix_ingame_download_clear">Clear the search</string>
     <string name="aerix_loader_title">Modloader</string>
-    <string name="aerix_loader_subtitle">Installs into %1$s, currently on %2$s</string>
+    <string name="aerix_loader_subtitle">installs into %1$s · running %2$s</string>
     <string name="aerix_loader_bench_minecraft">Minecraft version</string>
     <string name="aerix_loader_bench_build">%1$s build</string>
     <string name="aerix_loader_stable_only">Stable only</string>

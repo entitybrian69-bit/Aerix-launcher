@@ -35,6 +35,7 @@ import android.text.format.Formatter
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -52,6 +53,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -244,7 +246,9 @@ fun InstanceEditorScreen(activity: FragmentActivity, onClose: () -> Unit) {
         )
     }
 
-    // Two-pane layout from Mirai VersionSettingsScreen.kt (Screenshot 2)
+    // Two-pane layout from Mirai VersionSettingsScreen.kt (Screenshot 2). The loader page needs
+    // the width - two version lists side by side - so the sidebar gives it up while that page is
+    // open instead of squeezing the lists.
     Row(
         modifier = Modifier
             .fillMaxSize()
@@ -254,7 +258,7 @@ fun InstanceEditorScreen(activity: FragmentActivity, onClose: () -> Unit) {
         // Left sidebar: Back button + InstanceSidebarCard + 2-column InstanceNavGrid
         Column(
             modifier = Modifier
-                .width(264.dp)
+                .width(if (activeTab == "loader") 226.dp else 264.dp)
                 .fillMaxHeight(),
             verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
         ) {
@@ -1703,18 +1707,19 @@ private fun InstanceLoaderPane(activity: FragmentActivity, draft: AerixInstanceD
     var installError by remember { mutableStateOf<String?>(null) }
     var reload by remember { mutableIntStateOf(0) }
 
-    // The version of the instance the screen was opened on, picked by default.
+    // The version of the instance the screen was opened on, picked by default. Nothing in here is
+    // allowed to throw: a failing source is an empty list and the retry row, never a crash.
     LaunchedEffect(kind, reload) {
         metaLoading = true
         metaFailed = false
-        val versions = PojavLoaderBridge.gameVersions(kind)
+        val versions = runCatching { PojavLoaderBridge.gameVersions(kind) }.getOrDefault(emptyList())
         mcVersions = versions
         if (versions.isEmpty()) {
             metaFailed = true
             builds = emptyList()
         } else {
-            // A loader that has no stable build at all, today or for the newest version, would
-            // leave both benches empty under the switch; dropping the filter opens them.
+            // A loader without a single stable build would leave both benches empty under the
+            // switch; dropping the filter opens them instead.
             if (stableOnly && versions.none { it.stable }) stableOnly = false
             val current = draft.versionId.takeIf { it.isNotBlank() }
             mcVersion = versions.firstOrNull { it.value == current }?.value ?: versions.first().value
@@ -1725,9 +1730,7 @@ private fun InstanceLoaderPane(activity: FragmentActivity, draft: AerixInstanceD
     LaunchedEffect(kind, mcVersion, reload) {
         val version = mcVersion ?: return@LaunchedEffect
         metaLoading = true
-        val found = PojavLoaderBridge.builds(kind, version)
-        // Same for the builds of a single version: a version that only has beta builds still has
-        // to be installable, so the switch gives way instead of the list staying empty.
+        val found = runCatching { PojavLoaderBridge.builds(kind, version) }.getOrDefault(emptyList())
         if (stableOnly && found.none { it.stable }) stableOnly = false
         builds = found
         build = found.firstOrNull { !stableOnly || it.stable }
@@ -1741,25 +1744,32 @@ private fun InstanceLoaderPane(activity: FragmentActivity, draft: AerixInstanceD
         builds.filter { (!stableOnly || it.stable) && it.label.contains(buildQuery, true) }
     }
 
-    Column(modifier = Modifier.fillMaxSize().padding(AerixSpacing.mdPlus)) {
-        Text(
-            text = stringResource(R.string.aerix_loader_title),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.ExtraBold,
-            color = Color.White
-        )
-        Spacer(Modifier.height(AerixSpacing.xxs))
-        Text(
-            text = stringResource(
-                R.string.aerix_loader_subtitle,
-                draft.name.ifEmpty { draft.versionId },
-                loaderLabel(draft.versionId, vanilla)
-            ),
-            style = MaterialTheme.typography.labelMedium,
-            color = AerixSurface.textSecondary
-        )
+    Column(modifier = Modifier.fillMaxSize().padding(AerixSpacing.smPlus)) {
+        // One line of heading, with what the instance currently runs on the other side, so the
+        // lists below get the height instead of the chrome.
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = stringResource(R.string.aerix_loader_title),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.ExtraBold,
+                color = Color.White
+            )
+            Spacer(Modifier.width(AerixSpacing.sm))
+            Text(
+                text = stringResource(
+                    R.string.aerix_loader_subtitle,
+                    draft.name.ifEmpty { draft.versionId },
+                    loaderLabel(draft.versionId, vanilla)
+                ),
+                color = AerixSurface.textSecondary,
+                fontSize = 10.5.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+        }
 
-        Spacer(Modifier.height(AerixSpacing.smPlus))
+        Spacer(Modifier.height(AerixSpacing.xs))
 
         // The loaders, as chips: the logo carries the recognition, the title the rest.
         Row(
@@ -1789,20 +1799,20 @@ private fun InstanceLoaderPane(activity: FragmentActivity, draft: AerixInstanceD
                                 PojavNavigator.openInstaller(activity, entry.installer!!)
                             }
                         }
-                        .padding(horizontal = AerixSpacing.smPlus, vertical = AerixSpacing.smCompact),
+                        .padding(horizontal = AerixSpacing.sm, vertical = AerixSpacing.xsPlus),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
                         painter = painterResource(entry.iconRes),
                         contentDescription = null,
                         tint = Color.Unspecified,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(17.dp)
                     )
                     Spacer(Modifier.width(AerixSpacing.xs))
                     Text(
                         text = entry.title,
                         color = if (selected) accent else AerixSurface.textPrimary,
-                        fontSize = 12.sp,
+                        fontSize = 11.5.sp,
                         fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
                         maxLines = 1
                     )
@@ -1810,35 +1820,29 @@ private fun InstanceLoaderPane(activity: FragmentActivity, draft: AerixInstanceD
             }
         }
 
-        if (!kind.installsHere) {
-            Spacer(Modifier.height(AerixSpacing.xs))
-            Text(
-                text = stringResource(R.string.aerix_loader_own_page, kind.title),
-                color = AerixSurface.textMuted,
-                fontSize = 10.5.sp
-            )
-        }
-
-        Spacer(Modifier.height(AerixSpacing.smPlus))
+        Spacer(Modifier.height(AerixSpacing.smCompact))
 
         if (metaFailed) {
-            Text(
-                text = stringResource(R.string.aerix_loader_failed),
-                color = AerixSurface.warning,
-                fontSize = 11.5.sp
-            )
-            Spacer(Modifier.height(AerixSpacing.xs))
-            AerixGhostButton(
-                text = stringResource(R.string.aerix_loader_retry),
-                iconRes = R.drawable.aerix_ic_refresh,
-                onClick = { reload++ }
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = stringResource(R.string.aerix_loader_failed),
+                    color = AerixSurface.warning,
+                    fontSize = 11.5.sp,
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(Modifier.width(AerixSpacing.sm))
+                AerixGhostButton(
+                    text = stringResource(R.string.aerix_loader_retry),
+                    iconRes = R.drawable.aerix_ic_refresh,
+                    onClick = { reload++ }
+                )
+            }
             return@Column
         }
 
         Row(
             modifier = Modifier.fillMaxWidth().weight(1f),
-            horizontalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
+            horizontalArrangement = Arrangement.spacedBy(AerixSpacing.smCompact)
         ) {
             VersionBench(
                 title = stringResource(R.string.aerix_loader_bench_minecraft),
@@ -1864,8 +1868,8 @@ private fun InstanceLoaderPane(activity: FragmentActivity, draft: AerixInstanceD
                 toggleChecked = stableOnly,
                 onToggleChange = { checked ->
                     stableOnly = checked
-                    // A build that the switch is about to hide is replaced by the newest one that
-                    // stays visible, so the button never points at something off screen.
+                    // A build the switch is about to hide is replaced by the newest one that stays
+                    // visible, so the button never points at something off screen.
                     if (checked && build?.stable == false) {
                         build = builds.firstOrNull { it.stable }
                     }
@@ -1874,7 +1878,7 @@ private fun InstanceLoaderPane(activity: FragmentActivity, draft: AerixInstanceD
             )
         }
 
-        Spacer(Modifier.height(AerixSpacing.sm))
+        Spacer(Modifier.height(AerixSpacing.smCompact))
 
         // What the button is about to do, spelled out: loader, version, and where it lands.
         val picked = build
@@ -1885,7 +1889,10 @@ private fun InstanceLoaderPane(activity: FragmentActivity, draft: AerixInstanceD
             border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft)
         ) {
             Row(
-                modifier = Modifier.padding(AerixSpacing.smPlus),
+                modifier = Modifier.padding(
+                    horizontal = AerixSpacing.smPlus,
+                    vertical = AerixSpacing.smCompact
+                ),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
@@ -1896,7 +1903,7 @@ private fun InstanceLoaderPane(activity: FragmentActivity, draft: AerixInstanceD
                             "${kind.title} ${picked.label}"
                         },
                         color = AerixSurface.textPrimary,
-                        fontSize = 13.5.sp,
+                        fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -1908,8 +1915,8 @@ private fun InstanceLoaderPane(activity: FragmentActivity, draft: AerixInstanceD
                             kind.title
                         ),
                         color = if (installError != null) AerixSurface.danger else AerixSurface.textSecondary,
-                        fontSize = 10.5.sp,
-                        maxLines = 2,
+                        fontSize = 10.sp,
+                        maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
@@ -1945,7 +1952,10 @@ private fun InstanceLoaderPane(activity: FragmentActivity, draft: AerixInstanceD
                     }
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = AerixSpacing.md, vertical = AerixSpacing.smCompact),
+                        modifier = Modifier.padding(
+                            horizontal = AerixSpacing.md,
+                            vertical = AerixSpacing.smCompact
+                        ),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         if (installing) {
@@ -1977,8 +1987,9 @@ private fun InstanceLoaderPane(activity: FragmentActivity, draft: AerixInstanceD
 }
 
 /**
- * One bench of the loader screen: a titled card holding a scrollable list of versions, with an
- * optional search field and an optional switch in its header.
+ * One bench of the loader screen: a titled card holding a scrollable list of versions, a search
+ * field and an optional switch. Everything is sized for a phone on its side, so the list - the part
+ * the player came for - gets most of the card: a row is 32dp and the head of the card is one line.
  */
 @Composable
 private fun VersionBench(
@@ -2001,29 +2012,26 @@ private fun VersionBench(
         color = AerixSurface.panel.copy(alpha = 0.72f),
         border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft)
     ) {
-        Column(modifier = Modifier.fillMaxSize().padding(AerixSpacing.smCompact)) {
+        Column(modifier = Modifier.fillMaxSize().padding(AerixSpacing.xsPlus)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = title,
                     color = AerixSurface.textPrimary,
-                    fontSize = 12.5.sp,
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f)
                 )
                 if (toggleLabel != null && onToggleChange != null) {
-                    Text(toggleLabel, color = AerixSurface.textSecondary, fontSize = 10.sp, maxLines = 1)
-                    Spacer(Modifier.width(AerixSpacing.xs))
-                    Switch(
-                        checked = toggleChecked,
-                        onCheckedChange = onToggleChange,
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color.White,
-                            checkedTrackColor = accent
-                        ),
-                        modifier = Modifier.scale(0.7f)
+                    Text(
+                        text = toggleLabel,
+                        color = AerixSurface.textSecondary,
+                        fontSize = 9.5.sp,
+                        maxLines = 1
                     )
+                    Spacer(Modifier.width(AerixSpacing.xs))
+                    MiniToggle(checked = toggleChecked, accent = accent, onChange = onToggleChange)
                 }
             }
             Spacer(Modifier.height(AerixSpacing.xs))
@@ -2032,7 +2040,11 @@ private fun VersionBench(
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 when {
                     loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = accent, strokeWidth = 2.dp, modifier = Modifier.size(22.dp))
+                        CircularProgressIndicator(
+                            color = accent,
+                            strokeWidth = 2.dp,
+                            modifier = Modifier.size(20.dp)
+                        )
                     }
                     rows.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(
@@ -2051,8 +2063,12 @@ private fun VersionBench(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
+                                    .height(32.dp)
                                     .clip(shape)
-                                    .background(if (isSelected) accent.copy(alpha = 0.16f) else Color.White.copy(alpha = 0.04f))
+                                    .background(
+                                        if (isSelected) accent.copy(alpha = 0.16f)
+                                        else Color.White.copy(alpha = 0.04f)
+                                    )
                                     .border(
                                         BorderStroke(
                                             AerixSpacing.hairline,
@@ -2061,19 +2077,34 @@ private fun VersionBench(
                                         shape
                                     )
                                     .clickable(role = Role.RadioButton) { onSelect(row.value) }
-                                    .padding(horizontal = AerixSpacing.smCompact, vertical = AerixSpacing.xs),
+                                    .padding(horizontal = AerixSpacing.sm),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                RadioButton(
-                                    selected = isSelected,
-                                    onClick = { onSelect(row.value) },
-                                    colors = RadioButtonDefaults.colors(
-                                        selectedColor = accent,
-                                        unselectedColor = AerixSurface.textMuted
-                                    ),
-                                    modifier = Modifier.scale(0.8f)
-                                )
-                                Spacer(Modifier.width(AerixSpacing.xxs))
+                                // A drawn dot instead of a RadioButton: the stock one is 48dp of
+                                // touch target for a 14dp circle, which cost three rows per screen.
+                                Box(
+                                    modifier = Modifier
+                                        .size(14.dp)
+                                        .clip(CircleShape)
+                                        .border(
+                                            BorderStroke(
+                                                1.5.dp,
+                                                if (isSelected) accent else AerixSurface.textMuted
+                                            ),
+                                            CircleShape
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (isSelected) {
+                                        Box(
+                                            Modifier
+                                                .size(6.dp)
+                                                .clip(CircleShape)
+                                                .background(accent)
+                                        )
+                                    }
+                                }
+                                Spacer(Modifier.width(AerixSpacing.smCompact))
                                 Text(
                                     text = row.label,
                                     color = if (isSelected) accent else AerixSurface.textPrimary,
@@ -2087,7 +2118,7 @@ private fun VersionBench(
                                     Text(
                                         text = stringResource(R.string.aerix_loader_unstable),
                                         color = AerixSurface.warning,
-                                        fontSize = 9.5.sp
+                                        fontSize = 9.sp
                                     )
                                 }
                             }
@@ -2099,30 +2130,61 @@ private fun VersionBench(
     }
 }
 
+/** Compact on/off pill for the bench headers: a 28x16 track with a dot that slides across. */
+@Composable
+private fun MiniToggle(checked: Boolean, accent: Color, onChange: ((Boolean) -> Unit)?) {
+    val offset by animateFloatAsState(if (checked) 1f else 0f, label = "miniToggle")
+    Box(
+        modifier = Modifier
+            .size(width = 30.dp, height = 16.dp)
+            .clip(CircleShape)
+            .background(if (checked) accent else Color.White.copy(alpha = 0.16f))
+            .border(
+                BorderStroke(AerixSpacing.hairline, if (checked) accent else AerixSurface.borderSoft),
+                CircleShape
+            )
+            .clickable(enabled = onChange != null, role = Role.Switch) { onChange?.invoke(!checked) },
+        contentAlignment = Alignment.CenterStart
+    ) {
+        Box(
+            modifier = Modifier
+                .padding(start = 2.dp)
+                .offset(x = (offset * 14).dp)
+                .size(12.dp)
+                .clip(CircleShape)
+                .background(if (checked) AerixSurface.onAccent else AerixSurface.textSecondary)
+        )
+    }
+}
+
 @Composable
 private fun SearchRow(query: String, onQueryChange: (String) -> Unit, accent: Color) {
     val shape = RoundedCornerShape(AerixRadii.compact)
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .height(26.dp)
             .clip(shape)
             .background(Color.White.copy(alpha = 0.05f))
             .border(AerixSpacing.hairline, AerixSurface.borderSoft, shape)
-            .padding(horizontal = AerixSpacing.smCompact, vertical = AerixSpacing.xsPlus),
+            .padding(horizontal = AerixSpacing.smCompact),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
             painter = painterResource(R.drawable.aerix_ic_search),
             contentDescription = null,
             tint = AerixSurface.textMuted,
-            modifier = Modifier.size(13.dp)
+            modifier = Modifier.size(12.dp)
         )
         Spacer(Modifier.width(AerixSpacing.xs))
         BasicTextField(
             value = query,
             onValueChange = onQueryChange,
             singleLine = true,
-            textStyle = MaterialTheme.typography.bodyMedium.copy(color = AerixSurface.textPrimary, fontSize = 11.5.sp),
+            textStyle = MaterialTheme.typography.bodyMedium.copy(
+                color = AerixSurface.textPrimary,
+                fontSize = 11.sp
+            ),
             cursorBrush = SolidColor(accent),
             modifier = Modifier.weight(1f)
         )
