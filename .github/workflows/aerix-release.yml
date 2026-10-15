@@ -39,10 +39,14 @@ permissions:
   actions: read
 
 # The knobs of a push-triggered release, same as the workflow_dispatch inputs above.
+#
+# Note: the token of a workflow cannot create a release here - the API answers "Resource not
+# accessible by integration" even with contents: write - but it can upload the assets of one that
+# exists. Create the release itself (empty) next to the branch, then set RUN_ID / TAG here and push.
 env:
-  RUN_ID: ""
+  RUN_ID: "38737569701"
   BUILD_SHA: ""
-  TAG: ""
+  TAG: "aerix-6a5cf31"
   NOTES: "The in-game downloader works by default, and the launcher shell uses the whole display."
 
 
