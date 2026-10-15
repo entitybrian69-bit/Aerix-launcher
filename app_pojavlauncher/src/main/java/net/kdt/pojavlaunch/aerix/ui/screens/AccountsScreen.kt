@@ -1,9 +1,11 @@
 /*
  * Aerix Launcher UI layer for PojavLauncher.
- * Screen: Accounts & Skin Wardrobe — combines Mirai's AccountManageScreen with the
- * Account Details & Skin Wardrobe view (assets/mockups/account_skin_wardrobe_mockup.png):
+ * Ported from mirai-launcher- (Zalith Launcher 2 fork):
+ *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/ui/screens/content/AccountManageScreen.kt
+ *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/ui/screens/content/elements/AccountItem.kt
+ * Plus the Account Details & Skin Wardrobe view (assets/mockups/account_skin_wardrobe_mockup.png):
  *   - Selected Account card (2D pixel avatar, username, account type badge, copyable UUID,
- *     Set Active / Refresh / Delete actions)
+ *     Set Active / Delete actions)
  *   - Saved Skins & Presets 4-column grid (<DIR_GAME_HOME>/skins) + "+" import & Open Skins Folder
  *   - Interactive 360° 3D skinview3d character stage with Wide (Classic 4px) / Slim (Alex 3px)
  *     toggle, Equip Skin from Internal Storage (.png), Equip Cape (.png), and Reset to Default.
@@ -50,39 +52,20 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowLeft
-import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
-import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.Check
-import androidx.compose.material.icons.outlined.CheckCircle
-import androidx.compose.material.icons.outlined.Checkroom
-import androidx.compose.material.icons.outlined.ContentCopy
-import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material.icons.outlined.FolderOpen
-import androidx.compose.material.icons.outlined.GridView
-import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material.icons.outlined.PersonAdd
-import androidx.compose.material.icons.outlined.Refresh
-import androidx.compose.material.icons.outlined.RestartAlt
-import androidx.compose.material.icons.outlined.Shield
-import androidx.compose.material.icons.outlined.UploadFile
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -96,7 +79,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -110,12 +95,13 @@ import net.kdt.pojavlaunch.Tools
 import net.kdt.pojavlaunch.aerix.bridge.AerixAccount
 import net.kdt.pojavlaunch.aerix.bridge.AerixSkinPreset
 import net.kdt.pojavlaunch.aerix.bridge.PojavAccountBridge
-import net.kdt.pojavlaunch.aerix.components.AerixCard
+import net.kdt.pojavlaunch.aerix.components.AerixImageWell
 import net.kdt.pojavlaunch.aerix.components.AerixPrimaryButton
-import net.kdt.pojavlaunch.aerix.components.AerixSectionHeader
 import net.kdt.pojavlaunch.aerix.components.AerixSkinPreview3D
-import net.kdt.pojavlaunch.aerix.components.AerixStatusChip
-import net.kdt.pojavlaunch.aerix.theme.AerixRadius
+import net.kdt.pojavlaunch.aerix.components.MetaPill
+import net.kdt.pojavlaunch.aerix.components.QuietEmptyState
+import net.kdt.pojavlaunch.aerix.components.liquidGlass
+import net.kdt.pojavlaunch.aerix.theme.AerixRadii
 import net.kdt.pojavlaunch.aerix.theme.AerixSpacing
 import net.kdt.pojavlaunch.aerix.theme.AerixSurface
 import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
@@ -131,6 +117,27 @@ fun AccountsScreen(activity: FragmentActivity) {
     val focusedAccount = remember(accounts, focusedKey) {
         if (focusedKey == null) null else accounts.firstOrNull { it.key == focusedKey }
     }
+    var pendingDelete by remember { mutableStateOf<AerixAccount?>(null) }
+
+    pendingDelete?.let { account ->
+        AlertDialog(
+            onDismissRequest = { pendingDelete = null },
+            containerColor = AerixSurface.panelRaised,
+            title = { Text(stringResource(R.string.aerix_accounts_remove), color = AerixSurface.textPrimary) },
+            text = { Text(stringResource(R.string.aerix_accounts_remove_confirm, account.username), color = AerixSurface.textSecondary) },
+            confirmButton = {
+                TextButton(onClick = {
+                    PojavAccountBridge.delete(account)
+                    pendingDelete = null
+                }) { Text(stringResource(R.string.aerix_accounts_remove), color = AerixSurface.danger) }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDelete = null }) {
+                    Text(stringResource(R.string.aerix_settings_cancel), color = AerixSurface.textSecondary)
+                }
+            }
+        )
+    }
 
     if (focusedAccount != null) {
         BackHandler {
@@ -140,87 +147,47 @@ fun AccountsScreen(activity: FragmentActivity) {
             activity = activity,
             account = focusedAccount,
             isSelected = focusedAccount == current,
-            onBackToAccounts = { PojavAccountBridge.closeDetail() }
+            onBackToAccounts = { PojavAccountBridge.closeDetail() },
+            onRequestDelete = { pendingDelete = focusedAccount }
         )
         return
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(AerixSpacing.xl)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            AerixSectionHeader(
-                title = "Accounts",
-                subtitle = "Tap an account to open its Skin Wardrobe and equip a .png skin from internal storage"
-            )
+    AerixPage(
+        title = stringResource(R.string.aerix_accounts_title),
+        subtitle = "Tap an account card to open its Skin Wardrobe and equip a .png skin from internal storage",
+        trailing = {
             AerixPrimaryButton(
-                text = stringResource(R.string.other_login_Status),
-                icon = Icons.Outlined.PersonAdd,
+                text = stringResource(R.string.aerix_accounts_add),
+                iconRes = R.drawable.aerix_ic_login,
                 onClick = { AerixNav.navigate(LauncherSection.ADD_ACCOUNT) }
             )
         }
-
-        Spacer(modifier = Modifier.height(AerixSpacing.lg))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(AerixSpacing.md)
-        ) {
-            LoginMethodTile(
-                modifier = Modifier.weight(1f),
-                title = "Local / Offline Account",
-                subtitle = "Enter any username directly in Aerix",
-                onClick = { AerixNav.navigate(LauncherSection.OFFLINE_ACCOUNT) }
-            )
-            LoginMethodTile(
-                modifier = Modifier.weight(1f),
-                title = stringResource(R.string.login_microsoft),
-                subtitle = "Sign in with Xbox Live / Microsoft",
-                onClick = { AerixNav.navigate(LauncherSection.ADD_ACCOUNT) }
-            )
-            LoginMethodTile(
-                modifier = Modifier.weight(1f),
-                title = "Ely.by Account",
-                subtitle = "OAuth2 skin & auth service",
-                onClick = { AerixNav.navigate(LauncherSection.ADD_ACCOUNT) }
-            )
-        }
-
-        Spacer(modifier = Modifier.height(AerixSpacing.lg))
-
-        if (accounts.isEmpty()) {
-            AerixCard(modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    text = "No accounts added yet",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = AerixSurface.textPrimary
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            if (accounts.isEmpty()) {
+                QuietEmptyState(
+                    R.drawable.aerix_ic_person_outlined,
+                    stringResource(R.string.aerix_accounts_empty),
+                    Modifier.align(Alignment.Center)
                 )
-                Spacer(modifier = Modifier.height(AerixSpacing.xs))
-                Text(
-                    text = "Create a Local / Offline account or sign in with Microsoft / Ely.by, then tap the account card to equip a skin from internal storage.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = AerixSurface.textSecondary
-                )
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
-            ) {
-                items(accounts, key = { it.key }) { acc ->
-                    AccountCard(
-                        account = acc,
-                        selected = acc == current,
-                        onOpenWardrobe = { PojavAccountBridge.openDetail(acc) },
-                        onRefresh = { PojavAccountBridge.forceRefresh(acc) },
-                        onDelete = { PojavAccountBridge.delete(acc) }
-                    )
+            } else {
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(minSize = 280.dp),
+                    contentPadding = PaddingValues(bottom = AerixSpacing.xxl),
+                    horizontalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus),
+                    verticalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus)
+                ) {
+                    items(accounts, key = { it.key }) { account ->
+                        AccountCard(
+                            account = account,
+                            isCurrent = account == current,
+                            onOpenWardrobe = { PojavAccountBridge.openDetail(account) },
+                            onUse = { PojavAccountBridge.select(account) },
+                            onRefresh = { PojavAccountBridge.forceRefresh(account) },
+                            onRemove = { pendingDelete = account }
+                        )
+                    }
                 }
             }
         }
@@ -232,7 +199,8 @@ private fun AccountSkinWardrobeView(
     activity: FragmentActivity,
     account: AerixAccount,
     isSelected: Boolean,
-    onBackToAccounts: () -> Unit
+    onBackToAccounts: () -> Unit,
+    onRequestDelete: () -> Unit
 ) {
     val accent = AerixThemeManager.currentAccent()
     val revision = PojavAccountBridge.wardrobeRevision
@@ -311,7 +279,7 @@ private fun AccountSkinWardrobeView(
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
-                            imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                            painter = painterResource(R.drawable.aerix_ic_arrow_back),
                             contentDescription = "Back to accounts",
                             tint = Color.White,
                             modifier = Modifier.size(18.dp)
@@ -349,13 +317,13 @@ private fun AccountSkinWardrobeView(
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Outlined.Add,
+                        painter = painterResource(R.drawable.aerix_ic_add),
                         contentDescription = null,
                         tint = accent,
                         modifier = Modifier.size(16.dp)
                     )
                     Text(
-                        text = "Add Account",
+                        text = stringResource(R.string.aerix_accounts_add),
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = Color.White
@@ -428,7 +396,7 @@ private fun AccountSkinWardrobeView(
                                         )
                                     } else {
                                         Icon(
-                                            imageVector = Icons.Outlined.Person,
+                                            painter = painterResource(R.drawable.aerix_ic_person_outlined),
                                             contentDescription = null,
                                             tint = accent,
                                             modifier = Modifier.size(34.dp)
@@ -518,7 +486,7 @@ private fun AccountSkinWardrobeView(
                                         )
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Icon(
-                                            imageVector = Icons.Outlined.ContentCopy,
+                                            painter = painterResource(R.drawable.aerix_ic_content_copy_filled),
                                             contentDescription = "Copy UUID",
                                             tint = Color.White.copy(alpha = 0.55f),
                                             modifier = Modifier.size(13.dp)
@@ -543,7 +511,7 @@ private fun AccountSkinWardrobeView(
                                     modifier = Modifier.height(34.dp)
                                 ) {
                                     Icon(
-                                        imageVector = if (isSelected) Icons.Outlined.CheckCircle else Icons.Outlined.Check,
+                                        painter = painterResource(R.drawable.aerix_ic_check),
                                         contentDescription = null,
                                         modifier = Modifier.size(14.dp)
                                     )
@@ -556,7 +524,7 @@ private fun AccountSkinWardrobeView(
                                 }
 
                                 OutlinedButton(
-                                    onClick = { PojavAccountBridge.delete(account) },
+                                    onClick = onRequestDelete,
                                     shape = RoundedCornerShape(10.dp),
                                     border = BorderStroke(1.dp, AerixSurface.danger.copy(alpha = 0.55f)),
                                     colors = ButtonDefaults.outlinedButtonColors(
@@ -567,7 +535,7 @@ private fun AccountSkinWardrobeView(
                                     modifier = Modifier.height(34.dp)
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Outlined.Delete,
+                                        painter = painterResource(R.drawable.aerix_ic_delete_outlined),
                                         contentDescription = null,
                                         modifier = Modifier.size(14.dp)
                                     )
@@ -624,7 +592,7 @@ private fun AccountSkinWardrobeView(
                                 ) {
                                     Box(contentAlignment = Alignment.Center) {
                                         Icon(
-                                            imageVector = Icons.Outlined.Add,
+                                            painter = painterResource(R.drawable.aerix_ic_add),
                                             contentDescription = "Import .png Skin",
                                             tint = accent,
                                             modifier = Modifier.size(16.dp)
@@ -642,7 +610,7 @@ private fun AccountSkinWardrobeView(
                                 ) {
                                     Box(contentAlignment = Alignment.Center) {
                                         Icon(
-                                            imageVector = Icons.Outlined.GridView,
+                                            painter = painterResource(R.drawable.aerix_ic_dashboard_outlined),
                                             contentDescription = "Toggle Grid Density",
                                             tint = Color.White.copy(alpha = 0.75f),
                                             modifier = Modifier.size(15.dp)
@@ -699,7 +667,7 @@ private fun AccountSkinWardrobeView(
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Outlined.FolderOpen,
+                                        painter = painterResource(R.drawable.aerix_ic_folder_outlined),
                                         contentDescription = null,
                                         tint = accent,
                                         modifier = Modifier.size(16.dp)
@@ -852,7 +820,7 @@ private fun AccountSkinWardrobeView(
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
                                     Icon(
-                                        imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowLeft,
+                                        painter = painterResource(R.drawable.aerix_ic_arrow_left_rounded),
                                         contentDescription = "Drag left to rotate",
                                         tint = Color.White.copy(alpha = 0.8f),
                                         modifier = Modifier.size(18.dp)
@@ -867,7 +835,7 @@ private fun AccountSkinWardrobeView(
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
                                     Icon(
-                                        imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                                        painter = painterResource(R.drawable.aerix_ic_arrow_right_rounded),
                                         contentDescription = "Drag right to rotate",
                                         tint = Color.White.copy(alpha = 0.8f),
                                         modifier = Modifier.size(18.dp)
@@ -901,7 +869,7 @@ private fun AccountSkinWardrobeView(
                                 .height(42.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Outlined.UploadFile,
+                                painter = painterResource(R.drawable.aerix_ic_upload),
                                 contentDescription = null,
                                 modifier = Modifier.size(18.dp)
                             )
@@ -932,7 +900,7 @@ private fun AccountSkinWardrobeView(
                                     .height(38.dp)
                             ) {
                                 Icon(
-                                    imageVector = Icons.Outlined.Shield,
+                                    painter = painterResource(R.drawable.aerix_ic_style_outlined),
                                     contentDescription = null,
                                     tint = accent,
                                     modifier = Modifier.size(16.dp)
@@ -962,7 +930,7 @@ private fun AccountSkinWardrobeView(
                                     .height(38.dp)
                             ) {
                                 Icon(
-                                    imageVector = Icons.Outlined.RestartAlt,
+                                    painter = painterResource(R.drawable.aerix_ic_refresh),
                                     contentDescription = null,
                                     tint = Color.White.copy(alpha = 0.75f),
                                     modifier = Modifier.size(16.dp)
@@ -1048,7 +1016,7 @@ private fun SkinPresetGridCard(
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Outlined.Check,
+                        painter = painterResource(R.drawable.aerix_ic_check),
                         contentDescription = "Equipped",
                         tint = Color(0xFF061018),
                         modifier = Modifier.size(11.dp)
@@ -1079,7 +1047,7 @@ private fun SkinPresetGridCard(
                         )
                     } else {
                         Icon(
-                            imageVector = Icons.Outlined.Person,
+                            painter = painterResource(R.drawable.aerix_ic_person_outlined),
                             contentDescription = preset.name,
                             tint = accent,
                             modifier = Modifier.size(32.dp)
@@ -1107,161 +1075,80 @@ private fun authTypeDisplayLabel(authType: AuthType): String = when (authType) {
 }
 
 @Composable
-private fun LoginMethodTile(
-    modifier: Modifier = Modifier,
-    title: String,
-    subtitle: String,
-    onClick: () -> Unit
+private fun AccountCard(
+    account: AerixAccount,
+    isCurrent: Boolean,
+    onOpenWardrobe: () -> Unit,
+    onUse: () -> Unit,
+    onRefresh: () -> Unit,
+    onRemove: () -> Unit
 ) {
     val accent = AerixThemeManager.currentAccent()
-    AerixCard(
-        modifier = modifier,
-        onClick = onClick
+    val shape = RoundedCornerShape(AerixRadii.cardLarge)
+    val typeLabel = when (account.authType) {
+        AuthType.MICROSOFT -> stringResource(R.string.aerix_accounts_type_microsoft)
+        AuthType.ELY_BY -> stringResource(R.string.aerix_accounts_type_elyby)
+        AuthType.LOCAL -> stringResource(R.string.aerix_accounts_type_local)
+    }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .liquidGlass(shape = shape, tint = if (isCurrent) accent else AerixSurface.glassTint, strength = if (isCurrent) 0.9f else 0.6f)
+            .background(if (isCurrent) accent.copy(alpha = 0.12f) else AerixSurface.panel, shape)
+            .border(BorderStroke(if (isCurrent) 1.5.dp else AerixSpacing.hairline, if (isCurrent) accent else AerixSurface.borderSoft), shape)
+            .clickable(role = Role.Button, onClick = onOpenWardrobe)
+            .padding(AerixSpacing.md),
+        verticalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus)
     ) {
-        Icon(
-            imageVector = Icons.Outlined.PersonAdd,
-            contentDescription = null,
-            tint = accent
-        )
-        Spacer(modifier = Modifier.height(AerixSpacing.sm))
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = AerixSurface.textPrimary
-        )
-        Text(
-            text = subtitle,
-            style = MaterialTheme.typography.bodySmall,
-            color = AerixSurface.textSecondary
-        )
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus)) {
+            AerixImageWell(image = account.face, fallback = R.drawable.aerix_ic_person_outlined, size = 48.dp, radius = AerixRadii.control)
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = account.username, color = AerixSurface.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    text = if (account.expired) stringResource(R.string.aerix_accounts_expired) else "$typeLabel • Tap to equip skin",
+                    color = if (account.expired) AerixSurface.warning else AerixSurface.textSecondary,
+                    fontSize = 11.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            if (isCurrent) MetaPill(text = stringResource(R.string.aerix_accounts_current), iconRes = R.drawable.aerix_ic_check)
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(AerixSpacing.sm)) {
+            MetaPill(text = typeLabel, iconRes = R.drawable.aerix_ic_link)
+            Box(Modifier.weight(1f))
+            CardTextAction("Skin Wardrobe", accent, onOpenWardrobe)
+            if (account.authType.requiresLogin()) {
+                CardTextAction(stringResource(R.string.aerix_accounts_refresh), AerixSurface.textSecondary, onRefresh)
+            }
+            CardTextAction(stringResource(R.string.aerix_accounts_remove), AerixSurface.danger, onRemove)
+            if (!isCurrent) {
+                Text(
+                    text = stringResource(R.string.aerix_accounts_use),
+                    color = AerixSurface.onAccent,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .background(accent)
+                        .clickable(onClick = onUse)
+                        .padding(horizontal = AerixSpacing.md, vertical = AerixSpacing.xs)
+                )
+            }
+        }
     }
 }
 
 @Composable
-private fun AccountCard(
-    account: AerixAccount,
-    selected: Boolean,
-    onOpenWardrobe: () -> Unit,
-    onRefresh: () -> Unit,
-    onDelete: () -> Unit
-) {
-    val accent = AerixThemeManager.currentAccent()
-    val shape = RoundedCornerShape(AerixRadius.lg)
-    Row(
+private fun CardTextAction(text: String, color: Color, onClick: () -> Unit) {
+    Text(
+        text = text,
+        color = color,
+        fontSize = 11.sp,
+        fontWeight = FontWeight.Bold,
         modifier = Modifier
-            .fillMaxWidth()
-            .clip(shape)
-            .background(if (selected) accent.copy(alpha = 0.14f) else AerixSurface.card(0.84f))
-            .border(
-                width = 1.dp,
-                color = if (selected) accent.copy(alpha = 0.55f) else AerixSurface.cardBorder(),
-                shape = shape
-            )
-            .clickable(onClick = onOpenWardrobe)
-            .padding(AerixSpacing.lg),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        if (account.face != null) {
-            Image(
-                bitmap = account.face,
-                contentDescription = account.username,
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(AerixRadius.sm))
-                    .border(1.dp, accent.copy(alpha = 0.5f), RoundedCornerShape(AerixRadius.sm)),
-                contentScale = ContentScale.Crop,
-                filterQuality = FilterQuality.None
-            )
-        } else {
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(AerixRadius.sm))
-                    .background(accent.copy(alpha = 0.2f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.Person,
-                    contentDescription = null,
-                    tint = accent
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.width(AerixSpacing.md))
-
-        Column(modifier = Modifier.weight(1f)) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
-            ) {
-                Text(
-                    text = account.username,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = AerixSurface.textPrimary
-                )
-                if (selected) {
-                    AerixStatusChip(text = "Active", color = AerixSurface.success)
-                }
-                if (account.expired) {
-                    AerixStatusChip(
-                        text = stringResource(R.string.account_expired),
-                        color = AerixSurface.warning
-                    )
-                }
-            }
-            Text(
-                text = "${authTypeDisplayLabel(account.authType)} • Tap to equip skin (.png)",
-                style = MaterialTheme.typography.bodySmall,
-                color = AerixSurface.textSecondary
-            )
-        }
-
-        Surface(
-            shape = RoundedCornerShape(10.dp),
-            color = accent.copy(alpha = 0.16f),
-            border = BorderStroke(1.dp, accent.copy(alpha = 0.40f)),
-            modifier = Modifier
-                .clip(RoundedCornerShape(10.dp))
-                .clickable(onClick = onOpenWardrobe)
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.Checkroom,
-                    contentDescription = null,
-                    tint = accent,
-                    modifier = Modifier.size(16.dp)
-                )
-                Text(
-                    text = "Equip Skin",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = accent
-                )
-            }
-        }
-
-        if (account.authType.requiresLogin()) {
-            IconButton(onClick = onRefresh) {
-                Icon(
-                    imageVector = Icons.Outlined.Refresh,
-                    contentDescription = "Refresh token",
-                    tint = AerixSurface.textSecondary
-                )
-            }
-        }
-        IconButton(onClick = onDelete) {
-            Icon(
-                imageVector = Icons.Outlined.Delete,
-                contentDescription = stringResource(R.string.global_remove),
-                tint = AerixSurface.danger
-            )
-        }
-    }
+            .clip(CircleShape)
+            .clickable(onClick = onClick)
+            .padding(horizontal = AerixSpacing.smPlus, vertical = AerixSpacing.xs)
+    )
 }
