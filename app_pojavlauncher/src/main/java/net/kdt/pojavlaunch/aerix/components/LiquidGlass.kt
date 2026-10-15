@@ -30,12 +30,20 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import net.kdt.pojavlaunch.aerix.theme.AerixMetrics
 import net.kdt.pojavlaunch.aerix.theme.AerixSpacing
 import net.kdt.pojavlaunch.aerix.theme.AerixSurface
 
-/** Glass sheen + rim treatment shared by every Aerix panel, rail and button. */
+/**
+ * Glass sheen + rim treatment shared by every Aerix panel, rail and button.
+ *
+ * A shadow that the system draws needs an extra layer for every panel, and the lists of the
+ * launcher are full of them. Only the panels that really float get one, the flat ones get a
+ * drawn edge instead: it looks the same and it costs nothing while the list scrolls.
+ */
 fun Modifier.liquidGlass(
     shape: Shape,
     tint: Color = AerixSurface.glassTint,
@@ -44,13 +52,18 @@ fun Modifier.liquidGlass(
     clipContent: Boolean = true
 ): Modifier {
     val intensity = strength.coerceIn(0f, 1f)
-    val shadowed = this.shadow(
-        elevation = elevation * intensity,
-        shape = shape,
-        clip = false,
-        ambientColor = AerixSurface.glassShadow,
-        spotColor = AerixSurface.glassShadow
-    )
+    val systemShadow = elevation >= 2.dp
+    val shadowed = if (systemShadow) {
+        this.shadow(
+            elevation = elevation * intensity,
+            shape = shape,
+            clip = false,
+            ambientColor = AerixSurface.glassShadow,
+            spotColor = AerixSurface.glassShadow
+        )
+    } else {
+        this
+    }
     val glassModifier = if (clipContent) shadowed.clip(shape) else shadowed
 
     return glassModifier.drawWithCache {
@@ -79,8 +92,19 @@ fun Modifier.liquidGlass(
         )
         val outline = shape.createOutline(size, layoutDirection, this)
         val rimWidth = AerixSpacing.hairline.toPx() * intensity
+        // The drawn shadow of the flat panels, the outline a little lower and a little darker.
+        val edgeOffset = if (systemShadow) 0f else (elevation.toPx() * intensity).coerceAtLeast(0f)
 
         onDrawWithContent {
+            if (edgeOffset > 0f) {
+                translate(top = edgeOffset) {
+                    drawOutline(
+                        outline = outline,
+                        color = AerixSurface.glassShadow,
+                        style = Stroke(width = edgeOffset.coerceAtLeast(1f))
+                    )
+                }
+            }
             drawRect(brush = sheen)
             drawContent()
             if (rimWidth > 0f) {
