@@ -875,6 +875,113 @@ code {
   }
 }
 
+
+/* ─────────────────────────── multi-page pieces ─────────────────────────── */
+
+/* the nav marks the page you are on, and the GitHub mark sits beside Discord */
+.nav-links a.is-active { color: var(--text); }
+.nav-links a.is-active::after { transform: scaleX(1); }
+
+.icon-btn {
+  display: grid;
+  place-items: center;
+  width: 40px; height: 40px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, .04);
+  color: var(--muted);
+  transition: color .25s var(--ease), border-color .25s var(--ease),
+              background .25s var(--ease), transform .25s var(--ease);
+}
+.icon-btn svg { width: 19px; height: 19px; fill: currentColor; }
+.icon-btn:hover {
+  color: var(--text);
+  border-color: var(--accent);
+  background: rgba(141, 239, 224, .1);
+  transform: translateY(-2px);
+}
+
+/* the compact opener every sub-page starts with */
+.page-hero { padding-bottom: clamp(6px, 1.5vw, 14px); }
+.page-hero h1 { font-size: clamp(1.85rem, 5vw, 3.15rem); max-width: 22ch; }
+.page-hero .lede { max-width: 62ch; }
+
+/* a closing band that pushes the reader to the next page */
+.cta-band {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: clamp(16px, 2.5vw, 30px);
+  padding: clamp(20px, 3vw, 34px);
+  border-radius: var(--radius-xl);
+  background: linear-gradient(160deg, rgba(141, 239, 224, .12), rgba(15, 33, 48, .82));
+  border: 1px solid var(--border-soft);
+}
+.cta-band h2 { margin-bottom: 6px; }
+.cta-band p { color: var(--muted); margin: 0 0 6px; }
+.cta-band .chip { margin-bottom: 12px; }
+.cta-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.download-band { margin-top: clamp(6px, 1.5vw, 16px); }
+
+/* the arrow links on the home page cards */
+.card-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  color: var(--accent);
+  font-weight: 700;
+  font-size: .93rem;
+}
+.card-link::after {
+  content: "→";
+  transition: transform .3s var(--ease);
+}
+.card-link:hover::after { transform: translateX(4px); }
+
+/* the renderer lineup */
+.spec-grid { display: flex; flex-wrap: wrap; gap: var(--gap); }
+.spec {
+  flex: 1 1 258px;
+  min-width: 0;
+  padding: 18px 20px;
+  border-radius: var(--radius);
+  background: var(--panel);
+  border: 1px solid var(--border-soft);
+  transition: transform .4s var(--ease), border-color .4s var(--ease), box-shadow .4s var(--ease);
+}
+.spec:hover { transform: translateY(-4px); border-color: var(--border); box-shadow: var(--shadow-soft); }
+.spec h3 { margin-bottom: 6px; }
+.spec p { color: var(--muted); font-size: .92rem; margin: 0; }
+.spec .range {
+  display: inline-block;
+  font-size: .76rem;
+  font-weight: 800;
+  letter-spacing: .03em;
+  color: var(--accent);
+  background: rgba(141, 239, 224, .12);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px 11px;
+  margin-bottom: 10px;
+}
+.spec.is-extra { background: transparent; border-style: dashed; }
+
+/* the screenshot rail on sub-pages breathes a little more */
+.rail + .cta-row { margin-top: clamp(20px, 3vw, 30px); }
+
+@media (max-width: 900px) {
+  .cta-band { flex-direction: column; align-items: flex-start; }
+  .cta-actions { width: 100%; }
+  .cta-actions .btn { flex: 1 1 100%; }
+}
+
+@media (max-width: 620px) {
+  .page-hero h1 { max-width: none; }
+  .spec { flex-basis: 100%; }
+}
+
 @media print {
   body::before, .float-a, .float-b, .float-c { animation: none; }
   .nav, .footer { background: none; }
