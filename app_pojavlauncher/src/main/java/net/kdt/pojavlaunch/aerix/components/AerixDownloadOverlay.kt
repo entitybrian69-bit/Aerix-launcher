@@ -17,7 +17,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/gpl-3.0.txt>.
  */
 
-package net.kdt.pojavlaunch.aerix.ui.components
+package net.kdt.pojavlaunch.aerix.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
