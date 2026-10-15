@@ -1,58 +1,185 @@
 name: Aerix release
 
-# Commits the no-runtime debug APK of a finished Android CI run into apk/ on the Aerix branch.
-# The full APK (128 MB) is over GitHub's 100 MB file limit and LFS uploads are refused on forks;
-# the no-runtime APK downloads every Java runtime on demand through NewJREUtil.
-# Runs when this file changes on the Aerix branch; RUN_ID / BUILD_SHA select the CI run.
+# Publishes a finished Android CI run as a GitHub release.
+#
+# Both APKs of the run are attached as release assets: the full one, which carries its own Java
+# runtime, and the no-runtime one, which downloads the runtime on demand. Release assets are not
+# part of the git history and may be up to 2 GB, so the 128 MB full APK belongs here rather than
+# in the tree - the old version of this file committed APKs into apk/ and could only ever ship
+# the no-runtime build.
+#
+# Started by hand (Actions -> Aerix release -> Run workflow, which asks for the run id, tag and a
+# note) or by touching this file on a branch that should publish. With RUN_ID and BUILD_SHA left
+# empty it publishes the newest successful Android CI run of the branch that triggered it.
 on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "Android CI run id to publish (empty: newest successful run of the branch)"
+        required: false
+        default: ""
+      tag:
+        description: "Release tag (empty: aerix-<short sha>)"
+        required: false
+        default: ""
+      notes:
+        description: "One line to put at the top of the release notes"
+        required: false
+        default: ""
+      skip_noruntime:
+        description: "Attach only the full APK"
+        required: false
+        type: boolean
+        default: false
   push:
-    branches: [ "arena/5d11b9a3-aerix-launcher" ]
     paths: [ ".github/workflows/aerix-release.yml" ]
 
 permissions:
   contents: write
   actions: read
 
+# The knobs of a push-triggered release, same as the workflow_dispatch inputs above.
 env:
-  RUN_ID: "38670604839"
-  BUILD_SHA: "822150482e735571b68c163f3743111b500e9273"
+  RUN_ID: ""
+  BUILD_SHA: ""
+  TAG: ""
+  NOTES: ""
 
 jobs:
   publish:
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      DISPATCH_RUN_ID: ${{ github.event.inputs.run_id }}
+      DISPATCH_TAG: ${{ github.event.inputs.tag }}
+      DISPATCH_NOTES: ${{ github.event.inputs.notes }}
+      DISPATCH_SKIP_NORUNTIME: ${{ github.event.inputs.skip_noruntime }}
     steps:
-      - name: Checkout Aerix branch
+      - name: Checkout the branch that publishes
         uses: actions/checkout@v4
         with:
-          ref: arena/5d11b9a3-aerix-launcher
+          ref: ${{ github.ref_name }}
           fetch-depth: 1
 
-      - name: Download no-runtime APK
-        uses: actions/download-artifact@v4
-        with:
-          name: app-debug-noruntime
-          path: out
-          run-id: ${{ env.RUN_ID }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Commit APKs to apk/
+      - name: Resolve the CI run to publish
+        id: run
         shell: bash
         run: |
-          report() {
-            msg=$(tail -c 3000 step.log | tr '\n' '|' | sed 's/%/%25/g')
-            echo "::error title=commit-step::$msg"
-          }
-          exec > >(tee step.log) 2>&1
-          trap report ERR
-          set -e
-          SHORT=${BUILD_SHA:0:7}
-          git rm -q --ignore-unmatch apk/*.apk
-          # git rm drops the directory once its last file is gone; recreate it before copying.
-          mkdir -p apk
-          cp out/app-debug-noruntime.apk "apk/Aerix-Launcher-$SHORT-debug.apk"
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add apk
-          git commit -m "Build: Aerix APK $SHORT (CI run $RUN_ID) [skip ci]"
-          git push origin HEAD:arena/5d11b9a3-aerix-launcher
+          set -euo pipefail
+          run_id="${DISPATCH_RUN_ID:-${RUN_ID:-}}"
+          sha="${BUILD_SHA:-}"
+          if [ -z "$run_id" ]; then
+            if [ -n "$sha" ]; then
+              run_id=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow android.yml \
+                --commit "$sha" --status success --limit 1 --json databaseId --jq '.[0].databaseId // ""')
+            else
+              run_id=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow android.yml \
+                --branch "$GITHUB_REF_NAME" --status success --limit 1 --json databaseId --jq '.[0].databaseId // ""')
+            fi
+          fi
+          if [ -z "$run_id" ]; then
+            echo "::error title=no CI run::No finished Android CI run to publish. Give a run id, or wait for CI on $GITHUB_REF_NAME."
+            exit 1
+          fi
+          # The run is the source of truth for the commit: a release always names the build it ships.
+          sha=$(gh run view "$run_id" --repo "$GITHUB_REPOSITORY" --json headSha --jq .headSha)
+          short=${sha:0:7}
+          tag="${DISPATCH_TAG:-${TAG:-}}"
+          [ -n "$tag" ] || tag="aerix-$short"
+          {
+            echo "run_id=$run_id"
+            echo "sha=$sha"
+            echo "short=$short"
+            echo "tag=$tag"
+            echo "url=https://github.com/$GITHUB_REPOSITORY/actions/runs/$run_id"
+          } >> "$GITHUB_OUTPUT"
+          echo "Publishing run $run_id ($short) as $tag"
 
+      - name: Download the APKs of that run
+        uses: actions/download-artifact@v4
+        with:
+          pattern: app-debug*
+          path: out
+          run-id: ${{ steps.run.outputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Collect the APKs
+        id: apk
+        shell: bash
+        run: |
+          set -euo pipefail
+          short="${{ steps.run.outputs.short }}"
+          mkdir -p dist
+          pick() { find "out/$1" -name '*.apk' -print -quit 2>/dev/null || true; }
+          full=$(pick app-debug)
+          noruntime=$(pick app-debug-noruntime)
+          if [ -z "$full" ]; then
+            echo "::error title=no APK::The run has no app-debug artifact."
+            exit 1
+          fi
+          cp "$full" "dist/Aerix-Launcher-$short.apk"
+          {
+            echo "full=Aerix-Launcher-$short.apk"
+            echo "size=$(du -h "$full" | cut -f1)"
+          } >> "$GITHUB_OUTPUT"
+          assets="dist/Aerix-Launcher-$short.apk"
+          notes_extra=""
+          if [ -n "$noruntime" ] && [ "${DISPATCH_SKIP_NORUNTIME:-}" != "true" ]; then
+            cp "$noruntime" "dist/Aerix-Launcher-$short-noruntime.apk"
+            assets="$assets dist/Aerix-Launcher-$short-noruntime.apk"
+            notes_extra="noruntime"
+          fi
+          echo "assets=$assets" >> "$GITHUB_OUTPUT"
+          echo "noruntime=$notes_extra" >> "$GITHUB_OUTPUT"
+          ls -la dist
+
+      - name: Write the release notes
+        shell: bash
+        run: |
+          set -euo pipefail
+          short="${{ steps.run.outputs.short }}"
+          run_url="${{ steps.run.outputs.url }}"
+          {
+            echo "**Build \`$short\`** - [Android CI run]($run_url) - `$GITHUB_REF_NAME`"
+            echo ""
+            if [ -n "${DISPATCH_NOTES:-${NOTES:-}}" ]; then
+              echo "${DISPATCH_NOTES:-${NOTES:-}}"
+              echo ""
+            fi
+            echo "| File | What it is |"
+            echo "| --- | --- |"
+            echo "| \`Aerix-Launcher-$short.apk\` | Everything included, including the Java runtime. Install this one. |"
+            if [ "${{ steps.apk.outputs.noruntime }}" = "noruntime" ]; then
+              echo "| \`Aerix-Launcher-$short-noruntime.apk\` | The same build without the bundled runtime, for a smaller download. |"
+            fi
+            echo ""
+            echo "Debug build, signed with the debug key: uninstall a previous Aerix or PojavLauncher"
+            echo "first if the signature differs, and allow installing unknown apps."
+            echo ""
+          } > notes.md
+          cat notes.md
+
+      - name: Publish the release
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${{ steps.run.outputs.tag }}"
+          sha="${{ steps.run.outputs.sha }}"
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$tag" ${{ steps.apk.outputs.assets }} \
+              --repo "$GITHUB_REPOSITORY" --clobber
+            gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --notes-file notes.md
+          else
+            gh release create "$tag" ${{ steps.apk.outputs.assets }} \
+              --repo "$GITHUB_REPOSITORY" --target "$sha" \
+              --title "Aerix Launcher $tag" --notes-file notes.md --prerelease
+          fi
+          url=$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json url --jq .url)
+          {
+            echo "## Aerix release $tag"
+            echo ""
+            echo "$url"
+            echo ""
+            cat notes.md
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "Release: $url"
