@@ -105,6 +105,15 @@
 			</LinearLayout>
 		</FrameLayout>
 
+		<!-- The in game menu: a full screen Compose overlay, hidden until the button opens it.
+		     It is composed once and stays out of the way (and out of the frame budget) while the
+		     game runs. -->
+		<net.kdt.pojavlaunch.aerix.ui.game.GameMenuOverlayView
+			android:id="@+id/game_menu_overlay"
+			android:layout_width="match_parent"
+			android:layout_height="match_parent"
+			android:visibility="gone" />
+
 		<net.kdt.pojavlaunch.game.FpsView
 			android:id="@+id/main_fps_view"
 			android:layout_width="wrap_content"

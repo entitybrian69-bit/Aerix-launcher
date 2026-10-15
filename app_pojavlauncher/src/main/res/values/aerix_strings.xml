@@ -36,6 +36,42 @@
     <string name="aerix_home_recent">Recent worlds</string>
     <string name="aerix_home_view_all">View all</string>
     <string name="aerix_home_quick_tools">Quick tools</string>
+    <!-- In game menu (full screen overlay) -->
+    <string name="aerix_ingame_menu_title">Aerix Menu</string>
+    <string name="aerix_ingame_menu_subtitle">%1$s</string>
+    <string name="aerix_ingame_menu_resume">Resume game</string>
+    <string name="aerix_ingame_menu_force_close">Force close game</string>
+    <string name="aerix_ingame_menu_logs">Log output</string>
+    <string name="aerix_ingame_menu_keycode">Send custom keycode</string>
+    <string name="aerix_ingame_menu_quick_settings">Quick settings</string>
+    <string name="aerix_ingame_menu_controls">Custom controls</string>
+    <string name="aerix_ingame_menu_downloads">In-Game Downloads</string>
+    <string name="aerix_ingame_menu_close">Close the menu</string>
+    <string name="aerix_ingame_menu_no_account">No account</string>
+
+    <!-- In game downloader -->
+    <string name="aerix_ingame_download_title">In-Game Downloads</string>
+    <string name="aerix_ingame_download_subtitle">Into %1$s, without closing the game</string>
+    <string name="aerix_ingame_download_type_resourcepacks">Resource packs</string>
+    <string name="aerix_ingame_download_type_shaders">Shaders</string>
+    <string name="aerix_ingame_download_type_worlds">Worlds</string>
+    <string name="aerix_ingame_download_search">Search %1$s</string>
+    <string name="aerix_ingame_download_install">Install</string>
+    <string name="aerix_ingame_download_installed">Installed</string>
+    <string name="aerix_ingame_download_working">Downloading…</string>
+    <string name="aerix_ingame_download_done">Installed %1$s</string>
+    <string name="aerix_ingame_download_searching">Looking for content…</string>
+    <string name="aerix_ingame_download_empty">Nothing found for Minecraft %1$s. Try another search.</string>
+    <string name="aerix_ingame_download_offline">No internet connection. Check your network, then retry.</string>
+    <string name="aerix_ingame_download_api_error">The download source did not answer. Retry in a moment.</string>
+    <string name="aerix_ingame_download_no_instance">No instance is selected, so there is no folder to download into.</string>
+    <string name="aerix_ingame_download_storage_error">The instance folder cannot be written to. Free up space, or move the launcher data back to internal storage.</string>
+    <string name="aerix_ingame_download_storage_action">Storage</string>
+    <string name="aerix_ingame_download_failed">The download failed. Retry, or pick another file.</string>
+    <string name="aerix_ingame_download_retry">Retry</string>
+    <string name="aerix_ingame_download_clear">Clear the search</string>
+    <string name="aerix_ingame_download_no_key">CurseForge needs an API key, set it in the launcher settings. Modrinth works without one.</string>
+
     <string name="aerix_home_aetherium_hint">Try the Aetherium mod</string>
     <string name="aerix_home_aetherium_tag">New</string>
     <string name="aerix_home_quick_create">Create instance</string>
