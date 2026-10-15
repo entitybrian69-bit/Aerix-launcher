@@ -6,6 +6,9 @@ on:
   pull_request:
     types: [labeled]
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-22.04
@@ -62,14 +65,37 @@ jobs:
       - name: Build Debug .apk (Full)
         run: |
           # Build the launcher
-          gradle :app_pojavlauncher:assembleFullDebug
+          set -o pipefail
+          gradle :app_pojavlauncher:assembleFullDebug 2>&1 | tee -a build.log
           mv app_pojavlauncher/build/outputs/apk/full/debug/app_pojavlauncher-full-debug.apk out/app-debug-full.apk
 
       - name: Build Debug .apk (No runtime)
         run: |
          # Build the launcher (without jre8 installed)
-          gradle :app_pojavlauncher:assembleNoruntimeDebug
+          set -o pipefail
+          gradle :app_pojavlauncher:assembleNoruntimeDebug 2>&1 | tee -a build.log
           mv app_pojavlauncher/build/outputs/apk/noruntime/debug/app_pojavlauncher-noruntime-debug.apk out/app-debug-noruntime.apk
+
+      - name: Report build failure
+        if: failure()
+        run: |
+          # The CI log itself cannot be read from outside, so the interesting part of it is
+          # written back into the branch when a build breaks.
+          mkdir -p ci-logs
+          {
+            echo "# Android CI failure report"
+            echo
+            echo "## Error lines"
+            grep -nE "^e: |error: |FAILURE:|What went wrong|Execution failed|Caused by:|FAILED$|warning: " build.log | head -400 || true
+            echo
+            echo "## Tail of the build output"
+            tail -n 800 build.log
+          } > ci-logs/failure.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ci-logs/failure.txt
+          git commit -m "CI: build failure report [skip ci]"
+          git push origin HEAD:arena/68d5e5c9-aerix-launcher
 
       - name: Gen md5sums
         run: |
