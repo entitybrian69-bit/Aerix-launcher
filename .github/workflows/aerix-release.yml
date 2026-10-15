@@ -19,7 +19,11 @@ on:
         required: false
         default: ""
       tag:
-        description: "Release tag (empty: aerix-<short sha>)"
+        description: "Release tag (empty: v<version>)"
+        required: false
+        default: ""
+      version:
+        description: "Version the build carries, used in the asset names (empty: VERSION below)"
         required: false
         default: ""
       notes:
@@ -44,10 +48,13 @@ permissions:
 # accessible by integration" even with contents: write - but it can upload the assets of one that
 # exists. Create the release itself (empty) next to the branch, then set RUN_ID / TAG here and push.
 env:
-  RUN_ID: "38762308660"
+  RUN_ID: ""
   BUILD_SHA: ""
-  TAG: "aerix-6f9ce88"
-  NOTES: "The content browser opens its long filter lists in a dialog, and its version filter is the whole game."
+  TAG: "v1.0.0"
+  # Name of the release: the version the build carries, and the tag it is published under when TAG
+  # is left empty.
+  VERSION: "1.0.0"
+  NOTES: "Aerix Launcher 1.0.0 - the first release: the loader screen, the in-game menu and downloader, and the content browser."
 
 
 jobs:
@@ -58,15 +65,32 @@ jobs:
       DISPATCH_RUN_ID: ${{ github.event.inputs.run_id }}
       DISPATCH_TAG: ${{ github.event.inputs.tag }}
       DISPATCH_NOTES: ${{ github.event.inputs.notes }}
+      DISPATCH_VERSION: ${{ github.event.inputs.version }}
       DISPATCH_SKIP_NORUNTIME: ${{ github.event.inputs.skip_noruntime }}
     steps:
+      # A push to this file with no run chosen only stores the workflow: it must not publish the
+      # newest run it happens to find, which may be an older build with other artifacts.
+      - name: Decide whether this run publishes
+        id: gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_EVENT_NAME}" = "push" ] && [ -z "${RUN_ID:-}" ] && [ -z "${BUILD_SHA:-}" ]; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=stored::No RUN_ID or BUILD_SHA set, so this push only stores the workflow."
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Checkout the branch that publishes
+        if: steps.gate.outputs.publish == 'true'
         uses: actions/checkout@v4
         with:
           ref: ${{ github.ref_name }}
           fetch-depth: 1
 
       - name: Resolve the CI run to publish
+        if: steps.gate.outputs.publish == 'true'
         id: run
         shell: bash
         run: |
@@ -90,48 +114,52 @@ jobs:
           sha=$(gh run view "$run_id" --repo "$GITHUB_REPOSITORY" --json headSha --jq .headSha)
           short=${sha:0:7}
           tag="${DISPATCH_TAG:-${TAG:-}}"
-          [ -n "$tag" ] || tag="aerix-$short"
+          version="${DISPATCH_VERSION:-${VERSION:-}}"
+          [ -n "$tag" ] || tag="v$version"
           {
             echo "run_id=$run_id"
             echo "sha=$sha"
             echo "short=$short"
             echo "tag=$tag"
+            echo "version=$version"
             echo "url=https://github.com/$GITHUB_REPOSITORY/actions/runs/$run_id"
           } >> "$GITHUB_OUTPUT"
           echo "Publishing run $run_id ($short) as $tag"
 
       - name: Download the APKs of that run
+        if: steps.gate.outputs.publish == 'true'
         uses: actions/download-artifact@v4
         with:
-          pattern: app-debug*
+          pattern: app-release*
           path: out
           run-id: ${{ steps.run.outputs.run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Collect the APKs
+        if: steps.gate.outputs.publish == 'true'
         id: apk
         shell: bash
         run: |
           set -euo pipefail
-          short="${{ steps.run.outputs.short }}"
+          version="${{ steps.run.outputs.version }}"
           mkdir -p dist
           pick() { find "out/$1" -name '*.apk' -print -quit 2>/dev/null || true; }
-          full=$(pick app-debug)
-          noruntime=$(pick app-debug-noruntime)
+          full=$(pick app-release)
+          noruntime=$(pick app-release-noruntime)
           if [ -z "$full" ]; then
-            echo "::error title=no APK::The run has no app-debug artifact."
+            echo "::error title=no APK::The run has no app-release artifact."
             exit 1
           fi
-          cp "$full" "dist/Aerix-Launcher-$short.apk"
+          cp "$full" "dist/Aerix-Launcher-$version.apk"
           {
-            echo "full=Aerix-Launcher-$short.apk"
+            echo "full=Aerix-Launcher-$version.apk"
             echo "size=$(du -h "$full" | cut -f1)"
           } >> "$GITHUB_OUTPUT"
-          assets="dist/Aerix-Launcher-$short.apk"
+          assets="dist/Aerix-Launcher-$version.apk"
           notes_extra=""
           if [ -n "$noruntime" ] && [ "${DISPATCH_SKIP_NORUNTIME:-}" != "true" ]; then
-            cp "$noruntime" "dist/Aerix-Launcher-$short-noruntime.apk"
-            assets="$assets dist/Aerix-Launcher-$short-noruntime.apk"
+            cp "$noruntime" "dist/Aerix-Launcher-$version-noruntime.apk"
+            assets="$assets dist/Aerix-Launcher-$version-noruntime.apk"
             notes_extra="noruntime"
           fi
           echo "assets=$assets" >> "$GITHUB_OUTPUT"
@@ -139,13 +167,15 @@ jobs:
           ls -la dist
 
       - name: Write the release notes
+        if: steps.gate.outputs.publish == 'true'
         shell: bash
         run: |
           set -euo pipefail
+          version="${{ steps.run.outputs.version }}"
           short="${{ steps.run.outputs.short }}"
           run_url="${{ steps.run.outputs.url }}"
           {
-            echo "**Build \`$short\`** - [Android CI run]($run_url) - branch \`$GITHUB_REF_NAME\`"
+            echo "**Aerix Launcher $version** - build \`$short\` - [Android CI run]($run_url)"
             echo ""
             if [ -n "${DISPATCH_NOTES:-${NOTES:-}}" ]; then
               echo "${DISPATCH_NOTES:-${NOTES:-}}"
@@ -153,18 +183,19 @@ jobs:
             fi
             echo "| File | What it is |"
             echo "| --- | --- |"
-            echo "| \`Aerix-Launcher-$short.apk\` | Everything included, including the Java runtime. Install this one. |"
+            echo "| \`Aerix-Launcher-$version.apk\` | Everything included, including the Java runtime. Install this one. |"
             if [ "${{ steps.apk.outputs.noruntime }}" = "noruntime" ]; then
-              echo "| \`Aerix-Launcher-$short-noruntime.apk\` | The same build without the bundled runtime, for a smaller download. |"
+              echo "| \`Aerix-Launcher-$version-noruntime.apk\` | The same build without the bundled runtime, for a smaller download. |"
             fi
             echo ""
-            echo "Debug build, signed with the debug key: uninstall a previous Aerix or PojavLauncher"
-            echo "first if the signature differs, and allow installing unknown apps."
+            echo "Release build, signed with the release key of this project - not a debug build."
+            echo "Android may ask to allow installing apps from unknown sources the first time."
             echo ""
           } > notes.md
           cat notes.md
 
       - name: Publish the release
+        if: steps.gate.outputs.publish == 'true'
         shell: bash
         run: |
           # The job log of a failed run is not always reachable by the caller that reads this, so a
