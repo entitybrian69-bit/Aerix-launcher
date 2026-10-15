@@ -22,6 +22,7 @@
 package net.kdt.pojavlaunch.aerix.ui.game
 
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -62,6 +63,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -80,6 +82,7 @@ import net.kdt.pojavlaunch.aerix.bridge.AssetType
 import net.kdt.pojavlaunch.aerix.bridge.DownloadError
 import net.kdt.pojavlaunch.aerix.bridge.GameDownloadTarget
 import net.kdt.pojavlaunch.aerix.bridge.PojavGameDownloadsBridge
+import net.kdt.pojavlaunch.aerix.ui.screens.rememberRemoteBitmap
 import net.kdt.pojavlaunch.aerix.theme.AerixRadii
 import net.kdt.pojavlaunch.aerix.theme.AerixSpacing
 import net.kdt.pojavlaunch.aerix.theme.AerixSurface
@@ -460,7 +463,9 @@ private fun DownloadRow(
             .padding(AerixSpacing.smCompact),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // The letter avatar keeps the list light: no image is fetched while the game runs.
+        // The icon of the project, through the same cache the Discover screen fills, so a page of
+        // results shares what it downloaded with the launcher. The letter stays as the fallback
+        // while the icon arrives, and for projects that have none.
         Box(
             modifier = Modifier
                 .size(38.dp)
@@ -474,6 +479,14 @@ private fun DownloadRow(
                 fontSize = 17.sp,
                 fontWeight = FontWeight.Bold
             )
+            rememberRemoteBitmap(project.iconUrl, targetMinEdgePx = 64)?.let { icon ->
+                Image(
+                    bitmap = icon,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
         }
         Spacer(Modifier.width(AerixSpacing.sm))
         Column(modifier = Modifier.weight(1f)) {
