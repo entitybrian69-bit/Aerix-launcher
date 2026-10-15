@@ -6,10 +6,10 @@ import android.net.NetworkCapabilities
 import android.os.Build
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import net.kdt.pojavlaunch.Instances
 import net.kdt.pojavlaunch.JVersionList
 import net.kdt.pojavlaunch.Tools
 import net.kdt.pojavlaunch.instances.Instance
+import net.kdt.pojavlaunch.instances.Instances
 import java.io.File
 
 /**
