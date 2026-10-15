@@ -55,22 +55,99 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* a very slow, very soft aurora behind everything: the "cozy" layer */
+/* The static base: a deep teal canvas with the faintest cyan and violet wash. */
 body::before {
   content: "";
   position: fixed;
-  inset: -20% -10% -20% -10%;
+  inset: 0;
   z-index: -2;
   background:
-    radial-gradient(46rem 30rem at 12% 6%,  rgba(55, 220, 236, .17), transparent 62%),
-    radial-gradient(52rem 34rem at 88% 82%, rgba(122, 113, 245, .16), transparent 66%),
+    radial-gradient(46rem 30rem at 12% 6%,  rgba(55, 220, 236, .14), transparent 62%),
+    radial-gradient(52rem 34rem at 88% 82%, rgba(122, 113, 245, .14), transparent 66%),
     linear-gradient(180deg, var(--canvas) 0%, var(--canvas-deep) 100%);
-  animation: drift 26s ease-in-out infinite alternate;
 }
 
-@keyframes drift {
-  from { transform: translate3d(-1.2%, -1%, 0) scale(1.02); }
-  to   { transform: translate3d(1.4%, 1.2%, 0) scale(1.06); }
+/* ─────────────────────────── the aurora ───────────────────────────
+   Three wide, heavily blurred colour bands and two long ribbons, all
+   drifting very slowly out of phase. Only transform and opacity are
+   animated, so phones composite it on the GPU instead of repainting,
+   and every layer disappears entirely under prefers-reduced-motion. */
+
+.aurora {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  contain: strict;
+}
+
+.aurora .band {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(64px);
+  opacity: .5;
+  mix-blend-mode: screen;
+  will-change: transform, opacity;
+  transform: translate3d(0, 0, 0);
+}
+
+.band-1 {
+  width: 110vmax; height: 46vmax;
+  left: -18vmax; top: -14vmax;
+  background: radial-gradient(closest-side, rgba(55, 220, 236, .50), rgba(55, 220, 236, 0) 72%);
+  animation: aurora-drift-a 26s ease-in-out infinite alternate;
+}
+.band-2 {
+  width: 96vmax; height: 42vmax;
+  left: 6vmax; top: -10vmax;
+  background: radial-gradient(closest-side, rgba(141, 239, 224, .40), rgba(141, 239, 224, 0) 74%);
+  animation: aurora-drift-b 32s ease-in-out infinite alternate;
+}
+.band-3 {
+  width: 120vmax; height: 52vmax;
+  right: -26vmax; top: 4vmax;
+  background: radial-gradient(closest-side, rgba(122, 113, 245, .44), rgba(122, 113, 245, 0) 72%);
+  animation: aurora-drift-c 29s ease-in-out infinite alternate;
+}
+
+.aurora .curtain {
+  position: absolute;
+  left: -30vmax;
+  width: 160vmax;
+  height: 12vmax;
+  filter: blur(38px);
+  mix-blend-mode: screen;
+  opacity: .34;
+  will-change: transform, opacity;
+  background: linear-gradient(90deg,
+    rgba(141, 239, 224, 0),
+    rgba(141, 239, 224, .34) 22%,
+    rgba(55, 220, 236, .22) 55%,
+    rgba(141, 239, 224, 0));
+}
+.curtain-1 { top: 5vh;  animation: aurora-sway-a 34s ease-in-out infinite alternate; }
+.curtain-2 { top: 25vh; opacity: .26; animation: aurora-sway-b 41s ease-in-out infinite alternate; }
+
+@keyframes aurora-drift-a {
+  from { transform: translate3d(-4%, -3%, 0) scale(1);    opacity: .38; }
+  to   { transform: translate3d(6%, 5%, 0)   scale(1.12); opacity: .58; }
+}
+@keyframes aurora-drift-b {
+  from { transform: translate3d(5%, 4%, 0)   scale(1.06); opacity: .34; }
+  to   { transform: translate3d(-6%, -2%, 0) scale(.98);  opacity: .52; }
+}
+@keyframes aurora-drift-c {
+  from { transform: translate3d(4%, 6%, 0)   scale(1.04); opacity: .36; }
+  to   { transform: translate3d(-7%, -4%, 0) scale(1.14); opacity: .56; }
+}
+@keyframes aurora-sway-a {
+  from { transform: rotate(-9deg) translate3d(-6%, 0, 0);  opacity: .20; }
+  to   { transform: rotate(-7deg) translate3d(6%, 5vh, 0); opacity: .42; }
+}
+@keyframes aurora-sway-b {
+  from { transform: rotate(7deg) translate3d(5%, 0, 0);     opacity: .18; }
+  to   { transform: rotate(9deg) translate3d(-5%, -4vh, 0); opacity: .34; }
 }
 
 img { max-width: 100%; height: auto; display: block; }
@@ -142,9 +219,11 @@ p  { margin: 0 0 .9rem; }
 
 .nav-links {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: clamp(10px, 1.6vw, 26px);
   margin-left: auto;
+  min-width: 0;
 }
 
 .nav-links a {
@@ -774,6 +853,26 @@ code {
     transition-duration: .001ms !important;
   }
   .reveal { opacity: 1; transform: none; }
+}
+
+/* notched and rounded phones: keep the content out of the system bars */
+@supports (padding: max(0px)) {
+  .nav, .hero, .section, .footer {
+    padding-left: max(var(--pad-x), env(safe-area-inset-left));
+    padding-right: max(var(--pad-x), env(safe-area-inset-right));
+  }
+  .footer { padding-bottom: max(clamp(20px, 3vw, 34px), env(safe-area-inset-bottom)); }
+}
+
+/* a phone has less GPU to spare: fewer layers, softer blur, no blend modes */
+@media (max-width: 900px) {
+  .aurora .band { filter: blur(46px); mix-blend-mode: normal; opacity: .34; }
+  .aurora .curtain { filter: blur(30px); mix-blend-mode: normal; opacity: .24; }
+  .curtain-2 { display: none; }
+  @keyframes aurora-drift-a {
+    from { transform: translate3d(-3%, -2%, 0) scale(1);    opacity: .26; }
+    to   { transform: translate3d(4%, 3%, 0)   scale(1.08); opacity: .40; }
+  }
 }
 
 @media print {
