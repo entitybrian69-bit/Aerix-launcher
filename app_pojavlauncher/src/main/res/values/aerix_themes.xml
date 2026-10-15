@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Launch theme of the entry activity: Aerix mark on the Aerix canvas, full screen. -->
+    <style name="Aerix.SplashScreen" parent="MojoLauncher.AppTheme">
+        <item name="android:windowBackground">@drawable/aerix_splash</item>
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:windowDisablePreview">false</item>
+    </style>
+
+    <!-- Launcher host: Aerix canvas behind the Compose shell. System bars are driven at runtime by
+         Tools.setInsetsMode() from LauncherActivity.setFullscreen() (Aerix "launcherFullScreen"). -->
+    <style name="Aerix.Launcher" parent="MojoLauncher.AppTheme">
+        <item name="android:windowBackground">@color/aerix_canvas</item>
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowContentOverlay">@null</item>
+    </style>
+</resources>

@@ -337,11 +337,16 @@ public final class Tools {
     }
 
     public static String printToString(Throwable throwable) {
+        if (throwable == null) return "Unknown error (no exception attached)";
         StringWriter stringWriter = new StringWriter();
         PrintWriter printWriter = new PrintWriter(stringWriter);
-        throwable.printStackTrace(printWriter);
-        printWriter.close();
-        return stringWriter.toString();
+        try {
+            throwable.printStackTrace(printWriter);
+            printWriter.close();
+            return stringWriter.toString();
+        } catch (Throwable ignored) {
+            return FatalErrorActivity.safeFormatThrowable(throwable);
+        }
     }
 
     public static void showError(Context ctx, Throwable e) {

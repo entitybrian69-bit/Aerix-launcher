@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- From mirai-launcher- res/values-zh-rTW/chinese_festivals.xml and strings.xml. -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:ignore="MissingTranslation">
+    <string name="aerix_festivals_spring">春節快樂！</string>
+    <string name="aerix_festivals_qing_ming">清明節安康！</string>
+    <string name="aerix_festivals_dragon_boat">端午節安康！</string>
+    <string name="aerix_festivals_mid_autumn">中秋節快樂！</string>
+    <string name="aerix_festivals_national_day">國慶日快樂！</string>
+    <string name="aerix_festivals_qixi">七夕節快樂！</string>
+    <string name="aerix_festivals_new_year">新年快樂！</string>
+    <string name="aerix_festivals_april_fools">愚人節快樂！</string>
+    <string name="aerix_festivals_christmas">聖誕節快樂！</string>
+</resources>

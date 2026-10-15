@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Aerix Launcher artwork (GPL-3.0), drawn for the Aerix UI layer of PojavLauncher. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="8"
+    android:viewportHeight="8">
+    <path android:fillColor="#FFE08A3C" android:pathData="M0,0h1v1h-1zM1,0h1v1h-1zM2,0h1v1h-1zM3,0h1v1h-1zM4,0h1v1h-1zM5,0h1v1h-1zM6,0h1v1h-1zM7,0h1v1h-1zM0,1h1v1h-1zM2,1h1v1h-1zM3,1h1v1h-1zM4,1h1v1h-1zM5,1h1v1h-1zM6,1h1v1h-1zM0,2h1v1h-1zM1,2h1v1h-1zM6,2h1v1h-1zM7,2h1v1h-1zM0,3h1v1h-1zM7,3h1v1h-1z"/>
+    <path android:fillColor="#FFC96F26" android:pathData="M1,1h1v1h-1zM7,1h1v1h-1z"/>
+    <path android:fillColor="#FFF3C7A5" android:pathData="M2,2h1v1h-1zM3,2h1v1h-1zM4,2h1v1h-1zM5,2h1v1h-1zM1,3h1v1h-1zM2,3h1v1h-1zM3,3h1v1h-1zM4,3h1v1h-1zM5,3h1v1h-1zM6,3h1v1h-1zM0,4h1v1h-1zM3,4h1v1h-1zM4,4h1v1h-1zM7,4h1v1h-1zM0,5h1v1h-1zM1,5h1v1h-1zM2,5h1v1h-1zM5,5h1v1h-1zM6,5h1v1h-1zM7,5h1v1h-1zM0,6h1v1h-1zM1,6h1v1h-1zM2,6h1v1h-1zM5,6h1v1h-1zM6,6h1v1h-1zM7,6h1v1h-1zM0,7h1v1h-1zM1,7h1v1h-1zM2,7h1v1h-1zM3,7h1v1h-1zM4,7h1v1h-1zM5,7h1v1h-1zM6,7h1v1h-1zM7,7h1v1h-1z"/>
+    <path android:fillColor="#FFFFFFFF" android:pathData="M1,4h1v1h-1zM6,4h1v1h-1z"/>
+    <path android:fillColor="#FF3C8F3C" android:pathData="M2,4h1v1h-1zM5,4h1v1h-1z"/>
+    <path android:fillColor="#FFE7B48E" android:pathData="M3,5h1v1h-1zM4,5h1v1h-1z"/>
+    <path android:fillColor="#FFD98C7A" android:pathData="M3,6h1v1h-1zM4,6h1v1h-1z"/>
+</vector>

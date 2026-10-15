@@ -1,30 +1,26 @@
 package com.kdt;
 
 import android.content.Context;
-import android.graphics.Typeface;
 import android.util.AttributeSet;
-import android.view.View;
-import android.widget.ImageButton;
-import android.widget.TextView;
-import android.widget.ToggleButton;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.constraintlayout.widget.ConstraintLayout;
 
-import net.kdt.pojavlaunch.Logger;
-import net.kdt.pojavlaunch.R;
+import net.kdt.pojavlaunch.aerix.log.AerixLogHost;
 
 /**
  * A class able to display logs to the user.
- * It has support for the Logger class
+ * The view itself is now the Aerix log box, the port of mirai-launcher-
+ *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/ui/screens/game/elements/LogBox.kt
+ * via net.kdt.pojavlaunch.aerix.log.AerixLogBox, which consumes the same
+ * net.kdt.pojavlaunch.Logger.setLogListener contract this view used before.
+ * Visibility is the log switch: VISIBLE registers the log listener, anything else releases it, exactly
+ * like the "Output" toggle the previous implementation drew.
  */
 public class LoggerView extends ConstraintLayout {
-    private Logger.eventLogListener mLogListener;
-    private ToggleButton mLogToggle;
-    private DefocusableScrollView mScrollView;
-    private TextView mLogTextView;
-
+    private boolean mLogVisible;
+    private boolean mAttached;
 
     public LoggerView(@NonNull Context context) {
         this(context, null);
@@ -37,65 +33,26 @@ public class LoggerView extends ConstraintLayout {
 
     @Override
     public void setVisibility(int visibility) {
+        if (visibility == VISIBLE && !mAttached) {
+            mAttached = true;
+            AerixLogHost.attach(this);
+        }
         super.setVisibility(visibility);
-        // Triggers the log view shown state by default when viewing it
-        mLogToggle.setChecked(visibility == VISIBLE);
+        mLogVisible = visibility == VISIBLE;
+        if (mAttached) {
+            AerixLogHost.setVisible(mLogVisible);
+        }
+    }
+
+    public boolean isLogVisible() {
+        return mLogVisible;
     }
 
     /**
-     * Inflate the layout, and add component behaviors
+     * Defer ComposeView creation until the user opens the in-game log view (visibility == VISIBLE),
+     * avoiding an eager ComposeView/Recomposer attachment during GameActivity / AWTActivity startup.
      */
-    private void init(){
-        inflate(getContext(), R.layout.view_logger, this);
-        mLogTextView = findViewById(R.id.content_log_view);
-        mLogTextView.setTypeface(Typeface.MONOSPACE);
-        //TODO clamp the max text so it doesn't go oob
-        mLogTextView.setMaxLines(Integer.MAX_VALUE);
-        mLogTextView.setEllipsize(null);
-        mLogTextView.setVisibility(GONE);
-
-        // Toggle log visibility
-        mLogToggle = findViewById(R.id.content_log_toggle_log);
-        mLogToggle.setOnCheckedChangeListener(
-                (compoundButton, isChecked) -> {
-                    mLogTextView.setVisibility(isChecked ? VISIBLE : GONE);
-                    if(isChecked) {
-                        Logger.setLogListener(mLogListener);
-                    }else{
-                        mLogTextView.setText("");
-                        Logger.setLogListener(null); // Makes the JNI code be able to skip expensive logger callbacks
-                        // NOTE: was tested by rapidly smashing the log on/off button, no sync issues found :)
-                    }
-                });
-        mLogToggle.setChecked(false);
-
-        // Remove the loggerView from the user View
-        ImageButton cancelButton = findViewById(R.id.log_view_cancel);
-        cancelButton.setOnClickListener(view -> LoggerView.this.setVisibility(GONE));
-
-        // Set the scroll view
-        mScrollView = findViewById(R.id.content_log_scroll);
-        mScrollView.setKeepFocusing(true);
-
-        //Set up the autoscroll switch
-        ToggleButton autoscrollToggle = findViewById(R.id.content_log_toggle_autoscroll);
-        autoscrollToggle.setOnCheckedChangeListener(
-                (compoundButton, isChecked) -> {
-                    if(isChecked) mScrollView.fullScroll(View.FOCUS_DOWN);
-                    mScrollView.setKeepFocusing(isChecked);
-                }
-        );
-        autoscrollToggle.setChecked(true);
-
-        // Listen to logs
-        mLogListener = text -> {
-            if(mLogTextView.getVisibility() != VISIBLE) return;
-            post(() -> {
-                mLogTextView.append(text + '\n');
-                if(mScrollView.isKeepFocusing()) mScrollView.fullScroll(View.FOCUS_DOWN);
-            });
-
-        };
+    private void init() {
+        super.setVisibility(GONE);
     }
-
 }
