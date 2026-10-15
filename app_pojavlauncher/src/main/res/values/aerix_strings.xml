@@ -70,10 +70,13 @@
     <string name="aerix_ingame_download_failed">The download failed. Retry, or pick another file.</string>
     <string name="aerix_ingame_download_retry">Retry</string>
     <string name="aerix_ingame_download_clear">Clear the search</string>
-    <string name="aerix_ingame_download_no_key">CurseForge needs an API key, set it in the launcher settings. Modrinth works without one.</string>
+    <string name="aerix_ingame_download_empty_any">Nothing found. Try other words, or the other download source.</string>
+    <string name="aerix_ingame_download_version_relaxed">Nothing is tagged for Minecraft %1$s, so the newest content is shown instead.</string>
+    <string name="aerix_ingame_download_key_error">CurseForge did not answer. Setting an API key in the launcher settings can help.</string>
 
-    <string name="aerix_home_aetherium_hint">Try the Aetherium mod</string>
-    <string name="aerix_home_aetherium_tag">New</string>
+    <string name="aerix_settings_aetherium">Try the Aetherium mod</string>
+    <string name="aerix_settings_aetherium_sub">A visual mod that pairs with the wallpapers and shaders of the launcher. Opens the content browser.</string>
+    <string name="aerix_settings_aetherium_tag">New</string>
     <string name="aerix_home_quick_create">Create instance</string>
     <string name="aerix_home_quick_create_sub">Vanilla or modded</string>
     <string name="aerix_home_quick_explore">Explore content</string>

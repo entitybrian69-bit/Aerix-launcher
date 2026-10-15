@@ -59,7 +59,7 @@ class GameMenuOverlayView @JvmOverloads constructor(
     private val composeView = ComposeView(context)
     private val callbacksState = mutableStateOf<GameMenuCallbacks?>(null)
     private val revisionState = mutableIntStateOf(0)
-    private val targetState = mutableStateOf(GameDownloadTarget.of(null, "", null))
+    private val targetState = mutableStateOf(GameDownloadTarget.of(null))
     private var contentInstalled = false
 
     /** Handler of the back button, published by the composition while the menu is on screen. */

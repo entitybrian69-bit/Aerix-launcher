@@ -229,17 +229,9 @@ object PojavAssetBridge {
     }
 
     suspend fun instanceTarget(): InstanceTarget = withContext(Dispatchers.IO) {
-        val versionId = runCatching { Instances.loadSelectedInstance()?.versionId }.getOrNull()
-            ?: return@withContext InstanceTarget(null, null)
-        val id = versionId.lowercase()
-        val loader = when {
-            id.contains("neoforge") -> "neoforge"
-            id.contains("fabric") -> "fabric"
-            id.contains("quilt") -> "quilt"
-            id.contains("forge") -> "forge"
-            else -> null
-        }
-        InstanceTarget(mcVersionPattern.find(versionId)?.value, loader)
+        // The version of the game, not the version of its loader: see GameDownloadTarget.of.
+        val target = PojavGameDownloadsBridge.runningTarget()
+        InstanceTarget(target.mcVersion, target.loader)
     }
 
     /** Names of files currently in the selected instance's folder for [type], lowercased. */

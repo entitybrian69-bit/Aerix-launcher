@@ -6,7 +6,10 @@ import android.net.NetworkCapabilities
 import android.os.Build
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import net.kdt.pojavlaunch.instances.Instances
+import net.kdt.pojavlaunch.Instances
+import net.kdt.pojavlaunch.JVersionList
+import net.kdt.pojavlaunch.Tools
+import net.kdt.pojavlaunch.instances.Instance
 import java.io.File
 
 /**
@@ -45,29 +48,87 @@ class GameDownloadTarget(
         }
 
     companion object {
-        private val MC_VERSION = Regex("\\d+\\.\\d+(\\.\\d+)?")
+        /** A Minecraft release version, as it appears in version ids and folder names. */
+        private val MC_RELEASE = Regex("""\b1\.\d{1,2}(?:\.\d{1,2})?\b""")
 
-        fun of(versionId: String?, instanceName: String, gameDirectory: File?): GameDownloadTarget {
-            val id = versionId.orEmpty()
-            val loader = when {
-                id.contains("neoforge", true) -> "neoforge"
-                id.contains("fabric", true) -> "fabric"
-                id.contains("quilt", true) -> "quilt"
-                id.contains("forge", true) -> "forge"
-                else -> null
-            }
+        /** A Minecraft snapshot, e.g. 24w14a. */
+        private val MC_SNAPSHOT = Regex("""\b\d{2}w\d{2}[a-z]\b""")
+
+        /** Last resort: anything that looks like a version number. */
+        private val ANY_VERSION = Regex("""\d+\.\d+(?:\.\d+)?""")
+
+        /** Checked in this order: "neoforge" contains "forge". */
+        private val LOADERS = listOf("neoforge", "fabric", "quilt", "forge")
+
+        /**
+         * The Minecraft version inside a version id.
+         *
+         * A loader id is "fabric-loader-0.19.5-1.21.4": the first number in it is the version of
+         * the loader, not of the game, so the game version has to be picked by shape and not by
+         * being the first number in the string.
+         */
+        fun minecraftVersionIn(text: String?): String? {
+            val id = text.orEmpty()
+            MC_RELEASE.find(id)?.let { return it.value }
+            MC_SNAPSHOT.find(id)?.let { return it.value }
+            return ANY_VERSION.find(id)?.value
+        }
+
+        fun loaderIn(versionId: String?): String? {
+            val id = versionId.orEmpty().lowercase()
+            return LOADERS.firstOrNull { id.contains(it) }
+        }
+
+        /** The instance the game runs, with the Minecraft version it is built on. */
+        fun of(instance: Instance?): GameDownloadTarget {
+            val versionId = instance?.versionId
+            // A loader instance is a version of its own that inherits from the Minecraft one, so
+            // "fabric-loader-0.19.5-1.21.4" only spells out 1.21.4 in the version json it points at.
+            val inherited = versionJsonOf(instance, versionId)?.inheritsFrom
+                ?.takeIf { it.isNotBlank() && !it.equals(versionId, true) }
             return GameDownloadTarget(
-                instanceName = instanceName,
-                mcVersion = MC_VERSION.find(id)?.value,
-                loader = loader,
-                gameDirectory = gameDirectory
+                instanceName = instance?.name.orEmpty(),
+                mcVersion = inherited?.let { minecraftVersionIn(it) ?: it }
+                    ?: minecraftVersionIn(versionId),
+                loader = loaderIn(versionId),
+                gameDirectory = runCatching { instance?.gameDirectory }.getOrNull()
             )
+        }
+
+        /**
+         * The version json of the instance: from its own folder first (instances that keep their
+         * data apart), then the one Pojav resolves versions from.
+         */
+        private fun versionJsonOf(instance: Instance?, versionId: String?): JVersionList.Version? {
+            if (instance == null || versionId.isNullOrBlank()) return null
+            val file = runCatching {
+                File(instance.gameDirectory, "versions/$versionId/$versionId.json")
+            }.getOrNull()
+            if (file != null && file.isFile) {
+                val inInstance = runCatching {
+                    Tools.GLOBAL_GSON.fromJson(file.readText(), JVersionList.Version::class.java)
+                }.getOrNull()
+                if (inInstance != null) return inInstance
+            }
+            return runCatching { Tools.getVersionInfo(versionId, true) }.getOrNull()
         }
     }
 }
 
 /** What went wrong while searching or downloading, in the words of the menu. */
-enum class DownloadError { OFFLINE, API, NO_TARGET, STORAGE, FILE }
+enum class DownloadError { OFFLINE, API, KEY, NO_TARGET, STORAGE, FILE }
+
+/**
+ * One page of the downloader.
+ *
+ * [versionRelaxed] says the version of the running game had to be dropped to fill the page: the
+ * player sees that what is on screen is not tagged for their version instead of an empty list.
+ */
+class GameSearchResult(
+    val page: AssetPage?,
+    val error: DownloadError?,
+    val versionRelaxed: Boolean = false
+)
 
 /** Result of one download: the file that was written, or why it was not. */
 class DownloadOutcome(val fileName: String?, val error: DownloadError?) {
@@ -79,14 +140,8 @@ object PojavGameDownloadsBridge {
     const val PAGE_SIZE = 20
 
     /** The instance the game runs, read the same way the game itself reads it. */
-    fun runningTarget(): GameDownloadTarget {
-        val instance = runCatching { Instances.loadSelectedInstance() }.getOrNull()
-        return GameDownloadTarget.of(
-            versionId = instance?.versionId,
-            instanceName = instance?.name.orEmpty(),
-            gameDirectory = runCatching { instance?.gameDirectory }.getOrNull()
-        )
-    }
+    fun runningTarget(): GameDownloadTarget =
+        GameDownloadTarget.of(runCatching { Instances.loadSelectedInstance() }.getOrNull())
 
     /** Whether the device has a usable connection; used to tell offline from a failing API. */
     fun isOnline(context: Context): Boolean {
@@ -97,7 +152,12 @@ object PojavGameDownloadsBridge {
         return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
     }
 
-    /** CurseForge answers only with an API key, the one from the launcher settings is used. */
+    /**
+     * Whether a CurseForge API key is configured.
+     *
+     * CurseForge does not need one to be usable: without a key the bridge goes through the MCIM
+     * mirror of the same API, and a key only adds the game version filter of the official one.
+     */
     fun hasCurseForgeKey(context: Context): Boolean = PojavAssetBridge.curseForgeKey(context) != null
 
     /**
@@ -124,22 +184,48 @@ object PojavGameDownloadsBridge {
         query: String,
         target: GameDownloadTarget,
         offset: Int = 0
-    ): Pair<AssetPage?, DownloadError?> = withContext(Dispatchers.IO) {
-        if (platform == AssetPlatform.CURSEFORGE && !hasCurseForgeKey(context)) {
-            return@withContext null to DownloadError.API
+    ): GameSearchResult = withContext(Dispatchers.IO) {
+        val version = target.mcVersion
+        val filtered = queryPage(context, platform, type, query, version, offset)
+        if (filtered != null && (filtered.projects.isNotEmpty() || version == null)) {
+            return@withContext GameSearchResult(filtered, null)
         }
-        val page = PojavAssetBridge.search(
+        if (version != null) {
+            // Nothing carries the version of the running game: ask again without the filter, so
+            // that a pack nobody tagged for that version is still reachable.
+            val relaxed = queryPage(context, platform, type, query, null, offset)
+            if (relaxed != null) {
+                return@withContext GameSearchResult(relaxed, null, relaxed.projects.isNotEmpty())
+            }
+        }
+        if (filtered != null) return@withContext GameSearchResult(filtered, null)
+        GameSearchResult(null, failure(context, platform))
+    }
+
+    private suspend fun queryPage(
+        context: Context,
+        platform: AssetPlatform,
+        type: AssetType,
+        query: String,
+        mcVersion: String?,
+        offset: Int
+    ): AssetPage? = runCatching {
+        PojavAssetBridge.search(
             context = context,
             platform = platform,
             type = type,
             query = query,
-            mcVersion = target.mcVersion,
+            mcVersion = mcVersion,
             loader = null,
             offset = offset
         )
-        if (page != null) return@withContext page to null
-        if (!isOnline(context)) return@withContext null to DownloadError.OFFLINE
-        null to DownloadError.API
+    }.getOrNull()
+
+    /** Why nothing came back: no connection, a CurseForge that needs a key, or a silent API. */
+    private fun failure(context: Context, platform: AssetPlatform): DownloadError = when {
+        !isOnline(context) -> DownloadError.OFFLINE
+        platform == AssetPlatform.CURSEFORGE && !hasCurseForgeKey(context) -> DownloadError.KEY
+        else -> DownloadError.API
     }
 
     /** Names of what is already installed in the instance folder of [type]. */

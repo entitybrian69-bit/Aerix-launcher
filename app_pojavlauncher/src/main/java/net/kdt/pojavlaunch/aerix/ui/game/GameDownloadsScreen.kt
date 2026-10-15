@@ -73,6 +73,7 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import net.kdt.pojavlaunch.R
+import net.kdt.pojavlaunch.aerix.bridge.AerixPreferences
 import net.kdt.pojavlaunch.aerix.bridge.AssetPlatform
 import net.kdt.pojavlaunch.aerix.bridge.AssetProject
 import net.kdt.pojavlaunch.aerix.bridge.AssetType
@@ -110,20 +111,21 @@ fun GameDownloadsScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val version = target.mcVersion
 
     var type by remember { mutableStateOf(DOWNLOAD_TYPES.first().first) }
-    var platform by remember { mutableStateOf(AssetPlatform.MODRINTH) }
+    // The platform picked in the launcher settings is the one the downloader starts on.
+    var platform by remember { mutableStateOf(AerixPreferences.assetPlatformSource) }
     var query by remember { mutableStateOf("") }
     var reload by remember { mutableIntStateOf(0) }
     var projects by remember { mutableStateOf<List<AssetProject>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var failure by remember { mutableStateOf<DownloadError?>(null) }
+    var versionRelaxed by remember { mutableStateOf(false) }
     var storageFailure by remember { mutableStateOf<DownloadError?>(null) }
     var installingId by remember { mutableStateOf<String?>(null) }
     var statusLine by remember { mutableStateOf<String?>(null) }
     var installed by remember { mutableStateOf<Set<String>>(emptySet()) }
-
-    val hasCurseForge = remember { PojavGameDownloadsBridge.hasCurseForgeKey(context) }
 
     // Folder of the running instance: created and checked once per content type.
     LaunchedEffect(type, reload) {
@@ -134,11 +136,13 @@ fun GameDownloadsScreen(
     LaunchedEffect(type, platform, query, reload) {
         loading = true
         failure = null
-        // Wait for the rest of the word while the player types.
+        // Wait for the rest of the word while the player types. Not on an empty query: deleting
+        // the search has to bring the list back at once.
         if (query.isNotEmpty()) delay(450)
-        val (page, error) = PojavGameDownloadsBridge.search(context, platform, type, query, target)
-        projects = page?.projects.orEmpty()
-        failure = if (page == null) error ?: DownloadError.API else null
+        val result = PojavGameDownloadsBridge.search(context, platform, type, query, target)
+        projects = result.page?.projects.orEmpty()
+        failure = result.error
+        versionRelaxed = result.versionRelaxed
         loading = false
     }
 
@@ -184,12 +188,14 @@ fun GameDownloadsScreen(
             onQueryChange = { query = it }
         )
 
-        if (!hasCurseForge && platform == AssetPlatform.CURSEFORGE) {
+        if (versionRelaxed && version != null && projects.isNotEmpty()) {
             Spacer(Modifier.height(AerixSpacing.xs))
             Text(
-                text = stringResource(R.string.aerix_ingame_download_no_key),
-                color = AerixSurface.warning,
-                fontSize = 11.sp
+                text = stringResource(R.string.aerix_ingame_download_version_relaxed, version),
+                color = AerixSurface.textMuted,
+                fontSize = 11.sp,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
             )
         }
 
@@ -214,7 +220,11 @@ fun GameDownloadsScreen(
                     onAction = { reload++ }
                 )
                 projects.isEmpty() -> MessageCard(
-                    text = stringResource(R.string.aerix_ingame_download_empty, target.mcVersion ?: "?"),
+                    text = if (version == null) {
+                        stringResource(R.string.aerix_ingame_download_empty_any)
+                    } else {
+                        stringResource(R.string.aerix_ingame_download_empty, version)
+                    },
                     accent = accent,
                     actionLabel = stringResource(R.string.aerix_ingame_download_retry),
                     onAction = { reload++ }
@@ -599,6 +609,7 @@ private fun MessageCard(text: String, accent: Color, actionLabel: String, onActi
 private fun errorMessage(context: Context, error: DownloadError): String = when (error) {
     DownloadError.OFFLINE -> context.getString(R.string.aerix_ingame_download_offline)
     DownloadError.API -> context.getString(R.string.aerix_ingame_download_api_error)
+    DownloadError.KEY -> context.getString(R.string.aerix_ingame_download_key_error)
     DownloadError.NO_TARGET -> context.getString(R.string.aerix_ingame_download_no_instance)
     DownloadError.STORAGE -> context.getString(R.string.aerix_ingame_download_storage_error)
     DownloadError.FILE -> context.getString(R.string.aerix_ingame_download_failed)

@@ -167,7 +167,7 @@ private val settingTabItems = listOf(
     SettingTabItem(AerixNav.TAB_WALLPAPERS, R.drawable.aerix_ic_format_paint_outlined, "Wallpapers"),
     SettingTabItem(AerixNav.TAB_LAUNCHER, R.drawable.aerix_ic_setting_launcher, "Launcher"),
     SettingTabItem(AerixNav.TAB_CONTROLS, R.drawable.aerix_ic_videogame_asset_outlined, "Controls"),
-    SettingTabItem(AerixNav.TAB_CONTROL_MANAGER, R.drawable.aerix_ic_videogame_asset_outlined, "Controls"),
+    SettingTabItem(AerixNav.TAB_CONTROL_MANAGER, R.drawable.aerix_ic_dashboard_outlined, "Layouts"),
     SettingTabItem(AerixNav.TAB_GAMEPAD, R.drawable.aerix_ic_sports_esports_outlined, "Gamepad"),
     SettingTabItem(AerixNav.TAB_ABOUT, R.drawable.aerix_ic_info_outlined, "About")
 )
@@ -1416,6 +1416,20 @@ private fun LauncherTabContent(activity: FragmentActivity) {
                     summary = stringResource(R.string.aerix_logs_subtitle),
                     value = "Share",
                     onClick = { PojavNavigator.shareLogs(activity) }
+                )
+            }
+        }
+
+        // Group 5: the Aetherium mod. It is a recommendation, so it lives here with the rest of
+        // the launcher settings instead of over the home screen.
+        item {
+            SettingsCardColumn(modifier = Modifier.fillMaxWidth()) {
+                MiraiActionSettingsCard(
+                    position = CardPosition.Single,
+                    title = stringResource(R.string.aerix_settings_aetherium),
+                    summary = stringResource(R.string.aerix_settings_aetherium_sub),
+                    value = stringResource(R.string.aerix_settings_aetherium_tag),
+                    onClick = { AerixNav.navigate(LauncherSection.DISCOVER) }
                 )
             }
         }
