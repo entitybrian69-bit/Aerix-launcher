@@ -44,10 +44,10 @@ permissions:
 # accessible by integration" even with contents: write - but it can upload the assets of one that
 # exists. Create the release itself (empty) next to the branch, then set RUN_ID / TAG here and push.
 env:
-  RUN_ID: "38753303992"
+  RUN_ID: "38756061484"
   BUILD_SHA: ""
-  TAG: "aerix-6823587"
-  NOTES: "A real modloader screen, icons in the downloader, and a rail that hugs the left edge."
+  TAG: "aerix-c1a9cea"
+  NOTES: "BTA joins the loader screen, and a loader without stable builds stays usable."
 
 
 jobs:
