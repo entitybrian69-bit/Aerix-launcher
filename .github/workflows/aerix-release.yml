@@ -55,3 +55,4 @@ jobs:
           git add apk
           git commit -m "Build: Aerix APK $SHORT (CI run $RUN_ID) [skip ci]"
           git push origin HEAD:arena/5d11b9a3-aerix-launcher
+
