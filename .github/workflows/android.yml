@@ -62,21 +62,8 @@ jobs:
       - name: Build Debug .apk (Full)
         run: |
           # Build the launcher
-          set -o pipefail
-          gradle :app_pojavlauncher:assembleFullDebug 2>&1 | tee /tmp/build-full.log
+          gradle :app_pojavlauncher:assembleFullDebug
           mv app_pojavlauncher/build/outputs/apk/full/debug/app_pojavlauncher-full-debug.apk out/app-debug-full.apk
-
-      # Temporary: the build log of a failing run lives on a host this tooling cannot read, so
-      # the compiler errors are copied into the annotations of the run instead.
-      - name: Report build errors
-        if: failure()
-        run: |
-          if [ ! -f /tmp/build-full.log ]; then echo "no log captured"; exit 0; fi
-          grep -nE "error:|e: file|Unresolved reference|cannot find symbol|Execution failed|Caused by|FAILURE:" /tmp/build-full.log | head -60 > /tmp/errors.txt || true
-          { echo "## Build errors"; echo '```'; cat /tmp/errors.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
-          while IFS= read -r line; do
-            echo "::error::$line"
-          done < /tmp/errors.txt
 
       - name: Build Debug .apk (No runtime)
         run: |
