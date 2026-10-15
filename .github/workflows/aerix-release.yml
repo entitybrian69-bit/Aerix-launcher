@@ -43,7 +43,8 @@ env:
   RUN_ID: ""
   BUILD_SHA: ""
   TAG: ""
-  NOTES: ""
+  NOTES: "The in-game downloader works by default, and the launcher shell uses the whole display."
+
 
 jobs:
   publish:
