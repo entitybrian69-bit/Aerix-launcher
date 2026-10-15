@@ -163,18 +163,26 @@ jobs:
       - name: Publish the release
         shell: bash
         run: |
+          # The job log of a failed run is not always reachable by the caller that reads this, so a
+          # failure is folded into an annotation as well.
+          report() {
+            msg=$(tail -c 3000 step.log 2>/dev/null | tr '\n' '|' | sed 's/%/%25/g')
+            [ -n "$msg" ] && echo "::error title=publish::$msg" || true
+          }
+          exec > >(tee step.log) 2>&1
+          trap report ERR
           set -euo pipefail
           tag="${{ steps.run.outputs.tag }}"
           sha="${{ steps.run.outputs.sha }}"
-          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload "$tag" ${{ steps.apk.outputs.assets }} \
-              --repo "$GITHUB_REPOSITORY" --clobber
-            gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --notes-file notes.md
-          else
-            gh release create "$tag" ${{ steps.apk.outputs.assets }} \
-              --repo "$GITHUB_REPOSITORY" --target "$sha" \
-              --title "Aerix Launcher $tag" --notes-file notes.md --prerelease
+          assets=(${{ steps.apk.outputs.assets }})
+          echo "tag=$tag sha=$sha assets=${assets[*]}"
+          ls -la "${assets[@]}"
+          if ! gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target "$sha" \
+              --title "Aerix Launcher $tag" --prerelease --notes-file notes.md
           fi
+          gh release upload "$tag" "${assets[@]}" --repo "$GITHUB_REPOSITORY" --clobber
+          gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --notes-file notes.md
           url=$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json url --jq .url)
           {
             echo "## Aerix release $tag"
