@@ -1,0 +1,15 @@
+{
+  "slug": "example-scheduled-from-repo-file",
+  "title": "Aerix Launcher - example title, 100 characters at most",
+  "description": "Everything under title goes here, up to 5000 characters.\n\nChapters work exactly as they do on YouTube:\n0:00 Intro\n0:42 What changed\n\nLinks from the description:\n- Launcher: https://entitybrian69-bit.github.io/Aerix-launcher/\n- APK: https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest/download/Aerix-Launcher.apk",
+  "tags": ["aerix launcher", "minecraft android", "example"],
+  "categoryId": "20",
+  "visibility": "scheduled",
+  "publishAt": "2026-12-01T17:00:00+05:45",
+  "madeForKids": false,
+  "video": { "file": "youtube/videos/example.mp4" },
+  "thumbnail": { "file": "youtube/thumbs/example.jpg" },
+  "captions": [
+    { "file": "youtube/captions/example.en.vtt", "language": "en", "name": "English" }
+  ]
+}

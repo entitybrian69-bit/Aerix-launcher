@@ -1,0 +1,16 @@
+{
+  "note": [
+    "Defaults for every manifest in youtube/queue. A manifest only has to say what is special about",
+    "its own video; everything else is filled in from here. Filled in by the person running the",
+    "channel (channel name, category, the default playlist), never guessed by the bot."
+  ],
+  "channel": {
+    "name": "",
+    "language": "en"
+  },
+  "defaultCategoryId": "20",
+  "defaultTags": [],
+  "defaultPlaylistId": "",
+  "defaultVisibility": "scheduled",
+  "defaultMadeForKids": false
+}

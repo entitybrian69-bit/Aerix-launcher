@@ -1,0 +1,91 @@
+name: YouTube
+
+# Uploads the videos queued in youtube/queue/ to the channel: title, description, tags, category,
+# thumbnail, playlist and captions, either published at once or scheduled for the moment the
+# manifest asks for. It records the video id in youtube/published/ so nothing is posted twice.
+#
+# Starts by itself three ways - a manifest pushed to the queue, every six hours, or by hand from
+# the Actions tab - and needs the three secrets described in tools/youtube/README.md. Until those
+# exist it reports "Waiting on setup" instead of failing.
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "check = print the plan only, upload = post the queued videos"
+        required: true
+        default: check
+        type: choice
+        options: [check, upload]
+      slug:
+        description: "one manifest, by slug or file name (empty: everything in the queue)"
+        required: false
+        default: ""
+      max:
+        description: "uploads this run (quota guard)"
+        required: false
+        default: "5"
+  push:
+    paths:
+      - "youtube/queue/**"
+  schedule:
+    # A few times a day: anything left in the queue goes out even if the push was forgotten.
+    - cron: "17 */6 * * *"
+
+permissions:
+  contents: write
+
+# Two runs must never upload at the same time, or the same video could go up twice.
+concurrency:
+  group: youtube-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  youtube:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install the Google client
+        run: pip install --disable-pip-version-check --quiet google-api-python-client google-auth google-auth-oauthlib requests
+
+      - name: What is queued
+        run: python tools/youtube/yt_bot.py check
+
+      - name: Upload
+        if: github.event_name != 'workflow_dispatch' || github.event.inputs.mode == 'upload'
+        env:
+          YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
+          YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
+          YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
+          STAGE_TOKEN: ${{ secrets.STAGE_TOKEN }}
+        run: |
+          only="${{ github.event.inputs.slug }}"
+          max="${{ github.event.inputs.max }}"
+          [ -n "$max" ] || max=5
+          if [ -n "$only" ]; then
+            python tools/youtube/yt_bot.py upload --only "$only" --max "$max"
+          else
+            python tools/youtube/yt_bot.py upload --max "$max"
+          fi
+
+      # The record of what was posted has to outlive the run, so it is committed back. [skip ci]
+      # keeps this bookkeeping commit from starting another build.
+      - name: Record what was published
+        run: |
+          if [ -n "$(git status --porcelain youtube/published youtube/queue)" ]; then
+            git config user.name "aerix-youtube-bot"
+            git config user.email "aerix-youtube-bot@users.noreply.github.com"
+            git add youtube/published youtube/queue
+            git commit -m "YouTube: record what was uploaded [skip ci]"
+            git pull --rebase --autostash
+            git push
+          else
+            echo "nothing to record"
+          fi
