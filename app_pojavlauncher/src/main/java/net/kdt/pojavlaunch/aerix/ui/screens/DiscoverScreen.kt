@@ -1122,9 +1122,13 @@ private fun AssetDetailContent(
                 plan = InstallPlan(file = file, loading = true)
                 scope.launch {
                     val targets = PojavAssetBridge.targets()
+                    // What to resolve for: the instance this file is headed into, then whatever the
+                    // launcher is sitting on. With no instance at all there is nothing to match, and
+                    // the dialog says so rather than naming a version nobody has: the file's own
+                    // version list is not evidence of anything installed here.
                     val anchor = targets.firstOrNull { it.detected } ?: targets.firstOrNull()
-                    val mcVersion = anchor?.mcVersion ?: target.mcVersion ?: file.gameVersions.lastOrNull()
-                    val loader = anchor?.loader ?: target.loader ?: file.loaders.firstOrNull()
+                    val mcVersion = anchor?.mcVersion ?: target.mcVersion
+                    val loader = anchor?.loader ?: target.loader
                     val dependencies = PojavAssetBridge.planDependencies(
                         context = context,
                         type = project.type,
@@ -1138,7 +1142,11 @@ private fun AssetDetailContent(
                         loading = false,
                         targets = targets,
                         dependencies = dependencies,
-                        detected = mcVersion?.let { InstanceTarget(it, loader) }
+                        detected = if (mcVersion != null || loader != null) {
+                            InstanceTarget(mcVersion, loader)
+                        } else {
+                            null
+                        }
                     )
                 }
             }

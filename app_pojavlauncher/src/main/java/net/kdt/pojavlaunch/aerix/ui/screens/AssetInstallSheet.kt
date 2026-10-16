@@ -132,7 +132,9 @@ internal fun AssetInstallDialog(
     val isModpack = type == AssetType.MODPACK
     val pickedTargets = targets.filter { target -> targetTicks[target.name + target.versionId] == true }
     val pickedDependencies = dependencies.filter { dependencyTicks[it.project.id + it.project.platform] == true }
-    val canInstall = if (isModpack || targets.isEmpty()) true else pickedTargets.isNotEmpty()
+    // A modpack brings its own instance. Anything else needs somewhere to go: with no instance
+    // at all, or with every row unticked, there is nothing to install into.
+    val canInstall = isModpack || pickedTargets.isNotEmpty()
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -154,9 +156,19 @@ internal fun AssetInstallDialog(
                     .padding(AerixSpacing.md)
             ) {
                 val wide = maxWidth >= 560.dp
+                // The panel is never taller than the screen it is on. The header and the two buttons
+                // are measured first and the panes take whatever is left, scrolling inside
+                // themselves: that is what keeps Cancel and Install on screen when the display is
+                // short, which a fixed height cannot promise.
+                val panelMaxHeight = minOf(maxHeight, 640.dp)
+                val tight = maxHeight < 480.dp
+                val gap = if (tight) AerixSpacing.sm else AerixSpacing.md
+                val paneMaxHeight = if (tight) 190.dp else 360.dp
+
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .heightIn(max = panelMaxHeight)
                         .clip(RoundedCornerShape(AerixRadii.dialog))
                         .background(AerixSurface.panelRaised)
                         .border(AerixSpacing.hairline, AerixSurface.borderSoft, RoundedCornerShape(AerixRadii.dialog))
@@ -165,7 +177,7 @@ internal fun AssetInstallDialog(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null
                         ) { }
-                        .padding(AerixSpacing.lg)
+                        .padding(if (tight) AerixSpacing.md else AerixSpacing.lg)
                 ) {
                     InstallHeader(file = file, onDismiss = onDismiss)
 
@@ -174,22 +186,24 @@ internal fun AssetInstallDialog(
                             text = stringResource(R.string.aerix_install_modpack_note),
                             color = AerixSurface.textSecondary,
                             fontSize = 12.sp,
-                            modifier = Modifier.padding(top = AerixSpacing.sm)
+                            modifier = Modifier.padding(top = gap)
                         )
                     } else if (wide) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .heightIn(max = 420.dp)
-                                .padding(top = AerixSpacing.md),
-                            horizontalArrangement = Arrangement.spacedBy(AerixSpacing.md)
+                                // fill = false, so the dialog stays as short as its content and the
+                                // row only ever takes the room the header and the buttons left over.
+                                .weight(1f, fill = false)
+                                .padding(top = gap),
+                            horizontalArrangement = Arrangement.spacedBy(gap)
                         ) {
                             DependencyPane(
                                 dependencies = dependencies,
                                 ticks = dependencyTicks,
                                 loading = loading,
                                 accent = accent,
-                                listMaxHeight = 360.dp,
+                                listMaxHeight = paneMaxHeight,
                                 modifier = Modifier.weight(1f).fillMaxHeight()
                             )
                             TargetPane(
@@ -199,7 +213,7 @@ internal fun AssetInstallDialog(
                                 detected = detected,
                                 ticksChanged = { key, checked -> targetTicks[key] = checked },
                                 accent = accent,
-                                listMaxHeight = 360.dp,
+                                listMaxHeight = paneMaxHeight,
                                 modifier = Modifier.weight(1f).fillMaxHeight()
                             )
                         }
@@ -207,17 +221,17 @@ internal fun AssetInstallDialog(
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .heightIn(max = 460.dp)
+                                .weight(1f, fill = false)
                                 .verticalScroll(rememberScrollState())
-                                .padding(top = AerixSpacing.md),
-                            verticalArrangement = Arrangement.spacedBy(AerixSpacing.md)
+                                .padding(top = gap),
+                            verticalArrangement = Arrangement.spacedBy(gap)
                         ) {
                             DependencyPane(
                                 dependencies = dependencies,
                                 ticks = dependencyTicks,
                                 loading = loading,
                                 accent = accent,
-                                listMaxHeight = 190.dp,
+                                listMaxHeight = if (tight) 150.dp else 190.dp,
                                 modifier = Modifier.fillMaxWidth()
                             )
                             TargetPane(
@@ -227,7 +241,7 @@ internal fun AssetInstallDialog(
                                 detected = detected,
                                 ticksChanged = { key, checked -> targetTicks[key] = checked },
                                 accent = accent,
-                                listMaxHeight = 190.dp,
+                                listMaxHeight = if (tight) 150.dp else 190.dp,
                                 modifier = Modifier.fillMaxWidth()
                             )
                         }
@@ -236,7 +250,7 @@ internal fun AssetInstallDialog(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = AerixSpacing.lg),
+                            .padding(top = gap),
                         horizontalArrangement = Arrangement.spacedBy(AerixSpacing.sm),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -656,82 +670,90 @@ internal fun AerixInstallPanel(onMinimize: () -> Unit) {
                 ) { onMinimize() },
             contentAlignment = Alignment.Center
         ) {
-            Column(
+            // The same rule as the plan dialog: the panel is never taller than the screen, and the
+            // list is what gives up room, so the button under it stays on screen.
+            BoxWithConstraints(
                 modifier = Modifier
                     .widthIn(min = 300.dp, max = 520.dp)
                     .padding(AerixSpacing.md)
-                    .clip(RoundedCornerShape(AerixRadii.dialog))
-                    .background(AerixSurface.panelRaised)
-                    .border(AerixSpacing.hairline, AerixSurface.borderSoft, RoundedCornerShape(AerixRadii.dialog))
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null
-                    ) { }
-                    .padding(AerixSpacing.lg)
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
-                ) {
-                    Text(
-                        text = stringResource(R.string.aerix_install_tasks).uppercase(),
-                        color = accent,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        letterSpacing = 0.6.sp,
-                        modifier = Modifier.weight(1f)
-                    )
-                    if (tasks.any { it.finished }) {
-                        Surface(
-                            shape = RoundedCornerShape(AerixRadii.pill),
-                            color = AerixSurface.panel,
-                            onClick = { AerixInstallQueue.clearFinished() }
-                        ) {
-                            Text(
-                                text = stringResource(R.string.aerix_install_clear_finished),
-                                color = AerixSurface.textSecondary,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = AerixSpacing.smPlus, vertical = 4.dp)
-                            )
-                        }
-                    }
-                }
-
-                LazyColumn(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(max = 420.dp)
-                        .padding(top = AerixSpacing.sm),
-                    verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
+                        .heightIn(max = minOf(maxHeight, 640.dp))
+                        .clip(RoundedCornerShape(AerixRadii.dialog))
+                        .background(AerixSurface.panelRaised)
+                        .border(AerixSpacing.hairline, AerixSurface.borderSoft, RoundedCornerShape(AerixRadii.dialog))
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) { }
+                        .padding(AerixSpacing.lg)
                 ) {
-                    items(tasks, key = { it.id }) { task ->
-                        InstallTaskCard(task = task, accent = accent)
-                    }
-                }
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = AerixSpacing.md),
-                    horizontalArrangement = Arrangement.spacedBy(AerixSpacing.sm),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Spacer(modifier = Modifier.weight(1f))
-                    AerixGhostButton(
-                        text = stringResource(
-                            if (anyRunning) R.string.aerix_install_minimize
-                            else R.string.aerix_install_dismiss
-                        ),
-                        iconRes = if (anyRunning) R.drawable.aerix_ic_arrow_drop_down_rounded else null,
-                        // With nothing running the button also clears the finished cards, so the
-                        // pill does not outlive the install it was reporting.
-                        onClick = {
-                            if (!anyRunning) AerixInstallQueue.clearFinished()
-                            onMinimize()
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
+                    ) {
+                        Text(
+                            text = stringResource(R.string.aerix_install_tasks).uppercase(),
+                            color = accent,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            letterSpacing = 0.6.sp,
+                            modifier = Modifier.weight(1f)
+                        )
+                        if (tasks.any { it.finished }) {
+                            Surface(
+                                shape = RoundedCornerShape(AerixRadii.pill),
+                                color = AerixSurface.panel,
+                                onClick = { AerixInstallQueue.clearFinished() }
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.aerix_install_clear_finished),
+                                    color = AerixSurface.textSecondary,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = AerixSpacing.smPlus, vertical = 4.dp)
+                                )
+                            }
                         }
-                    )
+                    }
+
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f, fill = false)
+                            .padding(top = AerixSpacing.sm),
+                        verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
+                    ) {
+                        items(tasks, key = { it.id }) { task ->
+                            InstallTaskCard(task = task, accent = accent)
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = AerixSpacing.md),
+                        horizontalArrangement = Arrangement.spacedBy(AerixSpacing.sm),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Spacer(modifier = Modifier.weight(1f))
+                        AerixGhostButton(
+                            text = stringResource(
+                                if (anyRunning) R.string.aerix_install_minimize
+                                else R.string.aerix_install_dismiss
+                            ),
+                            iconRes = if (anyRunning) R.drawable.aerix_ic_arrow_drop_down_rounded else null,
+                            // With nothing running the button also clears the finished cards, so the
+                            // pill does not outlive the install it was reporting.
+                            onClick = {
+                                if (!anyRunning) AerixInstallQueue.clearFinished()
+                                onMinimize()
+                            }
+                        )
+                    }
                 }
             }
         }

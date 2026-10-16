@@ -22,8 +22,8 @@ static def getDateSeconds() {
 
 // The released version of this fork. Bump it by hand when a build is published; the git-derived
 // name the upstream project used is kept below for local builds that want it.
-def AERIX_VERSION_NAME = "1.1.0"
-def AERIX_VERSION_CODE = 10100
+def AERIX_VERSION_NAME = "1.1.1"
+def AERIX_VERSION_CODE = 10101
 
 def getVersionName = {
     def currentBranch = grgit.branch.current()
