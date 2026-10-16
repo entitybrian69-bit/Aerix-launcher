@@ -48,13 +48,13 @@ permissions:
 # accessible by integration" even with contents: write - but it can upload the assets of one that
 # exists. Create the release itself (empty) next to the branch, then set RUN_ID / TAG here and push.
 env:
-  RUN_ID: "38844570175"
+  RUN_ID: "38943742933"
   BUILD_SHA: ""
-  TAG: "v1.1.1"
+  TAG: "v1.1.2"
   # Name of the release: the version the build carries, and the tag it is published under when TAG
   # is left empty.
-  VERSION: "1.1.1"
-  NOTES: "Aerix Launcher 1.1.1 - Cancel and Install stay on screen on a short display, the picker no longer names a version that is not installed, and Install waits for somewhere to install into."
+  VERSION: "1.1.2"
+  NOTES: "Aerix Launcher 1.1.2 - Instance Management gets the whole screen on a short display: the instances become a list beside the detail card, the facts are pills that wrap, and PLAY never scrolls away."
 
 
 jobs:
