@@ -115,6 +115,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import net.kdt.pojavlaunch.R
+import net.kdt.pojavlaunch.aerix.bridge.AerixInstallQueue
 import net.kdt.pojavlaunch.aerix.bridge.AerixPreferences
 import net.kdt.pojavlaunch.aerix.bridge.AssetFile
 import net.kdt.pojavlaunch.aerix.bridge.AssetPage
@@ -124,11 +125,13 @@ import net.kdt.pojavlaunch.aerix.bridge.AssetPlatform
 import net.kdt.pojavlaunch.aerix.bridge.AssetProject
 import net.kdt.pojavlaunch.aerix.bridge.AssetProjectDetails
 import net.kdt.pojavlaunch.aerix.bridge.AssetScreenshot
+import net.kdt.pojavlaunch.aerix.bridge.AssetTarget
 import net.kdt.pojavlaunch.aerix.bridge.AssetSort
 import net.kdt.pojavlaunch.aerix.bridge.AssetType
 import net.kdt.pojavlaunch.aerix.bridge.InstanceTarget
 import net.kdt.pojavlaunch.aerix.bridge.PojavAssetBridge
 import net.kdt.pojavlaunch.aerix.bridge.PojavCreateInstanceBridge
+import net.kdt.pojavlaunch.aerix.bridge.ResolvedDependency
 import net.kdt.pojavlaunch.aerix.bridge.PojavInstanceBridge
 import net.kdt.pojavlaunch.aerix.bridge.PojavNavigator
 import net.kdt.pojavlaunch.aerix.components.AerixGhostButton
@@ -1048,7 +1051,12 @@ private fun AssetDetailContent(
     var files by remember(project.id) { mutableStateOf<List<AssetFile>?>(null) }
     var target by remember { mutableStateOf(InstanceTarget(null, null)) }
     var loadingFiles by remember(project.id) { mutableStateOf(true) }
-    var installingFile by remember { mutableStateOf<String?>(null) }
+    // The plan dialog: what the tapped file needs and which instances it can go into, filled in
+    // off the main thread while the dialog is already on screen.
+    var plan by remember { mutableStateOf<InstallPlan?>(null) }
+    // A modpack installs through Pojav's own installer, which reports itself; kept apart so the
+    // dialog and the queue stay in charge of everything else.
+    var modpackInstalling by remember { mutableStateOf<String?>(null) }
     var showOnlyReleases by remember { mutableStateOf(true) }
     var searchMcVersion by remember { mutableStateOf("") }
 
@@ -1090,17 +1098,49 @@ private fun AssetDetailContent(
             ?: files?.firstOrNull()
     }
 
+    // Read from the queue rather than tracked here, so an install that has been minimized still
+    // reads as running on this screen and its buttons stay switched off.
+    val queuedFile = AerixInstallQueue.activeTasks.firstOrNull()?.steps?.firstOrNull()?.file?.fileName
+    val installingFile = modpackInstalling ?: queuedFile
+
     val runInstall: (AssetFile) -> Unit = { file ->
         if (installingFile == null) {
-            installingFile = file.fileName
-            scope.launch {
-                val ok = PojavAssetBridge.install(context, project, file)
-                installingFile = null
-                Toast.makeText(
-                    context,
-                    if (ok) installedToast.format(file.fileName) else failedToast,
-                    Toast.LENGTH_SHORT
-                ).show()
+            if (project.type == AssetType.MODPACK) {
+                // A modpack brings its own instance: no picker to show.
+                modpackInstalling = file.fileName
+                scope.launch {
+                    val ok = PojavAssetBridge.install(context, project, file)
+                    modpackInstalling = null
+                    Toast.makeText(
+                        context,
+                        if (ok) installedToast.format(file.fileName) else failedToast,
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            } else {
+                // Show the dialog at once; the panes fill themselves in as the answers arrive.
+                plan = InstallPlan(file = file, loading = true)
+                scope.launch {
+                    val targets = PojavAssetBridge.targets()
+                    val anchor = targets.firstOrNull { it.detected } ?: targets.firstOrNull()
+                    val mcVersion = anchor?.mcVersion ?: target.mcVersion ?: file.gameVersions.lastOrNull()
+                    val loader = anchor?.loader ?: target.loader ?: file.loaders.firstOrNull()
+                    val dependencies = PojavAssetBridge.planDependencies(
+                        context = context,
+                        type = project.type,
+                        file = file,
+                        mcVersion = mcVersion,
+                        loader = loader,
+                        body = details?.body
+                    )
+                    plan = InstallPlan(
+                        file = file,
+                        loading = false,
+                        targets = targets,
+                        dependencies = dependencies,
+                        detected = mcVersion?.let { InstanceTarget(it, loader) }
+                    )
+                }
             }
         }
     }
@@ -1238,7 +1278,44 @@ private fun AssetDetailContent(
             }
         }
     }
+
+    // 6. The download dialog: dependencies on one side, the instances to install into on the other.
+    // Install hands the ticks over to the queue and the dialog goes away, so the download carries on
+    // with the page closed and can be minimized, watched from the pill, or cancelled from the panel.
+    plan?.let { current ->
+        AssetInstallDialog(
+            file = current.file,
+            type = project.type,
+            targets = current.targets,
+            dependencies = current.dependencies,
+            detected = current.detected,
+            loading = current.loading,
+            onDismiss = { plan = null },
+            onInstall = { targetList, dependencyList ->
+                plan = null
+                AerixInstallQueue.submit(
+                    context = context,
+                    project = project,
+                    file = current.file,
+                    targets = targetList,
+                    dependencies = dependencyList
+                )
+            }
+        )
+    }
 }
+
+/**
+ * What the download dialog needs for one file: the instances that can take it and the dependencies
+ * that fit the version they run. [loading] covers the moment between the tap and the answers.
+ */
+private class InstallPlan(
+    val file: AssetFile,
+    val loading: Boolean = false,
+    val targets: List<AssetTarget> = emptyList(),
+    val dependencies: List<ResolvedDependency> = emptyList(),
+    val detected: InstanceTarget? = null
+)
 
 @Composable
 private fun DownloadHeroCard(

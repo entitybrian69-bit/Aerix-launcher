@@ -72,6 +72,9 @@ import net.kdt.pojavlaunch.aerix.ui.screens.FileManagerScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.HomeScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.InstanceEditorScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.LibraryScreen
+import net.kdt.pojavlaunch.aerix.bridge.AerixInstallQueue
+import net.kdt.pojavlaunch.aerix.ui.screens.AerixInstallPanel
+import net.kdt.pojavlaunch.aerix.ui.screens.AerixInstallPill
 import net.kdt.pojavlaunch.aerix.ui.screens.LogScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.OfflineAccountScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.SettingsScreen
@@ -185,6 +188,21 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
                     .align(Alignment.TopEnd)
                     .padding(top = AerixSpacing.xs, end = AerixSpacing.lg)
             )
+
+            // Installs outlive the page that started them, so their two surfaces live here: the
+            // panel with the progress bars, and the pill it collapses into when minimized.
+            if (AerixInstallQueue.visible) {
+                if (AerixInstallQueue.panelOpen) {
+                    AerixInstallPanel(onMinimize = { AerixInstallQueue.minimizePanel() })
+                } else {
+                    AerixInstallPill(
+                        onExpand = { AerixInstallQueue.openPanel() },
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(AerixSpacing.lg)
+                    )
+                }
+            }
         }
       }
     }
