@@ -255,6 +255,9 @@ fun LibraryScreen(activity: FragmentActivity) {
     // on a short display, the list and the detail each get the whole height instead.
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val sideBySide = maxHeight < 500.dp
+        // Read here, in the scope that owns it: inside the Row below, the receiver is the row and
+        // maxWidth would not resolve.
+        val listPaneWidth = (maxWidth * 0.34f).coerceIn(196.dp, 288.dp)
 
         // Everything the detail card can ask for, gathered once: both arrangements hand it over the
         // same way, so neither can drift from the other.
@@ -300,7 +303,7 @@ fun LibraryScreen(activity: FragmentActivity) {
                 ) {
                     InstanceListPane(
                         modifier = Modifier
-                            .width((maxWidth * 0.34f).coerceIn(196.dp, 288.dp))
+                            .width(listPaneWidth)
                             .fillMaxHeight(),
                         instances = displayedInstances,
                         installedCount = instances.size,
