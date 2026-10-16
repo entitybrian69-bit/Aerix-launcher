@@ -26,13 +26,31 @@
 
   function $(id) { return document.getElementById(id); }
 
+  /* Sizes are shown to a tenth of a megabyte: rounding 112.5 up to "113 MB" overstates what the
+     download costs, and the release page says 112.5 too. */
   function megabytes(bytes) {
     if (!bytes || !isFinite(bytes)) return null;
-    return Math.round(bytes / 1048576) + ' MB';
+    var mb = Math.round((bytes / 1048576) * 10) / 10;
+    return (mb % 1 === 0 ? mb : mb.toFixed(1)) + ' MB';
   }
 
   function isApk(name) {
     return /\.apk$/i.test(name || '');
+  }
+
+  /* "2026-10-16T02:58:28Z" becomes "16 Oct 2026". */
+  function releaseDate(iso) {
+    if (!iso) return null;
+    var date = new Date(iso);
+    if (isNaN(date.getTime())) return null;
+    return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+
+  /* GitHub reports an asset's checksum as "sha256:<hex>"; the hex is what people compare. */
+  function checksum(asset) {
+    var digest = asset && asset.digest ? String(asset.digest) : '';
+    var hex = digest.replace(/^sha256:/i, '');
+    return /^[0-9a-f]{64}$/i.test(hex) ? hex : null;
   }
 
   /* The full build carries its own Java runtime; the other one downloads it. */
@@ -73,6 +91,9 @@
     var meta = $('downloadMeta');
     var alt = $('downloadAlt');
     var version = $('releaseVersion');
+    var facts = $('downloadFacts');
+    var notes = $('releaseNotes');
+    var sha = $('downloadSha');
 
     // "v1.0.0" stays "v1.0.0"; a build tag such as "aerix-9b26f17" is shown as it is, so the
     // label never invents a "v" in front of something that is not a version.
@@ -103,6 +124,26 @@
       var size = megabytes(assets.full.size);
       meta.textContent = (size ? size + ' · ' : '') +
         'Android 8.0+ · release build, signed with the project key';
+    }
+
+    // What is being handed out, spelled out: which release, how big, from when, and the checksum
+    // of the exact bytes, so a download from this page can be checked against the release.
+    if (facts && tag) {
+      var pieces = [tag];
+      var fullSize = megabytes(assets.full && assets.full.size);
+      if (fullSize) pieces.push(fullSize);
+      var when = releaseDate(release.published_at || release.created_at);
+      if (when) pieces.push(when);
+      facts.textContent = pieces.join(' · ');
+    }
+
+    if (notes && release.html_url) {
+      notes.href = release.html_url;
+    }
+
+    if (sha) {
+      var hex = checksum(assets.full);
+      if (hex) sha.textContent = hex;
     }
 
     if (alt && assets.light && assets.light.browser_download_url) {

@@ -7,7 +7,8 @@
 
 **Hand-built. Privately kept. Tested on real phones. Maintained by its owners.**
 
-[![Platform](https://img.shields.io/badge/Platform-Android%208.0%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/entitybrian69-bit/Aerix-launcher/releases)
+[![Release](https://img.shields.io/github/v/release/entitybrian69-bit/Aerix-launcher?style=for-the-badge&label=release&color=0EA5A0)](https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest)
+[![Platform](https://img.shields.io/badge/Platform-Android%208.0%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest)
 [![Human Made](https://img.shields.io/badge/100%25-Human%20Made-7C3AED?style=for-the-badge)](https://github.com/entitybrian69-bit/Aerix-launcher)
 [![Team](https://img.shields.io/badge/Maintained%20by-entitybrian-F59E0B?style=for-the-badge)](https://github.com/entitybrian69-bit)
 [![Privacy](https://img.shields.io/badge/Privacy-No%20Trackers-111827?style=for-the-badge)](https://github.com/entitybrian69-bit/Aerix-launcher)
@@ -15,6 +16,10 @@
 [![Discord](https://img.shields.io/badge/Discord-Community%20%26%20suggestions-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/RS7q9KaCm6)
 
 ▶ Play &nbsp;·&nbsp; 🔍 Discover &nbsp;·&nbsp; ⚙️ Settings &nbsp;·&nbsp; 👤 Offline accounts & capes &nbsp;·&nbsp; 🔒 Private by design
+
+**[📥 Download Aerix Launcher](https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest/download/Aerix-Launcher.apk)** — the newest build, straight to the file
+
+Smaller download: **[no bundled runtime](https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest/download/Aerix-Launcher-noruntime.apk)** &nbsp;·&nbsp; [release notes](https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest)
 
 </div>
 
@@ -159,7 +164,7 @@ That is why the product stays coherent: the people who add offline capes are the
 
 ## 📥 Install
 
-1. Download the latest APK from [Releases](https://github.com/entitybrian69-bit/Aerix-launcher/releases).
+1. Download the APK: **[Aerix-Launcher.apk](https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest/download/Aerix-Launcher.apk)** — the link always serves the newest build, and the download starts from it directly. No bundled runtime, smaller download: [Aerix-Launcher-noruntime.apk](https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest/download/Aerix-Launcher-noruntime.apk).
 2. Allow install from this source in Android settings.
 3. Open Aerix, add an offline account or sign in with Microsoft, equip a skin and cape, and play.
 
@@ -215,6 +220,6 @@ Minecraft is a trademark of Mojang Synergies AB. Aerix Launcher is an independen
 
 **Configurable renderers. Private by design. Offline accounts and capes. Updated with care.**
 
-🌐 **[Website](https://entitybrian69-bit.github.io/Aerix-launcher/)** · 💬 **[Discord](https://discord.gg/RS7q9KaCm6)** · ⭐ [Star Aerix](https://github.com/entitybrian69-bit/Aerix-launcher) · 📦 [Get the APK](https://github.com/entitybrian69-bit/Aerix-launcher/releases)
+🌐 **[Website](https://entitybrian69-bit.github.io/Aerix-launcher/)** · 💬 **[Discord](https://discord.gg/RS7q9KaCm6)** · ⭐ [Star Aerix](https://github.com/entitybrian69-bit/Aerix-launcher) · 📦 [Get the APK](https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest/download/Aerix-Launcher.apk)
 
 </div>

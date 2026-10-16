@@ -986,3 +986,12 @@ code {
   body::before, .float-a, .float-b, .float-c { animation: none; }
   .nav, .footer { background: none; }
 }
+
+/* The release block under the download button: the checksum is the one thing on the page that
+   people copy by hand, so it wraps instead of overflowing on a phone. */
+.checksum code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: .84em;
+  color: var(--muted);
+  word-break: break-all;
+}
