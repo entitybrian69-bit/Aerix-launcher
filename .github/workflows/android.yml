@@ -59,16 +59,36 @@ jobs:
           gradle :app_pojavlauncher:bundleFullGplay
           mv app_pojavlauncher/build/outputs/bundle/fullGplay/app_pojavlauncher-full-gplay.aab out/app-gplay.aab
 
+      # A failed Gradle build only leaves "Process completed with exit code 1" in the job, and the
+      # log files themselves are not reachable from everywhere, so the compiler errors are repeated
+      # as annotations: those are always readable through the API.
       - name: Build Release .apk (Full)
+        shell: bash
         run: |
-          # Build the launcher
-          gradle :app_pojavlauncher:assembleFullRelease
+          set -o pipefail
+          gradle :app_pojavlauncher:assembleFullRelease 2>&1 | tee build-full.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            grep -E '^e: |^w: .*error|error: |Execution failed for task|What went wrong|FAILED$' build-full.log \
+              | head -40 | sed 's/%/%25/g; s/\r//g' \
+              | while IFS= read -r line; do echo "::error title=gradle full::$line"; done
+            exit "$status"
+          fi
           mv app_pojavlauncher/build/outputs/apk/full/release/app_pojavlauncher-full-release.apk out/app-release-full.apk
 
       - name: Build Release .apk (No runtime)
+        shell: bash
         run: |
-         # Build the launcher (without jre8 installed)
-          gradle :app_pojavlauncher:assembleNoruntimeRelease
+          set -o pipefail
+          # Build the launcher (without jre8 installed)
+          gradle :app_pojavlauncher:assembleNoruntimeRelease 2>&1 | tee build-noruntime.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            grep -E '^e: |error: |Execution failed for task|What went wrong|FAILED$' build-noruntime.log \
+              | head -40 | sed 's/%/%25/g; s/\r//g' \
+              | while IFS= read -r line; do echo "::error title=gradle noruntime::$line"; done
+            exit "$status"
+          fi
           mv app_pojavlauncher/build/outputs/apk/noruntime/release/app_pojavlauncher-noruntime-release.apk out/app-release-noruntime.apk
 
       - name: Gen md5sums
