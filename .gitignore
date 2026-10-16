@@ -10,7 +10,3 @@ app_pojavlauncher/.cxx/
 .vs/
 /curseforge_key.txt
 /app_pojavlauncher/libs/ltw-release.aar
-
-# Python leftovers from the tools (the YouTube bot is Python)
-__pycache__/
-*.pyc
