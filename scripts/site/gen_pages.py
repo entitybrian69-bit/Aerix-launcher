@@ -250,7 +250,7 @@ def build_index():
         <a class="btn btn-ghost btn-lg" href="install.html">How to install</a>
       </div>
       <p class="meta" id="downloadMeta">Android 8.0+ · release build, signed with the project key</p>
-      <p class="meta small"><span id="downloadFacts">v1.1.1 · 112.5 MB · 16 Oct 2026</span> · <a id="releaseNotes" href="{LATEST_RELEASE}" target="_blank" rel="noopener">release notes</a></p>
+      <p class="meta small"><span id="downloadFacts">v1.1.2 · 112.5 MB · 16 Oct 2026</span> · <a id="releaseNotes" href="{LATEST_RELEASE}" target="_blank" rel="noopener">release notes</a></p>
       <p class="meta small" id="downloadAlt">Smaller download: <a href="{LATEST_APK_LIGHT}" download>Aerix-Launcher-noruntime.apk</a> — the same launcher, with the Java runtime fetched on demand.</p>
       <p class="meta small checksum">SHA-256 <code id="downloadSha">on the release page</code></p>
     </div>
@@ -500,7 +500,7 @@ def build_install():
         <p class="chip"><span class="pulse" aria-hidden="true"></span><span id="releaseChipText">latest release</span></p>
         <h2>Get the launcher</h2>
         <p id="downloadMeta">Android 8.0+ · release build, signed with the project key</p>
-        <p class="meta small"><span id="downloadFacts">v1.1.1 · 112.5 MB · 16 Oct 2026</span> · <a id="releaseNotes" href="{LATEST_RELEASE}" target="_blank" rel="noopener">release notes</a></p>
+        <p class="meta small"><span id="downloadFacts">v1.1.2 · 112.5 MB · 16 Oct 2026</span> · <a id="releaseNotes" href="{LATEST_RELEASE}" target="_blank" rel="noopener">release notes</a></p>
         <p class="meta small" id="downloadAlt">Smaller download: <a href="{LATEST_APK_LIGHT}" download>Aerix-Launcher-noruntime.apk</a> — the same launcher, with the Java runtime fetched on demand.</p>
         <p class="meta small checksum">SHA-256 <code id="downloadSha">on the release page</code></p>
         <p class="meta small">The APK is published on <a href="{ALL_RELEASES}" target="_blank" rel="noopener">GitHub Releases</a>; the buttons above download the file itself, with no GitHub page in between.</p>
