@@ -72,6 +72,7 @@
     var button = $('downloadBtn');
     var meta = $('downloadMeta');
     var alt = $('downloadAlt');
+    var version = $('releaseVersion');
 
     // "v1.0.0" stays "v1.0.0"; a build tag such as "aerix-9b26f17" is shown as it is, so the
     // label never invents a "v" in front of something that is not a version.
@@ -81,6 +82,12 @@
 
     if (chipText && tag) {
       chipText.textContent = tag + ' · latest release';
+    }
+
+    // The "current release" figure of the at-a-glance strip follows the same answer as the
+    // button, so it cannot go stale between the two.
+    if (version && tag) {
+      version.textContent = tag;
     }
 
     if (button && assets.full && assets.full.browser_download_url) {
