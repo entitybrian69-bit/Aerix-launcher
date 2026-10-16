@@ -254,7 +254,7 @@ object AerixInstallQueue {
                     // A modpack needs its project, not just the file: it becomes a new instance.
                     task.type == AssetType.MODPACK ->
                         PojavAssetBridge.install(task.appContext, task.project, step.file)
-                    target == null -> PojavAssetBridge.install(task.appContext, task.type, step.file)
+                    target == null -> PojavAssetBridge.install(task.type, step.file)
                     else -> PojavAssetBridge.installInto(task.appContext, task.type, step.file, target) { current, total ->
                         if (total > 0) {
                             val within = (current.toFloat() / total).coerceIn(0f, 1f)

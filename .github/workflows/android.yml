@@ -62,19 +62,36 @@ jobs:
       # A failed Gradle build only leaves "Process completed with exit code 1" in the job, and the
       # log files themselves are not reachable from everywhere, so the compiler errors are repeated
       # as annotations: those are always readable through the API.
+      # A failed Gradle build only leaves "Process completed with exit code 1" in the job, and the
+      # log files themselves are not reachable from everywhere, so the compiler errors are repeated
+      # as annotations: those are always readable through the API. One annotation carries all of
+      # them, because GitHub only shows ten annotations per step and a build can carry more errors.
+      - name: Prepare the failure reporter
+        shell: bash
+        run: |
+          cat > report_gradle_failure.sh <<'HELPER'
+          report_gradle_failure() {
+            label=$1
+            log=$2
+            errors=$(grep -E '^e: |error: |Execution failed|What went wrong|FAILED|Could not|Caused by' "$log" \
+              | head -60 | sed 's/%/%25/g; s/\r//g' | tr '\n' '|' | cut -c1-6000)
+            echo "::error title=gradle $label::${errors:-no error line matched}"
+            tailmsg=$(tail -c 1500 "$log" | tr '\n' '|' | sed 's/%/%25/g')
+            echo "::error title=gradle $label tail::$tailmsg"
+          }
+          HELPER
+          cat report_gradle_failure.sh
+
       - name: Build Release .apk (Full)
         shell: bash
         run: |
+          . ./report_gradle_failure.sh
           assert_apk() {
             [ -f "$2" ] || { echo "::error title=missing apk::$2 was not produced"; ls -R app_pojavlauncher/build/outputs/apk || true; exit 1; }
             mv "$2" "$3"
           }
           if ! gradle :app_pojavlauncher:assembleFullRelease 2>&1 | tee build-full.log; then
-            grep -E '^e: |error: |Execution failed|What went wrong|FAILED|Could not|Caused by' build-full.log \
-              | head -40 | sed 's/%/%25/g; s/\r//g' \
-              | while IFS= read -r line; do echo "::error title=gradle full::$line"; done
-            tail -c 2000 build-full.log | tr '\n' '|' | sed 's/%/%25/g' \
-              | while IFS= read -r line; do echo "::error title=gradle full tail::$line"; done
+            report_gradle_failure full build-full.log
             exit 1
           fi
           # Build the launcher
@@ -83,12 +100,9 @@ jobs:
       - name: Build Release .apk (No runtime)
         shell: bash
         run: |
+          . ./report_gradle_failure.sh
           if ! gradle :app_pojavlauncher:assembleNoruntimeRelease 2>&1 | tee build-noruntime.log; then
-            grep -E '^e: |error: |Execution failed|What went wrong|FAILED|Could not|Caused by' build-noruntime.log \
-              | head -40 | sed 's/%/%25/g; s/\r//g' \
-              | while IFS= read -r line; do echo "::error title=gradle noruntime::$line"; done
-            tail -c 2000 build-noruntime.log | tr '\n' '|' | sed 's/%/%25/g' \
-              | while IFS= read -r line; do echo "::error title=gradle noruntime tail::$line"; done
+            report_gradle_failure noruntime build-noruntime.log
             exit 1
           fi
           # Build the launcher (without jre8 installed)

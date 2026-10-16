@@ -130,7 +130,7 @@ internal fun AssetInstallDialog(
     }
 
     val isModpack = type == AssetType.MODPACK
-    val pickedTargets = targets.filter { targetTicks[target.name + target.versionId] == true }
+    val pickedTargets = targets.filter { target -> targetTicks[target.name + target.versionId] == true }
     val pickedDependencies = dependencies.filter { dependencyTicks[it.project.id + it.project.platform] == true }
     val canInstall = if (isModpack || targets.isEmpty()) true else pickedTargets.isNotEmpty()
 
@@ -359,7 +359,7 @@ private fun DependencyRow(
             .clip(RoundedCornerShape(AerixRadii.controlSmall))
             .background(if (checked) accent.copy(alpha = 0.10f) else Color.Transparent)
             .clickable { onCheckedChange(!checked) }
-            .padding(end = AerixSpacing.sm, vertical = AerixSpacing.xxs),
+            .padding(top = AerixSpacing.xxs, end = AerixSpacing.sm, bottom = AerixSpacing.xxs),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Checkbox(
