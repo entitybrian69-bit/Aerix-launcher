@@ -115,7 +115,9 @@ fun AerixNavigationRail(
             modifier = Modifier
                 .width(if (expandedRail) AerixMetrics.expandedNavigationRailWidth else AerixMetrics.navigationRailWidth)
                 .fillMaxHeight()
-                .padding(horizontal = AerixSpacing.xs, vertical = AerixSpacing.smPlus)
+                // The pill sits against the left edge - only the end side keeps a gap, so the
+                // pages own the rest of the width.
+                .padding(start = 2.dp, end = AerixSpacing.xs, top = AerixSpacing.smPlus, bottom = AerixSpacing.smPlus)
                 .liquidGlass(shape = CircleShape, tint = AerixSurface.glassTint, strength = 0.94f, elevation = AerixMetrics.glassRailElevation),
             shape = CircleShape,
             color = Color.Transparent,

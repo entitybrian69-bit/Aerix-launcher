@@ -33,6 +33,7 @@ import com.google.gson.JsonParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import net.kdt.pojavlaunch.R
+import net.kdt.pojavlaunch.instances.Instance
 import net.kdt.pojavlaunch.instances.Instances
 import net.kdt.pojavlaunch.modloaders.modpacks.api.ApiHandler
 import net.kdt.pojavlaunch.modloaders.modpacks.api.CurseforgeApi
@@ -171,8 +172,44 @@ class AssetProjectDetails(
     val sourceUrl: String?,
     val issuesUrl: String?,
     val wikiUrl: String?,
-    val discordUrl: String?
+    val discordUrl: String?,
+    /** Modrinth project description, which can carry [[install-rules]] bundles. Empty elsewhere. */
+    val body: String = ""
 )
+
+/** Something the platform says a file needs besides itself. */
+class AssetDependency(
+    val projectId: String,
+    val platform: AssetPlatform,
+    /** Required dependencies are ticked for the user; optional ones are offered unticked. */
+    val required: Boolean
+)
+
+/** A dependency with the file that fits the version being installed, ready to go. */
+class ResolvedDependency(
+    val project: AssetProject,
+    val file: AssetFile?,
+    val required: Boolean
+) {
+    val installable: Boolean get() = file?.url != null
+}
+
+/** An instance a file can be installed into, with the version it is built on. */
+class AssetTarget(
+    val name: String,
+    val versionId: String,
+    val mcVersion: String?,
+    val loader: String?,
+    /** The instance the launcher is sitting on: the obvious default. */
+    val detected: Boolean,
+    val gameDirectory: File?
+) {
+    val subtitle: String
+        get() = listOfNotNull(
+            mcVersion?.takeIf { it.isNotBlank() } ?: versionId.takeIf { it.isNotBlank() },
+            loader?.replaceFirstChar { it.uppercase() }
+        ).joinToString(" · ")
+}
 
 class AssetFile(
     val name: String,
@@ -184,7 +221,9 @@ class AssetFile(
     val releaseType: String,
     val datePublished: String,
     val gameVersions: List<String>,
-    val loaders: List<String>
+    val loaders: List<String>,
+    /** What this file needs, as the platform reports it. Empty when it needs nothing. */
+    val dependencies: List<AssetDependency> = emptyList()
 ) {
     constructor(
         name: String,
@@ -197,6 +236,22 @@ class AssetFile(
 }
 
 class AssetPage(val projects: List<AssetProject>, val total: Int)
+
+/**
+ * One choice of a filter: the id a search is asked for, or the id of a category; [label] is what
+ * the player reads.
+ */
+class AssetFacet(val id: String, val label: String)
+
+/**
+ * The filter lists of one source: every Minecraft version it knows and the categories of the
+ * content type. Both come from the source itself - the platform decides what it offers - so a
+ * category that only CurseForge has is only shown there, and vice versa.
+ */
+class AssetFacets(
+    val versions: List<AssetFacet> = emptyList(),
+    val categories: List<AssetFacet> = emptyList()
+)
 
 /** Minecraft version and loader of the selected instance, used as default search filters. */
 class InstanceTarget(val mcVersion: String?, val loader: String?)
@@ -229,17 +284,9 @@ object PojavAssetBridge {
     }
 
     suspend fun instanceTarget(): InstanceTarget = withContext(Dispatchers.IO) {
-        val versionId = runCatching { Instances.loadSelectedInstance()?.versionId }.getOrNull()
-            ?: return@withContext InstanceTarget(null, null)
-        val id = versionId.lowercase()
-        val loader = when {
-            id.contains("neoforge") -> "neoforge"
-            id.contains("fabric") -> "fabric"
-            id.contains("quilt") -> "quilt"
-            id.contains("forge") -> "forge"
-            else -> null
-        }
-        InstanceTarget(mcVersionPattern.find(versionId)?.value, loader)
+        // The version of the game, not the version of its loader: see GameDownloadTarget.of.
+        val target = PojavGameDownloadsBridge.runningTarget()
+        InstanceTarget(target.mcVersion, target.loader)
     }
 
     /** Names of files currently in the selected instance's folder for [type], lowercased. */
@@ -284,6 +331,151 @@ object PojavAssetBridge {
             }
         }.getOrNull()
     }
+
+    /**
+     * The Minecraft versions and the categories a source offers for [type].
+     *
+     * Modrinth answers both from its tag endpoints. CurseForge answers its categories from the class
+     * the content type belongs to, by the ids CurseForge itself uses; its game version list is only
+     * reachable with an API key, so when that stays silent the full Modrinth tag list stands in -
+     * the same Minecraft versions, all of them - and the version table the launcher already holds
+     * after that. A filter may end up with the short list the type ships with only when the device
+     * has neither a network nor a downloaded version table, never because one endpoint failed.
+     */
+    suspend fun facets(context: Context, platform: AssetPlatform, type: AssetType): AssetFacets =
+        withContext(Dispatchers.IO) {
+            val fallbackCategories = type.categories.map { (id, label) -> AssetFacet(id, label) }
+            runCatching {
+                val versions = when (platform) {
+                    AssetPlatform.MODRINTH -> modrinthVersions()
+                    AssetPlatform.CURSEFORGE -> curseForgeVersions(context).ifEmpty { modrinthVersions() }
+                }.ifEmpty { localVersions() }
+                val categories = when (platform) {
+                    AssetPlatform.MODRINTH -> modrinthCategories(type)
+                    AssetPlatform.CURSEFORGE -> curseForgeCategories(context, type.curseForgeClassId)
+                }.ifEmpty { fallbackCategories }
+                AssetFacets(versions, categories)
+            }.getOrElse { AssetFacets(localVersions(), fallbackCategories) }
+        }
+
+    // ---- Version lists -----------------------------------------------------------------------
+
+    /**
+     * Every game version Modrinth knows, newest first. This is the whole history of the game -
+     * releases, snapshots, pre-releases, betas and alphas - and it needs no key, which is why it is
+     * the list a source that cannot answer its own falls back to.
+     */
+    private fun modrinthVersions(): List<AssetFacet> {
+        val array = modrinthGet("tag/game_version", null, JsonArray::class.java) ?: return emptyList()
+        val dated = array.mapNotNull { element ->
+            if (!element.isJsonObject) return@mapNotNull null
+            val version = element.asJsonObject
+            val id = version.string("version") ?: return@mapNotNull null
+            // ISO-8601 timestamps compare as text, so no date parsing is needed.
+            (version.string("date") ?: "") to id
+        }
+        // Distinct ids: the dropdowns key their lazy rows by id, and a repeated key is a crash.
+        return dated.sortedByDescending { it.first }.map { AssetFacet(it.second, it.second) }.distinctBy { it.id }
+    }
+
+    /** CurseForge's own game version list, empty when the key of the moment cannot reach it. */
+    private fun curseForgeVersions(context: Context): List<AssetFacet> {
+        val array = curseForgeGet(
+            context, "minecraft/version",
+            hashMapOf<String, Any>("gameId" to CURSEFORGE_GAME_ID), JsonArray::class.java
+        ) ?: return emptyList()
+        return array.mapNotNull { element ->
+            if (!element.isJsonObject) return@mapNotNull null
+            val version = element.asJsonObject.string("versionString") ?: return@mapNotNull null
+            AssetFacet(version, version)
+        }.distinctBy { it.id }
+    }
+
+    /**
+     * The version table the launcher itself works from: what is installed plus the whole Mojang
+     * manifest behind the version list on the create screen. Offline and complete, so a version
+     * filter is never left with a handful of entries.
+     */
+    private fun localVersions(): List<AssetFacet> = runCatching {
+        PojavCreateInstanceBridge.gameVersions().map { AssetFacet(it.id, it.id) }.distinctBy { it.id }
+    }.getOrDefault(emptyList())
+
+    // ---- Modrinth facets ---------------------------------------------------------------------
+
+    private fun modrinthCategories(type: AssetType): List<AssetFacet> {
+        val projectType = type.modrinthType ?: return emptyList()
+        val array = modrinthGet("tag/category", null, JsonArray::class.java) ?: return emptyList()
+        val rows = array.mapNotNull { element ->
+            if (!element.isJsonObject) return@mapNotNull null
+            val category = element.asJsonObject
+            // The endpoint answers for every kind of project at once; the project type is what puts
+            // a category on a mod rather than on a shader pack.
+            if (category.string("project_type") != projectType) return@mapNotNull null
+            val slug = category.string("name") ?: return@mapNotNull null
+            val header = category.string("header") ?: "categories"
+            Triple(header, slug, categoryLabel(slug))
+        }
+        // The plain categories come first, the way the site orders its filter, then the rest, each
+        // alphabetically.
+        return rows.sortedWith(compareBy({ if (it.first == "categories") 0 else 1 }, { it.second }))
+            .map { AssetFacet(it.second, it.third) }.distinctBy { it.id }
+    }
+
+    // ---- CurseForge facets -------------------------------------------------------------------
+
+    /**
+     * The categories CurseForge has for [classId]: the parents first, each followed by the
+     * sub-categories that belong to it and labelled "Parent - Child". The website shows the parents
+     * and reveals the sub-categories under them; a sub-category is a filter of its own on the site,
+     * so the list carries them all. The ids travel unchanged - they are the ids the search wants.
+     */
+    private fun curseForgeCategories(context: Context, classId: Int): List<AssetFacet> {
+        val array = curseForgeGet(
+            context, "categories",
+            hashMapOf<String, Any>("gameId" to CURSEFORGE_GAME_ID, "classId" to classId),
+            JsonArray::class.java
+        ) ?: return emptyList()
+        data class Row(val id: String, val name: String, val parent: String?, val index: Int)
+        val rows = array.mapNotNull { element ->
+            if (!element.isJsonObject) return@mapNotNull null
+            val category = element.asJsonObject
+            val id = category.get("id")?.takeIf { !it.isJsonNull }?.asString ?: return@mapNotNull null
+            if (id == classId.toString()) return@mapNotNull null
+            if (category.get("isClass")?.takeIf { !it.isJsonNull }?.asBoolean == true) return@mapNotNull null
+            val name = category.string("name") ?: return@mapNotNull null
+            val parentId = category.get("parentCategoryId")?.takeIf { !it.isJsonNull }?.asString
+            Row(id, name, parentId?.takeIf { it != id && it != classId.toString() }, category.int("displayIndex"))
+        }
+        val names = rows.associate { it.id to it.name }
+        val order = compareBy<Row>({ it.index }, { it.name })
+        val children = rows.filter { it.parent != null && it.parent in names }.groupBy { it.parent }
+        val result = ArrayList<AssetFacet>(rows.size)
+        rows.filter { it.parent == null || it.parent !in names }.sortedWith(order).forEach { parent ->
+            result.add(AssetFacet(parent.id, parent.name))
+            children[parent.id]?.sortedWith(order)?.forEach { child ->
+                result.add(AssetFacet(child.id, "${parent.name} - ${child.name}"))
+            }
+        }
+        return result.distinctBy { it.id }
+    }
+
+    /** "vanilla-like" reads as "Vanilla Like", "16x" stays "16x", "pbr" becomes "PBR". */
+    private fun categoryLabel(slug: String): String =
+        slug.split('-', '_').joinToString(" ") { word ->
+            when (word.lowercase()) {
+                "pbr" -> "PBR"
+                "gui" -> "GUI"
+                "hud" -> "HUD"
+                "rpg" -> "RPG"
+                "qol" -> "QoL"
+                "api" -> "API"
+                "mmo" -> "MMO"
+                "pvp" -> "PvP"
+                "pve" -> "PvE"
+                "3d" -> "3D"
+                else -> word.replaceFirstChar { it.uppercase() }
+            }
+        }
 
     suspend fun details(context: Context, project: AssetProject): AssetProjectDetails = withContext(Dispatchers.IO) {
         runCatching {
@@ -347,10 +539,164 @@ object PojavAssetBridge {
         return cfApi
     }
 
+    /**
+     * Every instance a file can be installed into, the one the launcher is sitting on first.
+     * Each row carries the Minecraft version the instance actually runs, so the picker can say
+     * which of them the file was built for.
+     */
+    suspend fun targets(): List<AssetTarget> = withContext(Dispatchers.IO) {
+        runCatching {
+            val selected = runCatching { Instances.loadSelectedInstance() }.getOrNull()
+            val selectedRoot = runCatching { selected?.gameDirectory }.getOrNull()
+            Instances.loadDisplay().list.mapNotNull { display ->
+                val instance = display as? Instance ?: return@mapNotNull null
+                val game = GameDownloadTarget.of(instance)
+                AssetTarget(
+                    name = display.name?.takeIf { it.isNotBlank() } ?: instance.versionId.orEmpty(),
+                    versionId = instance.versionId.orEmpty(),
+                    mcVersion = game.mcVersion,
+                    loader = game.loader,
+                    detected = selectedRoot != null && game.gameDirectory == selectedRoot,
+                    gameDirectory = game.gameDirectory
+                )
+            }.sortedByDescending { it.detected }
+        }.getOrDefault(emptyList())
+    }
+
+    /**
+     * Every dependency of [file] that fits [mcVersion] and [loader]: what the platform records on
+     * the file itself plus the project's Modrinth install rules, so the dialog can offer the whole
+     * set as tick boxes instead of sending the user hunting for it.
+     *
+     * A dependency the target version has no build of is still returned, with no file, and the
+     * dialog says so rather than silently installing a half-working set.
+     */
+    suspend fun planDependencies(
+        context: Context,
+        type: AssetType,
+        file: AssetFile,
+        mcVersion: String?,
+        loader: String?,
+        body: String? = null
+    ): List<ResolvedDependency> {
+        val fromFile = resolveDependencies(context, type, file.dependencies, mcVersion, loader)
+        // Modrinth lets a project spell out "install these together" in its description body.
+        val known = fromFile.map { it.project.id }.toMutableSet()
+        val ruleIds = ModrinthInstallRules.requiredProjectIds(body)
+            .filter { it.isNotBlank() && known.add(it) }
+        if (ruleIds.isEmpty()) return fromFile
+        val ruleDependencies = ruleIds.map { AssetDependency(it, AssetPlatform.MODRINTH, true) }
+        return fromFile + resolveDependencies(context, type, ruleDependencies, mcVersion, loader)
+    }
+
+    private suspend fun resolveDependencies(
+        context: Context,
+        type: AssetType,
+        dependencies: List<AssetDependency>,
+        mcVersion: String?,
+        loader: String?
+    ): List<ResolvedDependency> = withContext(Dispatchers.IO) {
+        dependencies.mapNotNull { dependency ->
+            runCatching {
+                when (dependency.platform) {
+                    AssetPlatform.MODRINTH -> {
+                        val meta = modrinthGet("project/${dependency.projectId}", null, JsonObject::class.java)
+                        val project = AssetProject(
+                            platform = AssetPlatform.MODRINTH,
+                            type = type,
+                            id = dependency.projectId,
+                            title = meta?.string("title") ?: dependency.projectId,
+                            description = meta?.string("description") ?: "",
+                            author = "",
+                            iconUrl = meta?.string("icon_url"),
+                            downloads = meta?.long("downloads") ?: 0L
+                        )
+                        ResolvedDependency(
+                            project,
+                            pickFor(modrinthFiles(dependency.projectId), mcVersion, loader),
+                            dependency.required
+                        )
+                    }
+                    AssetPlatform.CURSEFORGE -> {
+                        val meta = curseForgeGet(context, "mods/${dependency.projectId}", null, JsonObject::class.java)
+                            ?.obj("data")
+                        val project = AssetProject(
+                            platform = AssetPlatform.CURSEFORGE,
+                            type = type,
+                            id = dependency.projectId,
+                            title = meta?.string("name") ?: dependency.projectId,
+                            description = meta?.string("summary") ?: "",
+                            author = "",
+                            iconUrl = meta?.obj("logo")?.string("thumbnailUrl"),
+                            downloads = meta?.long("downloadCount") ?: 0L
+                        )
+                        ResolvedDependency(
+                            project,
+                            pickFor(curseForgeFiles(context, dependency.projectId), mcVersion, loader),
+                            dependency.required
+                        )
+                    }
+                }
+            }.getOrNull()
+        }
+    }
+
+    /**
+     * The file of [files] that belongs on a [mcVersion] running [loader]: the newest release for
+     * that version first, then any build for it, then anything the project has.
+     */
+    private fun pickFor(files: List<AssetFile>?, mcVersion: String?, loader: String?): AssetFile? {
+        val all = files.orEmpty().filter { it.url != null }
+        if (all.isEmpty()) return null
+        val byVersion = if (mcVersion.isNullOrBlank()) all
+        else all.filter { file -> file.gameVersions.any { it.equals(mcVersion, true) } }
+        val pool = byVersion.ifEmpty { all }
+        val byLoader = if (loader.isNullOrBlank()) pool
+        else pool.filter { file -> file.loaders.any { it.equals(loader, true) } }
+        val best = byLoader.ifEmpty { pool }
+        return best.firstOrNull { it.releaseType == "release" } ?: best.first()
+    }
+
+    /**
+     * One file, reporting how many bytes have arrived. [DownloadUtils.downloadFile] has no progress
+     * hook, so the monitored variant stands in for it while keeping the SHA-1 check around it.
+     */
+    private fun download(url: String, target: File, onProgress: ((Long, Long) -> Unit)?) {
+        if (onProgress == null) {
+            DownloadUtils.downloadFile(url, target)
+            return
+        }
+        DownloadUtils.downloadFileMonitored(url, target, null) { current, total ->
+            onProgress(current.toLong(), total.toLong())
+        }
+    }
+
+    /** Installs [file] into [target] instead of into whichever instance happens to be selected. */
+    suspend fun installInto(
+        context: Context,
+        type: AssetType,
+        file: AssetFile,
+        target: AssetTarget,
+        onProgress: ((Long, Long) -> Unit)? = null
+    ): Boolean {
+        val kind = type.folder ?: return false
+        val root = target.gameDirectory ?: return false
+        return install(type, file, File(root, kind.directoryName), onProgress)
+    }
+
     suspend fun install(type: AssetType, file: AssetFile): Boolean = withContext(Dispatchers.IO) {
-        val url = file.url ?: return@withContext false
         val folder = type.folder ?: return@withContext false
         val dir = PojavContentBridge.directory(folder) ?: return@withContext false
+        install(type, file, dir)
+    }
+
+    private suspend fun install(
+        type: AssetType,
+        file: AssetFile,
+        dir: File,
+        onProgress: ((Long, Long) -> Unit)? = null
+    ): Boolean = withContext(Dispatchers.IO) {
+        val url = file.url ?: return@withContext false
         if (!dir.isDirectory && !dir.mkdirs()) return@withContext false
         val safeName = File(file.fileName).name.ifBlank { return@withContext false }
         runCatching {
@@ -358,14 +704,14 @@ object PojavAssetBridge {
                 val temp = File.createTempFile("aerix_world", ".zip", dir.parentFile)
                 try {
                     temp.delete()
-                    DownloadUtils.ensureSha1(temp, file.sha1) { DownloadUtils.downloadFile(url, temp) }
+                    DownloadUtils.ensureSha1(temp, file.sha1) { download(url, temp, onProgress) }
                     PojavContentBridge.extractWorldFile(temp, dir, safeName.removeSuffix(".zip"))
                 } finally {
                     temp.delete()
                 }
             } else {
                 val target = File(dir, safeName)
-                DownloadUtils.ensureSha1(target, file.sha1) { DownloadUtils.downloadFile(url, target) }
+                DownloadUtils.ensureSha1(target, file.sha1) { download(url, target, onProgress) }
             }
         }.isSuccess
     }
@@ -511,7 +857,8 @@ object PojavAssetBridge {
             sourceUrl = obj.string("source_url"),
             issuesUrl = obj.string("issues_url"),
             wikiUrl = obj.string("wiki_url"),
-            discordUrl = obj.string("discord_url")
+            discordUrl = obj.string("discord_url"),
+            body = obj.string("body") ?: ""
         )
     }
 
@@ -536,7 +883,19 @@ object PojavAssetBridge {
                 releaseType = version.string("version_type") ?: "release",
                 datePublished = (version.string("date_published") ?: "").take(10),
                 gameVersions = version.arr("game_versions").strings(),
-                loaders = version.arr("loaders").strings()
+                loaders = version.arr("loaders").strings(),
+                dependencies = version.arr("dependencies")?.mapNotNull { dep ->
+                    if (!dep.isJsonObject) return@mapNotNull null
+                    val dependency = dep.asJsonObject
+                    val id = dependency.string("project_id") ?: return@mapNotNull null
+                    // "embedded" is already inside the file and "incompatible" is a warning, not
+                    // something to install.
+                    when (dependency.string("dependency_type")) {
+                        "required" -> AssetDependency(id, AssetPlatform.MODRINTH, true)
+                        "optional" -> AssetDependency(id, AssetPlatform.MODRINTH, false)
+                        else -> null
+                    }
+                } ?: emptyList()
             )
         }
     }
@@ -666,6 +1025,9 @@ object PojavAssetBridge {
     /** Maps Aerix category slugs to CurseForge categoryId integers (from Mirai _CurseForgeCategories.kt). */
     private fun curseForgeCategoryId(type: AssetType, slug: String?): Int? {
         if (slug.isNullOrBlank()) return null
+        // The category filter of the UI carries the id CurseForge itself uses once the lists come
+        // from its API, so it can be used as it is.
+        slug.toIntOrNull()?.let { return it }
         return when (type) {
             AssetType.MODPACK -> when (slug) {
                 "adventure" -> 4475
@@ -766,7 +1128,20 @@ object PojavAssetBridge {
                         datePublished = (file.string("fileDate") ?: "").take(10),
                         gameVersions = versions.filter { mcVersionPattern.matches(it) },
                         loaders = versions.filter { !mcVersionPattern.matches(it) && it.lowercase() in knownLoaders }
-                            .map { it.lowercase() }
+                            .map { it.lowercase() },
+                        // relationType: 3 is a required dependency, 2 an optional one. 1 is an
+                        // embedded library (already inside the jar), 4 a tool, 5 an incompatible mod.
+                        dependencies = file.arr("dependencies")?.mapNotNull { dep ->
+                            if (!dep.isJsonObject) return@mapNotNull null
+                            val relation = dep.asJsonObject.int("relationType")
+                            val id = dep.asJsonObject.get("modId")?.takeIf { !it.isJsonNull }?.asString
+                                ?: return@mapNotNull null
+                            when (relation) {
+                                3 -> AssetDependency(id, AssetPlatform.CURSEFORGE, true)
+                                2 -> AssetDependency(id, AssetPlatform.CURSEFORGE, false)
+                                else -> null
+                            }
+                        } ?: emptyList()
                     )
                 )
             }
@@ -814,4 +1189,91 @@ object PojavAssetBridge {
 
     private fun JsonArray?.strings(): List<String> =
         this?.mapNotNull { if (it == null || it.isJsonNull || !it.isJsonPrimitive) null else runCatching { it.asString }.getOrNull() } ?: emptyList()
+    /**
+     * Modrinth projects can describe, in their description body, which other projects belong
+     * alongside them:
+     *
+     *     [[install-rules]]
+     *     title = "Install with these"
+     *     [[install-rules.entries]]
+     *     project-id = "P7dR8mSH"
+     *     type = "required"
+     *
+     * Only entries the project marks as required are read, and only when the entry spells out a
+     * project id, so a body that merely mentions a project can never add it. Version filters that
+     * may sit inside an entry are not read: [pickFor] already picks the file that fits the
+     * instance being installed into, and a dependency with no build for it is shown as such.
+     */
+    fun installRuleProjectIds(body: String?): List<String> = ModrinthInstallRules.requiredProjectIds(body)
+}
+
+/**
+ * Reads the required projects out of a Modrinth project body's `[[install-rules]]` block. A tiny
+ * line reader rather than a YAML parser: the block is flat and only three keys are read.
+ *
+ * Version filters a rule can carry in its own nested block are deliberately not read: [pickFor]
+ * already picks the file that fits the instance being installed into, and a dependency with no
+ * build for that instance is shown as missing instead of being dropped in silence.
+ */
+object ModrinthInstallRules {
+    private const val BLOCK = "[[install-rules]]"
+    private const val ENTRIES = "[[install-rules.entries"
+    private const val ENTRY = "[[install-rules.entries]]"
+
+    /** Characters a YAML key or value can be wrapped in. */
+    private val QUOTES = charArrayOf('"', '\u0027')
+
+    fun requiredProjectIds(body: String?): List<String> {
+        val text = body.orEmpty()
+        if (!text.contains(BLOCK)) return emptyList()
+        val ids = ArrayList<String>()
+        var inRules = false
+        var inEntry = false
+        // A nested block inside an entry, e.g. [[install-rules.entries.rules]]: keys in there are
+        // the rule's own filters, not the entry's project.
+        var nested = false
+        var currentId: String? = null
+        var currentType: String? = null
+
+        fun flush() {
+            // An entry with no type of its own counts as required, which is how Modrinth's own
+            // install dialog reads it.
+            val id = currentId
+            if (inEntry && id != null && (currentType ?: "required") == "required") ids.add(id)
+            currentId = null
+            currentType = null
+            nested = false
+        }
+
+        for (raw in text.lines()) {
+            val line = raw.trim()
+            if (line.startsWith(BLOCK)) {
+                flush()
+                inRules = true
+                inEntry = false
+            } else if (line.startsWith(ENTRIES)) {
+                if (!inRules) continue
+                if (line == ENTRY) {
+                    // A new entry: the previous one ends here.
+                    flush()
+                    inEntry = true
+                } else {
+                    // A nested block of the entry being read.
+                    nested = true
+                }
+            } else if (line.startsWith("[[")) {
+                // Any other top level block ends the install rules.
+                flush()
+                inRules = false
+                inEntry = false
+            } else if (inRules && inEntry && !nested && line.contains('=')) {
+                val key = line.substringBefore('=').trim().trim(*QUOTES).lowercase()
+                val value = line.substringAfter('=').trim().trim(*QUOTES)
+                if (key == "project-id" || key == "project_id") currentId = value
+                if (key == "type") currentType = value.lowercase()
+            }
+        }
+        flush()
+        return ids.filter { it.isNotBlank() }.distinct()
+    }
 }

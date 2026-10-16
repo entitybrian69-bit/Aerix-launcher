@@ -59,34 +59,73 @@ jobs:
           gradle :app_pojavlauncher:bundleFullGplay
           mv app_pojavlauncher/build/outputs/bundle/fullGplay/app_pojavlauncher-full-gplay.aab out/app-gplay.aab
 
-      - name: Build Debug .apk (Full)
+      # A failed Gradle build only leaves "Process completed with exit code 1" in the job, and the
+      # log files themselves are not reachable from everywhere, so the compiler errors are repeated
+      # as annotations: those are always readable through the API.
+      # A failed Gradle build only leaves "Process completed with exit code 1" in the job, and the
+      # log files themselves are not reachable from everywhere, so the compiler errors are repeated
+      # as annotations: those are always readable through the API. One annotation carries all of
+      # them, because GitHub only shows ten annotations per step and a build can carry more errors.
+      - name: Prepare the failure reporter
+        shell: bash
         run: |
-          # Build the launcher
-          gradle :app_pojavlauncher:assembleFullDebug
-          mv app_pojavlauncher/build/outputs/apk/full/debug/app_pojavlauncher-full-debug.apk out/app-debug-full.apk
+          cat > report_gradle_failure.sh <<'HELPER'
+          report_gradle_failure() {
+            label=$1
+            log=$2
+            errors=$(grep -E '^e: |error: |Execution failed|What went wrong|FAILED|Could not|Caused by' "$log" \
+              | head -60 | sed 's/%/%25/g; s/\r//g' | tr '\n' '|' | cut -c1-6000)
+            echo "::error title=gradle $label::${errors:-no error line matched}"
+            tailmsg=$(tail -c 1500 "$log" | tr '\n' '|' | sed 's/%/%25/g')
+            echo "::error title=gradle $label tail::$tailmsg"
+          }
+          HELPER
+          cat report_gradle_failure.sh
 
-      - name: Build Debug .apk (No runtime)
+      - name: Build Release .apk (Full)
+        shell: bash
         run: |
-         # Build the launcher (without jre8 installed)
-          gradle :app_pojavlauncher:assembleNoruntimeDebug
-          mv app_pojavlauncher/build/outputs/apk/noruntime/debug/app_pojavlauncher-noruntime-debug.apk out/app-debug-noruntime.apk
+          . ./report_gradle_failure.sh
+          assert_apk() {
+            [ -f "$2" ] || { echo "::error title=missing apk::$2 was not produced"; ls -R app_pojavlauncher/build/outputs/apk || true; exit 1; }
+            mv "$2" "$3"
+          }
+          if ! gradle :app_pojavlauncher:assembleFullRelease 2>&1 | tee build-full.log; then
+            report_gradle_failure full build-full.log
+            exit 1
+          fi
+          # Build the launcher
+          assert_apk full app_pojavlauncher/build/outputs/apk/full/release/app_pojavlauncher-full-release.apk out/app-release-full.apk
+
+      - name: Build Release .apk (No runtime)
+        shell: bash
+        run: |
+          . ./report_gradle_failure.sh
+          if ! gradle :app_pojavlauncher:assembleNoruntimeRelease 2>&1 | tee build-noruntime.log; then
+            report_gradle_failure noruntime build-noruntime.log
+            exit 1
+          fi
+          # Build the launcher (without jre8 installed)
+          [ -f app_pojavlauncher/build/outputs/apk/noruntime/release/app_pojavlauncher-noruntime-release.apk ] \
+            || { echo "::error title=missing apk::the noruntime apk was not produced"; ls -R app_pojavlauncher/build/outputs/apk || true; exit 1; }
+          mv app_pojavlauncher/build/outputs/apk/noruntime/release/app_pojavlauncher-noruntime-release.apk out/app-release-noruntime.apk
 
       - name: Gen md5sums
         run: |
-          md5sum out/app-debug-full.apk > out/app-debug-full.md5
-          md5sum out/app-debug-noruntime.apk > out/app-debug-noruntime.md5
+          md5sum out/app-release-full.apk > out/app-release-full.md5
+          md5sum out/app-release-noruntime.apk > out/app-release-noruntime.md5
 
-      - name: Upload Debug APK (Full)
+      - name: Upload Release APK (Full)
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug
-          path: out/app-debug-full.apk
+          name: app-release
+          path: out/app-release-full.apk
 
-      - name: Upload Debug APK (No runtime)
+      - name: Upload Release APK (No runtime)
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug-noruntime
-          path: out/app-debug-noruntime.apk
+          name: app-release-noruntime
+          path: out/app-release-noruntime.apk
 
       - name: Upload AAB
         uses: actions/upload-artifact@v4

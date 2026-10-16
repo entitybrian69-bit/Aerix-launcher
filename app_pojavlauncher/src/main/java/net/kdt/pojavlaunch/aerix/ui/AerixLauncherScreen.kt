@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.fragment.app.FragmentActivity
 import net.kdt.pojavlaunch.aerix.bridge.AerixPreferences
 import net.kdt.pojavlaunch.aerix.bridge.AerixTransitionType
+import net.kdt.pojavlaunch.aerix.bridge.AerixWindowInsets
 import net.kdt.pojavlaunch.aerix.bridge.PojavAccountBridge
 import net.kdt.pojavlaunch.aerix.bridge.PojavInstanceEditorBridge
 import net.kdt.pojavlaunch.aerix.components.AerixBackground
@@ -71,6 +72,9 @@ import net.kdt.pojavlaunch.aerix.ui.screens.FileManagerScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.HomeScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.InstanceEditorScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.LibraryScreen
+import net.kdt.pojavlaunch.aerix.bridge.AerixInstallQueue
+import net.kdt.pojavlaunch.aerix.ui.screens.AerixInstallPanel
+import net.kdt.pojavlaunch.aerix.ui.screens.AerixInstallPill
 import net.kdt.pojavlaunch.aerix.ui.screens.LogScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.OfflineAccountScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.SettingsScreen
@@ -109,78 +113,97 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
 
     AerixBackground {
       FestivalEffectsHost(festivals = festivals, modifier = Modifier.fillMaxSize()) {
-        Row(modifier = Modifier.fillMaxSize()) {
-            AerixNavigationRail(
-                selectedSection = section,
-                onNavigate = navigate,
-                onCreateInstance = { AerixNav.navigate(LauncherSection.CREATE_INSTANCE) }
-            )
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-            ) {
-                AnimatedContent(
-                    targetState = section,
-                    transitionSpec = { sectionTransition(transitionType, duration, extent) },
-                    label = "aerixSection"
-                ) { target ->
-                    when (target) {
-                        LauncherSection.HOME -> HomeScreen(activity, navigate)
-                        LauncherSection.LIBRARY -> LibraryScreen(activity)
-                        LauncherSection.DISCOVER, LauncherSection.DOWNLOADS -> DiscoverScreen(activity, navigate)
-                        LauncherSection.FILES -> FileManagerScreen(activity)
-                        LauncherSection.LOGS -> LogScreen(activity)
-                        LauncherSection.WALLPAPERS -> WallpapersScreen()
-                        LauncherSection.SETTINGS -> SettingsScreen(
-                            activity = activity,
-                            tabKey = AerixNav.settingsTab,
-                            onTabChanged = { AerixNav.settingsTab = it }
-                        )
-                        LauncherSection.ACCOUNTS -> AccountsScreen(activity)
-                        LauncherSection.ABOUT -> AboutScreen(activity)
-                        LauncherSection.CREATE_INSTANCE -> CreateInstanceScreen(activity) {
-                            AerixNav.finishTo(LauncherSection.LIBRARY)
+        // The wallpaper and the festival effects run to the edges of the display; the shell
+        // itself stays clear of the camera cutout and of the system bars.
+        Box(modifier = Modifier.fillMaxSize().padding(AerixWindowInsets.padding())) {
+            Row(modifier = Modifier.fillMaxSize()) {
+                AerixNavigationRail(
+                    selectedSection = section,
+                    onNavigate = navigate,
+                    onCreateInstance = { AerixNav.navigate(LauncherSection.CREATE_INSTANCE) }
+                )
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                ) {
+                    AnimatedContent(
+                        targetState = section,
+                        transitionSpec = { sectionTransition(transitionType, duration, extent) },
+                        label = "aerixSection"
+                    ) { target ->
+                        when (target) {
+                            LauncherSection.HOME -> HomeScreen(activity, navigate)
+                            LauncherSection.LIBRARY -> LibraryScreen(activity)
+                            LauncherSection.DISCOVER, LauncherSection.DOWNLOADS -> DiscoverScreen(activity, navigate)
+                            LauncherSection.FILES -> FileManagerScreen(activity)
+                            LauncherSection.LOGS -> LogScreen(activity)
+                            LauncherSection.WALLPAPERS -> WallpapersScreen()
+                            LauncherSection.SETTINGS -> SettingsScreen(
+                                activity = activity,
+                                tabKey = AerixNav.settingsTab,
+                                onTabChanged = { AerixNav.settingsTab = it }
+                            )
+                            LauncherSection.ACCOUNTS -> AccountsScreen(activity)
+                            LauncherSection.ABOUT -> AboutScreen(activity)
+                            LauncherSection.CREATE_INSTANCE -> CreateInstanceScreen(activity) {
+                                AerixNav.finishTo(LauncherSection.LIBRARY)
+                            }
+                            LauncherSection.INSTANCE_EDITOR, LauncherSection.CONTENT -> InstanceEditorScreen(activity) {
+                                PojavInstanceEditorBridge.close()
+                                AerixNav.finishTo(LauncherSection.LIBRARY)
+                            }
+                            LauncherSection.ADD_ACCOUNT -> AddAccountScreen(
+                                activity = activity,
+                                onClose = { AerixNav.finishTo(LauncherSection.ACCOUNTS) },
+                                onOffline = { AerixNav.navigate(LauncherSection.OFFLINE_ACCOUNT) }
+                            )
+                            LauncherSection.OFFLINE_ACCOUNT -> OfflineAccountScreen(
+                                activity = activity,
+                                onClose = { AerixNav.navigate(LauncherSection.ADD_ACCOUNT) },
+                                onCreated = { AerixNav.finishTo(LauncherSection.ACCOUNTS) }
+                            )
                         }
-                        LauncherSection.INSTANCE_EDITOR, LauncherSection.CONTENT -> InstanceEditorScreen(activity) {
-                            PojavInstanceEditorBridge.close()
-                            AerixNav.finishTo(LauncherSection.LIBRARY)
-                        }
-                        LauncherSection.ADD_ACCOUNT -> AddAccountScreen(
-                            activity = activity,
-                            onClose = { AerixNav.finishTo(LauncherSection.ACCOUNTS) },
-                            onOffline = { AerixNav.navigate(LauncherSection.OFFLINE_ACCOUNT) }
-                        )
-                        LauncherSection.OFFLINE_ACCOUNT -> OfflineAccountScreen(
-                            activity = activity,
-                            onClose = { AerixNav.navigate(LauncherSection.ADD_ACCOUNT) },
-                            onCreated = { AerixNav.finishTo(LauncherSection.ACCOUNTS) }
+                    }
+
+                    // Login progress bar, the Aerix replacement for the bar drawn under Pojav's AccountSpinner.
+                    val progress = PojavAccountBridge.loginProgress
+                    if (progress < 1f) {
+                        LinearProgressIndicator(
+                            progress = { progress },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .align(Alignment.TopCenter)
+                                .padding(horizontal = AerixSpacing.lg),
+                            color = if (PojavAccountBridge.loginError) AerixSurface.danger else AerixThemeManager.currentAccent(),
+                            trackColor = Color.Transparent
                         )
                     }
                 }
+            }
 
-                // Login progress bar, the Aerix replacement for the bar drawn under Pojav's AccountSpinner.
-                val progress = PojavAccountBridge.loginProgress
-                if (progress < 1f) {
-                    LinearProgressIndicator(
-                        progress = { progress },
+            FestivalTitleText(
+                festivals = festivals,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = AerixSpacing.xs, end = AerixSpacing.lg)
+            )
+
+            // Installs outlive the page that started them, so their two surfaces live here: the
+            // panel with the progress bars, and the pill it collapses into when minimized.
+            if (AerixInstallQueue.visible) {
+                if (AerixInstallQueue.panelOpen) {
+                    AerixInstallPanel(onMinimize = { AerixInstallQueue.minimizePanel() })
+                } else {
+                    AerixInstallPill(
+                        onExpand = { AerixInstallQueue.openPanel() },
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .align(Alignment.TopCenter)
-                            .padding(horizontal = AerixSpacing.lg),
-                        color = if (PojavAccountBridge.loginError) AerixSurface.danger else AerixThemeManager.currentAccent(),
-                        trackColor = Color.Transparent
+                            .align(Alignment.BottomEnd)
+                            .padding(AerixSpacing.lg)
                     )
                 }
             }
         }
-
-        FestivalTitleText(
-            festivals = festivals,
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = AerixSpacing.xs, end = AerixSpacing.lg)
-        )
       }
     }
 }

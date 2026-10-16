@@ -20,6 +20,11 @@ static def getDateSeconds() {
     }
 }
 
+// The released version of this fork. Bump it by hand when a build is published; the git-derived
+// name the upstream project used is kept below for local builds that want it.
+def AERIX_VERSION_NAME = "1.1.2"
+def AERIX_VERSION_CODE = 10102
+
 def getVersionName = {
     def currentBranch = grgit.branch.current()
     def latestCommit = grgit.log(maxCommits: 1)
@@ -73,6 +78,17 @@ android {
             keyAlias "android_github_release"
             keyPassword System.getenv("POJAV_KEYSTORE_PASSWORD")
         }
+        // The key the published Aerix builds are signed with. It travels with the project next to
+        // the other keystores, so a build never depends on a secret this repository may not have;
+        // AERIX_KEYSTORE_PASSWORD overrides the password in the environment for anyone who keeps
+        // the key out of the tree.
+        aerixRelease {
+            storeFile file("aerix_release.p12")
+            storeType "PKCS12"
+            storePassword System.getenv("AERIX_KEYSTORE_PASSWORD") ?: "aerix-release"
+            keyAlias "aerix"
+            keyPassword System.getenv("AERIX_KEYSTORE_PASSWORD") ?: "aerix-release"
+        }
         googlePlayBuild {
             storeFile file("pojav_gplay.jks")
             storePassword System.getenv("POJAV_GPLAY_KEYSTORE_PASSWORD")
@@ -97,8 +113,8 @@ android {
         applicationId "net.kdt.pojavlaunch"
         minSdkVersion 23
         targetSdkVersion 36
-        versionCode getDateSeconds()
-        versionName getVersionName()
+        versionCode AERIX_VERSION_CODE
+        versionName AERIX_VERSION_NAME
         multiDexEnabled false //important
         resValue 'string', 'curseforge_api_key', getCFApiKey()
         resValue 'string', 'group_id', 'net.kdt'
@@ -145,7 +161,7 @@ android {
             // Don't set to true or java.awt will be a.a or something similar.
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-            signingConfig signingConfigs.customRelease
+            signingConfig signingConfigs.aerixRelease
             resValue "string", "app_name", "Aerix Launcher"
             resValue "string", "app_short_name", "PojavLauncher"
             resValue "string", "aerix_app_label", "Aerix Launcher"
