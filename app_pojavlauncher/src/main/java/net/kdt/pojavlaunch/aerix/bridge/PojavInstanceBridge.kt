@@ -104,6 +104,7 @@ object PojavInstanceBridge {
     fun reload() {
         val context = appContext ?: return
         val generation = reloadGeneration.incrementAndGet()
+        val editorId = PojavInstanceEditorBridge.draft?.instance?.instanceId
         loading = true
         PojavApplication.sExecutorService.execute {
             val result = runCatching {
@@ -119,14 +120,16 @@ object PojavInstanceBridge {
                         icon = icon
                     )
                 }
-                rows to display.selectedIndex
+                val editorInstance = editorId?.let { runCatching { Instances.loadInstance(it) }.getOrNull() }
+                Triple(rows, display.selectedIndex, editorInstance)
             }
             Tools.runOnUiThread {
                 // A slower earlier scan must not overwrite a just-completed installation.
                 if (generation != reloadGeneration.get()) return@runOnUiThread
-                result.onSuccess { (rows, index) ->
+                result.onSuccess { (rows, index, editorInstance) ->
                     instances = rows
                     selectedIndex = index
+                    editorInstance?.let { PojavInstanceEditorBridge.syncLoaderState(it) }
                 }.onFailure { Tools.showErrorRemote(it) }
                 loading = false
             }

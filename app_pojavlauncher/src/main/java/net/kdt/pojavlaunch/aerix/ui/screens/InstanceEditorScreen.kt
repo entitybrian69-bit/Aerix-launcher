@@ -1710,7 +1710,7 @@ private fun InstanceLoaderPane(activity: FragmentActivity, draft: AerixInstanceD
 
     // The version of the instance the screen was opened on, picked by default. Nothing in here is
     // allowed to throw: a failing source is an empty list and the retry row, never a crash.
-    LaunchedEffect(kind, reload) {
+    LaunchedEffect(kind, reload, draft.versionId) {
         metaLoading = true
         metaFailed = false
         val versions = runCatching { PojavLoaderBridge.gameVersions(kind) }.getOrDefault(emptyList())
