@@ -21,7 +21,7 @@ object MinecraftVersionFilters {
             "old_alpha", "alpha" -> MinecraftVersionKind.OLD_ALPHA
             else -> when {
                 Regex("\\d+\\.\\d+(?:\\.\\d+)?").matches(name) -> MinecraftVersionKind.RELEASE
-                Regex("\\d{2}w\\d{2}[a-z].*").matches(name) || "snapshot" in name -> MinecraftVersionKind.SNAPSHOT
+                Regex("\\d{2}w\\d{2}.+").matches(name) || "snapshot" in name -> MinecraftVersionKind.SNAPSHOT
                 Regex("b\\d.*").matches(name) -> MinecraftVersionKind.OLD_BETA
                 Regex("a\\d.*").matches(name) -> MinecraftVersionKind.OLD_ALPHA
                 else -> MinecraftVersionKind.OTHER

@@ -764,7 +764,8 @@ object PojavAssetBridge {
                 ?: throw java.io.IOException("Could not load all content versions; retry the download list")
             val data = response.arr("data") ?: throw java.io.IOException("Provider omitted the file list")
             val fingerprint = data.joinToString { it.toString() }
-            check(seenPages.add(fingerprint)) { "Provider repeated a file page; retry instead of showing an incomplete version list" }
+            val pageHash = java.security.MessageDigest.getInstance("SHA-256").digest(fingerprint.toByteArray()).joinToString("") { "%02x".format(it) }
+            check(seenPages.add(pageHash)) { "Provider repeated a file page; retry instead of showing an incomplete version list" }
             data.forEach { element ->
                 if (!element.isJsonObject) return@forEach
                 val file = element.asJsonObject
