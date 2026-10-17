@@ -5,10 +5,10 @@
         android:background="@drawable/aerix_download_dock_bg"
         app:layout_constraintStart_toStartOf="parent" app:layout_constraintEnd_toEndOf="parent" app:layout_constraintBottom_toBottomOf="parent" app:layout_constraintTop_toTopOf="parent">
         <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
-            <ImageView android:layout_width="48dp" android:layout_height="48dp" android:padding="12dp"
+            <ImageView android:id="@+id/dock_icon" android:layout_width="48dp" android:layout_height="48dp" android:padding="12dp"
                 android:background="@drawable/aerix_download_control_bg" android:src="@drawable/aerix_ic_cloud_download" android:tint="#D6E4ED" android:importantForAccessibility="no" />
             <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginHorizontal="14dp" android:orientation="vertical">
-                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical">
+                <LinearLayout android:id="@+id/dock_metadata" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical">
                     <TextView android:id="@+id/dock_title" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:textSize="17sp" android:textStyle="bold" android:textColor="#EDF4FA" android:maxLines="1" android:ellipsize="end" />
                     <TextView android:id="@+id/dock_percent" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="8dp" android:textColor="#C7C2FF" android:textSize="16sp" android:textStyle="bold" />
                 </LinearLayout>

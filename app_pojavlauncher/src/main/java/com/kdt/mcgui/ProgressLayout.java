@@ -72,6 +72,19 @@ public class ProgressLayout extends ConstraintLayout implements View.OnClickList
         params.height = Math.min(dp(160), getResources().getDisplayMetrics().heightPixels / 3);
         taskScroll.setLayoutParams(params);
     }
+    @Override protected void onSizeChanged(int w, int h, int oldw, int oldh) {
+        super.onSizeChanged(w, h, oldw, oldh);
+        if (w == oldw) return;
+        boolean narrow = w < dp(500);
+        findViewById(R.id.dock_icon).setVisibility(w < dp(600) ? GONE : VISIBLE);
+        LinearLayout metadata = findViewById(R.id.dock_metadata);
+        metadata.setOrientation(narrow ? LinearLayout.VERTICAL : LinearLayout.HORIZONTAL);
+        status.setLayoutParams(new LinearLayout.LayoutParams(narrow ? -1 : 0, -2, narrow ? 0 : 1));
+        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-2, -2);
+        p.setMarginStart(narrow ? 0 : dp(12));
+        speed.setLayoutParams(p);
+        render();
+    }
     public void observe(String key) {
         for (LayoutProgressListener observer : observers) if (observer.key.equals(key)) return;
         LayoutProgressListener observer = new LayoutProgressListener(key);
@@ -151,10 +164,10 @@ public class ProgressLayout extends ConstraintLayout implements View.OnClickList
             status.setText(getContext().getString(R.string.dock_size, done, total));
             speed.setText(getContext().getString(R.string.dock_speed, rate));
             speed.setVisibility(VISIBLE);
-            if (rate > 0 && total > done && Double.isFinite(rate) && Double.isFinite(total)) {
+            if (rate > 0 && total > done && !Double.isInfinite(rate) && !Double.isNaN(rate) && !Double.isInfinite(total) && !Double.isNaN(total)) {
                 long seconds = (long) Math.ceil((total - done) / rate);
                 eta.setText(getContext().getString(R.string.dock_eta, seconds / 60, seconds % 60));
-                eta.setVisibility(getResources().getConfiguration().screenWidthDp >= 600 ? VISIBLE : GONE);
+                eta.setVisibility(getWidth() >= dp(600) ? VISIBLE : GONE);
             }
         }
         expand.setContentDescription(getContext().getString(taskScroll.getVisibility() == VISIBLE ? R.string.dock_hide_tasks : R.string.dock_show_tasks)
