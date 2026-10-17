@@ -11,6 +11,7 @@ internal object WorldTaskGate {
         check(writing.compareAndSet(false, true)) { "Another world task is already running" }
         try {
             val pending = preferences(context).getLong("launch-pending", 0) - System.currentTimeMillis()
+            check(!net.kdt.pojavlaunch.progresskeeper.ProgressKeeper.hasOngoingTasks()) { "Wait for launcher downloads/installers to finish first" }
             check(!AerixToolsBridge.gameRunning(context) && pending !in 1..60_000) { "Close Minecraft and finish any pending launch first" }
         } catch (e: Exception) { writing.set(false); throw e }
     }
@@ -18,6 +19,7 @@ internal object WorldTaskGate {
     @Synchronized fun beginLaunch(context: Context) {
         check(writing.compareAndSet(false, true)) { "Wait for the world task to finish before launching" }
         try {
+            check(!net.kdt.pojavlaunch.progresskeeper.ProgressKeeper.hasOngoingTasks()) { "Wait for launcher tasks to finish first" }
             check(!AerixToolsBridge.gameRunning(context)) { "Minecraft is already running" }
             check(preferences(context).getLong("launch-pending", 0) - System.currentTimeMillis() !in 1..60_000) { "A launch is already pending" }
             check(preferences(context).edit().putLong("launch-pending", System.currentTimeMillis() + 60_000).commit()) { "Unable to reserve launch" }

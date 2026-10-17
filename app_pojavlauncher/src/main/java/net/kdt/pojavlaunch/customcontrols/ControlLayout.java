@@ -142,6 +142,9 @@ public class ControlLayout extends FrameLayout {
             float step = Tools.dpToPx(24);
             for (float x = 0; x < getWidth(); x += step) canvas.drawLine(x, 0, x, getHeight(), paint);
             for (float y = 0; y < getHeight(); y += step) canvas.drawLine(0, y, getWidth(), y, paint);
+            paint.setColor(0x8086E9FF);
+            canvas.drawLine(getWidth() / 2f, 0, getWidth() / 2f, getHeight(), paint);
+            canvas.drawLine(0, getHeight() / 2f, getWidth(), getHeight() / 2f, paint);
         }
         super.dispatchDraw(canvas);
     }

@@ -166,7 +166,7 @@ private fun WorldLibrary(activity: FragmentActivity) {
                     }, enabled = !busy, modifier = Modifier.heightIn(min = 48.dp)) { Text("Back up") }
                     OutlinedButton(onClick = { export = world.lastBackup; saveZip.launch("${world.directory.name}-backup.zip") },
                         enabled = !busy && world.lastBackup != null, modifier = Modifier.heightIn(min = 48.dp)) { Text("Export backup") }
-                    OutlinedButton(onClick = { Tools.openPath(activity, world.directory.path) }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Open folder") }
+                    OutlinedButton(onClick = { Tools.openPath(activity, world.directory, false) }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Open folder") }
                 }
             }
         }
@@ -280,7 +280,7 @@ private fun RendererBench(activity: FragmentActivity) {
     var running by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     LazyColumn(verticalArrangement = Arrangement.spacedBy(20.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
-        item { Text("Experimental off-screen 256 × 256 probe. Checks EGL setup, pixel correctness and 120 synchronized clears after 10 warm-up clears. Timings are NOT Minecraft FPS, shader compatibility, battery usage, or a renderer recommendation. Close Minecraft first. Driver crashes are isolated from the launcher.", color = AerixSurface.textSecondary) }
+        item { Text("Experimental GLES-wrapper-only off-screen 256 × 256 probe. Mesa/Vulkan renderers are not tested. Checks EGL setup, pixel correctness and 120 synchronized clears after 10 warm-up clears. Timings are NOT Minecraft FPS, shader compatibility, battery usage, or a renderer recommendation. Close Minecraft first. Driver crashes are isolated from the launcher.", color = AerixSurface.textSecondary) }
         items(options, key = { it.first }) { (tag, renderer) ->
             StudioCard(renderer.name()) {
                 val raw = results[tag].orEmpty()
@@ -392,7 +392,7 @@ internal fun HomeWorldCards(activity: FragmentActivity) {
                         catch (e: Exception) { if (e is CancellationException) throw e; message = e.message }
                         finally { busy = false }
                     } }, enabled = !busy, modifier = Modifier.heightIn(min = 48.dp)) { Text("Back up") }
-                    OutlinedButton(onClick = { Tools.openPath(activity, world.directory.path) }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Open folder") }
+                    OutlinedButton(onClick = { Tools.openPath(activity, world.directory, false) }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Open folder") }
                 }
             }
         }

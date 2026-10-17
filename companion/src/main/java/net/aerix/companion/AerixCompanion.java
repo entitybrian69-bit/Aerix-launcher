@@ -68,11 +68,12 @@ public final class AerixCompanion implements ClientModInitializer {
                 JsonObject json = JsonParser.parseString(contents).getAsJsonObject();
                 long age = System.currentTimeMillis() - json.get("created").getAsLong();
                 if (age < 0 || age > 30_000) return;
+                String nextId = json.get("id").getAsString();
                 if (!SWITCHING.compareAndSet(false, true)) return;
-                requestId = json.get("id").getAsString();
+                requestId = nextId;
                 message = "Preparing account switch…";
                 client.execute(() -> prepare(client, json));
-            } catch (Exception ignored) { message = "Account request could not be read; retry from Aerix."; SWITCHING.set(false); }
+            } catch (Exception ignored) { message = "Account request could not be read; retry from Aerix."; }
         });
     }
 
