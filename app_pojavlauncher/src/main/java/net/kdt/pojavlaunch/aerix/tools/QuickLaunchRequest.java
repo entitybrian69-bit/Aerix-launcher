@@ -14,7 +14,6 @@ import java.net.URI;
 import java.util.List;
 
 import net.kdt.pojavlaunch.JVersionList;
-import net.kdt.pojavlaunch.utils.DateUtils;
 
 /** A one-use launch destination; authentication data is never stored here. */
 public final class QuickLaunchRequest {
@@ -49,7 +48,8 @@ public final class QuickLaunchRequest {
             file.delete();
             long age = System.currentTimeMillis() - request.get("created").getAsLong();
             if (age < 0 || age > 600_000 || !gameDirectory.getCanonicalPath().equals(request.get("directory").getAsString())) return;
-            boolean quickPlay = !DateUtils.dateBefore(DateUtils.getOriginalReleaseDate(version), 2023, 5, 7);
+            boolean quickPlay = version.arguments != null && version.arguments.game != null
+                && net.kdt.pojavlaunch.Tools.GLOBAL_GSON.toJson(version.arguments.game).contains("\"--quickPlayMultiplayer\"");
             if (request.has("server") && !request.get("server").isJsonNull()) {
                 String server = request.get("server").getAsString();
                 if (quickPlay) {

@@ -38,15 +38,16 @@ import net.kdt.pojavlaunch.prefs.LauncherPreferences
 import net.kdt.pojavlaunch.utils.jre.GameRunner
 
 object PojavLaunchBridge {
-    private fun fire(activity: Activity) {
+    private fun fire(activity: Activity, instance: net.kdt.pojavlaunch.instances.Instance, server: String?, world: String?) {
+        var reserved = false
         try {
-            net.kdt.pojavlaunch.aerix.tools.WorldTaskGate.beginLaunch(activity)
+            check(Instances.loadSelectedInstance()?.directoryId == instance.directoryId) { "Selected instance changed. Start the launch again." }
             val runtimes = runCatching { MultiRTUtils.getRuntimes() }.getOrDefault(emptyList())
             if (runtimes.isEmpty()) {
                 val appContext = activity.applicationContext
                 Toast.makeText(activity, R.string.downloading_java_runtime_uni, Toast.LENGTH_SHORT).show()
                 PojavApplication.sExecutorService.execute {
-                    runCatching {
+                    val installedRuntime = runCatching {
                         NewJREUtil.ExternalRuntime.JRE_8.downloadRuntime(appContext.assets)
                         val installed = MultiRTUtils.getRuntimes()
                         if (installed.isNotEmpty() && LauncherPreferences.PREF_DEFAULT_RUNTIME.isNullOrEmpty()) {
@@ -58,16 +59,18 @@ object PojavLaunchBridge {
                     }.onFailure { err ->
                         Tools.showErrorRemote(err)
                     }
-                    Tools.runOnUiThread {
-                        runCatching { ExtraCore.setValue(ExtraConstants.LAUNCH_GAME, true) }
-                            .onFailure { Tools.showError(activity, it) }
+                    if (installedRuntime.isSuccess) Tools.runOnUiThread {
+                        fire(activity, instance, server, world)
                     }
                 }
             } else {
+                net.kdt.pojavlaunch.aerix.tools.WorldTaskGate.beginLaunch(activity)
+                reserved = true
+                net.kdt.pojavlaunch.aerix.tools.QuickLaunchRequest.write(activity, instance.gameDirectory, server, world)
                 ExtraCore.setValue(ExtraConstants.LAUNCH_GAME, true)
             }
         } catch (t: Throwable) {
-            net.kdt.pojavlaunch.aerix.tools.WorldTaskGate.cancelLaunch(activity)
+            if (reserved) net.kdt.pojavlaunch.aerix.tools.WorldTaskGate.cancelLaunch(activity)
             Tools.showError(activity, t)
         }
     }
@@ -84,12 +87,11 @@ object PojavLaunchBridge {
                 return
             }
             val gameDir = instance.gameDirectory
-            net.kdt.pojavlaunch.aerix.tools.QuickLaunchRequest.write(activity, gameDir, serverAddress, worldName)
             when {
                 GameRunner.hasVkMod(gameDir) -> AlertDialog.Builder(activity)
                     .setTitle(R.string.vk_mod_title)
                     .setMessage(R.string.vk_mod_message)
-                    .setPositiveButton(R.string.continue_button) { _, _ -> fire(activity) }
+                    .setPositiveButton(R.string.continue_button) { _, _ -> fire(activity, instance, serverAddress, worldName) }
                     .show()
 
                 GameRunner.hasReplay(gameDir) && GameRunner.hasFfmpeg(activity) -> AlertDialog.Builder(activity)
@@ -98,10 +100,10 @@ object PojavLaunchBridge {
                     .setPositiveButton(R.string.install_button) { _, _ ->
                         Tools.openURL(activity, "https://github.com/MojoLauncher/FFmpegPlugin/releases")
                     }
-                    .setNegativeButton(R.string.continue_button) { _, _ -> fire(activity) }
+                    .setNegativeButton(R.string.continue_button) { _, _ -> fire(activity, instance, serverAddress, worldName) }
                     .show()
 
-                else -> fire(activity)
+                else -> fire(activity, instance, serverAddress, worldName)
             }
         } catch (t: Throwable) {
             Tools.showError(activity, t)

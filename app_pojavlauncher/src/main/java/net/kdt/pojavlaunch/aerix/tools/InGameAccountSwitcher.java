@@ -65,7 +65,9 @@ public final class InGameAccountSwitcher {
             try {
                 if (launched == null || !java.util.Objects.equals(launched.authType.injectorUrl, target.authType.injectorUrl)) throw new IllegalStateException("Switching authentication providers requires restarting Minecraft.");
                 if (target.authType != AuthType.LOCAL && target.expiresAt <= System.currentTimeMillis()) throw new IllegalStateException("This account has expired. Sign in again in the launcher first.");
-                if (!status(activity).get("disconnected").getAsBoolean()) throw new IllegalStateException("Disconnect before switching accounts.");
+                JsonObject state = status(activity);
+                if (!state.get("disconnected").getAsBoolean()) throw new IllegalStateException("Disconnect before switching accounts.");
+                if (state.get("switching").getAsBoolean()) throw new IllegalStateException("The companion is already switching accounts.");
                 JsonObject json = new JsonObject();
                 String id = UUID.randomUUID().toString();
                 json.addProperty("id", id);
@@ -82,10 +84,11 @@ public final class InGameAccountSwitcher {
                 json.addProperty("provider", target.authType.injectorUrl == null ? "mojang" : target.authType.injectorUrl);
                 File directory = new File(activity.getFilesDir(), "aerix-game-bridge");
                 if (!directory.isDirectory() && !directory.mkdirs()) throw new IllegalStateException("Unable to open the private game bridge");
-                AtomicFile file = new AtomicFile(new File(directory, "switch.json"));
+                AtomicFile file = new AtomicFile(new File(directory, "switch-pending.json"));
                 FileOutputStream stream = file.startWrite();
                 try { stream.write(json.toString().getBytes(StandardCharsets.UTF_8)); file.finishWrite(stream); }
                 catch (Exception e) { file.failWrite(stream); throw e; }
+                if (!file.getBaseFile().renameTo(new File(directory, "switch.json"))) { file.delete(); throw new IllegalStateException("Unable to publish account request"); }
                 activity.runOnUiThread(() -> waitForResult(activity, id, System.currentTimeMillis() + 20_000));
             } catch (Exception e) { REQUESTING.set(false); explain(activity, e.getMessage()); }
         });

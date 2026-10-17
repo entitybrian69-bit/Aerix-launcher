@@ -196,11 +196,7 @@ fun HomeScreen(activity: FragmentActivity, navigate: (LauncherSection) -> Unit) 
                     .fillMaxHeight()
                     .padding(start = AerixSpacing.mdPlus, end = AerixSpacing.smCompact, top = AerixSpacing.smPlus)
             ) {
-                if (maxWidth >= 720.dp && maxWidth > maxHeight) {
-                    CompactHomeDashboard(selected, recent, instances.size, accent, taskCount, actions, activity)
-                } else {
-                    CompactHomeDashboard(selected, recent, instances.size, accent, taskCount, actions, activity)
-                }
+                CompactHomeDashboard(selected, recent, instances.size, accent, taskCount, actions, activity)
             }
             if (showActionMenu) {
                 ActionMenuCard(

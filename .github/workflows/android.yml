@@ -28,6 +28,7 @@ jobs:
         uses: dawidd6/action-download-artifact@v6
         continue-on-error: true
         with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
           repo: MojoLauncher/LTW
           workflow: android.yml
           workflow_conclusion: success
@@ -79,8 +80,23 @@ jobs:
       - name: Build Debug .apk (Full)
         run: |
           # Build the launcher
-          gradle :app_pojavlauncher:assembleFullDebug
+          set -o pipefail
+          gradle :app_pojavlauncher:assembleFullDebug 2>&1 | tee build-full.log
           mv app_pojavlauncher/build/outputs/apk/full/debug/app_pojavlauncher-full-debug.apk out/app-debug-full.apk
+
+      - name: Report build errors in check annotations
+        if: failure()
+        run: |
+          python - <<'PYREPORT'
+          from pathlib import Path
+          file = Path("build-full.log")
+          if file.exists():
+              lines = file.read_text(errors="replace").splitlines()
+              errors = [line for line in lines if "e: " in line or "error:" in line or "Execution failed" in line]
+              text = "\n".join(errors[:40] or lines[-70:])
+              text = text.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+              print("::error file=app_pojavlauncher/build.gradle::" + text)
+          PYREPORT
 
       - name: Build Debug .apk (No runtime)
         run: |

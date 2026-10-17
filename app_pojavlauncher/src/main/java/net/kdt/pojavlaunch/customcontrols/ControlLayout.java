@@ -67,6 +67,9 @@ public class ControlLayout extends FrameLayout {
             Toast.makeText(getContext(), redo ? "Nothing to redo" : "Nothing to undo", Toast.LENGTH_SHORT).show();
             return;
         }
+        String current = Tools.GLOBAL_GSON.toJson(mLayout);
+        while (!source.isEmpty() && current.equals(source.peekLast())) source.removeLast();
+        if (source.isEmpty()) return;
         removeEditWindow();
         destination.addLast(Tools.GLOBAL_GSON.toJson(mLayout));
         LayoutBitmaps bitmaps = mLayout.mLayoutBitmaps;
@@ -90,6 +93,12 @@ public class ControlLayout extends FrameLayout {
                     removeEditWindow();
                     for (ControlInterface control : getButtonChildren()) {
                         control.setDynamicX("${screen_width} - (" + control.getProperties().dynamicX + ") - ${width}");
+                    }
+                    for (ControlInterface control : getButtonChildren()) {
+                        if (!(control instanceof ControlDrawer)) continue;
+                        ControlDrawerData drawer = ((ControlDrawer) control).drawerData;
+                        if (drawer.orientation == ControlDrawerData.Orientation.LEFT) drawer.orientation = ControlDrawerData.Orientation.RIGHT;
+                        else if (drawer.orientation == ControlDrawerData.Orientation.RIGHT) drawer.orientation = ControlDrawerData.Orientation.LEFT;
                     }
                     setModified(true);
                     refreshControlButtonPositions();
