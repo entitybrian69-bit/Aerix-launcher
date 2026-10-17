@@ -135,14 +135,16 @@ internal fun InlineLoaderPane(activity: FragmentActivity, currentVersion: String
     }
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val wide = maxWidth >= 620.dp && maxHeight >= 380.dp
-        Column(Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(if (maxHeight < 300.dp) 6.dp else 12.dp)) {
+        val showLoaderIcons = maxWidth >= 420.dp
+        val shortViewport = maxHeight < 300.dp
+        Column(Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(if (shortViewport) 6.dp else 12.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                 if (onBackToEditor != null) IconButton(onClick = onBackToEditor, modifier = Modifier.size(48.dp)) {
                     Icon(painterResource(R.drawable.aerix_ic_arrow_back), "Back to instance", tint = AerixSurface.textPrimary)
                 }
                 OutlinedButton(onClick = { chooseLoader = true }, enabled = !installing,
                     modifier = Modifier.weight(1f).heightIn(min = 48.dp), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)) {
-                    if (maxWidth >= 420.dp) {
+                    if (showLoaderIcons) {
                         Icon(painterResource(loader.iconRes), null, Modifier.size(22.dp), tint = Color.Unspecified)
                         Spacer(Modifier.width(10.dp))
                     }
@@ -198,7 +200,7 @@ internal fun InlineLoaderPane(activity: FragmentActivity, currentVersion: String
                     PojavCreateInstanceBridge.install(activity, loader, gameVersion, build,
                         PojavCreateInstanceBridge.suggestedName(loader, gameVersion, build), null) {}
                 })
-            if (maxHeight >= 300.dp) Text("Creates a new instance; your current instance is unchanged.",
+            if (!shortViewport) Text("Creates a new instance; your current instance is unchanged.",
                 color = AerixSurface.textSecondary, style = MaterialTheme.typography.labelSmall)
         }
     }
