@@ -78,7 +78,7 @@
     <string name="aerix_loader_unstable">beta</string>
     <string name="aerix_loader_install">Install</string>
     <string name="aerix_loader_installing">Installing…</string>
-    <string name="aerix_loader_install_detail">for Minecraft %1$s · makes a new %2$s instance</string>
+    <string name="aerix_loader_install_detail">Minecraft %1$s · updates %2$s in place</string>
     <string name="aerix_loader_pick_a_build">Pick a loader and a version</string>
     <string name="aerix_loader_installed">Installed %1$s</string>
     <string name="aerix_loader_install_failed">The loader could not be installed. Check your connection and try again.</string>
@@ -552,4 +552,7 @@
     <string name="aerix_install_clear_finished">Clear finished</string>
     <string name="aerix_install_queued">Waiting to start</string>
     <string name="aerix_install_dismiss">Dismiss</string>
+    <string name="aerix_loader_finish_installer">Complete the installer to update this instance</string>
+    <string name="aerix_loader_change_game_title">Change Minecraft version?</string>
+    <string name="aerix_loader_change_game_warning">This updates the existing instance to a different Minecraft version. Its mods may be incompatible. Back up your worlds before launching.</string>
 </resources>

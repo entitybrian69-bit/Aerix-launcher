@@ -4,7 +4,9 @@ import androidx.annotation.DrawableRes
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import net.kdt.pojavlaunch.R
-import net.kdt.pojavlaunch.instances.Instance
+import net.kdt.pojavlaunch.Tools
+import net.kdt.pojavlaunch.instances.InstanceLoaderUpdate
+import net.kdt.pojavlaunch.instances.InstanceRefreshEvents
 import net.kdt.pojavlaunch.instances.Instances
 import net.kdt.pojavlaunch.modloaders.ComparableVersionString
 import net.kdt.pojavlaunch.modloaders.FabriclikeUtils
@@ -103,36 +105,41 @@ object PojavLoaderBridge {
             }.getOrDefault(emptyList())
         }
 
-    /**
-     * Install the picked loader and create an instance for it, exactly as Pojav's installer screens
-     * do: the version json is written by the metadata utilities, and a Forge-like loader leaves an
-     * [net.kdt.pojavlaunch.instances.InstanceInstaller] to run as soon as the instance exists.
-     *
-     * Runs on the IO dispatcher and throws when the source cannot be reached; the caller reports it.
-     */
-    suspend fun install(kind: LoaderKind, mcVersion: String, build: LoaderVersion): String =
+    /** Resolve the base game, not the loader's own version number. Never silently choose latest. */
+    suspend fun minecraftVersion(versionId: String, available: List<LoaderVersion>): String? =
         withContext(Dispatchers.IO) {
+            LoaderMinecraftVersionResolver.resolve(versionId, available.map { it.value }.toSet()) { id ->
+                runCatching { Tools.getVersionInfo(id, true)?.inheritsFrom }.getOrNull()
+            }
+        }
+
+    /** Update the explicitly captured instance; selecting another profile cannot redirect the job. */
+    suspend fun install(targetId: String, kind: LoaderKind, mcVersion: String, build: LoaderVersion): String =
+        withContext(Dispatchers.IO) {
+            val original = Instances.loadInstance(targetId)
+            if (original.installer != null) throw IOException("Finish the pending loader installation first")
             val fabricLike = kind.fabricLike
             if (fabricLike != null) {
                 val versionId = fabricLike.install(mcVersion, build.value)
                     ?: throw IOException("${kind.title} did not return a version id")
-                Instances.createInstance({ instance: Instance ->
-                    instance.name = fabricLike.name
-                    instance.icon = fabricLike.iconName
-                    instance.versionId = versionId
-                }, versionId)
+                val target = Instances.loadInstance(targetId)
+                if (target.versionId != original.versionId || target.installer != null)
+                    throw IOException("Instance changed during installation; please retry")
+                InstanceLoaderUpdate.version(target, versionId)
+                InstanceRefreshEvents.notifyChanged()
                 return@withContext versionId
             }
             val forgeLike = kind.forgeLike ?: throw IOException("${kind.title} cannot install from here")
             val installer = forgeLike.createInstaller(build.value)
                 ?: throw IOException("${kind.title} has no installer for ${build.value}")
-            Instances.createInstance({ instance: Instance ->
-                instance.name = forgeLike.name
-                instance.icon = forgeLike.iconName
-                instance.installer = installer
-            }, build.value)
+            val target = Instances.loadInstance(targetId)
+            if (target.versionId != original.versionId || target.installer != null)
+                throw IOException("Instance changed during installation; please retry")
+            InstanceLoaderUpdate.installer(target, installer)
+            InstanceRefreshEvents.notifyChanged()
+            // Existing postInstallCheck updates this same instance after the GUI installer finishes.
             installer.start()
-            build.value
+            target.versionId.orEmpty()
         }
 
     /** A Minecraft release looks like 1.21.4; anything else is a snapshot or a pre-release. */

@@ -1697,6 +1697,7 @@ private fun InstanceLoaderPane(activity: FragmentActivity, draft: AerixInstanceD
     var mcVersions by remember { mutableStateOf<List<LoaderVersion>>(emptyList()) }
     var builds by remember { mutableStateOf<List<LoaderVersion>>(emptyList()) }
     var mcVersion by remember { mutableStateOf<String?>(null) }
+    var instanceMcVersion by remember { mutableStateOf<String?>(null) }
     var build by remember { mutableStateOf<LoaderVersion?>(null) }
     var metaLoading by remember { mutableStateOf(true) }
     var metaFailed by remember { mutableStateOf(false) }
@@ -1721,8 +1722,9 @@ private fun InstanceLoaderPane(activity: FragmentActivity, draft: AerixInstanceD
             // A loader without a single stable build would leave both benches empty under the
             // switch; dropping the filter opens them instead.
             if (stableOnly && versions.none { it.stable }) stableOnly = false
-            val current = draft.versionId.takeIf { it.isNotBlank() }
-            mcVersion = versions.firstOrNull { it.value == current }?.value ?: versions.first().value
+            instanceMcVersion = PojavLoaderBridge.minecraftVersion(draft.versionId, versions)
+            mcVersion = instanceMcVersion
+            if (mcVersion == null) { builds = emptyList(); build = null }
         }
         metaLoading = false
     }
@@ -1790,13 +1792,13 @@ private fun InstanceLoaderPane(activity: FragmentActivity, draft: AerixInstanceD
                             ),
                             shape
                         )
-                        .clickable(role = Role.Button) {
+                        .clickable(enabled = !installing, role = Role.Button) {
                             if (entry.installsHere) {
                                 kind = entry
                                 build = null
                                 installError = null
                             } else {
-                                PojavNavigator.openInstaller(activity, entry.installer!!)
+                                PojavNavigator.openInstaller(activity, entry.installer!!, draft.instance.instanceId)
                             }
                         }
                         .padding(horizontal = AerixSpacing.sm, vertical = AerixSpacing.xsPlus),
@@ -1912,7 +1914,7 @@ private fun InstanceLoaderPane(activity: FragmentActivity, draft: AerixInstanceD
                         text = installError ?: stringResource(
                             R.string.aerix_loader_install_detail,
                             mcVersion ?: "?",
-                            kind.title
+                            draft.name.ifBlank { draft.versionId }
                         ),
                         color = if (installError != null) AerixSurface.danger else AerixSurface.textSecondary,
                         fontSize = 10.sp,
@@ -1928,27 +1930,40 @@ private fun InstanceLoaderPane(activity: FragmentActivity, draft: AerixInstanceD
                     onClick = {
                         val selectedVersion = mcVersion
                         if (picked == null || selectedVersion == null || installing) return@Surface
-                        installing = true
-                        installError = null
-                        scope.launch {
-                            val result = runCatching {
-                                PojavLoaderBridge.install(kind, selectedVersion, picked)
-                            }
-                            installing = false
-                            result.onSuccess { versionId ->
-                                PojavInstanceBridge.reload()
-                                Toast.makeText(
-                                    context,
-                                    context.getString(R.string.aerix_loader_installed, versionId),
-                                    Toast.LENGTH_LONG
-                                ).show()
-                                PojavInstanceEditorBridge.close()
-                                AerixNav.finishTo(LauncherSection.LIBRARY)
-                            }.onFailure { error ->
-                                installError = error.message
-                                    ?: context.getString(R.string.aerix_loader_install_failed)
+                        val targetId = draft.instance.instanceId
+                        val selectedKind = kind
+                        val startInstall: () -> Unit = {
+                            installing = true
+                            installError = null
+                            scope.launch {
+                                val result = runCatching {
+                                    PojavLoaderBridge.install(targetId, selectedKind, selectedVersion, picked)
+                                }
+                                installing = false
+                                result.onSuccess { versionId ->
+                                    PojavInstanceBridge.reload()
+                                    Toast.makeText(
+                                        context,
+                                        if (selectedKind.forgeLike != null) context.getString(R.string.aerix_loader_finish_installer)
+                                        else context.getString(R.string.aerix_loader_installed, versionId),
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                    PojavInstanceEditorBridge.close()
+                                    AerixNav.finishTo(LauncherSection.LIBRARY)
+                                }.onFailure { error ->
+                                    installError = error.message
+                                        ?: context.getString(R.string.aerix_loader_install_failed)
+                                }
                             }
                         }
+                        if (selectedVersion != instanceMcVersion) {
+                            android.app.AlertDialog.Builder(context)
+                                .setTitle(R.string.aerix_loader_change_game_title)
+                                .setMessage(R.string.aerix_loader_change_game_warning)
+                                .setNegativeButton(android.R.string.cancel, null)
+                                .setPositiveButton(android.R.string.ok) { _, _ -> startInstall() }
+                                .show()
+                        } else startInstall()
                     }
                 ) {
                     Row(
