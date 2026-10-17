@@ -261,6 +261,8 @@ public class GameRunner {
 
         int requiredJavaVersion = 8;
         if(versionInfo.javaVersion != null) requiredJavaVersion = versionInfo.javaVersion.majorVersion;
+        requiredJavaVersion = ModJavaRequirements.minimumJava(gamedir, requiredJavaVersion);
+        Log.i("GameRunner", "Minimum Java including enabled mod requirements: " + requiredJavaVersion);
 
         Runtime runtime = MultiRTUtils.forceReread(pickRuntime(instance, requiredJavaVersion));
 

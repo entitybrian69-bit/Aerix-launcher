@@ -157,12 +157,13 @@ public class NewJREUtil {
 
 
     public static void installNewJreIfNeeded(AssetManager assetManager, JVersionList.Version versionInfo) throws IOException, RuntimeSelectionException {
-        //Now we have the reliable information to check if our runtime settings are good enough
-        if (versionInfo.javaVersion == null || "jre-legacy".equalsIgnoreCase(versionInfo.javaVersion.component)) return;
-
-        int gameRequiredVersion = versionInfo.javaVersion.majorVersion;
-
         Instance instance = Instances.loadSelectedInstance();
+        if (instance == null) throw new IOException("No selected instance for runtime selection");
+        int baseMinimum = versionInfo.javaVersion == null ? 8 : versionInfo.javaVersion.majorVersion;
+        int gameRequiredVersion = net.kdt.pojavlaunch.utils.jre.ModJavaRequirements.minimumJava(instance.getGameDirectory(), baseMinimum);
+        // Vanilla legacy metadata may say Java 8 while a mod's mixins explicitly need Java 17+.
+        if (gameRequiredVersion <= 8 && (versionInfo.javaVersion == null ||
+                "jre-legacy".equalsIgnoreCase(versionInfo.javaVersion.component))) return;
         String profileRuntime = Tools.getSelectedRuntime(instance);
         Runtime runtime = MultiRTUtils.read(profileRuntime);
         // Partly trust the user with his own selection, if the game can even try to run in this case
