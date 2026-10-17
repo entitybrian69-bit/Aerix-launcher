@@ -12,6 +12,7 @@ import android.widget.Toast;
 
 import androidx.annotation.Nullable;
 
+import net.kdt.pojavlaunch.customcontrols.ControlLayoutImporter;
 import net.kdt.pojavlaunch.customcontrols.LayoutBitmaps;
 import net.kdt.pojavlaunch.utils.FileUtils;
 
@@ -185,14 +186,17 @@ public class ImportControlActivity extends Activity {
     }
 
     /**
-     * Verify if the control file is valid
-     * @return Whether the control file is valid
+     * Verify if the control file is valid.
+     * The file may come from this launcher, from another PojavLauncher launcher, from the Zalith
+     * Launcher 2 editor or from Fold Craft Launcher: the last two are converted when the layout is
+     * loaded.
+     * @return Whether the control file can be used
      */
     private static boolean verify() {
         try {
             LayoutBitmaps.ControlsContainer layout = LayoutBitmaps.load(new File(Tools.CTRLMAP_PATH,"TMP_IMPORT_FILE.json"));
             JSONObject layoutJobj = new JSONObject(layout.mControlsJson);
-            return layoutJobj.has("version") && layoutJobj.has("mControlDataList");
+            return ControlLayoutImporter.detectFormat(layoutJobj) != ControlLayoutImporter.Format.UNKNOWN;
         }catch (IOException | JSONException e) {
             Log.w("ImportControlActivity", "Failed to validate layout", e);
             return false;

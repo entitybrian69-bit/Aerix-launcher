@@ -1,0 +1,72 @@
+name: Website
+
+# Publishes docs/ as the project website. GitHub Pages serves it for free at
+# https://entitybrian69-bit.github.io/Aerix-launcher/ — there is no server to run.
+#
+# Pages has to be turned on once in Settings → Pages; this workflow cannot do that, the token of a
+# workflow is not allowed to enable it. Whichever source is chosen there, this file stays quiet:
+#
+#   * Source "Deploy from a branch" (branch + /docs)  -> Pages publishes docs/ itself, and the
+#     steps below skip, so nothing goes red.
+#   * Source "GitHub Actions"                          -> the steps below deploy docs/ on every
+#     push that touches it, including the first one.
+
+on:
+  push:
+    branches: [ "arena/96c87123-aerix-launcher" ]
+    paths: [ "docs/**", ".github/workflows/pages.yml" ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Is Pages set up for this workflow?
+        id: pages
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mode=$(gh api "repos/$GITHUB_REPOSITORY/pages" --jq '.build_type' 2>/dev/null || echo "off")
+          echo "mode=$mode"
+          if [ "$mode" = "workflow" ]; then
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            case "$mode" in
+              legacy) echo "::notice title=Pages publishes the branch itself::Settings → Pages serves docs/ directly, so this workflow has nothing to do." ;;
+              off)    echo "::notice title=Pages is not enabled::Turn it on in Settings → Pages to get the site URL." ;;
+              *)      echo "::notice title=Pages not reachable::Leaving the site to Settings → Pages." ;;
+            esac
+          fi
+
+      - name: Prepare Pages
+        if: steps.pages.outputs.publish == 'true'
+        uses: actions/configure-pages@v5
+
+      - name: Upload the site
+        if: steps.pages.outputs.publish == 'true'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+      - name: Deploy
+        id: deployment
+        if: steps.pages.outputs.publish == 'true'
+        uses: actions/deploy-pages@v4

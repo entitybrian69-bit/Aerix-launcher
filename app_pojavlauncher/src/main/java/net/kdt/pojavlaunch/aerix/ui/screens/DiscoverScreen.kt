@@ -40,6 +40,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -53,10 +54,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -69,7 +71,6 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -77,7 +78,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -105,6 +105,8 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -113,19 +115,23 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import net.kdt.pojavlaunch.R
-import net.kdt.pojavlaunch.aerix.bridge.MinecraftVersionKind
-import net.kdt.pojavlaunch.aerix.bridge.MinecraftVersionFilters
+import net.kdt.pojavlaunch.aerix.bridge.AerixInstallQueue
 import net.kdt.pojavlaunch.aerix.bridge.AerixPreferences
 import net.kdt.pojavlaunch.aerix.bridge.AssetFile
 import net.kdt.pojavlaunch.aerix.bridge.AssetPage
+import net.kdt.pojavlaunch.aerix.bridge.AssetFacet
+import net.kdt.pojavlaunch.aerix.bridge.AssetFacets
 import net.kdt.pojavlaunch.aerix.bridge.AssetPlatform
 import net.kdt.pojavlaunch.aerix.bridge.AssetProject
 import net.kdt.pojavlaunch.aerix.bridge.AssetProjectDetails
 import net.kdt.pojavlaunch.aerix.bridge.AssetScreenshot
+import net.kdt.pojavlaunch.aerix.bridge.AssetTarget
 import net.kdt.pojavlaunch.aerix.bridge.AssetSort
 import net.kdt.pojavlaunch.aerix.bridge.AssetType
 import net.kdt.pojavlaunch.aerix.bridge.InstanceTarget
 import net.kdt.pojavlaunch.aerix.bridge.PojavAssetBridge
+import net.kdt.pojavlaunch.aerix.bridge.PojavCreateInstanceBridge
+import net.kdt.pojavlaunch.aerix.bridge.ResolvedDependency
 import net.kdt.pojavlaunch.aerix.bridge.PojavInstanceBridge
 import net.kdt.pojavlaunch.aerix.bridge.PojavNavigator
 import net.kdt.pojavlaunch.aerix.components.AerixGhostButton
@@ -186,6 +192,14 @@ private fun formatDownloadCount(count: Long): String = when {
     count >= 1_000L -> "%.1fK".format(count / 1_000.0)
     else -> count.toString()
 }
+
+private val commonMcVersions = listOf(
+    "26.3", "26.2", "26.1",
+    "1.21.4", "1.21.3", "1.21.1", "1.21",
+    "1.20.6", "1.20.4", "1.20.2", "1.20.1",
+    "1.19.4", "1.19.2",
+    "1.18.2", "1.17.1", "1.16.5", "1.12.2", "1.8.9", "1.7.10"
+)
 
 private val filterLoaders = listOf(
     "fabric" to "Fabric",
@@ -318,10 +332,8 @@ private fun SearchAssetsContent(
     var platform by rememberSaveable { mutableStateOf(AerixPreferences.assetPlatformSource) }
     var query by rememberSaveable(type) { mutableStateOf("") }
     var submittedQuery by rememberSaveable(type) { mutableStateOf("") }
-    var categories by rememberSaveable(type) { mutableStateOf(arrayListOf<String>()) }
+    var category by rememberSaveable(type) { mutableStateOf<String?>(null) }
     var mcVersion by rememberSaveable(type) { mutableStateOf<String?>(null) }
-    var versionPickerKind by rememberSaveable(type) { mutableStateOf(MinecraftVersionKind.ALL) }
-    var versionPickerQuery by rememberSaveable(type) { mutableStateOf("") }
     var loader by rememberSaveable(type) { mutableStateOf<String?>(null) }
     var sort by rememberSaveable(type) { mutableStateOf(AssetSort.RELEVANCE) }
     var pageIndex by rememberSaveable(type) { mutableIntStateOf(1) }
@@ -332,13 +344,38 @@ private fun SearchAssetsContent(
     var reloadNonce by remember { mutableIntStateOf(0) }
     var installedFingerprints by remember { mutableStateOf<Set<String>>(emptySet()) }
 
+    // The filters of the source: every Minecraft version it knows, and the categories of the
+    // content type as that source names them. They follow the platform switch, because the two
+    // sources do not offer the same ones - CurseForge has categories Modrinth never had, and the
+    // other way round. The lists the type ships with stand in until the answer arrives.
+    var facets by remember(type) { mutableStateOf(AssetFacets()) }
+    val fallbackCategories = remember(type) {
+        type.categories.map { (id, label) -> AssetFacet(id, label) }
+    }
+    // Before the source answers - and if it never does - the versions are the ones the launcher
+    // already has: the table behind the create screen, complete and offline. The short list is
+    // only there for a fresh install that has not downloaded that table yet.
+    val localVersions = remember {
+        runCatching { PojavCreateInstanceBridge.gameVersions().map { AssetFacet(it.id, it.id) } }
+            .getOrDefault(emptyList())
+    }
+    val versions = remember(facets, localVersions) {
+        facets.versions.ifEmpty { localVersions.ifEmpty { commonMcVersions.map { AssetFacet(it, it) } } }
+    }
+    val categories = remember(facets, fallbackCategories) { facets.categories.ifEmpty { fallbackCategories } }
+
     val selectedInstance = PojavInstanceBridge.selected
 
     LaunchedEffect(type, selectedInstance?.source) {
         installedFingerprints = PojavAssetBridge.installedFingerprints(type)
     }
 
-    LaunchedEffect(type, platform, submittedQuery, categories, mcVersion, loader, sort, pageIndex, reloadNonce) {
+    LaunchedEffect(type, platform) {
+        facets = AssetFacets()
+        facets = PojavAssetBridge.facets(context, platform, type)
+    }
+
+    LaunchedEffect(type, platform, submittedQuery, category, mcVersion, loader, sort, pageIndex, reloadNonce) {
         loading = true
         failed = false
         val offset = (pageIndex - 1).coerceAtLeast(0) * PojavAssetBridge.PAGE_SIZE
@@ -350,7 +387,7 @@ private fun SearchAssetsContent(
             mcVersion = mcVersion,
             loader = if (type.supportsLoaderFilter) loader else null,
             offset = offset,
-            categories = categories,
+            category = category,
             sort = sort
         )
         page = result
@@ -359,8 +396,10 @@ private fun SearchAssetsContent(
     }
 
     var showPlatformMenu by remember { mutableStateOf(false) }
-    var showCategoryMenu by remember { mutableStateOf(false) }
-    var showMcMenu by remember { mutableStateOf(false) }
+    // The two long lists - every version of the game, every category of the source - are picked in
+    // a dialog, not in a dropdown menu: see FacetPicker for why.
+    var showCategoryPicker by remember { mutableStateOf(false) }
+    var showVersionPicker by remember { mutableStateOf(false) }
     var showLoaderMenu by remember { mutableStateOf(false) }
     var showSortMenu by remember { mutableStateOf(false) }
 
@@ -462,7 +501,10 @@ private fun SearchAssetsContent(
                                 if (platform != p) {
                                     platform = p
                                     AerixPreferences.saveAssetPlatformSource(p)
-                                    categories = arrayListOf()
+                                    // The categories and the version list belong to the source that
+                                    // answered them, so both are cleared for the new one.
+                                    category = null
+                                    mcVersion = null
                                     pageIndex = 1
                                 }
                             }
@@ -471,57 +513,19 @@ private fun SearchAssetsContent(
                 }
             }
 
-            // Category Dropdown Pill ("Category: All ▾")
-            if (type.categories.isNotEmpty()) {
-                Box {
-                    val catLabel = when (categories.size) {
-                        0 -> "All"
-                        1 -> type.categories.firstOrNull { it.first == categories.first() }?.second ?: "All"
-                        else -> "${categories.size} selected"
-                    }
-                    DiscoverFilterDropdownPill(
-                        label = "Category: $catLabel",
-                        onClick = { showCategoryMenu = true }
-                    )
-                    DropdownMenu(
-                        expanded = showCategoryMenu,
-                        onDismissRequest = { showCategoryMenu = false }
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("All Categories") },
-                            leadingIcon = { Checkbox(checked = categories.isEmpty(), onCheckedChange = null) },
-                            onClick = {
-                                showCategoryMenu = false
-                                categories = arrayListOf()
-                                pageIndex = 1
-                            }
-                        )
-                        type.categories.forEach { (id, label) ->
-                            DropdownMenuItem(
-                                text = { Text(label) },
-                                leadingIcon = { Checkbox(checked = id in categories, onCheckedChange = null) },
-                                enabled = platform != AssetPlatform.CURSEFORGE || categories.size < 10 || id in categories,
-                                onClick = {
-                                    categories = ArrayList(if (id in categories) categories - id else categories + id)
-                                    pageIndex = 1
-                                }
-                            )
-                        }
-                        DropdownMenuItem(
-                            text = { Text(if (platform == AssetPlatform.CURSEFORGE) "Done · up to 10 categories" else "Done") },
-                            onClick = { showCategoryMenu = false }
-                        )
-                    }
-                }
-            }
-
-            // MC Version Dropdown Pill ("MC: All ▾")
-            Box {
+            // Category pill. The list is the source's own and can be a couple of hundred entries.
+            if (categories.isNotEmpty()) {
                 DiscoverFilterDropdownPill(
-                    label = "MC: ${mcVersion ?: "All"}",
-                    onClick = { showMcMenu = !showMcMenu }
+                    label = "Category: ${categories.firstOrNull { it.id == category }?.label ?: "All"}",
+                    onClick = { showCategoryPicker = true }
                 )
             }
+
+            // MC Version pill. The list is every version of the game the source knows.
+            DiscoverFilterDropdownPill(
+                label = "MC: ${mcVersion ?: "All"}",
+                onClick = { showVersionPicker = true }
+            )
 
             // Loader Dropdown Pill ("Loader: All ▾")
             if (type.supportsLoaderFilter) {
@@ -581,103 +585,123 @@ private fun SearchAssetsContent(
             }
         }
 
-        // Version filtering stays in this page's content area instead of opening an Android window.
-        if (showMcMenu) {
-            MinecraftVersionPicker(
-                selected = mcVersion, kind = versionPickerKind, onKindChange = { versionPickerKind = it },
-                query = versionPickerQuery, onQueryChange = { versionPickerQuery = it },
-                onSelect = { version -> mcVersion = version; pageIndex = 1 },
-                onDismiss = { showMcMenu = false }, modifier = Modifier.fillMaxWidth().weight(1f)
+        // Outside the scrolling pill row, because a dialog is a window of its own.
+        if (showVersionPicker) {
+            FacetPicker(
+                title = "Minecraft version",
+                allLabel = "All Versions",
+                facets = versions,
+                selectedId = mcVersion,
+                onPick = {
+                    mcVersion = it
+                    pageIndex = 1
+                    showVersionPicker = false
+                },
+                onDismiss = { showVersionPicker = false }
             )
-        } else {
-            // Results area
-            BoxWithConstraints(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-            ) {
-                val columns = when {
-                    maxWidth > maxHeight && maxWidth >= 1040.dp -> 4
-                    maxWidth > maxHeight && maxWidth >= 640.dp -> 3
-                    else -> 2
-                }
-                val currentPage = page
-                when {
-                    loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = AerixThemeManager.currentAccent())
-                    }
-                    failed -> Column(
-                        modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.Center,
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        QuietEmptyState(R.drawable.aerix_ic_warning_outlined, stringResource(R.string.aerix_download_error))
-                        AerixGhostButton(
-                            text = stringResource(R.string.aerix_library_refresh),
-                            iconRes = R.drawable.aerix_ic_refresh,
-                            onClick = { reloadNonce++ }
-                        )
-                    }
-                    currentPage == null || currentPage.projects.isEmpty() -> Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        QuietEmptyState(R.drawable.aerix_ic_search, stringResource(R.string.aerix_download_empty))
-                    }
-                    else -> {
-                        val rows = remember(currentPage.projects, columns) {
-                            currentPage.projects.chunked(columns)
-                        }
-                        val totalPages = ((currentPage.total + PojavAssetBridge.PAGE_SIZE - 1) / PojavAssetBridge.PAGE_SIZE)
-                            .coerceAtLeast(1)
+        }
+        if (showCategoryPicker) {
+            FacetPicker(
+                title = "Category",
+                allLabel = "All Categories",
+                facets = categories,
+                selectedId = category,
+                onPick = {
+                    category = it
+                    pageIndex = 1
+                    showCategoryPicker = false
+                },
+                onDismiss = { showCategoryPicker = false }
+            )
+        }
 
-                        Box(modifier = Modifier.fillMaxSize()) {
-                            LazyColumn(
-                                modifier = Modifier.fillMaxSize(),
-                                contentPadding = PaddingValues(top = AerixSpacing.xs, bottom = 68.dp),
-                                verticalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus)
-                            ) {
-                                items(
-                                    count = rows.size,
-                                    key = { idx -> rows[idx].joinToString("_") { "${it.platform}:${it.id}" } }
-                                ) { idx ->
-                                    val rowItems = rows[idx]
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus)
-                                    ) {
-                                        rowItems.forEach { project ->
-                                            val isInstalled = PojavAssetBridge.isProjectInstalled(project, installedFingerprints)
-                                            val isFavorite = remember(AerixPreferences.favoritesJson, project.id) {
-                                                PojavAssetBridge.isFavorite(project)
-                                            }
-                                            ResultProjectLayout(
-                                                project = project,
-                                                isInstalled = isInstalled,
-                                                isFavorite = isFavorite,
-                                                onFavoriteClick = { PojavAssetBridge.toggleFavorite(project) },
-                                                onClick = { onOpenProject(project) },
-                                                modifier = Modifier.weight(1f)
-                                            )
+        // Results area
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+        ) {
+            val columns = when {
+                maxWidth > maxHeight && maxWidth >= 1040.dp -> 4
+                maxWidth > maxHeight && maxWidth >= 640.dp -> 3
+                else -> 2
+            }
+            val currentPage = page
+            when {
+                loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = AerixThemeManager.currentAccent())
+                }
+                failed -> Column(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    QuietEmptyState(R.drawable.aerix_ic_warning_outlined, stringResource(R.string.aerix_download_error))
+                    AerixGhostButton(
+                        text = stringResource(R.string.aerix_library_refresh),
+                        iconRes = R.drawable.aerix_ic_refresh,
+                        onClick = { reloadNonce++ }
+                    )
+                }
+                currentPage == null || currentPage.projects.isEmpty() -> Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    QuietEmptyState(R.drawable.aerix_ic_search, stringResource(R.string.aerix_download_empty))
+                }
+                else -> {
+                    val rows = remember(currentPage.projects, columns) {
+                        currentPage.projects.chunked(columns)
+                    }
+                    val totalPages = ((currentPage.total + PojavAssetBridge.PAGE_SIZE - 1) / PojavAssetBridge.PAGE_SIZE)
+                        .coerceAtLeast(1)
+
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(top = AerixSpacing.xs, bottom = 68.dp),
+                            verticalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus)
+                        ) {
+                            items(
+                                count = rows.size,
+                                key = { idx -> rows[idx].joinToString("_") { "${it.platform}:${it.id}" } }
+                            ) { idx ->
+                                val rowItems = rows[idx]
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus)
+                                ) {
+                                    rowItems.forEach { project ->
+                                        val isInstalled = PojavAssetBridge.isProjectInstalled(project, installedFingerprints)
+                                        val isFavorite = remember(AerixPreferences.favoritesJson, project.id) {
+                                            PojavAssetBridge.isFavorite(project)
                                         }
-                                        repeat(columns - rowItems.size) {
-                                            Spacer(modifier = Modifier.weight(1f))
-                                        }
+                                        ResultProjectLayout(
+                                            project = project,
+                                            isInstalled = isInstalled,
+                                            isFavorite = isFavorite,
+                                            onFavoriteClick = { PojavAssetBridge.toggleFavorite(project) },
+                                            onClick = { onOpenProject(project) },
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                    }
+                                    repeat(columns - rowItems.size) {
+                                        Spacer(modifier = Modifier.weight(1f))
                                     }
                                 }
                             }
-
-                            // Floating PageController bottom-end ("1 / 3862   <   >")
-                            PageController(
-                                pageNumber = pageIndex,
-                                totalPages = totalPages,
-                                onPrevious = { if (pageIndex > 1) pageIndex-- },
-                                onNext = { if (pageIndex < totalPages) pageIndex++ },
-                                modifier = Modifier
-                                    .align(Alignment.BottomEnd)
-                                    .padding(bottom = AerixSpacing.sm, end = AerixSpacing.smCompact)
-                            )
                         }
+
+                        // Floating PageController bottom-end ("1 / 3862   <   >")
+                        PageController(
+                            pageNumber = pageIndex,
+                            totalPages = totalPages,
+                            onPrevious = { if (pageIndex > 1) pageIndex-- },
+                            onNext = { if (pageIndex < totalPages) pageIndex++ },
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(bottom = AerixSpacing.sm, end = AerixSpacing.smCompact)
+                        )
                     }
                 }
             }
@@ -1027,9 +1051,13 @@ private fun AssetDetailContent(
     var files by remember(project.id) { mutableStateOf<List<AssetFile>?>(null) }
     var target by remember { mutableStateOf(InstanceTarget(null, null)) }
     var loadingFiles by remember(project.id) { mutableStateOf(true) }
-    var installingFile by remember { mutableStateOf<String?>(null) }
-    var versionKind by rememberSaveable(project.id) { mutableStateOf(MinecraftVersionKind.ALL) }
-    var showVersionTypes by remember { mutableStateOf(false) }
+    // The plan dialog: what the tapped file needs and which instances it can go into, filled in
+    // off the main thread while the dialog is already on screen.
+    var plan by remember { mutableStateOf<InstallPlan?>(null) }
+    // A modpack installs through Pojav's own installer, which reports itself; kept apart so the
+    // dialog and the queue stay in charge of everything else.
+    var modpackInstalling by remember { mutableStateOf<String?>(null) }
+    var showOnlyReleases by remember { mutableStateOf(true) }
     var searchMcVersion by remember { mutableStateOf("") }
 
     val installedToast = stringResource(R.string.aerix_download_installed)
@@ -1043,14 +1071,15 @@ private fun AssetDetailContent(
         loadingFiles = false
     }
 
-    val groups = remember(files, target, versionKind, searchMcVersion) {
+    val releaseRegex = remember { Regex("""^\d+\.\d+(\.\d+)?$""") }
+    val groups = remember(files, target, showOnlyReleases, searchMcVersion) {
         val all = files ?: emptyList()
         val map = LinkedHashMap<Pair<String, String?>, MutableList<AssetFile>>()
         for (f in all) {
             val loader = f.loaders.firstOrNull()?.replaceFirstChar { it.uppercase() }
             val mcVers = f.gameVersions.ifEmpty { listOf("Any") }
             for (gv in mcVers) {
-                if (gv != "Any" && !MinecraftVersionFilters.matches(versionKind, MinecraftVersionFilters.classify(gv))) continue
+                if (showOnlyReleases && gv != "Any" && !releaseRegex.matches(gv)) continue
                 if (searchMcVersion.isNotBlank() && !gv.contains(searchMcVersion, ignoreCase = true)) continue
                 map.getOrPut(gv to loader) { ArrayList() }.add(f)
             }
@@ -1069,17 +1098,57 @@ private fun AssetDetailContent(
             ?: files?.firstOrNull()
     }
 
+    // Read from the queue rather than tracked here, so an install that has been minimized still
+    // reads as running on this screen and its buttons stay switched off.
+    val queuedFile = AerixInstallQueue.activeTasks.firstOrNull()?.steps?.firstOrNull()?.file?.fileName
+    val installingFile = modpackInstalling ?: queuedFile
+
     val runInstall: (AssetFile) -> Unit = { file ->
         if (installingFile == null) {
-            installingFile = file.fileName
-            scope.launch {
-                val ok = PojavAssetBridge.install(context, project, file)
-                installingFile = null
-                Toast.makeText(
-                    context,
-                    if (ok) installedToast.format(file.fileName) else failedToast,
-                    Toast.LENGTH_SHORT
-                ).show()
+            if (project.type == AssetType.MODPACK) {
+                // A modpack brings its own instance: no picker to show.
+                modpackInstalling = file.fileName
+                scope.launch {
+                    val ok = PojavAssetBridge.install(context, project, file)
+                    modpackInstalling = null
+                    Toast.makeText(
+                        context,
+                        if (ok) installedToast.format(file.fileName) else failedToast,
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            } else {
+                // Show the dialog at once; the panes fill themselves in as the answers arrive.
+                plan = InstallPlan(file = file, loading = true)
+                scope.launch {
+                    val targets = PojavAssetBridge.targets()
+                    // What to resolve for: the instance this file is headed into, then whatever the
+                    // launcher is sitting on. With no instance at all there is nothing to match, and
+                    // the dialog says so rather than naming a version nobody has: the file's own
+                    // version list is not evidence of anything installed here.
+                    val anchor = targets.firstOrNull { it.detected } ?: targets.firstOrNull()
+                    val mcVersion = anchor?.mcVersion ?: target.mcVersion
+                    val loader = anchor?.loader ?: target.loader
+                    val dependencies = PojavAssetBridge.planDependencies(
+                        context = context,
+                        type = project.type,
+                        file = file,
+                        mcVersion = mcVersion,
+                        loader = loader,
+                        body = details?.body
+                    )
+                    plan = InstallPlan(
+                        file = file,
+                        loading = false,
+                        targets = targets,
+                        dependencies = dependencies,
+                        detected = if (mcVersion != null || loader != null) {
+                            InstanceTarget(mcVersion, loader)
+                        } else {
+                            null
+                        }
+                    )
+                }
             }
         }
     }
@@ -1121,12 +1190,31 @@ private fun AssetDetailContent(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(AerixSpacing.md)
                 ) {
-                    Box {
-                        OutlinedButton(onClick = { showVersionTypes = true }, modifier = Modifier.heightIn(min = 48.dp)) { Text(versionKind.label) }
-                        DropdownMenu(showVersionTypes, { showVersionTypes = false }) {
-                            MinecraftVersionKind.entries.forEach { option ->
-                                DropdownMenuItem(text = { Text(option.label) }, onClick = { versionKind = option; showVersionTypes = false })
-                            }
+                    Surface(
+                        shape = RoundedCornerShape(AerixRadii.controlSmall),
+                        color = if (showOnlyReleases) accent.copy(alpha = 0.18f) else AerixSurface.panel,
+                        border = BorderStroke(AerixSpacing.hairline, if (showOnlyReleases) accent else AerixSurface.borderSoft),
+                        onClick = { showOnlyReleases = !showOnlyReleases }
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .height(36.dp)
+                                .padding(horizontal = AerixSpacing.smPlus),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(AerixSpacing.xs)
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.aerix_ic_check),
+                                contentDescription = null,
+                                tint = if (showOnlyReleases) accent else AerixSurface.textSecondary,
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Text(
+                                text = "Show only Minecraft release versions",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (showOnlyReleases) accent else AerixSurface.textPrimary
+                            )
                         }
                     }
 
@@ -1198,7 +1286,44 @@ private fun AssetDetailContent(
             }
         }
     }
+
+    // 6. The download dialog: dependencies on one side, the instances to install into on the other.
+    // Install hands the ticks over to the queue and the dialog goes away, so the download carries on
+    // with the page closed and can be minimized, watched from the pill, or cancelled from the panel.
+    plan?.let { current ->
+        AssetInstallDialog(
+            file = current.file,
+            type = project.type,
+            targets = current.targets,
+            dependencies = current.dependencies,
+            detected = current.detected,
+            loading = current.loading,
+            onDismiss = { plan = null },
+            onInstall = { targetList, dependencyList ->
+                plan = null
+                AerixInstallQueue.submit(
+                    context = context,
+                    project = project,
+                    file = current.file,
+                    targets = targetList,
+                    dependencies = dependencyList
+                )
+            }
+        )
+    }
 }
+
+/**
+ * What the download dialog needs for one file: the instances that can take it and the dependencies
+ * that fit the version they run. [loading] covers the moment between the tap and the answers.
+ */
+private class InstallPlan(
+    val file: AssetFile,
+    val loading: Boolean = false,
+    val targets: List<AssetTarget> = emptyList(),
+    val dependencies: List<ResolvedDependency> = emptyList(),
+    val detected: InstanceTarget? = null
+)
 
 @Composable
 private fun DownloadHeroCard(
@@ -1595,6 +1720,151 @@ private fun LinksRail(activity: FragmentActivity, details: AssetProjectDetails) 
             details.discordUrl?.let { url ->
                 AerixGhostButton("Discord", R.drawable.aerix_ic_link, { PojavNavigator.openUrl(activity, url) })
             }
+        }
+    }
+}
+
+/**
+ * The picker for the two long filter lists of this screen - every Minecraft version the source
+ * knows, and every category it has.
+ *
+ * It is a dialog and not a dropdown menu on purpose. A dropdown menu measures its content for the
+ * intrinsic size it sizes itself by, and a lazy list cannot answer that: the framework threw
+ * "Asking for intrinsic measurements of SubcomposeLayout layouts is not supported" the moment one
+ * was opened, which took the app down. A dialog measures its content the ordinary way, so a list of
+ * several hundred entries can be laid out lazily inside it and searched.
+ */
+@Composable
+private fun FacetPicker(
+    title: String,
+    allLabel: String,
+    facets: List<AssetFacet>,
+    selectedId: String?,
+    onPick: (String?) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val accent = AerixThemeManager.currentAccent()
+    var filterText by remember { mutableStateOf("") }
+    val matches = remember(facets, filterText) {
+        if (filterText.isBlank()) facets
+        else facets.filter { it.label.contains(filterText.trim(), ignoreCase = true) }
+    }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.5f))
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
+                ) { onDismiss() },
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                modifier = Modifier
+                    .widthIn(min = 300.dp, max = 460.dp)
+                    .clip(RoundedCornerShape(AerixRadii.dialog))
+                    .background(AerixSurface.panelRaised)
+                    // Swallows the taps that land on the panel instead of the scrim.
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) { }
+                    .padding(vertical = AerixSpacing.smCompact)
+            ) {
+                Text(
+                    text = title.uppercase(),
+                    color = accent,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    modifier = Modifier.padding(horizontal = AerixSpacing.md, vertical = AerixSpacing.xxs)
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = AerixSpacing.md, vertical = AerixSpacing.smCompact)
+                        .clip(RoundedCornerShape(AerixRadii.control))
+                        .background(AerixSurface.panelTrack)
+                        .padding(horizontal = AerixSpacing.smTight, vertical = AerixSpacing.smCompact)
+                ) {
+                    if (filterText.isEmpty()) {
+                        Text(
+                            text = "Search...",
+                            fontSize = 12.sp,
+                            color = AerixSurface.textMuted
+                        )
+                    }
+                    BasicTextField(
+                        value = filterText,
+                        onValueChange = { filterText = it },
+                        singleLine = true,
+                        textStyle = TextStyle(color = AerixSurface.textPrimary, fontSize = 12.sp),
+                        cursorBrush = SolidColor(accent),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+                FacetPickerRow(
+                    label = allLabel,
+                    selected = selectedId == null,
+                    accent = accent,
+                    onClick = { onPick(null) }
+                )
+                HorizontalDivider(color = AerixSurface.borderSoft)
+                if (matches.isEmpty()) {
+                    Text(
+                        text = "Nothing matches",
+                        fontSize = 12.sp,
+                        color = AerixSurface.textMuted,
+                        modifier = Modifier.padding(horizontal = AerixSpacing.md, vertical = AerixSpacing.smTight)
+                    )
+                } else {
+                    LazyColumn(modifier = Modifier.heightIn(max = 340.dp)) {
+                        items(matches, key = { it.id }) { facet ->
+                            FacetPickerRow(
+                                label = facet.label,
+                                selected = facet.id == selectedId,
+                                accent = accent,
+                                onClick = { onPick(facet.id) }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** One row of [FacetPicker]: the label, and the accent and a tick when it is the picked one. */
+@Composable
+private fun FacetPickerRow(label: String, selected: Boolean, accent: Color, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .background(if (selected) accent.copy(alpha = 0.14f) else Color.Transparent)
+            .padding(horizontal = AerixSpacing.md, vertical = AerixSpacing.smTight),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(AerixSpacing.xs)
+    ) {
+        Text(
+            text = label,
+            color = if (selected) accent else AerixSurface.textPrimary,
+            fontSize = 13.sp,
+            modifier = Modifier.weight(1f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        if (selected) {
+            Icon(
+                painter = painterResource(R.drawable.aerix_ic_check),
+                contentDescription = null,
+                tint = accent,
+                modifier = Modifier.size(14.dp)
+            )
         }
     }
 }

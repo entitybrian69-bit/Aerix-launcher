@@ -143,8 +143,6 @@ fun AccountsScreen(activity: FragmentActivity) {
     var showOfflineDialog by remember { mutableStateOf(false) }
     var offlineUsername by remember { mutableStateOf("") }
     var skinPickerAccount by remember { mutableStateOf<AerixAccount?>(null) }
-    var capePickerAccount by remember { mutableStateOf<AerixAccount?>(null) }
-    var elyCapeTarget by remember { mutableStateOf<AerixAccount?>(null) }
     var pendingSkinUri by remember { mutableStateOf<Pair<AerixAccount, Uri>?>(null) }
 
     val skinFilePicker = rememberLauncherForActivityResult(
@@ -159,25 +157,10 @@ fun AccountsScreen(activity: FragmentActivity) {
     val capeFilePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
-        val target = capePickerAccount
-        capePickerAccount = null
+        val target = current ?: accounts.firstOrNull()
         if (uri != null && target != null) {
             PojavAccountBridge.equipCapeFromUri(activity, target, uri)
         }
-    }
-
-    elyCapeTarget?.let { target ->
-        ElyByCapeOptionsDialog(
-            activity = activity,
-            onDismiss = { elyCapeTarget = null },
-            onPreview = {
-                elyCapeTarget = null
-                capePickerAccount = target
-                runCatching { capeFilePicker.launch(arrayOf("image/png")) }.onFailure {
-                    Toast.makeText(activity, "Unable to open file picker", Toast.LENGTH_SHORT).show()
-                }
-            }
-        )
     }
 
     if (showOfflineDialog) {
@@ -336,16 +319,13 @@ fun AccountsScreen(activity: FragmentActivity) {
                     onClick = { AerixNav.navigate(LauncherSection.ADD_ACCOUNT) }
                 )
                 MiraiTopAccountPill(
-                    text = if (current?.authType == AuthType.ELY_BY) "Ely.by Cape" else "Equip Cape",
+                    text = "Equip Cape",
                     highlighted = true,
                     onClick = {
                         val target = current ?: accounts.firstOrNull()
                         if (target == null) {
                             Toast.makeText(activity, "Add or select an account first", Toast.LENGTH_SHORT).show()
-                        } else if (target.authType == AuthType.ELY_BY) {
-                            elyCapeTarget = target
                         } else {
-                            capePickerAccount = target
                             runCatching {
                                 capeFilePicker.launch(arrayOf("image/png", "image/*"))
                             }.onFailure {
@@ -1039,18 +1019,6 @@ private fun AccountSkinWardrobeView(
         }
     }
 
-    var showElyCapeOptions by remember(account.key) { mutableStateOf(false) }
-    if (showElyCapeOptions) {
-        ElyByCapeOptionsDialog(
-            activity = activity,
-            onDismiss = { showElyCapeOptions = false },
-            onPreview = {
-                showElyCapeOptions = false
-                launchCapePicker()
-            }
-        )
-    }
-
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -1686,10 +1654,7 @@ private fun AccountSkinWardrobeView(
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             OutlinedButton(
-                                onClick = {
-                                    if (account.authType == AuthType.ELY_BY) showElyCapeOptions = true
-                                    else launchCapePicker()
-                                },
+                                onClick = { launchCapePicker() },
                                 shape = RoundedCornerShape(12.dp),
                                 border = BorderStroke(1.dp, Color.White.copy(alpha = 0.14f)),
                                 colors = ButtonDefaults.outlinedButtonColors(
@@ -1708,7 +1673,7 @@ private fun AccountSkinWardrobeView(
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    text = if (account.authType == AuthType.ELY_BY) "Ely.by Cape Options" else "Equip Cape (.png)",
+                                    text = "Equip Cape (.png)",
                                     style = MaterialTheme.typography.labelMedium,
                                     fontWeight = FontWeight.SemiBold,
                                     maxLines = 1,
@@ -1951,29 +1916,5 @@ private fun CardTextAction(text: String, color: Color, onClick: () -> Unit) {
             .clip(CircleShape)
             .clickable(onClick = onClick)
             .padding(horizontal = AerixSpacing.smPlus, vertical = AerixSpacing.xs)
-    )
-}
-
-@Composable
-private fun ElyByCapeOptionsDialog(
-    activity: FragmentActivity,
-    onDismiss: () -> Unit,
-    onPreview: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Ely.by capes") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Ely.by does not allow users to equip custom capes through its skin service.")
-                Text("Importing a PNG here changes only the launcher preview. It does not equip a cape in worlds or servers, or make it visible to other players.")
-                Text("In-game visibility requires a cape supplied by the account's skin service, or a compatible cape mod/service on the clients that should see it.")
-                TextButton(onClick = {
-                    Tools.openURL(activity, "https://docs.ely.by/en/skins-system.html")
-                }) { Text("Ely.by cape documentation") }
-            }
-        },
-        confirmButton = { TextButton(onClick = onPreview) { Text("Preview a PNG locally") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Close") } }
     )
 }

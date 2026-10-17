@@ -114,7 +114,7 @@ import net.kdt.pojavlaunch.aerix.theme.AerixRadii
 import net.kdt.pojavlaunch.aerix.theme.AerixSpacing
 import net.kdt.pojavlaunch.aerix.theme.AerixSurface
 import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
-import net.kdt.pojavlaunch.game.renderer.def.Renderers
+import net.kdt.pojavlaunch.game.renderer.RendererCache
 import net.kdt.pojavlaunch.prefs.LauncherPreferences
 import kotlin.math.roundToInt
 
@@ -1121,8 +1121,12 @@ fun <E> MiraiEnumSettingsCard(
 }
 
 /**
- * Built-in renderer metadata ported from mirai-launcher- (Renderers.kt)
- * using only installed, device-compatible backends. No cosmetic aliases or synthetic renderers.
+ * A renderer the launcher can run.
+ *
+ * The entries are built from the launcher's own renderer list, so every option maps to a
+ * backend implemented in net.kdt.pojavlaunch.game.renderer and is only offered when the
+ * current device supports it. The name of each renderer is the one the launcher itself
+ * uses, the supported Minecraft versions included.
  */
 data class MiraiRendererEntry(
     val uniqueId: String,
@@ -1136,27 +1140,66 @@ data class MiraiRendererEntry(
 private const val PREF_MIRAI_GLOBAL_RENDERER_ID = "aerix_mirai_global_renderer_id"
 private const val PREF_MIRAI_INSTANCE_RENDERER_PREFIX = "aerix_mirai_instance_renderer_"
 
+/**
+ * Every renderer the launcher implements, plus the external renderer plugins that are installed.
+ *
+ * @param includeFollowGlobal add the "Follow Global" entry used by the per instance list
+ */
 fun miraiRendererEntries(context: Context, includeFollowGlobal: Boolean): List<MiraiRendererEntry> {
-    val available = net.kdt.pojavlaunch.aerix.bridge.PojavSettingsBridge.renderers(context)
-    return buildList {
-        if (includeFollowGlobal) add(MiraiRendererEntry("", "Follow Global", null))
-        available.forEach { (id, name) -> add(MiraiRendererEntry(id, name, id)) }
+    val list = ArrayList<MiraiRendererEntry>()
+    if (includeFollowGlobal) {
+        list.add(
+            MiraiRendererEntry(
+                uniqueId = "",
+                displayName = "Follow Global",
+                backendRendererId = null
+            )
+        )
     }
+    val plugins = runCatching { PojavPluginBridge.loadPlugins(context) }.getOrDefault(emptyList())
+    val pluginTags = plugins.map { it.pluginTag }.toSet()
+    val cache = RendererCache.getCompatibleRenderers(context)
+    cache.rendererIds.forEachIndexed { index, rendererId ->
+        if (rendererId in pluginTags) return@forEachIndexed
+        list.add(
+            MiraiRendererEntry(
+                uniqueId = rendererId,
+                displayName = cache.rendererDisplayNames.getOrElse(index) { rendererId },
+                backendRendererId = rendererId
+            )
+        )
+    }
+    plugins.forEach { plugin ->
+        if (list.none { it.uniqueId == plugin.pluginTag }) {
+            list.add(
+                MiraiRendererEntry(
+                    uniqueId = plugin.pluginTag,
+                    displayName = plugin.displayName,
+                    backendRendererId = plugin.pluginTag,
+                    summary = plugin.summary.ifBlank { "External Renderer Plugin (${plugin.packageName})" },
+                    minVer = plugin.minMCVer,
+                    maxVer = plugin.maxMCVer
+                )
+            )
+        }
+    }
+    return list
 }
 
 fun getMiraiGlobalRendererId(context: Context): String {
     val entries = miraiRendererEntries(context, includeFollowGlobal = false)
     val saved = LauncherPreferences.DEFAULT_PREF.getString(PREF_MIRAI_GLOBAL_RENDERER_ID, null)
-    if (!saved.isNullOrEmpty() && entries.any { it.uniqueId == saved && it.backendRendererId == LauncherPreferences.PREF_RENDERER }) {
+    if (!saved.isNullOrEmpty() && entries.any { it.uniqueId == saved }) {
         return saved
     }
     val backend = LauncherPreferences.PREF_RENDERER
     return entries.firstOrNull { it.backendRendererId == backend }?.uniqueId
-        ?: backend.orEmpty()
+        ?: entries.firstOrNull()?.uniqueId
+        ?: backend
 }
 
 fun setMiraiGlobalRenderer(entry: MiraiRendererEntry) {
-    val backend = entry.backendRendererId ?: Renderers.NGGL4ES_RENDERER
+    val backend = entry.backendRendererId ?: LauncherPreferences.PREF_RENDERER
     LauncherPreferences.PREF_RENDERER = backend
     LauncherPreferences.DEFAULT_PREF.edit()
         .putString("renderer", backend)

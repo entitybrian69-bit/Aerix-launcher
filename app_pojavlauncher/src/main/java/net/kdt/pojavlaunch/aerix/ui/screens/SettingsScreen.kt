@@ -167,7 +167,7 @@ private val settingTabItems = listOf(
     SettingTabItem(AerixNav.TAB_WALLPAPERS, R.drawable.aerix_ic_format_paint_outlined, "Wallpapers"),
     SettingTabItem(AerixNav.TAB_LAUNCHER, R.drawable.aerix_ic_setting_launcher, "Launcher"),
     SettingTabItem(AerixNav.TAB_CONTROLS, R.drawable.aerix_ic_videogame_asset_outlined, "Controls"),
-    SettingTabItem(AerixNav.TAB_CONTROL_MANAGER, R.drawable.aerix_ic_videogame_asset_outlined, "Controls"),
+    SettingTabItem(AerixNav.TAB_CONTROL_MANAGER, R.drawable.aerix_ic_dashboard_outlined, "Layouts"),
     SettingTabItem(AerixNav.TAB_GAMEPAD, R.drawable.aerix_ic_sports_esports_outlined, "Gamepad"),
     SettingTabItem(AerixNav.TAB_ABOUT, R.drawable.aerix_ic_info_outlined, "About")
 )
@@ -179,6 +179,18 @@ private data class RendererStackOption(
     val rendererId: String
 )
 
+/**
+ * Tiles of the renderer grid. "AUTO" stands for the renderer the launcher uses by default,
+ * every other tile names a backend renderer directly.
+ */
+private fun defaultRendererStackOptions(defaultRendererId: String): List<RendererStackOption> = listOf(
+    RendererStackOption("AUTO", "Auto (Smart Pick)", "RECOMMENDED", defaultRendererId),
+    RendererStackOption("VGPU_FAST", "vgpu - (up to 1.16.5, fast)", "1.16.5 FAST", Renderers.NGGL4ES_RENDERER),
+    RendererStackOption("VGPU_1368", "VGPU 1.3.6\u03B2", "SHADERCONV", Renderers.SFPEW_RENDERER),
+    RendererStackOption("LTW", "LTW (1.17+ Core)", "1.17+", Renderers.LTW_RENDERER),
+    RendererStackOption("Legacy", "LTW Legacy (1.8\u20131.16.5)", "1.8\u20131.16.5", Renderers.GL4ES_RENDERER),
+    RendererStackOption("Zink", "Kopper Zink (Vulkan)", "VULKAN", Renderers.ZINK_RENDERER)
+)
 
 @Composable
 fun SettingsScreen(activity: FragmentActivity, tabKey: String, onTabChanged: (String) -> Unit) {
@@ -241,13 +253,15 @@ fun SettingsScreen(activity: FragmentActivity, tabKey: String, onTabChanged: (St
 @Composable
 private fun RendererTabContent(activity: FragmentActivity) {
     val revision = PojavSettingsBridge.revision
+    val compatible = remember(revision) { PojavSettingsBridge.renderers(activity) }
+    val plugins = remember(revision) { PojavPluginBridge.loadPlugins(activity) }
     val currentRenderer = remember(revision) { LauncherPreferences.PREF_RENDERER ?: Renderers.GL4ES_RENDERER }
+    // Renderer the launcher falls back to while nothing was picked in the settings.
+    val defaultRendererId = remember(revision) { LauncherPreferences.defaultRendererId(activity) }
+    val rendererStackOptions = remember(revision) { defaultRendererStackOptions(defaultRendererId) }
     val rendererEntries = remember(revision) { miraiRendererEntries(activity, includeFollowGlobal = false) }
     var currentMiraiRendererId by remember(revision) { mutableStateOf(getMiraiGlobalRendererId(activity)) }
-    val rendererStackOptions = rendererEntries.filterNot { it.uniqueId.startsWith("plugin:") }
-        .map { RendererStackOption(it.uniqueId, it.displayName, "INSTALLED", it.backendRendererId!!) }
-    val plugins = remember(revision) { PojavPluginBridge.loadPlugins(activity) }
-        .filter { plugin -> rendererEntries.any { it.uniqueId == plugin.pluginTag } }
+    var autoSelected by remember(revision) { mutableStateOf(currentRenderer == defaultRendererId) }
     var globalVulkanDriver by remember(revision) {
         mutableStateOf(
             LauncherPreferences.DEFAULT_PREF.getString("aerix_global_vulkan_driver", "default driver")
@@ -299,9 +313,18 @@ private fun RendererTabContent(activity: FragmentActivity) {
                         horizontalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
                     ) {
                         rowOptions.forEach { option ->
-                            val isSelected = currentRenderer == option.rendererId
+                            val isSelected = when (option.keyMatch) {
+                                "AUTO" -> autoSelected
+                                else -> !autoSelected && currentRenderer == option.rendererId
+                            }
                             val selectOption = {
-                                PojavSettingsBridge.writeString(activity, "renderer", option.rendererId)
+                                autoSelected = option.keyMatch == "AUTO"
+                                val targetId = if (compatible.any { it.first == option.rendererId }) {
+                                    option.rendererId
+                                } else {
+                                    compatible.firstOrNull()?.first ?: Renderers.GL4ES_RENDERER
+                                }
+                                PojavSettingsBridge.writeString(activity, "renderer", targetId)
                             }
                             val borderColor by animateColorAsState(
                                 targetValue = if (isSelected) AerixThemeManager.currentAccent() else AerixSurface.panelRaised,
@@ -348,7 +371,7 @@ private fun RendererTabContent(activity: FragmentActivity) {
                                     )
                                     ModrinthMetaPill(
                                         text = option.badge,
-                                        highlighted = isSelected
+                                        highlighted = isSelected || option.keyMatch == "AUTO"
                                     )
                                 }
                             }
@@ -366,8 +389,9 @@ private fun RendererTabContent(activity: FragmentActivity) {
                             rowPlugins.forEach { plugin ->
                                 RendererPluginCard(
                                     plugin = plugin,
-                                    selected = currentRenderer == plugin.pluginTag,
+                                    selected = !autoSelected && currentRenderer == plugin.pluginTag,
                                     onSelect = {
+                                        autoSelected = false
                                         PojavSettingsBridge.writeString(activity, "renderer", plugin.pluginTag)
                                     },
                                     modifier = Modifier.weight(1f)
@@ -525,7 +549,8 @@ private fun RendererTabContent(activity: FragmentActivity) {
 
         // 4. Detailed Renderer, Vulkan Driver, Graphics API, Resolution & Fullscreen SettingsCardColumn (Mirai RendererSettingsScreen — Photos 1 & 2)
         item {
-            val showMgSettings = currentRenderer == Renderers.MOBILEGLUES_RENDERER || currentMiraiRendererId == "opengles3_mobileglues"
+            val showMgSettings = currentRenderer == Renderers.MOBILEGLUES_RENDERER ||
+                currentMiraiRendererId == Renderers.MOBILEGLUES_RENDERER
             val vulkanDrivers = remember {
                 listOf(
                     "default driver" to "default driver",
@@ -553,7 +578,7 @@ private fun RendererTabContent(activity: FragmentActivity) {
                     position = CardPosition.Top,
                     items = rendererEntries,
                     currentId = currentMiraiRendererId,
-                    defaultId = rendererEntries.firstOrNull()?.uniqueId ?: "opengles3",
+                    defaultId = rendererEntries.firstOrNull()?.uniqueId ?: defaultRendererId,
                     title = "Global Renderer",
                     summary = "Define the global renderer used by the game",
                     getItemText = { it.displayName },
@@ -578,6 +603,7 @@ private fun RendererTabContent(activity: FragmentActivity) {
                         }
                     },
                     onValueChange = { entry ->
+                        autoSelected = false
                         currentMiraiRendererId = entry.uniqueId
                         setMiraiGlobalRenderer(entry)
                         PojavSettingsBridge.touch()
@@ -1390,6 +1416,20 @@ private fun LauncherTabContent(activity: FragmentActivity) {
                     summary = stringResource(R.string.aerix_logs_subtitle),
                     value = "Share",
                     onClick = { PojavNavigator.shareLogs(activity) }
+                )
+            }
+        }
+
+        // Group 5: the Aetherium mod. It is a recommendation, so it lives here with the rest of
+        // the launcher settings instead of over the home screen.
+        item {
+            SettingsCardColumn(modifier = Modifier.fillMaxWidth()) {
+                MiraiActionSettingsCard(
+                    position = CardPosition.Single,
+                    title = stringResource(R.string.aerix_settings_aetherium),
+                    summary = stringResource(R.string.aerix_settings_aetherium_sub),
+                    value = stringResource(R.string.aerix_settings_aetherium_tag),
+                    onClick = { AerixNav.navigate(LauncherSection.DISCOVER) }
                 )
             }
         }

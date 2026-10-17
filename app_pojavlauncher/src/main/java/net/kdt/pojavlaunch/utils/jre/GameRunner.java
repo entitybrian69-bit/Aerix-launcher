@@ -213,7 +213,6 @@ public class GameRunner {
                 }
             }
         File gamedir = instance.getGameDirectory();
-        net.kdt.pojavlaunch.utils.RetiredFeatureCleanup.beforeLaunch(activity, gamedir);
         JVersionList.Version versionInfo = Tools.getVersionInfo(versionId);
         // We don't need the library list, the asset index, client download info for the code below
         versionInfo.libraries = null;
