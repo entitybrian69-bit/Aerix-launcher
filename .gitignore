@@ -10,11 +10,3 @@ app_pojavlauncher/.cxx/
 .vs/
 /curseforge_key.txt
 /app_pojavlauncher/libs/ltw-release.aar
-
-/companion/.gradle/
-/companion/build/
-/app_pojavlauncher/src/main/assets/components/aerix-companion/
-/services/capes/cape-data/
-/services/capes/.pytest_cache/
-/services/capes/__pycache__/
-/services/capes/tests/__pycache__/

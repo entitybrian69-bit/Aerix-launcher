@@ -179,15 +179,6 @@ private data class RendererStackOption(
     val rendererId: String
 )
 
-private val rendererStackOptions = listOf(
-    RendererStackOption("AUTO", "Auto (Smart Pick)", "RECOMMENDED", Renderers.LTW_RENDERER),
-    RendererStackOption("VGPU_FAST", "vgpu - (up to 1.16.5, fast)", "1.16.5 FAST", Renderers.NGGL4ES_RENDERER),
-    RendererStackOption("VGPU_1368", "VGPU 1.3.6\u03B2", "SHADERCONV", Renderers.SFPEW_RENDERER),
-    RendererStackOption("LTW", "LTW (1.17+ Core)", "1.17+", Renderers.LTW_RENDERER),
-    RendererStackOption("Legacy", "LTW Legacy (1.8\u20131.16.5)", "1.8\u20131.16.5", Renderers.GL4ES_RENDERER),
-    RendererStackOption("Zink", "Kopper Zink (Vulkan)", "VULKAN", Renderers.ZINK_RENDERER),
-    RendererStackOption("MOBILEGLUES", "MobileGlues (1.17+)", "MODERN", Renderers.MOBILEGLUES_RENDERER)
-)
 
 @Composable
 fun SettingsScreen(activity: FragmentActivity, tabKey: String, onTabChanged: (String) -> Unit) {
@@ -250,12 +241,13 @@ fun SettingsScreen(activity: FragmentActivity, tabKey: String, onTabChanged: (St
 @Composable
 private fun RendererTabContent(activity: FragmentActivity) {
     val revision = PojavSettingsBridge.revision
-    val compatible = remember(revision) { PojavSettingsBridge.renderers(activity) }
-    val plugins = remember(revision) { PojavPluginBridge.loadPlugins(activity) }
     val currentRenderer = remember(revision) { LauncherPreferences.PREF_RENDERER ?: Renderers.GL4ES_RENDERER }
     val rendererEntries = remember(revision) { miraiRendererEntries(activity, includeFollowGlobal = false) }
     var currentMiraiRendererId by remember(revision) { mutableStateOf(getMiraiGlobalRendererId(activity)) }
-    var autoSelected by remember { mutableStateOf(false) }
+    val rendererStackOptions = rendererEntries.filterNot { it.uniqueId.startsWith("plugin:") }
+        .map { RendererStackOption(it.uniqueId, it.displayName, "INSTALLED", it.backendRendererId!!) }
+    val plugins = remember(revision) { PojavPluginBridge.loadPlugins(activity) }
+        .filter { plugin -> rendererEntries.any { it.uniqueId == plugin.pluginTag } }
     var globalVulkanDriver by remember(revision) {
         mutableStateOf(
             LauncherPreferences.DEFAULT_PREF.getString("aerix_global_vulkan_driver", "default driver")
@@ -307,18 +299,9 @@ private fun RendererTabContent(activity: FragmentActivity) {
                         horizontalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
                     ) {
                         rowOptions.forEach { option ->
-                            val isSelected = when (option.keyMatch) {
-                                "AUTO" -> autoSelected
-                                else -> !autoSelected && currentRenderer == option.rendererId
-                            }
+                            val isSelected = currentRenderer == option.rendererId
                             val selectOption = {
-                                autoSelected = option.keyMatch == "AUTO"
-                                val targetId = if (compatible.any { it.first == option.rendererId }) {
-                                    option.rendererId
-                                } else {
-                                    compatible.firstOrNull()?.first ?: Renderers.GL4ES_RENDERER
-                                }
-                                PojavSettingsBridge.writeString(activity, "renderer", targetId)
+                                PojavSettingsBridge.writeString(activity, "renderer", option.rendererId)
                             }
                             val borderColor by animateColorAsState(
                                 targetValue = if (isSelected) AerixThemeManager.currentAccent() else AerixSurface.panelRaised,
@@ -365,7 +348,7 @@ private fun RendererTabContent(activity: FragmentActivity) {
                                     )
                                     ModrinthMetaPill(
                                         text = option.badge,
-                                        highlighted = isSelected || option.keyMatch == "AUTO"
+                                        highlighted = isSelected
                                     )
                                 }
                             }
@@ -383,9 +366,8 @@ private fun RendererTabContent(activity: FragmentActivity) {
                             rowPlugins.forEach { plugin ->
                                 RendererPluginCard(
                                     plugin = plugin,
-                                    selected = !autoSelected && currentRenderer == plugin.pluginTag,
+                                    selected = currentRenderer == plugin.pluginTag,
                                     onSelect = {
-                                        autoSelected = false
                                         PojavSettingsBridge.writeString(activity, "renderer", plugin.pluginTag)
                                     },
                                     modifier = Modifier.weight(1f)
@@ -596,7 +578,6 @@ private fun RendererTabContent(activity: FragmentActivity) {
                         }
                     },
                     onValueChange = { entry ->
-                        autoSelected = false
                         currentMiraiRendererId = entry.uniqueId
                         setMiraiGlobalRenderer(entry)
                         PojavSettingsBridge.touch()

@@ -1122,8 +1122,7 @@ fun <E> MiraiEnumSettingsCard(
 
 /**
  * Built-in renderer metadata ported from mirai-launcher- (Renderers.kt)
- * matching Photos 1, 2, and 5 (Krypton Wrapper, MobileGlues, GL4ES, vgpu - (up to 1.16.5, fast),
- * VGPU 1.3.6β, LTW Legacy, LTW (Large Thin Wrapper), Kopper Zink, VirGLRenderer, Freedreno (Adreno)).
+ * using only installed, device-compatible backends. No cosmetic aliases or synthetic renderers.
  */
 data class MiraiRendererEntry(
     val uniqueId: String,
@@ -1138,113 +1137,22 @@ private const val PREF_MIRAI_GLOBAL_RENDERER_ID = "aerix_mirai_global_renderer_i
 private const val PREF_MIRAI_INSTANCE_RENDERER_PREFIX = "aerix_mirai_instance_renderer_"
 
 fun miraiRendererEntries(context: Context, includeFollowGlobal: Boolean): List<MiraiRendererEntry> {
-    val list = ArrayList<MiraiRendererEntry>()
-    if (includeFollowGlobal) {
-        list.add(
-            MiraiRendererEntry(
-                uniqueId = "",
-                displayName = "Follow Global",
-                backendRendererId = null
-            )
-        )
+    val available = net.kdt.pojavlaunch.aerix.bridge.PojavSettingsBridge.renderers(context)
+    return buildList {
+        if (includeFollowGlobal) add(MiraiRendererEntry("", "Follow Global", null))
+        available.forEach { (id, name) -> add(MiraiRendererEntry(id, name, id)) }
     }
-    list.addAll(
-        listOf(
-            MiraiRendererEntry(
-                uniqueId = "opengles3",
-                displayName = "Krypton Wrapper",
-                backendRendererId = Renderers.NGGL4ES_RENDERER,
-                minVer = "1.17",
-                maxVer = "26.2"
-            ),
-            MiraiRendererEntry(
-                uniqueId = "opengles3_mobileglues",
-                displayName = "MobileGlues",
-                backendRendererId = Renderers.MOBILEGLUES_RENDERER,
-                minVer = "1.17",
-                maxVer = "26.3"
-            ),
-            MiraiRendererEntry(
-                uniqueId = "opengles2",
-                displayName = "GL4ES",
-                backendRendererId = Renderers.GL4ES_RENDERER,
-                maxVer = "1.16.5"
-            ),
-            MiraiRendererEntry(
-                uniqueId = "opengles2_vgpu",
-                displayName = "vgpu - (up to 1.16.5, fast)",
-                backendRendererId = Renderers.SFPEW_RENDERER,
-                summary = "( Performative and balance for version above 1.16.5)",
-                maxVer = "1.16.5"
-            ),
-            MiraiRendererEntry(
-                uniqueId = "opengles2_vgpu_1",
-                displayName = "VGPU 1.3.6\u03B2",
-                backendRendererId = Renderers.SFPEW_RENDERER,
-                summary = "(Compat with all version and very reliable)",
-                maxVer = "1.16.5"
-            ),
-            MiraiRendererEntry(
-                uniqueId = "opengles2_ltwlegacy",
-                displayName = "LTW Legacy",
-                backendRendererId = Renderers.GL4ES_RENDERER,
-                summary = "OpenGL 1.x/2.1 translation layer for Minecraft 1.8 - 1.16.5, built from source.",
-                minVer = "1.8",
-                maxVer = "1.16.5"
-            ),
-            MiraiRendererEntry(
-                uniqueId = "opengles3_ltw",
-                displayName = "LTW (Large Thin Wrapper)",
-                backendRendererId = Renderers.LTW_RENDERER,
-                summary = "Incomplete OpenGL 3.2 core wrapper on OpenGL ES 3; game, mod, and device compatibility varies.",
-                minVer = "1.17"
-            ),
-            MiraiRendererEntry(
-                uniqueId = "opengles3_desktopgl_zink_kopper",
-                displayName = "Kopper Zink",
-                backendRendererId = Renderers.ZINK_RENDERER,
-                maxVer = "26.2"
-            ),
-            MiraiRendererEntry(
-                uniqueId = "gallium_virgl",
-                displayName = "VirGLRenderer",
-                backendRendererId = Renderers.LEGACYZINK_RENDERER,
-                maxVer = "26.2"
-            ),
-            MiraiRendererEntry(
-                uniqueId = "gallium_freedreno",
-                displayName = "Freedreno (Adreno)",
-                backendRendererId = Renderers.FREEDRENO_RENDERER,
-                maxVer = "26.2"
-            )
-        )
-    )
-    runCatching { PojavPluginBridge.loadPlugins(context) }.getOrDefault(emptyList()).forEach { plugin ->
-        if (list.none { it.uniqueId == plugin.pluginTag }) {
-            list.add(
-                MiraiRendererEntry(
-                    uniqueId = plugin.pluginTag,
-                    displayName = plugin.displayName,
-                    backendRendererId = plugin.pluginTag,
-                    summary = plugin.summary.ifBlank { "External Renderer Plugin (${plugin.packageName})" },
-                    minVer = plugin.minMCVer,
-                    maxVer = plugin.maxMCVer
-                )
-            )
-        }
-    }
-    return list
 }
 
 fun getMiraiGlobalRendererId(context: Context): String {
     val entries = miraiRendererEntries(context, includeFollowGlobal = false)
     val saved = LauncherPreferences.DEFAULT_PREF.getString(PREF_MIRAI_GLOBAL_RENDERER_ID, null)
-    if (!saved.isNullOrEmpty() && entries.any { it.uniqueId == saved }) {
+    if (!saved.isNullOrEmpty() && entries.any { it.uniqueId == saved && it.backendRendererId == LauncherPreferences.PREF_RENDERER }) {
         return saved
     }
     val backend = LauncherPreferences.PREF_RENDERER
     return entries.firstOrNull { it.backendRendererId == backend }?.uniqueId
-        ?: entries.first().uniqueId
+        ?: backend.orEmpty()
 }
 
 fun setMiraiGlobalRenderer(entry: MiraiRendererEntry) {

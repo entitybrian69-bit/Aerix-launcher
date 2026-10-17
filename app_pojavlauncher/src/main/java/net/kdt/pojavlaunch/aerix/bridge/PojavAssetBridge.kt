@@ -294,6 +294,24 @@ object PojavAssetBridge {
         }.getOrNull() ?: AssetProjectDetails(project, null, emptyList(), null, null, null, null)
     }
 
+    @Volatile private var gameVersionCatalog: List<AssetGameVersion>? = null
+
+    /** Complete provider catalog; no hand-picked list or latest-N truncation. */
+    suspend fun minecraftVersions(): List<AssetGameVersion> = withContext(Dispatchers.IO) {
+        gameVersionCatalog?.let { return@withContext it }
+        val tags = modrinthGet("tag/game_version", null, JsonArray::class.java)
+            ?: throw java.io.IOException("The Minecraft version catalog could not be loaded. Retry or enter an exact version.")
+        val versions = tags.mapNotNull { value ->
+            if (!value.isJsonObject) return@mapNotNull null
+            val tag = value.asJsonObject
+            val id = tag.string("version") ?: return@mapNotNull null
+            AssetGameVersion(id, MinecraftVersionFilters.classify(id, tag.string("version_type")))
+        }.distinctBy { it.id }
+        check(versions.isNotEmpty()) { "The provider returned an empty Minecraft version catalog" }
+        gameVersionCatalog = versions
+        versions
+    }
+
     suspend fun files(context: Context, project: AssetProject): List<AssetFile>? = withContext(Dispatchers.IO) {
         runCatching {
             when (project.platform) {
@@ -737,13 +755,16 @@ object PojavAssetBridge {
     private fun curseForgeFiles(context: Context, modId: String): List<AssetFile>? {
         val result = ArrayList<AssetFile>()
         var index = 0
+        val seenPages = HashSet<String>()
         while (true) {
             val params = HashMap<String, Any>()
             params["index"] = index
             params["pageSize"] = 50
             val response = curseForgeGet(context, "mods/$modId/files", params, JsonObject::class.java)
-                ?: return if (result.isEmpty()) null else result
-            val data = response.arr("data") ?: break
+                ?: throw java.io.IOException("Could not load all content versions; retry the download list")
+            val data = response.arr("data") ?: throw java.io.IOException("Provider omitted the file list")
+            val fingerprint = data.joinToString { it.toString() }
+            check(seenPages.add(fingerprint)) { "Provider repeated a file page; retry instead of showing an incomplete version list" }
             data.forEach { element ->
                 if (!element.isJsonObject) return@forEach
                 val file = element.asJsonObject
@@ -766,15 +787,15 @@ object PojavAssetBridge {
                         sizeBytes = file.long("fileLength"),
                         releaseType = relType,
                         datePublished = (file.string("fileDate") ?: "").take(10),
-                        gameVersions = versions.filter { mcVersionPattern.matches(it) },
-                        loaders = versions.filter { !mcVersionPattern.matches(it) && it.lowercase() in knownLoaders }
+                        gameVersions = versions.filter { it.lowercase() !in knownLoaders && !it.startsWith("Java ", true) && it.lowercase() !in setOf("client", "server") },
+                        loaders = versions.filter { it.lowercase() in knownLoaders }
                             .map { it.lowercase() }
                     )
                 )
             }
             index += data.size()
             val total = response.obj("pagination")?.int("totalCount") ?: index
-            if (data.size() == 0 || index >= total || index >= 1000) break
+            if (data.size() == 0 || index >= total) break
         }
         return result
     }

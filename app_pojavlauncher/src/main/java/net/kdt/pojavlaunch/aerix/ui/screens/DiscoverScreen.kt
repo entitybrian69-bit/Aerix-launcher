@@ -54,6 +54,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -76,6 +77,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -111,6 +113,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import net.kdt.pojavlaunch.R
+import net.kdt.pojavlaunch.aerix.bridge.MinecraftVersionKind
+import net.kdt.pojavlaunch.aerix.bridge.MinecraftVersionFilters
 import net.kdt.pojavlaunch.aerix.bridge.AerixPreferences
 import net.kdt.pojavlaunch.aerix.bridge.AssetFile
 import net.kdt.pojavlaunch.aerix.bridge.AssetPage
@@ -182,14 +186,6 @@ private fun formatDownloadCount(count: Long): String = when {
     count >= 1_000L -> "%.1fK".format(count / 1_000.0)
     else -> count.toString()
 }
-
-private val commonMcVersions = listOf(
-    "26.3", "26.2", "26.1",
-    "1.21.4", "1.21.3", "1.21.1", "1.21",
-    "1.20.6", "1.20.4", "1.20.2", "1.20.1",
-    "1.19.4", "1.19.2",
-    "1.18.2", "1.17.1", "1.16.5", "1.12.2", "1.8.9", "1.7.10"
-)
 
 private val filterLoaders = listOf(
     "fabric" to "Fabric",
@@ -366,6 +362,11 @@ private fun SearchAssetsContent(
     var showLoaderMenu by remember { mutableStateOf(false) }
     var showSortMenu by remember { mutableStateOf(false) }
 
+    if (showMcMenu) MinecraftVersionPicker(mcVersion, onSelect = { version ->
+        mcVersion = version
+        pageIndex = 1
+    }, onDismiss = { showMcMenu = false })
+
     Column(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
@@ -523,29 +524,6 @@ private fun SearchAssetsContent(
                     label = "MC: ${mcVersion ?: "All"}",
                     onClick = { showMcMenu = true }
                 )
-                DropdownMenu(
-                    expanded = showMcMenu,
-                    onDismissRequest = { showMcMenu = false }
-                ) {
-                    DropdownMenuItem(
-                        text = { Text("All Versions") },
-                        onClick = {
-                            showMcMenu = false
-                            mcVersion = null
-                            pageIndex = 1
-                        }
-                    )
-                    commonMcVersions.forEach { ver ->
-                        DropdownMenuItem(
-                            text = { Text(ver) },
-                            onClick = {
-                                showMcMenu = false
-                                mcVersion = ver
-                                pageIndex = 1
-                            }
-                        )
-                    }
-                }
             }
 
             // Loader Dropdown Pill ("Loader: All ▾")
@@ -1043,7 +1021,8 @@ private fun AssetDetailContent(
     var target by remember { mutableStateOf(InstanceTarget(null, null)) }
     var loadingFiles by remember(project.id) { mutableStateOf(true) }
     var installingFile by remember { mutableStateOf<String?>(null) }
-    var showOnlyReleases by remember { mutableStateOf(true) }
+    var versionKind by rememberSaveable(project.id) { mutableStateOf(MinecraftVersionKind.ALL) }
+    var showVersionTypes by remember { mutableStateOf(false) }
     var searchMcVersion by remember { mutableStateOf("") }
 
     val installedToast = stringResource(R.string.aerix_download_installed)
@@ -1057,15 +1036,14 @@ private fun AssetDetailContent(
         loadingFiles = false
     }
 
-    val releaseRegex = remember { Regex("""^\d+\.\d+(\.\d+)?$""") }
-    val groups = remember(files, target, showOnlyReleases, searchMcVersion) {
+    val groups = remember(files, target, versionKind, searchMcVersion) {
         val all = files ?: emptyList()
         val map = LinkedHashMap<Pair<String, String?>, MutableList<AssetFile>>()
         for (f in all) {
             val loader = f.loaders.firstOrNull()?.replaceFirstChar { it.uppercase() }
             val mcVers = f.gameVersions.ifEmpty { listOf("Any") }
             for (gv in mcVers) {
-                if (showOnlyReleases && gv != "Any" && !releaseRegex.matches(gv)) continue
+                if (gv != "Any" && !MinecraftVersionFilters.matches(versionKind, MinecraftVersionFilters.classify(gv))) continue
                 if (searchMcVersion.isNotBlank() && !gv.contains(searchMcVersion, ignoreCase = true)) continue
                 map.getOrPut(gv to loader) { ArrayList() }.add(f)
             }
@@ -1136,31 +1114,12 @@ private fun AssetDetailContent(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(AerixSpacing.md)
                 ) {
-                    Surface(
-                        shape = RoundedCornerShape(AerixRadii.controlSmall),
-                        color = if (showOnlyReleases) accent.copy(alpha = 0.18f) else AerixSurface.panel,
-                        border = BorderStroke(AerixSpacing.hairline, if (showOnlyReleases) accent else AerixSurface.borderSoft),
-                        onClick = { showOnlyReleases = !showOnlyReleases }
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .height(36.dp)
-                                .padding(horizontal = AerixSpacing.smPlus),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(AerixSpacing.xs)
-                        ) {
-                            Icon(
-                                painter = painterResource(R.drawable.aerix_ic_check),
-                                contentDescription = null,
-                                tint = if (showOnlyReleases) accent else AerixSurface.textSecondary,
-                                modifier = Modifier.size(15.dp)
-                            )
-                            Text(
-                                text = "Show only Minecraft release versions",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = if (showOnlyReleases) accent else AerixSurface.textPrimary
-                            )
+                    Box {
+                        OutlinedButton(onClick = { showVersionTypes = true }, modifier = Modifier.heightIn(min = 48.dp)) { Text(versionKind.label) }
+                        DropdownMenu(showVersionTypes, { showVersionTypes = false }) {
+                            MinecraftVersionKind.entries.forEach { option ->
+                                DropdownMenuItem(text = { Text(option.label) }, onClick = { versionKind = option; showVersionTypes = false })
+                            }
                         }
                     }
 

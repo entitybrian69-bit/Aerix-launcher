@@ -213,6 +213,7 @@ public class GameRunner {
                 }
             }
         File gamedir = instance.getGameDirectory();
+        net.kdt.pojavlaunch.utils.RetiredFeatureCleanup.beforeLaunch(activity, gamedir);
         JVersionList.Version versionInfo = Tools.getVersionInfo(versionId);
         // We don't need the library list, the asset index, client download info for the code below
         versionInfo.libraries = null;
@@ -267,7 +268,6 @@ public class GameRunner {
         // Pre-process specific files
         disableSplash(gamedir);
         List<String> launchArgs = getMoJsonClientArgs(account, versionInfo, gamedir);
-        net.kdt.pojavlaunch.aerix.tools.QuickLaunchRequest.consume(activity, gamedir, versionInfo, launchArgs);
 
         // Select the appropriate openGL version
         OldVersionsUtils.selectOpenGlVersion(versionInfo);
@@ -311,8 +311,6 @@ public class GameRunner {
         javaArgList.add("-Dorg.lwjgl.system.SharedLibraryExtractPath="+lwjglExtractDir.getAbsolutePath());
 
         addAuthlibInjectorArgs(javaArgList, account);
-        javaArgList.add("-Daerix.bridge.path=" + new File(activity.getFilesDir(), "aerix-game-bridge").getAbsolutePath());
-        javaArgList.add("-Daerix.auth.provider=" + (account.authType.injectorUrl == null ? "mojang" : account.authType.injectorUrl));
 
         mergeMoJsonArgs(javaArgList, getMoJsonJvmArgs(versionId));
 

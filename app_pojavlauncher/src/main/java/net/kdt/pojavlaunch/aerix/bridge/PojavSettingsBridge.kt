@@ -215,9 +215,18 @@ object PojavSettingsBridge {
     }.getOrDefault(false)
 
     fun renderers(context: Context): List<Pair<String, String>> {
-        PojavPluginBridge.loadPlugins(context)
+        val plugins = PojavPluginBridge.loadPlugins(context).associateBy { it.pluginTag }
         val cache = RendererCache.getCompatibleRenderers(context)
-        return cache.rendererIds.mapIndexed { i, id -> id to (cache.rendererDisplayNames.getOrNull(i) ?: id) }
+        return cache.rendererIds.distinct().mapNotNull { id ->
+            val spec = plugins[id] ?: net.kdt.pojavlaunch.game.renderer.GameRenderer.getKnownRenderer(id)
+                ?: return@mapNotNull null
+            if (!runCatching { spec.compatibleDevice(context) }.getOrDefault(false)) return@mapNotNull null
+            val library = File(spec.library())
+            val location = if (library.isAbsolute) library else File(
+                spec.librarySearchPath() ?: Tools.NATIVE_LIB_DIR, spec.library())
+            if (!location.isFile) return@mapNotNull null
+            id to spec.name()
+        }
     }
 
     private fun downloadSources(context: Context): List<Pair<String, String>> {

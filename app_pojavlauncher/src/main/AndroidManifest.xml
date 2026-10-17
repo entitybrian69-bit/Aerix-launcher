@@ -153,8 +153,6 @@
             <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="This application is intended to run a 3rd-party piece of software which cannot be managed using the activity's saved instance state. This service is used for background persistence of this piece of software."/>
         </service>
-        <service android:name="net.kdt.pojavlaunch.aerix.tools.RendererProbeService"
-            android:exported="false" android:process=":rendererprobe" />
     </application>
     <queries>
         <package android:name="net.kdt.pojavlaunch.ffmpeg"/>

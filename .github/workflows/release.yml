@@ -47,18 +47,6 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Build and package Fabric 1.20.1 companion
-        run: |
-          gradle -p companion build --stacktrace
-          mkdir -p app_pojavlauncher/src/main/assets/components/aerix-companion
-          cp companion/build/libs/aerix-companion-fabric-1.20.1-0.1.0.jar app_pojavlauncher/src/main/assets/components/aerix-companion/aerix-companion.jar
-
-      - name: Upload companion for desktop clients
-        uses: actions/upload-artifact@v4
-        with:
-          name: aerix-companion-fabric-1.20.1
-          path: companion/build/libs/aerix-companion-fabric-1.20.1-0.1.0.jar
-
       - name: Create out directory
         run: mkdir out
 

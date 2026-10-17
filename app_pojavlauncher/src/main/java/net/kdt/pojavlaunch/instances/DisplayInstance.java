@@ -8,10 +8,6 @@ public class DisplayInstance {
     public String versionId;
     public String icon;
 
-    public String getDirectoryId() {
-        return mInstanceRoot.getName();
-    }
-
     protected void sanitize() {
         sanitizeIcon();
     }

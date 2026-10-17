@@ -87,12 +87,6 @@ import java.util.Objects;
 import net.kdt.pojavlaunch.R;
 
 public class GameActivity extends BaseActivity implements ControlButtonMenuListener, EditorExitable, ServiceConnection {
-    private static String[] appendMenuItem(String[] original, String item) {
-        String[] result = java.util.Arrays.copyOf(original, original.length + 1);
-        result[original.length] = item;
-        return result;
-    }
-
     public static final String INTENT_LAUNCH_VERSION = "intent_version";
     public static final String INTENT_LAUNCH_CLASSPATH = "intent_classpath";
 
@@ -205,7 +199,7 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         });
 
         ingameControlsEditorArrayAdapter = new ArrayAdapter<>(this,
-                android.R.layout.simple_list_item_1, appendMenuItem(getResources().getStringArray(R.array.menu_customcontrol), "Studio tools"));
+                android.R.layout.simple_list_item_1, getResources().getStringArray(R.array.menu_customcontrol));
         ingameControlsEditorListener = (parent, view, position, id) -> {
             switch(position) {
                 case 0: mControlLayout.addControlButton(new ControlData("New")); break;
@@ -214,8 +208,7 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
                 case 3: mControlLayout.openLoadDialog(); break;
                 case 4: mControlLayout.openSaveDialog(this); break;
                 case 5: mControlLayout.openSetDefaultDialog(); break;
-                case 6: mControlLayout.openExitDialog(this); break;
-                case 7: mControlLayout.showStudioTools(); break;
+                case 6: mControlLayout.openExitDialog(this);
             }
         };
 
@@ -261,7 +254,7 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
 
             // Menu
             gameActionArrayAdapter = new ArrayAdapter<>(this,
-                    android.R.layout.simple_list_item_1, appendMenuItem(getResources().getStringArray(R.array.menu_ingame), "Switch account"));
+                    android.R.layout.simple_list_item_1, getResources().getStringArray(R.array.menu_ingame));
             gameActionClickListener = (parent, view, position, id) -> {
                 switch(position) {
                      case 0: dialogForceClose(GameActivity.this); break;
@@ -269,7 +262,6 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
                      case 2: dialogSendCustomKey(); break;
                      case 3: openQuickSettings(); break;
                      case 4: openCustomControls(); break;
-                     case 5: net.kdt.pojavlaunch.aerix.tools.InGameAccountSwitcher.show(this, account); break;
                 }
                 drawerLayout.closeDrawers();
             };
