@@ -582,7 +582,7 @@ object PojavAccountBridge : LoginListener {
             Tools.runOnUiThread {
                 if (ok) {
                     wardrobeRevision++
-                    Toast.makeText(appCtx, "Cape equipped for ${account.username}", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(appCtx, "Cape preview saved for ${account.username}; not uploaded to the game", Toast.LENGTH_LONG).show()
                 } else {
                     Toast.makeText(appCtx, "Unable to read .png cape file", Toast.LENGTH_SHORT).show()
                 }

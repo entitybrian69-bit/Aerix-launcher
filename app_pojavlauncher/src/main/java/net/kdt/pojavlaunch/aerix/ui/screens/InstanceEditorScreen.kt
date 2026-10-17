@@ -115,11 +115,9 @@ import net.kdt.pojavlaunch.aerix.bridge.AssetType
 import net.kdt.pojavlaunch.aerix.bridge.ContentEntry
 import net.kdt.pojavlaunch.aerix.bridge.ContentKind
 import net.kdt.pojavlaunch.aerix.bridge.PojavContentBridge
-import net.kdt.pojavlaunch.aerix.bridge.PojavInstaller
 import net.kdt.pojavlaunch.aerix.bridge.PojavInstanceBridge
 import net.kdt.pojavlaunch.aerix.bridge.PojavInstanceEditorBridge
 import net.kdt.pojavlaunch.aerix.bridge.PojavLaunchBridge
-import net.kdt.pojavlaunch.aerix.bridge.PojavNavigator
 import net.kdt.pojavlaunch.aerix.bridge.PojavSettingsBridge
 import net.kdt.pojavlaunch.aerix.components.ActionSettingRow
 import net.kdt.pojavlaunch.aerix.components.AerixGhostButton
@@ -1679,70 +1677,7 @@ private fun OverviewTile(title: String, value: String, modifier: Modifier = Modi
 
 @Composable
 private fun InstanceLoaderPane(activity: FragmentActivity, draft: AerixInstanceDraft) {
-    val vanilla = stringResource(R.string.aerix_home_vanilla)
-    val currentLoader = loaderLabel(draft.versionId, vanilla)
-    val installers = listOf(
-        Triple("Fabric", R.drawable.ic_fabric, PojavInstaller.FABRIC),
-        Triple("NeoForge", R.drawable.ic_neoforge, PojavInstaller.NEOFORGE),
-        Triple("Forge", R.drawable.ic_forge, PojavInstaller.FORGE),
-        Triple("Quilt", R.drawable.ic_quilt, PojavInstaller.QUILT),
-        Triple("OptiFine", R.drawable.aerix_loader_optifine, PojavInstaller.OPTIFINE),
-        Triple("Legacy Fabric", R.drawable.aerix_loader_legacy_fabric, PojavInstaller.LEGACY_FABRIC)
-    )
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(AerixSpacing.mdPlus)
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus)
-    ) {
-        Text(
-            text = "Install or Update Modloader",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.ExtraBold,
-            color = Color.White
-        )
-        Text(
-            text = "Current version: ${draft.versionId} ($currentLoader)",
-            style = MaterialTheme.typography.labelMedium,
-            color = AerixSurface.textSecondary
-        )
-
-        installers.chunked(2).forEach { row ->
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
-            ) {
-                row.forEach { (label, iconRes, installer) ->
-                    Surface(
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(AerixRadii.cardSmall),
-                        color = AerixSurface.panelRaised,
-                        border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft),
-                        onClick = { PojavNavigator.openInstaller(activity, installer) }
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(AerixSpacing.md),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus)
-                        ) {
-                            Icon(
-                                painter = painterResource(iconRes),
-                                contentDescription = null,
-                                tint = Color.Unspecified,
-                                modifier = Modifier.size(28.dp)
-                            )
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(label, fontWeight = FontWeight.Bold, color = Color.White, fontSize = 14.sp)
-                                Text("Install / update $label", color = AerixSurface.textSecondary, fontSize = 11.sp)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
+    InlineLoaderPane(activity, draft.versionId)
 }
 
 // ============================================================================================

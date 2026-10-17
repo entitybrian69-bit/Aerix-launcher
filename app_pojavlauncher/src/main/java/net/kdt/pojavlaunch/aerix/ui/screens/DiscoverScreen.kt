@@ -68,6 +68,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -321,7 +322,7 @@ private fun SearchAssetsContent(
     var platform by rememberSaveable { mutableStateOf(AerixPreferences.assetPlatformSource) }
     var query by rememberSaveable(type) { mutableStateOf("") }
     var submittedQuery by rememberSaveable(type) { mutableStateOf("") }
-    var category by rememberSaveable(type) { mutableStateOf<String?>(null) }
+    var categories by rememberSaveable(type) { mutableStateOf(arrayListOf<String>()) }
     var mcVersion by rememberSaveable(type) { mutableStateOf<String?>(null) }
     var loader by rememberSaveable(type) { mutableStateOf<String?>(null) }
     var sort by rememberSaveable(type) { mutableStateOf(AssetSort.RELEVANCE) }
@@ -339,7 +340,7 @@ private fun SearchAssetsContent(
         installedFingerprints = PojavAssetBridge.installedFingerprints(type)
     }
 
-    LaunchedEffect(type, platform, submittedQuery, category, mcVersion, loader, sort, pageIndex, reloadNonce) {
+    LaunchedEffect(type, platform, submittedQuery, categories, mcVersion, loader, sort, pageIndex, reloadNonce) {
         loading = true
         failed = false
         val offset = (pageIndex - 1).coerceAtLeast(0) * PojavAssetBridge.PAGE_SIZE
@@ -351,7 +352,7 @@ private fun SearchAssetsContent(
             mcVersion = mcVersion,
             loader = if (type.supportsLoaderFilter) loader else null,
             offset = offset,
-            category = category,
+            categories = categories,
             sort = sort
         )
         page = result
@@ -463,7 +464,7 @@ private fun SearchAssetsContent(
                                 if (platform != p) {
                                     platform = p
                                     AerixPreferences.saveAssetPlatformSource(p)
-                                    category = null
+                                    categories = arrayListOf()
                                     pageIndex = 1
                                 }
                             }
@@ -475,7 +476,11 @@ private fun SearchAssetsContent(
             // Category Dropdown Pill ("Category: All ▾")
             if (type.categories.isNotEmpty()) {
                 Box {
-                    val catLabel = type.categories.firstOrNull { it.first == category }?.second ?: "All"
+                    val catLabel = when (categories.size) {
+                        0 -> "All"
+                        1 -> type.categories.firstOrNull { it.first == categories.first() }?.second ?: "All"
+                        else -> "${categories.size} selected"
+                    }
                     DiscoverFilterDropdownPill(
                         label = "Category: $catLabel",
                         onClick = { showCategoryMenu = true }
@@ -486,22 +491,28 @@ private fun SearchAssetsContent(
                     ) {
                         DropdownMenuItem(
                             text = { Text("All Categories") },
+                            leadingIcon = { Checkbox(checked = categories.isEmpty(), onCheckedChange = null) },
                             onClick = {
                                 showCategoryMenu = false
-                                category = null
+                                categories = arrayListOf()
                                 pageIndex = 1
                             }
                         )
                         type.categories.forEach { (id, label) ->
                             DropdownMenuItem(
                                 text = { Text(label) },
+                                leadingIcon = { Checkbox(checked = id in categories, onCheckedChange = null) },
+                                enabled = platform != AssetPlatform.CURSEFORGE || categories.size < 10 || id in categories,
                                 onClick = {
-                                    showCategoryMenu = false
-                                    category = id
+                                    categories = ArrayList(if (id in categories) categories - id else categories + id)
                                     pageIndex = 1
                                 }
                             )
                         }
+                        DropdownMenuItem(
+                            text = { Text(if (platform == AssetPlatform.CURSEFORGE) "Done · up to 10 categories" else "Done") },
+                            onClick = { showCategoryMenu = false }
+                        )
                     }
                 }
             }

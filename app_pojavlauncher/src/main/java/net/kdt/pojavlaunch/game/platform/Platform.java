@@ -49,6 +49,7 @@ public class Platform {
     private static PlatformCursorImplementor mCursorImplementor = null;
     private static boolean isGrabbing = false;
     private static Surface mPendingSurface;
+    private static boolean mSurfaceAttached;
     private static PlatformGamepad mPlatformGamepad = null;
     private static PlatformCursor mPlatformCursor = null;
     private static AndroidClipboard mClipboard;
@@ -249,9 +250,30 @@ public class Platform {
      *
      * @param surface Surface object
      */
-    public static void updateSurface(Surface surface) {
+    public static synchronized void updateSurface(Surface surface) {
+        if (surface == null || !surface.isValid()) return;
+        if (surface == mPendingSurface && mSurfaceAttached) return;
+        destroySurface();
         mPendingSurface = surface;
-        PLATFORM.surfaceCreated(surface);
+        attachSurface();
+    }
+
+    /** Clear the pending surface before another backend can reuse it. */
+    public static synchronized void destroySurface() {
+        mPendingSurface = null;
+        if (mSurfaceAttached) {
+            mSurfaceAttached = false;
+            PLATFORM.surfaceDestroyed();
+        }
+    }
+
+    private static void attachSurface() {
+        if (mPendingSurface == null || !mPendingSurface.isValid()) {
+            mPendingSurface = null;
+            return;
+        }
+        PLATFORM.surfaceCreated(mPendingSurface);
+        mSurfaceAttached = true;
     }
 
     /**
@@ -259,12 +281,13 @@ public class Platform {
      *
      * @param backend implementation backend
      */
-    public static void setPlatformLibrary(PlatformBackend backend) {
-        if(PLATFORM != null) PLATFORM.surfaceDestroyed();
+    public static synchronized void setPlatformLibrary(PlatformBackend backend) {
+        if (mSurfaceAttached) {
+            mSurfaceAttached = false;
+            PLATFORM.surfaceDestroyed();
+        }
         PLATFORM = backend;
-        // To be picked by platform library
-        if (mPendingSurface != null)
-            PLATFORM.surfaceCreated(mPendingSurface);
+        attachSurface();
     }
 
     /**

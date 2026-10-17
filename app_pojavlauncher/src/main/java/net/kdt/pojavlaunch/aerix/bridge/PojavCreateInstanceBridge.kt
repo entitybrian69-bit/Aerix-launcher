@@ -84,7 +84,7 @@ enum class AerixVersionType { RELEASE, SNAPSHOT, OLD_BETA, OLD_ALPHA, INSTALLED 
 class AerixGameVersion(val id: String, val type: AerixVersionType)
 
 /** One selectable loader build. [source] is the untouched Pojav object (OptiFineVersion, BTAVersion, version string). */
-class AerixLoaderVersion(val id: String, val label: String, val stable: Boolean, val source: Any?)
+class AerixLoaderVersion(val id: String, val label: String, val stable: Boolean, val source: Any?, val group: String? = null)
 
 object PojavCreateInstanceBridge {
     /** Bumped when Pojav publishes the Mojang version manifest (ExtraConstants.RELEASE_TABLE). */
@@ -147,6 +147,17 @@ object PojavCreateInstanceBridge {
         }
     }
 
+    /** OptiFine only lists Minecraft versions with a published installer. */
+    @WorkerThread
+    fun loaderGameVersions(loader: AerixLoader): List<String> {
+        if (loader == AerixLoader.OPTIFINE) {
+            val versions = optiFineCache ?: OptiFineUtils.downloadOptiFineVersions()
+                ?.also { optiFineCache = it } ?: throw IOException("OptiFine versions are unavailable")
+            return versions.gameVersions.map { it.removePrefix("Minecraft").trim() }.distinct()
+        }
+        return gameVersions().map { it.id }.distinct()
+    }
+
     private fun fabriclike(utils: FabriclikeUtils, gameVersion: String?): List<AerixLoaderVersion> {
         if (gameVersion == null) return emptyList()
         // The loader endpoint answers for any id; only offer it when the game version is supported.
@@ -179,9 +190,9 @@ object PojavCreateInstanceBridge {
     private fun bta(): List<AerixLoaderVersion> {
         val list = btaCache ?: BTAUtils.downloadVersionList()?.also { btaCache = it } ?: return emptyList()
         val result = ArrayList<AerixLoaderVersion>()
-        list.testedVersions.forEach { result.add(AerixLoaderVersion(it.versionName, it.versionName, true, it)) }
-        list.untestedVersions.forEach { result.add(AerixLoaderVersion(it.versionName, it.versionName, false, it)) }
-        list.nightlyVersions.forEach { result.add(AerixLoaderVersion(it.versionName, it.versionName, false, it)) }
+        list.testedVersions.forEach { result.add(AerixLoaderVersion(it.versionName, it.versionName, true, it, "Supported")) }
+        list.untestedVersions.forEach { result.add(AerixLoaderVersion(it.versionName, it.versionName, false, it, "Untested")) }
+        list.nightlyVersions.forEach { result.add(AerixLoaderVersion(it.versionName, it.versionName, false, it, "Nightly")) }
         return result
     }
 
