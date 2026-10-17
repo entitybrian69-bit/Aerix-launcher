@@ -592,4 +592,8 @@
     <string name="dock_migration">Moving files</string>
     <string name="dock_extract">Extracting files</string>
     <plurals name="dock_tasks"><item quantity="one">%d active task</item><item quantity="other">%d active tasks</item></plurals>
+    <string name="fps_overlay_waiting">-- FPS</string>
+    <string name="fps_overlay_unavailable">FPS unavailable</string>
+    <string name="fps_overlay_value">%1$d FPS (avg. %2$d)</string>
+    <string name="fps_overlay_drag">Drag the FPS counter to move it</string>
 </resources>

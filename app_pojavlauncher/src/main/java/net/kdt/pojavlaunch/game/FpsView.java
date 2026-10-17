@@ -1,188 +1,198 @@
 package net.kdt.pojavlaunch.game;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.RectF;
+import android.os.SystemClock;
 import android.util.AttributeSet;
-import android.view.Choreographer;
+import android.view.MotionEvent;
 import android.view.View;
-
+import android.view.ViewConfiguration;
 import androidx.annotation.Nullable;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
+import net.kdt.pojavlaunch.R;
+import net.kdt.pojavlaunch.game.platform.Platform;
+import net.kdt.pojavlaunch.game.platform.backend.GLFWBackend;
 
-import java.util.Locale;
-
-/**
- * Small frame rate readout drawn over the game.
- *
- * The counter is driven by the frame callback of the window, so it measures the frames the device
- * actually presents, and it is only active while it is visible: a hidden readout costs nothing.
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/gpl-3.0.txt>.
- */
-public class FpsView extends View implements Choreographer.FrameCallback {
-    /** How often the readout is refreshed, in milliseconds. */
+/** Draggable game-render FPS readout. Android UI vsync is deliberately not a frame source. */
+public class FpsView extends View {
     private static final long UPDATE_INTERVAL_MS = 500;
-    /** How many refreshes the average covers. */
-    private static final int AVERAGE_SAMPLES = 10;
+    private final Paint background = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final RectF backgroundRect = new RectF(), bounds = new RectF();
+    private final FrameRateSampler sampler = new FrameRateSampler();
+    private SharedPreferences preferences;
+    private boolean running, positionLoaded, dragging;
+    private int pointerId = -1, touchSlop;
+    private float downX, downY, startX, startY;
+    private String text = "-- FPS";
+    private View host;
+    private final int[] parentLocation = new int[2];
+    private final OnLayoutChangeListener hostLayout = (v, l, t, r, b, ol, ot, or, ob) -> {
+        if (r - l != or - ol || b - t != ob - ot) post(this::restorePosition);
+    };
+    private final Runnable poll = new Runnable() {
+        @Override public void run() {
+            if (!running) return;
+            // Backends that bypass GLFW swaps must not substitute UI refresh rate for game FPS.
+            long count = Platform.PLATFORM instanceof GLFWBackend ? NativeFrameCounter.read() : -1;
+            if (count < 0) {
+                sampler.reset();
+                updateText(getContext().getString(R.string.fps_overlay_unavailable));
+            } else if (sampler.sample(count, SystemClock.elapsedRealtimeNanos())) {
+                updateText(getContext().getString(R.string.fps_overlay_value, sampler.fps(), sampler.average()));
+            }
+            postDelayed(this, UPDATE_INTERVAL_MS);
+        }
+    };
 
-    private final Paint mBackgroundPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint mTextPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final RectF mBackgroundRect = new RectF();
-    private final int[] mSamples = new int[AVERAGE_SAMPLES];
-
-    private boolean mRunning = false;
-    private long mIntervalStart = 0;
-    private int mFrames = 0;
-    private int mCurrentFps = 0;
-    private int mSampleCount = 0;
-    private int mSampleIndex = 0;
-    private String mText = "-- FPS";
-
-    public FpsView(Context context) {
-        super(context);
-        init();
-    }
-
-    public FpsView(Context context, @Nullable AttributeSet attrs) {
-        super(context, attrs);
-        init();
-    }
-
-    public FpsView(Context context, @Nullable AttributeSet attrs, int defStyleAttr) {
-        super(context, attrs, defStyleAttr);
-        init();
-    }
-
+    public FpsView(Context context) { super(context); init(); }
+    public FpsView(Context context, @Nullable AttributeSet attrs) { super(context, attrs); init(); }
+    public FpsView(Context context, @Nullable AttributeSet attrs, int style) { super(context, attrs, style); init(); }
     private void init() {
-        // The readout must never take a touch away from the game controls.
-        setClickable(false);
-        setFocusable(false);
+        setClickable(true);
+        setFocusable(true);
         setWillNotDraw(false);
-
-        mBackgroundPaint.setColor(0xB0000000);
-        mTextPaint.setColor(Color.WHITE);
-        mTextPaint.setTypeface(android.graphics.Typeface.MONOSPACE);
-        mTextPaint.setTextAlign(Paint.Align.LEFT);
-        float textSize = getResources().getDisplayMetrics().scaledDensity * 12f;
-        mTextPaint.setTextSize(textSize);
+        preferences = getContext().getSharedPreferences("fps_overlay", Context.MODE_PRIVATE);
+        touchSlop = ViewConfiguration.get(getContext()).getScaledTouchSlop();
+        background.setColor(0xB0000000);
+        textPaint.setColor(Color.WHITE);
+        textPaint.setTypeface(android.graphics.Typeface.MONOSPACE);
+        textPaint.setTextAlign(Paint.Align.LEFT);
+        textPaint.setTextSize(getResources().getDisplayMetrics().scaledDensity * 12f);
+        setContentDescription(getContext().getString(R.string.fps_overlay_drag));
+        ViewCompat.setOnApplyWindowInsetsListener(this, (v, insets) -> { post(this::restorePosition); return insets; });
     }
-
-    @Override
-    protected void onVisibilityChanged(View changedView, int visibility) {
-        super.onVisibilityChanged(changedView, visibility);
-        updateRunning();
-    }
-
-    @Override
-    protected void onWindowVisibilityChanged(int visibility) {
-        super.onWindowVisibilityChanged(visibility);
-        updateRunning();
-    }
-
-    @Override
-    protected void onAttachedToWindow() {
-        super.onAttachedToWindow();
-        updateRunning();
-    }
-
-    @Override
-    protected void onDetachedFromWindow() {
-        stopCounting();
-        super.onDetachedFromWindow();
-    }
-
-    /** Start or stop the counter, depending on whether the readout can be seen. */
-    private void updateRunning() {
-        if (isAttachedToWindow() && getVisibility() == VISIBLE && getWindowVisibility() == VISIBLE) {
-            startCounting();
-        } else {
-            stopCounting();
-        }
-    }
-
-    private void startCounting() {
-        if (mRunning) return;
-        mRunning = true;
-        mFrames = 0;
-        mSampleCount = 0;
-        mSampleIndex = 0;
-        mIntervalStart = 0;
-        Choreographer.getInstance().postFrameCallback(this);
-    }
-
-    private void stopCounting() {
-        if (!mRunning) return;
-        mRunning = false;
-        Choreographer.getInstance().removeFrameCallback(this);
-    }
-
-    @Override
-    public void doFrame(long frameTimeNanos) {
-        if (!mRunning) return;
-        Choreographer.getInstance().postFrameCallback(this);
-
-        long now = frameTimeNanos / 1000000L;
-        if (mIntervalStart == 0) {
-            mIntervalStart = now;
-            return;
-        }
-        mFrames++;
-        long elapsed = now - mIntervalStart;
-        if (elapsed < UPDATE_INTERVAL_MS) return;
-
-        mCurrentFps = (int) (mFrames * 1000L / elapsed);
-        mFrames = 0;
-        mIntervalStart = now;
-        mSamples[mSampleIndex] = mCurrentFps;
-        mSampleIndex = (mSampleIndex + 1) % AVERAGE_SAMPLES;
-        if (mSampleCount < AVERAGE_SAMPLES) mSampleCount++;
-
-        mText = String.format(Locale.US, "%d FPS (avg. %d)", mCurrentFps, averageFps());
+    private void updateText(String value) {
+        if (value.equals(text)) return;
+        text = value;
+        setContentDescription(value + ". " + getContext().getString(R.string.fps_overlay_drag));
         requestLayout();
         invalidate();
     }
-
-    private int averageFps() {
-        if (mSampleCount == 0) return mCurrentFps;
-        int total = 0;
-        for (int i = 0; i < mSampleCount; i++) total += mSamples[i];
-        return Math.round((float) total / mSampleCount);
+    @Override protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        if (getParent() instanceof View) {
+            host = (View) getParent();
+            host.addOnLayoutChangeListener(hostLayout);
+        }
+        post(this::restorePosition);
+        updateRunning();
     }
-
-    @Override
-    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        int horizontalPadding = getPaddingLeft() + getPaddingRight();
-        int verticalPadding = getPaddingTop() + getPaddingBottom();
-        int desiredWidth = (int) Math.ceil(mTextPaint.measureText(mText)) + horizontalPadding;
-        int desiredHeight = (int) Math.ceil(mTextPaint.getFontMetrics().descent
-                - mTextPaint.getFontMetrics().ascent) + verticalPadding;
-
-        setMeasuredDimension(
-                resolveSize(desiredWidth, widthMeasureSpec),
-                resolveSize(desiredHeight, heightMeasureSpec));
+    @Override protected void onDetachedFromWindow() {
+        stopCounting();
+        if (host != null) { host.removeOnLayoutChangeListener(hostLayout); host = null; }
+        super.onDetachedFromWindow();
     }
-
-    @Override
-    protected void onDraw(Canvas canvas) {
+    @Override protected void onVisibilityChanged(View changed, int visibility) { super.onVisibilityChanged(changed, visibility); updateRunning(); }
+    @Override protected void onWindowVisibilityChanged(int visibility) { super.onWindowVisibilityChanged(visibility); updateRunning(); }
+    @Override public void onWindowFocusChanged(boolean focus) { super.onWindowFocusChanged(focus); updateRunning(); }
+    private void updateRunning() {
+        if (isAttachedToWindow() && isShown() && getWindowVisibility() == VISIBLE && hasWindowFocus()) {
+            if (running) return;
+            running = true;
+            sampler.reset();
+            updateText(getContext().getString(R.string.fps_overlay_waiting));
+            post(poll);
+        } else stopCounting();
+    }
+    private void stopCounting() {
+        if (!running) return;
+        running = false;
+        removeCallbacks(poll);
+        pointerId = -1;
+        dragging = false;
+        if (getParent() != null) getParent().requestDisallowInterceptTouchEvent(false);
+    }
+    private boolean updateBounds() {
+        if (host == null || host.getWidth() == 0 || getWidth() == 0) return false;
+        float left = host.getPaddingLeft(), top = host.getPaddingTop();
+        float right = host.getWidth() - host.getPaddingRight();
+        float bottom = host.getHeight() - host.getPaddingBottom();
+        WindowInsetsCompat windowInsets = ViewCompat.getRootWindowInsets(this);
+        if (windowInsets != null) {
+            Insets safe = windowInsets.getInsets(WindowInsetsCompat.Type.displayCutout() | WindowInsetsCompat.Type.systemBars());
+            host.getLocationInWindow(parentLocation);
+            left = Math.max(left, safe.left - parentLocation[0]);
+            top = Math.max(top, safe.top - parentLocation[1]);
+            right = Math.min(right, getRootView().getWidth() - safe.right - parentLocation[0]);
+            bottom = Math.min(bottom, getRootView().getHeight() - safe.bottom - parentLocation[1]);
+        }
+        bounds.set(left, top, Math.max(left, right - getWidth()), Math.max(top, bottom - getHeight()));
+        return true;
+    }
+    private void moveTo(float x, float y) {
+        if (!updateBounds()) return;
+        setX(OverlayPosition.clamp(x, bounds.left, bounds.right));
+        setY(OverlayPosition.clamp(y, bounds.top, bounds.bottom));
+    }
+    private void restorePosition() {
+        if (pointerId != -1 || !updateBounds()) return;
+        if (preferences.contains("x") && preferences.contains("y")) {
+            setX(OverlayPosition.restore(preferences.getFloat("x", 0), bounds.left, bounds.right));
+            setY(OverlayPosition.restore(preferences.getFloat("y", 0), bounds.top, bounds.bottom));
+        } else moveTo(getX(), getY());
+        positionLoaded = true;
+    }
+    private void savePosition() {
+        if (!updateBounds()) return;
+        preferences.edit()
+            .putFloat("x", OverlayPosition.fraction(getX(), bounds.left, bounds.right))
+            .putFloat("y", OverlayPosition.fraction(getY(), bounds.top, bounds.bottom)).apply();
+    }
+    @Override public boolean onTouchEvent(MotionEvent event) {
+        switch (event.getActionMasked()) {
+            case MotionEvent.ACTION_DOWN:
+                pointerId = event.getPointerId(0);
+                downX = event.getRawX(); downY = event.getRawY();
+                startX = getX(); startY = getY(); dragging = false;
+                getParent().requestDisallowInterceptTouchEvent(true);
+                return true;
+            case MotionEvent.ACTION_MOVE:
+                if (pointerId == -1 || event.getPointerId(0) != pointerId) return true;
+                float dx = event.getRawX() - downX, dy = event.getRawY() - downY;
+                if (dx * dx + dy * dy > touchSlop * touchSlop) dragging = true;
+                if (dragging) moveTo(startX + dx, startY + dy);
+                return true;
+            case MotionEvent.ACTION_POINTER_UP:
+                if (event.getPointerId(event.getActionIndex()) != pointerId) return true;
+                // Do not transfer the drag to another finger and jump across the game screen.
+                if (dragging) savePosition();
+                pointerId = -1; dragging = false;
+                getParent().requestDisallowInterceptTouchEvent(false);
+                return true;
+            case MotionEvent.ACTION_UP:
+                if (pointerId != -1) { if (dragging) savePosition(); else performClick(); }
+                pointerId = -1; dragging = false;
+                getParent().requestDisallowInterceptTouchEvent(false);
+                return true;
+            case MotionEvent.ACTION_CANCEL:
+                if (dragging) moveTo(startX, startY);
+                pointerId = -1; dragging = false;
+                getParent().requestDisallowInterceptTouchEvent(false);
+                return true;
+            default: return true;
+        }
+    }
+    @Override public boolean performClick() { super.performClick(); return true; }
+    @Override protected void onSizeChanged(int w, int h, int oldw, int oldh) {
+        super.onSizeChanged(w, h, oldw, oldh);
+        post(() -> { if (!positionLoaded) restorePosition(); else moveTo(getX(), getY()); });
+    }
+    @Override protected void onMeasure(int widthSpec, int heightSpec) {
+        int width = (int) Math.ceil(textPaint.measureText(text)) + getPaddingLeft() + getPaddingRight();
+        int height = (int) Math.ceil(textPaint.getFontMetrics().descent - textPaint.getFontMetrics().ascent) + getPaddingTop() + getPaddingBottom();
+        setMeasuredDimension(resolveSize(width, widthSpec), resolveSize(height, heightSpec));
+    }
+    @Override protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
-        float radius = getHeight() / 4f;
-        mBackgroundRect.set(0, 0, getWidth(), getHeight());
-        canvas.drawRoundRect(mBackgroundRect, radius, radius, mBackgroundPaint);
-
-        float textY = -mTextPaint.getFontMetrics().ascent + getPaddingTop();
-        canvas.drawText(mText, getPaddingLeft(), textY, mTextPaint);
+        backgroundRect.set(0, 0, getWidth(), getHeight());
+        canvas.drawRoundRect(backgroundRect, getHeight() / 4f, getHeight() / 4f, background);
+        canvas.drawText(text, getPaddingLeft(), -textPaint.getFontMetrics().ascent + getPaddingTop(), textPaint);
     }
 }
