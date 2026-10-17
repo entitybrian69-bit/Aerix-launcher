@@ -49,11 +49,12 @@ public class ModpackInstaller {
             ModIconCache.writeInstanceImage(instance, icon);
 
             Instances.setSelectedInstance(instance);
-            InstanceRefreshEvents.notifyChanged();
             if(loaderInstaller.requiresGuiInstallation()) {
                 instance.installer.start();
             }
             else ContextExecutor.executeActivity(activity -> Toast.makeText(activity, R.string.modpack_install_toast_success, Toast.LENGTH_SHORT).show());
+            // Refresh only after installation (or GUI-installer handoff) succeeded.
+            InstanceRefreshEvents.notifyChanged();
         } catch (IOException e) {
             Instances.removeInstance(instance);
             throw e;
