@@ -87,7 +87,7 @@ public final class InGameAccountSwitcher {
                 AtomicFile file = new AtomicFile(new File(directory, "switch-pending.json"));
                 FileOutputStream stream = file.startWrite();
                 try { stream.write(json.toString().getBytes(StandardCharsets.UTF_8)); file.finishWrite(stream); }
-                catch (Exception e) { file.failWrite(stream); throw e; }
+                catch (Exception e) { file.failWrite(stream); file.delete(); throw e; }
                 if (!file.getBaseFile().renameTo(new File(directory, "switch.json"))) { file.delete(); throw new IllegalStateException("Unable to publish account request"); }
                 activity.runOnUiThread(() -> waitForResult(activity, id, System.currentTimeMillis() + 20_000));
             } catch (Exception e) { REQUESTING.set(false); explain(activity, e.getMessage()); }

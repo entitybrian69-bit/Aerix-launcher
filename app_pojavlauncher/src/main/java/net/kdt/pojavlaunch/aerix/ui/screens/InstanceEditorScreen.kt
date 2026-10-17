@@ -237,6 +237,24 @@ fun InstanceEditorScreen(activity: FragmentActivity, onClose: () -> Unit) {
         )
     }
 
+    // The loader needs the editor's width, not the old fixed 264 dp navigation sidebar.
+    // Every loader still uses the same inline workspace; no legacy installer page opens.
+    if (activeTab == "loader") {
+        val backToInstance = {
+            activeTab = "overview"
+            PojavInstanceBridge.requestedSubTab = "overview"
+        }
+        androidx.activity.compose.BackHandler(onBack = backToInstance)
+        Surface(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp, vertical = 4.dp),
+            shape = RoundedCornerShape(AerixRadii.panel), color = AerixSurface.panel,
+            border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft)
+        ) {
+            InlineLoaderPane(activity, draft.versionId, backToInstance)
+        }
+        return
+    }
+
     // Two-pane layout from Mirai VersionSettingsScreen.kt (Screenshot 2)
     Row(
         modifier = Modifier

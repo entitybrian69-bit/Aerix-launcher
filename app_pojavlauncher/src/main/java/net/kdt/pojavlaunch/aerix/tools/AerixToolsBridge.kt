@@ -24,6 +24,7 @@ import java.util.UUID
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
+@androidx.annotation.Keep
 internal data class ServerProfile(
     val id: String = UUID.randomUUID().toString(),
     val name: String,

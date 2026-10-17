@@ -86,6 +86,11 @@ object PojavLaunchBridge {
                 Toast.makeText(activity, "Minecraft is already running", Toast.LENGTH_LONG).show()
                 return
             }
+            if (net.kdt.pojavlaunch.authenticator.accounts.Accounts.getCurrent() == null) {
+                Toast.makeText(activity, R.string.no_saved_accounts, Toast.LENGTH_LONG).show()
+                ExtraCore.setValue(ExtraConstants.SELECT_AUTH_METHOD, true)
+                return
+            }
             val gameDir = instance.gameDirectory
             when {
                 GameRunner.hasVkMod(gameDir) -> AlertDialog.Builder(activity)

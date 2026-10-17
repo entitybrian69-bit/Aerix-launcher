@@ -26,6 +26,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public final class AerixCompanion implements ClientModInitializer {
     private static Path bridge;
     private static int ticks;
+    private static volatile boolean switchedSession;
+    public static boolean hasSwitchedSession() { return switchedSession; }
     private static volatile String requestId = "";
     private static volatile String message = "Ready. Disconnect before switching accounts.";
     private static final AtomicBoolean SWITCHING = new AtomicBoolean();
@@ -38,14 +40,18 @@ public final class AerixCompanion implements ClientModInitializer {
         String path = System.getProperty("aerix.bridge.path", "");
         if (!path.isEmpty()) {
             bridge = Path.of(path);
-            try { Files.createDirectories(bridge); Files.deleteIfExists(bridge.resolve("switch.json")); } catch (Exception ignored) { bridge = null; }
+            try {
+                Files.createDirectories(bridge);
+                for (String stale : new String[]{"switch.json", "switch-pending.json", "switch-pending.json.bak", "switch-pending.json.new"}) Files.deleteIfExists(bridge.resolve(stale));
+            } catch (Exception ignored) { bridge = null; }
         }
     }
 
     public static Identifier cape(UUID uuid) { return CapeCache.texture(uuid); }
 
     private static boolean disconnected(MinecraftClient client) {
-        return client.world == null && client.getNetworkHandler() == null && !client.isIntegratedServerRunning();
+        return client.currentScreen instanceof net.minecraft.client.gui.screen.TitleScreen
+                && client.world == null && client.getNetworkHandler() == null && !client.isIntegratedServerRunning();
     }
 
     public static void tick(MinecraftClient client) {
@@ -79,7 +85,7 @@ public final class AerixCompanion implements ClientModInitializer {
 
     private static void prepare(MinecraftClient client, JsonObject json) {
         try {
-            if (!disconnected(client)) throw new IllegalStateException("Save and disconnect first. Your account was not changed.");
+            if (!disconnected(client)) throw new IllegalStateException("Save, disconnect and return to the title screen first. Your account was not changed.");
             if (!json.get("provider").getAsString().equals(System.getProperty("aerix.auth.provider", "mojang"))) throw new IllegalStateException("Changing authentication provider requires restarting Minecraft.");
             String type = json.get("type").getAsString();
             if (!type.equals("local") && json.get("expires").getAsLong() <= System.currentTimeMillis()) throw new IllegalStateException("Account expired. Sign in again in the launcher.");
@@ -108,6 +114,7 @@ public final class AerixCompanion implements ClientModInitializer {
                             access.aerix$reports(reports);
                             access.aerix$telemetry(telemetry);
                             access.aerix$properties().clear();
+                            switchedSession = true;
                             message = "Switched to " + session.getUsername() + ". You can rejoin now. Realms requires a restart.";
                         } catch (Exception e) { message = "Switch failed; restart Minecraft before joining."; }
                         finally { SWITCHING.set(false); }

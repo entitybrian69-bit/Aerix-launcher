@@ -166,7 +166,7 @@ private fun WorldLibrary(activity: FragmentActivity) {
                     }, enabled = !busy, modifier = Modifier.heightIn(min = 48.dp)) { Text("Back up") }
                     OutlinedButton(onClick = { export = world.lastBackup; saveZip.launch("${world.directory.name}-backup.zip") },
                         enabled = !busy && world.lastBackup != null, modifier = Modifier.heightIn(min = 48.dp)) { Text("Export backup") }
-                    OutlinedButton(onClick = { Tools.openPath(activity, world.directory, false) }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Open folder") }
+                    OutlinedButton(onClick = { runCatching { Tools.openPath(activity, world.directory, false) }.onFailure { Tools.showError(activity, it) } }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Open folder") }
                 }
             }
         }
@@ -280,7 +280,7 @@ private fun RendererBench(activity: FragmentActivity) {
     var running by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     LazyColumn(verticalArrangement = Arrangement.spacedBy(20.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
-        item { Text("Experimental GLES-wrapper-only off-screen 256 × 256 probe. Mesa/Vulkan renderers are not tested. Checks EGL setup, pixel correctness and 120 synchronized clears after 10 warm-up clears. Timings are NOT Minecraft FPS, shader compatibility, battery usage, or a renderer recommendation. Close Minecraft first. Driver crashes are isolated from the launcher.", color = AerixSurface.textSecondary) }
+        item { Text("Experimental GLES-wrapper-only off-screen 256 × 256 probe. Mesa/Vulkan renderers are not tested. Checks EGL setup, pixel correctness and 120 synchronized clears after 10 warm-up clears. Timings are NOT Minecraft FPS, shader compatibility, battery usage, or a renderer recommendation. Close Minecraft first. Probe-process crashes are isolated from the launcher, but GPU-driver faults can still affect Android.", color = AerixSurface.textSecondary) }
         items(options, key = { it.first }) { (tag, renderer) ->
             StudioCard(renderer.name()) {
                 val raw = results[tag].orEmpty()
@@ -336,7 +336,8 @@ private fun SharedCapes(activity: FragmentActivity) {
         item { StudioCard("Upload a cape") {
             Text("Account: ${current?.username ?: "Select an account first"}. Use the upload key assigned to this account's UUID by your service administrator. Never enter a Minecraft password or access token here. Upload keys are not saved.", color = AerixSurface.textSecondary)
             OutlinedTextField(key, { key = it }, label = { Text("Cape service upload key") }, modifier = Modifier.fillMaxWidth(),
-                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(), singleLine = true)
+                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Password), singleLine = true)
             OutlinedButton(onClick = { capePicker.launch(arrayOf("image/png")) }, enabled = !busy) { Text(if (pendingImage == null) "Choose 64 × 32 PNG" else "Choose another PNG") }
             Button(onClick = { scope.launch {
                 busy = true
@@ -392,7 +393,7 @@ internal fun HomeWorldCards(activity: FragmentActivity) {
                         catch (e: Exception) { if (e is CancellationException) throw e; message = e.message }
                         finally { busy = false }
                     } }, enabled = !busy, modifier = Modifier.heightIn(min = 48.dp)) { Text("Back up") }
-                    OutlinedButton(onClick = { Tools.openPath(activity, world.directory, false) }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Open folder") }
+                    OutlinedButton(onClick = { runCatching { Tools.openPath(activity, world.directory, false) }.onFailure { Tools.showError(activity, it) } }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Open folder") }
                 }
             }
         }

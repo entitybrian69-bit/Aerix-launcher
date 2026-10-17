@@ -9,6 +9,7 @@ import net.kdt.pojavlaunch.game.renderer.GameRenderer
 import net.kdt.pojavlaunch.game.renderer.def.Renderers
 
 /** Driver failures are confined to this disposable process. */
+@androidx.annotation.Keep
 class RendererProbeService : Service() {
     private external fun runNative(library: String, gles: Int): String
     private val binder = object : IRendererProbe.Stub() {

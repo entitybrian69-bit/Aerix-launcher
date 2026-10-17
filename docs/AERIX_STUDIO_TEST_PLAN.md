@@ -15,6 +15,7 @@ as Minecraft FPS, shader support, or full compatibility.
 
 ## Device acceptance checklist (not yet executed)
 1. On narrow portrait and short landscape screens, open Library → instance → Loader.
+   The 264 dp sidebar must give way to a full-width inline loader workspace with a back action.
    Check all seven loaders. Buttons must not overlap; small screens show one full-width
    version/build list at a time. OptiFine and BTA stay in the same loader area.
 2. Open Studio in both orientations; check every tool and the on-screen keyboard.

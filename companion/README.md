@@ -15,10 +15,10 @@ Cache refresh is once a minute, capped at 512 players and 16 outstanding downloa
 ## In-game account switching
 Launch from Aerix, save/disconnect to the title screen, and choose **Switch account**
 in Android's game drawer. Minecraft stays open. This protocol is deliberately unavailable
-while a world/server connection exists. The selected account must be saved, unexpired,
+unless the client is disconnected and on the title screen. The selected account must be saved, unexpired,
 and use the same authentication provider that launched the JVM. It changes the running
 session, not the launcher's default account. Sign-in/refresh and provider changes need the
-launcher; provider changes and Realms need a restart. Realms' cached client is not rebuilt.
+launcher; provider changes and Realms need a restart. Realms' cached client is not rebuilt; its main screen is blocked after a switch until restart.
 
 The private Android files directory carries a short-lived request and a heartbeat.
 No credentials are placed in game directories, backups, logs, or public endpoints.
