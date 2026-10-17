@@ -197,9 +197,9 @@ fun HomeScreen(activity: FragmentActivity, navigate: (LauncherSection) -> Unit) 
                     .padding(start = AerixSpacing.mdPlus, end = AerixSpacing.smCompact, top = AerixSpacing.smPlus)
             ) {
                 if (maxWidth >= 720.dp && maxWidth > maxHeight) {
-                    WideHomeDashboard(selected, recent, instances.size, accent, taskCount, actions)
+                    CompactHomeDashboard(selected, recent, instances.size, accent, taskCount, actions, activity)
                 } else {
-                    CompactHomeDashboard(selected, recent, instances.size, accent, taskCount, actions)
+                    CompactHomeDashboard(selected, recent, instances.size, accent, taskCount, actions, activity)
                 }
             }
             if (showActionMenu) {
@@ -519,7 +519,8 @@ private fun CompactHomeDashboard(
     count: Int,
     accent: Color,
     taskCount: Int,
-    actions: HomeActions
+    actions: HomeActions,
+    activity: FragmentActivity
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -534,6 +535,7 @@ private fun CompactHomeDashboard(
             }
         }
         item { ActiveWorldPanel(selected, accent, actions, Modifier.fillMaxWidth().height(190.dp)) }
+        item { HomeWorldCards(activity) }
         item { TaskSummaryPanel(taskCount, accent, Modifier.fillMaxWidth().height(74.dp)) }
         item { RecentWorldsPanel(recent, selected, accent, actions, Modifier.fillMaxWidth(), lazy = false) }
         item { QuickToolsPanel(accent, actions, Modifier.fillMaxWidth(), scrollable = false) }

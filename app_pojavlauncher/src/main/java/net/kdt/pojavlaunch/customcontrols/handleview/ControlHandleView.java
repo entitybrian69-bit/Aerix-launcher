@@ -68,6 +68,7 @@ public class ControlHandleView extends View {
     public boolean onTouchEvent(MotionEvent event) {
         switch (event.getActionMasked()){
             case MotionEvent.ACTION_DOWN:
+                mView.getControlLayoutParent().recordEditState();
                 mXOffset = event.getX();
                 mYOffset = event.getY();
                 break;

@@ -50,7 +50,7 @@ public class CustomControlsActivity extends BaseActivity implements EditorExitab
 		mPullDrawerButton.setOnClickListener(v -> mDrawerLayout.openDrawer(mDrawerNavigationView));
 		mDrawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED);
 
-		mDrawerNavigationView.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_list_item_1,getResources().getStringArray(R.array.menu_customcontrol_customactivity)));
+		mDrawerNavigationView.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_list_item_1,studioMenu()));
 		mDrawerNavigationView.setOnItemClickListener((parent, view, position, id) -> {
 			switch(position) {
 				case 0: mControlLayout.addControlButton(new ControlData("New")); break;
@@ -59,6 +59,7 @@ public class CustomControlsActivity extends BaseActivity implements EditorExitab
 				case 3: mControlLayout.openLoadDialog(); break;
 				case 4: mControlLayout.openSaveDialog(this); break;
 				case 5: mControlLayout.openSetDefaultDialog(); break;
+                case 7: mControlLayout.showStudioTools(); break;
 				case 6: // Saving the currently shown control
 					try {
 						Uri contentUri = DocumentsContract.buildDocumentUri(getString(R.string.storageProviderAuthorities), mControlLayout.saveToDirectory(mControlLayout.mLayoutFileName));
@@ -81,6 +82,13 @@ public class CustomControlsActivity extends BaseActivity implements EditorExitab
 		});
 		mControlLayout.setModifiable(true);
 	}
+
+    private String[] studioMenu() {
+        String[] original = getResources().getStringArray(R.array.menu_customcontrol_customactivity);
+        String[] extended = java.util.Arrays.copyOf(original, original.length + 1);
+        extended[original.length] = "Studio tools";
+        return extended;
+    }
 
 	@Override
 	public void onAttachedToWindow() {

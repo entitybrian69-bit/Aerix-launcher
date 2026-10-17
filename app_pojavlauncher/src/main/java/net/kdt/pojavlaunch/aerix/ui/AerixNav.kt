@@ -42,13 +42,16 @@ object AerixNav {
     /** Kept as an alias so existing callers open the Launcher tab. */
     const val TAB_APPEARANCE = TAB_LAUNCHER
 
+    var studioTool by mutableStateOf<String?>(null)
+
     private val pageSections = setOf(
         LauncherSection.CREATE_INSTANCE,
         LauncherSection.INSTANCE_EDITOR,
         LauncherSection.ADD_ACCOUNT,
         LauncherSection.OFFLINE_ACCOUNT,
         LauncherSection.FILES,
-        LauncherSection.LOGS
+        LauncherSection.LOGS,
+        LauncherSection.STUDIO
     )
 
     var section by mutableStateOf(LauncherSection.HOME)

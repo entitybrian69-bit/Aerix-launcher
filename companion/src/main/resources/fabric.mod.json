@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "id": "aerix_companion",
+  "version": "0.1.0",
+  "name": "Aerix Companion",
+  "description": "Optional shared capes and disconnected-session account switching for Fabric 1.20.1.",
+  "environment": "client",
+  "entrypoints": {"client": ["net.aerix.companion.AerixCompanion"]},
+  "mixins": ["aerix-companion.mixins.json"],
+  "license": "GPL-3.0-or-later",
+  "depends": {"fabricloader": ">=0.16.0", "minecraft": "1.20.1", "java": ">=17"}
+}

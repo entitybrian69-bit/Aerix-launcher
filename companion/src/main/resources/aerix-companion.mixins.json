@@ -1,0 +1,7 @@
+{
+  "required": true,
+  "package": "net.aerix.companion.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "client": ["CapeMixin", "ClientTickMixin", "ClientSessionAccess"],
+  "injectors": {"defaultRequire": 1}
+}

@@ -92,7 +92,8 @@ enum class LauncherSection {
     CREATE_INSTANCE,
     INSTANCE_EDITOR,
     ADD_ACCOUNT,
-    OFFLINE_ACCOUNT
+    OFFLINE_ACCOUNT,
+    STUDIO
 }
 
 @Composable
@@ -176,6 +177,12 @@ fun AerixNavigationRail(
                     discoverSelected(selectedSection), activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.DISCOVER) }
                 RailIconItem(R.drawable.aerix_ic_format_paint_outlined, stringResource(R.string.aerix_nav_wallpapers),
                     wallpapersSelected(selectedSection), activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.WALLPAPERS) }
+
+                RailIconItem(R.drawable.aerix_ic_build_outlined, "Studio",
+                    selectedSection == LauncherSection.STUDIO, activeAccent, expandedRail, compactRail) {
+                    AerixNav.studioTool = null
+                    onNavigate(LauncherSection.STUDIO)
+                }
 
                 HorizontalDivider(modifier = Modifier.width(28.dp).padding(vertical = AerixSpacing.xxs), color = AerixSurface.borderSoft)
 

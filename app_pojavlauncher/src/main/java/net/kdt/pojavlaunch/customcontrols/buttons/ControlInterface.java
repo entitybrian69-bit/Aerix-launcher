@@ -249,6 +249,11 @@ public interface ControlInterface extends View.OnLongClickListener, PlatformGrab
      * @param y Coordinate on the y axis
      */
     default void snapAndAlign(float x, float y) {
+        if (getControlLayoutParent().isGridSnapEnabled()) {
+            float grid = Tools.dpToPx(24);
+            x = MathUtils.clamp(Math.round(x / grid) * grid, 0, Math.max(0, getControlLayoutParent().getWidth() - getControlView().getWidth()));
+            y = MathUtils.clamp(Math.round(y / grid) * grid, 0, Math.max(0, getControlLayoutParent().getHeight() - getControlView().getHeight()));
+        }
         final float MIN_DISTANCE = getSnapDistance();
         String dynamicX = generateDynamicX(x);
         String dynamicY = generateDynamicY(y);
@@ -256,7 +261,7 @@ public interface ControlInterface extends View.OnLongClickListener, PlatformGrab
         getControlView().setX(x);
         getControlView().setY(y);
 
-        for (ControlInterface button : ((ControlLayout) getControlView().getParent()).getButtonChildren()) {
+        if (!getControlLayoutParent().isGridSnapEnabled()) for (ControlInterface button : ((ControlLayout) getControlView().getParent()).getButtonChildren()) {
             //Step 1: Filter unwanted buttons
             if (!canSnap(button)) continue;
 
@@ -362,6 +367,7 @@ public interface ControlInterface extends View.OnLongClickListener, PlatformGrab
 
                 switch (event.getActionMasked()) {
                     case MotionEvent.ACTION_DOWN:
+                        getControlLayoutParent().recordEditState();
                         mCanTriggerLongClick = true;
                         downRawX = event.getRawX();
                         downRawY = event.getRawY();
@@ -375,7 +381,7 @@ public interface ControlInterface extends View.OnLongClickListener, PlatformGrab
                         getControlLayoutParent().adaptPanelPosition();
                         snapAndAlign(
                                 MathUtils.clamp(event.getRawX() - downX, 0, getControlLayoutParent().getWidth() - view.getWidth()),
-                                MathUtils.clamp(event.getRawY() - downY, 0, getControlLayoutParent().getWidth() - view.getHeight())
+                                MathUtils.clamp(event.getRawY() - downY, 0, getControlLayoutParent().getHeight() - view.getHeight())
                         );
                         break;
                     case MotionEvent.ACTION_UP:

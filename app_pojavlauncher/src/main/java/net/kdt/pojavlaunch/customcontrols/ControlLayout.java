@@ -47,6 +47,96 @@ import java.util.HashMap;
 import java.util.List;
 
 public class ControlLayout extends FrameLayout {
+    private final java.util.ArrayDeque<String> mUndo = new java.util.ArrayDeque<>();
+    private final java.util.ArrayDeque<String> mRedo = new java.util.ArrayDeque<>();
+    private boolean mRestoringHistory;
+
+    public void recordEditState() {
+        if (!mModifiable || mLayout == null || mRestoringHistory) return;
+        String json = Tools.GLOBAL_GSON.toJson(mLayout);
+        if (json.length() > 262144 || json.equals(mUndo.peekLast())) return;
+        if (mUndo.size() >= 20) mUndo.removeFirst();
+        mUndo.addLast(json);
+        mRedo.clear();
+    }
+
+    private void restoreHistory(boolean redo) {
+        java.util.ArrayDeque<String> source = redo ? mRedo : mUndo;
+        java.util.ArrayDeque<String> destination = redo ? mUndo : mRedo;
+        if (source.isEmpty() || mLayout == null) {
+            Toast.makeText(getContext(), redo ? "Nothing to redo" : "Nothing to undo", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        removeEditWindow();
+        destination.addLast(Tools.GLOBAL_GSON.toJson(mLayout));
+        LayoutBitmaps bitmaps = mLayout.mLayoutBitmaps;
+        CustomControls restored = Tools.GLOBAL_GSON.fromJson(source.removeLast(), CustomControls.class);
+        restored.mLayoutBitmaps = bitmaps;
+        mRestoringHistory = true;
+        try { loadLayout(restored); setModified(true); }
+        finally { mRestoringHistory = false; }
+    }
+
+    public boolean isGridSnapEnabled() {
+        return LauncherPreferences.DEFAULT_PREF.getBoolean("aerix_control_grid_snap", false);
+    }
+
+    public void showStudioTools() {
+        new AlertDialog.Builder(getContext()).setTitle("Touch-control studio")
+            .setItems(new String[]{"Undo", "Redo", "Mirror horizontally", isGridSnapEnabled() ? "Turn grid snapping off" : "Turn grid snapping on", "Menu / gameplay presets"}, (dialog, index) -> {
+                if (index == 0 || index == 1) restoreHistory(index == 1);
+                if (index == 2 && mLayout != null) {
+                    recordEditState();
+                    removeEditWindow();
+                    for (ControlInterface control : getButtonChildren()) {
+                        control.setDynamicX("${screen_width} - (" + control.getProperties().dynamicX + ") - ${width}");
+                    }
+                    setModified(true);
+                    refreshControlButtonPositions();
+                }
+                if (index == 4) showVisibilityPresets();
+                if (index == 3) {
+                    LauncherPreferences.DEFAULT_PREF.edit().putBoolean("aerix_control_grid_snap", !isGridSnapEnabled()).apply();
+                    invalidate();
+                }
+            }).setNegativeButton(android.R.string.cancel, null).show();
+    }
+
+    private void showVisibilityPresets() {
+        List<ControlInterface> controls = new ArrayList<>(getButtonChildren());
+        String[] names = new String[controls.size()];
+        boolean[] chosen = new boolean[controls.size()];
+        for (int i = 0; i < controls.size(); i++) names[i] = controls.get(i).getProperties().name;
+        new AlertDialog.Builder(getContext()).setTitle("Choose buttons for preset")
+            .setMultiChoiceItems(names, chosen, (dialog, which, checked) -> chosen[which] = checked)
+            .setPositiveButton("Choose visibility", (dialog, which) -> new AlertDialog.Builder(getContext())
+                .setTitle("Visibility preset")
+                .setItems(new String[]{"Gameplay only", "Menus only", "Menus and gameplay"}, (presetDialog, preset) -> {
+                    recordEditState();
+                    for (int i = 0; i < controls.size(); i++) {
+                        if (!chosen[i]) continue;
+                        ControlData properties = controls.get(i).getProperties();
+                        properties.displayInGame = preset != 1;
+                        properties.displayInMenu = preset != 0;
+                        controls.get(i).updateProperties();
+                    }
+                    setModified(true);
+                }).setNegativeButton(android.R.string.cancel, null).show())
+            .setNegativeButton(android.R.string.cancel, null).show();
+    }
+
+    @Override protected void dispatchDraw(android.graphics.Canvas canvas) {
+        if (mModifiable && isGridSnapEnabled()) {
+            android.graphics.Paint paint = new android.graphics.Paint();
+            paint.setColor(0x30FFFFFF);
+            paint.setStrokeWidth(Tools.dpToPx(1));
+            float step = Tools.dpToPx(24);
+            for (float x = 0; x < getWidth(); x += step) canvas.drawLine(x, 0, x, getHeight(), paint);
+            for (float y = 0; y < getHeight(); y += step) canvas.drawLine(0, y, getWidth(), y, paint);
+        }
+        super.dispatchDraw(canvas);
+    }
+
 	protected CustomControls mLayout;
 	/* Accessible when inside the game by ControlInterface implementations, cached for perf. */
 	private GameView mGameSurface = null;
@@ -80,6 +170,8 @@ public class ControlLayout extends FrameLayout {
             CustomControls layout = LayoutConverter.loadAndConvertIfNecessary(size, jsonPath);
             loadLayout(layout);
             updateLoadedFileName(jsonPath);
+            mUndo.clear();
+            mRedo.clear();
         }catch (IOException | JsonSyntaxException e) {
             // Load an empty layout on exception to avoid breakage when adding buttons in the editor
             CustomControls customControls = new CustomControls();
@@ -140,6 +232,7 @@ public class ControlLayout extends FrameLayout {
 
 	//CONTROL BUTTON
 	public void addControlButton(ControlData controlButton) {
+        recordEditState();
 		mLayout.mControlDataList.add(controlButton);
 		addControlView(controlButton);
 	}
@@ -159,6 +252,7 @@ public class ControlLayout extends FrameLayout {
 
 	// CONTROL DRAWER
 	public void addDrawer(ControlDrawerData drawerData){
+        recordEditState();
 		mLayout.mDrawerDataList.add(drawerData);
 		addDrawerView();
 	}
@@ -213,6 +307,7 @@ public class ControlLayout extends FrameLayout {
 
 	// JOYSTICK BUTTON
 	public void addJoystickButton(ControlJoystickData data){
+        recordEditState();
 		mLayout.mJoystickDataList.add(data);
 		addJoystickView(data);
 	}
@@ -315,6 +410,7 @@ public class ControlLayout extends FrameLayout {
 	 * to the button at hand.
 	 */
 	public void editControlButton(ControlInterface button){
+        recordEditState();
 		if(mControlDialog == null){
 			// When the panel is null, it needs to inflate first.
 			// So inflate it, then process it on the next frame

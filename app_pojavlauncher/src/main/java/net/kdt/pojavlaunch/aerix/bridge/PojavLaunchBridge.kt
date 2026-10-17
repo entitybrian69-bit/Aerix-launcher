@@ -40,6 +40,7 @@ import net.kdt.pojavlaunch.utils.jre.GameRunner
 object PojavLaunchBridge {
     private fun fire(activity: Activity) {
         try {
+            net.kdt.pojavlaunch.aerix.tools.WorldTaskGate.beginLaunch(activity)
             val runtimes = runCatching { MultiRTUtils.getRuntimes() }.getOrDefault(emptyList())
             if (runtimes.isEmpty()) {
                 val appContext = activity.applicationContext
@@ -66,18 +67,24 @@ object PojavLaunchBridge {
                 ExtraCore.setValue(ExtraConstants.LAUNCH_GAME, true)
             }
         } catch (t: Throwable) {
+            net.kdt.pojavlaunch.aerix.tools.WorldTaskGate.cancelLaunch(activity)
             Tools.showError(activity, t)
         }
     }
 
-    fun play(activity: Activity) {
+    fun play(activity: Activity, serverAddress: String? = null, worldName: String? = null) {
         try {
             val instance = Instances.loadSelectedInstance()
             if (instance == null) {
                 Toast.makeText(activity, R.string.no_instance, Toast.LENGTH_LONG).show()
                 return
             }
+            if (net.kdt.pojavlaunch.aerix.tools.AerixToolsBridge.gameRunning(activity)) {
+                Toast.makeText(activity, "Minecraft is already running", Toast.LENGTH_LONG).show()
+                return
+            }
             val gameDir = instance.gameDirectory
+            net.kdt.pojavlaunch.aerix.tools.QuickLaunchRequest.write(activity, gameDir, serverAddress, worldName)
             when {
                 GameRunner.hasVkMod(gameDir) -> AlertDialog.Builder(activity)
                     .setTitle(R.string.vk_mod_title)

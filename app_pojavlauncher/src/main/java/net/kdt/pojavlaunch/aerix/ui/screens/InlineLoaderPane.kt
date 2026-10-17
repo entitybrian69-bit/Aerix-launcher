@@ -1,11 +1,9 @@
 package net.kdt.pojavlaunch.aerix.ui.screens
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -50,6 +48,9 @@ internal fun InlineLoaderPane(activity: FragmentActivity, currentVersion: String
     var gamesError by remember(loader) { mutableStateOf<String?>(null) }
     var buildsError by remember(loader, gameVersion) { mutableStateOf<String?>(null) }
     var retry by remember { mutableIntStateOf(0) }
+    var chooseLoader by remember { mutableStateOf(false) }
+    var chooseVersion by remember(loader) { mutableStateOf(false) }
+    var showFilters by remember { mutableStateOf(false) }
     val revision = PojavCreateInstanceBridge.versionTableRevision
 
     LaunchedEffect(loader, revision, retry) {
@@ -104,77 +105,96 @@ internal fun InlineLoaderPane(activity: FragmentActivity, currentVersion: String
     val canInstall = !installing && !loadingGames && !loadingBuilds &&
         gamesError == null && buildsError == null && selectedBuild in visibleBuilds && selectedBuild != null
 
-    Column(Modifier.fillMaxSize().padding(AerixSpacing.smPlus), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Modloader", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold,
-            color = AerixSurface.textPrimary)
-        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            loaders.forEach { option ->
-                FilterChip(
-                    selected = loader == option,
-                    onClick = { if (!installing) loader = option },
-                    label = { Text(option.displayName) },
-                    leadingIcon = {
-                        Icon(painterResource(option.iconRes), null, Modifier.size(20.dp), tint = Color.Unspecified)
-                    }
-                )
-            }
-        }
-        Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            LoaderListPanel(
-                title = if (loader == AerixLoader.BTA) "BTA channel" else "Minecraft version",
-                query = gameQuery,
-                onQuery = { gameQuery = it },
-                entries = if (loader == AerixLoader.BTA) listOf("Supported", "Untested", "Nightly")
-                    else games.filter { it.contains(gameQuery, ignoreCase = true) },
-                selected = if (loader == AerixLoader.BTA) group else gameVersion,
-                onSelect = { if (!installing) { if (loader == AerixLoader.BTA) group = it else gameVersion = it } },
-                loading = loadingGames,
-                error = gamesError,
-                onRetry = { retry++ },
-                modifier = Modifier.weight(1f).fillMaxHeight(),
-                showSearch = loader != AerixLoader.BTA
-            )
-            Surface(Modifier.weight(1f).fillMaxHeight(), shape = RoundedCornerShape(AerixRadii.panel),
-                color = AerixSurface.panel, border = BorderStroke(1.dp, AerixSurface.borderSoft)) {
-                Column(Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("${loader.displayName} build", Modifier.weight(1f), color = AerixSurface.textPrimary,
-                            fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        if (loader != AerixLoader.BTA) {
-                            Text("Stable only", style = MaterialTheme.typography.labelSmall, color = AerixSurface.textSecondary)
-                            Switch(checked = onlyStable, onCheckedChange = { onlyStable = it })
+    if (chooseLoader) {
+        AlertDialog(
+            onDismissRequest = { chooseLoader = false },
+            title = { Text("Choose modloader") },
+            text = {
+                LazyColumn(Modifier.fillMaxWidth().heightIn(max = 400.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(loaders) { option ->
+                        OutlinedButton(onClick = { loader = option; chooseLoader = false },
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp), enabled = !installing) {
+                            Icon(painterResource(option.iconRes), null, Modifier.size(24.dp), tint = Color.Unspecified)
+                            Spacer(Modifier.width(16.dp))
+                            Text(option.displayName, Modifier.weight(1f))
+                            if (loader == option) Text("Selected")
                         }
                     }
-                    ModrinthCompactSearchField(buildQuery, { buildQuery = it }, "Search builds", Modifier.fillMaxWidth())
-                    LoaderListBody(
-                        entries = visibleBuilds.map { it.id to it.label }, selected = selectedBuild?.id,
-                        onSelect = { id -> if (!installing) selectedBuild = visibleBuilds.firstOrNull { it.id == id } },
-                        loading = loadingBuilds, error = buildsError, onRetry = { retry++ },
-                        modifier = Modifier.weight(1f)
+                }
+            },
+            confirmButton = { TextButton(onClick = { chooseLoader = false }) { Text("Close") } }
+        )
+    }
+    if (showFilters) {
+        AlertDialog(onDismissRequest = { showFilters = false }, title = { Text("Build filters") }, text = {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("Stable builds only", Modifier.weight(1f))
+                Switch(checked = onlyStable, onCheckedChange = { onlyStable = it })
+            }
+        }, confirmButton = { TextButton(onClick = { showFilters = false }) { Text("Done") } })
+    }
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val wide = maxWidth >= 620.dp && maxHeight >= 380.dp
+        Column(Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedButton(onClick = { chooseLoader = true }, enabled = !installing,
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
+                    Icon(painterResource(loader.iconRes), null, Modifier.size(22.dp), tint = Color.Unspecified)
+                    Spacer(Modifier.width(10.dp))
+                    Text(loader.displayName, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                if (!wide) {
+                    OutlinedButton(onClick = { chooseVersion = !chooseVersion }, enabled = !installing,
+                        modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
+                        Text(if (chooseVersion) "Back to builds" else if (loader == AerixLoader.BTA) group
+                            else "MC ${gameVersion ?: "Choose"}", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+            }
+            Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                if (wide || chooseVersion) {
+                    LoaderListPanel(
+                        title = if (loader == AerixLoader.BTA) "BTA channel" else "Minecraft version",
+                        query = gameQuery, onQuery = { gameQuery = it },
+                        entries = if (loader == AerixLoader.BTA) listOf("Supported", "Untested", "Nightly")
+                            else games.filter { it.contains(gameQuery, ignoreCase = true) },
+                        selected = if (loader == AerixLoader.BTA) group else gameVersion,
+                        onSelect = {
+                            if (!installing) {
+                                if (loader == AerixLoader.BTA) group = it else gameVersion = it
+                                chooseVersion = false
+                            }
+                        },
+                        loading = loadingGames, error = gamesError, onRetry = { retry++ },
+                        modifier = Modifier.weight(1f).fillMaxHeight(), showSearch = loader != AerixLoader.BTA
                     )
                 }
-            }
-        }
-        Surface(shape = RoundedCornerShape(AerixRadii.cardSmall), color = AerixSurface.panelRaised,
-            border = BorderStroke(1.dp, AerixSurface.borderSoft)) {
-            Row(Modifier.fillMaxWidth().padding(10.dp), verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Column(Modifier.weight(1f)) {
-                    Text(selectedBuild?.let { "${loader.displayName} ${it.label}" } ?: "Select a build",
-                        color = AerixSurface.textPrimary, fontWeight = FontWeight.Bold, maxLines = 1,
-                        overflow = TextOverflow.Ellipsis)
-                    Text(if (loader == AerixLoader.BTA) "Creates a new BTA instance · $group"
-                        else "Minecraft ${gameVersion ?: "—"} · creates a new instance",
-                        color = AerixSurface.textSecondary, style = MaterialTheme.typography.labelSmall)
+                if (wide || !chooseVersion) {
+                    Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            ModrinthCompactSearchField(buildQuery, { buildQuery = it }, "Search ${loader.displayName} builds", Modifier.weight(1f))
+                            if (loader != AerixLoader.BTA) {
+                                TextButton(onClick = { showFilters = true }) { Text(if (onlyStable) "Stable" else "All builds") }
+                            }
+                        }
+                        LoaderListBody(
+                            entries = visibleBuilds.map { it.id to it.label }, selected = selectedBuild?.id,
+                            onSelect = { id -> if (!installing) selectedBuild = visibleBuilds.firstOrNull { it.id == id } },
+                            loading = loadingBuilds || loadingGames, error = buildsError ?: gamesError,
+                            onRetry = { retry++ }, modifier = Modifier.weight(1f)
+                        )
+                    }
                 }
-                AerixPrimaryButton(if (installing) "Installing…" else "Install", R.drawable.aerix_ic_download,
-                    enabled = canInstall,
-                    onClick = {
-                        val build = selectedBuild ?: return@AerixPrimaryButton
-                        PojavCreateInstanceBridge.install(activity, loader, gameVersion, build,
-                            PojavCreateInstanceBridge.suggestedName(loader, gameVersion, build), null) {}
-                    })
             }
+            AerixPrimaryButton(if (installing) "Installing…" else "Install selected build", R.drawable.aerix_ic_download,
+                modifier = Modifier.fillMaxWidth(), enabled = canInstall && !chooseVersion,
+                onClick = {
+                    val build = selectedBuild ?: return@AerixPrimaryButton
+                    PojavCreateInstanceBridge.install(activity, loader, gameVersion, build,
+                        PojavCreateInstanceBridge.suggestedName(loader, gameVersion, build), null) {}
+                })
+            Text("Creates a new instance; your current instance is unchanged.",
+                color = AerixSurface.textSecondary, style = MaterialTheme.typography.labelSmall)
         }
     }
 }
@@ -218,7 +238,7 @@ private fun LoaderListBody(
                 Surface(onClick = { onSelect(id) }, shape = RoundedCornerShape(AerixRadii.control),
                     color = if (checked) AerixSurface.accent.copy(alpha = 0.16f) else AerixSurface.panelRaised,
                     border = BorderStroke(1.dp, if (checked) AerixSurface.accent else AerixSurface.borderSoft)) {
-                    Row(Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 2.dp),
+                    Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = 12.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically) {
                         RadioButton(checked, onClick = null)
                         Text(label, color = AerixSurface.textPrimary, maxLines = 2,

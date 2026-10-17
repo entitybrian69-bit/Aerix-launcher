@@ -108,3 +108,5 @@ target_link_libraries(mobileglues_info_getter
         ${log-lib}
         dl
 )
+add_library(aerix_renderer_probe SHARED renderer_probe.cpp)
+target_link_libraries(aerix_renderer_probe PRIVATE dl log)
