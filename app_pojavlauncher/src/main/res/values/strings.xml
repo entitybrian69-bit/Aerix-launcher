@@ -569,4 +569,27 @@
     <string name="mjdl_download_error_subtitle">Download failed. Check your internet connection and make sure that you have enough free disk space.</string>
     <string name="mjdl_download_error_subtitle_2">File verification failed. Please try again. If this error keeps happening, contact us on GitHub or on Discord.</string>
     <string name="bta_configuring">Configuring BTA…</string>
+    <string name="dock_download_minecraft">Downloading Minecraft</string>
+    <string name="dock_working">Preparing files</string>
+    <string name="dock_pause">Pause download</string>
+    <string name="dock_resume">Resume download</string>
+    <string name="dock_paused">Download paused</string>
+    <string name="dock_cancel">Cancel download</string>
+    <string name="dock_cancel_message">Stop this download? Verified files will be kept for your next attempt.</string>
+    <string name="dock_stopping">Stopping download…</string>
+    <string name="dock_cancelled">Download cancelled</string>
+    <string name="dock_cancelled_detail">You can try again when ready. Existing verified files have been kept.</string>
+    <string name="dock_show_tasks">Show active tasks</string>
+    <string name="dock_hide_tasks">Hide active tasks</string>
+    <string name="dock_size">%1$.1f / %2$.1f MB</string>
+    <string name="dock_speed">%1$.2f MB/s</string>
+    <string name="dock_eta">%1$dm %2$ds left</string>
+    <string name="dock_percent">%1$d%%</string>
+    <string name="dock_runtime">Installing runtime</string>
+    <string name="dock_modpack">Installing content</string>
+    <string name="dock_auth">Signing in</string>
+    <string name="dock_versions">Refreshing versions</string>
+    <string name="dock_migration">Moving files</string>
+    <string name="dock_extract">Extracting files</string>
+    <plurals name="dock_tasks"><item quantity="one">%d active task</item><item quantity="other">%d active tasks</item></plurals>
 </resources>

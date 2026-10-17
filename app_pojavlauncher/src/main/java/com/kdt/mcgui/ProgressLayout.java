@@ -1,34 +1,27 @@
 package com.kdt.mcgui;
 
-
+import android.app.AlertDialog;
 import android.content.Context;
+import android.graphics.Color;
 import android.util.AttributeSet;
-import android.util.Log;
 import android.view.View;
-import android.widget.ImageView;
+import android.widget.ImageButton;
 import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.TextView;
-
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.StringRes;
 import androidx.constraintlayout.widget.ConstraintLayout;
-
 import net.kdt.pojavlaunch.R;
-
+import net.kdt.pojavlaunch.downloader.DownloadControl;
 import net.kdt.pojavlaunch.progresskeeper.ProgressKeeper;
 import net.kdt.pojavlaunch.progresskeeper.ProgressListener;
 import net.kdt.pojavlaunch.progresskeeper.TaskCountListener;
-
 import java.util.ArrayList;
 
-
-/** Class staring at specific values and automatically show something if the progress is present
- * Since progress is posted in a specific way, The packing/unpacking is handheld by the class
- *
- * This class relies on ExtraCore for its behavior.
- */
-public class ProgressLayout extends ConstraintLayout implements View.OnClickListener, TaskCountListener{
+/** Release launcher's shared task observer, presented as the full-width Aerix download dock. */
+public class ProgressLayout extends ConstraintLayout implements View.OnClickListener, TaskCountListener {
     public static final String UNPACK_RUNTIME = "unpack_runtime";
     public static final String DOWNLOAD_GAME = "download_minecraft";
     public static final String DOWNLOAD_VERSION_LIST = "download_verlist";
@@ -38,132 +31,172 @@ public class ProgressLayout extends ConstraintLayout implements View.OnClickList
     public static final String EXTRACT_SINGLE_FILES = "extract_single_files";
     public static final String INSTANCE_INSTALL = "instance_install";
     public static final String DATA_MIGRATION = "data_migration";
+    private final ArrayList<LayoutProgressListener> observers = new ArrayList<>();
+    private LinearLayout tasks;
+    private View taskScroll;
+    private TextView title, percent, status, speed, eta;
+    private ProgressBar progress;
+    private ImageButton pause, cancel, expand;
+    private DownloadControl selectedControl;
+    private boolean closed;
 
-    public ProgressLayout(@NonNull Context context) {
-        super(context);
-        init();
-    }
-    public ProgressLayout(@NonNull Context context, @Nullable AttributeSet attrs) {
-        super(context, attrs);
-        init();
-    }
-    public ProgressLayout(@NonNull Context context, @Nullable AttributeSet attrs, int defStyleAttr) {
-        super(context, attrs, defStyleAttr);
-        init();
-    }
-    public ProgressLayout(@NonNull Context context, @Nullable AttributeSet attrs, int defStyleAttr, int defStyleRes) {
-        super(context, attrs, defStyleAttr, defStyleRes);
-        init();
-    }
-
-    private final ArrayList<LayoutProgressListener> mMap = new ArrayList<>();
-    private LinearLayout mLinearLayout;
-    private TextView mTaskNumberDisplayer;
-    private ImageView mFlipArrow;
-
-
-
-    public void observe(String progressKey){
-        mMap.add(new LayoutProgressListener(progressKey));
-    }
-
-    public void cleanUpObservers() {
-        for(LayoutProgressListener progressListener : mMap) {
-            ProgressKeeper.removeListener(progressListener.progressKey, progressListener);
-        }
-    }
-
-    public boolean hasProcesses(){
-        return ProgressKeeper.getTaskCount() > 0;
-    }
-
-
-    private void init(){
+    public ProgressLayout(@NonNull Context c) { super(c); init(); }
+    public ProgressLayout(@NonNull Context c, @Nullable AttributeSet a) { super(c, a); init(); }
+    public ProgressLayout(@NonNull Context c, @Nullable AttributeSet a, int s) { super(c, a, s); init(); }
+    public ProgressLayout(@NonNull Context c, @Nullable AttributeSet a, int s, int r) { super(c, a, s, r); init(); }
+    private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
+    private void init() {
         inflate(getContext(), R.layout.view_progress, this);
-        mLinearLayout = findViewById(R.id.progress_linear_layout);
-        mTaskNumberDisplayer = findViewById(R.id.progress_textview);
-        mFlipArrow = findViewById(R.id.progress_flip_arrow);
-        setBackgroundColor(getResources().getColor(R.color.background_bottom_bar));
-        setOnClickListener(this);
+        tasks = findViewById(R.id.progress_linear_layout);
+        taskScroll = findViewById(R.id.dock_task_scroll);
+        title = findViewById(R.id.dock_title);
+        percent = findViewById(R.id.dock_percent);
+        status = findViewById(R.id.dock_status);
+        speed = findViewById(R.id.dock_speed);
+        eta = findViewById(R.id.dock_eta);
+        progress = findViewById(R.id.dock_progress);
+        pause = findViewById(R.id.dock_pause);
+        cancel = findViewById(R.id.dock_cancel);
+        expand = findViewById(R.id.progress_flip_arrow);
+        expand.setOnClickListener(this);
+        pause.setOnClickListener(v -> { if (selectedControl != null) selectedControl.togglePause(); render(); });
+        cancel.setOnClickListener(v -> {
+            final DownloadControl control = selectedControl;
+            if (control == null) return;
+            new AlertDialog.Builder(getContext()).setTitle(R.string.dock_cancel)
+                .setMessage(R.string.dock_cancel_message)
+                .setNegativeButton(android.R.string.no, null)
+                .setPositiveButton(android.R.string.yes, (dialog, which) -> control.cancel()).show();
+        });
+        android.view.ViewGroup.LayoutParams params = taskScroll.getLayoutParams();
+        params.height = Math.min(dp(160), getResources().getDisplayMetrics().heightPixels / 3);
+        taskScroll.setLayoutParams(params);
     }
-
-
-    /** Update the progress bar content */
-    public static void setProgress(String progressKey, int progress){
-        ProgressKeeper.submitProgress(progressKey, progress, -1, (Object)null);
+    public void observe(String key) {
+        for (LayoutProgressListener observer : observers) if (observer.key.equals(key)) return;
+        LayoutProgressListener observer = new LayoutProgressListener(key);
+        observers.add(observer);
+        ProgressKeeper.addListener(key, observer);
     }
-
-    /** Update the text and progress content */
-    public static void setProgress(String progressKey, int progress, @StringRes int resource, Object... message){
-        ProgressKeeper.submitProgress(progressKey, progress, resource, message);
+    public void cleanUpObservers() {
+        closed = true;
+        for (LayoutProgressListener observer : observers) ProgressKeeper.removeListener(observer.key, observer);
     }
-
-    /** Update the text and progress content */
-    public static void setProgress(String progressKey, int progress, String message){
-        setProgress(progressKey,progress, -1, message);
+    public boolean hasProcesses() { return ProgressKeeper.getTaskCount() > 0; }
+    public static void setProgress(String key, int value) { ProgressKeeper.submitProgress(key, value, -1, (Object) null); }
+    public static void setProgress(String key, int value, @StringRes int resource, Object... args) { ProgressKeeper.submitProgress(key, value, resource, args); }
+    public static void setProgress(String key, int value, String message) { setProgress(key, value, -1, message); }
+    public static void clearProgress(String key) { setProgress(key, -1, -1); }
+    @Override public void onClick(View v) {
+        boolean show = taskScroll.getVisibility() != VISIBLE;
+        taskScroll.setVisibility(show ? VISIBLE : GONE);
+        expand.setRotation(show ? 180 : 0);
+        expand.setContentDescription(getContext().getString(show ? R.string.dock_hide_tasks : R.string.dock_show_tasks));
     }
-
-    /** Update the text and progress content */
-    public static void clearProgress(String progressKey){
-        setProgress(progressKey, -1, -1);
-    }
-
-    @Override
-    public void onClick(View v) {
-        mLinearLayout.setVisibility(mLinearLayout.getVisibility() == GONE ? VISIBLE : GONE);
-        mFlipArrow.setRotation(mLinearLayout.getVisibility() == GONE? 0 : 180);
-    }
-
-    @Override
-    public boolean onUpdateTaskCount(int tc) {
-        post(()->{
-            if(tc > 0) {
-                mTaskNumberDisplayer.setText(getContext().getString(R.string.progresslayout_tasks_in_progress, tc));
-                setVisibility(VISIBLE);
-            }else
-                setVisibility(GONE);
+    @Override public boolean onUpdateTaskCount(int count) {
+        post(() -> {
+            if (closed) return;
+            setVisibility(count > 0 ? VISIBLE : GONE);
+            if (count == 0) { taskScroll.setVisibility(GONE); expand.setRotation(0); }
+            render();
         });
         return false;
     }
-
-    class LayoutProgressListener implements ProgressListener {
-        final String progressKey;
-        final TextProgressBar textView;
-        final LinearLayout.LayoutParams params;
-        boolean isAttached = false;
-        public LayoutProgressListener(String progressKey) {
-            this.progressKey = progressKey;
-            textView = new TextProgressBar(getContext());
-            textView.setTextPadding(getContext().getResources().getDimensionPixelOffset(R.dimen._6sdp));
-            params = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, getResources().getDimensionPixelOffset(R.dimen._20sdp));
-            params.bottomMargin = getResources().getDimensionPixelOffset(R.dimen._6sdp);
-            ProgressKeeper.addListener(progressKey, this);
+    private int taskTitle(String key) {
+        switch (key) {
+            case DOWNLOAD_GAME: return R.string.dock_download_minecraft;
+            case UNPACK_RUNTIME: return R.string.dock_runtime;
+            case INSTALL_MODPACK: case INSTANCE_INSTALL: return R.string.dock_modpack;
+            case AUTHENTICATE: return R.string.dock_auth;
+            case DOWNLOAD_VERSION_LIST: return R.string.dock_versions;
+            case DATA_MIGRATION: return R.string.dock_migration;
+            case EXTRACT_COMPONENTS: case EXTRACT_SINGLE_FILES: return R.string.dock_extract;
+            default: return R.string.dock_working;
         }
-        @Override
-        public void onProgressStarted() {
-            post(()-> {
-                Log.i("ProgressLayout", "onProgressStarted");
-                if(!isAttached) mLinearLayout.addView(textView, params);
-                isAttached = true;
+    }
+    private void render() {
+        LayoutProgressListener primary = null;
+        int count = 0;
+        for (LayoutProgressListener observer : observers) if (observer.active) {
+            count++;
+            if (primary == null || observer.key.equals(DOWNLOAD_GAME)) primary = observer;
+        }
+        selectedControl = primary == null ? null : DownloadControl.active(primary.key);
+        boolean paused = selectedControl != null && selectedControl.isPaused();
+        boolean stopping = selectedControl != null && selectedControl.isCancelled();
+        pause.setEnabled(!stopping); cancel.setEnabled(!stopping);
+        pause.setVisibility(selectedControl == null ? GONE : VISIBLE);
+        cancel.setVisibility(selectedControl == null ? GONE : VISIBLE);
+        pause.setImageResource(paused ? android.R.drawable.ic_media_play : android.R.drawable.ic_media_pause);
+        pause.setContentDescription(getContext().getString(paused ? R.string.dock_resume : R.string.dock_pause));
+        title.setText(stopping ? R.string.dock_stopping : paused ? R.string.dock_paused : primary == null ? R.string.dock_working : taskTitle(primary.key));
+        speed.setVisibility(GONE);
+        eta.setVisibility(GONE);
+        if (primary == null) {
+            progress.setIndeterminate(true); percent.setText("");
+            status.setText(getResources().getQuantityString(R.plurals.dock_tasks, Math.max(1, count), Math.max(1, count)));
+            return;
+        }
+        boolean sized = primary.resource == R.string.newerdl_downloading_files_size && primary.args.length >= 3;
+        boolean counted = primary.resource == R.string.newerdl_downloading_files_count || primary.resource == R.string.newerdl_inserting_metadata_count;
+        boolean determinate = sized || counted || primary.value > 0;
+        progress.setIndeterminate(!determinate && !paused);
+        progress.setProgress(Math.max(0, Math.min(100, primary.value)));
+        percent.setText(determinate ? getContext().getString(R.string.dock_percent, Math.max(0, Math.min(100, primary.value))) : "");
+        status.setText(primary.message());
+        if (sized && primary.args[0] instanceof Number && primary.args[1] instanceof Number && primary.args[2] instanceof Number) {
+            double done = ((Number) primary.args[0]).doubleValue();
+            double total = ((Number) primary.args[1]).doubleValue();
+            double rate = paused ? 0 : ((Number) primary.args[2]).doubleValue();
+            status.setText(getContext().getString(R.string.dock_size, done, total));
+            speed.setText(getContext().getString(R.string.dock_speed, rate));
+            speed.setVisibility(VISIBLE);
+            if (rate > 0 && total > done && Double.isFinite(rate) && Double.isFinite(total)) {
+                long seconds = (long) Math.ceil((total - done) / rate);
+                eta.setText(getContext().getString(R.string.dock_eta, seconds / 60, seconds % 60));
+                eta.setVisibility(getResources().getConfiguration().screenWidthDp >= 600 ? VISIBLE : GONE);
+            }
+        }
+        expand.setContentDescription(getContext().getString(taskScroll.getVisibility() == VISIBLE ? R.string.dock_hide_tasks : R.string.dock_show_tasks)
+            + ", " + getResources().getQuantityString(R.plurals.dock_tasks, count, count));
+    }
+    private final class LayoutProgressListener implements ProgressListener {
+        final String key;
+        final LinearLayout row;
+        final TextView label;
+        final ProgressBar bar;
+        boolean active;
+        int value, resource = -1;
+        Object[] args = new Object[0];
+        LayoutProgressListener(String key) {
+            this.key = key;
+            row = new LinearLayout(getContext()); row.setOrientation(LinearLayout.VERTICAL); row.setPadding(dp(8), dp(8), dp(8), dp(12));
+            label = new TextView(getContext()); label.setTextSize(13); label.setTextColor(Color.parseColor("#D6E4ED"));
+            bar = new ProgressBar(getContext(), null, android.R.attr.progressBarStyleHorizontal);
+            bar.setProgressDrawable(getContext().getDrawable(R.drawable.aerix_download_progress));
+            row.addView(label, new LinearLayout.LayoutParams(-1, -2));
+            LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-1, dp(6)); p.topMargin = dp(8); row.addView(bar, p);
+        }
+        String message() {
+            if (resource != -1) return getContext().getString(resource, args);
+            if (args.length > 0 && args[0] != null) return String.valueOf(args[0]);
+            return getContext().getString(taskTitle(key));
+        }
+        @Override public void onProgressStarted() {
+            post(() -> { if (closed) return; active = true; if (row.getParent() == null) tasks.addView(row); render(); });
+        }
+        @Override public void onProgressUpdated(int value, int resource, Object... args) {
+            final Object[] copy = args == null ? new Object[0] : args.clone();
+            post(() -> {
+                if (closed) return;
+                this.value = value; this.resource = resource; this.args = copy;
+                label.setText(getContext().getString(taskTitle(key)) + " · " + message());
+                bar.setIndeterminate(value <= 0 && resource != R.string.newerdl_downloading_files_size && resource != R.string.newerdl_downloading_files_count);
+                bar.setProgress(Math.max(0, Math.min(100, value))); render();
             });
         }
-
-        @Override
-        public void onProgressUpdated(int progress, int resid, Object... va) {
-            post(()-> {
-                textView.setProgress(progress);
-                if(resid != -1) textView.setText(getContext().getString(resid, va));
-                else if(va.length > 0 && va[0] != null)textView.setText((String)va[0]);
-                else textView.setText("");
-            });
-        }
-
-        @Override
-        public void onProgressEnded() {
-            post(()-> {
-                mLinearLayout.removeView(textView);
-                isAttached = false;
-            });
+        @Override public void onProgressEnded() {
+            post(() -> { if (closed) return; active = false; tasks.removeView(row); render(); });
         }
     }
 }

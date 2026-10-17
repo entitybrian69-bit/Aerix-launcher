@@ -224,6 +224,8 @@ public class LauncherActivity extends BaseActivity {
 
         mProgressLayout.observe(ProgressLayout.DOWNLOAD_GAME);
         mProgressLayout.observe(ProgressLayout.UNPACK_RUNTIME);
+        mProgressLayout.observe(ProgressLayout.EXTRACT_COMPONENTS);
+        mProgressLayout.observe(ProgressLayout.EXTRACT_SINGLE_FILES);
         mProgressLayout.observe(ProgressLayout.INSTALL_MODPACK);
         mProgressLayout.observe(ProgressLayout.AUTHENTICATE);
         mProgressLayout.observe(ProgressLayout.DOWNLOAD_VERSION_LIST);

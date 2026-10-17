@@ -28,6 +28,7 @@ jobs:
         uses: dawidd6/action-download-artifact@v6
         continue-on-error: true
         with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
           repo: MojoLauncher/LTW
           workflow: android.yml
           workflow_conclusion: success
@@ -109,6 +110,9 @@ jobs:
           [ -f app_pojavlauncher/build/outputs/apk/noruntime/release/app_pojavlauncher-noruntime-release.apk ] \
             || { echo "::error title=missing apk::the noruntime apk was not produced"; ls -R app_pojavlauncher/build/outputs/apk || true; exit 1; }
           mv app_pojavlauncher/build/outputs/apk/noruntime/release/app_pojavlauncher-noruntime-release.apk out/app-release-noruntime.apk
+
+      - name: Download dock regression tests
+        run: gradle :app_pojavlauncher:testNoruntimeReleaseUnitTest
 
       - name: Gen md5sums
         run: |
