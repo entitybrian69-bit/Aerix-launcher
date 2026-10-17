@@ -81,6 +81,7 @@ object PojavInstanceBridge {
     val selected: AerixInstance?
         get() = instances.getOrNull(selectedIndex)
 
+    private val reloadGeneration = java.util.concurrent.atomic.AtomicLong()
     private var attached = false
     private var appContext: Context? = null
 
@@ -102,6 +103,7 @@ object PojavInstanceBridge {
     /** Reloads the instance list off the main thread, same source as Pojav's mcVersionSpinner. */
     fun reload() {
         val context = appContext ?: return
+        val generation = reloadGeneration.incrementAndGet()
         loading = true
         PojavApplication.sExecutorService.execute {
             val result = runCatching {
@@ -120,6 +122,8 @@ object PojavInstanceBridge {
                 rows to display.selectedIndex
             }
             Tools.runOnUiThread {
+                // A slower earlier scan must not overwrite a just-completed installation.
+                if (generation != reloadGeneration.get()) return@runOnUiThread
                 result.onSuccess { (rows, index) ->
                     instances = rows
                     selectedIndex = index

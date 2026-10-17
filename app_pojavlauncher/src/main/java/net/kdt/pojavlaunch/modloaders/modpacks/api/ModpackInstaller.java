@@ -8,6 +8,7 @@ import net.kdt.pojavlaunch.R;
 
 import net.kdt.pojavlaunch.Tools;
 import net.kdt.pojavlaunch.instances.InstanceInstaller;
+import net.kdt.pojavlaunch.instances.InstanceRefreshEvents;
 import net.kdt.pojavlaunch.instances.Instances;
 import net.kdt.pojavlaunch.instances.Instance;
 import net.kdt.pojavlaunch.lifecycle.ContextExecutor;
@@ -48,6 +49,7 @@ public class ModpackInstaller {
             ModIconCache.writeInstanceImage(instance, icon);
 
             Instances.setSelectedInstance(instance);
+            InstanceRefreshEvents.notifyChanged();
             if(loaderInstaller.requiresGuiInstallation()) {
                 instance.installer.start();
             }
