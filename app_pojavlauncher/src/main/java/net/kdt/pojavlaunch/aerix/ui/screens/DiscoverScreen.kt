@@ -320,6 +320,8 @@ private fun SearchAssetsContent(
     var submittedQuery by rememberSaveable(type) { mutableStateOf("") }
     var categories by rememberSaveable(type) { mutableStateOf(arrayListOf<String>()) }
     var mcVersion by rememberSaveable(type) { mutableStateOf<String?>(null) }
+    var versionPickerKind by rememberSaveable(type) { mutableStateOf(MinecraftVersionKind.ALL) }
+    var versionPickerQuery by rememberSaveable(type) { mutableStateOf("") }
     var loader by rememberSaveable(type) { mutableStateOf<String?>(null) }
     var sort by rememberSaveable(type) { mutableStateOf(AssetSort.RELEVANCE) }
     var pageIndex by rememberSaveable(type) { mutableIntStateOf(1) }
@@ -361,11 +363,6 @@ private fun SearchAssetsContent(
     var showMcMenu by remember { mutableStateOf(false) }
     var showLoaderMenu by remember { mutableStateOf(false) }
     var showSortMenu by remember { mutableStateOf(false) }
-
-    if (showMcMenu) MinecraftVersionPicker(mcVersion, onSelect = { version ->
-        mcVersion = version
-        pageIndex = 1
-    }, onDismiss = { showMcMenu = false })
 
     Column(
         modifier = modifier,
@@ -522,7 +519,7 @@ private fun SearchAssetsContent(
             Box {
                 DiscoverFilterDropdownPill(
                     label = "MC: ${mcVersion ?: "All"}",
-                    onClick = { showMcMenu = true }
+                    onClick = { showMcMenu = !showMcMenu }
                 )
             }
 
@@ -584,93 +581,103 @@ private fun SearchAssetsContent(
             }
         }
 
-        // Results area
-        BoxWithConstraints(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-        ) {
-            val columns = when {
-                maxWidth > maxHeight && maxWidth >= 1040.dp -> 4
-                maxWidth > maxHeight && maxWidth >= 640.dp -> 3
-                else -> 2
-            }
-            val currentPage = page
-            when {
-                loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = AerixThemeManager.currentAccent())
+        // Version filtering stays in this page's content area instead of opening an Android window.
+        if (showMcMenu) {
+            MinecraftVersionPicker(
+                selected = mcVersion, kind = versionPickerKind, onKindChange = { versionPickerKind = it },
+                query = versionPickerQuery, onQueryChange = { versionPickerQuery = it },
+                onSelect = { version -> mcVersion = version; pageIndex = 1 },
+                onDismiss = { showMcMenu = false }, modifier = Modifier.fillMaxWidth().weight(1f)
+            )
+        } else {
+            // Results area
+            BoxWithConstraints(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+            ) {
+                val columns = when {
+                    maxWidth > maxHeight && maxWidth >= 1040.dp -> 4
+                    maxWidth > maxHeight && maxWidth >= 640.dp -> 3
+                    else -> 2
                 }
-                failed -> Column(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    QuietEmptyState(R.drawable.aerix_ic_warning_outlined, stringResource(R.string.aerix_download_error))
-                    AerixGhostButton(
-                        text = stringResource(R.string.aerix_library_refresh),
-                        iconRes = R.drawable.aerix_ic_refresh,
-                        onClick = { reloadNonce++ }
-                    )
-                }
-                currentPage == null || currentPage.projects.isEmpty() -> Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    QuietEmptyState(R.drawable.aerix_ic_search, stringResource(R.string.aerix_download_empty))
-                }
-                else -> {
-                    val rows = remember(currentPage.projects, columns) {
-                        currentPage.projects.chunked(columns)
+                val currentPage = page
+                when {
+                    loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = AerixThemeManager.currentAccent())
                     }
-                    val totalPages = ((currentPage.total + PojavAssetBridge.PAGE_SIZE - 1) / PojavAssetBridge.PAGE_SIZE)
-                        .coerceAtLeast(1)
+                    failed -> Column(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.Center,
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        QuietEmptyState(R.drawable.aerix_ic_warning_outlined, stringResource(R.string.aerix_download_error))
+                        AerixGhostButton(
+                            text = stringResource(R.string.aerix_library_refresh),
+                            iconRes = R.drawable.aerix_ic_refresh,
+                            onClick = { reloadNonce++ }
+                        )
+                    }
+                    currentPage == null || currentPage.projects.isEmpty() -> Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        QuietEmptyState(R.drawable.aerix_ic_search, stringResource(R.string.aerix_download_empty))
+                    }
+                    else -> {
+                        val rows = remember(currentPage.projects, columns) {
+                            currentPage.projects.chunked(columns)
+                        }
+                        val totalPages = ((currentPage.total + PojavAssetBridge.PAGE_SIZE - 1) / PojavAssetBridge.PAGE_SIZE)
+                            .coerceAtLeast(1)
 
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        LazyColumn(
-                            modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(top = AerixSpacing.xs, bottom = 68.dp),
-                            verticalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus)
-                        ) {
-                            items(
-                                count = rows.size,
-                                key = { idx -> rows[idx].joinToString("_") { "${it.platform}:${it.id}" } }
-                            ) { idx ->
-                                val rowItems = rows[idx]
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus)
-                                ) {
-                                    rowItems.forEach { project ->
-                                        val isInstalled = PojavAssetBridge.isProjectInstalled(project, installedFingerprints)
-                                        val isFavorite = remember(AerixPreferences.favoritesJson, project.id) {
-                                            PojavAssetBridge.isFavorite(project)
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize(),
+                                contentPadding = PaddingValues(top = AerixSpacing.xs, bottom = 68.dp),
+                                verticalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus)
+                            ) {
+                                items(
+                                    count = rows.size,
+                                    key = { idx -> rows[idx].joinToString("_") { "${it.platform}:${it.id}" } }
+                                ) { idx ->
+                                    val rowItems = rows[idx]
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus)
+                                    ) {
+                                        rowItems.forEach { project ->
+                                            val isInstalled = PojavAssetBridge.isProjectInstalled(project, installedFingerprints)
+                                            val isFavorite = remember(AerixPreferences.favoritesJson, project.id) {
+                                                PojavAssetBridge.isFavorite(project)
+                                            }
+                                            ResultProjectLayout(
+                                                project = project,
+                                                isInstalled = isInstalled,
+                                                isFavorite = isFavorite,
+                                                onFavoriteClick = { PojavAssetBridge.toggleFavorite(project) },
+                                                onClick = { onOpenProject(project) },
+                                                modifier = Modifier.weight(1f)
+                                            )
                                         }
-                                        ResultProjectLayout(
-                                            project = project,
-                                            isInstalled = isInstalled,
-                                            isFavorite = isFavorite,
-                                            onFavoriteClick = { PojavAssetBridge.toggleFavorite(project) },
-                                            onClick = { onOpenProject(project) },
-                                            modifier = Modifier.weight(1f)
-                                        )
-                                    }
-                                    repeat(columns - rowItems.size) {
-                                        Spacer(modifier = Modifier.weight(1f))
+                                        repeat(columns - rowItems.size) {
+                                            Spacer(modifier = Modifier.weight(1f))
+                                        }
                                     }
                                 }
                             }
-                        }
 
-                        // Floating PageController bottom-end ("1 / 3862   <   >")
-                        PageController(
-                            pageNumber = pageIndex,
-                            totalPages = totalPages,
-                            onPrevious = { if (pageIndex > 1) pageIndex-- },
-                            onNext = { if (pageIndex < totalPages) pageIndex++ },
-                            modifier = Modifier
-                                .align(Alignment.BottomEnd)
-                                .padding(bottom = AerixSpacing.sm, end = AerixSpacing.smCompact)
-                        )
+                            // Floating PageController bottom-end ("1 / 3862   <   >")
+                            PageController(
+                                pageNumber = pageIndex,
+                                totalPages = totalPages,
+                                onPrevious = { if (pageIndex > 1) pageIndex-- },
+                                onNext = { if (pageIndex < totalPages) pageIndex++ },
+                                modifier = Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .padding(bottom = AerixSpacing.sm, end = AerixSpacing.smCompact)
+                            )
+                        }
                     }
                 }
             }
