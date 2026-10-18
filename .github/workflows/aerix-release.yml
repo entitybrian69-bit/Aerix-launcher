@@ -48,13 +48,13 @@ permissions:
 # accessible by integration" even with contents: write - but it can upload the assets of one that
 # exists. Create the release itself (empty) next to the branch, then set RUN_ID / TAG here and push.
 env:
-  RUN_ID: "39117836219"
-  BUILD_SHA: "bc286f633b2f358e7210bf9296ac2489b9c22f3c"
-  TAG: "v1.2.3"
+  RUN_ID: "39120410635"
+  BUILD_SHA: "85500d58b00ae21cf286ef16ae743c3dfc19182c"
+  TAG: "v1.2.4"
   # Name of the release: the version the build carries, and the tag it is published under when TAG
   # is left empty.
-  VERSION: "1.2.3"
-  NOTES: "Aerix Launcher 1.2.3 - Expand Zalith Launcher 2 joystick/toggle/control imports, preserve custom FCL joystick bindings, normalize legacy layouts and show compatibility warnings."
+  VERSION: "1.2.4"
+  NOTES: "Aerix Launcher 1.2.4 - Hold the floating in-game Aerix logo to adjust its size from very small to big with live preview and saved preferences."
 
 
 jobs:
