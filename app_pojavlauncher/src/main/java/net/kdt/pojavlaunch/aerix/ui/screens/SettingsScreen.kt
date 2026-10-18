@@ -33,6 +33,7 @@
 
 package net.kdt.pojavlaunch.aerix.ui.screens
 
+import net.kdt.pojavlaunch.BuildConfig
 import android.content.Intent
 import android.content.res.Configuration
 import android.net.Uri
@@ -103,7 +104,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.fragment.app.FragmentActivity
 import net.kdt.pojavlaunch.Architecture
-import net.kdt.pojavlaunch.BuildConfig
 import net.kdt.pojavlaunch.ImportControlActivity
 import net.kdt.pojavlaunch.NewJREUtil
 import net.kdt.pojavlaunch.PojavApplication
@@ -252,6 +252,9 @@ fun SettingsScreen(activity: FragmentActivity, tabKey: String, onTabChanged: (St
 
 @Composable
 private fun RendererTabContent(activity: FragmentActivity) {
+    var showUpdateDialog by remember { mutableStateOf(false) }
+    if (showUpdateDialog) LauncherUpdateDialog(activity) { showUpdateDialog = false }
+
     val revision = PojavSettingsBridge.revision
     val compatible = remember(revision) { PojavSettingsBridge.renderers(activity) }
     val plugins = remember(revision) { PojavPluginBridge.loadPlugins(activity) }
@@ -520,7 +523,7 @@ private fun RendererTabContent(activity: FragmentActivity) {
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = "Aerix Launcher v1.6 \u2022 Built by entitybrian",
+                        text = "Aerix Launcher v${BuildConfig.VERSION_NAME} \u2022 Built by entitybrian",
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.SemiBold,
                         color = AerixSurface.textPrimary
@@ -528,7 +531,7 @@ private fun RendererTabContent(activity: FragmentActivity) {
 
                     Button(
                         onClick = {
-                            PojavNavigator.openUrl(activity, "https://github.com/entitybrian69-bit/Aerix-launcher/releases")
+                            showUpdateDialog = true
                         },
                         shape = RoundedCornerShape(AerixRadii.card),
                         colors = ButtonDefaults.buttonColors(
@@ -1822,6 +1825,9 @@ private fun GamepadTabContent(activity: FragmentActivity) {
 
 @Composable
 private fun AboutInfoTabContent(activity: FragmentActivity) {
+    var showUpdateDialog by remember { mutableStateOf(false) }
+    if (showUpdateDialog) LauncherUpdateDialog(activity) { showUpdateDialog = false }
+
     val accent = AerixThemeManager.currentAccent()
 
     LazyColumn(
@@ -1849,10 +1855,10 @@ private fun AboutInfoTabContent(activity: FragmentActivity) {
                         iconRes = R.drawable.ic_aerix_mark,
                         iconTint = Color.Unspecified,
                         title = "Aerix Launcher",
-                        subtitle = "Launcher Version: 1.6",
+                        subtitle = "Launcher Version: ${BuildConfig.VERSION_NAME}",
                         actions = {
                             AboutPillButton("Check for Updates", accent) {
-                                PojavNavigator.openUrl(activity, "https://github.com/entitybrian69-bit/Aerix-launcher/releases")
+                                showUpdateDialog = true
                             }
                             AboutPillButton("Project Link", accent) {
                                 PojavNavigator.openUrl(activity, "https://github.com/entitybrian69-bit/Aerix-launcher")
@@ -1878,134 +1884,6 @@ private fun AboutInfoTabContent(activity: FragmentActivity) {
             }
         }
 
-        // Card 2: Acknowledgements (Screenshot 5 bottom card)
-        item {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(AerixRadii.hero),
-                color = AerixSurface.panel,
-                border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = AerixSpacing.mdPlus),
-                    verticalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus)
-                ) {
-                    Text(
-                        text = "Acknowledgements",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        modifier = Modifier.padding(horizontal = AerixSpacing.lg)
-                    )
-                    HorizontalDivider(color = AerixSurface.borderSoft)
-
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = AerixSpacing.mdPlus),
-                        verticalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus)
-                    ) {
-                        AboutRowCard(
-                            iconRes = R.drawable.aerix_img_avatar_bangbang93,
-                            iconTint = Color.Unspecified,
-                            title = "bangbang93",
-                            subtitle = "Aerix uses the BMCL API mirror source",
-                            actions = {
-                                AboutPillButton("Sponsorship Support", accent) {
-                                    PojavNavigator.openUrl(activity, "https://afdian.com/a/bangbang93")
-                                }
-                            }
-                        )
-                        AboutRowCard(
-                            iconRes = R.drawable.aerix_img_launcher_fcl,
-                            iconTint = Color.Unspecified,
-                            title = "Fold Craft Launcher",
-                            subtitle = "Aerix incorporates code from FCL and references parts of its implementation",
-                            actions = {
-                                AboutPillButton("Project Link", accent) {
-                                    PojavNavigator.openUrl(activity, "https://github.com/FCL-Team/FoldCraftLauncher")
-                                }
-                            }
-                        )
-                        AboutRowCard(
-                            iconRes = R.drawable.aerix_img_launcher_hmcl,
-                            iconTint = Color.Unspecified,
-                            title = "Hello Minecraft! Launcher",
-                            subtitle = "Aerix incorporates code from HMCL and references parts of its implementation",
-                            actions = {
-                                AboutPillButton("Project Link", accent) {
-                                    PojavNavigator.openUrl(activity, "https://github.com/HMCL-dev/HMCL")
-                                }
-                            }
-                        )
-                        AboutRowCard(
-                            iconRes = R.drawable.aerix_img_platform_mcmod,
-                            iconTint = Color.Unspecified,
-                            title = "MCMod (mcmod.cn)",
-                            subtitle = "Aerix uses Simplified Chinese translations of mods and modpacks from MCMod",
-                            actions = {
-                                AboutPillButton("Open", accent) {
-                                    PojavNavigator.openUrl(activity, "https://www.mcmod.cn/")
-                                }
-                            }
-                        )
-                        AboutRowCard(
-                            iconRes = R.drawable.aerix_img_avatar_mcim,
-                            iconTint = Color.Unspecified,
-                            title = "mcmod-info-mirror",
-                            subtitle = "Aerix uses the MCIM mirror source",
-                            actions = {
-                                AboutPillButton("Sponsorship Support", accent) {
-                                    PojavNavigator.openUrl(activity, "https://afdian.com/a/vels")
-                                }
-                            }
-                        )
-                        AboutRowCard(
-                            iconRes = R.drawable.aerix_img_launcher_pcl2,
-                            iconTint = Color.Unspecified,
-                            title = "Plain Craft Launcher 2",
-                            subtitle = "Aerix references parts of the implementation from PCL2",
-                            actions = {}
-                        )
-                        AboutRowCard(
-                            iconRes = R.drawable.aerix_img_launcher_pojav,
-                            iconTint = Color.Unspecified,
-                            title = "PojavLauncher",
-                            subtitle = "Aerix uses the launch backend from PojavLauncher / MojoLauncher",
-                            actions = {
-                                AboutPillButton("Project Link", accent) {
-                                    PojavNavigator.openUrl(activity, "https://github.com/PojavLauncherTeam/PojavLauncher")
-                                }
-                            }
-                        )
-                        AboutRowCard(
-                            iconRes = R.drawable.aerix_ic_github,
-                            iconTint = Color.White,
-                            title = "GitHub Community",
-                            subtitle = "All issue reporters and contributors from the GitHub community",
-                            actions = {
-                                AboutPillButton("Contributors", accent) {
-                                    PojavNavigator.openUrl(activity, "https://github.com/entitybrian69-bit/Aerix-launcher/graphs/contributors")
-                                }
-                            }
-                        )
-                        AboutRowCard(
-                            iconRes = R.drawable.aerix_img_platform_weblate,
-                            iconTint = Color.Unspecified,
-                            title = "Weblate Community",
-                            subtitle = "All translators who participated in community language localization",
-                            actions = {
-                                AboutPillButton("Weblate", accent) {
-                                    PojavNavigator.openUrl(activity, "https://hosted.weblate.org/projects/zalithlauncher2")
-                                }
-                            }
-                        )
-                    }
-                }
-            }
-        }
     }
 }
 

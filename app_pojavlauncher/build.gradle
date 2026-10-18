@@ -20,10 +20,14 @@ static def getDateSeconds() {
     }
 }
 
-// The released version of this fork. Bump it by hand when a build is published; the git-derived
-// name the upstream project used is kept below for local builds that want it.
-def AERIX_VERSION_NAME = "1.1.2"
-def AERIX_VERSION_CODE = 10102
+// One version source: the APK, About page and updater all read this same value.
+def aerixVersion = new Properties()
+rootProject.file('version.properties').withInputStream { aerixVersion.load(it) }
+def AERIX_VERSION_NAME = aerixVersion.getProperty('versionName')
+if (!(AERIX_VERSION_NAME ==~ /\d+\.\d+\.\d+/)) throw new GradleException('versionName must be major.minor.patch')
+def versionParts = AERIX_VERSION_NAME.split('\\.').collect { it.toInteger() }
+if (versionParts[1] >= 100 || versionParts[2] >= 100) throw new GradleException('Minor/patch must be below 100')
+def AERIX_VERSION_CODE = versionParts[0] * 10000 + versionParts[1] * 100 + versionParts[2]
 
 def getVersionName = {
     def currentBranch = grgit.branch.current()
