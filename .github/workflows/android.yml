@@ -83,6 +83,37 @@ jobs:
           HELPER
           cat report_gradle_failure.sh
 
+      - name: Launcher regression tests
+        shell: bash
+        run: |
+          if ! gradle :app_pojavlauncher:testNoruntimeReleaseUnitTest 2>&1 | tee regression-tests.log; then
+            python3 - <<'PYREPORT'
+          import glob, xml.etree.ElementTree as ET
+          def annotate(title, text):
+              text = text[:5000].replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+              print(f'::error title={title}::{text}')
+          count = 0
+          for file in glob.glob('app_pojavlauncher/build/test-results/**/*.xml', recursive=True):
+              for case in ET.parse(file).getroot().iter('testcase'):
+                  failure = case.find('failure')
+                  if failure is None:
+                      failure = case.find('error')
+                  if failure is not None and count < 8:
+                      annotate(case.get('classname', '') + '.' + case.get('name', ''), failure.get('message', '') + '\n' + (failure.text or ''))
+                      count += 1
+          if not count:
+              annotate('regression test failure', open('regression-tests.log').read()[-5000:])
+          PYREPORT
+            exit 1
+          fi
+
+      - name: Upload regression test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: launcher-regression-reports
+          path: app_pojavlauncher/build/test-results/
+
       - name: Build Release .apk (Full)
         shell: bash
         run: |
@@ -117,37 +148,6 @@ jobs:
             app_pojavlauncher/src/main/jni/fps/frame_counter.c \
             app_pojavlauncher/src/test/native/frame_counter_test.c -o "$RUNNER_TEMP/fps-counter-test"
           "$RUNNER_TEMP/fps-counter-test"
-
-      - name: Launcher regression tests
-        shell: bash
-        run: |
-          if ! gradle :app_pojavlauncher:testNoruntimeReleaseUnitTest 2>&1 | tee regression-tests.log; then
-            python3 - <<'PYREPORT'
-          import glob, xml.etree.ElementTree as ET
-          def annotate(title, text):
-              text = text[:5000].replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
-              print(f'::error title={title}::{text}')
-          count = 0
-          for file in glob.glob('app_pojavlauncher/build/test-results/**/*.xml', recursive=True):
-              for case in ET.parse(file).getroot().iter('testcase'):
-                  failure = case.find('failure')
-                  if failure is None:
-                      failure = case.find('error')
-                  if failure is not None and count < 8:
-                      annotate(case.get('classname', '') + '.' + case.get('name', ''), failure.get('message', '') + '\n' + (failure.text or ''))
-                      count += 1
-          if not count:
-              annotate('regression test failure', open('regression-tests.log').read()[-5000:])
-          PYREPORT
-            exit 1
-          fi
-
-      - name: Upload regression test reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: launcher-regression-reports
-          path: app_pojavlauncher/build/test-results/
 
       - name: Gen md5sums
         run: |
