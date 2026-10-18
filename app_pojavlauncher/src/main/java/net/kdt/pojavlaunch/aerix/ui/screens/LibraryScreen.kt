@@ -755,7 +755,7 @@ private fun InstanceListPane(
                 }
                 items(
                     items = instances,
-                    key = { "${it.name}_${it.versionId}" }
+                    key = { it.id }
                 ) { instance ->
                     InstanceListRow(
                         instance = instance,
@@ -892,7 +892,7 @@ private fun InstanceStrip(
         ) {
             items(
                 items = instances,
-                key = { "${it.name}_${it.versionId}" }
+                key = { it.id }
             ) { instance ->
                 LandscapeInstanceListItem(
                     instance = instance,

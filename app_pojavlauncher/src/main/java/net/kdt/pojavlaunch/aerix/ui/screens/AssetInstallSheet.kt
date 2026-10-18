@@ -125,12 +125,12 @@ internal fun AssetInstallDialog(
         mutableStateMapOf<String, Boolean>().apply {
             // Every instance is ticked to begin with: installing into several at once is the point
             // of the picker, and unticking is one tap.
-            targets.forEach { put(it.name + it.versionId, true) }
+            targets.forEach { put(it.instanceId, true) }
         }
     }
 
     val isModpack = type == AssetType.MODPACK
-    val pickedTargets = targets.filter { target -> targetTicks[target.name + target.versionId] == true }
+    val pickedTargets = targets.filter { target -> targetTicks[target.instanceId] == true }
     val pickedDependencies = dependencies.filter { dependencyTicks[it.project.id + it.project.platform] == true }
     // A modpack brings its own instance. Anything else needs somewhere to go: with no instance
     // at all, or with every row unticked, there is nothing to install into.
@@ -476,7 +476,7 @@ private fun TargetPane(
             )
             return@Column
         }
-        val allTicked = targets.all { ticks[it.name + it.versionId] == true }
+        val allTicked = targets.all { ticks[it.instanceId] == true }
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -486,7 +486,7 @@ private fun TargetPane(
             Surface(
                 shape = RoundedCornerShape(AerixRadii.pill),
                 color = accent.copy(alpha = 0.12f),
-                onClick = { targets.forEach { ticksChanged(it.name + it.versionId, !allTicked) } }
+                onClick = { targets.forEach { ticksChanged(it.instanceId, !allTicked) } }
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = AerixSpacing.smPlus, vertical = 3.dp),
@@ -520,14 +520,14 @@ private fun TargetPane(
             contentPadding = PaddingValues(vertical = AerixSpacing.xs),
             verticalArrangement = Arrangement.spacedBy(AerixSpacing.xs)
         ) {
-            items(targets, key = { it.name + it.versionId }) { target ->
+            items(targets, key = { it.instanceId }) { target ->
                 TargetRow(
                     target = target,
                     mismatch = target.mcVersion != null && fileVersions.isNotEmpty() &&
                         fileVersions.none { it.equals(target.mcVersion, ignoreCase = true) },
-                    checked = ticks[target.name + target.versionId] == true,
+                    checked = ticks[target.instanceId] == true,
                     accent = accent,
-                    onCheckedChange = { checked -> ticksChanged(target.name + target.versionId, checked) }
+                    onCheckedChange = { checked -> ticksChanged(target.instanceId, checked) }
                 )
             }
         }

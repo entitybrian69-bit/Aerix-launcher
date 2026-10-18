@@ -196,6 +196,7 @@ class ResolvedDependency(
 
 /** An instance a file can be installed into, with the version it is built on. */
 class AssetTarget(
+    val instanceId: String,
     val name: String,
     val versionId: String,
     val mcVersion: String?,
@@ -1278,6 +1279,7 @@ internal fun contentInstallTargets(
     runCatching {
         val game = describe(instance)
         AssetTarget(
+            instanceId = instance.instanceId,
             name = instance.name?.takeIf { it.isNotBlank() } ?: instance.versionId.orEmpty(),
             versionId = instance.versionId.orEmpty(),
             mcVersion = game.mcVersion,

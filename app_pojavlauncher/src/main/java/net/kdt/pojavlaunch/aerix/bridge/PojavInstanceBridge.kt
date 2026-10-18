@@ -59,7 +59,10 @@ class AerixInstance(
     val name: String,
     val versionId: String,
     val icon: ImageBitmap?
-)
+) {
+    /** Folder identity stays unique across copies and stable across renames/loader updates. */
+    val id: String = source.instanceId
+}
 
 enum class ModpackExportFormat(val label: String, val extension: String, val description: String) {
     MODRINTH("Modrinth (.mrpack)", "mrpack", "Modrinth index + overrides archive"),

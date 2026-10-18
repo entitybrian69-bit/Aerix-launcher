@@ -1,14 +1,33 @@
 package net.kdt.pojavlaunch.aerix.bridge
 
 import com.google.gson.Gson
+import net.kdt.pojavlaunch.instances.DisplayInstance
 import net.kdt.pojavlaunch.instances.Instance
 import org.junit.Assert.*
 import org.junit.Test
 import java.io.File
 
 class ContentInstallTargetsTest {
-    private fun instance(name: String): Instance = Gson().fromJson(
-        """{"name":"$name","versionId":"fabric-loader-0.16.10-1.16.5"}""", Instance::class.java)
+    private fun instance(name: String, id: String = name): Instance = Gson().fromJson(
+        """{"name":"$name","versionId":"fabric-loader-0.16.10-1.16.5"}""", Instance::class.java).also { instance ->
+        DisplayInstance::class.java.getDeclaredField("mInstanceRoot").apply { isAccessible = true }
+            .set(instance, File(id))
+    }
+
+    @Test fun copiedInstancesKeepDistinctStableLibraryAndContentKeys() {
+        val first = instance("Spunky Boost", "original-folder")
+        val copy = instance("Spunky Boost", "copied-folder")
+        val targets = contentInstallTargets(listOf(first, copy), null) {
+            GameDownloadTarget(it.name, "1.20.1", "fabric", File(it.instanceId))
+        }
+        assertEquals(2, targets.map { it.instanceId }.toSet().size)
+        val rows = listOf(first, copy).map { AerixInstance(it, it.name, it.versionId, null) }
+        assertEquals(2, rows.map { it.id }.toSet().size)
+        first.name = "Renamed"
+        first.versionId = "another-loader-version"
+        assertEquals(rows.first().id, AerixInstance(first, first.name, first.versionId, null).id)
+        assertEquals(targets.first().instanceId, rows.first().id)
+    }
 
     @Test fun fullInstancesBecomeSelectableDestinations() {
         val targets = contentInstallTargets(listOf(instance("Fabric")), File("fabric")) {
