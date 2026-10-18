@@ -49,6 +49,9 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.ui.semantics.Role
+import net.kdt.pojavlaunch.aerix.bridge.rememberControlLayoutCatalog
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -1616,16 +1619,9 @@ private fun ControlsTabContent(activity: FragmentActivity) {
 
 @Composable
 private fun ControlManagerTabContent(activity: FragmentActivity) {
-    var refreshTick by remember { mutableIntStateOf(0) }
-    val ctrlDir = remember { File(Tools.CTRLMAP_PATH).also { it.mkdirs() } }
-    val files = remember(refreshTick) {
-        ctrlDir.listFiles { f -> f.isFile && f.name.endsWith(".json", ignoreCase = true) }
-            ?.sortedBy { it.name.lowercase() }
-            ?: emptyList()
-    }
-    val defaultPath = remember(refreshTick, PojavSettingsBridge.revision) {
-        LauncherPreferences.PREF_DEFAULTCTRL_PATH ?: Tools.CTRLDEF_FILE
-    }
+    val catalog = rememberControlLayoutCatalog(activity)
+    val files = catalog.files
+    val defaultPath = catalog.selectedPath
 
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
@@ -1666,7 +1662,7 @@ private fun ControlManagerTabContent(activity: FragmentActivity) {
                 AerixGhostButton(
                     text = "",
                     iconRes = R.drawable.aerix_ic_refresh,
-                    onClick = { refreshTick++ }
+                    onClick = { catalog.refresh() }
                 )
                 AerixGhostButton(
                     text = "Import",
@@ -1688,9 +1684,13 @@ private fun ControlManagerTabContent(activity: FragmentActivity) {
         ) {
             items(files.size, key = { files[it].absolutePath }) { index ->
                 val file = files[index]
-                val isDefault = file.absolutePath == defaultPath || defaultPath.endsWith("/${file.name}")
+                val isDefault = file.absolutePath == defaultPath
                 Surface(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().selectable(
+                        selected = isDefault,
+                        role = Role.RadioButton,
+                        onClick = { catalog.select(file) }
+                    ),
                     shape = RoundedCornerShape(AerixRadii.card),
                     color = AerixSurface.panel,
                     border = BorderStroke(
@@ -1728,15 +1728,11 @@ private fun ControlManagerTabContent(activity: FragmentActivity) {
                             text = if (isDefault) "Default" else "Set default",
                             iconRes = if (isDefault) R.drawable.aerix_ic_check else null,
                             onClick = {
-                                LauncherPreferences.PREF_DEFAULTCTRL_PATH = file.absolutePath
-                                PojavSettingsBridge.writeString(activity, "defaultCtrl", file.absolutePath)
-                                refreshTick++
+                                catalog.select(file)
                             }
                         )
                         IconButton(onClick = {
-                            LauncherPreferences.PREF_DEFAULTCTRL_PATH = file.absolutePath
-                            PojavSettingsBridge.writeString(activity, "defaultCtrl", file.absolutePath)
-                            PojavNavigator.openCustomControls(activity)
+                            if (catalog.select(file)) PojavNavigator.openCustomControls(activity)
                         }) {
                             Icon(
                                 painter = painterResource(R.drawable.aerix_ic_edit_outlined),
@@ -1746,8 +1742,7 @@ private fun ControlManagerTabContent(activity: FragmentActivity) {
                         }
                         if (file.name != "default.json") {
                             IconButton(onClick = {
-                                file.delete()
-                                refreshTick++
+                                catalog.delete(file)
                             }) {
                                 Icon(
                                     painter = painterResource(R.drawable.aerix_ic_delete_outlined),

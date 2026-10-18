@@ -30,6 +30,7 @@
 
 package net.kdt.pojavlaunch.aerix.ui.screens
 
+import net.kdt.pojavlaunch.aerix.bridge.rememberControlLayoutCatalog
 import android.text.format.DateFormat
 import android.text.format.Formatter
 import android.widget.Toast
@@ -1233,16 +1234,12 @@ private fun InstanceSettingsPane(
         }
     }
 
-    var controlRefreshTick by remember { mutableIntStateOf(0) }
-    val controlEntries = remember(controlRefreshTick) {
-        val dir = File(Tools.CTRLMAP_PATH)
-        val files = dir.listFiles { f -> f.isFile && f.name.endsWith(".json", ignoreCase = true) }
-            ?.sortedBy { it.name.lowercase() }
-            .orEmpty()
+    val controlCatalog = rememberControlLayoutCatalog(activity)
+    val controlEntries = remember(controlCatalog.files) {
         buildList {
             add("" to "Follow Global")
-            files.forEach { file ->
-                add(file.name to file.name.removeSuffix(".json"))
+            controlCatalog.files.forEach { file ->
+                add(file.name to file.nameWithoutExtension)
             }
         }
     }
@@ -1415,7 +1412,7 @@ private fun InstanceSettingsPane(
                 getItemText = { it.second },
                 getItemId = { it.first },
                 trailingIcon = {
-                    IconButton(onClick = { controlRefreshTick++ }) {
+                    IconButton(onClick = { controlCatalog.refresh() }) {
                         Icon(
                             painter = painterResource(R.drawable.aerix_ic_refresh),
                             contentDescription = "Refresh Controls",
