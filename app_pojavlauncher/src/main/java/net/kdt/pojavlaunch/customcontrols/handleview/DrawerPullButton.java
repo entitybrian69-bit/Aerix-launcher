@@ -107,8 +107,9 @@ public class DrawerPullButton extends View {
 
         if (mDrawable == null) return;
         int iconSize = MenuButtonSize.iconPixels(Math.min(getWidth(), getHeight()));
-        int inset = (getWidth() - iconSize) / 2;
-        mDrawable.setBounds(inset, inset, inset + iconSize, inset + iconSize);
+        int insetX = (getWidth() - iconSize) / 2;
+        int insetY = (getHeight() - iconSize) / 2;
+        mDrawable.setBounds(insetX, insetY, insetX + iconSize, insetY + iconSize);
         mDrawable.draw(canvas);
     }
 
@@ -222,6 +223,13 @@ public class DrawerPullButton extends View {
     public void showSizeDialog() {
         if (mSizeDialog != null && mSizeDialog.isShowing()) return;
         final int originalSize = mSizeDp;
+        final float originalX = getTranslationX();
+        final float originalY = getTranslationY();
+        final Runnable restorePreview = () -> {
+            setSizeDp(originalSize);
+            setTranslationX(originalX);
+            setTranslationY(originalY);
+        };
         LinearLayout panel = new LinearLayout(getContext());
         panel.setOrientation(LinearLayout.VERTICAL);
         int padding = dpToPx(24);
@@ -248,12 +256,12 @@ public class DrawerPullButton extends View {
         mSizeDialog = new AlertDialog.Builder(getContext())
                 .setTitle(R.string.aerix_logo_size_title).setView(panel)
                 .setPositiveButton(android.R.string.ok, (dialog, which) -> MenuButtonSize.save(getContext(), mSizeDp))
-                .setNegativeButton(android.R.string.cancel, (dialog, which) -> setSizeDp(originalSize))
+                .setNegativeButton(android.R.string.cancel, (dialog, which) -> restorePreview.run())
                 .setNeutralButton(R.string.aerix_logo_size_default, (dialog, which) -> {
                     setSizeDp(MenuButtonSize.DEFAULT_DP);
                     MenuButtonSize.save(getContext(), mSizeDp);
                 }).create();
-        mSizeDialog.setOnCancelListener(dialog -> setSizeDp(originalSize));
+        mSizeDialog.setOnCancelListener(dialog -> restorePreview.run());
         mSizeDialog.setOnDismissListener(dialog -> mSizeDialog = null);
         mSizeDialog.show();
     }
