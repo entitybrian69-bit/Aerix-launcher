@@ -50,11 +50,7 @@ public class DrawerPullButton extends View {
     private int mSizeDp;
     private boolean mLongPressHandled;
     private AlertDialog mSizeDialog;
-    private final Runnable mLongPress = () -> {
-        if (!mDragging && isAttachedToWindow()) {
-            mLongPressHandled = performLongClick();
-        }
-    };
+
 
     private final Paint mBackgroundPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint mBorderPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -69,6 +65,12 @@ public class DrawerPullButton extends View {
     private float mTouchDownY;
     private float mDragStartX;
     private float mDragStartY;
+
+    private final Runnable mLongPress = () -> {
+        if (!mDragging && isAttachedToWindow()) {
+            mLongPressHandled = performLongClick();
+        }
+    };
 
     public DrawerPullButton(Context context) {super(context); init();}
     public DrawerPullButton(Context context, @Nullable AttributeSet attrs) {super(context, attrs); init();}
