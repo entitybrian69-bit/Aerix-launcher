@@ -134,7 +134,7 @@ internal fun AssetInstallDialog(
     val pickedDependencies = dependencies.filter { dependencyTicks[it.project.id + it.project.platform] == true }
     // A modpack brings its own instance. Anything else needs somewhere to go: with no instance
     // at all, or with every row unticked, there is nothing to install into.
-    val canInstall = isModpack || pickedTargets.isNotEmpty()
+    val canInstall = !loading && (isModpack || pickedTargets.isNotEmpty())
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -207,6 +207,7 @@ internal fun AssetInstallDialog(
                                 modifier = Modifier.weight(1f).fillMaxHeight()
                             )
                             TargetPane(
+                                loading = loading,
                                 targets = targets,
                                 fileVersions = file.gameVersions,
                                 ticks = targetTicks,
@@ -235,6 +236,7 @@ internal fun AssetInstallDialog(
                                 modifier = Modifier.fillMaxWidth()
                             )
                             TargetPane(
+                                loading = loading,
                                 targets = targets,
                                 fileVersions = file.gameVersions,
                                 ticks = targetTicks,
@@ -440,6 +442,7 @@ private fun DependencyChip(required: Boolean, accent: Color) {
 /** Right pane of the dialog: the instances to install into, several at once. */
 @Composable
 private fun TargetPane(
+    loading: Boolean,
     targets: List<AssetTarget>,
     /** Versions the file itself covers: an instance outside them gets a warning, not a blocked tick. */
     fileVersions: List<String>,
@@ -467,7 +470,10 @@ private fun TargetPane(
             )
         }
         if (targets.isEmpty()) {
-            PaneNote(text = stringResource(R.string.aerix_install_targets_none), loading = false)
+            PaneNote(
+                text = stringResource(if (loading) R.string.aerix_install_targets_loading else R.string.aerix_install_targets_none),
+                loading = loading
+            )
             return@Column
         }
         val allTicked = targets.all { ticks[it.name + it.versionId] == true }

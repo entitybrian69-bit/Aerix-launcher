@@ -529,6 +529,7 @@
     <string name="aerix_install_dependency_missing">no build for this version</string>
     <string name="aerix_install_targets">Install for which instance?</string>
     <string name="aerix_install_targets_detected">Detected: %1$s</string>
+    <string name="aerix_install_targets_loading">Loading install destinations…</string>
     <string name="aerix_install_targets_none">No instance to install into yet. Create one first, then come back.</string>
     <string name="aerix_install_target_detected">Detected</string>
     <string name="aerix_install_target_mismatch">not for %1$s</string>
