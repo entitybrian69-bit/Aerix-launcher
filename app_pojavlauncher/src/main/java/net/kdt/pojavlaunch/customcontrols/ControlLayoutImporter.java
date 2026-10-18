@@ -158,7 +158,7 @@ public class ControlLayoutImporter {
         }
 
         JSONArray layers = layout.optJSONArray("layers");
-        if (layers == null) return result;
+        if (layers == null) return null;
 
         for (int i = 0; i < layers.length(); i++) {
             JSONObject layer = layers.optJSONObject(i);
@@ -345,7 +345,7 @@ public class ControlLayoutImporter {
         // The colours are plain ARGB values, which may be written as 64 bit numbers.
         long color = style.optLong(key, fallback & 0xFFFFFFFFL);
         // Old Compose exports stored ARGB in the high word; modern exports use uint32.
-        return (int) ((color >>> 32) != 0 ? color >>> 32 : color);
+        return (int) (color >= Integer.MIN_VALUE && color <= 0xFFFFFFFFL ? color : color >>> 32);
     }
 
     private static double zalithDouble(@Nullable JSONObject style, String key, double fallback) {

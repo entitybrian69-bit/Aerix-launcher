@@ -98,6 +98,8 @@ public class ControlLayoutImporterTest {
         assertEquals(0xFF123456, convert(json).controls.mControlDataList.get(0).bgColor);
         style.getJSONObject("lightStyle").put("backgroundColor", 0xFF123456L);
         assertEquals(0xFF123456, convert(json).controls.mControlDataList.get(0).bgColor);
+        style.getJSONObject("lightStyle").put("backgroundColor", (int) 0xFF123456L);
+        assertEquals(0xFF123456, convert(json).controls.mControlDataList.get(0).bgColor);
     }
     @Test public void preservesLayerAndWidgetVisibilityRestrictions() throws Exception {
         ControlData data = convert(layout(new JSONObject().put("visibilityType", "in_menu")
