@@ -106,6 +106,7 @@ public class LayoutConverter {
             // only made to fix bugs or improve scalability.
 
             CustomControls layout = Tools.GLOBAL_GSON.fromJson(jsonLayoutData, CustomControls.class);
+            normalizeLists(layout); // Legacy files often omit joystick/drawer arrays.
 
             if(layout.version > TARGET_VERSION) {
                 // Refuse the whole layout instead of the version: a file written by a newer
@@ -208,7 +209,8 @@ public class LayoutConverter {
             convertStrokeWidth(n_button);
             layout.mControlDataList.add(n_button);
         }
-        JSONArray layoutDrawerArray = oldLayoutJson.getJSONArray("mDrawerDataList");
+        JSONArray layoutDrawerArray = oldLayoutJson.optJSONArray("mDrawerDataList");
+        if (layoutDrawerArray == null) layoutDrawerArray = new JSONArray();
         layout.mDrawerDataList = new ArrayList<>();
         for (int i = 0; i < layoutDrawerArray.length(); i++) {
             JSONObject button = layoutDrawerArray.getJSONObject(i);
@@ -235,6 +237,7 @@ public class LayoutConverter {
         }
 
         layout.version = 9;
+        normalizeLists(layout);
         return layout;
     }
 

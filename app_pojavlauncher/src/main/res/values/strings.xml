@@ -133,6 +133,14 @@
     <string name="import_control_import_button">import controls</string>
     <string name="import_control_verifying_file">File is being verified, please wait and try again…</string>
     <string name="import_control_invalid_name">Invalid name or file already exists</string>
+    <string name="import_control_compatibility_title">Control layout compatibility</string>
+    <string name="import_control_compatibility_warning">%1$s layout detected. Buttons and supported joystick/key bindings will be adapted to Aerix. Layers are flattened; layer switching, text/chat macros, text widgets, source-specific images and some visual/gesture effects cannot be reproduced exactly.
+
+Skipped widgets: %2$d
+Buttons without an action: %3$d
+Unsupported or excess events: %4$d
+
+Your original layout is kept unchanged. Continue importing?</string>
     <string name="import_control_done">Importation done</string>
     <!--
     <string name="control_more3"></string>

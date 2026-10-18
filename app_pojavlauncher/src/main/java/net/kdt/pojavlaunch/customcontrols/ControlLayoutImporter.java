@@ -33,7 +33,7 @@ import java.util.Map;
  * display, entries that cannot be represented are skipped instead of throwing, and the number of
  * skipped entries is reported so the caller can tell the user what was dropped.
  *
- * Neither the Zalith Launcher 2 nor the Fold Craft Launcher sources were used to write this file;
+ * The JSON schemas of Zalith Launcher 2 and Fold Craft Launcher inform this adapter;
  * it only reads their published layout files. Both are GPL-3.0 projects, like this launcher.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -82,13 +82,14 @@ public class ControlLayoutImporter {
         public int skippedEntries;
         /** Number of buttons that ended up without any key or launcher action. */
         public int inertButtons;
+        public int unsupportedEvents;
 
         Result(CustomControls controls) {
             this.controls = controls;
         }
 
         public boolean wasModified() {
-            return skippedEntries > 0 || inertButtons > 0;
+            return skippedEntries > 0 || inertButtons > 0 || unsupportedEvents > 0;
         }
     }
 
@@ -177,9 +178,14 @@ public class ControlLayoutImporter {
                     buttons.add(data);
                 }
             }
-            // Text boxes and joystick widgets of the Zalith editor have no equivalent here.
+            // Text rendering, layer switching and source-only styling are not executable widgets.
             result.skippedEntries += countEntries(layer.optJSONArray("textBoxes"));
-            result.skippedEntries += countEntries(layer.optJSONArray("joystickButtons"));
+            JSONArray sticks = layer.optJSONArray("joystickButtons");
+            if (sticks != null) for (int j = 0; j < sticks.length(); j++) {
+                JSONObject stick = sticks.optJSONObject(j);
+                if (stick == null) { result.skippedEntries++; continue; }
+                joysticks.add(convertZalithJoystick(context, size, stick, layerVisibility, result));
+            }
         }
 
         if (buttons.isEmpty() && joysticks.isEmpty()) return null;
@@ -199,14 +205,16 @@ public class ControlLayoutImporter {
         if (name.isEmpty()) name = button.optString("uuid", "");
 
         boolean[] keycodes = new boolean[1];
-        int[] codes = zalithEventKeycodes(button.optJSONArray("clickEvents"), keycodes);
+        JSONArray events = button.optJSONArray("clickEvents");
+        countUnsupportedEvents(events, result);
+        int[] codes = zalithEventKeycodes(events, keycodes);
         JSONObject switchEvent = firstEventOfType(button.optJSONArray("clickEvents"), "switch_layer");
         // A button that only switches between Zalith layers has no equivalent: the layers it
         // switched to are imported as visible buttons instead.
         if (!keycodes[0] && switchEvent != null) return null;
         result.inertButtons += keycodes[0] ? 0 : 1;
 
-        float[] position = zalithPosition(size, button.optJSONObject("position"));
+
         float[] dimensions = zalithDimensions(context, size, button.optJSONObject("buttonSize"));
 
         JSONObject style = findZalithStyle(styles, button.optString("buttonStyle", ""));
@@ -218,16 +226,14 @@ public class ControlLayoutImporter {
 
         String visibility = button.optString("visibilityType", "");
         if (visibility.isEmpty()) visibility = layerVisibility;
-        boolean inGame = !"in_menu".equals(visibility);
-        boolean inMenu = !"in_game".equals(visibility);
+        boolean inGame = !"in_menu".equals(visibility) && !"in_menu".equals(layerVisibility);
+        boolean inMenu = !"in_game".equals(visibility) && !"in_game".equals(layerVisibility);
 
-        float widthPx = dpToPx(context, dimensions[0]);
-        float heightPx = dpToPx(context, dimensions[1]);
-        String dynamicX = positionString(clamp(position[0], 0, Math.max(0, size.x - widthPx)));
-        String dynamicY = positionString(clamp(position[1], 0, Math.max(0, size.y - heightPx)));
+        String dynamicX = zalithDynamicPosition(button.optJSONObject("position"), "x", "right");
+        String dynamicY = zalithDynamicPosition(button.optJSONObject("position"), "y", "bottom");
 
         return new ControlData(name, codes, dynamicX, dynamicY,
-                dimensions[0], dimensions[1], false, opacity,
+                dimensions[0], dimensions[1], button.optBoolean("isToggleable", false), opacity,
                 bgColor, strokeColor, strokeWidth, cornerRadius,
                 inGame, inMenu, button.optBoolean("isSwipple", false),
                 button.optBoolean("isPenetrable", false), null);
@@ -244,14 +250,60 @@ public class ControlLayoutImporter {
         return dark != null ? dark : style;
     }
 
-    private static float[] zalithPosition(Point size, JSONObject position) {
-        float x = 0;
-        float y = 0;
-        if (position != null) {
-            x = (float) (position.optDouble("x", 0) / POSITION_SCALE * size.x);
-            y = (float) (position.optDouble("y", 0) / POSITION_SCALE * size.y);
+    private static String zalithDynamicPosition(JSONObject position, String axis, String edge) {
+        double fraction = position == null ? 0 : clamp(position.optDouble(axis, 0) / POSITION_SCALE, 0, 1);
+        return "${" + edge + "} * " + Double.toString(fraction);
+    }
+
+    private static void countUnsupportedEvents(JSONArray events, Result result) {
+        if (events == null) return;
+        int represented = 0;
+        for (int i = 0; i < events.length(); i++) {
+            JSONObject event = events.optJSONObject(i);
+            if (event == null || zalithEventKeycode(event.optString("type"), event.optString("key")) == UNKNOWN_KEYCODE
+                    || represented >= MAX_KEYCODES) result.unsupportedEvents++;
+            else represented++;
         }
-        return new float[]{x, y};
+    }
+
+    private static int[] joystickEvents(JSONArray events, Result result) {
+        boolean[] hasKeys = new boolean[1];
+        countUnsupportedEvents(events, result);
+        int[] codes = zalithEventKeycodes(events, hasKeys);
+        List<Integer> keyboard = new ArrayList<>();
+        for (int code : codes) {
+            if (code > 0) keyboard.add(code);
+            else result.unsupportedEvents++; // Native joystick dispatch is keyboard-only.
+        }
+        return toKeycodeArray(keyboard);
+    }
+
+    private static ControlJoystickData convertZalithJoystick(Context context, Point size,
+            JSONObject stick, String layerVisibility, Result result) {
+        float pixels = "dp".equals(stick.optString("sizeType", "percentage"))
+                ? dpToPx(context, (float) stick.optDouble("sizeDp", 200))
+                : size.y * (float) clamp(stick.optDouble("sizePercentage", 2500) / POSITION_SCALE, 0.01, 1);
+        float dp = (float) clamp(pxToDp(context, pixels), MIN_BUTTON_DP, MAX_BUTTON_DP);
+        String visibility = stick.optString("visibilityType", layerVisibility);
+        ControlData base = new ControlData("Joystick", new int[0],
+                zalithDynamicPosition(stick.optJSONObject("position"), "x", "right"),
+                zalithDynamicPosition(stick.optJSONObject("position"), "y", "bottom"), dp, dp, false);
+        ControlJoystickData joystick = new ControlJoystickData(base);
+        joystick.displayInGame = !"in_menu".equals(visibility) && !"in_menu".equals(layerVisibility);
+        joystick.displayInMenu = !"in_game".equals(visibility) && !"in_game".equals(layerVisibility);
+        joystick.deadzone = (int) clamp(stick.optDouble("deadZoneRatio", 0.5) * 100, 0, 95);
+        joystick.forwardLock = stick.optBoolean("canLock", true);
+        JSONObject directions = stick.optJSONObject("directionEvents");
+        if (directions != null) {
+            String[] names = {"east", "north_east", "north", "north_west", "west", "south_west", "south", "south_east"};
+            joystick.directionKeycodes = new int[8][];
+            for (int i = 0; i < names.length; i++)
+                joystick.directionKeycodes[i] = joystickEvents(directions.optJSONArray(names[i]), result);
+            if (directions.has("none")) result.unsupportedEvents += countEntries(directions.optJSONArray("none"));
+        }
+        if (stick.has("lockEvents")) joystick.forwardLockKeycodes = joystickEvents(stick.optJSONArray("lockEvents"), result);
+        // Omitted direction/lock maps use the native WASD/Ctrl defaults, as in the ZL2 schema.
+        return joystick;
     }
 
     /** Zalith sizes are either absolute dp, or a fraction of the screen sent to this pair. */
@@ -291,7 +343,9 @@ public class ControlLayoutImporter {
     private static int zalithColor(@Nullable JSONObject style, String key, int fallback) {
         if (style == null || !style.has(key)) return fallback;
         // The colours are plain ARGB values, which may be written as 64 bit numbers.
-        return (int) style.optLong(key, fallback);
+        long color = style.optLong(key, fallback & 0xFFFFFFFFL);
+        // Old Compose exports stored ARGB in the high word; modern exports use uint32.
+        return (int) ((color >>> 32) != 0 ? color >>> 32 : color);
     }
 
     private static double zalithDouble(@Nullable JSONObject style, String key, double fallback) {
@@ -405,6 +459,8 @@ public class ControlLayoutImporter {
         ControlJoystickData joystick = new ControlJoystickData();
         joystick.name = direction.optString("id", "Joystick");
         joystick.keycodes = mergeKeycodes(up, down, left, right);
+        joystick.directionKeycodes = new int[][]{right, mergeKeycodes(up, right), up,
+                mergeKeycodes(up, left), left, mergeKeycodes(down, left), down, mergeKeycodes(down, right)};
         float widthPx = dpToPx(context, dimensions[0]);
         float heightPx = dpToPx(context, dimensions[1]);
         joystick.dynamicX = positionString(clamp(position[0], 0, Math.max(0, size.x - widthPx)));
@@ -595,6 +651,7 @@ public class ControlLayoutImporter {
     }
 
     private static float clamp(float value, float min, float max) {
+        if (Float.isNaN(value)) return min;
         return Math.max(min, Math.min(max, value));
     }
 
