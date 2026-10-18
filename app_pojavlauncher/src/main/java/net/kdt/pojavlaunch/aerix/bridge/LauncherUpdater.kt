@@ -143,7 +143,8 @@ internal object LauncherUpdater {
         require(next.packageName == context.packageName) { "This APK is for a different launcher edition" }
         val code = if (Build.VERSION.SDK_INT >= 28) next.longVersionCode else next.versionCode.toLong()
         val currentCode = if (Build.VERSION.SDK_INT >= 28) current.longVersionCode else current.versionCode.toLong()
-        require(code > currentCode && LauncherVersion.parse(next.versionName.orEmpty()) == update.version) { "APK version does not match a newer release" }
+        val expectedVersion = update.tag.removePrefix("v") + if (BuildConfig.FLAVOR == "noruntime") "-noruntime" else ""
+        require(code > currentCode && next.versionName == expectedVersion) { "APK version or runtime edition does not match a newer release" }
         if (Build.VERSION.SDK_INT >= 24) require((next.applicationInfo?.minSdkVersion ?: 23) <= Build.VERSION.SDK_INT) { "This update requires a newer Android version" }
         val installedSignatures = if (Build.VERSION.SDK_INT >= 28) current.signingInfo?.apkContentsSigners else current.signatures
         val newSignatures = if (Build.VERSION.SDK_INT >= 28) next.signingInfo?.apkContentsSigners else next.signatures
