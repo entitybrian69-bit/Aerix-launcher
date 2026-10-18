@@ -48,13 +48,13 @@ permissions:
 # accessible by integration" even with contents: write - but it can upload the assets of one that
 # exists. Create the release itself (empty) next to the branch, then set RUN_ID / TAG here and push.
 env:
-  RUN_ID: "39102366185"
-  BUILD_SHA: "6e1170cf4b618396a42e8e18340922b218f1e974"
-  TAG: "v1.2.0"
+  RUN_ID: "39104496662"
+  BUILD_SHA: "0292050cc7bc220a54d8194faafc5b72b32f33f3"
+  TAG: "v1.2.1"
   # Name of the release: the version the build carries, and the tag it is published under when TAG
   # is left empty.
-  VERSION: "1.2.0"
-  NOTES: "Aerix Launcher 1.2 (1.2.0) - Unique folder-based Library and Content keys, defensive repeated-record filtering, stable selection and regression coverage for the reported Spunky Boost crash."
+  VERSION: "1.2.1"
+  NOTES: "Aerix Launcher 1.2.1 - Indexed render keys protect Library and Content against repeated instance IDs; copied crash reports now include the installed build version."
 
 
 jobs:
@@ -150,6 +150,24 @@ jobs:
             echo "::error title=no APK::The run has no app-release artifact."
             exit 1
           fi
+          # Check the actual APK metadata before giving it a public versioned filename.
+          python3 - "$full" "$noruntime" "$version" <<'PYAPK'
+          import glob, os, re, subprocess, sys
+          tools = glob.glob(os.path.join(os.environ.get('ANDROID_HOME', '/usr/local/lib/android/sdk'), 'build-tools', '*', 'aapt'))
+          if not tools:
+              raise SystemExit('aapt is required to verify APK metadata before publication')
+          version = sys.argv[3]
+          major, minor, patch = map(int, version.split('.'))
+          expected_code = major * 10000 + minor * 100 + patch
+          for path, suffix in [(sys.argv[1], ''), (sys.argv[2], '-noruntime')]:
+              if not path:
+                  continue
+              output = subprocess.check_output([tools[-1], 'dump', 'badging', path], text=True)
+              package = dict(re.findall(r"(name|versionCode|versionName)='([^']*)'", output.splitlines()[0]))
+              if package.get('versionName') != version + suffix or package.get('versionCode') != str(expected_code):
+                  raise SystemExit(f'APK metadata mismatch: {path}: {package}')
+              print(f'Verified APK metadata: {path}: {package}')
+          PYAPK
           cp "$full" "dist/Aerix-Launcher-$version.apk"
           # The same file under a name that never changes, so
           # /releases/latest/download/Aerix-Launcher.apk is a permanent link to the
