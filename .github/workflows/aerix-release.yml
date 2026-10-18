@@ -48,13 +48,13 @@ permissions:
 # accessible by integration" even with contents: write - but it can upload the assets of one that
 # exists. Create the release itself (empty) next to the branch, then set RUN_ID / TAG here and push.
 env:
-  RUN_ID: "39101532634"
-  BUILD_SHA: "2abf94055802273b2d8d9695c985e24a77542c45"
-  TAG: "v1.1.4"
+  RUN_ID: "39102366185"
+  BUILD_SHA: "6e1170cf4b618396a42e8e18340922b218f1e974"
+  TAG: "v1.2.0"
   # Name of the release: the version the build carries, and the tag it is published under when TAG
   # is left empty.
-  VERSION: "1.1.4"
-  NOTES: "Aerix Launcher 1.1.4 - Fix Content install destinations and duplicate-instance launcher crashes. Includes the themed updater, actual APK version labels and updated About page."
+  VERSION: "1.2.0"
+  NOTES: "Aerix Launcher 1.2 (1.2.0) - Unique folder-based Library and Content keys, defensive repeated-record filtering, stable selection and regression coverage for the reported Spunky Boost crash."
 
 
 jobs:
