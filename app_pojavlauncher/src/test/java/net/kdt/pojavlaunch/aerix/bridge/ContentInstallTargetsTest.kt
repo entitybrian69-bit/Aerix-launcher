@@ -29,6 +29,22 @@ class ContentInstallTargetsTest {
         assertEquals(targets.first().instanceId, rows.first().id)
     }
 
+    @Test fun repeatedRecordsCannotReintroduceDuplicateKeysOrDropCopies() {
+        val original = instance("Spunky Boost", "original-folder").apply {
+            versionId = "fabric-loader-0.16.10-1.20.1"
+        }
+        val copied = instance("Spunky Boost", "copied-folder").apply {
+            versionId = original.versionId
+        }
+        fun row(source: Instance) = AerixInstance(source, source.name, source.versionId, null)
+        val rows = uniqueInstanceRows(listOf(row(original), row(original), row(copied)))
+        assertEquals(2, rows.size)
+        assertEquals(2, rows.map { it.id }.toSet().size)
+        assertEquals(listOf("original-folder", "copied-folder"), rows.map { it.id })
+        assertEquals(1, rows.indexOfFirst { it.id == copied.instanceId })
+        assertTrue(uniqueInstanceRows(emptyList()).isEmpty())
+    }
+
     @Test fun fullInstancesBecomeSelectableDestinations() {
         val targets = contentInstallTargets(listOf(instance("Fabric")), File("fabric")) {
             GameDownloadTarget(it.name, "1.16.5", "fabric", File("fabric"))

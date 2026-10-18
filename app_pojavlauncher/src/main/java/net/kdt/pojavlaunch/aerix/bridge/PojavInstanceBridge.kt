@@ -64,6 +64,11 @@ class AerixInstance(
     val id: String = source.instanceId
 }
 
+/** Defensive boundary: repeated records cannot become duplicate Compose keys.
+ * Copies with identical labels remain distinct because identity is the instance folder ID.
+ */
+internal fun uniqueInstanceRows(rows: List<AerixInstance>): List<AerixInstance> = rows.distinctBy { it.id }
+
 enum class ModpackExportFormat(val label: String, val extension: String, val description: String) {
     MODRINTH("Modrinth (.mrpack)", "mrpack", "Modrinth index + overrides archive"),
     CURSEFORGE("CurseForge (.zip)", "zip", "CurseForge manifest.json + overrides archive"),
@@ -112,7 +117,7 @@ object PojavInstanceBridge {
         PojavApplication.sExecutorService.execute {
             val result = runCatching {
                 val display = Instances.loadDisplay()
-                val rows = display.list.map { instance ->
+                val rows = uniqueInstanceRows(display.list.map { instance ->
                     val icon = runCatching {
                         InstanceIconProvider.fetchIcon(context.resources, instance).toAerixBitmap()
                     }.getOrNull()
@@ -122,9 +127,10 @@ object PojavInstanceBridge {
                         versionId = instance.versionId ?: "",
                         icon = icon
                     )
-                }
+                })
                 val editorInstance = editorId?.let { runCatching { Instances.loadInstance(it) }.getOrNull() }
-                Triple(rows, display.selectedIndex, editorInstance)
+                val selectedId = display.list.getOrNull(display.selectedIndex)?.instanceId
+                Triple(rows, rows.indexOfFirst { it.id == selectedId }, editorInstance)
             }
             Tools.runOnUiThread {
                 // A slower earlier scan must not overwrite a just-completed installation.
