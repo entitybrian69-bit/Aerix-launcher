@@ -548,18 +548,9 @@ object PojavAssetBridge {
         runCatching {
             val selected = runCatching { Instances.loadSelectedInstance() }.getOrNull()
             val selectedRoot = runCatching { selected?.gameDirectory }.getOrNull()
-            Instances.loadDisplay().list.mapNotNull { display ->
-                val instance = display as? Instance ?: return@mapNotNull null
-                val game = GameDownloadTarget.of(instance)
-                AssetTarget(
-                    name = display.name?.takeIf { it.isNotBlank() } ?: instance.versionId.orEmpty(),
-                    versionId = instance.versionId.orEmpty(),
-                    mcVersion = game.mcVersion,
-                    loader = game.loader,
-                    detected = selectedRoot != null && game.gameDirectory == selectedRoot,
-                    gameDirectory = game.gameDirectory
-                )
-            }.sortedByDescending { it.detected }
+            // DisplayInstance records are not Instance subclasses. Casting the lightweight
+            // display list silently discarded every installed instance and disabled Install.
+            contentInstallTargets(Instances.loadAllInstances(), selectedRoot)
         }.getOrDefault(emptyList())
     }
 
@@ -1277,3 +1268,22 @@ object ModrinthInstallRules {
         return ids.filter { it.isNotBlank() }.distinct()
     }
 }
+
+/** Resolve full instance records; one broken profile must not hide all healthy destinations. */
+internal fun contentInstallTargets(
+    instances: List<Instance>,
+    selectedRoot: File?,
+    describe: (Instance) -> GameDownloadTarget = { GameDownloadTarget.of(it) }
+): List<AssetTarget> = instances.mapNotNull { instance ->
+    runCatching {
+        val game = describe(instance)
+        AssetTarget(
+            name = instance.name?.takeIf { it.isNotBlank() } ?: instance.versionId.orEmpty(),
+            versionId = instance.versionId.orEmpty(),
+            mcVersion = game.mcVersion,
+            loader = game.loader,
+            detected = selectedRoot != null && game.gameDirectory == selectedRoot,
+            gameDirectory = game.gameDirectory
+        ).takeIf { it.gameDirectory != null }
+    }.getOrNull()
+}.sortedByDescending { it.detected }
