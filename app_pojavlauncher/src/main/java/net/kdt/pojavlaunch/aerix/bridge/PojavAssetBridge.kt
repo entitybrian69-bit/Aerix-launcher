@@ -323,12 +323,14 @@ object PojavAssetBridge {
         loader: String?,
         offset: Int,
         category: String? = null,
-        sort: AssetSort = AssetSort.RELEVANCE
+        sort: AssetSort = AssetSort.RELEVANCE,
+        categories: List<String> = emptyList()
     ): AssetPage? = withContext(Dispatchers.IO) {
         runCatching {
+            val chosenCategories = (categories + listOfNotNull(category)).filter { it.isNotBlank() }.distinct()
             when (platform) {
-                AssetPlatform.MODRINTH -> searchModrinth(type, query, mcVersion, loader, category, sort, offset)
-                AssetPlatform.CURSEFORGE -> searchCurseForge(context, type, query, mcVersion, loader, category, sort, offset)
+                AssetPlatform.MODRINTH -> searchModrinth(type, query, mcVersion, loader, chosenCategories, sort, offset)
+                AssetPlatform.CURSEFORGE -> searchCurseForge(context, type, query, mcVersion, loader, chosenCategories, sort, offset)
             }
         }.getOrNull()
     }
@@ -783,7 +785,7 @@ object PojavAssetBridge {
         query: String,
         mcVersion: String?,
         loader: String?,
-        category: String?,
+        categories: List<String>,
         sort: AssetSort,
         offset: Int
     ): AssetPage? {
@@ -791,7 +793,7 @@ object PojavAssetBridge {
         val facets = StringBuilder("[[\"project_type:$projectType\"]")
         if (!mcVersion.isNullOrBlank()) facets.append(",[\"versions:$mcVersion\"]")
         if (type.supportsLoaderFilter && !loader.isNullOrBlank()) facets.append(",[\"categories:${loader.lowercase()}\"]")
-        if (!category.isNullOrBlank()) facets.append(",[\"categories:$category\"]")
+        if (categories.isNotEmpty()) facets.append(",").append(discoveryCategoryFacet(categories))
         facets.append("]")
         val params = HashMap<String, Any>()
         params["facets"] = facets.toString()
@@ -928,7 +930,7 @@ object PojavAssetBridge {
         query: String,
         mcVersion: String?,
         loader: String?,
-        category: String?,
+        categories: List<String>,
         sort: AssetSort,
         offset: Int
     ): AssetPage? {
@@ -942,7 +944,9 @@ object PojavAssetBridge {
         params["index"] = offset
         if (!mcVersion.isNullOrBlank()) params["gameVersion"] = mcVersion
         if (type.supportsLoaderFilter) curseForgeLoaderType(loader)?.let { params["modLoaderType"] = it }
-        curseForgeCategoryId(type, category)?.let { params["categoryId"] = it }
+        val categoryIds = categories.mapNotNull { curseForgeCategoryId(type, it) }.distinct()
+        if (categoryIds.size == 1) params["categoryId"] = categoryIds.single()
+        else if (categoryIds.isNotEmpty()) params["categoryIds"] = categoryIds.joinToString(prefix = "[", postfix = "]")
         val response = curseForgeGet(context, "mods/search", params, JsonObject::class.java) ?: return null
         val data = response.arr("data") ?: return null
         val projects = data.mapNotNull { element ->

@@ -88,6 +88,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -232,6 +235,7 @@ object AerixDownloadRequest {
 fun DiscoverScreen(activity: FragmentActivity, @Suppress("UNUSED_PARAMETER") navigate: (LauncherSection) -> Unit) {
     var selectedTab by rememberSaveable { mutableStateOf(DiscoverTab.MODS) }
     var activeProject by remember { mutableStateOf<AssetProject?>(null) }
+    val browseStates = rememberSaveableStateHolder()
 
     val requested = AerixDownloadRequest.type
     if (requested != null) {
@@ -291,23 +295,24 @@ fun DiscoverScreen(activity: FragmentActivity, @Suppress("UNUSED_PARAMETER") nav
                     .fillMaxWidth()
                     .weight(1f)
             )
-        } else if (selectedTab == DiscoverTab.FAVORITES) {
-            FavoritesContent(
-                onOpenProject = { activeProject = it },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-            )
         } else {
-            val type = selectedTab.assetType ?: AssetType.MOD
-            SearchAssetsContent(
-                activity = activity,
-                type = type,
-                onOpenProject = { activeProject = it },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-            )
+            // Detail navigation removes the browser from composition. Keep each content tab's
+            // saveable filters, page and lazy-list position until that browser returns.
+            browseStates.SaveableStateProvider(selectedTab.name) {
+                if (selectedTab == DiscoverTab.FAVORITES) {
+                    FavoritesContent(
+                        onOpenProject = { activeProject = it },
+                        modifier = Modifier.fillMaxWidth().weight(1f)
+                    )
+                } else {
+                    SearchAssetsContent(
+                        activity = activity,
+                        type = selectedTab.assetType ?: AssetType.MOD,
+                        onOpenProject = { activeProject = it },
+                        modifier = Modifier.fillMaxWidth().weight(1f)
+                    )
+                }
+            }
         }
     }
 }
@@ -332,7 +337,8 @@ private fun SearchAssetsContent(
     var platform by rememberSaveable { mutableStateOf(AerixPreferences.assetPlatformSource) }
     var query by rememberSaveable(type) { mutableStateOf("") }
     var submittedQuery by rememberSaveable(type) { mutableStateOf("") }
-    var category by rememberSaveable(type) { mutableStateOf<String?>(null) }
+    var selectedCategories by rememberSaveable(type) { mutableStateOf(arrayListOf<String>()) }
+    val resultsState = rememberLazyListState()
     var mcVersion by rememberSaveable(type) { mutableStateOf<String?>(null) }
     var loader by rememberSaveable(type) { mutableStateOf<String?>(null) }
     var sort by rememberSaveable(type) { mutableStateOf(AssetSort.RELEVANCE) }
@@ -375,7 +381,7 @@ private fun SearchAssetsContent(
         facets = PojavAssetBridge.facets(context, platform, type)
     }
 
-    LaunchedEffect(type, platform, submittedQuery, category, mcVersion, loader, sort, pageIndex, reloadNonce) {
+    LaunchedEffect(type, platform, submittedQuery, selectedCategories, mcVersion, loader, sort, pageIndex, reloadNonce) {
         loading = true
         failed = false
         val offset = (pageIndex - 1).coerceAtLeast(0) * PojavAssetBridge.PAGE_SIZE
@@ -387,7 +393,7 @@ private fun SearchAssetsContent(
             mcVersion = mcVersion,
             loader = if (type.supportsLoaderFilter) loader else null,
             offset = offset,
-            category = category,
+            categories = selectedCategories,
             sort = sort
         )
         page = result
@@ -503,7 +509,7 @@ private fun SearchAssetsContent(
                                     AerixPreferences.saveAssetPlatformSource(p)
                                     // The categories and the version list belong to the source that
                                     // answered them, so both are cleared for the new one.
-                                    category = null
+                                    selectedCategories = arrayListOf()
                                     mcVersion = null
                                     pageIndex = 1
                                 }
@@ -516,7 +522,7 @@ private fun SearchAssetsContent(
             // Category pill. The list is the source's own and can be a couple of hundred entries.
             if (categories.isNotEmpty()) {
                 DiscoverFilterDropdownPill(
-                    label = "Category: ${categories.firstOrNull { it.id == category }?.label ?: "All"}",
+                    label = "Categories: ${if (selectedCategories.isEmpty()) "All" else selectedCategories.joinToString(", ") { id -> categories.firstOrNull { it.id == id }?.label ?: id }}",
                     onClick = { showCategoryPicker = true }
                 )
             }
@@ -602,14 +608,18 @@ private fun SearchAssetsContent(
         }
         if (showCategoryPicker) {
             FacetPicker(
-                title = "Category",
-                allLabel = "All Categories",
+                title = "Categories · select multiple",
+                allLabel = "All Categories (clear selection)",
                 facets = categories,
-                selectedId = category,
-                onPick = {
-                    category = it
+                selectedId = null,
+                selectedIds = selectedCategories,
+                onPick = { id ->
+                    selectedCategories = ArrayList(when {
+                        id == null -> emptyList()
+                        id in selectedCategories -> selectedCategories - id
+                        else -> selectedCategories + id
+                    })
                     pageIndex = 1
-                    showCategoryPicker = false
                 },
                 onDismiss = { showCategoryPicker = false }
             )
@@ -658,6 +668,7 @@ private fun SearchAssetsContent(
 
                     Box(modifier = Modifier.fillMaxSize()) {
                         LazyColumn(
+                            state = resultsState,
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(top = AerixSpacing.xs, bottom = 68.dp),
                             verticalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus)
@@ -981,6 +992,7 @@ private fun FavoritesContent(
     onOpenProject: (AssetProject) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val favoritesState = rememberLazyListState()
     val favorites = remember(AerixPreferences.favoritesJson) { PojavAssetBridge.favorites() }
     if (favorites.isEmpty()) {
         Box(modifier = modifier, contentAlignment = Alignment.Center) {
@@ -996,6 +1008,7 @@ private fun FavoritesContent(
         }
         val rows = remember(favorites, columns) { favorites.chunked(columns) }
         LazyColumn(
+            state = favoritesState,
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = AerixSpacing.xxl),
             verticalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus)
@@ -1740,6 +1753,7 @@ private fun FacetPicker(
     allLabel: String,
     facets: List<AssetFacet>,
     selectedId: String?,
+    selectedIds: List<String>? = null,
     onPick: (String?) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -1809,7 +1823,7 @@ private fun FacetPicker(
                 }
                 FacetPickerRow(
                     label = allLabel,
-                    selected = selectedId == null,
+                    selected = selectedIds?.isEmpty() ?: (selectedId == null),
                     accent = accent,
                     onClick = { onPick(null) }
                 )
@@ -1826,11 +1840,16 @@ private fun FacetPicker(
                         items(matches, key = { it.id }) { facet ->
                             FacetPickerRow(
                                 label = facet.label,
-                                selected = facet.id == selectedId,
+                                selected = selectedIds?.contains(facet.id) ?: (facet.id == selectedId),
                                 accent = accent,
                                 onClick = { onPick(facet.id) }
                             )
                         }
+                    }
+                }
+                if (selectedIds != null) {
+                    TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) {
+                        Text("Done · ${selectedIds.size} selected", color = accent)
                     }
                 }
             }
