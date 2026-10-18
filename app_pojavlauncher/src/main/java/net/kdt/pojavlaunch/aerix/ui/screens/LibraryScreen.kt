@@ -59,6 +59,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -95,6 +96,7 @@ import androidx.compose.ui.unit.sp
 import androidx.fragment.app.FragmentActivity
 import net.kdt.pojavlaunch.R
 import net.kdt.pojavlaunch.aerix.bridge.AerixInstance
+import net.kdt.pojavlaunch.aerix.bridge.instanceRenderKey
 import net.kdt.pojavlaunch.aerix.bridge.AerixPreferences
 import net.kdt.pojavlaunch.aerix.bridge.ModpackExportFormat
 import net.kdt.pojavlaunch.aerix.bridge.PojavInstanceBridge
@@ -753,10 +755,10 @@ private fun InstanceListPane(
                         )
                     }
                 }
-                items(
+                itemsIndexed(
                     items = instances,
-                    key = { it.id }
-                ) { instance ->
+                    key = { index, instance -> instanceRenderKey(index, instance.id) }
+                ) { _, instance ->
                     InstanceListRow(
                         instance = instance,
                         selected = instance == selected,
@@ -890,10 +892,10 @@ private fun InstanceStrip(
             contentPadding = PaddingValues(horizontal = AerixSpacing.xs),
             horizontalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
         ) {
-            items(
+            itemsIndexed(
                 items = instances,
-                key = { it.id }
-            ) { instance ->
+                key = { index, instance -> instanceRenderKey(index, instance.id) }
+            ) { _, instance ->
                 LandscapeInstanceListItem(
                     instance = instance,
                     selected = instance == selected,

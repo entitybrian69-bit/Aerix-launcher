@@ -46,6 +46,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -84,6 +85,7 @@ import net.kdt.pojavlaunch.aerix.bridge.AerixInstallStatus
 import net.kdt.pojavlaunch.aerix.bridge.AerixInstallTask
 import net.kdt.pojavlaunch.aerix.bridge.AssetFile
 import net.kdt.pojavlaunch.aerix.bridge.AssetTarget
+import net.kdt.pojavlaunch.aerix.bridge.instanceRenderKey
 import net.kdt.pojavlaunch.aerix.bridge.AssetType
 import net.kdt.pojavlaunch.aerix.bridge.InstanceTarget
 import net.kdt.pojavlaunch.aerix.bridge.ResolvedDependency
@@ -520,7 +522,7 @@ private fun TargetPane(
             contentPadding = PaddingValues(vertical = AerixSpacing.xs),
             verticalArrangement = Arrangement.spacedBy(AerixSpacing.xs)
         ) {
-            items(targets, key = { it.instanceId }) { target ->
+            itemsIndexed(targets, key = { index, target -> instanceRenderKey(index, target.instanceId) }) { _, target ->
                 TargetRow(
                     target = target,
                     mismatch = target.mcVersion != null && fileVersions.isNotEmpty() &&
