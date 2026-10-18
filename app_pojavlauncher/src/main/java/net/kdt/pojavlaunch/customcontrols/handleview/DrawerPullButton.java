@@ -1,6 +1,10 @@
 package net.kdt.pojavlaunch.customcontrols.handleview;
 
 import android.content.Context;
+import android.app.AlertDialog;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+import android.widget.SeekBar;
 import android.content.SharedPreferences;
 import android.graphics.Canvas;
 import android.graphics.Paint;
@@ -39,14 +43,18 @@ import net.kdt.pojavlaunch.R;
  */
 public class DrawerPullButton extends View {
     /** Where the button is remembered between two game sessions. */
-    private static final String PREFERENCES_NAME = "aerix_menu_button";
+    private static final String PREFERENCES_NAME = MenuButtonSize.PREFERENCES;
     private static final String KEY_X = "menuButtonX";
     private static final String KEY_Y = "menuButtonY";
 
-    /** Size of the button, which is big enough to be hit and small enough to stay out of the way. */
-    private static final int BUTTON_SIZE_DP = 46;
-    /** Size of the launcher mark inside the button. */
-    private static final int ICON_SIZE_DP = 26;
+    private int mSizeDp;
+    private boolean mLongPressHandled;
+    private AlertDialog mSizeDialog;
+    private final Runnable mLongPress = () -> {
+        if (!mDragging && isAttachedToWindow()) {
+            mLongPressHandled = performLongClick();
+        }
+    };
 
     private final Paint mBackgroundPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint mBorderPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -66,6 +74,9 @@ public class DrawerPullButton extends View {
     public DrawerPullButton(Context context, @Nullable AttributeSet attrs) {super(context, attrs); init();}
 
     private void init(){
+        mSizeDp = MenuButtonSize.read(getContext());
+        setContentDescription(getContext().getString(R.string.aerix_logo_size_accessibility));
+        setOnLongClickListener(view -> { showSizeDialog(); return true; });
         mDrawable = ContextCompat.getDrawable(getContext(), R.drawable.ic_aerix_mark);
         mBackgroundPaint.setColor(0xB0121A24);
         mBorderPaint.setStyle(Paint.Style.STROKE);
@@ -81,7 +92,7 @@ public class DrawerPullButton extends View {
 
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        int size = dpToPx(BUTTON_SIZE_DP);
+        int size = dpToPx(mSizeDp);
         setMeasuredDimension(
                 resolveSize(size, widthMeasureSpec),
                 resolveSize(size, heightMeasureSpec));
@@ -95,7 +106,7 @@ public class DrawerPullButton extends View {
         canvas.drawRoundRect(mBackgroundRect, radius, radius, mBorderPaint);
 
         if (mDrawable == null) return;
-        int iconSize = dpToPx(ICON_SIZE_DP);
+        int iconSize = MenuButtonSize.iconPixels(Math.min(getWidth(), getHeight()));
         int inset = (getWidth() - iconSize) / 2;
         mDrawable.setBounds(inset, inset, inset + iconSize, inset + iconSize);
         mDrawable.draw(canvas);
@@ -104,10 +115,14 @@ public class DrawerPullButton extends View {
     @Override
     protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
         super.onLayout(changed, left, top, right, bottom);
-        if (mPositionRestored) return;
         View parent = (View) getParent();
         if (parent == null || parent.getWidth() == 0) return;
-        restorePosition(parent);
+        if (!mPositionRestored) restorePosition(parent);
+        else {
+            // Enlarging near an edge must not put the logo out of reach.
+            setTranslationX(clampX(parent, getTranslationX()));
+            setTranslationY(clampY(parent, getTranslationY()));
+        }
     }
 
     /** Put the button back where the player left it, or in the middle of the top edge. */
@@ -153,6 +168,9 @@ public class DrawerPullButton extends View {
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
                 mDragging = false;
+                mLongPressHandled = false;
+                removeCallbacks(mLongPress);
+                postDelayed(mLongPress, ViewConfiguration.getLongPressTimeout());
                 mTouchDownX = event.getRawX();
                 mTouchDownY = event.getRawY();
                 mDragStartX = getTranslationX();
@@ -160,9 +178,13 @@ public class DrawerPullButton extends View {
                 if (touchParent != null) touchParent.requestDisallowInterceptTouchEvent(true);
                 return true;
             case MotionEvent.ACTION_MOVE: {
+                if (mLongPressHandled) return true;
                 float dx = event.getRawX() - mTouchDownX;
                 float dy = event.getRawY() - mTouchDownY;
-                if (!mDragging && Math.hypot(dx, dy) > mTouchSlop) mDragging = true;
+                if (!mDragging && Math.hypot(dx, dy) > mTouchSlop) {
+                    mDragging = true;
+                    removeCallbacks(mLongPress);
+                }
                 if (mDragging && parent != null) {
                     setTranslationX(clampX(parent, mDragStartX + dx));
                     setTranslationY(clampY(parent, mDragStartY + dy));
@@ -170,15 +192,17 @@ public class DrawerPullButton extends View {
                 return true;
             }
             case MotionEvent.ACTION_UP:
+                removeCallbacks(mLongPress);
                 if (mDragging) {
                     savePosition();
-                } else {
+                } else if (!mLongPressHandled) {
                     performClick();
                 }
                 if (touchParent != null) touchParent.requestDisallowInterceptTouchEvent(false);
                 mDragging = false;
                 return true;
             case MotionEvent.ACTION_CANCEL:
+                removeCallbacks(mLongPress);
                 if (mDragging) savePosition();
                 if (touchParent != null) touchParent.requestDisallowInterceptTouchEvent(false);
                 mDragging = false;
@@ -186,6 +210,59 @@ public class DrawerPullButton extends View {
             default:
                 return super.onTouchEvent(event);
         }
+    }
+
+    private void setSizeDp(int sizeDp) {
+        mSizeDp = MenuButtonSize.clamp(sizeDp);
+        requestLayout();
+        invalidate();
+    }
+
+    /** Long-press opens a live preview. Only Done/Default persist; Cancel restores the old size. */
+    public void showSizeDialog() {
+        if (mSizeDialog != null && mSizeDialog.isShowing()) return;
+        final int originalSize = mSizeDp;
+        LinearLayout panel = new LinearLayout(getContext());
+        panel.setOrientation(LinearLayout.VERTICAL);
+        int padding = dpToPx(24);
+        panel.setPadding(padding, dpToPx(8), padding, dpToPx(8));
+        TextView label = new TextView(getContext());
+        label.setText(getContext().getString(R.string.aerix_logo_size_value, mSizeDp));
+        panel.addView(label);
+        SeekBar slider = new SeekBar(getContext());
+        slider.setMax(MenuButtonSize.MAX_DP - MenuButtonSize.MIN_DP);
+        slider.setProgress(mSizeDp - MenuButtonSize.MIN_DP);
+        slider.setContentDescription(getContext().getString(R.string.aerix_logo_size_title));
+        panel.addView(slider, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        TextView hint = new TextView(getContext());
+        hint.setText(R.string.aerix_logo_size_hint);
+        panel.addView(hint);
+        slider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
+                setSizeDp(progress + MenuButtonSize.MIN_DP);
+                label.setText(getContext().getString(R.string.aerix_logo_size_value, mSizeDp));
+            }
+            public void onStartTrackingTouch(SeekBar bar) { }
+            public void onStopTrackingTouch(SeekBar bar) { }
+        });
+        mSizeDialog = new AlertDialog.Builder(getContext())
+                .setTitle(R.string.aerix_logo_size_title).setView(panel)
+                .setPositiveButton(android.R.string.ok, (dialog, which) -> MenuButtonSize.save(getContext(), mSizeDp))
+                .setNegativeButton(android.R.string.cancel, (dialog, which) -> setSizeDp(originalSize))
+                .setNeutralButton(R.string.aerix_logo_size_default, (dialog, which) -> {
+                    setSizeDp(MenuButtonSize.DEFAULT_DP);
+                    MenuButtonSize.save(getContext(), mSizeDp);
+                }).create();
+        mSizeDialog.setOnCancelListener(dialog -> setSizeDp(originalSize));
+        mSizeDialog.setOnDismissListener(dialog -> mSizeDialog = null);
+        mSizeDialog.show();
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        removeCallbacks(mLongPress);
+        if (mSizeDialog != null) mSizeDialog.dismiss();
+        super.onDetachedFromWindow();
     }
 
     @Override
@@ -196,6 +273,6 @@ public class DrawerPullButton extends View {
     /** Forget the place the button was dragged to. */
     public static void resetPosition(Context context) {
         context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
-                .edit().clear().apply();
+                .edit().remove(KEY_X).remove(KEY_Y).apply();
     }
 }

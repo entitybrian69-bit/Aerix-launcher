@@ -556,4 +556,9 @@
     <string name="aerix_loader_finish_installer">Complete the installer to update this instance</string>
     <string name="aerix_loader_change_game_title">Change Minecraft version?</string>
     <string name="aerix_loader_change_game_warning">This updates the existing instance to a different Minecraft version. Its mods may be incompatible. Back up your worlds before launching.</string>
+    <string name="aerix_logo_size_title">In-game Aerix logo size</string>
+    <string name="aerix_logo_size_value">Logo size: %1$d dp</string>
+    <string name="aerix_logo_size_hint">Very small (20 dp) to big (96 dp). Drag the slider for a live preview. Small sizes are harder to tap.</string>
+    <string name="aerix_logo_size_default">Default</string>
+    <string name="aerix_logo_size_accessibility">Aerix menu. Tap to open; drag to move; hold to resize.</string>
 </resources>
