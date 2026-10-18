@@ -62,6 +62,7 @@ public class MenuButtonViewTest {
         assertEquals(Math.round(96 * activity.getResources().getDisplayMetrics().density), button.getMeasuredWidth());
         assertTrue(button.getTranslationX() + button.getWidth() <= parent.getWidth());
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick();
+        shadowOf(Looper.getMainLooper()).idle();
         assertEquals(96, MenuButtonSize.read(activity));
     }
     @Test public void cancelRestoresSizeAndDoesNotSavePreview() {
@@ -72,6 +73,7 @@ public class MenuButtonViewTest {
         layout();
         assertTrue(button.getMeasuredWidth() < originalWidth);
         dialog.getButton(AlertDialog.BUTTON_NEGATIVE).performClick();
+        shadowOf(Looper.getMainLooper()).idle();
         layout();
         assertEquals(originalWidth, button.getMeasuredWidth());
         assertEquals(46, MenuButtonSize.read(activity));
