@@ -122,4 +122,18 @@ public class TouchCharInputTest {
         assertEquals(1, backend.enters);
         assertEquals(HISTORY + "hello", backend.chat.toString());
     }
+    @Test public void restartingConnectionDoesNotLeaveTypingStuckInOldBatch() {
+        connection.beginBatchEdit();
+        connection.commitText("hello", 1);
+        InputConnection restarted = input.onCreateInputConnection(new EditorInfo());
+        assertNotNull(restarted);
+        assertEquals(HISTORY + "hello", backend.chat.toString());
+        restarted.beginBatchEdit();
+        restarted.commitText(" ", 1);
+        connection.endBatchEdit();
+        assertEquals(HISTORY + "hello", backend.chat.toString());
+        restarted.endBatchEdit();
+        assertEquals(HISTORY + "hello ", backend.chat.toString());
+    }
+
 }

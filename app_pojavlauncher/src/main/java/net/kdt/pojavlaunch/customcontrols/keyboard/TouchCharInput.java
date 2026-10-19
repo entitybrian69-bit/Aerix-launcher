@@ -42,25 +42,42 @@ public class TouchCharInput extends androidx.appcompat.widget.AppCompatEditText 
     private boolean mIsDoingInternalChanges = false;
     private final ChatTextMirror mTextMirror = new ChatTextMirror(TEXT_FILLER);
     private int mImeBatchDepth;
+    private int mInputConnectionGeneration;
 
     @Override
     public InputConnection onCreateInputConnection(EditorInfo outAttrs) {
+        flushTextChanges();
+        mImeBatchDepth = 0;
+        final int generation = ++mInputConnectionGeneration;
         InputConnection connection = super.onCreateInputConnection(outAttrs);
         if (connection == null) return null;
         return new InputConnectionWrapper(connection, false) {
             @Override public boolean beginBatchEdit() {
                 boolean accepted = super.beginBatchEdit();
-                if (accepted) mImeBatchDepth++;
+                if (accepted && generation == mInputConnectionGeneration) mImeBatchDepth++;
                 return accepted;
             }
             @Override public boolean endBatchEdit() {
                 try {
                     return super.endBatchEdit();
                 } finally {
-                    if (mImeBatchDepth > 0) mImeBatchDepth--;
-                    if (mImeBatchDepth == 0) {
+                    if (generation == mInputConnectionGeneration) {
+                        if (mImeBatchDepth > 0) mImeBatchDepth--;
+                        if (mImeBatchDepth == 0) {
+                            flushTextChanges();
+                            if (getEditableText().length() == 0) clear();
+                        }
+                    }
+                }
+            }
+            @Override public void closeConnection() {
+                try {
+                    super.closeConnection();
+                } finally {
+                    if (generation == mInputConnectionGeneration) {
+                        mImeBatchDepth = 0;
                         flushTextChanges();
-                        if (getEditableText().length() == 0) clear();
+                        mInputConnectionGeneration++;
                     }
                 }
             }
@@ -158,6 +175,9 @@ public class TouchCharInput extends androidx.appcompat.widget.AppCompatEditText 
 
     /** Lose ability to exist, take focus and have some text being input */
     public void disable(){
+        flushTextChanges();
+        mImeBatchDepth = 0;
+        mInputConnectionGeneration++;
         clear();
         setVisibility(GONE);
         clearFocus();
@@ -193,9 +213,9 @@ public class TouchCharInput extends androidx.appcompat.widget.AppCompatEditText 
         }
 
         /**
-         * We take the new chars, and send them to the game.
-         * If less chars are present, remove some.
-         * The text is always cleaned up.
+         * IMEs may replace an unchanged composing word (or the whole editor) on Space.
+         * Mirror the logical before/after text instead of interpreting the replacement
+         * length as a number of game Backspace presses. Batch edits flush atomically.
          */
         @Override
         public void onTextChanged(CharSequence text, int start, int lengthBefore, int lengthAfter) {
