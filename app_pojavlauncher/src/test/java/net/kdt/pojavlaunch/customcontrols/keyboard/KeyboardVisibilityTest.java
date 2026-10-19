@@ -103,6 +103,19 @@ public class KeyboardVisibilityTest {
         idle(1);
         assertEquals(1, ime.shows);
     }
+    @Test public void toggleWhileDialogClosesDoesNotMistakeItsImeForTheGameKeyboard() {
+        input.setKeyboardState(true);
+        idle(1);
+        focus(false);
+        input.keyboardVisible = true;
+        input.switchKeyboardState();
+        idle(1);
+        assertTrue(input.isEnabled());
+        assertEquals(1, ime.shows);
+        focus(true);
+        idle(1);
+        assertEquals(2, ime.shows);
+    }
     @Test public void focusBouncesDoNotCreateRepeatedImeWork() {
         input.setKeyboardState(true);
         idle(1);

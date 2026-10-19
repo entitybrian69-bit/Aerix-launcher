@@ -192,7 +192,7 @@ public class TouchCharInput extends androidx.appcompat.widget.AppCompatEditText 
         }
         // A request is not proof that the keyboard opened. A second tap must be
         // able to recover a rejected/hidden IME rather than disabling the editor.
-        if (hasFocus() && isKeyboardVisible()) disable();
+        if (hasWindowFocus() && hasFocus() && isKeyboardVisible()) disable();
         else requestKeyboard(true);
     }
 
