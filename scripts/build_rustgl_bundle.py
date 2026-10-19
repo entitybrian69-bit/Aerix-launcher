@@ -41,7 +41,7 @@ def run(args):
     report.mkdir(parents=True, exist_ok=True)
     evidence_dir = report / "evidence"
     evidence_dir.mkdir(exist_ok=True)
-    meta = json.loads(subprocess.check_output(["cargo", "metadata", "--locked", "--format-version", "1"], cwd=source, text=True))
+    meta = json.loads(subprocess.check_output(["cargo", "metadata", "--locked", "--all-features", "--format-version", "1"], cwd=source, text=True))
     inventory = json.loads(args.inventory.read_text())
     expected = {(c["name"], c["version"]) for c in inventory["components"]}
     actual = {(p["name"], p["version"]) for p in meta["packages"]}
@@ -61,6 +61,12 @@ def run(args):
         if workspace:
             files.append(source / "README.md")
         files = sorted(set(files))
+        if not files and package["source"] and package["source"].startswith("git+"):
+            for parent in directory.parents:
+                files = [p for p in parent.iterdir() if p.is_file() and
+                         p.name.upper().startswith(("LICENSE", "LICENCE", "COPYING", "COPYRIGHT", "NOTICE"))]
+                if files or (parent / ".git").exists():
+                    break
         if not files:
             raise ValueError(f"License text absent: {package['name']}")
         evidence = []

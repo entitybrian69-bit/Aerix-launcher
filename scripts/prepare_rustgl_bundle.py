@@ -29,9 +29,9 @@ def prepare(args):
     audit = json.loads(audit_path.read_text())
     inventory = json.loads(args.inventory.read_text())
     revision = inventory["sourceRevision"]
-    approved = audit.get("redistributionApproved") is True
+    redistribution_approved = audit.get("redistributionApproved") is True
     experimental = getattr(args, "experimental_mit_declaration", False) and audit.get("experimentalUserAuthorized") is True
-    require((approved or experimental) and audit.get("reviewedBy"), "Named redistribution review required")
+    require((redistribution_approved or experimental) and audit.get("reviewedBy"), "Named redistribution review required")
     require(audit.get("sourceRevision") == revision, "Approval must cover the pinned source revision")
     require(re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", args.version), "Bundle version must be numeric semver")
     expected = {(c["name"], c["version"]) for c in inventory["components"]}
@@ -88,7 +88,7 @@ def prepare(args):
         require(not (output / args.version).exists(), "Immutable bundle version already exists; use a new version")
         os.replace(staging / args.version, output / args.version)
     old = previous["releases"] if previous else []
-    index = {"schema": 1, "redistributionApproved": approved, "experimentalUserAuthorized": experimental, "backend": "gles", "releases": releases + old}
+    index = {"schema": 1, "redistributionApproved": redistribution_approved, "experimentalUserAuthorized": experimental, "backend": "gles", "releases": releases + old}
     temporary = output / "index.json.tmp"
     with temporary.open("w") as stream:
         json.dump(index, stream, indent=2); stream.write("\n"); stream.flush(); os.fsync(stream.fileno())
