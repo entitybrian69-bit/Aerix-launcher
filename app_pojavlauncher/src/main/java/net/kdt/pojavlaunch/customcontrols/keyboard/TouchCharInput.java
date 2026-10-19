@@ -11,6 +11,9 @@ import android.text.Selection;
 import android.util.AttributeSet;
 import android.view.KeyEvent;
 import android.view.inputmethod.InputMethodManager;
+import android.view.inputmethod.EditorInfo;
+import android.view.inputmethod.InputConnection;
+import android.view.inputmethod.InputConnectionWrapper;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -37,6 +40,42 @@ public class TouchCharInput extends androidx.appcompat.widget.AppCompatEditText 
 
 
     private boolean mIsDoingInternalChanges = false;
+    private final ChatTextMirror mTextMirror = new ChatTextMirror(TEXT_FILLER);
+    private int mImeBatchDepth;
+
+    @Override
+    public InputConnection onCreateInputConnection(EditorInfo outAttrs) {
+        InputConnection connection = super.onCreateInputConnection(outAttrs);
+        if (connection == null) return null;
+        return new InputConnectionWrapper(connection, false) {
+            @Override public boolean beginBatchEdit() {
+                boolean accepted = super.beginBatchEdit();
+                if (accepted) mImeBatchDepth++;
+                return accepted;
+            }
+            @Override public boolean endBatchEdit() {
+                try {
+                    return super.endBatchEdit();
+                } finally {
+                    if (mImeBatchDepth > 0) mImeBatchDepth--;
+                    if (mImeBatchDepth == 0) {
+                        flushTextChanges();
+                        if (getEditableText().length() == 0) clear();
+                    }
+                }
+            }
+        };
+    }
+
+    private void flushTextChanges() {
+        ChatTextMirror.Edit edit = mTextMirror.drain();
+        for (int i = 0; i < edit.backspaces; i++) {
+            CallbackBridge.sendKeyPress(KeyEvent.KEYCODE_DEL);
+        }
+        if (!edit.insertion.isEmpty()) {
+            PLATFORM.sendBulkUnicodeEvent(edit.insertion, CallbackBridge.getCurrentMods());
+        }
+    }
 
     /**
      * When we change from app to app, the keyboard gets disabled.
@@ -45,7 +84,7 @@ public class TouchCharInput extends androidx.appcompat.widget.AppCompatEditText 
     @Override
     public void onWindowFocusChanged(boolean hasWindowFocus) {
         super.onWindowFocusChanged(hasWindowFocus);
-        disable();
+        if (!hasWindowFocus) disable();
     }
 
     /**
@@ -102,9 +141,10 @@ public class TouchCharInput extends androidx.appcompat.widget.AppCompatEditText 
         // of the TextView.
         Editable editable = getEditableText();
         editable.clear();
-        //Braille space, doesn't trigger keyboard auto-complete
+        // Virtual deletion padding; this is never part of the typed game message.
         editable.append(TEXT_FILLER);
         Selection.setSelection(editable, TEXT_FILLER.length());
+        mTextMirror.reset();
         mIsDoingInternalChanges = false;
     }
 
@@ -118,7 +158,6 @@ public class TouchCharInput extends androidx.appcompat.widget.AppCompatEditText 
 
     /** Lose ability to exist, take focus and have some text being input */
     public void disable(){
-        Thread.dumpStack();
         clear();
         setVisibility(GONE);
         clearFocus();
@@ -128,6 +167,7 @@ public class TouchCharInput extends androidx.appcompat.widget.AppCompatEditText 
 
     /** Send the enter key. */
     private void sendEnter(){
+        flushTextChanges();
         CallbackBridge.sendKeyPress(KeyEvent.KEYCODE_ENTER);
         clear();
     }
@@ -141,7 +181,7 @@ public class TouchCharInput extends androidx.appcompat.widget.AppCompatEditText 
             sendEnter();
             clear();
             disable();
-            return false;
+            return true;
         });
         clear();
         disable();
@@ -160,11 +200,8 @@ public class TouchCharInput extends androidx.appcompat.widget.AppCompatEditText 
         @Override
         public void onTextChanged(CharSequence text, int start, int lengthBefore, int lengthAfter) {
             if(mIsDoingInternalChanges) return;
-            for(int i=0; i < lengthBefore; ++i){
-                CallbackBridge.sendKeyPress(KeyEvent.KEYCODE_DEL);
-            }
-
-            PLATFORM.sendBulkUnicodeEvent(text.subSequence(start, start + lengthAfter).toString(), CallbackBridge.getCurrentMods());
+            mTextMirror.changed(text, start, lengthBefore, lengthAfter);
+            if (mImeBatchDepth == 0) flushTextChanges();
         }
 
         @Override
@@ -172,7 +209,7 @@ public class TouchCharInput extends androidx.appcompat.widget.AppCompatEditText 
             if(mIsDoingInternalChanges) return;
             // Moved from onTextChanged because "It is an error to attempt to make changes to s from this callback."
             // reference: https://developer.android.com/reference/android/text/TextWatcher#onTextChanged(java.lang.CharSequence,%20int,%20int,%20int)
-            if(editable.length() < 1) clear();
+            if (editable.length() < 1 && mImeBatchDepth == 0) clear();
         }
     }
 }
