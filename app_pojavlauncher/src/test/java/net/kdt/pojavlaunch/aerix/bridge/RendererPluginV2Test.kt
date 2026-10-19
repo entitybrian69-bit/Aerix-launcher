@@ -27,12 +27,15 @@ class RendererPluginV2Test {
         assertEquals(File(dir, "librust_gl.so").canonicalPath, config.gl)
         assertEquals(config.gl, config.egl)
         assertFalse(RendererPluginV2.usesVulkan(config.id, config.env))
+        assertFalse(RendererPluginV2.usesDesktopGl(config.id, config.env))
     }
     @Test fun actualVulkanRenderersStillUseVulkanSetup() {
         assertTrue(RendererPluginV2.usesVulkan("zink", emptyMap()))
         assertTrue(RendererPluginV2.usesVulkan("vulkan_plugin", emptyMap()))
         assertTrue(RendererPluginV2.usesVulkan("mesa", mapOf("MESA_LOADER_DRIVER_OVERRIDE" to "zink")))
         assertFalse(RendererPluginV2.usesVulkan("gles", mapOf("MESA_LOADER_DRIVER_OVERRIDE" to "virpipe")))
+        assertTrue(RendererPluginV2.usesDesktopGl("gles", mapOf("MESA_LOADER_DRIVER_OVERRIDE" to "virpipe")))
+        assertTrue(RendererPluginV2.usesDesktopGl("zink", emptyMap()))
     }
     @Test fun selectableDefaultsAndDisabledSettingsFollowV2Schema() {
         val selectable = JsonObject().apply {

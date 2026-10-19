@@ -7,7 +7,8 @@ plugins, resolves `**|` native path markers, applies supported environment defau
 checks extracted ELF architecture against the current process/GLES 3/Android 8+, and registers the real plugin
 through the existing renderer cache and launch override. Legacy plugins remain
 supported. A blank Mesa-driver override no longer incorrectly selects Vulkan EGL
-setup. The application explicitly declares package visibility for RustGL.
+setup. Desktop-EGL selection for legacy Mesa plugins is retained separately from
+Vulkan preloading. V2 plugins receive their resolved SDL_EGL_LIBRARY path. The application explicitly declares package visibility for RustGL.
 
 RustGL is a separate installed APK, **not bundled into Aerix** by this change. No
 fake renderer entry is created when its native library is absent. Install only a

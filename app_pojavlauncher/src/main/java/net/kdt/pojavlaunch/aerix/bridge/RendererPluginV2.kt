@@ -19,6 +19,11 @@ internal object RendererPluginV2 {
         id.contains("zink", true) || id.contains("vulkan", true) ||
             env["MESA_LOADER_DRIVER_OVERRIDE"].orEmpty().trim().equals("zink", true)
 
+    // Legacy Mesa plugins may need desktop EGL without being Vulkan renderers.
+    // Keep their context selection intact while ignoring RustGL's blank override.
+    fun usesDesktopGl(id: String, env: Map<String, String>): Boolean =
+        usesVulkan(id, env) || !env["MESA_LOADER_DRIVER_OVERRIDE"].isNullOrBlank()
+
     /** Check the ELF class/machine against this process, not just the device's advertised ABIs. */
     fun matchesElfAbi(file: File, abi: String): Boolean = runCatching {
         val expected = when (abi) {

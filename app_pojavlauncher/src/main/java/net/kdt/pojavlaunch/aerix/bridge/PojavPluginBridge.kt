@@ -85,6 +85,7 @@ class AerixRendererPlugin(
     override fun setupEnvironment(context: Context, envMap: MutableMap<String, String>) {
         envMap.putAll(env)
         envMap["POJAV_RENDERER"] = rendererId
+        if (metadataVersion >= 2) envMap["SDL_EGL_LIBRARY"] = eglName
         if (glName.isNotEmpty()) {
             envMap["LIBGL_NAME"] = glName
         }
@@ -101,7 +102,7 @@ class AerixRendererPlugin(
             File(nativeLibDir, eglName).exists() -> File(nativeLibDir, eglName).absolutePath
             else -> eglName
         }
-        return MojoExec.prepareEgl(eglTarget, true, !isVulkan, 3)
+        return MojoExec.prepareEgl(eglTarget, true, !RendererPluginV2.usesDesktopGl(rendererId, env), 3)
     }
 
     companion object {
