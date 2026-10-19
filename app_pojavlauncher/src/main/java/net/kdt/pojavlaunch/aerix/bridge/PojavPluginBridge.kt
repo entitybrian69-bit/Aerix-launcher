@@ -128,7 +128,7 @@ object PojavPluginBridge {
         }
         val pm = context.packageManager
         val discovered = ArrayList<AerixRendererPlugin>()
-        val seen = HashSet<String>()
+        val seen = hashSetOf(net.kdt.pojavlaunch.aerix.renderer.BundledRustGl.PACKAGE)
         runCatching { net.kdt.pojavlaunch.aerix.renderer.BundledRustGl.discover(context) }
             .onFailure { Log.e("AerixRendererPlugin", "Bundled RustGL rejected", it) }
             .getOrNull()?.let { discovered.add(it); seen.add(it.packageName) }
