@@ -35,25 +35,21 @@ switching on real keyboards/devices. The bridge cannot read Minecraft's actual
 chat buffer or observe game-side cursor changes; it mirrors the current Android
 input session, not arbitrary external game editing.
 
-## Opening the keyboard under load
+## Opening the keyboard: 1.3 regression correction
 
-Keyboard visibility is an explicit requested state, not a synonym for View focus.
-The editor is focusable in touch mode; opening is posted until it is attached,
-visible and window-focused. A busy IME gets at most ten attempts, 200 ms apart; focus bouncing cannot
-reset that budget.
-An IME shown result or visible IME insets stops retries. An inactive input
-connection is restarted only once per opening attempt sequence, never repeatedly
-while composing. Repeated open requests share pending work; an explicit new open
-after the retry budget is exhausted may try again.
+The 1.3 custom retry/result/inset state machine is removed. It could confuse a
+pending open with a visible keyboard, make the next toggle close a rejected
+opening, and issue repeated IME requests. An explicit open now enables/focuses
+the editor and posts one showSoftInput request with explicit flags (0), without
+restartInput, ResultReceiver state, timed retries, or an early visible-inset gate.
+Attachment/window focus callbacks finish genuinely pending opens, but do not
+re-show a served editor on every focus bounce. Repeated native open notifications
+are idempotent. The user toggle checks actual visibility and can retry a rejected
+open instead of closing an invisible keyboard.
 
-Window focus loss cancels queued work while retaining the requested state and
-text; focus return resumes opening. Back/Done, explicit Close, activity pause and
-view detachment cancel opening so a delayed callback cannot reopen the keyboard
-in the background. Callback generations ignore stale IME results. Calls from the
-game thread are marshalled to the Android UI thread. No forced-keyboard mode,
-continuous polling or per-frame JNI requests are used.
-
-`KeyboardVisibilityTest` exercises busy-IME retries, cancellation, window-focus
-transitions, attachment, duplicate/toggle requests, stale results and UI-thread
-marshalling. These deterministic tests do not measure multiplayer frame rate or
-real low-end-device keyboard latency. Device confirmation remains necessary.
+ChatTextMirror and batched text forwarding are unchanged. Close/Back/Done,
+activity pause and detach cancel queued opening. Tests cover rejected openings,
+recovery taps, stale visibility, no polling/restart storms, focus, cancellation,
+repeated native requests and UI-thread dispatch. Real Android keyboard opening,
+typing and frame-time testing are still required; JVM tests cannot prove a
+particular keyboard or game/device behaves correctly.

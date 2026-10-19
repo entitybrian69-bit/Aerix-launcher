@@ -29,61 +29,70 @@ public class KeyboardVisibilityTest {
     public static class KeyboardIme extends ShadowInputMethodManager {
         int shows;
         int restarts;
-        boolean active = true;
-        ResultReceiver lastResult;
+        int lastFlags = -1;
         @Implementation public boolean showSoftInput(View view, int flags, ResultReceiver result) {
             shows++;
-            lastResult = result;
-            return false; // Simulate a slow/busy IME, not an instantly available keyboard.
+            lastFlags = flags;
+            return false; // Rejected/busy IME: never claim this means the keyboard is visible.
         }
-        @Implementation public boolean isActive(View view) { return active; }
         @Implementation public void restartInput(View view) { restarts++; }
     }
     private static class Editor extends TouchCharInput {
         boolean focusedWindow = true;
+        boolean keyboardVisible;
         Editor(Context context) { super(context); }
         @Override public boolean hasWindowFocus() { return focusedWindow; }
+        @Override protected boolean isKeyboardVisible() { return keyboardVisible; }
     }
     private Activity activity;
     private Editor input;
     private KeyboardIme ime;
-
     @Before public void setup() {
         activity = Robolectric.buildActivity(Activity.class).setup().visible().get();
         input = new Editor(activity);
         activity.setContentView(input);
         ime = Shadow.extract(activity.getSystemService(Context.INPUT_METHOD_SERVICE));
     }
-    private void idle(long millis) {
-        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(millis));
-    }
-    private void focus(boolean focused) {
-        input.focusedWindow = focused;
-        input.onWindowFocusChanged(focused);
-    }
+    private void idle(long millis) { shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(millis)); }
+    private void focus(boolean value) { input.focusedWindow = value; input.onWindowFocusChanged(value); }
 
-    @Test public void openingWaitsForPostedFocusAndRetriesBusyIme() {
+    @Test public void openingWaitsForPostedEditorFocusAndIsExplicit() {
         input.setKeyboardState(true);
         assertTrue(input.isFocusableInTouchMode());
         assertEquals(0, ime.shows);
         idle(1);
         assertEquals(1, ime.shows);
-        idle(200);
+        assertEquals(0, ime.lastFlags);
+    }
+    @Test public void rejectedShowDoesNotPollOrRestartTheIme() {
+        input.setKeyboardState(true);
+        int frameworkRestarts = ime.restarts;
+        idle(10000);
+        assertEquals(1, ime.shows);
+        assertEquals(frameworkRestarts, ime.restarts);
+    }
+    @Test public void nextToggleRetriesRejectedOpenRatherThanClosingEditor() {
+        input.switchKeyboardState();
+        idle(1);
+        input.switchKeyboardState();
+        idle(1);
         assertEquals(2, ime.shows);
         assertTrue(input.isEnabled());
     }
-    @Test public void transientWindowFocusLossDoesNotDisableOrClearEditor() {
+    @Test public void toggleClosesOnlyWhenKeyboardIsActuallyVisible() {
+        input.switchKeyboardState();
+        idle(1);
+        input.keyboardVisible = true;
+        input.switchKeyboardState();
+        idle(1000);
+        assertEquals(1, ime.shows);
+        assertFalse(input.isEnabled());
+    }
+    @Test public void staleVisibleInsetsCannotBlockAnExplicitOpen() {
+        input.keyboardVisible = true;
         input.setKeyboardState(true);
         idle(1);
-        String text = input.getText().toString();
-        focus(false);
-        idle(500);
-        assertTrue(input.isEnabled());
-        assertEquals(text, input.getText().toString());
         assertEquals(1, ime.shows);
-        focus(true);
-        idle(1);
-        assertEquals(2, ime.shows);
     }
     @Test public void requestBeforeWindowFocusOpensWhenFocusArrives() {
         focus(false);
@@ -94,61 +103,30 @@ public class KeyboardVisibilityTest {
         idle(1);
         assertEquals(1, ime.shows);
     }
-    @Test public void explicitCloseCancelsPendingAndFutureRetries() {
+    @Test public void focusBouncesDoNotCreateRepeatedImeWork() {
+        input.setKeyboardState(true);
+        idle(1);
+        String text = input.getText().toString();
+        for (int i = 0; i < 20; i++) { focus(false); focus(true); idle(1); }
+        idle(5000);
+        assertEquals(1, ime.shows);
+        assertTrue(input.isEnabled());
+        assertEquals(text, input.getText().toString());
+    }
+    @Test public void explicitCloseCancelsQueuedOpen() {
         input.setKeyboardState(true);
         input.setKeyboardState(false);
-        idle(3000);
         focus(true);
         idle(3000);
         assertEquals(0, ime.shows);
         assertFalse(input.isEnabled());
     }
-    @Test public void toggleDuringOpeningClosesInsteadOfRequestingAgain() {
-        input.switchKeyboardState();
-        input.clearFocus();
-        input.switchKeyboardState();
-        idle(3000);
-        assertEquals(0, ime.shows);
-        assertFalse(input.isEnabled());
-    }
-    @Test public void confirmedShownStopsRetrying() {
+    @Test public void repeatedNativeOpenRequestsDoNotSpamTheIme() {
         input.setKeyboardState(true);
         idle(1);
-        ime.lastResult.send(InputMethodManager.RESULT_SHOWN, null);
-        idle(3000);
+        for (int i = 0; i < 100; i++) input.setKeyboardState(true);
+        idle(5000);
         assertEquals(1, ime.shows);
-    }
-    @Test public void repeatedOpenRequestsShareOnePendingAttempt() {
-        input.setKeyboardState(true);
-        input.setKeyboardState(true);
-        input.setKeyboardState(true);
-        idle(1);
-        assertEquals(1, ime.shows);
-    }
-    @Test public void busyImeRetriesAreBoundedAndDoNotRestartActiveInput() {
-        input.setKeyboardState(true);
-        idle(1);
-        // TextView may restart input itself when enabling/focusing the editor.
-        int initialRestarts = ime.restarts;
-        idle(5000);
-        assertEquals(10, ime.shows);
-        assertEquals(initialRestarts, ime.restarts);
-        idle(5000);
-        assertEquals(10, ime.shows);
-        input.setKeyboardState(true);
-        idle(1);
-        assertEquals(11, ime.shows);
-    }
-    @Test public void inactiveImeIsRestartedOnceNotOnEveryAttempt() {
-        ime.active = false;
-        input.setKeyboardState(true);
-        int frameworkRestarts = ime.restarts;
-        idle(1);
-        assertEquals(frameworkRestarts + 1, ime.restarts);
-        int firstAttemptRestarts = ime.restarts;
-        idle(5000);
-        assertEquals(10, ime.shows);
-        assertEquals(firstAttemptRestarts, ime.restarts);
     }
     @Test public void detachCancelsPendingOpen() {
         input.setKeyboardState(true);
@@ -156,37 +134,10 @@ public class KeyboardVisibilityTest {
         idle(3000);
         assertEquals(0, ime.shows);
     }
-    @Test public void oldShownCallbackCannotCancelANewRequest() {
-        input.setKeyboardState(true);
-        idle(1);
-        ResultReceiver old = ime.lastResult;
-        input.setKeyboardState(false);
-        input.setKeyboardState(true);
-        idle(1);
-        old.send(InputMethodManager.RESULT_SHOWN, null);
-        idle(200);
-        assertEquals(3, ime.shows);
-    }
     @Test public void backgroundThreadRequestIsMarshalledToUiThread() throws Exception {
-        Thread request = new Thread(() -> input.setKeyboardState(true));
-        request.start();
-        request.join();
-        idle(1);
+        Thread thread = new Thread(() -> input.setKeyboardState(true));
+        thread.start(); thread.join(); idle(1);
         assertTrue(input.isEnabled());
         assertEquals(1, ime.shows);
     }
-    @Test public void repeatedFocusBouncesCannotResetTheRetryBudget() {
-        input.setKeyboardState(true);
-        idle(1);
-        for (int i = 0; i < 20; i++) {
-            focus(false);
-            idle(1);
-            focus(true);
-            idle(1);
-        }
-        assertEquals(1, ime.shows); // Focus bounce cannot bypass the retry cooldown either.
-        idle(5000);
-        assertEquals(10, ime.shows);
-    }
-
 }
