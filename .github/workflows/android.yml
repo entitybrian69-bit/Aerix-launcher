@@ -58,15 +58,27 @@ jobs:
         run: cargo test --locked -p renderer-core
       - name: RustGL compatibility-layer unit tests (serialized global GL state)
         working-directory: .cache/rustgl-source
-        run: cargo test --locked -p gl-compat --lib -- --test-threads=1
+        shell: bash
+        run: |
+          set -o pipefail
+          if ! cargo test --locked -p gl-compat --lib -- --test-threads=1 2>&1 | tee "$GITHUB_WORKSPACE/rustgl-compat.log"; then
+            detail=$(tail -c 16000 "$GITHUB_WORKSPACE/rustgl-compat.log" | sed 's/%/%25/g; s/\r//g' | tr '\n' '|')
+            echo "::error title=RustGL compatibility tests::$detail"
+            exit 1
+          fi
       - name: Real RustGL EGL/GLES host smoke test
+        if: ${{ !cancelled() }}
         shell: bash
         run: |
           set -o pipefail
           sudo apt-get update -qq
           sudo apt-get install -y libegl1-mesa-dev libgles2-mesa-dev
           (cd .cache/rustgl-source && cargo build --locked --release -p gl-compat)
-          python3 -u scripts/smoke_rustgl.py .cache/rustgl-source/target/release/librust_gl.so 2>&1 | tee rustgl-smoke.log
+          if ! python3 -u scripts/smoke_rustgl.py .cache/rustgl-source/target/release/librust_gl.so 2>&1 | tee rustgl-smoke.log; then
+            detail=$(tail -c 10000 rustgl-smoke.log | sed 's/%/%25/g; s/\r//g' | tr '\n' '|')
+            echo "::error title=RustGL EGL smoke::$detail"
+            exit 1
+          fi
       - name: Upload authenticated-build input assets
         uses: actions/upload-artifact@v4
         with:
@@ -84,6 +96,7 @@ jobs:
             .cache/rustgl-report/experimental-approval.json
             rustgl-build.log
             rustgl-smoke.log
+            rustgl-compat.log
 
   build:
     needs: rustgl-native
