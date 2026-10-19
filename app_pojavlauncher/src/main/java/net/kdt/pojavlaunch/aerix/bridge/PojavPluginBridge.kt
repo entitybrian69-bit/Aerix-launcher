@@ -29,6 +29,9 @@
 package net.kdt.pojavlaunch.aerix.bridge
 
 import android.annotation.SuppressLint
+import android.app.ActivityManager
+import android.os.Build
+import android.util.Log
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ApplicationInfo
@@ -54,11 +57,18 @@ class AerixRendererPlugin(
     val eglName: String,
     val nativeLibDir: String,
     val env: Map<String, String>,
-    val dlopen: List<String>
+    val dlopen: List<String>,
+    val metadataVersion: Int = 1
 ) : RenderSpec {
     val pluginTag: String = "$TAG_PREFIX$packageName"
 
-    override fun compatibleDevice(context: Context): Boolean = File(nativeLibDir).isDirectory
+    override fun compatibleDevice(context: Context): Boolean {
+        if (!File(nativeLibDir).isDirectory) return false
+        if (metadataVersion < 2) return true
+        val gles = context.getSystemService(ActivityManager::class.java)?.deviceConfigurationInfo?.reqGlEsVersion ?: 0
+        return Build.VERSION.SDK_INT >= 26 && gles >= 0x30000 && File(glName).isFile &&
+            (eglName == "libEGL.so" || File(eglName).isFile)
+    }
 
     override fun name(): String = displayName
 
@@ -79,9 +89,8 @@ class AerixRendererPlugin(
     }
 
     override fun setupRenderer(): Boolean {
-        val isVulkan = rendererId.contains("zink", ignoreCase = true) ||
-            rendererId.contains("vulkan", ignoreCase = true) ||
-            env.containsKey("MESA_LOADER_DRIVER_OVERRIDE")
+        // RustGL explicitly clears this variable. Presence of an empty key is NOT Vulkan.
+        val isVulkan = RendererPluginV2.usesVulkan(rendererId, env)
         if (isVulkan) {
             runCatching { MojoExec.preloadVulkan() }
         }
@@ -161,7 +170,31 @@ object PojavPluginBridge {
         val meta = info.metaData ?: return null
         val isFcl = meta.getBoolean("fclPlugin", false)
         val isZalith = meta.getBoolean("zalithRendererPlugin", false)
-        if (!isFcl && !isZalith) return null
+        if (!isFcl && !isZalith && !meta.containsKey("fclPlugin_V2")) return null
+        if (meta.containsKey("fclPlugin_V2")) {
+            val plugin = runCatching {
+                val metadata = when (val value = meta.get("fclPlugin_V2")) {
+                    is Int -> pm.getResourcesForApplication(info).getString(value)
+                    is String -> value
+                    else -> error("Invalid V2 config resource")
+                }
+                val nativeDir = requireNotNull(info.nativeLibraryDir)
+                val config = RendererPluginV2.parse(metadata, File(nativeDir))
+                val rustGl = info.packageName == RendererPluginV2.RUSTGL_PACKAGE
+                AerixRendererPlugin(
+                    packageName = info.packageName, appName = info.loadLabel(pm).toString(),
+                    appVersion = pm.getPackageInfo(info.packageName, 0).versionName.orEmpty(),
+                    rendererId = config.id,
+                    displayName = config.name + if (rustGl) " (Experimental)" else "",
+                    summary = if (rustGl) "External RustGL · Experimental GLES translation" else "External V2 renderer plugin",
+                    minMCVer = config.minVersion, maxMCVer = config.maxVersion,
+                    glName = config.gl, eglName = config.egl, nativeLibDir = nativeDir,
+                    env = config.env, dlopen = emptyList(), metadataVersion = 2
+                ).also { require(it.compatibleDevice(context)) { "Plugin requires Android 8+, GLES 3 and matching native libraries" } }
+            }.onFailure { Log.w("AerixRendererPlugin", "Cannot load V2 renderer ${info.packageName}: ${it.message}") }.getOrNull()
+            if (plugin != null) return plugin
+            // A malformed/unsupported V2 config may still supply valid legacy metadata.
+        }
 
         val rendererRaw = meta.getString("renderer") ?: return null
         val parts = rendererRaw.split(":")

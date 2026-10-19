@@ -763,6 +763,18 @@ private fun RendererPluginCard(
     onSelect: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var confirmExperimental by remember { mutableStateOf(false) }
+    val isRustGl = plugin.packageName == "dev.rustrenderer.plugin"
+    val select = {
+        if (isRustGl && !selected) confirmExperimental = true else onSelect()
+    }
+    if (confirmExperimental) AlertDialog(
+        onDismissRequest = { confirmExperimental = false },
+        title = { Text("Experimental RustGL renderer") },
+        text = { Text("This external plugin uses GLES translation. Its advertised GL 4.5 version does not mean complete GL 4.5 support. Android gameplay and performance are not verified by Aerix. The plugin's default configuration disables LWJGL safety checks. Use only a trusted plugin APK; Vulkan rendering is not established.") },
+        confirmButton = { TextButton(onClick = { confirmExperimental = false; onSelect() }) { Text("Use experimental renderer") } },
+        dismissButton = { TextButton(onClick = { confirmExperimental = false }) { Text("Cancel") } }
+    )
     val borderColor by animateColorAsState(
         targetValue = if (selected) AerixThemeManager.currentAccent() else AerixSurface.panelRaised,
         animationSpec = tween(160),
@@ -778,7 +790,7 @@ private fun RendererPluginCard(
         shape = RoundedCornerShape(AerixRadii.control),
         color = cardBg,
         border = BorderStroke(if (selected) 1.5.dp else AerixSpacing.hairline, borderColor),
-        onClick = onSelect
+        onClick = select
     ) {
         Row(
             modifier = Modifier
@@ -789,7 +801,7 @@ private fun RendererPluginCard(
         ) {
             RadioButton(
                 selected = selected,
-                onClick = onSelect,
+                onClick = select,
                 colors = RadioButtonDefaults.colors(
                     selectedColor = AerixThemeManager.currentAccent(),
                     unselectedColor = AerixSurface.textSecondary
@@ -806,7 +818,7 @@ private fun RendererPluginCard(
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = plugin.packageName,
+                    text = if (isRustGl) plugin.summary else plugin.packageName,
                     style = MaterialTheme.typography.labelSmall,
                     color = AerixSurface.textSecondary,
                     maxLines = 1,

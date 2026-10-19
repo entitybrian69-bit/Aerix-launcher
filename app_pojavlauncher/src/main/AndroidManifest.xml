@@ -171,6 +171,7 @@
         </service>
     </application>
     <queries>
+        <package android:name="dev.rustrenderer.plugin"/>
         <package android:name="net.kdt.pojavlaunch.ffmpeg"/>
         <package android:name="git.mojo.zink"/>
         <package android:name="git.mojo.mesa"/>
