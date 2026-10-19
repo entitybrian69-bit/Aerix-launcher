@@ -39,6 +39,7 @@ import android.content.pm.PackageManager
 import android.os.Bundle
 import git.artdeell.mojoexec.MojoExec
 import net.kdt.pojavlaunch.R
+import net.kdt.pojavlaunch.Logger
 import net.kdt.pojavlaunch.game.renderer.GameRenderer
 import net.kdt.pojavlaunch.game.renderer.RenderSpec
 import net.kdt.pojavlaunch.game.renderer.RendererCache
@@ -59,7 +60,8 @@ class AerixRendererPlugin(
     val env: Map<String, String>,
     val dlopen: List<String>,
     val metadataVersion: Int = 1,
-    val initializeBundle: ((() -> Boolean) -> Boolean)? = null
+    val initializeBundle: ((() -> Boolean) -> Boolean)? = null,
+    val useNamespaceBypass: Boolean = true
 ) : RenderSpec {
     val pluginTag: String = "$TAG_PREFIX$packageName"
 
@@ -92,20 +94,35 @@ class AerixRendererPlugin(
         }
     }
 
+    /** Values passed directly to MojoExec; inspecting this plan never loads native code. */
+    internal data class EglLaunchPlan(val library: String, val namespaceBypass: Boolean, val gles: Boolean, val major: Int)
+
+    internal fun eglLaunchPlan(): EglLaunchPlan {
+        val target = when {
+            eglName.startsWith("/") -> eglName
+            File(nativeLibDir, eglName).exists() -> File(nativeLibDir, eglName).absolutePath
+            else -> eglName
+        }
+        return EglLaunchPlan(target, useNamespaceBypass, !RendererPluginV2.usesDesktopGl(rendererId, env), 3)
+    }
+
     override fun setupRenderer(): Boolean = try {
         val initialize = {
             if (RendererPluginV2.usesVulkan(rendererId, env)) MojoExec.preloadVulkan()
-            val eglTarget = when {
-                eglName.startsWith("/") -> eglName
-                File(nativeLibDir, eglName).exists() -> File(nativeLibDir, eglName).absolutePath
-                else -> eglName
-            }
-            MojoExec.prepareEgl(eglTarget, true, !RendererPluginV2.usesDesktopGl(rendererId, env), 3)
+            val plan = eglLaunchPlan()
+            Logger.appendToLog("Renderer native load: tag=$pluginTag bundle=$appVersion " +
+                "egl=${plan.library} namespaceBypass=${plan.namespaceBypass} gles=${plan.gles} major=${plan.major}")
+            val loaded = MojoExec.prepareEgl(plan.library, plan.namespaceBypass, plan.gles, plan.major)
+            // prepareEgl only dlopens the provider. EGL context creation happens later in GLFW/SDL.
+            Logger.appendToLog("Renderer native provider loaded=$loaded tag=$pluginTag; EGL context/gameplay not yet verified")
+            loaded
         }
         initializeBundle?.invoke(initialize) ?: initialize()
     } catch (error: Exception) {
+        Logger.appendToLog("Renderer initialization failed: tag=$pluginTag ${error.javaClass.simpleName}: ${error.message}")
         Log.e("AerixRendererPlugin", "Renderer initialization failed", error); false
     } catch (error: LinkageError) {
+        Logger.appendToLog("Renderer native linkage failed: tag=$pluginTag ${error.javaClass.simpleName}: ${error.message}")
         Log.e("AerixRendererPlugin", "Renderer native linkage failed", error); false
     }
 

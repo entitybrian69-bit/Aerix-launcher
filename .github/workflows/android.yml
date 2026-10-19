@@ -56,6 +56,17 @@ jobs:
       - name: Renderer core unit tests
         working-directory: .cache/rustgl-source
         run: cargo test --locked -p renderer-core
+      - name: RustGL compatibility-layer unit tests (serialized global GL state)
+        working-directory: .cache/rustgl-source
+        run: cargo test --locked -p gl-compat --lib -- --test-threads=1
+      - name: Real RustGL EGL/GLES host smoke test
+        shell: bash
+        run: |
+          set -o pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y libegl1-mesa-dev libgles2-mesa-dev
+          (cd .cache/rustgl-source && cargo build --locked --release -p gl-compat)
+          python3 -u scripts/smoke_rustgl.py .cache/rustgl-source/target/release/librust_gl.so 2>&1 | tee rustgl-smoke.log
       - name: Upload authenticated-build input assets
         uses: actions/upload-artifact@v4
         with:
@@ -72,6 +83,7 @@ jobs:
             .cache/rustgl-report/evidence/
             .cache/rustgl-report/experimental-approval.json
             rustgl-build.log
+            rustgl-smoke.log
 
   build:
     needs: rustgl-native

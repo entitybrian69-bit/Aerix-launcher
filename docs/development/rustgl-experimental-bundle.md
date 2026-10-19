@@ -61,3 +61,34 @@ Android private-path loading, storage fault recovery and phone performance remai
 unverified until actual device reports exist. A successful APK build is not gameplay or
 FPS proof. The stable-release compliance checklist remains open; see
 `rustgl-compliance.md` and `rustgl-benchmark.md`.
+
+## Crash-review candidate: bundle integration 0.3.1
+
+This is an **Aerix integration revision**, not a claim that upstream released RustGL
+0.3.1. Native source remains pinned to `eb22559581cf400af29470205a9ebbff31e0db33`
+(upstream 0.3.0). The APK contains all four real native ABI payloads as before.
+
+- Bundled RustGL now uses normal Android library loading (`prepareEgl` namespace
+  bypass **false**), appropriate for its public system EGL/GLES dependencies. Other
+  plugins retain their existing bypass policy. This removes an unnecessary custom
+  graphics namespace; it is a suspected integration hazard, **not a confirmed
+  explanation of the user's native crash**.
+- Bundle version 0.3.1 creates a fresh immutable generation. A previous 0.3.0 init
+  quarantine remains preserved but cannot suppress this revised integration. A
+  new failure still quarantines the new generation; failures are not silently reset.
+- Launcher `latestlog.txt` records the actual renderer tag, bundle version, resolved
+  EGL path, namespace/GLES policy and native-provider load outcome. A successful
+  `prepareEgl` means only the provider loaded, **not** a working context or gameplay.
+- CI now runs serialized `gl-compat` tests and `scripts/smoke_rustgl.py` against the
+  real host cdylib and Mesa surfaceless EGL: ES3 context, extension enumeration,
+  RGBA clear/readback, desktop shader translation/compile/link, swap, rebind and
+  teardown. These checks complement four-ABI Android builds, ELF/APK integrity
+  checks and actual-payload Android discovery/old-quarantine regression tests.
+  They do not reproduce a PowerVR Android driver, Android window lifecycle or Minecraft.
+
+The supplied newer Minecraft 1.16.5 log ends during LWJGL initialization, without a
+native stack. The earlier 1.20.1 native report includes LTW and an Android surface
+fault; it is not proof of RustGL's current failure. Keep GLES-only policy, existing
+NoChecks compatibility setting and licensing restrictions unchanged. Device
+verification is still required; do not publish this as a stable crash fix or claim
+FPS, full desktop GL, Vulkan or gameplay support based on host smoke results.

@@ -64,6 +64,9 @@ internal object BundledRustGl {
                 "JAVA_TOOL_OPTIONS" to "-Dorg.lwjgl.util.NoChecks=true"
             )),
             dlopen = emptyList(), metadataVersion = 2,
+            // This bundle depends on public system EGL/GLES, not private custom-driver libraries.
+            // Keep Android's normal graphics-library namespace; other plugins retain their policy.
+            useNamespaceBypass = false,
             initializeBundle = { initialize ->
                 val attempt = storage.beginInit(release)
                 var success = false

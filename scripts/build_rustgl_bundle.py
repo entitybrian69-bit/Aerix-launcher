@@ -152,12 +152,14 @@ def run(args):
     approval = {"redistributionApproved": False, "experimentalUserAuthorized": True,
                 "reviewedBy": "Experimental build policy: user accepted upstream README MIT basis; no legal clearance claimed",
                 "sourceRevision": REVISION, "components": components, "artifacts": artifacts,
+                "bundleVersion": "0.3.1", "upstreamNativeVersion": "0.3.0",
+                "integration": "System EGL/GLES namespace; native source unchanged",
                 "toolchain": subprocess.check_output(["rustc", "-Vv"], text=True),
                 "ndk": args.ndk.name}
     approval_path = report / "experimental-approval.json"
     approval_path.write_text(json.dumps(approval, indent=2) + "\n")
     subprocess.run([sys.executable, str(Path(__file__).with_name("prepare_rustgl_bundle.py")),
-                    "--approval", str(approval_path), "--input", str(native), "--version", "0.3.0",
+                    "--approval", str(approval_path), "--input", str(native), "--version", "0.3.1",
                     "--inventory", str(args.inventory.resolve()), "--output", str(args.output.resolve()),
                     "--readelf", str(bin_dir / "llvm-readelf"), "--experimental-mit-declaration"], check=True)
     print("::notice title=RustGL bundled source build::" + json.dumps({"revision": REVISION, "artifacts": artifacts, "licenses": len(components), "experimental": True}))
