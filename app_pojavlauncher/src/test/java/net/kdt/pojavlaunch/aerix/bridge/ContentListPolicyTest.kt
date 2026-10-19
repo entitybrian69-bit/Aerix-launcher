@@ -7,6 +7,7 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class ContentListPolicyTest {
+    @get:org.junit.Rule val temporary = org.junit.rules.TemporaryFolder()
     private fun entry(name: String, enabled: Boolean = true, folder: String = "/instance/mods", title: String = name) =
         ContentEntry(File(folder, name + if (enabled) "" else ".disabled"), name, title,
             emptyList(), null, enabled, false, 1, 0)
@@ -76,4 +77,39 @@ class ContentListPolicyTest {
             assertTrue(rejected)
         }
     }
+    @Test fun realModBatchRenamesOnlySelectedFilesAndCanEnableThemAgain() = runBlocking {
+        val dir = temporary.newFolder("mods")
+        File(dir, "chosen.jar").writeText("selected bytes")
+        File(dir, "untouched.jar").writeText("keep me")
+        val chosen = entry("chosen.jar", folder = dir.absolutePath)
+        assertTrue(applyContentBatch(ContentKind.MODS, listOf(chosen), ContentBulkAction.DISABLE).failed.isEmpty())
+        assertFalse(chosen.file.exists())
+        assertEquals("selected bytes", File(dir, "chosen.jar.disabled").readText())
+        val disabled = entry("chosen.jar", enabled = false, folder = dir.absolutePath)
+        assertTrue(applyContentBatch(ContentKind.MODS, listOf(disabled), ContentBulkAction.ENABLE).failed.isEmpty())
+        assertEquals("selected bytes", chosen.file.readText())
+        assertEquals("keep me", File(dir, "untouched.jar").readText())
+    }
+    @Test fun fileCollisionIsReportedWithoutOverwritingEitherCopy() = runBlocking {
+        val dir = temporary.newFolder("collision")
+        File(dir, "same.jar").writeText("enabled copy")
+        File(dir, "same.jar.disabled").writeText("disabled copy")
+        val chosen = entry("same.jar", folder = dir.absolutePath)
+        val result = applyContentBatch(ContentKind.MODS, listOf(chosen), ContentBulkAction.DISABLE)
+        assertEquals(setOf(chosen.file.absolutePath), result.failed)
+        assertEquals("enabled copy", File(dir, "same.jar").readText())
+        assertEquals("disabled copy", File(dir, "same.jar.disabled").readText())
+    }
+    @Test fun deletingSelectedWorldDoesNotTouchUnselectedWorld() = runBlocking {
+        val dir = temporary.newFolder("saves")
+        val chosen = File(dir, "selected").apply { mkdir() }
+        val other = File(dir, "keep").apply { mkdir() }
+        File(chosen, "level.dat").writeText("chosen world")
+        File(other, "level.dat").writeText("keep world")
+        val model = ContentEntry(chosen, "selected", "selected", emptyList(), null, true, true, 1, 0)
+        assertTrue(applyContentBatch(ContentKind.SAVES, listOf(model), ContentBulkAction.DELETE).failed.isEmpty())
+        assertFalse(chosen.exists())
+        assertEquals("keep world", File(other, "level.dat").readText())
+    }
+
 }
