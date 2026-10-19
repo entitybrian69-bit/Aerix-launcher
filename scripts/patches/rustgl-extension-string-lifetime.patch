@@ -1,0 +1,30 @@
+--- a/crates/gl-compat/src/lib.rs
++++ b/crates/gl-compat/src/lib.rs
+@@ -1057,7 +1057,10 @@
+     if name == GL_EXTENSIONS {
+         // Indexed access into the same merged list GL_NUM_EXTENSIONS reports, so a caller
+         // that iterates `count` entries never hits an early null.
+-        let exts = merged_extensions();
++        // merged_extensions returns a cloned Vec. Its bytes die when this function
++        // returns; expose the persistent cache's bytes, not the temporary clone.
++        let _ = merged_extensions();
++        let exts = MERGED.lock().unwrap_or_else(|e| e.into_inner());
+         if (index as usize) < exts.len() {
+             return exts[index as usize].as_ptr();
+         }
+@@ -3210,6 +3213,15 @@
+     }
+ 
+     #[test]
++    fn indexed_extension_pointer_is_owned_by_persistent_cache() {
++        let _lock = global_test_lock();
++        let pointer = unsafe { glGetStringi(0x1F03, 0) };
++        let cache = MERGED.lock().unwrap_or_else(|e| e.into_inner());
++        assert!(!cache.is_empty());
++        assert_eq!(pointer, cache[0].as_ptr(), "glGetStringi must not return a dropped clone");
++    }
++
++    #[test]
+     fn minecraft_gpu_identity_uses_rustgl_brand() {
+         let (vendor, renderer) = renderer_identity();
+         assert_eq!(vendor.to_bytes(), b"WhalterMC");

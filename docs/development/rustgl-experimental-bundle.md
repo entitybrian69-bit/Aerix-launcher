@@ -65,9 +65,24 @@ FPS proof. The stable-release compliance checklist remains open; see
 ## Crash-review candidate: bundle integration 0.3.1
 
 This is an **Aerix integration revision**, not a claim that upstream released RustGL
-0.3.1. Native source remains pinned to `eb22559581cf400af29470205a9ebbff31e0db33`
-(upstream 0.3.0). The APK contains all four real native ABI payloads as before.
+0.3.1. Native source uses `eb22559581cf400af29470205a9ebbff31e0db33`
+(upstream 0.3.0) plus two hash-verified Aerix patches in `scripts/patches/`. The APK contains all four real native ABI payloads as before.
 
+- Source review found a **use-after-free in `glGetStringi`**: it returned an extension
+  string pointer from a local cloned vector that was dropped on return. LWJGL reads
+  those pointers during capability initialization. The patch returns the persistent
+  cache's bytes instead, with a pointer-ownership regression test. Host smoke checks
+  every returned extension's spelling as well as non-nullness. This is a concrete
+  memory-safety defect that can explain native startup failure; matching the phone's
+  exact crash still requires a same-attempt native stack/device test.
+- Real-library host testing of unpatched upstream reproduced an initialization GL
+  error. Source review identified indexed compute limits queried with the scalar
+  `glGetIntegerv`, a desktop dual-source limit incorrectly used as an indirect
+  draw-count limit, an unconditional anisotropy query and NUL-inconsistent extension
+  matching. The reviewed patch corrects these, adds an extension regression test,
+  and is shipped verbatim with SHA256 evidence in the bundle notices. Clean upstream
+  revision and patch hash are checked before building; no unrecorded dirty source.
+  These are concrete startup faults, not proof of the user's exact SIGSEGV cause.
 - Bundled RustGL now uses normal Android library loading (`prepareEgl` namespace
   bypass **false**), appropriate for its public system EGL/GLES dependencies. Other
   plugins retain their existing bypass policy. This removes an unnecessary custom

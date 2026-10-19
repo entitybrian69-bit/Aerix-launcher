@@ -7,7 +7,7 @@ import pathlib
 import tempfile
 import types
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 SCRIPTS = pathlib.Path(__file__).resolve().parents[1]
 
@@ -22,6 +22,7 @@ def load(name):
 bundle = load("prepare_rustgl_bundle")
 benchmark = load("renderer_benchmark")
 builder = load("build_rustgl_bundle")
+smoke = load("smoke_rustgl")
 
 
 class RendererToolsTest(unittest.TestCase):
@@ -130,3 +131,34 @@ class RendererToolsTest(unittest.TestCase):
         file.write_text("present_ns\n1\n1\n2\n")
         with self.assertRaises(ValueError):
             benchmark.analyze(types.SimpleNamespace(frames=file, warmup_seconds=0, label="synthetic"))
+
+
+    def test_recorded_source_patch_is_preserved_in_bundle_notices(self):
+        evidence = self.root / "reviewed.patch"
+        evidence.write_text("Synthetic patch evidence, not a renderer implementation.")
+        self.audit["sourcePatches"] = [{"file": evidence.name, "sha256": bundle.digest(evidence)}]
+        self.run_import()
+        notice = next(self.args.output.glob("*/*/NOTICE.txt")).read_text()
+        self.assertIn("Aerix source modifications", notice)
+        self.assertIn(evidence.read_text(), notice)
+
+    def test_tampered_source_patch_evidence_is_rejected(self):
+        evidence = self.root / "reviewed.patch"
+        evidence.write_text("Unreviewed modification")
+        self.audit["sourcePatches"] = [{"file": evidence.name, "sha256": "0" * 64}]
+        with self.assertRaisesRegex(ValueError, "Source patch evidence checksum mismatch"):
+            self.run_import()
+        self.assertFalse(self.args.output.exists())
+
+    def test_build_patch_matches_reviewed_recipe_hash(self):
+        evidence = SCRIPTS / "patches/rustgl-gles-capability-probe.patch"
+        self.assertEqual(builder.PATCH_SHA256, builder.digest(evidence))
+        self.assertEqual(builder.LIFETIME_PATCH_SHA256,
+                         builder.digest(SCRIPTS / "patches/rustgl-extension-string-lifetime.patch"))
+
+    def test_smoke_rejects_missing_egl_entry_point_without_calling_null(self):
+        resolver = Mock(return_value=None)
+        with patch.dict(smoke.os.environ), patch.object(smoke.c, "CDLL", return_value=types.SimpleNamespace(eglGetProcAddress=resolver)):
+            with self.assertRaisesRegex(RuntimeError, "RustGL resolver missing eglGetDisplay"):
+                smoke.main(self.root / "synthetic.so")
+        resolver.assert_called_once_with(b"eglGetDisplay")

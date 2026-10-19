@@ -70,8 +70,9 @@ def main(library):
         if not 0 < count.value < 16384:
             raise RuntimeError(f"Invalid GL_NUM_EXTENSIONS={count.value}")
         for i in range(count.value):
-            if not get_string_i(0x1F03, i):
-                raise RuntimeError(f"NULL extension {i}")
+            extension = get_string_i(0x1F03, i)
+            if not extension or not extension.startswith(b"GL_") or not extension.replace(b"_", b"").isalnum():
+                raise RuntimeError(f"Invalid extension string {i}: {extension!r}")
         viewport = bind("glViewport", None, integer, integer, integer, integer)
         clear_color = bind("glClearColor", None, c.c_float, c.c_float, c.c_float, c.c_float)
         clear = bind("glClear", None, c.c_uint32)

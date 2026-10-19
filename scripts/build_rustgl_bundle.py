@@ -14,6 +14,7 @@ import urllib.request
 
 REVISION = "eb22559581cf400af29470205a9ebbff31e0db33"
 PATCH_SHA256 = "aeaa3bd7362a62d31d46c8b04b9461abacb67a9de21f426417929b22db444885"
+LIFETIME_PATCH_SHA256 = "ba6d4f1bc71bbedea69d3b8a3fa30a2ad37d375db28206bfe955331b82494d12"
 TARGETS = {
     "arm64-v8a": ("aarch64-linux-android", "aarch64-linux-android26"),
     "armeabi-v7a": ("armv7-linux-androideabi", "armv7a-linux-androideabi26"),
@@ -78,17 +79,21 @@ def run(args):
         raise ValueError("Renderer source must be clean before compilation")
     # Apply only the reviewed patch to the exact clean upstream tree. Never accept an
     # arbitrary dirty renderer source as if it were the pinned upstream revision.
-    patch = Path(__file__).resolve().parent / "patches/rustgl-gles-capability-probe.patch"
-    if digest(patch) != PATCH_SHA256:
-        raise ValueError("RustGL source patch hash mismatch")
-    subprocess.run(["git", "apply", "--check", str(patch)], cwd=source, check=True)
-    subprocess.run(["git", "apply", str(patch)], cwd=source, check=True)
+    patch_dir = Path(__file__).resolve().parent / "patches"
+    patches = [(patch_dir / "rustgl-gles-capability-probe.patch", PATCH_SHA256),
+               (patch_dir / "rustgl-extension-string-lifetime.patch", LIFETIME_PATCH_SHA256)]
+    for patch, expected_hash in patches:
+        if digest(patch) != expected_hash:
+            raise ValueError("RustGL source patch hash mismatch")
+        subprocess.run(["git", "apply", "--check", str(patch)], cwd=source, check=True)
+    for patch, _ in patches:
+        subprocess.run(["git", "apply", str(patch)], cwd=source, check=True)
     report = args.report.resolve()
     report.mkdir(parents=True, exist_ok=True)
     evidence_dir = report / "evidence"
     evidence_dir.mkdir(exist_ok=True)
-    patch_evidence = evidence_dir / patch.name
-    shutil.copyfile(patch, patch_evidence)
+    for patch, _ in patches:
+        shutil.copyfile(patch, evidence_dir / patch.name)
     meta = json.loads(subprocess.check_output(["cargo", "metadata", "--locked", "--all-features", "--format-version", "1"], cwd=source, text=True))
     inventory = json.loads(args.inventory.read_text())
     expected = {(c["name"], c["version"]) for c in inventory["components"]}
@@ -163,8 +168,8 @@ def run(args):
                 "reviewedBy": "Experimental build policy: user accepted upstream README MIT basis; no legal clearance claimed",
                 "sourceRevision": REVISION, "components": components, "artifacts": artifacts,
                 "bundleVersion": "0.3.1", "upstreamNativeVersion": "0.3.0",
-                "integration": "System EGL/GLES namespace; reviewed GLES capability-probe corrections",
-                "sourcePatches": [{"file": "evidence/" + patch.name, "sha256": PATCH_SHA256}],
+                "integration": "System EGL/GLES namespace; capability-probe and extension-string lifetime fixes",
+                "sourcePatches": [{"file": "evidence/" + patch.name, "sha256": sha} for patch, sha in patches],
                 "toolchain": subprocess.check_output(["rustc", "-Vv"], text=True),
                 "ndk": args.ndk.name}
     approval_path = report / "experimental-approval.json"
