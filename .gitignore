@@ -13,3 +13,6 @@ app_pojavlauncher/.cxx/
 
 # Python renderer tooling
 __pycache__/
+
+# Generated, pinned RustGL build outputs; source recipe and hashes live in CI artifacts.
+/app_pojavlauncher/src/main/assets/renderer-bundles/rustgl/

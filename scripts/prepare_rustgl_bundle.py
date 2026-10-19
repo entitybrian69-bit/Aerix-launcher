@@ -10,7 +10,7 @@ import shutil
 import subprocess
 import tempfile
 
-PERMISSIVE = {"MIT", "Apache-2.0", "ISC", "BSD-2-Clause", "BSD-3-Clause", "Zlib", "MIT OR Apache-2.0", "Apache-2.0 OR MIT"}
+PERMISSIVE = {"MIT", "Apache-2.0", "ISC", "BSD-2-Clause", "BSD-3-Clause", "Zlib", "MIT OR Apache-2.0", "Apache-2.0 OR MIT", "Unicode-3.0", "Unicode-DFS-2016", "CC0-1.0", "BSL-1.0", "0BSD", "Unlicense"}
 SYSTEM = {"libc.so", "libm.so", "libdl.so", "liblog.so", "libandroid.so", "libEGL.so", "libGLESv2.so", "libGLESv3.so", "libvulkan.so"}
 ABIS = {"arm64-v8a": (2, 183), "armeabi-v7a": (1, 40), "x86": (1, 3), "x86_64": (2, 62)}
 
@@ -29,7 +29,9 @@ def prepare(args):
     audit = json.loads(audit_path.read_text())
     inventory = json.loads(args.inventory.read_text())
     revision = inventory["sourceRevision"]
-    require(audit.get("redistributionApproved") is True and audit.get("reviewedBy"), "Named redistribution review required")
+    approved = audit.get("redistributionApproved") is True
+    experimental = getattr(args, "experimental_mit_declaration", False) and audit.get("experimentalUserAuthorized") is True
+    require((approved or experimental) and audit.get("reviewedBy"), "Named redistribution review required")
     require(audit.get("sourceRevision") == revision, "Approval must cover the pinned source revision")
     require(re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", args.version), "Bundle version must be numeric semver")
     expected = {(c["name"], c["version"]) for c in inventory["components"]}
@@ -38,7 +40,8 @@ def prepare(args):
             "Every locked component, including workspace crates, requires an explicit license conclusion")
     notices = []
     for component in components:
-        require(component["licenseConclusion"] in PERMISSIVE, "Unknown/copyleft license requires a separate reviewed distribution method")
+        tokens = set(re.findall(r"[A-Za-z0-9.+-]+", component["licenseConclusion"])) - {"AND", "OR"}
+        require(bool(tokens) and tokens <= PERMISSIVE, "Unknown/copyleft license requires a separate reviewed distribution method")
         require(component.get("evidence"), "License evidence required")
         for evidence in component["evidence"]:
             path = audit_path.parent / evidence["file"]
@@ -85,7 +88,7 @@ def prepare(args):
         require(not (output / args.version).exists(), "Immutable bundle version already exists; use a new version")
         os.replace(staging / args.version, output / args.version)
     old = previous["releases"] if previous else []
-    index = {"schema": 1, "redistributionApproved": True, "backend": "gles", "releases": releases + old}
+    index = {"schema": 1, "redistributionApproved": approved, "experimentalUserAuthorized": experimental, "backend": "gles", "releases": releases + old}
     temporary = output / "index.json.tmp"
     with temporary.open("w") as stream:
         json.dump(index, stream, indent=2); stream.write("\n"); stream.flush(); os.fsync(stream.fileno())
@@ -95,6 +98,7 @@ def prepare(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--experimental-mit-declaration", action="store_true", help="Explicit experimental policy; does not claim legal clearance")
     parser.add_argument("--approval", required=True, type=pathlib.Path)
     parser.add_argument("--input", required=True, type=pathlib.Path, help="audited native files arranged by Android ABI")
     parser.add_argument("--version", required=True)

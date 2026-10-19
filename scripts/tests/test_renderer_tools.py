@@ -70,6 +70,21 @@ class RendererToolsTest(unittest.TestCase):
             self.run_import()
         self.assertFalse(self.args.output.exists())
 
+    def test_experimental_acceptance_does_not_claim_legal_clearance(self):
+        self.audit["redistributionApproved"] = False
+        self.audit["experimentalUserAuthorized"] = True
+        self.args.experimental_mit_declaration = True
+        self.run_import()
+        index = json.loads((self.args.output / "index.json").read_text())
+        self.assertFalse(index["redistributionApproved"])
+        self.assertTrue(index["experimentalUserAuthorized"])
+
+    def test_experimental_flag_without_acceptance_refused(self):
+        self.audit["redistributionApproved"] = False
+        self.args.experimental_mit_declaration = True
+        with self.assertRaises(ValueError):
+            self.run_import()
+
     def test_bad_artifact_hash_refused(self):
         self.audit["artifacts"][0]["sha256"] = "b" * 64
         with self.assertRaises(ValueError):

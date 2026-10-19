@@ -801,7 +801,7 @@ private fun RendererPluginCard(
     if (confirmExperimental) AlertDialog(
         onDismissRequest = { confirmExperimental = false },
         title = { Text("Experimental RustGL renderer") },
-        text = { Text("This experimental renderer uses GLES translation. Its advertised GL 4.5 version does not mean complete GL 4.5 support. Android gameplay and performance are not verified by Aerix. External plugins may disable LWJGL safety checks; use only trusted builds. Bundled releases require APK-authenticated checksums. Vulkan rendering is not established.") },
+        text = { Text("This experimental renderer uses GLES translation. Its advertised GL 4.5 version does not mean complete GL 4.5 support. Android gameplay and performance are not verified by Aerix. RustGL compatibility defaults disable LWJGL pointer checks; use only trusted builds. Bundled releases require APK-authenticated checksums. Vulkan rendering is not established.") },
         confirmButton = { TextButton(onClick = { confirmExperimental = false; onSelect() }) { Text("Use experimental renderer") } },
         dismissButton = { TextButton(onClick = { confirmExperimental = false }) { Text("Cancel") } }
     )

@@ -23,7 +23,7 @@ internal object BundledRustGl {
                 JsonParser.parseString(text).asJsonObject
             }
         } catch (_: java.io.FileNotFoundException) { return null }
-        if (!index.get("redistributionApproved").asBoolean) return null
+        if (index.get("redistributionApproved")?.asBoolean != true && index.get("experimentalUserAuthorized")?.asBoolean != true) return null
         require(index.get("schema").asInt == 1)
         require(index.get("backend").asString == "gles") { "RustGL Vulkan implementation has no release qualification" }
         val abi = (if (android.os.Process.is64Bit()) Build.SUPPORTED_64_BIT_ABIS else Build.SUPPORTED_32_BIT_ABIS).firstOrNull() ?: return null
@@ -58,7 +58,11 @@ internal object BundledRustGl {
             summary = "APK-authenticated RustGL bundle ${release.version} · GLES",
             minMCVer = null, maxMCVer = null, glName = gl.absolutePath, eglName = gl.absolutePath,
             nativeLibDir = directory.absolutePath,
-            env = RustGlBackendPolicy.environment(emptyMap()),
+            env = RustGlBackendPolicy.environment(mapOf(
+                "RENDERER_SPOOF_GL" to "1", "MESA_GL_VERSION_OVERRIDE" to "4.4",
+                "MESA_GLSL_VERSION_OVERRIDE" to "330", "LIB_MESA_NAME" to "",
+                "JAVA_TOOL_OPTIONS" to "-Dorg.lwjgl.util.NoChecks=true"
+            )),
             dlopen = emptyList(), metadataVersion = 2,
             initializeBundle = { initialize ->
                 val attempt = storage.beginInit(release)
