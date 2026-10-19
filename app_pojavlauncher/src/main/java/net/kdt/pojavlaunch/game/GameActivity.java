@@ -392,6 +392,7 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
 
     @Override
     protected void onPause() {
+        if (touchCharInput != null) touchCharInput.setKeyboardState(false);
         ContextExecutor.clearActivity();
         hideGameMenu();
         mGyroControl.disable();

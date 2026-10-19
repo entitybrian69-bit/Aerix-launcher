@@ -6,6 +6,10 @@ import static android.content.Context.INPUT_METHOD_SERVICE;
 import static net.kdt.pojavlaunch.game.platform.Platform.PLATFORM;
 
 import android.content.Context;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.ResultReceiver;
+import android.os.Bundle;
 import android.text.Editable;
 import android.text.Selection;
 import android.util.AttributeSet;
@@ -17,6 +21,8 @@ import android.view.inputmethod.InputConnectionWrapper;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 
 import net.kdt.pojavlaunch.R;
 
@@ -43,6 +49,82 @@ public class TouchCharInput extends androidx.appcompat.widget.AppCompatEditText 
     private final ChatTextMirror mTextMirror = new ChatTextMirror(TEXT_FILLER);
     private int mImeBatchDepth;
     private int mInputConnectionGeneration;
+    private boolean mKeyboardRequested;
+    private int mKeyboardRequestGeneration;
+    private int mShowAttempts;
+    private boolean mShowScheduled;
+    private boolean mImeShown;
+    private static final int MAX_SHOW_ATTEMPTS = 10;
+    private static final long SHOW_RETRY_MS = 200;
+    private final Runnable mShowKeyboard = this::tryShowKeyboard;
+
+    private void cancelShowRequest() {
+        removeCallbacks(mShowKeyboard);
+        mShowScheduled = false;
+    }
+
+    private void scheduleShow(long delay) {
+        if (!mKeyboardRequested || mImeShown || mShowScheduled || mShowAttempts >= MAX_SHOW_ATTEMPTS) return;
+        mShowScheduled = true;
+        postDelayed(mShowKeyboard, delay);
+    }
+
+    private void tryShowKeyboard() {
+        mShowScheduled = false;
+        // Window/attachment callbacks will resume the request. Never poll in the background.
+        if (!mKeyboardRequested || !isAttachedToWindow() || !hasWindowFocus() || !isShown()) return;
+        WindowInsetsCompat insets = ViewCompat.getRootWindowInsets(this);
+        if (insets != null && insets.isVisible(WindowInsetsCompat.Type.ime())) {
+            mImeShown = true;
+            return;
+        }
+        if (++mShowAttempts > MAX_SHOW_ATTEMPTS) return;
+        if (!hasFocus()) requestFocus();
+        if (hasFocus()) {
+            InputMethodManager imm = (InputMethodManager) getContext().getSystemService(INPUT_METHOD_SERVICE);
+            if (imm != null) {
+                // Do not restart an active connection on every retry: that discards composition.
+                if (mShowAttempts == 1 && !imm.isActive(this)) imm.restartInput(this);
+                final int generation = mKeyboardRequestGeneration;
+                imm.showSoftInput(this, InputMethodManager.SHOW_IMPLICIT,
+                        new ResultReceiver(new Handler(Looper.getMainLooper())) {
+                            @Override protected void onReceiveResult(int resultCode, Bundle data) {
+                                if (generation != mKeyboardRequestGeneration || !mKeyboardRequested) return;
+                                if (resultCode == InputMethodManager.RESULT_SHOWN ||
+                                        resultCode == InputMethodManager.RESULT_UNCHANGED_SHOWN) {
+                                    mImeShown = true;
+                                    cancelShowRequest();
+                                }
+                            }
+                        });
+            }
+        }
+        scheduleShow(SHOW_RETRY_MS);
+    }
+
+    private void requestKeyboard() {
+        if (!mKeyboardRequested || mShowAttempts >= MAX_SHOW_ATTEMPTS) {
+            mKeyboardRequestGeneration++;
+            mShowAttempts = 0;
+            mImeShown = false;
+        }
+        mKeyboardRequested = true;
+        enable();
+        // Let the visible, touch-focusable editor attach and register with the IME first.
+        scheduleShow(0);
+    }
+
+    @Override protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        scheduleShow(0);
+    }
+
+    @Override protected void onDetachedFromWindow() {
+        mKeyboardRequested = false;
+        mKeyboardRequestGeneration++;
+        cancelShowRequest();
+        super.onDetachedFromWindow();
+    }
 
     @Override
     public InputConnection onCreateInputConnection(EditorInfo outAttrs) {
@@ -95,13 +177,21 @@ public class TouchCharInput extends androidx.appcompat.widget.AppCompatEditText 
     }
 
     /**
-     * When we change from app to app, the keyboard gets disabled.
-     * So, we disable the object
+     * Keep the opening intent through transient window focus changes.
+     * Real activity pauses and explicit close/Back/Done dismiss the keyboard.
      */
     @Override
     public void onWindowFocusChanged(boolean hasWindowFocus) {
         super.onWindowFocusChanged(hasWindowFocus);
-        if (!hasWindowFocus) disable();
+        if (!hasWindowFocus) {
+            // IME/window transitions are not a request to erase or disable the editor.
+            cancelShowRequest();
+            mKeyboardRequestGeneration++;
+            mImeShown = false;
+        } else if (mKeyboardRequested) {
+            mShowAttempts = 0;
+            scheduleShow(0);
+        }
     }
 
     /**
@@ -122,27 +212,23 @@ public class TouchCharInput extends androidx.appcompat.widget.AppCompatEditText 
      * Toggle on and off the soft keyboard, depending of the state
      */
     public void switchKeyboardState(){
-        InputMethodManager imm = (InputMethodManager) getContext().getSystemService(INPUT_METHOD_SERVICE);
-        // Allow, regardless of whether or not a hardware keyboard is declared
-        if(hasFocus()){
-            disable();
-        }else{
-            enable();
-            imm.showSoftInput(this, InputMethodManager.SHOW_IMPLICIT);
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            post(this::switchKeyboardState);
+            return;
         }
+        // Focus may be temporarily missing even though an opening request is pending.
+        if (mKeyboardRequested) disable();
+        else requestKeyboard();
     }
 
-    /**
-     * Force keyboard state
-     */
+    /** Force the desired keyboard state; repeated open requests are idempotent. */
     public void setKeyboardState(boolean state){
-        InputMethodManager imm = (InputMethodManager) getContext().getSystemService(INPUT_METHOD_SERVICE);
-        if(!state){
-            disable();
-        }else{
-            enable();
-            imm.showSoftInput(this, InputMethodManager.SHOW_IMPLICIT);
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            post(() -> setKeyboardState(state));
+            return;
         }
+        if (state) requestKeyboard();
+        else disable();
     }
 
 
@@ -167,12 +253,19 @@ public class TouchCharInput extends androidx.appcompat.widget.AppCompatEditText 
     public void enable(){
         setEnabled(true);
         setFocusable(true);
+        setFocusableInTouchMode(true);
         setVisibility(VISIBLE);
         requestFocus();
     }
 
     /** Lose ability to exist, take focus and have some text being input */
     public void disable(){
+        mKeyboardRequested = false;
+        mKeyboardRequestGeneration++;
+        mImeShown = false;
+        cancelShowRequest();
+        InputMethodManager imm = (InputMethodManager) getContext().getSystemService(INPUT_METHOD_SERVICE);
+        if (imm != null && getWindowToken() != null) imm.hideSoftInputFromWindow(getWindowToken(), 0);
         flushTextChanges();
         mImeBatchDepth = 0;
         mInputConnectionGeneration++;
