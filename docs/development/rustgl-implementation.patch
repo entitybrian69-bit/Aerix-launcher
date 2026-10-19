@@ -67,7 +67,7 @@ index 0c21fdc..f10882e 100644
      }
  }
 diff --git a/app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/bridge/PojavPluginBridge.kt b/app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/bridge/PojavPluginBridge.kt
-index 79515e5..629d1cf 100644
+index 79515e5..802d2d8 100644
 --- a/app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/bridge/PojavPluginBridge.kt
 +++ b/app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/bridge/PojavPluginBridge.kt
 @@ -58,7 +58,8 @@ class AerixRendererPlugin(
@@ -113,10 +113,12 @@ index 79515e5..629d1cf 100644
      }
  
      companion object {
-@@ -125,6 +129,9 @@ object PojavPluginBridge {
+@@ -124,7 +128,10 @@ object PojavPluginBridge {
+         }
          val pm = context.packageManager
          val discovered = ArrayList<AerixRendererPlugin>()
-         val seen = HashSet<String>()
+-        val seen = HashSet<String>()
++        val seen = hashSetOf(net.kdt.pojavlaunch.aerix.renderer.BundledRustGl.PACKAGE)
 +        runCatching { net.kdt.pojavlaunch.aerix.renderer.BundledRustGl.discover(context) }
 +            .onFailure { Log.e("AerixRendererPlugin", "Bundled RustGL rejected", it) }
 +            .getOrNull()?.let { discovered.add(it); seen.add(it.packageName) }
