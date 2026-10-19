@@ -36,7 +36,7 @@ def supported_license(expression):
 def github_package_licenses(package, directory, destination):
     """Use the exact cargo-published VCS commit, never a moving branch or guessed tag."""
     vcs_path = directory / ".cargo_vcs_info.json"
-    repo = re.fullmatch(r"https://github.com/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+?)(?:\.git)?/?", package.get("repository") or "")
+    repo = re.match(r"https://github.com/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+?)(?:\.git)?(?:/|$)", package.get("repository") or "")
     if not repo or not vcs_path.is_file():
         return []
     vcs = json.loads(vcs_path.read_text())
@@ -108,7 +108,7 @@ def run(args):
         if not files:
             files = github_package_licenses(package, directory, evidence_dir)
         if not files:
-            raise ValueError(f"License text absent: {package['name']}")
+            raise ValueError(f"License text absent: {package['name']} {package['version']} repository={package.get('repository')} source={package['source']} vcs={(directory / '.cargo_vcs_info.json').exists()} entries={[p.name for p in directory.iterdir()][:30]}")
         evidence = []
         for i, path in enumerate(files):
             name = re.sub(r"[^A-Za-z0-9_.-]", "_", f"{package['name']}-{package['version']}-{i}-{path.name}")
