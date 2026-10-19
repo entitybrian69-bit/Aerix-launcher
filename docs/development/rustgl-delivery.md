@@ -99,7 +99,8 @@ beside a binary would not authenticate it.
   it cannot promise that arbitrary native code never crashes. Crashes after a successful
   EGL init are not automatically attributed/quarantined by this init-only mechanism.
 - No hot switch after GL/Vulkan handles are created. A false plugin init aborts the
-  current launch before JVM startup; changing native backends requires a fresh game
+  current launch before JVM startup. A process-wide failure flag refuses any further
+  renderer initialization in that game process; changing backends requires a fresh game
   process. No existing launcher-wide fallback behavior for non-plugin renderers is rewritten.
 - Fault-injection on real Android storage remains required, including full disk and
   power loss. Interrupted staging directories can remain; no unsafe live generation
