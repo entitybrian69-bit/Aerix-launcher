@@ -38,7 +38,7 @@ jobs:
       - name: Cache pinned Rust dependencies and compilation
         uses: actions/cache@v4
         with:
-          key: rustgl-eb225595-ndk29-api26-16k-${{ runner.os }}-${{ steps.rust-cache.outputs.version }}
+          key: rustgl-probe1-eb225595-ndk29-api26-16k-${{ runner.os }}-${{ steps.rust-cache.outputs.version }}
           path: |
             ~/.cargo/registry
             ~/.cargo/git
@@ -61,8 +61,9 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
+          export RUSTFLAGS="-Awarnings -C link-arg=-Wl,--export-dynamic"
           if ! cargo test --locked -p gl-compat --lib -- --test-threads=1 2>&1 | tee "$GITHUB_WORKSPACE/rustgl-compat.log"; then
-            detail=$(tail -c 16000 "$GITHUB_WORKSPACE/rustgl-compat.log" | sed 's/%/%25/g; s/\r//g' | tr '\n' '|')
+            detail=$(tail -c 3500 "$GITHUB_WORKSPACE/rustgl-compat.log" | sed 's/%/%25/g; s/\r//g' | tr '\n' '|')
             echo "::error title=RustGL compatibility tests::$detail"
             exit 1
           fi
@@ -75,7 +76,7 @@ jobs:
           sudo apt-get install -y libegl1-mesa-dev libgles2-mesa-dev
           (cd .cache/rustgl-source && cargo build --locked --release -p gl-compat)
           if ! python3 -u scripts/smoke_rustgl.py .cache/rustgl-source/target/release/librust_gl.so 2>&1 | tee rustgl-smoke.log; then
-            detail=$(tail -c 10000 rustgl-smoke.log | sed 's/%/%25/g; s/\r//g' | tr '\n' '|')
+            detail=$(tail -c 3500 rustgl-smoke.log | sed 's/%/%25/g; s/\r//g' | tr '\n' '|')
             echo "::error title=RustGL EGL smoke::$detail"
             exit 1
           fi

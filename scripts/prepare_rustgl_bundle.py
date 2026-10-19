@@ -49,6 +49,12 @@ def prepare(args):
             require(digest(path) == evidence["sha256"], "License evidence checksum mismatch")
             notices.append(f"\n--- {component['name']} {component['version']} ({component['licenseConclusion']}) ---\n" + path.read_text())
     require(notices, "License and copyright texts required")
+    for patch in audit.get("sourcePatches", []):
+        path = audit_path.parent / patch["file"]
+        require(path.resolve().is_relative_to(audit_path.parent) and not path.is_symlink(), "Patch evidence must stay in approval directory")
+        require(path.stat().st_size <= 128 * 1024 and digest(path) == patch["sha256"], "Source patch evidence checksum mismatch")
+        notices.append("\n--- Aerix source modifications, bundle " + args.version + " ---\n" +
+                       "Pinned upstream plus the following reviewed patch (SHA256 " + patch["sha256"] + "):\n" + path.read_text())
     notice_bytes = "".join(notices).encode()
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)

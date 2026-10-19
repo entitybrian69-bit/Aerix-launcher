@@ -84,8 +84,10 @@ def main(library):
         read(1, 1, 1, 1, 0x1908, 0x1401, pixel)
         if any(abs(a - b) > 2 for a, b in zip(pixel, (64, 128, 191, 255))):
             raise RuntimeError(f"Wrong clear/readback pixel: {list(pixel)}")
-        if get_error() != 0:
-            raise RuntimeError("GL error after extension queries and clear/readback")
+        error = get_error()
+        if error != 0:
+            raise RuntimeError(f"GL error 0x{error:04x} after extension queries and clear/readback")
+        clear_pixel = list(pixel)
         # Exercise desktop shader translation and real GLES compile/link, not just spoofed strings.
         create_shader = bind("glCreateShader", c.c_uint32, c.c_uint32)
         source = bind("glShaderSource", None, c.c_uint32, integer, c.POINTER(c.c_char_p), ints)
@@ -128,7 +130,7 @@ def main(library):
         check(current(display, surface, surface, context), "rebind context")
         clear(0x4000)
         read(1, 1, 1, 1, 0x1908, 0x1401, pixel)
-        if list(pixel) != [64, 128, 191, 255] or get_error() != 0:
+        if list(pixel) != clear_pixel or get_error() != 0:
             raise RuntimeError(f"Rebind/readback failed: {list(pixel)}")
         print("PASS: real EGL ES3 context, resolver, extension enumeration, RGBA clear/readback, desktop shader compile/link, swap and context rebind. Host Mesa only; not Android/gameplay validation.", flush=True)
     finally:
