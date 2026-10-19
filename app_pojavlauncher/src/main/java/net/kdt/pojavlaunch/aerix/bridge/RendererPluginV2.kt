@@ -26,7 +26,7 @@ internal object RendererPluginV2 {
             "armeabi-v7a", "armeabi" -> 1 to 40
             "x86_64" -> 2 to 62
             "x86" -> 1 to 3
-            else -> return false
+            else -> return@runCatching false
         }
         file.inputStream().use { input ->
             val bytes = ByteArray(20)
