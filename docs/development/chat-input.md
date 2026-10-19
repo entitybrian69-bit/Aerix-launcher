@@ -24,8 +24,8 @@ Android editor did not even own.
   not permission to delete unknown game text. Internal clear/reset operations never delete game
   text. Send/Done flushes pending text before Enter and consumes the editor action.
 - Input-connection generations prevent an old connection's batch completion from
-  flushing a newly restarted connection. Window focus gain no longer disables the
-  editor; focus loss still dismisses it as before.
+  flushing a newly restarted connection. Transient window focus loss no longer
+  disables or clears the editor. Real game-activity pauses explicitly dismiss it.
 
 Tests cover the pure mirror and real Android InputConnection calls under
 Robolectric, recording the platform text/key events with a fake game backend.
@@ -34,3 +34,25 @@ composition, emoji, Backspace, Done/Enter, keyboard hide/reopen and keyboard
 switching on real keyboards/devices. The bridge cannot read Minecraft's actual
 chat buffer or observe game-side cursor changes; it mirrors the current Android
 input session, not arbitrary external game editing.
+
+## Opening the keyboard under load
+
+Keyboard visibility is an explicit requested state, not a synonym for View focus.
+The editor is focusable in touch mode; opening is posted until it is attached,
+visible and window-focused. A busy IME gets at most ten attempts, 200 ms apart.
+An IME shown result or visible IME insets stops retries. An inactive input
+connection is restarted only once per opening attempt sequence, never repeatedly
+while composing. Repeated open requests share pending work; an explicit new open
+after the retry budget is exhausted may try again.
+
+Window focus loss cancels queued work while retaining the requested state and
+text; focus return resumes opening. Back/Done, explicit Close, activity pause and
+view detachment cancel opening so a delayed callback cannot reopen the keyboard
+in the background. Callback generations ignore stale IME results. Calls from the
+game thread are marshalled to the Android UI thread. No forced-keyboard mode,
+continuous polling or per-frame JNI requests are used.
+
+`KeyboardVisibilityTest` exercises busy-IME retries, cancellation, window-focus
+transitions, attachment, duplicate/toggle requests, stale results and UI-thread
+marshalling. These deterministic tests do not measure multiplayer frame rate or
+real low-end-device keyboard latency. Device confirmation remains necessary.

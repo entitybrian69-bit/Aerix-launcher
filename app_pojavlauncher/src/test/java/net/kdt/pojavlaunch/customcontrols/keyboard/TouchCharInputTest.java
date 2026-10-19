@@ -156,4 +156,16 @@ public class TouchCharInputTest {
         assertEquals(HISTORY + "hello", backend.chat.toString());
     }
 
+    @Test public void temporaryWindowFocusLossKeepsTypedMessageAndEditorEnabled() {
+        connection.commitText("hello friends", 1);
+        String editorText = input.getText().toString();
+        input.onWindowFocusChanged(false);
+        assertTrue(input.isEnabled());
+        assertEquals(editorText, input.getText().toString());
+        input.onWindowFocusChanged(true);
+        connection.commitText(" ", 1);
+        assertEquals(HISTORY + "hello friends ", backend.chat.toString());
+        assertEquals(0, backend.deletes);
+    }
+
 }
