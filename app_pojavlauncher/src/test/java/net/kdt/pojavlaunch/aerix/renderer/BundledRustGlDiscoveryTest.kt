@@ -19,7 +19,7 @@ import java.io.File
 @Config(sdk = [28], application = Application::class)
 class BundledRustGlDiscoveryTest {
     private fun context(gles: Int): Application {
-        val app = RuntimeEnvironment.getApplication<Application>()
+        val app = RuntimeEnvironment.getApplication()
         val present = app.assets.list("renderer-bundles/rustgl")?.contains("index.json") == true
         if (System.getenv("GITHUB_ACTIONS") == "true") assertTrue("CI must build a real RustGL payload", present)
         assumeTrue("Generate source-built assets before running this integration test locally", present)
