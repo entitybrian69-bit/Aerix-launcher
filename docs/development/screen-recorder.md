@@ -24,19 +24,22 @@ badge and Android foreground-service controls remain available.
 MediaProjection feeds a hardware MediaCodec input Surface. Asynchronous codec
 callbacks mux encoded H.264 to MP4 on a background HandlerThread. No renderer
 hooks, CPU bitmap copies, editing/re-encoding pass or per-frame main-thread work.
-Both **in-game audio and microphone are mandatory**. Android 10+ playback capture
+Choose **game audio, microphone, or both**; the selection is remembered. Android 10+ playback capture
 is filtered to this application's UID and GAME/MEDIA/UNKNOWN usages, not other
-apps. A separate blocking read thread combines stereo game PCM and mono microphone
-PCM at 48 kHz with 50/50 integer mixing, then encodes stereo AAC-LC at 128 kbps.
+apps. A separate blocking read thread reads only selected sources at 48 kHz.
+Single-source recordings retain full gain; Both combines stereo game PCM and mono
+microphone PCM with 50/50 integer mixing. Output is stereo AAC-LC at 128 kbps.
 Video and audio tracks must both be ready before the muxer starts, with a bounded
 4 MB startup buffer. Stop drains both streams. Audio initialization/read/encoder
 failure aborts the session rather than saving a video-only fallback. AAC may use
 a software audio encoder; hardware-only selection applies to the H.264 video.
 
-Microphone permission is requested before screen-capture consent. The foreground
-service declares both mediaProjection and microphone types/permissions. Android
+Android RECORD_AUDIO permission is requested before screen-capture consent, even
+for game-only playback capture. The foreground service declares mediaProjection
+and microphone capabilities, but activates the microphone type only for a mode
+that actually uses the mic (on supported API levels). Android
 6–9 cannot provide this supported internal-audio path, so recording is unavailable
-there rather than falsely claiming both sources work. The launcher itself still
+there rather than claiming unsupported internal capture works. The launcher itself still
 supports those Android versions. Android privacy controls, audio capture policies,
 OEM restrictions, muted game audio and competing microphone users can silence a
 source even after APIs initialize; audible capture needs device confirmation.
