@@ -24,7 +24,23 @@ badge and Android foreground-service controls remain available.
 MediaProjection feeds a hardware MediaCodec input Surface. Asynchronous codec
 callbacks mux encoded H.264 to MP4 on a background HandlerThread. No renderer
 hooks, CPU bitmap copies, editing/re-encoding pass or per-frame main-thread work.
-The first implementation is **video only**, not microphone/internal-audio capture.
+Both **in-game audio and microphone are mandatory**. Android 10+ playback capture
+is filtered to this application's UID and GAME/MEDIA/UNKNOWN usages, not other
+apps. A separate blocking read thread combines stereo game PCM and mono microphone
+PCM at 48 kHz with 50/50 integer mixing, then encodes stereo AAC-LC at 128 kbps.
+Video and audio tracks must both be ready before the muxer starts, with a bounded
+4 MB startup buffer. Stop drains both streams. Audio initialization/read/encoder
+failure aborts the session rather than saving a video-only fallback. AAC may use
+a software audio encoder; hardware-only selection applies to the H.264 video.
+
+Microphone permission is requested before screen-capture consent. The foreground
+service declares both mediaProjection and microphone types/permissions. Android
+6–9 cannot provide this supported internal-audio path, so recording is unavailable
+there rather than falsely claiming both sources work. The launcher itself still
+supports those Android versions. Android privacy controls, audio capture policies,
+OEM restrictions, muted game audio and competing microphone users can silence a
+source even after APIs initialize; audible capture needs device confirmation.
+Headphones are recommended to avoid the microphone re-recording speaker output.
 
 Android 10+ writes directly to a pending Movies/Aerix MediaStore item and publishes
 after finalization. Android 6–9 writes to external app-specific Movies/Aerix; that
@@ -38,10 +54,12 @@ resizing during capture uses fixed output dimensions and can be letterboxed.
 
 ## Validation / limits
 
-Policy tests cover range/defaults, aspect/alignment, bitrate bounds and hardware
-filters. Android CI verifies compilation and the existing regression suite. A
+Policy tests cover range/defaults, aspect/alignment, bitrate bounds, hardware
+filters and PCM mixing/clipping. UI tests cover selectors, consent/denial, stop
+requests, indicators and microphone permission denial. Android CI verifies compilation and the existing regression suite. A
 real Android device is required to validate MediaProjection permission/revocation,
-actual H.264 encoder behavior, playable MP4 finalization, notification Stop,
+actual H.264/AAC behavior, audible game+microphone mixing and A/V sync, playable
+MP4 finalization, notification Stop,
 app-only capture, background/lock handling and device-specific encoder limits.
 The recorder requires at least 64 MB free to start and requests a graceful stop
 below 16 MB, checked off the UI thread every two seconds of video. Android 10+

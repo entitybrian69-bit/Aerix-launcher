@@ -220,7 +220,7 @@ class ScreenRecordingService : Service() {
             if (stopRequested) { finish(false, "Recording cancelled"); return }
             display = requireNotNull(projection!!.createVirtualDisplay("Aerix recorder", config.width, config.height,
                 resources.displayMetrics.densityDpi, DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR, surface, null, worker))
-            RecordingState.update(RecordingState.Phase.RECORDING, "${config.quality}p · ${config.fps} FPS target")
+            RecordingState.update(RecordingState.Phase.RECORDING, "${config.quality}p · ${config.fps} FPS target · game audio + mic")
         } catch (error: Exception) { finish(false, error.message ?: "Unable to start hardware recording") }
     }
 
