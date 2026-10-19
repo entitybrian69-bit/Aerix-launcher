@@ -66,8 +66,10 @@ class AerixRendererPlugin(
         if (!File(nativeLibDir).isDirectory) return false
         if (metadataVersion < 2) return true
         val gles = context.getSystemService(ActivityManager::class.java)?.deviceConfigurationInfo?.reqGlEsVersion ?: 0
-        return Build.VERSION.SDK_INT >= 26 && gles >= 0x30000 && File(glName).isFile &&
-            (eglName == "libEGL.so" || File(eglName).isFile)
+        val abi = (if (android.os.Process.is64Bit()) Build.SUPPORTED_64_BIT_ABIS else Build.SUPPORTED_32_BIT_ABIS).firstOrNull() ?: return false
+        return Build.VERSION.SDK_INT >= 26 && gles >= 0x30000 &&
+            RendererPluginV2.matchesElfAbi(File(glName), abi) &&
+            (eglName == "libEGL.so" || eglName == glName || RendererPluginV2.matchesElfAbi(File(eglName), abi))
     }
 
     override fun name(): String = displayName

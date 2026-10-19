@@ -19,6 +19,30 @@ internal object RendererPluginV2 {
         id.contains("zink", true) || id.contains("vulkan", true) ||
             env["MESA_LOADER_DRIVER_OVERRIDE"].orEmpty().trim().equals("zink", true)
 
+    /** Check the ELF class/machine against this process, not just the device's advertised ABIs. */
+    fun matchesElfAbi(file: File, abi: String): Boolean = runCatching {
+        val expected = when (abi) {
+            "arm64-v8a" -> 2 to 183
+            "armeabi-v7a", "armeabi" -> 1 to 40
+            "x86_64" -> 2 to 62
+            "x86" -> 1 to 3
+            else -> return false
+        }
+        file.inputStream().use { input ->
+            val bytes = ByteArray(20)
+            var offset = 0
+            while (offset < bytes.size) {
+                val count = input.read(bytes, offset, bytes.size - offset)
+                if (count <= 0) return@use false
+                offset += count
+            }
+            bytes[0] == 0x7f.toByte() && bytes[1] == 'E'.code.toByte() &&
+                bytes[2] == 'L'.code.toByte() && bytes[3] == 'F'.code.toByte() &&
+                bytes[4].toInt() == expected.first && bytes[5].toInt() == 1 &&
+                ((bytes[18].toInt() and 255) or ((bytes[19].toInt() and 255) shl 8)) == expected.second
+        }
+    }.getOrDefault(false)
+
     /** Resolve only packaged native libraries. A metadata marker is not a literal dlopen path. */
     fun nativeLibrary(value: String, directory: File, systemEgl: Boolean = false): String {
         if (systemEgl && value == "libEGL.so") return value

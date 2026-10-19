@@ -91,4 +91,28 @@ class RendererPluginV2Test {
         val config = RendererPluginV2.parse(metadata().apply { addProperty("rendererEGLPath", "libEGL.so") }.toString(), directory())
         assertEquals("libEGL.so", config.egl)
     }
+    @Test fun binaryAbiMustMatchTheActualProcessArchitecture() {
+        val library = File(directory(), "librust_gl.so")
+        val header = ByteArray(20).apply {
+            this[0] = 0x7f; this[1] = 'E'.code.toByte(); this[2] = 'L'.code.toByte(); this[3] = 'F'.code.toByte()
+            this[4] = 2; this[5] = 1; this[18] = 183.toByte()
+        }
+        library.writeBytes(header)
+        assertTrue(RendererPluginV2.matchesElfAbi(library, "arm64-v8a"))
+        assertFalse(RendererPluginV2.matchesElfAbi(library, "armeabi-v7a"))
+        assertFalse(RendererPluginV2.matchesElfAbi(library, "x86_64"))
+        header[4] = 1; header[18] = 40
+        library.writeBytes(header)
+        assertTrue(RendererPluginV2.matchesElfAbi(library, "armeabi-v7a"))
+        assertFalse(RendererPluginV2.matchesElfAbi(library, "arm64-v8a"))
+    }
+    @Test fun missingTruncatedOrNonElfLibrariesDoNotPassAbiChecks() {
+        val dir = directory()
+        assertFalse(RendererPluginV2.matchesElfAbi(File(dir, "missing.so"), "arm64-v8a"))
+        val file = File(dir, "librust_gl.so")
+        assertFalse(RendererPluginV2.matchesElfAbi(file, "arm64-v8a"))
+        file.writeText("This is not an ELF binary even if its filename ends with .so")
+        assertFalse(RendererPluginV2.matchesElfAbi(file, "arm64-v8a"))
+    }
+
 }

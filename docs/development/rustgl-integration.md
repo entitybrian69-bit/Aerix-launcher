@@ -4,7 +4,7 @@
 
 Aerix reads RendererPlugin-v2 JSON metadata (`fclPlugin_V2`) from installed
 plugins, resolves `**|` native path markers, applies supported environment defaults,
-checks extracted native libraries/GLES 3/Android 8+, and registers the real plugin
+checks extracted ELF architecture against the current process/GLES 3/Android 8+, and registers the real plugin
 through the existing renderer cache and launch override. Legacy plugins remain
 supported. A blank Mesa-driver override no longer incorrectly selects Vulkan EGL
 setup. The application explicitly declares package visibility for RustGL.
