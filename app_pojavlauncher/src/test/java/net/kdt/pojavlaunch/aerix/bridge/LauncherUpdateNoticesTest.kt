@@ -12,7 +12,7 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [29], application = Application::class)
 class LauncherUpdateNoticesTest {
-    private val context get() = RuntimeEnvironment.getApplication<Application>()
+    private val context get() = RuntimeEnvironment.getApplication()
     private fun version(value: String) = LauncherVersion.parse(value)
     private fun release(value: String) = LauncherRelease(value, version(value)!!, "Changes", LauncherUpdateAsset("app.apk", "", 1, null))
     @Before fun clear() { context.getSharedPreferences("aerix_update_notices", 0).edit().clear().commit() }
