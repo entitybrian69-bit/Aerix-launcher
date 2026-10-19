@@ -101,4 +101,9 @@ public class ChatTextMirrorTest {
         mirror.changed(" ", 0, PAD.length(), 1);
         expect(0, " ");
     }
+    @Test public void bulkPaddingRemovalCannotEraseUnknownChatEvenOutsideBatch() {
+        mirror.changed("", 0, PAD.length(), 0);
+        expect(0, "");
+    }
+
 }

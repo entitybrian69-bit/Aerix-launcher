@@ -48,9 +48,10 @@ final class ChatTextMirror {
         }
         padding = Math.min(padding, value.length());
         text = value.substring(padding);
-        if (wasEmpty && text.isEmpty() && inserted == 0) {
-            // Preserve deliberate backspace into chat that predates this keyboard session.
-            historyDeletes += oldPadding - padding;
+        if (wasEmpty && text.isEmpty() && inserted == 0 && oldPadding - padding == 1) {
+            // A normal Backspace can edit earlier chat after reopening the keyboard.
+            // Bulk removal of virtual padding is an IME reset, not thirty real deletions.
+            historyDeletes++;
         }
         // A delete-and-reinsert IME transaction must never erase unknown game chat history.
         if (!text.isEmpty()) historyDeletes = 0;

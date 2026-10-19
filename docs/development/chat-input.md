@@ -19,8 +19,9 @@ Android editor did not even own.
 - Explicit IME batch edits are reconciled at the outermost end, including a
   delete-then-reinsert transaction. Transient empty buffers are not refilled in
   the middle of the transaction.
-- Deliberate backspace into the virtual padding still deletes earlier game chat
-  after reopening the keyboard. Internal clear/reset operations never delete game
+- Single-character Backspace into the virtual padding still deletes earlier game chat
+  after reopening the keyboard. Bulk padding removal is treated as an IME reset,
+  not permission to delete unknown game text. Internal clear/reset operations never delete game
   text. Send/Done flushes pending text before Enter and consumes the editor action.
 - Input-connection generations prevent an old connection's batch completion from
   flushing a newly restarted connection. Window focus gain no longer disables the
