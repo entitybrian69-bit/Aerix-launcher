@@ -1,4 +1,9 @@
-# RustGL integration: experimental external-plugin adapter
+# RustGL integration: experimental renderer support
+
+See [implementation delivery](rustgl-delivery.md), [compliance review](rustgl-compliance.md)
+and [phone benchmark protocol](rustgl-benchmark.md) for the new bundle lifecycle and
+Vulkan diagnostic. No approved native payload is included; the external path below
+remains available.
 
 ## What this change does
 

@@ -510,6 +510,8 @@ private fun RendererTabContent(activity: FragmentActivity) {
             }
         }
 
+        item { VulkanCapabilityCard(activity) }
+
         // 3. Compact Footer Updater Card (Mirai RendererSettingsScreen lines 428-469)
         item {
             Surface(
@@ -753,6 +755,34 @@ private fun RendererTabContent(activity: FragmentActivity) {
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun VulkanCapabilityCard(activity: FragmentActivity) {
+    var probing by remember { mutableStateOf(false) }
+    var report by remember { mutableStateOf<String?>(null) }
+    Surface(shape = RoundedCornerShape(AerixRadii.control), color = AerixSurface.panel) {
+        Column(Modifier.fillMaxWidth().padding(AerixSpacing.mdPlus), verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm)) {
+            Text("System Vulkan diagnostics", style = MaterialTheme.typography.titleSmall)
+            Text("Isolated capability check only. Does not enable or validate RustGL Vulkan rendering.", style = MaterialTheme.typography.bodySmall)
+            Button(enabled = !probing, onClick = {
+                probing = true
+                net.kdt.pojavlaunch.aerix.renderer.VulkanProbeClient.query(activity) {
+                    report = "Device: ${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}\nAndroid: ${android.os.Build.VERSION.SDK_INT}\nDriver source: system\n$it"
+                    probing = false
+                }
+            }) { Text(if (probing) "Checking…" else "Check system Vulkan") }
+        }
+    }
+    report?.let { result ->
+        AlertDialog(onDismissRequest = { report = null }, title = { Text("Vulkan capability report") },
+            text = { Column(Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState())) { Text(result) } },
+            confirmButton = { TextButton(onClick = {
+                val clipboard = activity.getSystemService(android.content.ClipboardManager::class.java)
+                clipboard?.setPrimaryClip(android.content.ClipData.newPlainText("Aerix Vulkan capability report", result))
+            }) { Text("Copy report") } },
+            dismissButton = { TextButton(onClick = { report = null }) { Text("Close") } })
     }
 }
 
