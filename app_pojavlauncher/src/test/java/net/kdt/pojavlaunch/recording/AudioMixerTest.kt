@@ -29,4 +29,25 @@ class AudioMixerTest {
     @Test(expected = IllegalArgumentException::class) fun rejectsUndersizedOutputBuffer() {
         AudioMixer.mix(shortArrayOf(1, 2), shortArrayOf(3), 1, ByteBuffer.allocate(2))
     }
+    @Test fun gameOnlyPreservesStereoAtFullVolumeAndNeedsNoMicrophoneBuffer() {
+        val output = ByteBuffer.allocate(8).order(ByteOrder.LITTLE_ENDIAN)
+        AudioMixer.mix(shortArrayOf(12000, -8000, 32767, -32768), shortArrayOf(), 2, output, RecordingOptions.AudioSource.GAME)
+        output.flip()
+        assertArrayEquals(shortArrayOf(12000, -8000, 32767, -32768), ShortArray(4) { output.short })
+    }
+    @Test fun microphoneOnlyPreservesFullVolumeAndNeedsNoGameBuffer() {
+        val output = ByteBuffer.allocate(8).order(ByteOrder.LITTLE_ENDIAN)
+        AudioMixer.mix(shortArrayOf(), shortArrayOf(12000, -32768), 2, output, RecordingOptions.AudioSource.MICROPHONE)
+        output.flip()
+        assertArrayEquals(shortArrayOf(12000, 12000, -32768, -32768), ShortArray(4) { output.short })
+    }
+    @Test fun sourcePolicyDoesNotEnableUnselectedHardware() {
+        assertTrue(RecordingOptions.AudioSource.GAME.game)
+        assertFalse(RecordingOptions.AudioSource.GAME.microphone)
+        assertFalse(RecordingOptions.AudioSource.MICROPHONE.game)
+        assertTrue(RecordingOptions.AudioSource.MICROPHONE.microphone)
+        assertTrue(RecordingOptions.AudioSource.BOTH.game && RecordingOptions.AudioSource.BOTH.microphone)
+        assertEquals(RecordingOptions.AudioSource.BOTH, RecordingOptions.AudioSource.saved("invalid"))
+    }
+
 }

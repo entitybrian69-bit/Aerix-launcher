@@ -69,3 +69,21 @@ No claim of zero lag, guaranteed 120 FPS or measured low-end performance is made
 Test short 240p/15 and 480p/24 clips before raising settings; monitor heat, FPS,
 free space and output playback. Kill/power loss can leave a pending/unfinished
 recording; it must not be advertised as a successfully saved video.
+
+## Selectable audio sources
+
+The recorder now offers **Game audio**, **Microphone**, and **Game audio +
+microphone**. The choice is saved separately from resolution/FPS and is passed
+through the consent flow to the service. Both remains the default for existing
+users. Game-only creates no microphone AudioRecord and requests no microphone
+foreground-service type; microphone-only creates no playback-capture AudioRecord.
+Android's RECORD_AUDIO runtime permission is still required in every mode,
+including playback capture. Single-source output retains full volume; Both uses
+the existing 50/50 mix. No automatic switch to another source on failure.
+
+The game process explicitly permits playback capture before Minecraft initializes
+its audio backend. Own-UID matching remains in place so unrelated apps are not
+recorded. This does not override a native backend's per-player capture policy,
+Android/OEM restrictions, or muted Minecraft audio. A user report of silent game
+audio cannot be confirmed fixed without an on-device test: compare Game audio
+with Both while audible Minecraft sound plays, preferably with headphones.

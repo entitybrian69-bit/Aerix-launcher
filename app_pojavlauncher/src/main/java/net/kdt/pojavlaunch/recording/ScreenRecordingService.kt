@@ -56,6 +56,7 @@ class ScreenRecordingService : Service() {
     private var muxerStarted = false
     private var track = -1
     private var samples = 0L
+    private var audioSource = RecordingOptions.AudioSource.BOTH
     private var audioSamples = 0L
     private var audioTrack = -1
     private var audio: RecordingAudio? = null
@@ -130,8 +131,11 @@ class ScreenRecordingService : Service() {
             check(ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
                 "Microphone/audio permission is required"
             }
+            val selectedAudio = intent.getStringExtra("audio_source") ?: RecordingOptions.AudioSource.BOTH.name
+            audioSource = RecordingOptions.AudioSource.entries.firstOrNull { it.name == selectedAudio }
+                ?: error("Invalid recording audio source")
             val types = ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION or
-                (if (Build.VERSION.SDK_INT >= 30) ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE else 0)
+                (if (Build.VERSION.SDK_INT >= 30 && audioSource.microphone) ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE else 0)
             startForeground(NOTIFICATION, notification(), types)
             RecordingState.update(RecordingState.Phase.STARTING)
             val token = if (Build.VERSION.SDK_INT >= 33) intent.getParcelableExtra("consent", Intent::class.java)
@@ -139,7 +143,7 @@ class ScreenRecordingService : Service() {
             requireNotNull(token) { "Screen recording permission missing" }
             val config = RecordingOptions.Config(intent.getIntExtra("quality", 480), intent.getIntExtra("fps", 24),
                 intent.getIntExtra("width", 0), intent.getIntExtra("height", 0),
-                intent.getIntExtra("bitrate", 0), intent.getStringExtra("encoder") ?: "")
+                intent.getIntExtra("bitrate", 0), intent.getStringExtra("encoder") ?: "", audioSource)
             require(config.quality in RecordingOptions.qualities && config.fps in RecordingOptions.frameRates &&
                 config.width > 0 && config.height > 0 && config.bitrate > 0 && config.encoder.isNotEmpty())
             worker.post { begin(token, config) }
@@ -200,7 +204,7 @@ class ScreenRecordingService : Service() {
             projection = requireNotNull(getSystemService(MediaProjectionManager::class.java)
                 .getMediaProjection(Activity.RESULT_OK, token))
             projection!!.registerCallback(projectionCallback, worker)
-            audio = RecordingAudio(this, worker, epochUs, object : RecordingAudio.Listener {
+            audio = RecordingAudio(this, worker, epochUs, config.audioSource, object : RecordingAudio.Listener {
                 override fun format(format: MediaFormat) {
                     if (completed) return
                     try {
@@ -219,7 +223,7 @@ class ScreenRecordingService : Service() {
             if (stopRequested) { finish(false, "Recording cancelled"); return }
             display = requireNotNull(projection!!.createVirtualDisplay("Aerix recorder", config.width, config.height,
                 resources.displayMetrics.densityDpi, DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR, surface, null, worker))
-            RecordingState.update(RecordingState.Phase.RECORDING, "${config.quality}p · ${config.fps} FPS target · game audio + mic")
+            RecordingState.update(RecordingState.Phase.RECORDING, "${config.quality}p · ${config.fps} FPS target · ${config.audioSource.label}")
         } catch (error: Exception) { finish(false, error.message ?: "Unable to start hardware recording") }
     }
 
@@ -272,7 +276,7 @@ class ScreenRecordingService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val builder = if (Build.VERSION.SDK_INT >= 26) Notification.Builder(this, CHANNEL) else @Suppress("DEPRECATION") Notification.Builder(this)
         return builder.setSmallIcon(R.drawable.aerix_ic_record).setContentTitle("Aerix screen recording")
-            .setContentText("Game audio + microphone · tap Stop to save").setOngoing(true)
+            .setContentText("${audioSource.label} · tap Stop to save").setOngoing(true)
             .addAction(Notification.Action.Builder(android.R.drawable.ic_media_pause, "Stop recording", stop).build()).build()
     }
 

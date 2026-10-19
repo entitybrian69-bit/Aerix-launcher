@@ -57,9 +57,11 @@ class RecorderControllerTest {
     @Test fun separateSelectorsShowEveryRequestedChoiceAndDefaultTo480p24() {
         val dialog = options()
         val spinners = allSpinners(dialog.window!!.decorView)
-        assertEquals(2, spinners.size)
+        assertEquals(3, spinners.size)
         assertEquals(5, spinners[0].count)
         assertEquals(7, spinners[1].count)
+        assertEquals(3, spinners[2].count)
+        assertEquals("Game audio + microphone", spinners[2].selectedItem)
         assertEquals("480p", spinners[0].selectedItem)
         assertEquals("24 FPS", spinners[1].selectedItem)
         assertTrue(dialog.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled)
@@ -136,6 +138,27 @@ class RecorderControllerTest {
         assertTrue(controller.onRequestPermissionsResult(RecorderController.REQUEST_AUDIO, intArrayOf(PackageManager.PERMISSION_GRANTED)))
         assertEquals(RecorderController.REQUEST_CAPTURE, shadowOf(activity).nextStartedActivityForResult.requestCode)
         assertNull(shadowOf(activity.application).nextStartedService)
+    }
+
+    @Test fun everyAudioSourceIsSavedAndPassedToTheService() {
+        for (source in RecordingOptions.AudioSource.entries) {
+            val dialog = options()
+            allSpinners(dialog.window!!.decorView)[2].setSelection(source.ordinal)
+            idle()
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+            idle()
+            assertEquals(RecorderController.REQUEST_CAPTURE, shadowOf(activity).nextStartedActivityForResult.requestCode)
+            controller.onActivityResult(RecorderController.REQUEST_CAPTURE, Activity.RESULT_OK, Intent("test-consent"))
+            assertEquals(source.name, shadowOf(activity.application).nextStartedService.getStringExtra("audio_source"))
+            assertEquals(source.name, activity.getSharedPreferences("aerix_recorder", 0).getString("audio_source", null))
+        }
+    }
+
+    @Test fun audioSourceSelectionSurvivesControllerRecreation() {
+        activity.getSharedPreferences("aerix_recorder", 0).edit().putString("audio_source", "GAME").commit()
+        controller.destroy()
+        controller = RecorderController(activity)
+        assertEquals("Game audio", allSpinners(options().window!!.decorView)[2].selectedItem)
     }
 
 }

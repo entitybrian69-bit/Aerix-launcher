@@ -128,6 +128,12 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        // Explicit process policy before Minecraft creates its native audio tracks.
+        // Per-track/backend restrictions and OEM privacy controls can still disallow capture.
+        if (android.os.Build.VERSION.SDK_INT >= 29) {
+            android.media.AudioManager audioManager = getSystemService(android.media.AudioManager.class);
+            if (audioManager != null) audioManager.setAllowedCapturePolicy(android.media.AudioAttributes.ALLOW_CAPTURE_BY_ALL);
+        }
         instance = Instances.loadSelectedInstance();
         account = Accounts.getCurrent();
         if(instance == null) {

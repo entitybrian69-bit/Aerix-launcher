@@ -13,10 +13,10 @@ import androidx.core.content.ContextCompat
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 
-/** Two AudioRecords, one small PCM mixer and one AAC encoder; video never runs on this read thread. */
+/** Opens only the selected sources. PCM/mixing and AAC input stay off the video thread. */
 @RequiresApi(29)
 internal class RecordingAudio(private val context: Context, private val handler: Handler,
-                              private val epochUs: Long, private val listener: Listener) {
+                              private val epochUs: Long, private val source: RecordingOptions.AudioSource, private val listener: Listener) {
     interface Listener {
         fun format(format: MediaFormat)
         fun sample(codec: MediaCodec, index: Int, info: MediaCodec.BufferInfo)
@@ -33,22 +33,25 @@ internal class RecordingAudio(private val context: Context, private val handler:
 
     fun start(projection: MediaProjection) {
         check(ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
-            "Microphone/audio capture permission is required"
+            "Audio capture permission is required"
         }
         val stereo = AudioFormat.Builder().setSampleRate(RATE).setEncoding(AudioFormat.ENCODING_PCM_16BIT)
             .setChannelMask(AudioFormat.CHANNEL_IN_STEREO).build()
         val mono = AudioFormat.Builder().setSampleRate(RATE).setEncoding(AudioFormat.ENCODING_PCM_16BIT)
             .setChannelMask(AudioFormat.CHANNEL_IN_MONO).build()
-        val capture = AudioPlaybackCaptureConfiguration.Builder(projection)
-            .addMatchingUid(android.os.Process.myUid())
-            .addMatchingUsage(AudioAttributes.USAGE_GAME).addMatchingUsage(AudioAttributes.USAGE_MEDIA)
-            .addMatchingUsage(AudioAttributes.USAGE_UNKNOWN).build()
-        game = AudioRecord.Builder().setAudioFormat(stereo).setAudioPlaybackCaptureConfig(capture)
-            .setBufferSizeInBytes(maxOf(16384, AudioRecord.getMinBufferSize(RATE, AudioFormat.CHANNEL_IN_STEREO, AudioFormat.ENCODING_PCM_16BIT))).build()
-        mic = AudioRecord.Builder().setAudioFormat(mono).setAudioSource(MediaRecorder.AudioSource.MIC)
+        if (source.game) {
+            val capture = AudioPlaybackCaptureConfiguration.Builder(projection)
+                .addMatchingUid(android.os.Process.myUid())
+                .addMatchingUsage(AudioAttributes.USAGE_GAME).addMatchingUsage(AudioAttributes.USAGE_MEDIA)
+                .addMatchingUsage(AudioAttributes.USAGE_UNKNOWN).build()
+            game = AudioRecord.Builder().setAudioFormat(stereo).setAudioPlaybackCaptureConfig(capture)
+                .setBufferSizeInBytes(maxOf(16384, AudioRecord.getMinBufferSize(RATE, AudioFormat.CHANNEL_IN_STEREO, AudioFormat.ENCODING_PCM_16BIT))).build()
+        }
+        if (source.microphone) mic = AudioRecord.Builder().setAudioFormat(mono).setAudioSource(MediaRecorder.AudioSource.MIC)
             .setBufferSizeInBytes(maxOf(8192, AudioRecord.getMinBufferSize(RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT))).build()
-        check(game!!.state == AudioRecord.STATE_INITIALIZED && mic!!.state == AudioRecord.STATE_INITIALIZED) {
-            "Device cannot initialize both game audio and microphone"
+        check((!source.game || game?.state == AudioRecord.STATE_INITIALIZED) &&
+            (!source.microphone || mic?.state == AudioRecord.STATE_INITIALIZED)) {
+            "Device cannot initialize ${source.label}"
         }
         encoder = MediaCodec.createEncoderByType("audio/mp4a-latm")
         encoder!!.setCallback(object : MediaCodec.Callback() {
@@ -74,9 +77,10 @@ internal class RecordingAudio(private val context: Context, private val handler:
             setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, FRAMES * 4)
         }, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
         encoder!!.start()
-        game!!.startRecording(); mic!!.startRecording()
-        check(game!!.recordingState == AudioRecord.RECORDSTATE_RECORDING && mic!!.recordingState == AudioRecord.RECORDSTATE_RECORDING) {
-            "Both game audio and microphone must be available"
+        game?.startRecording(); mic?.startRecording()
+        check((!source.game || game?.recordingState == AudioRecord.RECORDSTATE_RECORDING) &&
+            (!source.microphone || mic?.recordingState == AudioRecord.RECORDSTATE_RECORDING)) {
+            "${source.label} must be available"
         }
         reader = Thread({ readLoop() }, "Aerix audio capture").apply { start() }
     }
@@ -97,13 +101,14 @@ internal class RecordingAudio(private val context: Context, private val handler:
             return offset == buffer.size
         }
         try {
-            while (!stopping && !closed && read(game!!, gamePcm) && read(mic!!, micPcm)) {
+            while (!stopping && !closed && (!source.game || read(game!!, gamePcm)) &&
+                (!source.microphone || read(mic!!, micPcm))) {
                 var index: Int? = null
                 while (index == null && !stopping && !closed) index = indices.poll(100, TimeUnit.MILLISECONDS)
                 if (index == null || closed) break
                 val codec = encoder ?: break
                 val input = requireNotNull(codec.getInputBuffer(index)).apply { clear() }
-                AudioMixer.mix(gamePcm, micPcm, FRAMES, input)
+                AudioMixer.mix(gamePcm, micPcm, FRAMES, input, source)
                 codec.queueInputBuffer(index, 0, FRAMES * 4, startUs + submitted * 1_000_000 / RATE, 0)
                 submitted += FRAMES
             }

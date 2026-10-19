@@ -60,7 +60,7 @@ class RecorderController(private val activity: Activity) {
 
     fun show() {
         if (Build.VERSION.SDK_INT < 29) {
-            toast("Game audio + microphone recording requires Android 10 or newer")
+            toast("Screen recording with audio requires Android 10 or newer")
             return
         }
         if (disposed || dialog?.isShowing == true) return
@@ -105,9 +105,14 @@ class RecorderController(private val activity: Activity) {
         // Every requested value is shown; unsupported choices cannot enable Start.
         fps.adapter = ArrayAdapter(activity, android.R.layout.simple_spinner_dropdown_item,
             RecordingOptions.frameRates.map { "$it FPS" })
+        label("Audio source")
+        val audioSource = Spinner(activity).also { body.addView(it) }
+        audioSource.adapter = ArrayAdapter(activity, android.R.layout.simple_spinner_dropdown_item,
+            RecordingOptions.AudioSource.entries.map { it.label })
+        audioSource.setSelection(RecordingOptions.AudioSource.saved(prefs.getString("audio_source", null)).ordinal)
         val info = label("")
         val saveLocation = if (Build.VERSION.SDK_INT >= 29) "Movies/Aerix" else "this app's Movies/Aerix folder (removed on uninstall)"
-        label("Game audio + microphone are recorded together. Microphone permission is required. Use headphones to avoid speaker echo; Android privacy controls or capture restrictions may silence a source.\nSaves to $saveLocation.\nHigher settings add load and heat. FPS is a target, not a guarantee; 120 FPS cannot add frames the game/capture never produces.\nAndroid may capture notifications or other content: choose app-only capture if offered. Recording stops when you leave the game.")
+        label("Choose game audio, microphone, or both. Android audio permission is required for every mode, including internal game audio. Game-only never opens the microphone. For both, use headphones to avoid echo. If game sound is missing, check Minecraft volume; device or audio-backend restrictions can block internal capture.\nSaves to $saveLocation.\nHigher settings add load and heat. FPS is a target, not a guarantee; 120 FPS cannot add frames the game/capture never produces.\nAndroid may capture notifications or other content: choose app-only capture if offered. Recording stops when you leave the game.")
         val preferred = configs.firstOrNull { it.quality == prefs.getInt("quality", 480) && it.fps == prefs.getInt("fps", 24) }
             ?: configs.firstOrNull { it.quality == 480 && it.fps == 24 } ?: configs.first()
         quality.setSelection(RecordingOptions.qualities.indexOf(preferred.quality))
@@ -135,8 +140,10 @@ class RecorderController(private val activity: Activity) {
             refresh()
             created.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                 val option = selected() ?: return@setOnClickListener
-                prefs.edit().putInt("quality", option.quality).putInt("fps", option.fps).apply()
-                pending = option
+                val source = RecordingOptions.AudioSource.entries[audioSource.selectedItemPosition]
+                prefs.edit().putInt("quality", option.quality).putInt("fps", option.fps)
+                    .putString("audio_source", source.name).apply()
+                pending = option.copy(audioSource = source)
                 created.dismiss()
                 if (ContextCompat.checkSelfPermission(activity, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
                     ActivityCompat.requestPermissions(activity, arrayOf(Manifest.permission.RECORD_AUDIO), REQUEST_AUDIO)
@@ -157,7 +164,7 @@ class RecorderController(private val activity: Activity) {
     fun onRequestPermissionsResult(requestCode: Int, grants: IntArray): Boolean {
         if (requestCode != REQUEST_AUDIO) return false
         if (!disposed && pending != null && grants.isNotEmpty() && grants[0] == PackageManager.PERMISSION_GRANTED) requestCaptureConsent()
-        else { pending = null; if (!disposed) toast("Microphone permission is required; recording cancelled") }
+        else { pending = null; if (!disposed) toast("Audio recording permission is required; recording cancelled") }
         return true
     }
 
@@ -172,7 +179,7 @@ class RecorderController(private val activity: Activity) {
         val intent = Intent(activity, ScreenRecordingService::class.java).setAction(ScreenRecordingService.START)
             .putExtra("consent", data).putExtra("quality", option.quality).putExtra("fps", option.fps)
             .putExtra("width", option.width).putExtra("height", option.height).putExtra("bitrate", option.bitrate)
-            .putExtra("encoder", option.encoder)
+            .putExtra("encoder", option.encoder).putExtra("audio_source", option.audioSource.name)
         try { startRequested = true; ContextCompat.startForegroundService(activity, intent) }
         catch (error: Exception) { startRequested = false; toast("Cannot start recorder: ${error.message}") }
         return true

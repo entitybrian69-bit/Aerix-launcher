@@ -12,9 +12,18 @@ object RecordingOptions {
     const val DEFAULT_QUALITY = 480
     const val DEFAULT_FPS = 24
 
+    enum class AudioSource(val label: String, val game: Boolean, val microphone: Boolean) {
+        GAME("Game audio", true, false),
+        MICROPHONE("Microphone", false, true),
+        BOTH("Game audio + microphone", true, true);
+        companion object {
+            fun saved(value: String?): AudioSource = entries.firstOrNull { it.name == value } ?: BOTH
+        }
+    }
+
     data class Size(val width: Int, val height: Int)
     data class Config(val quality: Int, val fps: Int, val width: Int, val height: Int,
-                      val bitrate: Int, val encoder: String)
+                      val bitrate: Int, val encoder: String, val audioSource: AudioSource = AudioSource.BOTH)
 
     fun size(screenWidth: Int, screenHeight: Int, quality: Int, widthAlignment: Int, heightAlignment: Int): Size {
         require(screenWidth > 0 && screenHeight > 0 && quality in qualities)

@@ -51,16 +51,16 @@ internal val teamReleases = listOf(TeamRelease(
 internal fun OtherReleasesScreen(activity: FragmentActivity, navigate: (LauncherSection) -> Unit) {
     val accent = AerixThemeManager.currentAccent()
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-        LazyColumn(Modifier.widthIn(max = 1000.dp).fillMaxSize().padding(horizontal = 24.dp),
-            contentPadding = PaddingValues(top = 28.dp, bottom = 40.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp)) {
+        LazyColumn(Modifier.widthIn(max = 720.dp).fillMaxSize().padding(horizontal = 18.dp),
+            contentPadding = PaddingValues(top = 20.dp, bottom = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp)) {
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text("FROM TEAM AERIX", color = accent, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
                     Text("Our other new releases", color = AerixSurface.textPrimary,
-                        style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                        style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                     Text("More than a launcher. Explore our mods, modpacks, resource packs, shaders and world saves here as we release them.",
-                        color = AerixSurface.textSecondary, style = MaterialTheme.typography.bodyLarge)
+                        color = AerixSurface.textSecondary, style = MaterialTheme.typography.bodyMedium)
                 }
             }
             items(teamReleases, key = { it.slug }) { project -> TeamReleaseCard(activity, project, navigate) }
@@ -79,20 +79,20 @@ private fun TeamReleaseCard(activity: FragmentActivity, project: TeamRelease, na
     var opening by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val icon = rememberRemoteBitmap(project.iconUrl)
-    Surface(shape = RoundedCornerShape(28.dp), color = AerixSurface.panel) {
+    Surface(shape = RoundedCornerShape(22.dp), color = AerixSurface.panel) {
         Column(Modifier.background(Brush.verticalGradient(listOf(accent.copy(alpha = 0.13f), AerixSurface.panel)))
-            .padding(24.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
+            .padding(18.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             BoxWithConstraints {
                 val artwork: @Composable () -> Unit = {
                     Surface(shape = RoundedCornerShape(18.dp), color = accent.copy(alpha = 0.12f)) {
-                        if (icon != null) Image(icon, contentDescription = "${project.title} project logo", modifier = Modifier.size(72.dp).padding(8.dp))
+                        if (icon != null) Image(icon, contentDescription = "${project.title} project logo", modifier = Modifier.size(60.dp).padding(8.dp))
                         else Icon(painterResource(R.drawable.aerix_ic_public), contentDescription = null,
-                            tint = accent, modifier = Modifier.size(72.dp).padding(18.dp))
+                            tint = accent, modifier = Modifier.size(60.dp).padding(18.dp))
                     }
                 }
                 val heading: @Composable () -> Unit = {
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(project.title, style = MaterialTheme.typography.headlineSmall, color = AerixSurface.textPrimary, fontWeight = FontWeight.Bold)
+                        Text(project.title, style = MaterialTheme.typography.titleLarge, color = AerixSurface.textPrimary, fontWeight = FontWeight.Bold)
                         Text(project.badges, style = MaterialTheme.typography.labelLarge, color = accent)
                         Text(project.attribution, style = MaterialTheme.typography.bodyMedium, color = AerixSurface.textSecondary)
                     }
@@ -105,7 +105,7 @@ private fun TeamReleaseCard(activity: FragmentActivity, project: TeamRelease, na
             }
             Text(project.headline, style = MaterialTheme.typography.titleLarge, color = AerixSurface.textPrimary, fontWeight = FontWeight.SemiBold)
             Text(project.summary,
-                style = MaterialTheme.typography.bodyLarge, color = AerixSurface.textSecondary)
+                style = MaterialTheme.typography.bodyMedium, color = AerixSurface.textSecondary)
             project.features.forEach { (title, description) -> ReleaseFeature(title, description) }
             HorizontalDivider(color = AerixSurface.borderSoft)
             ReleaseFeature("Check compatibility first", project.compatibility)
