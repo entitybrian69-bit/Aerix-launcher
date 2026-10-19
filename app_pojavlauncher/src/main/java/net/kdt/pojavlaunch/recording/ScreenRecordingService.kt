@@ -62,7 +62,7 @@ class ScreenRecordingService : Service() {
     private var videoEnded = false
     private var audioEnded = false
     private var epochUs = 0L
-    private var videoBaseUs: Long? = null
+    private var timestamps = RecordingTimestamps(0)
     private data class Pending(val track: Int, val bytes: ByteArray, val pts: Long, val flags: Int)
     private val pendingSamples = ArrayList<Pending>()
     private var pendingBytes = 0
@@ -83,9 +83,7 @@ class ScreenRecordingService : Service() {
         check(trackIndex >= 0) { "Encoded data before track format" }
         val buffer = requireNotNull(codec.getOutputBuffer(index))
         buffer.position(source.offset); buffer.limit(source.offset + source.size)
-        if (!isAudio && videoBaseUs == null) videoBaseUs =
-            if (source.presentationTimeUs >= epochUs - 10_000_000) epochUs else source.presentationTimeUs
-        val pts = if (isAudio) source.presentationTimeUs else (source.presentationTimeUs - videoBaseUs!!).coerceAtLeast(0)
+        val pts = if (isAudio) timestamps.audio(source.presentationTimeUs) else timestamps.video(source.presentationTimeUs)
         val info = MediaCodec.BufferInfo().apply { set(source.offset, source.size, pts, source.flags) }
         if (muxerStarted) muxer!!.writeSampleData(trackIndex, buffer, info)
         else {
@@ -195,6 +193,7 @@ class ScreenRecordingService : Service() {
                 if (Build.VERSION.SDK_INT >= 29) setFloat(MediaFormat.KEY_MAX_FPS_TO_ENCODER, config.fps.toFloat())
             }
             epochUs = System.nanoTime() / 1000
+            timestamps = RecordingTimestamps(epochUs)
             codec!!.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
             surface = codec!!.createInputSurface()
             codec!!.start()
