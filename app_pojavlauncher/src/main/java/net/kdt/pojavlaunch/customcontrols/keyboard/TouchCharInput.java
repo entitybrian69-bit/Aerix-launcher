@@ -125,7 +125,6 @@ public class TouchCharInput extends androidx.appcompat.widget.AppCompatEditText 
         InputMethodManager imm = (InputMethodManager) getContext().getSystemService(INPUT_METHOD_SERVICE);
         // Allow, regardless of whether or not a hardware keyboard is declared
         if(hasFocus()){
-            clear();
             disable();
         }else{
             enable();
@@ -139,7 +138,6 @@ public class TouchCharInput extends androidx.appcompat.widget.AppCompatEditText 
     public void setKeyboardState(boolean state){
         InputMethodManager imm = (InputMethodManager) getContext().getSystemService(INPUT_METHOD_SERVICE);
         if(!state){
-            clear();
             disable();
         }else{
             enable();

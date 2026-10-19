@@ -136,4 +136,15 @@ public class TouchCharInputTest {
         assertEquals(HISTORY + "hello ", backend.chat.toString());
     }
 
+    @Test public void hidingKeyboardFlushesPendingTextWithoutDeletingIt() {
+        connection.beginBatchEdit();
+        connection.commitText("hello", 1);
+        input.setKeyboardState(false);
+        assertEquals(HISTORY + "hello", backend.chat.toString());
+        assertFalse(input.isEnabled());
+        assertEquals(0, backend.deletes);
+        connection.endBatchEdit();
+        assertEquals(HISTORY + "hello", backend.chat.toString());
+    }
+
 }
