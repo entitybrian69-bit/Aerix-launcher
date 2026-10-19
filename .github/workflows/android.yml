@@ -32,6 +32,17 @@ jobs:
           if [ ! -d "$ANDROID_HOME/ndk/29.0.14206865" ]; then
             "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;29.0.14206865"
           fi
+      - name: Rust cache identity
+        id: rust-cache
+        run: echo "version=$(rustc --version | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"
+      - name: Cache pinned Rust dependencies and compilation
+        uses: actions/cache@v4
+        with:
+          key: rustgl-eb225595-ndk29-api26-16k-${{ runner.os }}-${{ steps.rust-cache.outputs.version }}
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            .cache/rustgl-source/target
       - name: Compile and inspect native renderer with license evidence
         shell: bash
         run: |

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Pinned experimental source build; upstream README licensing basis was explicitly accepted."""
 import argparse
+import base64
 import hashlib
 import json
 import os
@@ -9,6 +10,7 @@ import re
 import shutil
 import subprocess
 import sys
+import urllib.request
 
 REVISION = "eb22559581cf400af29470205a9ebbff31e0db33"
 TARGETS = {
@@ -29,6 +31,42 @@ def supported_license(expression):
         return False
     tokens = set(re.findall(r"[A-Za-z0-9.+-]+", expression)) - {"AND", "OR"}
     return bool(tokens) and tokens <= PERMISSIVE
+
+
+def github_package_licenses(package, directory, destination):
+    """Use the exact cargo-published VCS commit, never a moving branch or guessed tag."""
+    vcs_path = directory / ".cargo_vcs_info.json"
+    repo = re.fullmatch(r"https://github.com/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+?)(?:\.git)?/?", package.get("repository") or "")
+    if not repo or not vcs_path.is_file():
+        return []
+    vcs = json.loads(vcs_path.read_text())
+    commit = vcs.get("git", {}).get("sha1", "")
+    if not re.fullmatch(r"[0-9a-f]{40}", commit):
+        raise ValueError("Unpinned license evidence")
+    base = "https://api.github.com/repos/" + repo[1]
+    def get(path):
+        request = urllib.request.Request(base + path, headers={"User-Agent": "Aerix-experimental-license-audit", "Accept": "application/vnd.github+json"})
+        with urllib.request.urlopen(request, timeout=60) as response:
+            return json.load(response)
+    tree = get("/git/trees/" + commit + "?recursive=1")
+    if tree.get("truncated"):
+        raise ValueError("License source tree truncated")
+    package_path = Path(vcs.get("path_in_vcs", "."))
+    parents = {"."} | {str(parent) for parent in package_path.parents} | {str(package_path)}
+    found = []
+    for item in tree["tree"]:
+        path = Path(item["path"])
+        if item["type"] != "blob" or str(path.parent) not in parents or not path.name.upper().startswith(("LICENSE", "LICENCE", "COPYING", "COPYRIGHT", "NOTICE")):
+            continue
+        blob = get("/git/blobs/" + item["sha"])
+        data = base64.b64decode(blob["content"])
+        if hashlib.sha1(b"blob " + str(len(data)).encode() + b"\0" + data).hexdigest() != item["sha"]:
+            raise ValueError("License Git object hash mismatch")
+        target = destination / (package["name"] + "-" + package["version"] + "-vcs-" + path.name)
+        target.write_bytes(data)
+        found.append(target)
+    print(f"License evidence: {package['name']} {package['version']} from {repo[1]}@{commit}")
+    return found
 
 
 def run(args):
@@ -67,6 +105,8 @@ def run(args):
                          p.name.upper().startswith(("LICENSE", "LICENCE", "COPYING", "COPYRIGHT", "NOTICE"))]
                 if files or (parent / ".git").exists():
                     break
+        if not files:
+            files = github_package_licenses(package, directory, evidence_dir)
         if not files:
             raise ValueError(f"License text absent: {package['name']}")
         evidence = []
