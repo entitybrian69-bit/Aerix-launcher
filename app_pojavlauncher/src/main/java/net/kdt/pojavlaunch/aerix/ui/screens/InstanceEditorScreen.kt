@@ -58,6 +58,10 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.Checkbox
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
+import net.kdt.pojavlaunch.aerix.bridge.ContentListPolicy
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -189,6 +193,7 @@ private val mcVerRegex = Regex("""(\d+\.\d+(?:\.\d+)?)""")
 
 @Composable
 fun InstanceEditorScreen(activity: FragmentActivity, onClose: () -> Unit) {
+    val contentPaneStates = rememberSaveableStateHolder()
     LaunchedEffect(Unit) {
         if (PojavInstanceEditorBridge.draft == null) {
             PojavInstanceEditorBridge.open(activity)
@@ -338,11 +343,11 @@ fun InstanceEditorScreen(activity: FragmentActivity, onClose: () -> Unit) {
                 border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft)
             ) {
                 when (activeTab) {
-                    "mods" -> InstanceModsPane(activity = activity)
-                    "packs" -> InstanceContentPane(activity = activity, kind = ContentKind.RESOURCE_PACKS, assetType = AssetType.RESOURCE_PACK)
-                    "shaders" -> InstanceContentPane(activity = activity, kind = ContentKind.SHADER_PACKS, assetType = AssetType.SHADER_PACK)
-                    "worlds" -> InstanceContentPane(activity = activity, kind = ContentKind.SAVES, assetType = AssetType.WORLD)
-                    "shots" -> InstanceContentPane(activity = activity, kind = ContentKind.SCREENSHOTS, assetType = null)
+                    "mods" -> contentPaneStates.SaveableStateProvider("${PojavInstanceBridge.selected?.source}:mods") { InstanceModsPane(activity = activity) }
+                    "packs" -> contentPaneStates.SaveableStateProvider("${PojavInstanceBridge.selected?.source}:packs") { InstanceContentPane(activity = activity, kind = ContentKind.RESOURCE_PACKS, assetType = AssetType.RESOURCE_PACK) }
+                    "shaders" -> contentPaneStates.SaveableStateProvider("${PojavInstanceBridge.selected?.source}:shaders") { InstanceContentPane(activity = activity, kind = ContentKind.SHADER_PACKS, assetType = AssetType.SHADER_PACK) }
+                    "worlds" -> contentPaneStates.SaveableStateProvider("${PojavInstanceBridge.selected?.source}:worlds") { InstanceContentPane(activity = activity, kind = ContentKind.SAVES, assetType = AssetType.WORLD) }
+                    "shots" -> contentPaneStates.SaveableStateProvider("${PojavInstanceBridge.selected?.source}:shots") { InstanceContentPane(activity = activity, kind = ContentKind.SCREENSHOTS, assetType = null) }
                     "overview" -> InstanceOverviewPane(
                         activity = activity,
                         draft = draft,
@@ -571,6 +576,9 @@ private fun InstanceModsPane(activity: FragmentActivity) {
     val scope = rememberCoroutineScope()
     val accent = AerixThemeManager.currentAccent()
 
+    val listState = rememberLazyListState()
+    val selection = remember { ContentSelectionState() }
+
     var entries by remember { mutableStateOf<List<ContentEntry>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var revision by remember { mutableIntStateOf(0) }
@@ -611,6 +619,8 @@ private fun InstanceModsPane(activity: FragmentActivity) {
             matchesName && matchesState
         }
     }
+
+    val rowKeys = remember(entries) { ContentListPolicy.rowKeys(entries) }
 
     val enabledCount = remember(entries) { entries.count { it.enabled } }
     val disabledCount = remember(entries) { entries.count { !it.enabled } }
@@ -749,6 +759,7 @@ private fun InstanceModsPane(activity: FragmentActivity) {
             // Refresh button
             IconButton(
                 onClick = { revision++ },
+                enabled = !selection.busy && !loading,
                 modifier = Modifier.size(36.dp)
             ) {
                 Icon(
@@ -807,32 +818,41 @@ private fun InstanceModsPane(activity: FragmentActivity) {
             }
         }
 
+        ContentSelectionControls(ContentKind.MODS, entries, filtered, selection, loading) { revision++ }
         when {
-            loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            loading && entries.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = accent)
             }
             filtered.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 QuietEmptyState(R.drawable.aerix_ic_extension_outlined, stringResource(R.string.aerix_content_empty))
             }
             else -> LazyColumn(
+                state = listState,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(horizontal = AerixSpacing.md, vertical = AerixSpacing.xs),
                 verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
             ) {
-                items(filtered, key = { it.file.absolutePath }) { entry ->
+                items(filtered, key = { rowKeys.getValue(it.file.absolutePath) }) { entry ->
                     ModItemCard(
                         entry = entry,
+                        selecting = selection.selecting,
+                        selected = entry.file.absolutePath in selection.selected,
+                        busy = selection.busy || loading,
+                        onSelect = { selection.toggle(entry) },
                         onToggle = { enabled ->
-                            scope.launch {
-                                PojavContentBridge.setEnabled(entry, enabled)
-                                revision++
+                            if (!selection.busy && !loading) scope.launch {
+                                selection.busy = true
+                                try {
+                                    val ok = try { PojavContentBridge.setEnabled(entry, enabled) }
+                                    catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                                    catch (_: Exception) { false }
+                                    if (!ok) Toast.makeText(context, failedText, Toast.LENGTH_SHORT).show()
+                                    revision++
+                                } finally { selection.busy = false }
                             }
                         },
                         onDelete = {
-                            scope.launch {
-                                PojavContentBridge.delete(entry)
-                                revision++
-                            }
+                            if (!selection.busy && !loading) selection.pendingDelete = listOf(entry)
                         }
                     )
                 }
@@ -849,6 +869,10 @@ private fun InstanceModsPane(activity: FragmentActivity) {
 @Composable
 private fun ModItemCard(
     entry: ContentEntry,
+    selecting: Boolean,
+    selected: Boolean,
+    busy: Boolean,
+    onSelect: () -> Unit,
     onToggle: (Boolean) -> Unit,
     onDelete: () -> Unit
 ) {
@@ -856,7 +880,7 @@ private fun ModItemCard(
     var showMenu by remember { mutableStateOf(false) }
 
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().then(if (selecting) Modifier.clickable(enabled = !busy, onClick = onSelect) else Modifier),
         shape = RoundedCornerShape(AerixRadii.card),
         color = AerixSurface.panel,
         border = BorderStroke(AerixSpacing.hairline, AerixSurface.border)
@@ -866,6 +890,7 @@ private fun ModItemCard(
             horizontalArrangement = Arrangement.spacedBy(AerixSpacing.md),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            if (selecting) Checkbox(checked = selected, onCheckedChange = { onSelect() }, enabled = !busy)
             AerixImageWell(
                 image = entry.icon,
                 fallback = R.drawable.aerix_ic_extension_outlined,
@@ -915,13 +940,14 @@ private fun ModItemCard(
                 )
             }
 
-            Row(
+            if (!selecting) Row(
                 horizontalArrangement = Arrangement.spacedBy(AerixSpacing.sm),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Switch(
                     modifier = Modifier.scale(0.75f),
                     checked = entry.enabled,
+                    enabled = !busy,
                     onCheckedChange = onToggle,
                     colors = SwitchDefaults.colors(
                         checkedThumbColor = AerixSurface.onAction,
@@ -935,6 +961,7 @@ private fun ModItemCard(
                 Box {
                     IconButton(
                         modifier = Modifier.size(32.dp),
+                        enabled = !busy,
                         onClick = { showMenu = true }
                     ) {
                         Icon(
@@ -983,6 +1010,9 @@ private fun InstanceContentPane(
     val scope = rememberCoroutineScope()
     val accent = AerixThemeManager.currentAccent()
 
+    val listState = rememberLazyListState()
+    val selection = remember(kind) { ContentSelectionState() }
+
     var entries by remember(kind) { mutableStateOf<List<ContentEntry>>(emptyList()) }
     var loading by remember(kind) { mutableStateOf(true) }
     var revision by remember { mutableIntStateOf(0) }
@@ -1012,6 +1042,7 @@ private fun InstanceContentPane(
         entries.filter { query.isBlank() || it.displayTitle.contains(query, ignoreCase = true) || it.name.contains(query, ignoreCase = true) }
     }
 
+    val rowKeys = remember(entries) { ContentListPolicy.rowKeys(entries) }
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
             modifier = Modifier
@@ -1063,6 +1094,7 @@ private fun InstanceContentPane(
 
             IconButton(
                 onClick = { revision++ },
+                enabled = !selection.busy && !loading,
                 modifier = Modifier.size(36.dp)
             ) {
                 Icon(
@@ -1107,26 +1139,30 @@ private fun InstanceContentPane(
             }
         }
 
+        ContentSelectionControls(kind, entries, shown, selection, loading) { revision++ }
         when {
-            loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            loading && entries.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = accent)
             }
             shown.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 QuietEmptyState(kind.iconRes, stringResource(R.string.aerix_content_empty))
             }
             else -> LazyColumn(
+                state = listState,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(horizontal = AerixSpacing.md, vertical = AerixSpacing.xs),
                 verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
             ) {
-                items(shown, key = { it.file.absolutePath }) { entry ->
+                items(shown, key = { rowKeys.getValue(it.file.absolutePath) }) { entry ->
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(AerixRadii.card),
                         color = AerixSurface.panel,
                         border = BorderStroke(AerixSpacing.hairline, AerixSurface.border),
+                        enabled = !selection.busy && !loading,
                         onClick = {
-                            if (kind == ContentKind.SCREENSHOTS) {
+                            if (selection.selecting) selection.toggle(entry)
+                            else if (kind == ContentKind.SCREENSHOTS) {
                                 Tools.openPath(context, entry.file, true)
                             }
                         }
@@ -1136,6 +1172,8 @@ private fun InstanceContentPane(
                             horizontalArrangement = Arrangement.spacedBy(AerixSpacing.md),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
+                            if (selection.selecting) Checkbox(checked = entry.file.absolutePath in selection.selected,
+                                onCheckedChange = { selection.toggle(entry) }, enabled = !selection.busy && !loading)
                             AerixImageWell(
                                 image = entry.icon,
                                 fallback = kind.iconRes,
@@ -1159,13 +1197,9 @@ private fun InstanceContentPane(
                                     maxLines = 1
                                 )
                             }
-                            IconButton(
-                                onClick = {
-                                    scope.launch {
-                                        PojavContentBridge.delete(entry)
-                                        revision++
-                                    }
-                                }
+                            if (!selection.selecting) IconButton(
+                                enabled = !selection.busy && !loading,
+                                onClick = { selection.pendingDelete = listOf(entry) }
                             ) {
                                 Icon(
                                     painter = painterResource(R.drawable.aerix_ic_delete_outlined),
