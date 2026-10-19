@@ -21,6 +21,7 @@ def load(name):
 
 bundle = load("prepare_rustgl_bundle")
 benchmark = load("renderer_benchmark")
+builder = load("build_rustgl_bundle")
 
 
 class RendererToolsTest(unittest.TestCase):
@@ -84,6 +85,11 @@ class RendererToolsTest(unittest.TestCase):
         self.args.experimental_mit_declaration = True
         with self.assertRaises(ValueError):
             self.run_import()
+
+    def test_build_license_expressions_require_known_permissive_terms(self):
+        self.assertTrue(builder.supported_license("(MIT OR Apache-2.0) AND Unicode-3.0"))
+        self.assertFalse(builder.supported_license("MIT OR GPL-3.0"))
+        self.assertFalse(builder.supported_license(None))
 
     def test_bad_artifact_hash_refused(self):
         self.audit["artifacts"][0]["sha256"] = "b" * 64

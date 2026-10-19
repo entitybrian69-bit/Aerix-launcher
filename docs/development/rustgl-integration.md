@@ -1,5 +1,13 @@
 # RustGL integration: experimental renderer support
 
+> **Experimental policy update:** The user approved a source-built experimental
+> bundle based on upstream's README MIT declaration, despite the missing LICENSE.
+> See [experimental bundle instructions](rustgl-experimental-bundle.md). New CI
+> test APKs now require real native payloads; older absence/hold statements below
+> describe the earlier implementation/review. Stable release and legal clearance
+> remain unapproved. No device gameplay or performance result is implied.
+
+
 See [implementation delivery](rustgl-delivery.md), [compliance review](rustgl-compliance.md)
 and [phone benchmark protocol](rustgl-benchmark.md) for the new bundle lifecycle and
 Vulkan diagnostic. No approved native payload is included; the external path below

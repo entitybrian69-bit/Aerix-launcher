@@ -1,5 +1,13 @@
 # RustGL native distribution review
 
+> **Experimental policy update:** The user approved a source-built experimental
+> bundle based on upstream's README MIT declaration, despite the missing LICENSE.
+> See [experimental bundle instructions](rustgl-experimental-bundle.md). New CI
+> test APKs now require real native payloads; older absence/hold statements below
+> describe the earlier implementation/review. Stable release and legal clearance
+> remain unapproved. No device gameplay or performance result is implied.
+
+
 Review target: `whaltermc/rust-renderer`, commit
 `eb22559581cf400af29470205a9ebbff31e0db33`. This is an engineering release
 assessment, not a legal opinion or a replacement for a rights-holder's grant.

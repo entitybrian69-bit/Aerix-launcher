@@ -1,0 +1,34 @@
+{
+  "revision": "eb22559581cf400af29470205a9ebbff31e0db33",
+  "artifacts": [
+    {
+      "abi": "arm64-v8a",
+      "name": "librust_gl.so",
+      "bytes": 1453840,
+      "sha256": "024adf0e680830c69628acfd4d7af84e2b97986c5ee87299d43c709c302fc819"
+    },
+    {
+      "abi": "armeabi-v7a",
+      "name": "librust_gl.so",
+      "bytes": 967392,
+      "sha256": "5999f517cb6fb9b7014b881468cdddadbdc1f64b71c5e35729417fe7ed3c5169"
+    },
+    {
+      "abi": "x86",
+      "name": "librust_gl.so",
+      "bytes": 1583080,
+      "sha256": "4450e4edda5327025c466904ba326bb55a4fb6e104475d1f867383ebef9a8322"
+    },
+    {
+      "abi": "x86_64",
+      "name": "librust_gl.so",
+      "bytes": 1460112,
+      "sha256": "cb256c1020a9cc12c467d88fdcd4b9451b751a03d26e7bab527b0f96912885da"
+    }
+  ],
+  "licenses": 89,
+  "experimental": true,
+  "ciRun": "https://github.com/entitybrian69-bit/Aerix-launcher/actions/runs/39276064833",
+  "launcherSourceCommit": "85d7704",
+  "note": "Native job succeeded. APK packaging/device validation are separate. Licenses means 89 captured declarations/text sets, not independent legal clearance."
+}

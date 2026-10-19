@@ -1,0 +1,63 @@
+# Experimental bundled RustGL GLES
+
+The user explicitly approved proceeding with an experimental bundle based on upstream's
+README MIT declaration despite its missing LICENSE file. This supersedes the previous
+hold **for experimental test APKs only**. It is not legal clearance or permission from
+an upstream rights-holder. No stable release is authorized by this acceptance.
+
+## Build and installation
+
+The Android workflow now builds `gl-compat` from pinned source
+`whaltermc/rust-renderer@eb22559581cf400af29470205a9ebbff31e0db33` for arm64-v8a,
+armeabi-v7a, x86 and x86_64 using Android API 26 and NDK 29. It does not download an
+unverified plugin APK, copy upstream debug keys, or insert a placeholder entry.
+
+The native job has read-only repository permissions, no launcher signing secrets,
+and credential-free checkouts. Cargo verifies locked registry packages; the build
+captures package SPDX declarations and license/copyright texts. Texts omitted from
+a published crate are recovered from its exact recorded Git revision, not a moving
+branch. Unsupported license expressions or missing evidence fail the build.
+
+`scripts/build_rustgl_bundle.py` invokes the existing verified importer with an explicit
+experimental policy. The manifest records `redistributionApproved: false` and
+`experimentalUserAuthorized: true`; the runtime accepts either a cleared release or
+this explicitly authorized experimental mode. The APK signature authenticates the
+manifest and hashes. The SHA-256/ABI/native-dependency/16-KiB checks remain mandatory.
+
+The launcher job depends on successful native build and downloads **that same workflow
+run's** generated assets. Both final APKs are inspected by `verify_rustgl_apk.py`, which
+requires matching checksums and all four ABI payloads. Build failure stops APK delivery;
+it cannot quietly fall back to producing another empty integration-only APK.
+
+Artifacts on the successful Android CI run:
+
+- `app-release`: full launcher APK, including the experimental native renderer.
+- `app-release-noruntime`: launcher without bundled Java runtime, also including RustGL.
+- `apk-sha256`: SHA-256 sums of both APK files.
+- `rustgl-build-evidence`: source/build log, exact package declarations/texts and
+  generated experimental manifest approval/provenance.
+- `rustgl-bundle-assets`: generated immutable payload files and manifest.
+
+Install the **new experimental APK** over Aerix only with the matching signing identity;
+do not uninstall or clear app data. Then open the instance's **Renderer** selector and
+choose **RustGL (Experimental)**. No separately installed RustGL plugin APK is needed
+for this build. Older stable/integration-only APKs do not gain assets retroactively.
+
+Android 8/API26+, GLES3 and matching native ABI are required. The selector only registers
+a bundle after real file installation/verification and compatibility checks. Unsupported
+or quarantined bundles remain unavailable. Logs use `BundledRustGL` and
+`AerixRendererPlugin` for discovery/init failures.
+
+## Scope and safety
+
+This is upstream's partial desktop-GL-to-GLES renderer, **not a completed Vulkan backend**.
+RustGL backend policy forces GLES. Its upstream-compatible defaults advertise desktop GL
+and disable LWJGL pointer checks; the experimental confirmation states that risk. There
+is no runtime renderer JAR, Fabric mod or modification of the instance's `mods/` folder.
+
+The existing bundle store retains atomic generation publication, checksums, approved
+rollback and failed/interrupted-init quarantine. Device rendering, native crash behavior,
+Android private-path loading, storage fault recovery and phone performance remain
+unverified until actual device reports exist. A successful APK build is not gameplay or
+FPS proof. The stable-release compliance checklist remains open; see
+`rustgl-compliance.md` and `rustgl-benchmark.md`.
