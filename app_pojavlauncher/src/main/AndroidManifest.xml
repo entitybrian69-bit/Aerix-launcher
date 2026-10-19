@@ -23,6 +23,7 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
     <uses-permission android:name="android.permission.VIBRATE"/>                         
@@ -30,6 +31,7 @@
     <application
         android:name="net.kdt.pojavlaunch.PojavApplication"
         android:allowBackup="true"
+        android:allowAudioPlaybackCapture="true"
         android:allowNativeHeapPointerTagging="false"
         android:appCategory="game"
         android:hasFragileUserData="true"
@@ -153,7 +155,7 @@
 
         <service android:name="net.kdt.pojavlaunch.recording.ScreenRecordingService"
             android:exported="false" android:process=":game"
-            android:foregroundServiceType="mediaProjection" />
+            android:foregroundServiceType="mediaProjection|microphone" />
 
         <service
             android:name="net.kdt.pojavlaunch.mobileglues.MgQueryService"

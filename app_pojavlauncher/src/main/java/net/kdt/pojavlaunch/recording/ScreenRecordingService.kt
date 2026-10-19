@@ -1,5 +1,9 @@
 package net.kdt.pojavlaunch.recording
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
+import java.nio.ByteBuffer
 import android.app.Activity
 import android.app.Notification
 import android.app.NotificationChannel
@@ -52,9 +56,52 @@ class ScreenRecordingService : Service() {
     private var muxerStarted = false
     private var track = -1
     private var samples = 0L
+    private var audioSamples = 0L
+    private var audioTrack = -1
+    private var audio: RecordingAudio? = null
+    private var videoEnded = false
+    private var audioEnded = false
+    private var epochUs = 0L
+    private var videoBaseUs: Long? = null
+    private data class Pending(val track: Int, val bytes: ByteArray, val pts: Long, val flags: Int)
+    private val pendingSamples = ArrayList<Pending>()
+    private var pendingBytes = 0
+
+    private fun startMuxerWhenReady() {
+        if (track < 0 || audioTrack < 0 || muxerStarted) return
+        muxer!!.start()
+        muxerStarted = true
+        pendingSamples.forEach { sample ->
+            val info = MediaCodec.BufferInfo().apply { set(0, sample.bytes.size, sample.pts, sample.flags) }
+            muxer!!.writeSampleData(sample.track, ByteBuffer.wrap(sample.bytes), info)
+        }
+        pendingSamples.clear(); pendingBytes = 0
+    }
+
+    private fun encoded(trackIndex: Int, codec: MediaCodec, index: Int, source: MediaCodec.BufferInfo, isAudio: Boolean) {
+        if (source.size <= 0 || source.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG != 0) return
+        check(trackIndex >= 0) { "Encoded data before track format" }
+        val buffer = requireNotNull(codec.getOutputBuffer(index))
+        buffer.position(source.offset); buffer.limit(source.offset + source.size)
+        if (!isAudio && videoBaseUs == null) videoBaseUs =
+            if (source.presentationTimeUs >= epochUs - 10_000_000) epochUs else source.presentationTimeUs
+        val pts = if (isAudio) source.presentationTimeUs else (source.presentationTimeUs - videoBaseUs!!).coerceAtLeast(0)
+        val info = MediaCodec.BufferInfo().apply { set(source.offset, source.size, pts, source.flags) }
+        if (muxerStarted) muxer!!.writeSampleData(trackIndex, buffer, info)
+        else {
+            check(pendingBytes + source.size <= 4 * 1024 * 1024) { "Audio/video encoder did not become ready together" }
+            val bytes = ByteArray(source.size); buffer.get(bytes)
+            pendingSamples.add(Pending(trackIndex, bytes, pts, source.flags)); pendingBytes += bytes.size
+        }
+        if (isAudio) audioSamples++ else samples++
+    }
+
+    private fun finishWhenDrained() {
+        if (videoEnded && audioEnded) finish(samples > 0 && audioSamples > 0, "Recording stopped")
+    }
     private var lastSpaceCheckUs = Long.MIN_VALUE
     private val storagePath by lazy { (getExternalFilesDir(Environment.DIRECTORY_MOVIES) ?: filesDir).absolutePath }
-    private val stopTimeout = Runnable { finish(samples > 0, "Recording stopped") }
+    private val stopTimeout = Runnable { finish(samples > 0 && audioSamples > 0, "Recording stopped") }
     private val projectionCallback = object : MediaProjection.Callback() {
         override fun onStop() { requestStop() }
     }
@@ -81,9 +128,13 @@ class ScreenRecordingService : Service() {
         }
         started = true
         try {
-            val notification = notification()
-            if (Build.VERSION.SDK_INT >= 29) startForeground(NOTIFICATION, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)
-            else startForeground(NOTIFICATION, notification)
+            check(Build.VERSION.SDK_INT >= 29) { "Game audio recording requires Android 10 or newer" }
+            check(ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                "Microphone/audio permission is required"
+            }
+            val types = ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION or
+                (if (Build.VERSION.SDK_INT >= 30) ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE else 0)
+            startForeground(NOTIFICATION, notification(), types)
             RecordingState.update(RecordingState.Phase.STARTING)
             val token = if (Build.VERSION.SDK_INT >= 33) intent.getParcelableExtra("consent", Intent::class.java)
                 else @Suppress("DEPRECATION") (intent.getParcelableExtra("consent") as? Intent)
@@ -112,29 +163,23 @@ class ScreenRecordingService : Service() {
                 override fun onOutputFormatChanged(codec: MediaCodec, format: MediaFormat) {
                     if (completed) return
                     try {
-                        check(!muxerStarted) { "Unexpected encoder format change" }
+                        check(track < 0) { "Unexpected encoder format change" }
                         track = muxer!!.addTrack(format)
-                        muxer!!.start()
-                        muxerStarted = true
+                        startMuxerWhenReady()
                     } catch (error: Exception) { finish(false, error.message ?: "Cannot create video track") }
                 }
                 override fun onOutputBufferAvailable(codec: MediaCodec, index: Int, info: MediaCodec.BufferInfo) {
                     if (completed) return
                     try {
-                        if (info.size > 0 && info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG == 0) {
-                            check(muxerStarted) { "Video data arrived before format" }
-                            val buffer = requireNotNull(codec.getOutputBuffer(index))
-                            buffer.position(info.offset)
-                            buffer.limit(info.offset + info.size)
-                            muxer!!.writeSampleData(track, buffer, info)
-                            samples++
-                        }
+                        encoded(track, codec, index, info, false)
                         if (!stopping && (lastSpaceCheckUs == Long.MIN_VALUE || info.presentationTimeUs - lastSpaceCheckUs >= 2_000_000)) {
                             lastSpaceCheckUs = info.presentationTimeUs
                             if (StatFs(storagePath).availableBytes < 16L * 1024 * 1024) requestStop()
                         }
                         codec.releaseOutputBuffer(index, false)
-                        if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) finish(samples > 0, "Recording stopped")
+                        if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) {
+                            videoEnded = true; finishWhenDrained()
+                        }
                     } catch (error: Exception) { finish(false, error.message ?: "Recording failed (check free storage)") }
                 }
                 override fun onError(codec: MediaCodec, error: MediaCodec.CodecException) {
@@ -149,12 +194,29 @@ class ScreenRecordingService : Service() {
                 setInteger(MediaFormat.KEY_PRIORITY, 1)
                 if (Build.VERSION.SDK_INT >= 29) setFloat(MediaFormat.KEY_MAX_FPS_TO_ENCODER, config.fps.toFloat())
             }
+            epochUs = System.nanoTime() / 1000
             codec!!.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
             surface = codec!!.createInputSurface()
             codec!!.start()
             projection = requireNotNull(getSystemService(MediaProjectionManager::class.java)
                 .getMediaProjection(Activity.RESULT_OK, token))
             projection!!.registerCallback(projectionCallback, worker)
+            audio = RecordingAudio(this, worker, epochUs, object : RecordingAudio.Listener {
+                override fun format(format: MediaFormat) {
+                    if (completed) return
+                    try {
+                        check(audioTrack < 0) { "Unexpected audio format change" }
+                        audioTrack = muxer!!.addTrack(format)
+                        startMuxerWhenReady()
+                    } catch (error: Exception) { finish(false, error.message ?: "Cannot create audio track") }
+                }
+                override fun sample(codec: MediaCodec, index: Int, info: MediaCodec.BufferInfo) {
+                    if (!completed) encoded(audioTrack, codec, index, info, true)
+                }
+                override fun ended() { audioEnded = true; finishWhenDrained() }
+                override fun error(message: String) { finish(false, message) }
+            })
+            audio!!.start(projection!!)
             if (stopRequested) { finish(false, "Recording cancelled"); return }
             display = requireNotNull(projection!!.createVirtualDisplay("Aerix recorder", config.width, config.height,
                 resources.displayMetrics.densityDpi, DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR, surface, null, worker))
@@ -165,20 +227,23 @@ class ScreenRecordingService : Service() {
     private fun requestStop() {
         if (completed || stopping) return
         stopping = true
+        audio?.stop()
         RecordingState.update(RecordingState.Phase.STOPPING)
         runCatching { display?.release() }
         display = null
         try {
             codec?.signalEndOfInputStream() ?: run { finish(false, "No recording data"); return }
             worker.postDelayed(stopTimeout, 3000)
-        } catch (_: Exception) { finish(samples > 0, "Recording stopped") }
+        } catch (_: Exception) { finish(samples > 0 && audioSamples > 0, "Recording stopped") }
     }
 
     private fun finish(keep: Boolean, message: String) {
         if (completed) return
         completed = true
         worker.removeCallbacks(stopTimeout)
-        var success = keep && muxerStarted && samples > 0
+        var success = keep && muxerStarted && samples > 0 && audioSamples > 0
+        runCatching { audio?.release() }; audio = null
+        pendingSamples.clear(); pendingBytes = 0
         runCatching { display?.release() }; display = null
         runCatching { codec?.stop() }; runCatching { codec?.release() }; codec = null
         runCatching { surface?.release() }; surface = null
@@ -208,13 +273,13 @@ class ScreenRecordingService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val builder = if (Build.VERSION.SDK_INT >= 26) Notification.Builder(this, CHANNEL) else @Suppress("DEPRECATION") Notification.Builder(this)
         return builder.setSmallIcon(R.drawable.aerix_ic_record).setContentTitle("Aerix screen recording")
-            .setContentText("Video only · tap Stop to save").setOngoing(true)
+            .setContentText("Game audio + microphone · tap Stop to save").setOngoing(true)
             .addAction(Notification.Action.Builder(android.R.drawable.ic_media_pause, "Stop recording", stop).build()).build()
     }
 
     override fun onDestroy() {
         if (!started) thread.quitSafely()
-        else if (thread.isAlive) worker.post { finish(samples > 0, "Recorder closed") }
+        else if (thread.isAlive) worker.post { finish(samples > 0 && audioSamples > 0, "Recorder closed") }
         super.onDestroy()
     }
 }

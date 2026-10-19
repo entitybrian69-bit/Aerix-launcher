@@ -1,5 +1,7 @@
 package net.kdt.pojavlaunch.recording
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.app.Activity
 import android.app.AlertDialog
 import android.app.Application
@@ -20,7 +22,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowAlertDialog
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [28], application = Application::class)
+@Config(sdk = [29], application = Application::class)
 class RecorderControllerTest {
     private lateinit var activity: Activity
     private lateinit var controller: RecorderController
@@ -29,6 +31,7 @@ class RecorderControllerTest {
 
     @Before fun setup() {
         activity = Robolectric.buildActivity(Activity::class.java).setup().visible().get()
+        shadowOf(activity.application).grantPermissions(Manifest.permission.RECORD_AUDIO)
         activity.getSharedPreferences("aerix_recorder", 0).edit().clear().commit()
         RecordingState.update(RecordingState.Phase.IDLE)
         idle()
@@ -114,4 +117,13 @@ class RecorderControllerTest {
         controller.destroy()
         assertNull(indicator.parent)
     }
+    @Test fun deniedMicrophonePermissionNeverStartsCapture() {
+        shadowOf(activity.application).denyPermissions(Manifest.permission.RECORD_AUDIO)
+        options().getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+        idle()
+        assertNull(shadowOf(activity).nextStartedActivityForResult)
+        assertTrue(controller.onRequestPermissionsResult(RecorderController.REQUEST_AUDIO, intArrayOf(PackageManager.PERMISSION_DENIED)))
+        assertNull(shadowOf(activity.application).nextStartedService)
+    }
+
 }

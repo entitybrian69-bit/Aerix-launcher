@@ -1,5 +1,8 @@
 package net.kdt.pojavlaunch.recording
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.core.app.ActivityCompat
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Intent
@@ -56,6 +59,10 @@ class RecorderController(private val activity: Activity) {
     }
 
     fun show() {
+        if (Build.VERSION.SDK_INT < 29) {
+            toast("Game audio + microphone recording requires Android 10 or newer")
+            return
+        }
         if (disposed || dialog?.isShowing == true) return
         if (RecordingState.isActive() || startRequested) {
             dialog = AlertDialog.Builder(activity).setTitle("Screen recorder")
@@ -100,7 +107,7 @@ class RecorderController(private val activity: Activity) {
             RecordingOptions.frameRates.map { "$it FPS" })
         val info = label("")
         val saveLocation = if (Build.VERSION.SDK_INT >= 29) "Movies/Aerix" else "this app's Movies/Aerix folder (removed on uninstall)"
-        label("Video only — no game audio or microphone in this version.\nSaves to $saveLocation.\nHigher settings add load and heat. FPS is a target, not a guarantee; 120 FPS cannot add frames the game/capture never produces.\nAndroid may capture notifications or other content: choose app-only capture if offered. Recording stops when you leave the game.")
+        label("Game audio + microphone are recorded together. Microphone permission is required. Use headphones to avoid speaker echo; Android privacy controls or capture restrictions may silence a source.\nSaves to $saveLocation.\nHigher settings add load and heat. FPS is a target, not a guarantee; 120 FPS cannot add frames the game/capture never produces.\nAndroid may capture notifications or other content: choose app-only capture if offered. Recording stops when you leave the game.")
         val preferred = configs.firstOrNull { it.quality == prefs.getInt("quality", 480) && it.fps == prefs.getInt("fps", 24) }
             ?: configs.firstOrNull { it.quality == 480 && it.fps == 24 } ?: configs.first()
         quality.setSelection(RecordingOptions.qualities.indexOf(preferred.quality))
@@ -131,13 +138,27 @@ class RecorderController(private val activity: Activity) {
                 prefs.edit().putInt("quality", option.quality).putInt("fps", option.fps).apply()
                 pending = option
                 created.dismiss()
-                try {
-                    val manager = activity.getSystemService(MediaProjectionManager::class.java)
-                    activity.startActivityForResult(manager.createScreenCaptureIntent(), REQUEST_CAPTURE)
-                } catch (error: Exception) { pending = null; toast("Cannot request screen capture: ${error.message}") }
+                if (ContextCompat.checkSelfPermission(activity, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                    ActivityCompat.requestPermissions(activity, arrayOf(Manifest.permission.RECORD_AUDIO), REQUEST_AUDIO)
+                } else requestCaptureConsent()
+
             }
         }
         created.show()
+    }
+
+    private fun requestCaptureConsent() {
+        try {
+            val manager = activity.getSystemService(MediaProjectionManager::class.java)
+            activity.startActivityForResult(manager.createScreenCaptureIntent(), REQUEST_CAPTURE)
+        } catch (error: Exception) { pending = null; toast("Cannot request screen capture: ${error.message}") }
+    }
+
+    fun onRequestPermissionsResult(requestCode: Int, grants: IntArray): Boolean {
+        if (requestCode != REQUEST_AUDIO) return false
+        if (!disposed && pending != null && grants.isNotEmpty() && grants[0] == PackageManager.PERMISSION_GRANTED) requestCaptureConsent()
+        else { pending = null; if (!disposed) toast("Microphone permission is required; recording cancelled") }
+        return true
     }
 
     fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean {
@@ -173,5 +194,5 @@ class RecorderController(private val activity: Activity) {
         executor.shutdownNow()
     }
     private fun toast(message: String) { Toast.makeText(activity, message, Toast.LENGTH_LONG).show() }
-    companion object { const val REQUEST_CAPTURE = 7143 }
+    companion object { const val REQUEST_CAPTURE = 7143; const val REQUEST_AUDIO = 7144 }
 }
