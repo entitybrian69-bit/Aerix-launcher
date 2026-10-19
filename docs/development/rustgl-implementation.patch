@@ -664,6 +664,18 @@ index 943f233..7cb4499 100644
              return getKnownRenderer(FALLBACK_RENDERER).setupRenderer();
          }
          return true;
+diff --git a/app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/mobileglues/MGApplication.kt b/app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/mobileglues/MGApplication.kt
+index ee4874b..ba99f10 100644
+--- a/app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/mobileglues/MGApplication.kt
++++ b/app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/mobileglues/MGApplication.kt
+@@ -39,6 +39,6 @@ open class MGApplication : Application() {
+ 
+     override fun onCreate() {
+         super.onCreate()
+-        authController.refresh()
++        if (applicationInfo.uid == android.os.Process.myUid()) authController.refresh()
+     }
+ }
 diff --git a/app_pojavlauncher/src/main/jni/CMakeLists.txt b/app_pojavlauncher/src/main/jni/CMakeLists.txt
 index 0e9ee33..887fe73 100644
 --- a/app_pojavlauncher/src/main/jni/CMakeLists.txt
@@ -773,6 +785,43 @@ index 889923c..6ede5da 100644
          }
          library.writeBytes(header)
          assertTrue(RendererPluginV2.matchesElfAbi(library, "arm64-v8a"))
+diff --git a/app_pojavlauncher/src/test/java/net/kdt/pojavlaunch/aerix/renderer/IsolatedProbeApplicationTest.kt b/app_pojavlauncher/src/test/java/net/kdt/pojavlaunch/aerix/renderer/IsolatedProbeApplicationTest.kt
+new file mode 100644
+index 0000000..f9553dc
+--- /dev/null
++++ b/app_pojavlauncher/src/test/java/net/kdt/pojavlaunch/aerix/renderer/IsolatedProbeApplicationTest.kt
+@@ -0,0 +1,31 @@
++package net.kdt.pojavlaunch.aerix.renderer
++
++import android.app.Application
++import net.kdt.pojavlaunch.PojavApplication
++import org.junit.Test
++import org.junit.runner.RunWith
++import android.content.Context
++import net.kdt.pojavlaunch.mobileglues.MGApplication
++import org.junit.Assert.*
++import org.robolectric.RuntimeEnvironment
++import org.robolectric.util.ReflectionHelpers
++import org.robolectric.util.ReflectionHelpers.ClassParameter
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.annotation.Config
++import org.robolectric.shadows.ShadowProcess
++
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [28], application = Application::class)
++class IsolatedProbeApplicationTest {
++    @Test fun isolatedApplicationSkipsLauncherAndMobileGluesPrivateStorageInitialization() {
++        ShadowProcess.setUid(99001)
++        val app = PojavApplication()
++        ReflectionHelpers.callInstanceMethod<Unit>(app, "attach",
++            ClassParameter.from(Context::class.java, RuntimeEnvironment.getApplication()))
++        assertNotEquals(99001, app.applicationInfo.uid)
++        app.onCreate()
++        val auth = MGApplication::class.java.getDeclaredField("authController\$delegate")
++        auth.isAccessible = true
++        assertFalse((auth.get(app) as Lazy<*>).isInitialized())
++    }
++}
 diff --git a/app_pojavlauncher/src/test/java/net/kdt/pojavlaunch/aerix/renderer/RendererBundleStoreTest.kt b/app_pojavlauncher/src/test/java/net/kdt/pojavlaunch/aerix/renderer/RendererBundleStoreTest.kt
 new file mode 100644
 index 0000000..4fa6268
