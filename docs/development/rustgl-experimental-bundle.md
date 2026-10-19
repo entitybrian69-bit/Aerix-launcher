@@ -115,7 +115,12 @@ FPS, full desktop GL, Vulkan or gameplay support based on host smoke results.
 - `rustgl-native-build.json` records this run's four native file hashes and both
   reviewed source-patch hashes. Native builds, core/compatibility unit tests and
   real-library host Mesa smoke passed; launcher regression tests also passed.
-  Consult the run for final APK build/verification status. Device testing remains open.
+  Both APK builds, final four-ABI native-payload verification and uploads also passed.
+  Device testing remains open. Download the full APK ZIP:
+  https://github.com/entitybrian69-bit/Aerix-launcher/actions/runs/39301821983/artifacts/12213235133
+  (extract `app-release-full.apk`; install as an update, never uninstall/clear data).
+  SHA-256 checksum artifact:
+  https://github.com/entitybrian69-bit/Aerix-launcher/actions/runs/39301821983/artifacts/12213070335
 - `rustgl-crash-fix.patch` is the code/workflow/tooling diff from `4ab44af` to this
   candidate; `git apply --reverse --check docs/development/rustgl-crash-fix.patch`
   passes on the candidate. `rustgl-implementation.patch` is the earlier integration

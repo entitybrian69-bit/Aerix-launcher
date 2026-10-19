@@ -42,5 +42,11 @@
   ],
   "ciRun": "https://github.com/entitybrian69-bit/Aerix-launcher/actions/runs/39301821983",
   "launcherSourceCommit": "2e36872d329b6d4bd3aa5bb31bf76126d780513b",
-  "note": "Four-ABI native builds, renderer-core/gl-compat tests and real-library host Mesa EGL smoke passed. APK packaging/device validation are separate. Licenses means 89 captured declarations/text sets, not legal clearance."
+  "note": "CI completed successfully: four-ABI native builds, core/compatibility tests, real-library host Mesa EGL smoke, launcher regressions, both APK builds and final payload/hash verification. No Android phone/gameplay proof. Licenses means 89 captured declarations/text sets, not legal clearance.",
+  "apkValidation": {
+    "status": "passed",
+    "full": "https://github.com/entitybrian69-bit/Aerix-launcher/actions/runs/39301821983/artifacts/12213235133",
+    "noruntime": "https://github.com/entitybrian69-bit/Aerix-launcher/actions/runs/39301821983/artifacts/12212334666",
+    "sha256": "https://github.com/entitybrian69-bit/Aerix-launcher/actions/runs/39301821983/artifacts/12213070335"
+  }
 }
