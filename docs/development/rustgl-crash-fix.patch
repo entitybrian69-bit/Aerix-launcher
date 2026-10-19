@@ -1,0 +1,622 @@
+diff --git a/.github/workflows/android.yml b/.github/workflows/android.yml
+index c2f2c8e..4cf0719 100644
+--- a/.github/workflows/android.yml
++++ b/.github/workflows/android.yml
+@@ -38,7 +38,7 @@ jobs:
+       - name: Cache pinned Rust dependencies and compilation
+         uses: actions/cache@v4
+         with:
+-          key: rustgl-eb225595-ndk29-api26-16k-${{ runner.os }}-${{ steps.rust-cache.outputs.version }}
++          key: rustgl-probe1-eb225595-ndk29-api26-16k-${{ runner.os }}-${{ steps.rust-cache.outputs.version }}
+           path: |
+             ~/.cargo/registry
+             ~/.cargo/git
+@@ -56,6 +56,30 @@ jobs:
+       - name: Renderer core unit tests
+         working-directory: .cache/rustgl-source
+         run: cargo test --locked -p renderer-core
++      - name: RustGL compatibility-layer unit tests (serialized global GL state)
++        working-directory: .cache/rustgl-source
++        shell: bash
++        run: |
++          set -o pipefail
++          export RUSTFLAGS="-Awarnings -C link-arg=-Wl,--export-dynamic"
++          if ! cargo test --locked -p gl-compat --lib -- --test-threads=1 2>&1 | tee "$GITHUB_WORKSPACE/rustgl-compat.log"; then
++            detail=$(tail -c 3500 "$GITHUB_WORKSPACE/rustgl-compat.log" | sed 's/%/%25/g; s/\r//g' | tr '\n' '|')
++            echo "::error title=RustGL compatibility tests::$detail"
++            exit 1
++          fi
++      - name: Real RustGL EGL/GLES host smoke test
++        if: ${{ !cancelled() }}
++        shell: bash
++        run: |
++          set -o pipefail
++          sudo apt-get update -qq
++          sudo apt-get install -y libegl1-mesa-dev libgles2-mesa-dev
++          (cd .cache/rustgl-source && cargo build --locked --release -p gl-compat)
++          if ! python3 -u scripts/smoke_rustgl.py .cache/rustgl-source/target/release/librust_gl.so 2>&1 | tee rustgl-smoke.log; then
++            detail=$(tail -c 3500 rustgl-smoke.log | sed 's/%/%25/g; s/\r//g' | tr '\n' '|')
++            echo "::error title=RustGL EGL smoke::$detail"
++            exit 1
++          fi
+       - name: Upload authenticated-build input assets
+         uses: actions/upload-artifact@v4
+         with:
+@@ -72,6 +96,8 @@ jobs:
+             .cache/rustgl-report/evidence/
+             .cache/rustgl-report/experimental-approval.json
+             rustgl-build.log
++            rustgl-smoke.log
++            rustgl-compat.log
+ 
+   build:
+     needs: rustgl-native
+diff --git a/app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/bridge/PojavPluginBridge.kt b/app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/bridge/PojavPluginBridge.kt
+index 802d2d8..13ff144 100644
+--- a/app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/bridge/PojavPluginBridge.kt
++++ b/app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/bridge/PojavPluginBridge.kt
+@@ -39,6 +39,7 @@ import android.content.pm.PackageManager
+ import android.os.Bundle
+ import git.artdeell.mojoexec.MojoExec
+ import net.kdt.pojavlaunch.R
++import net.kdt.pojavlaunch.Logger
+ import net.kdt.pojavlaunch.game.renderer.GameRenderer
+ import net.kdt.pojavlaunch.game.renderer.RenderSpec
+ import net.kdt.pojavlaunch.game.renderer.RendererCache
+@@ -59,7 +60,8 @@ class AerixRendererPlugin(
+     val env: Map<String, String>,
+     val dlopen: List<String>,
+     val metadataVersion: Int = 1,
+-    val initializeBundle: ((() -> Boolean) -> Boolean)? = null
++    val initializeBundle: ((() -> Boolean) -> Boolean)? = null,
++    val useNamespaceBypass: Boolean = true
+ ) : RenderSpec {
+     val pluginTag: String = "$TAG_PREFIX$packageName"
+ 
+@@ -92,20 +94,35 @@ class AerixRendererPlugin(
+         }
+     }
+ 
++    /** Values passed directly to MojoExec; inspecting this plan never loads native code. */
++    internal data class EglLaunchPlan(val library: String, val namespaceBypass: Boolean, val gles: Boolean, val major: Int)
++
++    internal fun eglLaunchPlan(): EglLaunchPlan {
++        val target = when {
++            eglName.startsWith("/") -> eglName
++            File(nativeLibDir, eglName).exists() -> File(nativeLibDir, eglName).absolutePath
++            else -> eglName
++        }
++        return EglLaunchPlan(target, useNamespaceBypass, !RendererPluginV2.usesDesktopGl(rendererId, env), 3)
++    }
++
+     override fun setupRenderer(): Boolean = try {
+         val initialize = {
+             if (RendererPluginV2.usesVulkan(rendererId, env)) MojoExec.preloadVulkan()
+-            val eglTarget = when {
+-                eglName.startsWith("/") -> eglName
+-                File(nativeLibDir, eglName).exists() -> File(nativeLibDir, eglName).absolutePath
+-                else -> eglName
+-            }
+-            MojoExec.prepareEgl(eglTarget, true, !RendererPluginV2.usesDesktopGl(rendererId, env), 3)
++            val plan = eglLaunchPlan()
++            Logger.appendToLog("Renderer native load: tag=$pluginTag bundle=$appVersion " +
++                "egl=${plan.library} namespaceBypass=${plan.namespaceBypass} gles=${plan.gles} major=${plan.major}")
++            val loaded = MojoExec.prepareEgl(plan.library, plan.namespaceBypass, plan.gles, plan.major)
++            // prepareEgl only dlopens the provider. EGL context creation happens later in GLFW/SDL.
++            Logger.appendToLog("Renderer native provider loaded=$loaded tag=$pluginTag; EGL context/gameplay not yet verified")
++            loaded
+         }
+         initializeBundle?.invoke(initialize) ?: initialize()
+     } catch (error: Exception) {
++        Logger.appendToLog("Renderer initialization failed: tag=$pluginTag ${error.javaClass.simpleName}: ${error.message}")
+         Log.e("AerixRendererPlugin", "Renderer initialization failed", error); false
+     } catch (error: LinkageError) {
++        Logger.appendToLog("Renderer native linkage failed: tag=$pluginTag ${error.javaClass.simpleName}: ${error.message}")
+         Log.e("AerixRendererPlugin", "Renderer native linkage failed", error); false
+     }
+ 
+diff --git a/app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/renderer/BundledRustGl.kt b/app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/renderer/BundledRustGl.kt
+index d6263e6..44f2e21 100644
+--- a/app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/renderer/BundledRustGl.kt
++++ b/app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/renderer/BundledRustGl.kt
+@@ -64,6 +64,9 @@ internal object BundledRustGl {
+                 "JAVA_TOOL_OPTIONS" to "-Dorg.lwjgl.util.NoChecks=true"
+             )),
+             dlopen = emptyList(), metadataVersion = 2,
++            // This bundle depends on public system EGL/GLES, not private custom-driver libraries.
++            // Keep Android's normal graphics-library namespace; other plugins retain their policy.
++            useNamespaceBypass = false,
+             initializeBundle = { initialize ->
+                 val attempt = storage.beginInit(release)
+                 var success = false
+diff --git a/app_pojavlauncher/src/test/java/net/kdt/pojavlaunch/aerix/renderer/BundledRustGlDiscoveryTest.kt b/app_pojavlauncher/src/test/java/net/kdt/pojavlaunch/aerix/renderer/BundledRustGlDiscoveryTest.kt
+index eba519e..7930695 100644
+--- a/app_pojavlauncher/src/test/java/net/kdt/pojavlaunch/aerix/renderer/BundledRustGlDiscoveryTest.kt
++++ b/app_pojavlauncher/src/test/java/net/kdt/pojavlaunch/aerix/renderer/BundledRustGlDiscoveryTest.kt
+@@ -37,11 +37,39 @@ class BundledRustGlDiscoveryTest {
+         assertEquals("plugin:net.kdt.pojavlaunch.renderer.rustgl", plugin.pluginTag)
+         assertEquals("RustGL (Experimental)", plugin.displayName)
+         assertEquals("gles", plugin.env["RENDERER_BACKEND"])
++        assertEquals("0.3.1", plugin.appVersion)
++        val plan = plugin.eglLaunchPlan()
++        assertEquals(plugin.glName, plan.library)
++        assertFalse("System EGL/GLES must not be duplicated into a driver namespace", plan.namespaceBypass)
++        assertTrue(plan.gles)
++        assertEquals(3, plan.major)
+         assertTrue(File(plugin.glName).length() > 64)
+         assertEquals(plugin.glName, plugin.eglName)
+         assertEquals(File(plugin.glName).parentFile.canonicalPath, plugin.librarySearchPath())
+     }
+ 
++    @Test fun quarantinedOldBundleDoesNotHideRevisedIntegration() {
++        val app = context(0x30000)
++        val revised = requireNotNull(BundledRustGl.discover(app))
++        val index = com.google.gson.JsonParser.parseString(app.assets.open("renderer-bundles/rustgl/index.json")
++            .bufferedReader().use { it.readText() }).asJsonObject
++        val entry = index.getAsJsonArray("releases").first { it.asJsonObject.get("abi").asString ==
++            (if (android.os.Process.is64Bit()) "arm64-v8a" else "armeabi-v7a") }.asJsonObject
++        val files = entry.getAsJsonArray("files").map { item -> item.asJsonObject.let {
++            BundleFile(it.get("name").asString, it.get("bytes").asLong, it.get("sha256").asString)
++        } }
++        val old = BundleRelease("0.3.0", entry.get("revision").asString, entry.get("abi").asString, files)
++        val store = RendererBundleStore(File(app.noBackupFilesDir, "renderer-bundles/rustgl"))
++        store.install(old) { name -> app.assets.open("renderer-bundles/rustgl/0.3.1/${old.abi}/$name") }
++        store.activate(old)
++        store.beginInit(old).finish(false)
++        val restored = requireNotNull(BundledRustGl.discover(app))
++        assertEquals("0.3.1", restored.appVersion)
++        assertEquals(revised.glName, restored.glName)
++        assertTrue("Do not erase the old failure record to restore discovery", store.rejected(old))
++        assertFalse(restored.eglLaunchPlan().namespaceBypass)
++    }
++
+     @Test fun gles2OnlyDeviceDoesNotGetUnsupportedSelectableRenderer() {
+         assertNull(BundledRustGl.discover(context(0x20000)))
+     }
+diff --git a/app_pojavlauncher/src/test/java/net/kdt/pojavlaunch/aerix/renderer/RendererEglLaunchPlanTest.kt b/app_pojavlauncher/src/test/java/net/kdt/pojavlaunch/aerix/renderer/RendererEglLaunchPlanTest.kt
+new file mode 100644
+index 0000000..0a7db42
+--- /dev/null
++++ b/app_pojavlauncher/src/test/java/net/kdt/pojavlaunch/aerix/renderer/RendererEglLaunchPlanTest.kt
+@@ -0,0 +1,36 @@
++package net.kdt.pojavlaunch.aerix.renderer
++
++import net.kdt.pojavlaunch.aerix.bridge.AerixRendererPlugin
++import org.junit.Assert.*
++import org.junit.Rule
++import org.junit.Test
++import org.junit.rules.TemporaryFolder
++
++/** No native loading or Android device required: these are the exact MojoExec call arguments. */
++class RendererEglLaunchPlanTest {
++    @get:Rule val temp = TemporaryFolder()
++    private fun plugin(egl: String, directory: String, env: Map<String, String> = emptyMap()) = AerixRendererPlugin(
++        packageName = "test.renderer", appName = "Test", appVersion = "1", rendererId = "test",
++        displayName = "Test", summary = "", minMCVer = null, maxMCVer = null,
++        glName = egl, eglName = egl, nativeLibDir = directory, env = env, dlopen = emptyList())
++
++    @Test fun externalPluginsRetainNamespaceBypassAndGles3() {
++        val plan = plugin("libEGL.so", temp.newFolder().path).eglLaunchPlan()
++        assertTrue(plan.namespaceBypass)
++        assertTrue(plan.gles)
++        assertEquals(3, plan.major)
++        assertEquals("libEGL.so", plan.library)
++    }
++
++    @Test fun absolutePrivateLibraryIsNotRewritten() {
++        val file = temp.newFile("librust_gl.so")
++        val plan = plugin(file.absolutePath, file.parent!!).eglLaunchPlan()
++        assertEquals(file.absolutePath, plan.library)
++    }
++
++    @Test fun relativeExistingPluginLibraryResolvesWithinNativeDirectory() {
++        val file = temp.newFile("libcustom.so")
++        val plan = plugin(file.name, file.parent!!).eglLaunchPlan()
++        assertEquals(file.absolutePath, plan.library)
++    }
++}
+diff --git a/scripts/build_rustgl_bundle.py b/scripts/build_rustgl_bundle.py
+index e425dfc..584081d 100644
+--- a/scripts/build_rustgl_bundle.py
++++ b/scripts/build_rustgl_bundle.py
+@@ -13,6 +13,8 @@ import sys
+ import urllib.request
+ 
+ REVISION = "eb22559581cf400af29470205a9ebbff31e0db33"
++PATCH_SHA256 = "aeaa3bd7362a62d31d46c8b04b9461abacb67a9de21f426417929b22db444885"
++LIFETIME_PATCH_SHA256 = "ba6d4f1bc71bbedea69d3b8a3fa30a2ad37d375db28206bfe955331b82494d12"
+ TARGETS = {
+     "arm64-v8a": ("aarch64-linux-android", "aarch64-linux-android26"),
+     "armeabi-v7a": ("armv7-linux-androideabi", "armv7a-linux-androideabi26"),
+@@ -75,10 +77,23 @@ def run(args):
+         raise ValueError("Unexpected renderer revision")
+     if subprocess.check_output(["git", "status", "--porcelain"], cwd=source, text=True).strip():
+         raise ValueError("Renderer source must be clean before compilation")
++    # Apply only the reviewed patch to the exact clean upstream tree. Never accept an
++    # arbitrary dirty renderer source as if it were the pinned upstream revision.
++    patch_dir = Path(__file__).resolve().parent / "patches"
++    patches = [(patch_dir / "rustgl-gles-capability-probe.patch", PATCH_SHA256),
++               (patch_dir / "rustgl-extension-string-lifetime.patch", LIFETIME_PATCH_SHA256)]
++    for patch, expected_hash in patches:
++        if digest(patch) != expected_hash:
++            raise ValueError("RustGL source patch hash mismatch")
++        subprocess.run(["git", "apply", "--check", str(patch)], cwd=source, check=True)
++    for patch, _ in patches:
++        subprocess.run(["git", "apply", str(patch)], cwd=source, check=True)
+     report = args.report.resolve()
+     report.mkdir(parents=True, exist_ok=True)
+     evidence_dir = report / "evidence"
+     evidence_dir.mkdir(exist_ok=True)
++    for patch, _ in patches:
++        shutil.copyfile(patch, evidence_dir / patch.name)
+     meta = json.loads(subprocess.check_output(["cargo", "metadata", "--locked", "--all-features", "--format-version", "1"], cwd=source, text=True))
+     inventory = json.loads(args.inventory.read_text())
+     expected = {(c["name"], c["version"]) for c in inventory["components"]}
+@@ -152,12 +167,15 @@ def run(args):
+     approval = {"redistributionApproved": False, "experimentalUserAuthorized": True,
+                 "reviewedBy": "Experimental build policy: user accepted upstream README MIT basis; no legal clearance claimed",
+                 "sourceRevision": REVISION, "components": components, "artifacts": artifacts,
++                "bundleVersion": "0.3.1", "upstreamNativeVersion": "0.3.0",
++                "integration": "System EGL/GLES namespace; capability-probe and extension-string lifetime fixes",
++                "sourcePatches": [{"file": "evidence/" + patch.name, "sha256": sha} for patch, sha in patches],
+                 "toolchain": subprocess.check_output(["rustc", "-Vv"], text=True),
+                 "ndk": args.ndk.name}
+     approval_path = report / "experimental-approval.json"
+     approval_path.write_text(json.dumps(approval, indent=2) + "\n")
+     subprocess.run([sys.executable, str(Path(__file__).with_name("prepare_rustgl_bundle.py")),
+-                    "--approval", str(approval_path), "--input", str(native), "--version", "0.3.0",
++                    "--approval", str(approval_path), "--input", str(native), "--version", "0.3.1",
+                     "--inventory", str(args.inventory.resolve()), "--output", str(args.output.resolve()),
+                     "--readelf", str(bin_dir / "llvm-readelf"), "--experimental-mit-declaration"], check=True)
+     print("::notice title=RustGL bundled source build::" + json.dumps({"revision": REVISION, "artifacts": artifacts, "licenses": len(components), "experimental": True}))
+diff --git a/scripts/patches/rustgl-extension-string-lifetime.patch b/scripts/patches/rustgl-extension-string-lifetime.patch
+new file mode 100644
+index 0000000..8b84082
+--- /dev/null
++++ b/scripts/patches/rustgl-extension-string-lifetime.patch
+@@ -0,0 +1,30 @@
++--- a/crates/gl-compat/src/lib.rs
+++++ b/crates/gl-compat/src/lib.rs
++@@ -1057,7 +1057,10 @@
++     if name == GL_EXTENSIONS {
++         // Indexed access into the same merged list GL_NUM_EXTENSIONS reports, so a caller
++         // that iterates `count` entries never hits an early null.
++-        let exts = merged_extensions();
+++        // merged_extensions returns a cloned Vec. Its bytes die when this function
+++        // returns; expose the persistent cache's bytes, not the temporary clone.
+++        let _ = merged_extensions();
+++        let exts = MERGED.lock().unwrap_or_else(|e| e.into_inner());
++         if (index as usize) < exts.len() {
++             return exts[index as usize].as_ptr();
++         }
++@@ -3210,6 +3213,15 @@
++     }
++ 
++     #[test]
+++    fn indexed_extension_pointer_is_owned_by_persistent_cache() {
+++        let _lock = global_test_lock();
+++        let pointer = unsafe { glGetStringi(0x1F03, 0) };
+++        let cache = MERGED.lock().unwrap_or_else(|e| e.into_inner());
+++        assert!(!cache.is_empty());
+++        assert_eq!(pointer, cache[0].as_ptr(), "glGetStringi must not return a dropped clone");
+++    }
+++
+++    #[test]
++     fn minecraft_gpu_identity_uses_rustgl_brand() {
++         let (vendor, renderer) = renderer_identity();
++         assert_eq!(vendor.to_bytes(), b"WhalterMC");
+diff --git a/scripts/patches/rustgl-gles-capability-probe.patch b/scripts/patches/rustgl-gles-capability-probe.patch
+new file mode 100644
+index 0000000..f9626f8
+--- /dev/null
++++ b/scripts/patches/rustgl-gles-capability-probe.patch
+@@ -0,0 +1,81 @@
++--- a/crates/gl-compat/src/gles3/mod.rs
+++++ b/crates/gl-compat/src/gles3/mod.rs
++@@ -72,7 +72,9 @@
++ 
++ impl GlesCapabilities {
++     pub fn has(&self, name: &[u8]) -> bool {
++-        self.extensions.contains(name)
+++        // Driver strings omit NUL; existing tables/fixtures may include terminators.
+++        let end = name.iter().rposition(|&byte| byte != 0).map_or(0, |i| i + 1);
+++        self.extensions.contains(&name[..end]) || self.extensions.contains(name)
++     }
++ 
++     /// True when the driver exposes an entry point in our bridge, i.e. the context is live.
++@@ -123,7 +125,7 @@
++ const GL_MAX_COMPUTE_WORK_GROUP_SIZE: u32 = 0x91BF;
++ const GL_MAX_COMPUTE_UNIFORM_COMPONENTS: u32 = 0x8263;
++ const GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS: u32 = 0x90EB;
++-const GL_MAX_DRAW_INDIRECT_COUNT: u32 = 0x88FC;
+++// 0x88FC is desktop GL_MAX_DUAL_SOURCE_DRAW_BUFFERS, not an indirect draw limit.
++ 
++ /// Reads extensions and limits from the current context. Returns an invalid `GlesCapabilities` when no
++ /// context is current, so callers can fall back rather than trust empty answers.
++@@ -204,17 +206,23 @@
++     limit(GL_MAX_TEXTURE_IMAGE_UNITS, &mut caps.max_texture_units);
++     limit(GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS, &mut caps.max_combined_texture_units);
++     limit(GL_MAX_UNIFORM_BLOCK_SIZE, &mut caps.max_uniform_block_size);
++-    limit(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &mut caps.max_anisotropy);
+++    if caps.has(b"GL_EXT_texture_filter_anisotropic\0") {
+++        limit(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &mut caps.max_anisotropy);
+++    }
++ 
++     // Compute shader detection: ES 3.1+ or GL_EXT_compute_shader extension
++     let has_compute = caps.es_at_least(3, 1) || caps.has(b"GL_EXT_compute_shader\0");
++     caps.has_compute_shader = has_compute;
++     if has_compute {
++-        let mut v = [0i32; 3];
++-        unsafe { get_int(GL_MAX_COMPUTE_WORK_GROUP_COUNT, v.as_mut_ptr()) };
++-        caps.max_compute_work_group_count = v;
++-        unsafe { get_int(GL_MAX_COMPUTE_WORK_GROUP_SIZE, v.as_mut_ptr()) };
++-        caps.max_compute_work_group_size = v;
+++        // These are indexed limits: glGetIntegerv raises GL_INVALID_ENUM here.
+++        if let Some(get_indexed) = driver_fn_cached::<unsafe extern "C" fn(u32, u32, *mut i32)>("glGetIntegeri_v") {
+++            for axis in 0..3 {
+++                unsafe {
+++                    get_indexed(GL_MAX_COMPUTE_WORK_GROUP_COUNT, axis as u32, &mut caps.max_compute_work_group_count[axis]);
+++                    get_indexed(GL_MAX_COMPUTE_WORK_GROUP_SIZE, axis as u32, &mut caps.max_compute_work_group_size[axis]);
+++                }
+++            }
+++        }
++         limit(GL_MAX_COMPUTE_UNIFORM_COMPONENTS, &mut caps.max_compute_uniform_components);
++         limit(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, &mut caps.max_compute_work_group_invocations);
++     } else {
++@@ -228,7 +236,8 @@
++     let has_indirect = caps.es_at_least(3, 2) || caps.has(b"GL_EXT_multi_draw_indirect\0");
++     caps.has_indirect_draw = has_indirect;
++     if has_indirect {
++-        limit(GL_MAX_DRAW_INDIRECT_COUNT, &mut caps.max_draw_indirect_commands);
+++        // GLES has no MAX_DRAW_INDIRECT_COUNT query. The count argument is a GLsizei.
+++        caps.max_draw_indirect_commands = i32::MAX;
++     } else {
++         caps.max_draw_indirect_commands = 0;
++     }
++@@ -528,3 +537,18 @@
++         }
++     }
++ }
+++
+++#[cfg(test)]
+++mod aerix_probe_tests {
+++    use super::*;
+++
+++    #[test]
+++    fn driver_extension_names_match_terminated_aliases() {
+++        let mut caps = GlesCapabilities::default();
+++        caps.extensions.insert(b"GL_EXT_texture_filter_anisotropic".to_vec());
+++        assert!(caps.has(b"GL_EXT_texture_filter_anisotropic"));
+++        assert!(caps.has(b"GL_EXT_texture_filter_anisotropic\0"));
+++        assert!(caps.has(b"GL_EXT_texture_filter_anisotropic\0\0"));
+++        assert!(!caps.has(b"GL_EXT_not_supported\0"));
+++    }
+++}
+diff --git a/scripts/prepare_rustgl_bundle.py b/scripts/prepare_rustgl_bundle.py
+index 5bf602a..1ec8090 100644
+--- a/scripts/prepare_rustgl_bundle.py
++++ b/scripts/prepare_rustgl_bundle.py
+@@ -49,6 +49,12 @@ def prepare(args):
+             require(digest(path) == evidence["sha256"], "License evidence checksum mismatch")
+             notices.append(f"\n--- {component['name']} {component['version']} ({component['licenseConclusion']}) ---\n" + path.read_text())
+     require(notices, "License and copyright texts required")
++    for patch in audit.get("sourcePatches", []):
++        path = audit_path.parent / patch["file"]
++        require(path.resolve().is_relative_to(audit_path.parent) and not path.is_symlink(), "Patch evidence must stay in approval directory")
++        require(path.stat().st_size <= 128 * 1024 and digest(path) == patch["sha256"], "Source patch evidence checksum mismatch")
++        notices.append("\n--- Aerix source modifications, bundle " + args.version + " ---\n" +
++                       "Pinned upstream plus the following reviewed patch (SHA256 " + patch["sha256"] + "):\n" + path.read_text())
+     notice_bytes = "".join(notices).encode()
+     output = args.output.resolve()
+     output.mkdir(parents=True, exist_ok=True)
+diff --git a/scripts/smoke_rustgl.py b/scripts/smoke_rustgl.py
+new file mode 100644
+index 0000000..925062d
+--- /dev/null
++++ b/scripts/smoke_rustgl.py
+@@ -0,0 +1,149 @@
++#!/usr/bin/env python3
++"""Host Mesa smoke test of the *real* pinned RustGL cdylib, not a mock or phone benchmark.
++
++Run in its own process: a native SIGSEGV is a test failure, never caught as a Python exception.
++Requires Mesa EGL/GLES development libraries (libEGL.so / libGLESv2.so) and surfaceless EGL.
++"""
++import argparse
++import ctypes as c
++import os
++from pathlib import Path
++
++
++def main(library):
++    os.environ.update(EGL_PLATFORM="surfaceless", LIBGL_ALWAYS_SOFTWARE="1", RENDERER_BACKEND="gles")
++    lib = c.CDLL(str(library.resolve()))
++    proc = lib.eglGetProcAddress
++    proc.restype, proc.argtypes = c.c_void_p, [c.c_char_p]
++    functions = {}  # Keep callable wrappers alive until after EGL teardown.
++
++    def bind(name, result, *args):
++        address = proc(name.encode())
++        if not address:
++            raise RuntimeError(f"RustGL resolver missing {name}")
++        fn = c.CFUNCTYPE(result, *args)(address)
++        functions[name] = fn
++        return fn
++
++    ptr, integer, boolean = c.c_void_p, c.c_int32, c.c_uint32
++    ints = c.POINTER(integer)
++    get_display = bind("eglGetDisplay", ptr, ptr)
++    initialize = bind("eglInitialize", boolean, ptr, ints, ints)
++    choose = bind("eglChooseConfig", boolean, ptr, ints, c.POINTER(ptr), integer, ints)
++    bind_api = bind("eglBindAPI", boolean, c.c_uint32)
++    create_surface = bind("eglCreatePbufferSurface", ptr, ptr, ptr, ints)
++    create_context = bind("eglCreateContext", ptr, ptr, ptr, ptr, ints)
++    current = bind("eglMakeCurrent", boolean, ptr, ptr, ptr, ptr)
++    destroy_context = bind("eglDestroyContext", boolean, ptr, ptr)
++    destroy_surface = bind("eglDestroySurface", boolean, ptr, ptr)
++    terminate = bind("eglTerminate", boolean, ptr)
++    egl_error = bind("eglGetError", integer)
++
++    def check(value, label):
++        if not value:
++            raise RuntimeError(f"{label} failed; EGL error=0x{egl_error():04x}")
++        return value
++
++    display = check(get_display(None), "eglGetDisplay")
++    surface = context = None
++    try:
++        major, minor = integer(), integer()
++        check(initialize(display, c.byref(major), c.byref(minor)), "eglInitialize")
++        check(bind_api(0x30A0), "eglBindAPI GLES")
++        attrs = (integer * 13)(0x3033, 1, 0x3040, 0x40, 0x3024, 8, 0x3023, 8, 0x3022, 8, 0x3021, 8, 0x3038)
++        config, count = ptr(), integer()
++        check(choose(display, attrs, c.byref(config), 1, c.byref(count)), "eglChooseConfig")
++        check(count.value, "ES3 pbuffer config")
++        surface = check(create_surface(display, config, (integer * 5)(0x3057, 4, 0x3056, 4, 0x3038)), "pbuffer")
++        context = check(create_context(display, config, None, (integer * 3)(0x3098, 3, 0x3038)), "ES3 context")
++        check(current(display, surface, surface, context), "eglMakeCurrent")
++        get_string = bind("glGetString", c.c_char_p, c.c_uint32)
++        for name, enum in (("GL_VERSION", 0x1F02), ("GL_RENDERER", 0x1F01), ("GL_VENDOR", 0x1F00)):
++            value = get_string(enum)
++            if not value:
++                raise RuntimeError(f"{name} is NULL")
++            print(f"{name}={value.decode(errors='replace')}", flush=True)
++        get_int = bind("glGetIntegerv", None, c.c_uint32, ints)
++        get_string_i = bind("glGetStringi", c.c_char_p, c.c_uint32, c.c_uint32)
++        count = integer()
++        get_int(0x821D, c.byref(count))
++        if not 0 < count.value < 16384:
++            raise RuntimeError(f"Invalid GL_NUM_EXTENSIONS={count.value}")
++        for i in range(count.value):
++            extension = get_string_i(0x1F03, i)
++            if not extension or not extension.startswith(b"GL_") or not extension.replace(b"_", b"").isalnum():
++                raise RuntimeError(f"Invalid extension string {i}: {extension!r}")
++        viewport = bind("glViewport", None, integer, integer, integer, integer)
++        clear_color = bind("glClearColor", None, c.c_float, c.c_float, c.c_float, c.c_float)
++        clear = bind("glClear", None, c.c_uint32)
++        read = bind("glReadPixels", None, integer, integer, integer, integer, c.c_uint32, c.c_uint32, ptr)
++        get_error = bind("glGetError", c.c_uint32)
++        viewport(0, 0, 4, 4)
++        clear_color(0.25, 0.5, 0.75, 1.0)
++        clear(0x4000)
++        pixel = (c.c_uint8 * 4)()
++        read(1, 1, 1, 1, 0x1908, 0x1401, pixel)
++        if any(abs(a - b) > 2 for a, b in zip(pixel, (64, 128, 191, 255))):
++            raise RuntimeError(f"Wrong clear/readback pixel: {list(pixel)}")
++        error = get_error()
++        if error != 0:
++            raise RuntimeError(f"GL error 0x{error:04x} after extension queries and clear/readback")
++        clear_pixel = list(pixel)
++        # Exercise desktop shader translation and real GLES compile/link, not just spoofed strings.
++        create_shader = bind("glCreateShader", c.c_uint32, c.c_uint32)
++        source = bind("glShaderSource", None, c.c_uint32, integer, c.POINTER(c.c_char_p), ints)
++        compile_shader = bind("glCompileShader", None, c.c_uint32)
++        shader_iv = bind("glGetShaderiv", None, c.c_uint32, c.c_uint32, ints)
++        shader_log = bind("glGetShaderInfoLog", None, c.c_uint32, integer, ints, ptr)
++        create_program = bind("glCreateProgram", c.c_uint32)
++        attach = bind("glAttachShader", None, c.c_uint32, c.c_uint32)
++        link = bind("glLinkProgram", None, c.c_uint32)
++        program_iv = bind("glGetProgramiv", None, c.c_uint32, c.c_uint32, ints)
++        shaders = []
++        for kind, text in ((0x8B31, b"#version 330 core\nvoid main(){gl_Position=vec4(0.0,0.0,0.0,1.0);}\n"),
++                           (0x8B30, b"#version 330 core\nout vec4 color;\nvoid main(){color=vec4(1.0);}\n")):
++            shader = create_shader(kind)
++            if not shader:
++                raise RuntimeError("glCreateShader returned zero")
++            source(shader, 1, (c.c_char_p * 1)(text), None)
++            compile_shader(shader)
++            status = integer()
++            shader_iv(shader, 0x8B81, c.byref(status))
++            if status.value != 1:
++                log = c.create_string_buffer(8192)
++                shader_log(shader, len(log), None, log)
++                raise RuntimeError(f"Translated shader failed: {log.value!r}")
++            shaders.append(shader)
++        program = create_program()
++        for shader in shaders:
++            attach(program, shader)
++        link(program)
++        status = integer()
++        program_iv(program, 0x8B82, c.byref(status))
++        if status.value != 1:
++            raise RuntimeError("Translated program link failed")
++        bind("glDeleteProgram", None, c.c_uint32)(program)
++        for shader in shaders:
++            bind("glDeleteShader", None, c.c_uint32)(shader)
++        check(bind("eglSwapBuffers", boolean, ptr, ptr)(display, surface), "pbuffer swap")
++        # Context rebinding exercises RustGL's driver-function cache invalidation.
++        check(current(display, None, None, None), "unbind context")
++        check(current(display, surface, surface, context), "rebind context")
++        clear(0x4000)
++        read(1, 1, 1, 1, 0x1908, 0x1401, pixel)
++        if list(pixel) != clear_pixel or get_error() != 0:
++            raise RuntimeError(f"Rebind/readback failed: {list(pixel)}")
++        print("PASS: real EGL ES3 context, resolver, extension enumeration, RGBA clear/readback, desktop shader compile/link, swap and context rebind. Host Mesa only; not Android/gameplay validation.", flush=True)
++    finally:
++        current(display, None, None, None)
++        if context:
++            destroy_context(display, context)
++        if surface:
++            destroy_surface(display, surface)
++        terminate(display)
++
++
++if __name__ == "__main__":
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument("library", type=Path)
++    main(parser.parse_args().library)
+diff --git a/scripts/tests/test_renderer_tools.py b/scripts/tests/test_renderer_tools.py
+index 83c9697..9527923 100644
+--- a/scripts/tests/test_renderer_tools.py
++++ b/scripts/tests/test_renderer_tools.py
+@@ -7,7 +7,7 @@ import pathlib
+ import tempfile
+ import types
+ import unittest
+-from unittest.mock import patch
++from unittest.mock import Mock, patch
+ 
+ SCRIPTS = pathlib.Path(__file__).resolve().parents[1]
+ 
+@@ -22,6 +22,7 @@ def load(name):
+ bundle = load("prepare_rustgl_bundle")
+ benchmark = load("renderer_benchmark")
+ builder = load("build_rustgl_bundle")
++smoke = load("smoke_rustgl")
+ 
+ 
+ class RendererToolsTest(unittest.TestCase):
+@@ -130,3 +131,34 @@ class RendererToolsTest(unittest.TestCase):
+         file.write_text("present_ns\n1\n1\n2\n")
+         with self.assertRaises(ValueError):
+             benchmark.analyze(types.SimpleNamespace(frames=file, warmup_seconds=0, label="synthetic"))
++
++
++    def test_recorded_source_patch_is_preserved_in_bundle_notices(self):
++        evidence = self.root / "reviewed.patch"
++        evidence.write_text("Synthetic patch evidence, not a renderer implementation.")
++        self.audit["sourcePatches"] = [{"file": evidence.name, "sha256": bundle.digest(evidence)}]
++        self.run_import()
++        notice = next(self.args.output.glob("*/*/NOTICE.txt")).read_text()
++        self.assertIn("Aerix source modifications", notice)
++        self.assertIn(evidence.read_text(), notice)
++
++    def test_tampered_source_patch_evidence_is_rejected(self):
++        evidence = self.root / "reviewed.patch"
++        evidence.write_text("Unreviewed modification")
++        self.audit["sourcePatches"] = [{"file": evidence.name, "sha256": "0" * 64}]
++        with self.assertRaisesRegex(ValueError, "Source patch evidence checksum mismatch"):
++            self.run_import()
++        self.assertFalse(self.args.output.exists())
++
++    def test_build_patch_matches_reviewed_recipe_hash(self):
++        evidence = SCRIPTS / "patches/rustgl-gles-capability-probe.patch"
++        self.assertEqual(builder.PATCH_SHA256, builder.digest(evidence))
++        self.assertEqual(builder.LIFETIME_PATCH_SHA256,
++                         builder.digest(SCRIPTS / "patches/rustgl-extension-string-lifetime.patch"))
++
++    def test_smoke_rejects_missing_egl_entry_point_without_calling_null(self):
++        resolver = Mock(return_value=None)
++        with patch.dict(smoke.os.environ), patch.object(smoke.c, "CDLL", return_value=types.SimpleNamespace(eglGetProcAddress=resolver)):
++            with self.assertRaisesRegex(RuntimeError, "RustGL resolver missing eglGetDisplay"):
++                smoke.main(self.root / "synthetic.so")
++        resolver.assert_called_once_with(b"eglGetDisplay")

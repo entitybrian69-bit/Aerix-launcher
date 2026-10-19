@@ -107,3 +107,19 @@ fault; it is not proof of RustGL's current failure. Keep GLES-only policy, exist
 NoChecks compatibility setting and licensing restrictions unchanged. Device
 verification is still required; do not publish this as a stable crash fix or claim
 FPS, full desktop GL, Vulkan or gameplay support based on host smoke results.
+
+### Reproducible fix review and current validation
+
+- Build source: `2e36872d329b6d4bd3aa5bb31bf76126d780513b`.
+- CI: https://github.com/entitybrian69-bit/Aerix-launcher/actions/runs/39301821983
+- `rustgl-native-build.json` records this run's four native file hashes and both
+  reviewed source-patch hashes. Native builds, core/compatibility unit tests and
+  real-library host Mesa smoke passed; launcher regression tests also passed.
+  Consult the run for final APK build/verification status. Device testing remains open.
+- `rustgl-crash-fix.patch` is the code/workflow/tooling diff from `4ab44af` to this
+  candidate; `git apply --reverse --check docs/development/rustgl-crash-fix.patch`
+  passes on the candidate. `rustgl-implementation.patch` is the earlier integration
+  snapshot, not the new crash-fix diff.
+- Locally: 15 Python tooling tests, Python syntax checks, diff whitespace checks
+  and the native frame-counter regression passed. Android/Gradle/Rust testing was
+  performed in CI, not claimed as local phone testing.

@@ -4,31 +4,43 @@
     {
       "abi": "arm64-v8a",
       "name": "librust_gl.so",
-      "bytes": 1453840,
-      "sha256": "024adf0e680830c69628acfd4d7af84e2b97986c5ee87299d43c709c302fc819"
+      "bytes": 1458584,
+      "sha256": "66e7bd61b8a512e2d1354521b9c0c8e9abd51923bcbe9afe489de64940bd052d"
     },
     {
       "abi": "armeabi-v7a",
       "name": "librust_gl.so",
-      "bytes": 967392,
-      "sha256": "5999f517cb6fb9b7014b881468cdddadbdc1f64b71c5e35729417fe7ed3c5169"
+      "bytes": 968544,
+      "sha256": "87dbebdb87bf180161c8a0cb7ea6637839e82fb3d87a022b482d948790e8895c"
     },
     {
       "abi": "x86",
       "name": "librust_gl.so",
-      "bytes": 1583080,
-      "sha256": "4450e4edda5327025c466904ba326bb55a4fb6e104475d1f867383ebef9a8322"
+      "bytes": 1589384,
+      "sha256": "e33fee2d53020d10004cf3d007ee6654fb77ae0aa529c015ac592ec9df1f825b"
     },
     {
       "abi": "x86_64",
       "name": "librust_gl.so",
-      "bytes": 1460112,
-      "sha256": "cb256c1020a9cc12c467d88fdcd4b9451b751a03d26e7bab527b0f96912885da"
+      "bytes": 1465608,
+      "sha256": "04dd487421986e9f2f270f7229ea745d69249e7cd2b7b806b40c57c616703501"
     }
   ],
   "licenses": 89,
   "experimental": true,
-  "ciRun": "https://github.com/entitybrian69-bit/Aerix-launcher/actions/runs/39276064833",
-  "launcherSourceCommit": "85d7704",
-  "note": "Native job succeeded. APK packaging/device validation are separate. Licenses means 89 captured declarations/text sets, not independent legal clearance."
+  "bundleVersion": "0.3.1",
+  "upstreamNativeVersion": "0.3.0",
+  "sourcePatches": [
+    {
+      "file": "scripts/patches/rustgl-gles-capability-probe.patch",
+      "sha256": "aeaa3bd7362a62d31d46c8b04b9461abacb67a9de21f426417929b22db444885"
+    },
+    {
+      "file": "scripts/patches/rustgl-extension-string-lifetime.patch",
+      "sha256": "ba6d4f1bc71bbedea69d3b8a3fa30a2ad37d375db28206bfe955331b82494d12"
+    }
+  ],
+  "ciRun": "https://github.com/entitybrian69-bit/Aerix-launcher/actions/runs/39301821983",
+  "launcherSourceCommit": "2e36872d329b6d4bd3aa5bb31bf76126d780513b",
+  "note": "Four-ABI native builds, renderer-core/gl-compat tests and real-library host Mesa EGL smoke passed. APK packaging/device validation are separate. Licenses means 89 captured declarations/text sets, not legal clearance."
 }
