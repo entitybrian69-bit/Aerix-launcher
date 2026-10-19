@@ -159,8 +159,8 @@ native payloads, preserving existing renderers and the separately trusted plugin
 
 ## Tests and ranked blockers
 
-Automated additions: 15 bundle-store tests, 6 backend/capability-policy tests and
-8 importer/benchmark-tool tests, alongside the earlier 16 metadata/ELF tests. Coverage
+Automated additions: 15 bundle-store tests, 6 backend/capability-policy tests,
+1 isolated-application initialization test and 8 importer/benchmark-tool tests, alongside the earlier 16 metadata/ELF tests. Coverage
 includes traversal, symlinks, checksums, size bounds, tampering, rollback approval,
 concurrent init vs interrupted init, quarantine, Vulkan version/feature/extension and
 bad-driver matching, license refusal, native dependency/alignment refusal and metric
