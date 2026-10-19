@@ -121,8 +121,20 @@ class RecorderControllerTest {
         shadowOf(activity.application).denyPermissions(Manifest.permission.RECORD_AUDIO)
         options().getButton(AlertDialog.BUTTON_POSITIVE).performClick()
         idle()
-        assertNull(shadowOf(activity).nextStartedActivityForResult)
+        assertEquals(RecorderController.REQUEST_AUDIO, shadowOf(activity).nextStartedActivityForResult.requestCode)
         assertTrue(controller.onRequestPermissionsResult(RecorderController.REQUEST_AUDIO, intArrayOf(PackageManager.PERMISSION_DENIED)))
+        assertNull(shadowOf(activity).nextStartedActivityForResult)
+        assertNull(shadowOf(activity.application).nextStartedService)
+    }
+
+    @Test fun microphoneGrantThenRequestsScreenCaptureConsentSeparately() {
+        shadowOf(activity.application).denyPermissions(Manifest.permission.RECORD_AUDIO)
+        options().getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+        idle()
+        assertEquals(RecorderController.REQUEST_AUDIO, shadowOf(activity).nextStartedActivityForResult.requestCode)
+        shadowOf(activity.application).grantPermissions(Manifest.permission.RECORD_AUDIO)
+        assertTrue(controller.onRequestPermissionsResult(RecorderController.REQUEST_AUDIO, intArrayOf(PackageManager.PERMISSION_GRANTED)))
+        assertEquals(RecorderController.REQUEST_CAPTURE, shadowOf(activity).nextStartedActivityForResult.requestCode)
         assertNull(shadowOf(activity.application).nextStartedService)
     }
 
