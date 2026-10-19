@@ -167,6 +167,7 @@ class GameMenuOverlayView @JvmOverloads constructor(
 
     /** Used before the activity hands its own callbacks over; every entry hides the menu. */
     private object EmptyCallbacks : GameMenuCallbacks {
+        override fun onScreenRecorder() = Unit
         override fun onResumeGame() = Unit
         override fun onForceCloseGame() = Unit
         override fun onLogOutput() = Unit

@@ -90,6 +90,7 @@ import java.util.Objects;
 import net.kdt.pojavlaunch.R;
 
 public class GameActivity extends BaseActivity implements ControlButtonMenuListener, EditorExitable, ServiceConnection {
+    private net.kdt.pojavlaunch.recording.RecorderController mRecorder;
     /** Request code of the legacy storage permission asked for by the in game downloader. */
     private static final int REQUEST_STORAGE_PERMISSION = 0x41E1;
     public static final String INTENT_LAUNCH_VERSION = "intent_version";
@@ -237,7 +238,13 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         mControlLayout.setMenuListener(this);
 
         mDrawerPullButton.setOnClickListener(v -> onClickedMenu());
+        mRecorder = new net.kdt.pojavlaunch.recording.RecorderController(this);
         mGameMenuOverlay.setCallbacks(new GameMenuCallbacks() {
+            @Override public void onScreenRecorder() {
+                hideGameMenu();
+                mRecorder.show();
+            }
+
             @Override
             public void onResumeGame() {
                 hideGameMenu();
@@ -415,12 +422,14 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
 
     @Override
     protected void onStop() {
+        if (mRecorder != null) mRecorder.onGameStopped();
         PLATFORM.setVisible(false);
         super.onStop();
     }
 
     @Override
     protected void onDestroy() {
+        if (mRecorder != null) mRecorder.destroy();
         super.onDestroy();
         ContextExecutor.clearActivity();
     }
@@ -453,6 +462,7 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (mRecorder != null && mRecorder.onActivityResult(requestCode, resultCode, data)) return;
 
         if (requestCode == 1 && resultCode == Activity.RESULT_OK) {
             // Reload PREF_DEFAULTCTRL_PATH

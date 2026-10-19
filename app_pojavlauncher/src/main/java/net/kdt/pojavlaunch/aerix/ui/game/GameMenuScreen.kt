@@ -28,6 +28,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -90,6 +92,7 @@ enum class GameMenuPage { MAIN, DOWNLOADS }
 
 /** Everything the menu asks the game activity to do. */
 interface GameMenuCallbacks {
+    fun onScreenRecorder()
     fun onResumeGame()
     fun onForceCloseGame()
     fun onLogOutput()
@@ -223,6 +226,7 @@ private fun GameMenuMainPage(
         Column(
             modifier = Modifier
                 .width(columnWidth)
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = AerixSpacing.mdPlus, vertical = AerixSpacing.sm),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
@@ -293,6 +297,14 @@ private fun GameMenuMainPage(
             }
 
             Spacer(Modifier.height(if (compact) AerixSpacing.smPlus else AerixSpacing.md))
+            MenuTile(
+                label = if (net.kdt.pojavlaunch.recording.RecordingState.isActive()) "Stop recording" else "Screen recorder",
+                iconRes = R.drawable.aerix_ic_record,
+                color = palette.tiles[0], compact = compact,
+                onClick = { onCloseRequest(); callbacks.onScreenRecorder() },
+                modifier = Modifier.fillMaxWidth().height(if (compact) 48.dp else 60.dp)
+            )
+            Spacer(Modifier.height(AerixSpacing.sm))
             ResumeButton(
                 color = palette.resume,
                 compact = compact,
