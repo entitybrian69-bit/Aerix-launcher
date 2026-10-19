@@ -184,7 +184,7 @@ public class KeyboardVisibilityTest {
             focus(true);
             idle(1);
         }
-        assertEquals(10, ime.shows);
+        assertEquals(1, ime.shows); // Focus bounce cannot bypass the retry cooldown either.
         idle(5000);
         assertEquals(10, ime.shows);
     }

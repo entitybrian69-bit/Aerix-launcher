@@ -10,6 +10,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.ResultReceiver;
 import android.os.Bundle;
+import android.os.SystemClock;
 import android.text.Editable;
 import android.text.Selection;
 import android.util.AttributeSet;
@@ -54,6 +55,7 @@ public class TouchCharInput extends androidx.appcompat.widget.AppCompatEditText 
     private int mShowAttempts;
     private boolean mShowScheduled;
     private boolean mImeShown;
+    private long mNextShowTime;
     private static final int MAX_SHOW_ATTEMPTS = 10;
     private static final long SHOW_RETRY_MS = 200;
     private final Runnable mShowKeyboard = this::tryShowKeyboard;
@@ -66,7 +68,7 @@ public class TouchCharInput extends androidx.appcompat.widget.AppCompatEditText 
     private void scheduleShow(long delay) {
         if (!mKeyboardRequested || mImeShown || mShowScheduled || mShowAttempts >= MAX_SHOW_ATTEMPTS) return;
         mShowScheduled = true;
-        postDelayed(mShowKeyboard, delay);
+        postDelayed(mShowKeyboard, Math.max(delay, mNextShowTime - SystemClock.uptimeMillis()));
     }
 
     private void tryShowKeyboard() {
@@ -79,6 +81,7 @@ public class TouchCharInput extends androidx.appcompat.widget.AppCompatEditText 
             return;
         }
         if (++mShowAttempts > MAX_SHOW_ATTEMPTS) return;
+        mNextShowTime = SystemClock.uptimeMillis() + SHOW_RETRY_MS;
         if (!hasFocus()) requestFocus();
         if (hasFocus()) {
             InputMethodManager imm = (InputMethodManager) getContext().getSystemService(INPUT_METHOD_SERVICE);
@@ -106,6 +109,7 @@ public class TouchCharInput extends androidx.appcompat.widget.AppCompatEditText 
         if (!mKeyboardRequested || mShowAttempts >= MAX_SHOW_ATTEMPTS) {
             mKeyboardRequestGeneration++;
             mShowAttempts = 0;
+            mNextShowTime = 0;
             mImeShown = false;
         }
         mKeyboardRequested = true;
