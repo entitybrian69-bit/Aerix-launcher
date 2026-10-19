@@ -129,7 +129,7 @@ class ScreenRecordingService : Service() {
         try {
             check(Build.VERSION.SDK_INT >= 29) { "Game audio recording requires Android 10 or newer" }
             check(ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
-                "Microphone/audio permission is required"
+                "Audio recording permission is required"
             }
             val selectedAudio = intent.getStringExtra("audio_source") ?: RecordingOptions.AudioSource.BOTH.name
             audioSource = RecordingOptions.AudioSource.entries.firstOrNull { it.name == selectedAudio }

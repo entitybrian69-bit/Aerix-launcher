@@ -87,3 +87,11 @@ recorded. This does not override a native backend's per-player capture policy,
 Android/OEM restrictions, or muted Minecraft audio. A user report of silent game
 audio cannot be confirmed fixed without an on-device test: compare Game audio
 with Both while audible Minecraft sound plays, preferably with headphones.
+
+The bundled ALSoft backend (`alsoft-android-aar:f369161d5f`, OpenAL Soft
+`dc7d7054a5b4f3bec1dc23a42fd616a0847af948`) requests Oboe Game/LowLatency output.
+The launcher's pre-existing `alsoftForceOpenSL` switch is explicitly documented
+as a capture workaround on some devices. Recorder help now points to Settings →
+Game → Forcefully use OpenSL for audio, followed by restarting Minecraft, when
+Game-only remains silent. The recorder does not silently change the backend,
+record other apps, or substitute microphone sound for internal game audio.
