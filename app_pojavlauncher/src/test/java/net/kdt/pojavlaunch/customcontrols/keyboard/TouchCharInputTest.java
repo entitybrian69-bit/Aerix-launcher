@@ -6,6 +6,7 @@ import android.view.KeyEvent;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
 import net.kdt.pojavlaunch.game.platform.Platform;
+import net.kdt.pojavlaunch.CallbackBridge;
 import net.kdt.pojavlaunch.game.platform.backend.DummyBackend;
 import net.kdt.pojavlaunch.game.platform.backend.PlatformBackend;
 import org.junit.After;
@@ -15,11 +16,19 @@ import org.junit.runner.RunWith;
 import org.robolectric.Robolectric;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.annotation.Config;
+import org.robolectric.annotation.Implements;
+import org.robolectric.annotation.Implementation;
 import static org.junit.Assert.*;
 
 @RunWith(RobolectricTestRunner.class)
-@Config(sdk = 28, application = android.app.Application.class)
+@Config(sdk = 28, application = android.app.Application.class, shadows = TouchCharInputTest.ShadowCallbackBridge.class)
 public class TouchCharInputTest {
+    // Keep the real Java key/modifier forwarding; only omit Android-only JNI loading on the JVM.
+    @Implements(CallbackBridge.class)
+    public static class ShadowCallbackBridge {
+        @Implementation protected static void __staticInitializer__() { }
+    }
+
     private TouchCharInput input;
     private InputConnection connection;
     private PlatformBackend previousBackend;
