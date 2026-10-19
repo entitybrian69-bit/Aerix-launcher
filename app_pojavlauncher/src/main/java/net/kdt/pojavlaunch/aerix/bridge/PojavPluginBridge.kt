@@ -58,7 +58,8 @@ class AerixRendererPlugin(
     val nativeLibDir: String,
     val env: Map<String, String>,
     val dlopen: List<String>,
-    val metadataVersion: Int = 1
+    val metadataVersion: Int = 1,
+    val initializeBundle: ((() -> Boolean) -> Boolean)? = null
 ) : RenderSpec {
     val pluginTag: String = "$TAG_PREFIX$packageName"
 
@@ -91,18 +92,21 @@ class AerixRendererPlugin(
         }
     }
 
-    override fun setupRenderer(): Boolean {
-        // RustGL explicitly clears this variable. Presence of an empty key is NOT Vulkan.
-        val isVulkan = RendererPluginV2.usesVulkan(rendererId, env)
-        if (isVulkan) {
-            runCatching { MojoExec.preloadVulkan() }
+    override fun setupRenderer(): Boolean = try {
+        val initialize = {
+            if (RendererPluginV2.usesVulkan(rendererId, env)) MojoExec.preloadVulkan()
+            val eglTarget = when {
+                eglName.startsWith("/") -> eglName
+                File(nativeLibDir, eglName).exists() -> File(nativeLibDir, eglName).absolutePath
+                else -> eglName
+            }
+            MojoExec.prepareEgl(eglTarget, true, !RendererPluginV2.usesDesktopGl(rendererId, env), 3)
         }
-        val eglTarget = when {
-            eglName.startsWith("/") -> eglName
-            File(nativeLibDir, eglName).exists() -> File(nativeLibDir, eglName).absolutePath
-            else -> eglName
-        }
-        return MojoExec.prepareEgl(eglTarget, true, !RendererPluginV2.usesDesktopGl(rendererId, env), 3)
+        initializeBundle?.invoke(initialize) ?: initialize()
+    } catch (error: Exception) {
+        Log.e("AerixRendererPlugin", "Renderer initialization failed", error); false
+    } catch (error: LinkageError) {
+        Log.e("AerixRendererPlugin", "Renderer native linkage failed", error); false
     }
 
     companion object {
@@ -125,6 +129,9 @@ object PojavPluginBridge {
         val pm = context.packageManager
         val discovered = ArrayList<AerixRendererPlugin>()
         val seen = HashSet<String>()
+        runCatching { net.kdt.pojavlaunch.aerix.renderer.BundledRustGl.discover(context) }
+            .onFailure { Log.e("AerixRendererPlugin", "Bundled RustGL rejected", it) }
+            .getOrNull()?.let { discovered.add(it); seen.add(it.packageName) }
 
         runCatching {
             val activities = pm.queryIntentActivities(Intent(Intent.ACTION_MAIN), PACKAGE_FLAGS)
@@ -142,6 +149,9 @@ object PojavPluginBridge {
             }
         }
 
+        if (discovered.any { it.packageName == RendererPluginV2.RUSTGL_PACKAGE || it.packageName == net.kdt.pojavlaunch.aerix.renderer.BundledRustGl.PACKAGE }) {
+            net.kdt.pojavlaunch.aerix.renderer.VulkanProbeClient.ensureProbed(context)
+        }
         plugins = discovered.sortedBy { it.displayName.lowercase() }
         injectIntoRendererCache(context, plugins)
         return plugins
@@ -160,7 +170,12 @@ object PojavPluginBridge {
     fun applyLaunchOverride(context: Context, gameRenderer: GameRenderer, rendererTag: String?) {
         if (rendererTag == null || !rendererTag.startsWith(AerixRendererPlugin.TAG_PREFIX)) return
         if (plugins.isEmpty()) loadPlugins(context)
-        val plugin = findByTag(rendererTag) ?: return
+        val plugin = findByTag(rendererTag)
+        if (plugin == null || !plugin.compatibleDevice(context)) {
+            Log.w("AerixRendererPlugin", "Selected renderer unavailable; keeping built-in fallback before environment setup")
+            android.widget.Toast.makeText(context, "Selected renderer unavailable; using built-in renderer", android.widget.Toast.LENGTH_LONG).show()
+            return
+        }
         gameRenderer.setCurrentRenderer(plugin)
     }
 

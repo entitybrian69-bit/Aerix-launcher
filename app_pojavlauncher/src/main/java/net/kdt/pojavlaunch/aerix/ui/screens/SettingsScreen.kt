@@ -764,14 +764,14 @@ private fun RendererPluginCard(
     modifier: Modifier = Modifier
 ) {
     var confirmExperimental by remember { mutableStateOf(false) }
-    val isRustGl = plugin.packageName == "dev.rustrenderer.plugin"
+    val isRustGl = plugin.packageName == "dev.rustrenderer.plugin" || plugin.packageName == "net.kdt.pojavlaunch.renderer.rustgl"
     val select = {
         if (isRustGl && !selected) confirmExperimental = true else onSelect()
     }
     if (confirmExperimental) AlertDialog(
         onDismissRequest = { confirmExperimental = false },
         title = { Text("Experimental RustGL renderer") },
-        text = { Text("This external plugin uses GLES translation. Its advertised GL 4.5 version does not mean complete GL 4.5 support. Android gameplay and performance are not verified by Aerix. The plugin's default configuration disables LWJGL safety checks. Use only a trusted plugin APK; Vulkan rendering is not established.") },
+        text = { Text("This experimental renderer uses GLES translation. Its advertised GL 4.5 version does not mean complete GL 4.5 support. Android gameplay and performance are not verified by Aerix. External plugins may disable LWJGL safety checks; use only trusted builds. Bundled releases require APK-authenticated checksums. Vulkan rendering is not established.") },
         confirmButton = { TextButton(onClick = { confirmExperimental = false; onSelect() }) { Text("Use experimental renderer") } },
         dismissButton = { TextButton(onClick = { confirmExperimental = false }) { Text("Cancel") } }
     )

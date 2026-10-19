@@ -121,3 +121,7 @@ target_link_libraries(mobileglues_info_getter
         ${log-lib}
         dl
 )
+# Loaded only by the non-exported capability-probe service process.
+add_library(aerix_vulkan_probe SHARED renderer/vulkan_probe.cpp)
+target_compile_features(aerix_vulkan_probe PRIVATE cxx_std_17)
+target_link_libraries(aerix_vulkan_probe PRIVATE dl)

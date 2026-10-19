@@ -153,6 +153,8 @@
             android:screenOrientation="sensorLandscape"
             android:theme="@style/MojoLauncher.AppTheme" />
 
+        <service android:name="net.kdt.pojavlaunch.aerix.renderer.VulkanProbeService"
+            android:exported="false" android:isolatedProcess="true" android:process=":renderer_probe" />
         <service android:name="net.kdt.pojavlaunch.recording.ScreenRecordingService"
             android:exported="false" android:process=":game"
             android:foregroundServiceType="mediaProjection|microphone" />

@@ -155,7 +155,8 @@ public class GameRenderer {
         setRendererLibraryPath(Tools.NATIVE_LIB_DIR, currentRenderer.librarySearchPath());
         if (!currentRenderer.setupRenderer()) {
             Log.e(TAG, "Failed to setup renderer " + currentRenderer.name() + ", falling back to " + FALLBACK_RENDERER);
-            // Hopefully (yes, it's going to be fun if it returns null for the fallback renderer. Shouldn't happen though)
+            // Plugin environment and native handles cannot safely be replaced in this process.
+            if (currentRenderer instanceof net.kdt.pojavlaunch.aerix.bridge.AerixRendererPlugin) return false;
             return getKnownRenderer(FALLBACK_RENDERER).setupRenderer();
         }
         return true;
