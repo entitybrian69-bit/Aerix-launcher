@@ -98,7 +98,7 @@ class RendererPluginV2Test {
         val library = File(directory(), "librust_gl.so")
         val header = ByteArray(20).apply {
             this[0] = 0x7f; this[1] = 'E'.code.toByte(); this[2] = 'L'.code.toByte(); this[3] = 'F'.code.toByte()
-            this[4] = 2; this[5] = 1; this[18] = 183.toByte()
+            this[4] = 2; this[5] = 1; this[6] = 1; this[16] = 3; this[18] = 183.toByte()
         }
         library.writeBytes(header)
         assertTrue(RendererPluginV2.matchesElfAbi(library, "arm64-v8a"))

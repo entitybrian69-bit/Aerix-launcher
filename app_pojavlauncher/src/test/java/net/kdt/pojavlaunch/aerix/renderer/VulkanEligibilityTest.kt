@@ -6,6 +6,12 @@ import org.junit.Test
 class VulkanEligibilityTest {
     private val vk13 = (1L shl 22) + (3L shl 12)
     private val capable = VulkanDevice(0x5143, 1, 42, vk13, false, true)
+    @Test fun unfinishedVulkanRequestFallsBackToGlesBeforeEnvironmentSetup() {
+        val env = RustGlBackendPolicy.environment(mapOf("RENDERER_BACKEND" to "directvk", "MESA_LOADER_DRIVER_OVERRIDE" to "zink", "OTHER" to "kept"))
+        assertEquals("gles", env["RENDERER_BACKEND"])
+        assertEquals("", env["MESA_LOADER_DRIVER_OVERRIDE"])
+        assertEquals("kept", env["OTHER"])
+    }
     @Test fun core13DoesNotRequireExtensionString() {
         assertNull(VulkanEligibility.rejection(capable, emptyList(), true))
     }

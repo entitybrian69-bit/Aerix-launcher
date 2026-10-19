@@ -169,7 +169,7 @@ object PojavPluginBridge {
     @JvmStatic
     fun applyLaunchOverride(context: Context, gameRenderer: GameRenderer, rendererTag: String?) {
         if (rendererTag == null || !rendererTag.startsWith(AerixRendererPlugin.TAG_PREFIX)) return
-        if (plugins.isEmpty()) loadPlugins(context)
+        if (plugins.isEmpty() || rendererTag == "${AerixRendererPlugin.TAG_PREFIX}${net.kdt.pojavlaunch.aerix.renderer.BundledRustGl.PACKAGE}") loadPlugins(context, force = true)
         val plugin = findByTag(rendererTag)
         if (plugin == null || !plugin.compatibleDevice(context)) {
             Log.w("AerixRendererPlugin", "Selected renderer unavailable; keeping built-in fallback before environment setup")
@@ -207,7 +207,8 @@ object PojavPluginBridge {
                     summary = if (rustGl) "External RustGL · Experimental GLES translation" else "External V2 renderer plugin",
                     minMCVer = config.minVersion, maxMCVer = config.maxVersion,
                     glName = config.gl, eglName = config.egl, nativeLibDir = nativeDir,
-                    env = config.env, dlopen = emptyList(), metadataVersion = 2
+                    env = if (rustGl) net.kdt.pojavlaunch.aerix.renderer.RustGlBackendPolicy.environment(config.env) else config.env,
+                    dlopen = emptyList(), metadataVersion = 2
                 ).also { require(it.compatibleDevice(context)) { "Plugin requires Android 8+, GLES 3 and matching native libraries" } }
             }.onFailure { Log.w("AerixRendererPlugin", "Cannot load V2 renderer ${info.packageName}: ${it.message}") }.getOrNull()
             if (plugin != null) return plugin

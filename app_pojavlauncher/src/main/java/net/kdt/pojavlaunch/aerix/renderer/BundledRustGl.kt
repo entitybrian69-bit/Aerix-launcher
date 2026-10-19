@@ -58,7 +58,7 @@ internal object BundledRustGl {
             summary = "APK-authenticated RustGL bundle ${release.version} · GLES",
             minMCVer = null, maxMCVer = null, glName = gl.absolutePath, eglName = gl.absolutePath,
             nativeLibDir = directory.absolutePath,
-            env = mapOf("RENDERER_BACKEND" to "gles", "LIBGL_ES" to "3", "MESA_LOADER_DRIVER_OVERRIDE" to ""),
+            env = RustGlBackendPolicy.environment(emptyMap()),
             dlopen = emptyList(), metadataVersion = 2,
             initializeBundle = { initialize ->
                 val attempt = storage.beginInit(release)

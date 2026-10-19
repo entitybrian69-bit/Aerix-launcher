@@ -45,11 +45,15 @@ internal class RendererBundleStore(root: File) {
         require(!Files.isSymbolicLink(file.toPath()) && file.canonicalFile.parentFile == root)
         return file
     }
-    private fun pointer(name: String): String? = child(name).takeIf { it.isFile }?.readText()?.trim()
+    private fun pointer(name: String): String? = child(name).takeIf { it.isFile && it.length() <= 256 }?.readText()?.trim()
+    private fun syncDirectory(directory: File) {
+        java.nio.channels.FileChannel.open(directory.toPath(), java.nio.file.StandardOpenOption.READ).use { it.force(true) }
+    }
     private fun atomic(name: String, value: String) {
         val temp = child("$name.tmp")
         FileOutputStream(temp).use { it.write(value.toByteArray()); it.fd.sync() }
         Files.move(temp.toPath(), child(name).toPath(), ATOMIC_MOVE, REPLACE_EXISTING)
+        syncDirectory(root)
     }
     private fun <T> locked(action: () -> T): T = synchronized(lock) {
         java.io.RandomAccessFile(child("lock"), "rw").channel.use { channel ->
@@ -105,7 +109,9 @@ internal class RendererBundleStore(root: File) {
                 }
                 require(file.setReadOnly())
             }
+            syncDirectory(staging)
             Files.move(staging.toPath(), destination.toPath(), ATOMIC_MOVE)
+            syncDirectory(root)
             requireNotNull(valid(release))
         } finally {
             if (staging.exists()) staging.deleteRecursively()
@@ -131,6 +137,7 @@ internal class RendererBundleStore(root: File) {
     }
 
     fun beginInit(release: BundleRelease): InitAttempt = locked {
+        require(pointer("active") == release.id && !child("bad-${release.id}").exists()) { "Bundle is no longer approved for this launch" }
         requireNotNull(valid(release))
         val channel = java.io.RandomAccessFile(child("init-lock"), "rw").channel
         try {

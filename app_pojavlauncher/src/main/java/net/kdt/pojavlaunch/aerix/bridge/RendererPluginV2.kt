@@ -43,7 +43,8 @@ internal object RendererPluginV2 {
             }
             bytes[0] == 0x7f.toByte() && bytes[1] == 'E'.code.toByte() &&
                 bytes[2] == 'L'.code.toByte() && bytes[3] == 'F'.code.toByte() &&
-                bytes[4].toInt() == expected.first && bytes[5].toInt() == 1 &&
+                bytes[4].toInt() == expected.first && bytes[5].toInt() == 1 && bytes[6].toInt() == 1 &&
+                bytes[16].toInt() == 3 && bytes[17].toInt() == 0 &&
                 ((bytes[18].toInt() and 255) or ((bytes[19].toInt() and 255) shl 8)) == expected.second
         }
     }.getOrDefault(false)

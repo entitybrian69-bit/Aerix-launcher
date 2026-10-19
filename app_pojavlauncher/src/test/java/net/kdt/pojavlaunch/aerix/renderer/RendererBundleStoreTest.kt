@@ -99,6 +99,11 @@ class RendererBundleStoreTest {
         assertNull(store.verify(release))
         assertThrows(IllegalArgumentException::class.java) { install(store, release) }
     }
+    @Test fun quarantinedReleaseCannotBeInitializedAgain() {
+        val store = RendererBundleStore(temp.newFolder()); val release = release()
+        install(store, release); store.activate(release); store.beginInit(release).finish(false)
+        assertThrows(IllegalArgumentException::class.java) { store.beginInit(release) }
+    }
     @Test fun idChangesWhenPayloadChanges() {
         val a = release(); val b = a.copy(files = listOf(a.files[0].copy(sha256 = "b".repeat(64))))
         assertNotEquals(a.id, b.id)

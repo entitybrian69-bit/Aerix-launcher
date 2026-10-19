@@ -154,9 +154,11 @@ public class GameRenderer {
     public boolean maybeSetupRenderer() {
         setRendererLibraryPath(Tools.NATIVE_LIB_DIR, currentRenderer.librarySearchPath());
         if (!currentRenderer.setupRenderer()) {
+            if (currentRenderer instanceof net.kdt.pojavlaunch.aerix.bridge.AerixRendererPlugin) {
+                Log.e(TAG, "Plugin renderer initialization failed; aborting this launch before starting the JVM");
+                return false;
+            }
             Log.e(TAG, "Failed to setup renderer " + currentRenderer.name() + ", falling back to " + FALLBACK_RENDERER);
-            // Plugin environment and native handles cannot safely be replaced in this process.
-            if (currentRenderer instanceof net.kdt.pojavlaunch.aerix.bridge.AerixRendererPlugin) return false;
             return getKnownRenderer(FALLBACK_RENDERER).setupRenderer();
         }
         return true;
