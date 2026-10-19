@@ -34,10 +34,11 @@ Aetherium (Fabric), Team_Aerix: client-side Fabric, no Fabric API requirement;
 separate exact-version files; incompatible with Sodium, Embeddium, Rubidium and
 OptiFine. Feature/performance descriptions are attributed project claims, not
 launcher benchmarks. The project is LGPL-3.0-only; the icon remains the project's
-remote CurseForge logo, not a copied/generated substitute.
+remote CurseForge logo, not a copied/generated substitute. The API/mirror also
+verified its numeric project ID **1749327**, slug and 256px logo URL.
 
-Download resolves the supplied CurseForge slug through the existing authenticated
-API/mirror path. `CurseForgeProjectLink` validates exact slug, Minecraft game ID,
+Download looks up the verified project ID through the existing authenticated
+API/mirror path (slug lookup is available for future entries without a verified ID). `CurseForgeProjectLink` validates exact slug, Minecraft game ID,
 content class and positive numeric project ID. It never selects the first result
 or a title lookalike, never switches to the NeoForge edition, and never invents
 a numeric ID. Failed/offline resolution leaves a retry message on the card.
@@ -53,4 +54,4 @@ choosing another Discover category returns to normal browsing.
 - Download acceptance, progress/cancellation, background return and installer.
 - Manual update checking alongside the automatic offer, rotation and app resume.
 - Narrow/landscape layouts, font scaling, dark/light themes and rail scrolling.
-- Live CurseForge slug resolution, Fabric detail/files and instance installation.
+- Live CurseForge project resolution, Fabric detail/files and instance installation.

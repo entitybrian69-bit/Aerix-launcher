@@ -177,7 +177,7 @@ fun AerixNavigationRail(
                     librarySelected(selectedSection), activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.LIBRARY) }
                 RailIconItem(R.drawable.aerix_ic_public, stringResource(R.string.aerix_nav_discover),
                     discoverSelected(selectedSection), activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.DISCOVER) }
-                RailIconItem(R.drawable.aerix_ic_cloud_download, "Our other new releases",
+                RailIconItem(R.drawable.aerix_ic_rocket_launch_filled, "Our other new releases",
                     selectedSection == LauncherSection.OTHER_RELEASES, activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.OTHER_RELEASES) }
                 RailIconItem(R.drawable.aerix_ic_format_paint_outlined, stringResource(R.string.aerix_nav_wallpapers),
                     wallpapersSelected(selectedSection), activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.WALLPAPERS) }

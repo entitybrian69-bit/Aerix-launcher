@@ -925,15 +925,22 @@ object PojavAssetBridge {
     }
 
     /** Resolve a curated link by its exact platform slug, never by title or first search result. */
-    suspend fun resolveCurseForgeSlug(context: Context, type: AssetType, slug: String): AssetProject? =
+    suspend fun resolveCurseForgeSlug(context: Context, type: AssetType, slug: String, projectId: String? = null): AssetProject? =
         withContext(Dispatchers.IO) {
             require(Regex("[a-z0-9]+(?:-[a-z0-9]+)*").matches(slug))
             val params = hashMapOf<String, Any>("gameId" to CURSEFORGE_GAME_ID,
                 "classId" to type.curseForgeClassId, "slug" to slug,
                 "searchFilter" to slug.substringBefore('-'), "pageSize" to 50, "index" to 0)
             try {
-                val response = curseForgeGet(context, "mods/search", params, JsonObject::class.java)
+                val response = if (projectId != null) {
+                    require((projectId.toLongOrNull() ?: 0) > 0)
+                    val metadata = curseForgeGet(context, "mods/$projectId", null, JsonObject::class.java)
+                    metadata?.obj("data")?.let { mod -> JsonObject().apply {
+                        add("data", com.google.gson.JsonArray().apply { add(mod) })
+                    } }
+                } else curseForgeGet(context, "mods/search", params, JsonObject::class.java)
                 response?.let { CurseForgeProjectLink.resolve(it, type, slug) }
+                    ?.takeIf { projectId == null || it.id == projectId }
             } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
             catch (_: Exception) { null }
         }

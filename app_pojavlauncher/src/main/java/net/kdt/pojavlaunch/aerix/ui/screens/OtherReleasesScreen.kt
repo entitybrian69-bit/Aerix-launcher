@@ -28,11 +28,12 @@ internal data class TeamRelease(
     val title: String, val slug: String, val type: AssetType, val iconUrl: String,
     val attribution: String, val badges: String, val headline: String, val summary: String,
     val features: List<Pair<String, String>>, val compatibility: String,
-    val warning: String, val footnote: String
+    val warning: String, val footnote: String, val projectId: String? = null
 )
 internal val teamReleases = listOf(TeamRelease(
-    title = "Aetherium (Fabric)", slug = "aetherium-fabric", type = AssetType.MOD,
-    iconUrl = "https://media.forgecdn.net/avatars/thumbnails/2125/90/64/64/639278007572469420.png",
+    // Verified from the CurseForge API/mirror on 2026-10-19, not a guessed title match.
+    title = "Aetherium (Fabric)", slug = "aetherium-fabric", projectId = "1749327", type = AssetType.MOD,
+    iconUrl = "https://media.forgecdn.net/avatars/thumbnails/2125/90/256/256/639278007572469420.png",
     attribution = "By Team_Aerix · CurseForge", badges = "Mod · Fabric · Client-side",
     headline = "A new view of Minecraft performance",
     summary = "Aetherium brings its own terrain renderer, frame-pacing controls and a redesigned video-settings experience to Fabric. The project describes features for both desktop and Android/Pojav setups.",
@@ -81,16 +82,25 @@ private fun TeamReleaseCard(activity: FragmentActivity, project: TeamRelease, na
     Surface(shape = RoundedCornerShape(28.dp), color = AerixSurface.panel) {
         Column(Modifier.background(Brush.verticalGradient(listOf(accent.copy(alpha = 0.13f), AerixSurface.panel)))
             .padding(24.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-                Surface(shape = RoundedCornerShape(18.dp), color = accent.copy(alpha = 0.12f)) {
-                    if (icon != null) Image(icon, contentDescription = "Aetherium project logo", modifier = Modifier.size(72.dp).padding(8.dp))
-                    else Icon(painterResource(R.drawable.aerix_ic_public), contentDescription = null,
-                        tint = accent, modifier = Modifier.size(72.dp).padding(18.dp))
+            BoxWithConstraints {
+                val artwork: @Composable () -> Unit = {
+                    Surface(shape = RoundedCornerShape(18.dp), color = accent.copy(alpha = 0.12f)) {
+                        if (icon != null) Image(icon, contentDescription = "${project.title} project logo", modifier = Modifier.size(72.dp).padding(8.dp))
+                        else Icon(painterResource(R.drawable.aerix_ic_public), contentDescription = null,
+                            tint = accent, modifier = Modifier.size(72.dp).padding(18.dp))
+                    }
                 }
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(project.title, style = MaterialTheme.typography.headlineSmall, color = AerixSurface.textPrimary, fontWeight = FontWeight.Bold)
-                    Text(project.badges, style = MaterialTheme.typography.labelLarge, color = accent)
-                    Text(project.attribution, style = MaterialTheme.typography.bodyMedium, color = AerixSurface.textSecondary)
+                val heading: @Composable () -> Unit = {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(project.title, style = MaterialTheme.typography.headlineSmall, color = AerixSurface.textPrimary, fontWeight = FontWeight.Bold)
+                        Text(project.badges, style = MaterialTheme.typography.labelLarge, color = accent)
+                        Text(project.attribution, style = MaterialTheme.typography.bodyMedium, color = AerixSurface.textSecondary)
+                    }
+                }
+                if (maxWidth < 360.dp) Column(verticalArrangement = Arrangement.spacedBy(16.dp)) { artwork(); heading() }
+                else Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+                    artwork()
+                    Box(Modifier.weight(1f)) { heading() }
                 }
             }
             Text(project.headline, style = MaterialTheme.typography.titleLarge, color = AerixSurface.textPrimary, fontWeight = FontWeight.SemiBold)
@@ -110,7 +120,7 @@ private fun TeamReleaseCard(activity: FragmentActivity, project: TeamRelease, na
                 opening = true; error = null
                 scope.launch {
                     try {
-                        val resolved = PojavAssetBridge.resolveCurseForgeSlug(activity, project.type, project.slug)
+                        val resolved = PojavAssetBridge.resolveCurseForgeSlug(activity, project.type, project.slug, project.projectId)
                         if (resolved == null) error = "Couldn't find this exact CurseForge project. Check your connection and CurseForge access in Settings, then retry."
                         else AerixDownloadRequest.openProject(resolved, navigate)
                     } finally { opening = false }

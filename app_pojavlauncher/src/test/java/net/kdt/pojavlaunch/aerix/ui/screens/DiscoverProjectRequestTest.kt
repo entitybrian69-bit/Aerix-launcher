@@ -8,6 +8,13 @@ import org.junit.Test
 
 class DiscoverProjectRequestTest {
     @After fun clear() { AerixDownloadRequest.consumeProject(); AerixDownloadRequest.type = null }
+    @Test fun cataloguePinsOnlyTheSuppliedFabricProject() {
+        val entry = teamReleases.single()
+        assertEquals("1749327", entry.projectId)
+        assertEquals("aetherium-fabric", entry.slug)
+        assertEquals(AssetType.MOD, entry.type)
+        assertTrue(entry.warning.contains("OptiFine"))
+    }
     @Test fun exactProjectIsSentToDiscoverNotAnExternalDownload() {
         val project = AssetProject(AssetPlatform.CURSEFORGE, AssetType.MOD, "123", "Fixture", "", "", null, 0)
         var destination: LauncherSection? = null
