@@ -224,29 +224,54 @@ private enum class DiscoverTab(val label: String, @DrawableRes val iconRes: Int,
 /** Lets other screens open Discover on a specific content tab (e.g. from Instance Management "+"). */
 object AerixDownloadRequest {
     var type by mutableStateOf<AssetType?>(null)
+    var project by mutableStateOf<AssetProject?>(null)
+        private set
+    fun openProject(project: AssetProject, navigate: (LauncherSection) -> Unit) {
+        this.type = null
+        this.project = project
+        navigate(LauncherSection.DISCOVER)
+    }
+    fun consumeProject() { project = null }
 
     fun open(type: AssetType, navigate: (LauncherSection) -> Unit) {
+        this.project = null
         this.type = type
         navigate(LauncherSection.DISCOVER)
     }
 }
 
 @Composable
-fun DiscoverScreen(activity: FragmentActivity, @Suppress("UNUSED_PARAMETER") navigate: (LauncherSection) -> Unit) {
+fun DiscoverScreen(activity: FragmentActivity, navigate: (LauncherSection) -> Unit) {
     var selectedTab by rememberSaveable { mutableStateOf(DiscoverTab.MODS) }
     var activeProject by remember { mutableStateOf<AssetProject?>(null) }
+    var returnToReleases by remember { mutableStateOf(false) }
+    val projectRequest = AerixDownloadRequest.project
+    LaunchedEffect(projectRequest) {
+        if (projectRequest != null) {
+            selectedTab = DiscoverTab.entries.firstOrNull { it.assetType == projectRequest.type } ?: DiscoverTab.MODS
+            activeProject = projectRequest
+            returnToReleases = true
+            AerixDownloadRequest.consumeProject()
+        }
+    }
+    val closeDetail: () -> Unit = {
+        activeProject = null
+        if (returnToReleases) {
+            returnToReleases = false
+            navigate(LauncherSection.OTHER_RELEASES)
+        }
+    }
     val browseStates = rememberSaveableStateHolder()
 
     val requested = AerixDownloadRequest.type
     if (requested != null) {
         selectedTab = DiscoverTab.entries.firstOrNull { it.assetType == requested } ?: DiscoverTab.MODS
         activeProject = null
+        returnToReleases = false
         AerixDownloadRequest.type = null
     }
 
-    BackHandler(enabled = activeProject != null) {
-        activeProject = null
-    }
+    BackHandler(enabled = activeProject != null, onBack = closeDetail)
 
     Column(
         modifier = Modifier
@@ -266,6 +291,7 @@ fun DiscoverScreen(activity: FragmentActivity, @Suppress("UNUSED_PARAMETER") nav
                         } else {
                             selectedTab = tab
                             activeProject = null
+                            returnToReleases = false
                         }
                     }
                 ) {
@@ -290,7 +316,7 @@ fun DiscoverScreen(activity: FragmentActivity, @Suppress("UNUSED_PARAMETER") nav
             AssetDetailContent(
                 activity = activity,
                 project = detailProject,
-                onBack = { activeProject = null },
+                onBack = closeDetail,
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)

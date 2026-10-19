@@ -68,7 +68,7 @@ internal object LauncherUpdater {
         }
     }
     fun download(context: Context) {
-        if (job?.isActive == true) return
+        if (phase == LauncherUpdatePhase.DOWNLOADING || phase == LauncherUpdatePhase.CHECKING) return
         val update = release ?: return
         val app = context.applicationContext
         phase = LauncherUpdatePhase.DOWNLOADING; error = ""; received = 0

@@ -2,6 +2,7 @@ package net.kdt.pojavlaunch.aerix.ui.screens
 
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -28,23 +29,29 @@ import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
 import java.util.Locale
 
 @Composable
-internal fun LauncherUpdateDialog(activity: FragmentActivity, onDismiss: () -> Unit) {
+internal fun LauncherUpdateDialog(activity: FragmentActivity, automatic: Boolean = false, onDismiss: () -> Unit) {
     val updater = LauncherUpdater
     val phase = updater.phase
     val release = updater.release
     val accent = AerixThemeManager.currentAccent()
-    val shape = RoundedCornerShape(24.dp)
-    val contentHeight = (LocalConfiguration.current.screenHeightDp * 0.34f).dp.coerceAtMost(220.dp)
+    var showNotes by remember { mutableStateOf(false) }
+    val dismiss = {
+        updater.release?.let { LauncherUpdateNotices.acknowledge(activity, it) }
+        onDismiss()
+    }
+    val shape = RoundedCornerShape(28.dp)
+    val contentHeight = (LocalConfiguration.current.screenHeightDp * 0.48f).dp.coerceAtMost(360.dp)
     val progress by animateFloatAsState(
         targetValue = (updater.received.toFloat() / (release?.asset?.size ?: 1)).coerceIn(0f, 1f), label = "update-download"
     )
-    LaunchedEffect(Unit) { updater.permissionReturned(activity); updater.check() }
-    DisposableEffect(activity) {
+    LaunchedEffect(Unit) { updater.permissionReturned(activity); if (!automatic) updater.check() }
+    DisposableEffect(activity, automatic) {
+        LauncherUpdateNotices.opened(automatic)
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) updater.permissionReturned(activity)
         }
         activity.lifecycle.addObserver(observer)
-        onDispose { activity.lifecycle.removeObserver(observer) }
+        onDispose { activity.lifecycle.removeObserver(observer); LauncherUpdateNotices.closed(automatic) }
     }
     val heading = when (phase) {
         LauncherUpdatePhase.CHECKING -> "Checking for updates"
@@ -55,8 +62,8 @@ internal fun LauncherUpdateDialog(activity: FragmentActivity, onDismiss: () -> U
         LauncherUpdatePhase.ERROR -> "Couldn't complete the update"
     }
     AlertDialog(
-        onDismissRequest = onDismiss,
-        modifier = Modifier.widthIn(max = 520.dp).fillMaxWidth(0.94f).border(BorderStroke(1.dp, AerixSurface.borderSoft), shape),
+        onDismissRequest = dismiss,
+        modifier = Modifier.widthIn(max = 680.dp).fillMaxWidth(0.94f).border(BorderStroke(1.dp, AerixSurface.borderSoft), shape),
         properties = DialogProperties(usePlatformDefaultWidth = false), shape = shape,
         containerColor = AerixSurface.panel, titleContentColor = AerixSurface.textPrimary,
         textContentColor = AerixSurface.textSecondary,
@@ -67,7 +74,18 @@ internal fun LauncherUpdateDialog(activity: FragmentActivity, onDismiss: () -> U
                 Column(Modifier.fillMaxWidth().heightIn(max = contentHeight).verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     Text("Installed version · ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.labelLarge)
-                    when (state) {
+                    if (release != null) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            FilterChip(selected = !showNotes, onClick = { showNotes = false }, label = { Text("Update") })
+                            FilterChip(selected = showNotes, onClick = { showNotes = true }, label = { Text("What's new") })
+                        }
+                    }
+                    if (showNotes && release != null) {
+                        Text("What's new in ${release.tag}", style = MaterialTheme.typography.titleMedium, color = accent)
+                        SelectionContainer {
+                            Text(release.notes.ifBlank { "No release notes were published for this update." }, style = MaterialTheme.typography.bodyMedium)
+                        }
+                    } else when (state) {
                         LauncherUpdatePhase.CHECKING -> {
                             LinearProgressIndicator(Modifier.fillMaxWidth(), color = accent)
                             Text("Looking for the latest stable release…")
@@ -77,7 +95,7 @@ internal fun LauncherUpdateDialog(activity: FragmentActivity, onDismiss: () -> U
                             Text("${release?.tag} · ${megabytes(release?.asset?.size ?: 0)} MB", color = accent,
                                 style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                             Text("Download the update here. Android will ask you to confirm installation; your instances stay in place.")
-                            if (!release?.notes.isNullOrBlank()) Text(release?.notes.orEmpty(), style = MaterialTheme.typography.bodySmall)
+                            Text("See What's new for the published changes. Cancel or accept this download and this release won't prompt you again; manual updates remain in Settings.", style = MaterialTheme.typography.bodyMedium)
                         }
                         LauncherUpdatePhase.DOWNLOADING -> {
                             Text("${(progress * 100).toInt()}%", color = accent, style = MaterialTheme.typography.headlineSmall)
@@ -97,7 +115,11 @@ internal fun LauncherUpdateDialog(activity: FragmentActivity, onDismiss: () -> U
         },
         confirmButton = {
             when (phase) {
-                LauncherUpdatePhase.AVAILABLE -> Button(onClick = { updater.download(activity) },
+                LauncherUpdatePhase.AVAILABLE -> Button(onClick = {
+                    release?.let { LauncherUpdateNotices.acknowledge(activity, it) }
+                    showNotes = false
+                    updater.download(activity)
+                },
                     colors = ButtonDefaults.buttonColors(containerColor = accent, contentColor = AerixSurface.onAccent)) { Text("Download update") }
                 LauncherUpdatePhase.READY -> Button(onClick = { updater.install(activity) }, enabled = !updater.installing,
                     colors = ButtonDefaults.buttonColors(containerColor = accent, contentColor = AerixSurface.onAccent)) {
@@ -105,13 +127,13 @@ internal fun LauncherUpdateDialog(activity: FragmentActivity, onDismiss: () -> U
                 }
                 LauncherUpdatePhase.ERROR -> TextButton(onClick = { updater.check() }) { Text("Try again", color = accent) }
                 LauncherUpdatePhase.DOWNLOADING -> TextButton(onClick = { updater.cancelDownload() }) { Text("Cancel download", color = AerixSurface.danger) }
-                LauncherUpdatePhase.CURRENT -> TextButton(onClick = onDismiss) { Text("Done", color = accent) }
+                LauncherUpdatePhase.CURRENT -> TextButton(onClick = dismiss) { Text("Done", color = accent) }
                 LauncherUpdatePhase.CHECKING -> Unit
             }
         },
         dismissButton = {
-            if (phase != LauncherUpdatePhase.CURRENT) TextButton(onClick = onDismiss) {
-                Text(if (phase == LauncherUpdatePhase.DOWNLOADING) "Background" else "Close", color = AerixSurface.textSecondary)
+            if (phase != LauncherUpdatePhase.CURRENT) TextButton(onClick = dismiss) {
+                Text(if (phase == LauncherUpdatePhase.DOWNLOADING) "Keep in background" else "Cancel", color = AerixSurface.textSecondary)
             }
         }
     )

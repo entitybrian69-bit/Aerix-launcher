@@ -83,6 +83,7 @@ import net.kdt.pojavlaunch.aerix.ui.screens.WallpapersScreen
 @Composable
 fun AerixLauncherScreen(activity: FragmentActivity) {
     AerixNav.init()
+    net.kdt.pojavlaunch.aerix.ui.screens.LauncherUpdateNoticeHost(activity)
     val section = AerixNav.section
     val navigate: (LauncherSection) -> Unit = { target ->
         when (target) {
@@ -133,6 +134,7 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
                         label = "aerixSection"
                     ) { target ->
                         when (target) {
+                            LauncherSection.OTHER_RELEASES -> net.kdt.pojavlaunch.aerix.ui.screens.OtherReleasesScreen(activity, navigate)
                             LauncherSection.HOME -> HomeScreen(activity, navigate)
                             LauncherSection.LIBRARY -> LibraryScreen(activity)
                             LauncherSection.DISCOVER, LauncherSection.DOWNLOADS -> DiscoverScreen(activity, navigate)
