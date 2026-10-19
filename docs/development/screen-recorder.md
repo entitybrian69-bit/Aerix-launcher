@@ -43,6 +43,10 @@ filters. Android CI verifies compilation and the existing regression suite. A
 real Android device is required to validate MediaProjection permission/revocation,
 actual H.264 encoder behavior, playable MP4 finalization, notification Stop,
 app-only capture, background/lock handling and device-specific encoder limits.
+The recorder requires at least 64 MB free to start and requests a graceful stop
+below 16 MB, checked off the UI thread every two seconds of video. Android 10+
+best-effort recovery on the next recording removes only the last tracked pending
+URI after checking IS_PENDING; already published recordings are never removed.
 No claim of zero lag, guaranteed 120 FPS or measured low-end performance is made.
 Test short 240p/15 and 480p/24 clips before raising settings; monitor heat, FPS,
 free space and output playback. Kill/power loss can leave a pending/unfinished

@@ -38,6 +38,8 @@ class RecordingOptionsTest {
         assertFalse(RecordingOptions.hardware("vendor.encoder", false, false))
         assertFalse(RecordingOptions.hardware("vendor.encoder", true, true))
         assertFalse(RecordingOptions.hardware("unknown", null, null))
+        assertFalse(RecordingOptions.hardware("OMX.SEC.avc.sw.enc", null, null))
+        assertFalse(RecordingOptions.hardware("OMX.ffmpeg.avc.encoder", null, null))
     }
     @Test fun acceptsVendorHardwareAndConservativeLegacyNames() {
         assertTrue(RecordingOptions.hardware("c2.qti.avc.encoder", true, false))

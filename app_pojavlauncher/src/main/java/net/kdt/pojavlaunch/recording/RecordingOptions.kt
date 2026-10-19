@@ -31,7 +31,7 @@ object RecordingOptions {
         if (reportedSoftware == true || reportedHardware == false) return false
         val lower = name.lowercase(java.util.Locale.ROOT)
         return !lower.startsWith("omx.google.") && !lower.startsWith("c2.android.") &&
-            !lower.contains("software") && (reportedHardware == true || lower.startsWith("omx.") || lower.startsWith("c2."))
+            !lower.contains("software") && !lower.contains(".sw.") && !lower.startsWith("omx.ffmpeg.") && (reportedHardware == true || lower.startsWith("omx.") || lower.startsWith("c2."))
     }
 
     /** Query off the UI thread. No software fallback that could steal CPU from Minecraft. */

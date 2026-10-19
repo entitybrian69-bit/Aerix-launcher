@@ -20,6 +20,8 @@ import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.IBinder
+import android.os.Environment
+import android.os.StatFs
 import android.os.Looper
 import android.view.Surface
 import android.widget.Toast
@@ -50,6 +52,8 @@ class ScreenRecordingService : Service() {
     private var muxerStarted = false
     private var track = -1
     private var samples = 0L
+    private var lastSpaceCheckUs = Long.MIN_VALUE
+    private val storagePath by lazy { (getExternalFilesDir(Environment.DIRECTORY_MOVIES) ?: filesDir).absolutePath }
     private val stopTimeout = Runnable { finish(samples > 0, "Recording stopped") }
     private val projectionCallback = object : MediaProjection.Callback() {
         override fun onStop() { requestStop() }
@@ -99,6 +103,7 @@ class ScreenRecordingService : Service() {
     private fun begin(token: Intent, config: RecordingOptions.Config) {
         try {
             if (stopRequested) { finish(false, "Recording cancelled"); return }
+            check(StatFs(storagePath).availableBytes >= 64L * 1024 * 1024) { "At least 64 MB of free storage is needed" }
             output = RecordingOutput(this)
             muxer = output!!.open()
             codec = MediaCodec.createByCodecName(config.encoder)
@@ -123,6 +128,10 @@ class ScreenRecordingService : Service() {
                             buffer.limit(info.offset + info.size)
                             muxer!!.writeSampleData(track, buffer, info)
                             samples++
+                        }
+                        if (!stopping && (lastSpaceCheckUs == Long.MIN_VALUE || info.presentationTimeUs - lastSpaceCheckUs >= 2_000_000)) {
+                            lastSpaceCheckUs = info.presentationTimeUs
+                            if (StatFs(storagePath).availableBytes < 16L * 1024 * 1024) requestStop()
                         }
                         codec.releaseOutputBuffer(index, false)
                         if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) finish(samples > 0, "Recording stopped")

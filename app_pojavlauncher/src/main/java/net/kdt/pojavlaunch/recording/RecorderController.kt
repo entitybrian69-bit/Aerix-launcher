@@ -159,7 +159,8 @@ class RecorderController(private val activity: Activity) {
 
     fun stop() {
         if (startRequested || RecordingState.isActive()) {
-            activity.startService(Intent(activity, ScreenRecordingService::class.java).setAction(ScreenRecordingService.STOP))
+            runCatching { activity.startService(Intent(activity, ScreenRecordingService::class.java).setAction(ScreenRecordingService.STOP)) }
+                .onFailure { toast("Could not request stop; use Android's recording notification to stop") }
             startRequested = false
         }
     }

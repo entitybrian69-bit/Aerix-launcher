@@ -16,6 +16,7 @@ import java.util.Locale
 
 /** Streams directly to the final file. Pending MediaStore rows are exposed only after MP4 finalization. */
 internal class RecordingOutput(private val context: Context) {
+    private val recovery = context.getSharedPreferences("aerix_recording_recovery", 0)
     private var uri: Uri? = null
     private var file: File? = null
     private var descriptor: ParcelFileDescriptor? = null
@@ -23,6 +24,18 @@ internal class RecordingOutput(private val context: Context) {
 
     fun open(): MediaMuxer {
         if (Build.VERSION.SDK_INT >= 29) {
+            // Only recover our own last pending URI; never delete a finalized recording.
+            recovery.getString("pending_uri", null)?.let { previous ->
+                runCatching {
+                    val abandoned = Uri.parse(previous)
+                    if (abandoned.authority == MediaStore.AUTHORITY) {
+                        context.contentResolver.query(abandoned, arrayOf(MediaStore.Video.Media.IS_PENDING), null, null, null)?.use { cursor ->
+                            if (cursor.moveToFirst() && cursor.getInt(0) == 1) context.contentResolver.delete(abandoned, null, null)
+                        }
+                    }
+                }
+                recovery.edit().remove("pending_uri").commit()
+            }
             uri = requireNotNull(context.contentResolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
                 ContentValues().apply {
                     put(MediaStore.Video.Media.DISPLAY_NAME, name)
@@ -30,6 +43,7 @@ internal class RecordingOutput(private val context: Context) {
                     put(MediaStore.Video.Media.RELATIVE_PATH, "Movies/Aerix")
                     put(MediaStore.Video.Media.IS_PENDING, 1)
                 })) { "Cannot create recording in Movies/Aerix" }
+            check(recovery.edit().putString("pending_uri", uri.toString()).commit()) { "Cannot track pending recording" }
             descriptor = requireNotNull(context.contentResolver.openFileDescriptor(uri!!, "rw"))
             return MediaMuxer(descriptor!!.fileDescriptor, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
         }
@@ -45,12 +59,14 @@ internal class RecordingOutput(private val context: Context) {
         if (!success) {
             uri?.let { runCatching { context.contentResolver.delete(it, null, null) } }
             file?.delete()
+            recovery.edit().remove("pending_uri").commit()
             return ""
         }
         uri?.let {
             check(context.contentResolver.update(it, ContentValues().apply {
                 put(MediaStore.Video.Media.IS_PENDING, 0)
             }, null, null) > 0) { "Cannot publish recording" }
+            recovery.edit().remove("pending_uri").commit()
             return "Movies/Aerix/$name"
         }
         val path = requireNotNull(file).absolutePath
