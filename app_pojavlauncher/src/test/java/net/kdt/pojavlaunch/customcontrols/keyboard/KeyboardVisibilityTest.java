@@ -175,4 +175,18 @@ public class KeyboardVisibilityTest {
         assertTrue(input.isEnabled());
         assertEquals(1, ime.shows);
     }
+    @Test public void repeatedFocusBouncesCannotResetTheRetryBudget() {
+        input.setKeyboardState(true);
+        idle(1);
+        for (int i = 0; i < 20; i++) {
+            focus(false);
+            idle(1);
+            focus(true);
+            idle(1);
+        }
+        assertEquals(10, ime.shows);
+        idle(5000);
+        assertEquals(10, ime.shows);
+    }
+
 }

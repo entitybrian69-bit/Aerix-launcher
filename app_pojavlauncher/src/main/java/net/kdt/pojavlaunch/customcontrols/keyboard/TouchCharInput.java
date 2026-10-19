@@ -189,7 +189,7 @@ public class TouchCharInput extends androidx.appcompat.widget.AppCompatEditText 
             mKeyboardRequestGeneration++;
             mImeShown = false;
         } else if (mKeyboardRequested) {
-            mShowAttempts = 0;
+            // Focus bouncing must not create an unlimited retry loop on a slow device.
             scheduleShow(0);
         }
     }

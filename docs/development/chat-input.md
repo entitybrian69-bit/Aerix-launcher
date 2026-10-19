@@ -39,7 +39,8 @@ input session, not arbitrary external game editing.
 
 Keyboard visibility is an explicit requested state, not a synonym for View focus.
 The editor is focusable in touch mode; opening is posted until it is attached,
-visible and window-focused. A busy IME gets at most ten attempts, 200 ms apart.
+visible and window-focused. A busy IME gets at most ten attempts, 200 ms apart; focus bouncing cannot
+reset that budget.
 An IME shown result or visible IME insets stops retries. An inactive input
 connection is restarted only once per opening attempt sequence, never repeatedly
 while composing. Repeated open requests share pending work; an explicit new open
