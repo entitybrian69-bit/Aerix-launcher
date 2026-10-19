@@ -51,7 +51,7 @@ internal val teamReleases = listOf(TeamRelease(
 internal fun OtherReleasesScreen(activity: FragmentActivity, navigate: (LauncherSection) -> Unit) {
     val accent = AerixThemeManager.currentAccent()
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-        LazyColumn(Modifier.widthIn(max = 720.dp).fillMaxSize().padding(horizontal = 18.dp),
+        LazyColumn(Modifier.widthIn(max = 720.dp).fillMaxWidth(0.94f).fillMaxHeight().padding(horizontal = 18.dp),
             contentPadding = PaddingValues(top = 20.dp, bottom = 28.dp),
             verticalArrangement = Arrangement.spacedBy(18.dp)) {
             item {
