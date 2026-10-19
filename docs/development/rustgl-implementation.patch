@@ -1,8 +1,96 @@
 diff --git a/.github/workflows/android.yml b/.github/workflows/android.yml
-index f851e07..559cfd5 100644
+index f851e07..c2f2c8e 100644
 --- a/.github/workflows/android.yml
 +++ b/.github/workflows/android.yml
-@@ -83,6 +83,9 @@ jobs:
+@@ -7,7 +7,74 @@ on:
+     types: [labeled]
+ 
+ jobs:
++  rustgl-native:
++    name: Build experimental RustGL GLES bundle
++    runs-on: ubuntu-22.04
++    permissions:
++      contents: read
++    steps:
++      - uses: actions/checkout@v4
++        with:
++          persist-credentials: false
++      - name: Checkout pinned renderer source
++        uses: actions/checkout@v4
++        with:
++          repository: whaltermc/rust-renderer
++          ref: eb22559581cf400af29470205a9ebbff31e0db33
++          path: .cache/rustgl-source
++          persist-credentials: false
++      - name: Install Rust and Android toolchain
++        shell: bash
++        run: |
++          rustup toolchain install stable --profile minimal --component rust-docs
++          rustup default stable
++          rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
++          if [ ! -d "$ANDROID_HOME/ndk/29.0.14206865" ]; then
++            "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;29.0.14206865"
++          fi
++      - name: Rust cache identity
++        id: rust-cache
++        run: echo "version=$(rustc --version | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"
++      - name: Cache pinned Rust dependencies and compilation
++        uses: actions/cache@v4
++        with:
++          key: rustgl-eb225595-ndk29-api26-16k-${{ runner.os }}-${{ steps.rust-cache.outputs.version }}
++          path: |
++            ~/.cargo/registry
++            ~/.cargo/git
++            .cache/rustgl-source/target
++      - name: Compile and inspect native renderer with license evidence
++        shell: bash
++        run: |
++          set -o pipefail
++          if ! python3 scripts/build_rustgl_bundle.py --source .cache/rustgl-source \
++              --ndk "$ANDROID_HOME/ndk/29.0.14206865" --report .cache/rustgl-report 2>&1 | tee rustgl-build.log; then
++            detail=$(tail -c 5000 rustgl-build.log | sed 's/%/%25/g; s/\r//g' | tr '\n' '|')
++            echo "::error title=RustGL native build::$detail"
++            exit 1
++          fi
++      - name: Renderer core unit tests
++        working-directory: .cache/rustgl-source
++        run: cargo test --locked -p renderer-core
++      - name: Upload authenticated-build input assets
++        uses: actions/upload-artifact@v4
++        with:
++          name: rustgl-bundle-assets
++          path: app_pojavlauncher/src/main/assets/renderer-bundles/rustgl/
++          if-no-files-found: error
++      - name: Upload experimental licensing and provenance evidence
++        if: always()
++        uses: actions/upload-artifact@v4
++        with:
++          name: rustgl-build-evidence
++          include-hidden-files: true
++          path: |
++            .cache/rustgl-report/evidence/
++            .cache/rustgl-report/experimental-approval.json
++            rustgl-build.log
++
+   build:
++    needs: rustgl-native
+     runs-on: ubuntu-22.04
+     env:
+       POJAV_GPLAY_KEYSTORE_PASSWORD: ${{ secrets.POJAV_GPLAY_KEYSTORE_PASSWORD }}
+@@ -18,6 +85,12 @@ jobs:
+         with:
+           submodules: recursive
+ 
++      - name: Download this run's verified RustGL bundle
++        uses: actions/download-artifact@v4
++        with:
++          name: rustgl-bundle-assets
++          path: app_pojavlauncher/src/main/assets/renderer-bundles/rustgl
++
+       - name: Set up JDK 21
+         uses: actions/setup-java@v3
+         with:
+@@ -83,6 +156,9 @@ jobs:
            HELPER
            cat report_gradle_failure.sh
  
@@ -12,17 +100,42 @@ index f851e07..559cfd5 100644
        - name: Launcher regression tests
          shell: bash
          run: |
+@@ -149,11 +225,21 @@ jobs:
+             app_pojavlauncher/src/test/native/frame_counter_test.c -o "$RUNNER_TEMP/fps-counter-test"
+           "$RUNNER_TEMP/fps-counter-test"
+ 
++      - name: Verify final APKs contain RustGL for every ABI
++        run: python3 scripts/verify_rustgl_apk.py out/app-release-full.apk out/app-release-noruntime.apk
++
+       - name: Gen md5sums
+         run: |
++          sha256sum out/app-release-full.apk out/app-release-noruntime.apk > out/SHA256SUMS
+           md5sum out/app-release-full.apk > out/app-release-full.md5
+           md5sum out/app-release-noruntime.apk > out/app-release-noruntime.md5
+ 
++      - name: Upload APK SHA-256 checksums
++        uses: actions/upload-artifact@v4
++        with:
++          name: apk-sha256
++          path: out/SHA256SUMS
++
+       - name: Upload Release APK (Full)
+         uses: actions/upload-artifact@v4
+         with:
 diff --git a/.gitignore b/.gitignore
-index 9fb5d26..abe9f1c 100644
+index 9fb5d26..213f31c 100644
 --- a/.gitignore
 +++ b/.gitignore
-@@ -10,3 +10,6 @@ app_pojavlauncher/.cxx/
+@@ -10,3 +10,9 @@ app_pojavlauncher/.cxx/
  .vs/
  /curseforge_key.txt
  /app_pojavlauncher/libs/ltw-release.aar
 +
 +# Python renderer tooling
 +__pycache__/
++
++# Generated, pinned RustGL build outputs; source recipe and hashes live in CI artifacts.
++/app_pojavlauncher/src/main/assets/renderer-bundles/rustgl/
 diff --git a/app_pojavlauncher/src/main/AndroidManifest.xml b/app_pojavlauncher/src/main/AndroidManifest.xml
 index 39a27e1..1e6bc12 100644
 --- a/app_pojavlauncher/src/main/AndroidManifest.xml
@@ -177,10 +290,10 @@ index 2d34c6e..19f58bb 100644
      }.getOrDefault(false)
 diff --git a/app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/renderer/BundledRustGl.kt b/app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/renderer/BundledRustGl.kt
 new file mode 100644
-index 0000000..5c77240
+index 0000000..d6263e6
 --- /dev/null
 +++ b/app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/renderer/BundledRustGl.kt
-@@ -0,0 +1,70 @@
+@@ -0,0 +1,74 @@
 +package net.kdt.pojavlaunch.aerix.renderer
 +
 +import android.content.Context
@@ -206,7 +319,7 @@ index 0000000..5c77240
 +                JsonParser.parseString(text).asJsonObject
 +            }
 +        } catch (_: java.io.FileNotFoundException) { return null }
-+        if (!index.get("redistributionApproved").asBoolean) return null
++        if (index.get("redistributionApproved")?.asBoolean != true && index.get("experimentalUserAuthorized")?.asBoolean != true) return null
 +        require(index.get("schema").asInt == 1)
 +        require(index.get("backend").asString == "gles") { "RustGL Vulkan implementation has no release qualification" }
 +        val abi = (if (android.os.Process.is64Bit()) Build.SUPPORTED_64_BIT_ABIS else Build.SUPPORTED_32_BIT_ABIS).firstOrNull() ?: return null
@@ -241,7 +354,11 @@ index 0000000..5c77240
 +            summary = "APK-authenticated RustGL bundle ${release.version} · GLES",
 +            minMCVer = null, maxMCVer = null, glName = gl.absolutePath, eglName = gl.absolutePath,
 +            nativeLibDir = directory.absolutePath,
-+            env = RustGlBackendPolicy.environment(emptyMap()),
++            env = RustGlBackendPolicy.environment(mapOf(
++                "RENDERER_SPOOF_GL" to "1", "MESA_GL_VERSION_OVERRIDE" to "4.4",
++                "MESA_GLSL_VERSION_OVERRIDE" to "330", "LIB_MESA_NAME" to "",
++                "JAVA_TOOL_OPTIONS" to "-Dorg.lwjgl.util.NoChecks=true"
++            )),
 +            dlopen = emptyList(), metadataVersion = 2,
 +            initializeBundle = { initialize ->
 +                val attempt = storage.beginInit(release)
@@ -570,7 +687,7 @@ index 0000000..1811b9c
 +    override fun onBind(intent: Intent?): IBinder = messenger.binder
 +}
 diff --git a/app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/ui/screens/SettingsScreen.kt b/app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/ui/screens/SettingsScreen.kt
-index 7c2b178..ff6f768 100644
+index 7c2b178..334b73e 100644
 --- a/app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/ui/screens/SettingsScreen.kt
 +++ b/app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/ui/screens/SettingsScreen.kt
 @@ -510,6 +510,8 @@ private fun RendererTabContent(activity: FragmentActivity) {
@@ -630,7 +747,7 @@ index 7c2b178..ff6f768 100644
          onDismissRequest = { confirmExperimental = false },
          title = { Text("Experimental RustGL renderer") },
 -        text = { Text("This external plugin uses GLES translation. Its advertised GL 4.5 version does not mean complete GL 4.5 support. Android gameplay and performance are not verified by Aerix. The plugin's default configuration disables LWJGL safety checks. Use only a trusted plugin APK; Vulkan rendering is not established.") },
-+        text = { Text("This experimental renderer uses GLES translation. Its advertised GL 4.5 version does not mean complete GL 4.5 support. Android gameplay and performance are not verified by Aerix. External plugins may disable LWJGL safety checks; use only trusted builds. Bundled releases require APK-authenticated checksums. Vulkan rendering is not established.") },
++        text = { Text("This experimental renderer uses GLES translation. Its advertised GL 4.5 version does not mean complete GL 4.5 support. Android gameplay and performance are not verified by Aerix. RustGL compatibility defaults disable LWJGL pointer checks; use only trusted builds. Bundled releases require APK-authenticated checksums. Vulkan rendering is not established.") },
          confirmButton = { TextButton(onClick = { confirmExperimental = false; onSelect() }) { Text("Use experimental renderer") } },
          dismissButton = { TextButton(onClick = { confirmExperimental = false }) { Text("Cancel") } }
      )
@@ -787,6 +904,60 @@ index 889923c..6ede5da 100644
          }
          library.writeBytes(header)
          assertTrue(RendererPluginV2.matchesElfAbi(library, "arm64-v8a"))
+diff --git a/app_pojavlauncher/src/test/java/net/kdt/pojavlaunch/aerix/renderer/BundledRustGlDiscoveryTest.kt b/app_pojavlauncher/src/test/java/net/kdt/pojavlaunch/aerix/renderer/BundledRustGlDiscoveryTest.kt
+new file mode 100644
+index 0000000..eba519e
+--- /dev/null
++++ b/app_pojavlauncher/src/test/java/net/kdt/pojavlaunch/aerix/renderer/BundledRustGlDiscoveryTest.kt
+@@ -0,0 +1,48 @@
++package net.kdt.pojavlaunch.aerix.renderer
++
++import android.app.ActivityManager
++import android.app.Application
++import android.content.pm.ConfigurationInfo
++import android.os.Build
++import org.junit.Assert.*
++import org.junit.Assume.assumeTrue
++import org.junit.Test
++import org.junit.runner.RunWith
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.RuntimeEnvironment
++import org.robolectric.Shadows.shadowOf
++import org.robolectric.annotation.Config
++import org.robolectric.util.ReflectionHelpers
++import java.io.File
++
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [28], application = Application::class)
++class BundledRustGlDiscoveryTest {
++    private fun context(gles: Int): Application {
++        val app = RuntimeEnvironment.getApplication()
++        val present = app.assets.list("renderer-bundles/rustgl")?.contains("index.json") == true
++        if (System.getenv("GITHUB_ACTIONS") == "true") assertTrue("CI must build a real RustGL payload", present)
++        assumeTrue("Generate source-built assets before running this integration test locally", present)
++        ReflectionHelpers.setStaticField(Build::class.java, "SUPPORTED_32_BIT_ABIS", arrayOf("armeabi-v7a"))
++        ReflectionHelpers.setStaticField(Build::class.java, "SUPPORTED_64_BIT_ABIS", arrayOf("arm64-v8a"))
++        shadowOf(app.getSystemService(ActivityManager::class.java)).setDeviceConfigurationInfo(
++            ConfigurationInfo().apply { reqGlEsVersion = gles })
++        return app
++    }
++
++    @Test fun sourceBuiltPayloadRegistersRealSelectableRendererWithoutPluginApk() {
++        val plugin = BundledRustGl.discover(context(0x30000))
++        assertNotNull("Generated assets must produce an actual RenderSpec", plugin)
++        requireNotNull(plugin)
++        assertEquals("plugin:net.kdt.pojavlaunch.renderer.rustgl", plugin.pluginTag)
++        assertEquals("RustGL (Experimental)", plugin.displayName)
++        assertEquals("gles", plugin.env["RENDERER_BACKEND"])
++        assertTrue(File(plugin.glName).length() > 64)
++        assertEquals(plugin.glName, plugin.eglName)
++        assertEquals(File(plugin.glName).parentFile.canonicalPath, plugin.librarySearchPath())
++    }
++
++    @Test fun gles2OnlyDeviceDoesNotGetUnsupportedSelectableRenderer() {
++        assertNull(BundledRustGl.discover(context(0x20000)))
++    }
++}
 diff --git a/app_pojavlauncher/src/test/java/net/kdt/pojavlaunch/aerix/renderer/IsolatedProbeApplicationTest.kt b/app_pojavlauncher/src/test/java/net/kdt/pojavlaunch/aerix/renderer/IsolatedProbeApplicationTest.kt
 new file mode 100644
 index 0000000..f9553dc
@@ -983,12 +1154,195 @@ index 0000000..004ee2b
 +        assertNull(VulkanEligibility.rejection(capable.copy(driverVersion = 43), listOf(rule), true))
 +    }
 +}
+diff --git a/scripts/build_rustgl_bundle.py b/scripts/build_rustgl_bundle.py
+new file mode 100644
+index 0000000..e425dfc
+--- /dev/null
++++ b/scripts/build_rustgl_bundle.py
+@@ -0,0 +1,177 @@
++#!/usr/bin/env python3
++"""Pinned experimental source build; upstream README licensing basis was explicitly accepted."""
++import argparse
++import base64
++import hashlib
++import json
++import os
++from pathlib import Path
++import re
++import shutil
++import subprocess
++import sys
++import urllib.request
++
++REVISION = "eb22559581cf400af29470205a9ebbff31e0db33"
++TARGETS = {
++    "arm64-v8a": ("aarch64-linux-android", "aarch64-linux-android26"),
++    "armeabi-v7a": ("armv7-linux-androideabi", "armv7a-linux-androideabi26"),
++    "x86": ("i686-linux-android", "i686-linux-android26"),
++    "x86_64": ("x86_64-linux-android", "x86_64-linux-android26"),
++}
++PERMISSIVE = {"MIT", "Apache-2.0", "ISC", "BSD-2-Clause", "BSD-3-Clause", "Zlib", "Unicode-3.0", "Unicode-DFS-2016", "CC0-1.0", "BSL-1.0", "0BSD", "Unlicense"}
++
++
++def digest(path):
++    return hashlib.sha256(path.read_bytes()).hexdigest()
++
++
++def supported_license(expression):
++    if not expression:
++        return False
++    tokens = set(re.findall(r"[A-Za-z0-9.+-]+", expression)) - {"AND", "OR"}
++    return bool(tokens) and tokens <= PERMISSIVE
++
++
++def github_package_licenses(package, directory, destination):
++    """Use the exact cargo-published VCS commit, never a moving branch or guessed tag."""
++    vcs_path = directory / ".cargo_vcs_info.json"
++    repo = re.match(r"https://github.com/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+?)(?:\.git)?(?:/|$)", package.get("repository") or "")
++    if not repo or not vcs_path.is_file():
++        return []
++    vcs = json.loads(vcs_path.read_text())
++    commit = vcs.get("git", {}).get("sha1", "")
++    if not re.fullmatch(r"[0-9a-f]{40}", commit):
++        raise ValueError("Unpinned license evidence")
++    base = "https://api.github.com/repos/" + repo[1]
++    def get(path):
++        request = urllib.request.Request(base + path, headers={"User-Agent": "Aerix-experimental-license-audit", "Accept": "application/vnd.github+json"})
++        with urllib.request.urlopen(request, timeout=60) as response:
++            return json.load(response)
++    tree = get("/git/trees/" + commit + "?recursive=1")
++    if tree.get("truncated"):
++        raise ValueError("License source tree truncated")
++    package_path = Path(vcs.get("path_in_vcs", "."))
++    parents = {"."} | {str(parent) for parent in package_path.parents} | {str(package_path)}
++    found = []
++    for item in tree["tree"]:
++        path = Path(item["path"])
++        if item["type"] != "blob" or str(path.parent) not in parents or not path.name.upper().startswith(("LICENSE", "LICENCE", "COPYING", "COPYRIGHT", "NOTICE")):
++            continue
++        blob = get("/git/blobs/" + item["sha"])
++        data = base64.b64decode(blob["content"])
++        if hashlib.sha1(b"blob " + str(len(data)).encode() + b"\0" + data).hexdigest() != item["sha"]:
++            raise ValueError("License Git object hash mismatch")
++        target = destination / (package["name"] + "-" + package["version"] + "-vcs-" + path.name)
++        target.write_bytes(data)
++        found.append(target)
++    print(f"License evidence: {package['name']} {package['version']} from {repo[1]}@{commit}")
++    return found
++
++
++def run(args):
++    source = args.source.resolve()
++    if subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=source, text=True).strip() != REVISION:
++        raise ValueError("Unexpected renderer revision")
++    if subprocess.check_output(["git", "status", "--porcelain"], cwd=source, text=True).strip():
++        raise ValueError("Renderer source must be clean before compilation")
++    report = args.report.resolve()
++    report.mkdir(parents=True, exist_ok=True)
++    evidence_dir = report / "evidence"
++    evidence_dir.mkdir(exist_ok=True)
++    meta = json.loads(subprocess.check_output(["cargo", "metadata", "--locked", "--all-features", "--format-version", "1"], cwd=source, text=True))
++    inventory = json.loads(args.inventory.read_text())
++    expected = {(c["name"], c["version"]) for c in inventory["components"]}
++    actual = {(p["name"], p["version"]) for p in meta["packages"]}
++    if expected != actual:
++        raise ValueError(f"Dependency inventory drift: missing={expected-actual}, extra={actual-expected}")
++    components = []
++    for package in sorted(meta["packages"], key=lambda p: (p["name"], p["version"])):
++        directory = Path(package["manifest_path"]).parent
++        workspace = package["source"] is None
++        license_expression = package["license"] or ("MIT" if workspace and directory.is_relative_to(source) else None)
++        if not supported_license(license_expression):
++            raise ValueError(f"Unreviewed dependency license: {package['name']} {license_expression}")
++        files = [p for p in directory.iterdir() if p.is_file() and
++                 p.name.upper().startswith(("LICENSE", "LICENCE", "COPYING", "COPYRIGHT", "NOTICE"))]
++        if package.get("license_file"):
++            files.append(directory / package["license_file"])
++        if workspace:
++            files.append(source / "README.md")
++        files = sorted(set(files))
++        if not files and package["source"] and package["source"].startswith("git+"):
++            for parent in directory.parents:
++                files = [p for p in parent.iterdir() if p.is_file() and
++                         p.name.upper().startswith(("LICENSE", "LICENCE", "COPYING", "COPYRIGHT", "NOTICE"))]
++                if files or (parent / ".git").exists():
++                    break
++        if not files:
++            files = github_package_licenses(package, directory, evidence_dir)
++        if not files:
++            raise ValueError(f"License text absent: {package['name']} {package['version']} repository={package.get('repository')} source={package['source']} vcs={(directory / '.cargo_vcs_info.json').exists()} entries={[p.name for p in directory.iterdir()][:30]}")
++        evidence = []
++        for i, path in enumerate(files):
++            name = re.sub(r"[^A-Za-z0-9_.-]", "_", f"{package['name']}-{package['version']}-{i}-{path.name}")
++            target = evidence_dir / name
++            target.write_text(path.read_text(errors="replace"))
++            evidence.append({"file": f"evidence/{name}", "sha256": digest(target)})
++        components.append({"name": package["name"], "version": package["version"],
++                           "licenseConclusion": license_expression, "evidence": evidence,
++                           "basis": "upstream README declaration; LICENSE missing; experimental acceptance only" if workspace else "exact Cargo package license declaration and packaged texts"})
++    # Preserve compiler/runtime distribution notices in addition to Cargo package texts.
++    sysroot = Path(subprocess.check_output(["rustc", "--print", "sysroot"], text=True).strip())
++    rust_docs = sysroot / "share/doc/rust"
++    tool_notices = []
++    for path in rust_docs.rglob("*"):
++        if path.is_file() and (path.name.upper().startswith(("LICENSE", "COPYRIGHT"))) and path.stat().st_size < 8 * 1024 * 1024:
++            # HTML reference pages are excluded except the distribution copyright document.
++            if path.suffix == ".html" and path.name != "COPYRIGHT.html":
++                continue
++            target = evidence_dir / ("rust-toolchain-" + hashlib.sha256(str(path.relative_to(rust_docs)).encode()).hexdigest()[:12] + "-" + path.name)
++            shutil.copyfile(path, target)
++            tool_notices.append({"file": f"evidence/{target.name}", "sha256": digest(target)})
++    if not tool_notices:
++        raise ValueError("Rust toolchain license/copyright material missing; install rust-docs")
++    components[0]["evidence"].extend(tool_notices)
++    native = report / "native"
++    bin_dir = args.ndk.resolve() / "toolchains/llvm/prebuilt/linux-x86_64/bin"
++    for abi, (triple, clang) in TARGETS.items():
++        env = os.environ.copy()
++        upper = triple.upper().replace("-", "_")
++        underscored = triple.replace("-", "_")
++        env[f"CARGO_TARGET_{upper}_LINKER"] = str(bin_dir / (clang + "-clang"))
++        env[f"CC_{underscored}"] = str(bin_dir / (clang + "-clang"))
++        env[f"AR_{underscored}"] = str(bin_dir / "llvm-ar")
++        env["RUSTFLAGS"] = "-C link-arg=-Wl,-z,max-page-size=16384 -C link-arg=-Wl,-z,common-page-size=16384"
++        subprocess.run(["cargo", "build", "--locked", "--release", "-p", "gl-compat", "--target", triple], cwd=source, env=env, check=True)
++        output = native / abi / "librust_gl.so"
++        output.parent.mkdir(parents=True, exist_ok=True)
++        shutil.copyfile(source / "target" / triple / "release/librust_gl.so", output)
++    artifacts = [{"abi": abi, "name": "librust_gl.so", "bytes": (native / abi / "librust_gl.so").stat().st_size,
++                  "sha256": digest(native / abi / "librust_gl.so")} for abi in TARGETS]
++    approval = {"redistributionApproved": False, "experimentalUserAuthorized": True,
++                "reviewedBy": "Experimental build policy: user accepted upstream README MIT basis; no legal clearance claimed",
++                "sourceRevision": REVISION, "components": components, "artifacts": artifacts,
++                "toolchain": subprocess.check_output(["rustc", "-Vv"], text=True),
++                "ndk": args.ndk.name}
++    approval_path = report / "experimental-approval.json"
++    approval_path.write_text(json.dumps(approval, indent=2) + "\n")
++    subprocess.run([sys.executable, str(Path(__file__).with_name("prepare_rustgl_bundle.py")),
++                    "--approval", str(approval_path), "--input", str(native), "--version", "0.3.0",
++                    "--inventory", str(args.inventory.resolve()), "--output", str(args.output.resolve()),
++                    "--readelf", str(bin_dir / "llvm-readelf"), "--experimental-mit-declaration"], check=True)
++    print("::notice title=RustGL bundled source build::" + json.dumps({"revision": REVISION, "artifacts": artifacts, "licenses": len(components), "experimental": True}))
++
++
++if __name__ == "__main__":
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument("--source", type=Path, required=True)
++    parser.add_argument("--ndk", type=Path, required=True)
++    parser.add_argument("--report", type=Path, required=True)
++    parser.add_argument("--inventory", type=Path, default=Path("docs/development/rustgl-cargo-inventory.json"))
++    parser.add_argument("--output", type=Path, default=Path("app_pojavlauncher/src/main/assets/renderer-bundles/rustgl"))
++    try:
++        run(parser.parse_args())
++    except (ValueError, OSError, subprocess.SubprocessError) as error:
++        print(f"::error title=RustGL source build::{error}")
++        raise
 diff --git a/scripts/prepare_rustgl_bundle.py b/scripts/prepare_rustgl_bundle.py
 new file mode 100644
-index 0000000..72c356f
+index 0000000..5bf602a
 --- /dev/null
 +++ b/scripts/prepare_rustgl_bundle.py
-@@ -0,0 +1,107 @@
+@@ -0,0 +1,111 @@
 +#!/usr/bin/env python3
 +"""Import only an explicitly audited native payload. This does not grant a license."""
 +import argparse
@@ -1001,7 +1355,7 @@ index 0000000..72c356f
 +import subprocess
 +import tempfile
 +
-+PERMISSIVE = {"MIT", "Apache-2.0", "ISC", "BSD-2-Clause", "BSD-3-Clause", "Zlib", "MIT OR Apache-2.0", "Apache-2.0 OR MIT"}
++PERMISSIVE = {"MIT", "Apache-2.0", "ISC", "BSD-2-Clause", "BSD-3-Clause", "Zlib", "MIT OR Apache-2.0", "Apache-2.0 OR MIT", "Unicode-3.0", "Unicode-DFS-2016", "CC0-1.0", "BSL-1.0", "0BSD", "Unlicense"}
 +SYSTEM = {"libc.so", "libm.so", "libdl.so", "liblog.so", "libandroid.so", "libEGL.so", "libGLESv2.so", "libGLESv3.so", "libvulkan.so"}
 +ABIS = {"arm64-v8a": (2, 183), "armeabi-v7a": (1, 40), "x86": (1, 3), "x86_64": (2, 62)}
 +
@@ -1020,7 +1374,9 @@ index 0000000..72c356f
 +    audit = json.loads(audit_path.read_text())
 +    inventory = json.loads(args.inventory.read_text())
 +    revision = inventory["sourceRevision"]
-+    require(audit.get("redistributionApproved") is True and audit.get("reviewedBy"), "Named redistribution review required")
++    redistribution_approved = audit.get("redistributionApproved") is True
++    experimental = getattr(args, "experimental_mit_declaration", False) and audit.get("experimentalUserAuthorized") is True
++    require((redistribution_approved or experimental) and audit.get("reviewedBy"), "Named redistribution review required")
 +    require(audit.get("sourceRevision") == revision, "Approval must cover the pinned source revision")
 +    require(re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", args.version), "Bundle version must be numeric semver")
 +    expected = {(c["name"], c["version"]) for c in inventory["components"]}
@@ -1029,7 +1385,8 @@ index 0000000..72c356f
 +            "Every locked component, including workspace crates, requires an explicit license conclusion")
 +    notices = []
 +    for component in components:
-+        require(component["licenseConclusion"] in PERMISSIVE, "Unknown/copyleft license requires a separate reviewed distribution method")
++        tokens = set(re.findall(r"[A-Za-z0-9.+-]+", component["licenseConclusion"])) - {"AND", "OR"}
++        require(bool(tokens) and tokens <= PERMISSIVE, "Unknown/copyleft license requires a separate reviewed distribution method")
 +        require(component.get("evidence"), "License evidence required")
 +        for evidence in component["evidence"]:
 +            path = audit_path.parent / evidence["file"]
@@ -1076,7 +1433,7 @@ index 0000000..72c356f
 +        require(not (output / args.version).exists(), "Immutable bundle version already exists; use a new version")
 +        os.replace(staging / args.version, output / args.version)
 +    old = previous["releases"] if previous else []
-+    index = {"schema": 1, "redistributionApproved": True, "backend": "gles", "releases": releases + old}
++    index = {"schema": 1, "redistributionApproved": redistribution_approved, "experimentalUserAuthorized": experimental, "backend": "gles", "releases": releases + old}
 +    temporary = output / "index.json.tmp"
 +    with temporary.open("w") as stream:
 +        json.dump(index, stream, indent=2); stream.write("\n"); stream.flush(); os.fsync(stream.fileno())
@@ -1086,6 +1443,7 @@ index 0000000..72c356f
 +
 +if __name__ == "__main__":
 +    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument("--experimental-mit-declaration", action="store_true", help="Explicit experimental policy; does not claim legal clearance")
 +    parser.add_argument("--approval", required=True, type=pathlib.Path)
 +    parser.add_argument("--input", required=True, type=pathlib.Path, help="audited native files arranged by Android ABI")
 +    parser.add_argument("--version", required=True)
@@ -1192,10 +1550,10 @@ index 0000000..c150f62
 +        parser.exit(1, f"Benchmark unavailable: {error}\n")
 diff --git a/scripts/tests/test_renderer_tools.py b/scripts/tests/test_renderer_tools.py
 new file mode 100644
-index 0000000..fcec95a
+index 0000000..83c9697
 --- /dev/null
 +++ b/scripts/tests/test_renderer_tools.py
-@@ -0,0 +1,111 @@
+@@ -0,0 +1,132 @@
 +import contextlib
 +import csv
 +import importlib.util
@@ -1219,6 +1577,7 @@ index 0000000..fcec95a
 +
 +bundle = load("prepare_rustgl_bundle")
 +benchmark = load("renderer_benchmark")
++builder = load("build_rustgl_bundle")
 +
 +
 +class RendererToolsTest(unittest.TestCase):
@@ -1268,6 +1627,26 @@ index 0000000..fcec95a
 +            self.run_import()
 +        self.assertFalse(self.args.output.exists())
 +
++    def test_experimental_acceptance_does_not_claim_legal_clearance(self):
++        self.audit["redistributionApproved"] = False
++        self.audit["experimentalUserAuthorized"] = True
++        self.args.experimental_mit_declaration = True
++        self.run_import()
++        index = json.loads((self.args.output / "index.json").read_text())
++        self.assertFalse(index["redistributionApproved"])
++        self.assertTrue(index["experimentalUserAuthorized"])
++
++    def test_experimental_flag_without_acceptance_refused(self):
++        self.audit["redistributionApproved"] = False
++        self.args.experimental_mit_declaration = True
++        with self.assertRaises(ValueError):
++            self.run_import()
++
++    def test_build_license_expressions_require_known_permissive_terms(self):
++        self.assertTrue(builder.supported_license("(MIT OR Apache-2.0) AND Unicode-3.0"))
++        self.assertFalse(builder.supported_license("MIT OR GPL-3.0"))
++        self.assertFalse(builder.supported_license(None))
++
 +    def test_bad_artifact_hash_refused(self):
 +        self.audit["artifacts"][0]["sha256"] = "b" * 64
 +        with self.assertRaises(ValueError):
@@ -1307,3 +1686,39 @@ index 0000000..fcec95a
 +        file.write_text("present_ns\n1\n1\n2\n")
 +        with self.assertRaises(ValueError):
 +            benchmark.analyze(types.SimpleNamespace(frames=file, warmup_seconds=0, label="synthetic"))
+diff --git a/scripts/verify_rustgl_apk.py b/scripts/verify_rustgl_apk.py
+new file mode 100644
+index 0000000..56bd803
+--- /dev/null
++++ b/scripts/verify_rustgl_apk.py
+@@ -0,0 +1,30 @@
++#!/usr/bin/env python3
++"""Verify generated APK assets against the exact native-bundle manifest."""
++import hashlib
++import json
++import sys
++import zipfile
++
++
++def verify(path):
++    base = "assets/renderer-bundles/rustgl"
++    with zipfile.ZipFile(path) as archive:
++        index = json.loads(archive.read(base + "/index.json"))
++        assert index["schema"] == 1 and index["backend"] == "gles"
++        assert index.get("redistributionApproved") or index.get("experimentalUserAuthorized")
++        seen = set()
++        for release in index["releases"]:
++            abi = release["abi"]
++            for entry in release["files"]:
++                data = archive.read(f"{base}/{release['version']}/{abi}/{entry['name']}")
++                assert len(data) == entry["bytes"] and hashlib.sha256(data).hexdigest() == entry["sha256"], entry["name"]
++                if entry["name"] == "librust_gl.so":
++                    assert data[:4] == b"\x7fELF"
++                    seen.add(abi)
++        assert seen == {"arm64-v8a", "armeabi-v7a", "x86", "x86_64"}, seen
++    print(f"{path}: RustGL GLES bundle present and checksummed for all four ABIs")
++
++
++if __name__ == "__main__":
++    for apk in sys.argv[1:]:
++        verify(apk)
