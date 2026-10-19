@@ -76,12 +76,12 @@ class RecorderController(private val activity: Activity) {
             activity.runOnUiThread {
                 if (disposed || activity.isFinishing || activity.isDestroyed || loading?.isShowing != true) return@runOnUiThread
                 loading.dismiss()
-                result.onSuccess { options(it) }.onFailure { toast("Cannot query recording encoders: ${it.message}") }
+                result.onSuccess { showOptions(it) }.onFailure { toast("Cannot query recording encoders: ${it.message}") }
             }
         }
     }
 
-    private fun options(configs: List<RecordingOptions.Config>) {
+    internal fun showOptions(configs: List<RecordingOptions.Config>) {
         if (configs.isEmpty()) { toast("No supported hardware H.264 recording combinations on this device"); return }
         val density = activity.resources.displayMetrics.density
         val body = LinearLayout(activity).apply {
