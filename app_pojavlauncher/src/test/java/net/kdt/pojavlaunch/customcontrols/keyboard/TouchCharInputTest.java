@@ -273,4 +273,27 @@ public class TouchCharInputTest {
         assertEquals(backend.chat.length(), backend.cursor);
     }
 
+    @Test public void editingLaterWordAfterMiddleDeletionUsesForwardDelete() {
+        connection.commitText("hello world", 1);
+        int position = TouchCharInput.TEXT_FILLER.length() + 4;
+        connection.setSelection(position, position);
+        connection.deleteSurroundingText(1, 0);
+        int later = TouchCharInput.TEXT_FILLER.length() + 6;
+        connection.setSelection(later, later + 1);
+        connection.commitText("a", 1);
+        assertEquals(HISTORY + "helo warld", backend.chat.toString());
+        assertEquals(2, backend.deletes);
+    }
+
+    @Test public void replacingSelectionAroundTrackedCaretPreservesUnknownHistory() {
+        connection.commitText("hello world", 1);
+        int position = TouchCharInput.TEXT_FILLER.length() + 4;
+        connection.setSelection(position, position);
+        connection.deleteSurroundingText(1, 0);
+        connection.setSelection(TouchCharInput.TEXT_FILLER.length(), input.length());
+        connection.commitText("goodbye", 1);
+        assertEquals(HISTORY + "goodbye", backend.chat.toString());
+        assertEquals(11, backend.deletes);
+    }
+
 }
