@@ -55,6 +55,10 @@ def main():
     if summary:
         with open(summary, "a") as out:
             out.write("## CurseForge live metadata check\n```json\n" + json.dumps(report, indent=2) + "\n```\n")
+    if not any(report[name]["result"] == "valid_list"
+               for name in ("official", "mirror_exact_search")):
+        print("::error title=CurseForge unavailable::Neither configured official access nor the exact mirror search succeeded. Do not treat fixture tests as live verification.")
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":
