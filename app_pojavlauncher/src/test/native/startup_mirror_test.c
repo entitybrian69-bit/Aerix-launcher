@@ -48,6 +48,31 @@ int main(void) {
     file = fopen(path, "r"); assert(file); fseek(file, 0, SEEK_END);
     assert(ftell(file) <= 65536 + (long)strlen("bounded\n")); fclose(file);
     aerix_startup_mirror_configure(NULL, NULL);
+    /* Reproduce latest (7).log's lookup flood without copying user account data. */
+    file = fopen(path, "w"); assert(file); fclose(file);
+    aerix_startup_mirror_configure(path, "lookup flood regression");
+    feed("Backend library: LWJGL version x\n");
+    for (int i = 0; i < 1000; ++i) {
+        char warning[256];
+        snprintf(warning, sizeof(warning), "[RustRenderer] [GLBridge] unresolved entry point 'glUnsupported%d': "
+            "returning a no-op stub. Whatever needs it will misbehave, but the process survives.\n", i);
+        feed(warning);
+    }
+    feed("[RustRenderer] [Renderer] LATE_RENDERER_ERROR\n");
+    feed("#  SIGSEGV (0xb) at pc=0x1234\n# Problematic frame:\n# C  [librust_gl.so+0x1234]\n");
+    feed("# Command Line: PRIVATE_AUTH_TOKEN SIGSEGV\naccount private\n");
+    file = fopen(path, "r"); assert(file); memset(data, 0, sizeof(data)); fread(data, 1, sizeof(data)-1, file); fclose(file);
+    assert(strstr(data, "glUnsupported0")); assert(strstr(data, "glUnsupported3"));
+    assert(!strstr(data, "glUnsupported4'")); assert(strstr(data, "lookup warnings omitted"));
+    assert(strstr(data, "LATE_RENDERER_ERROR")); assert(strstr(data, "SIGSEGV (0xb)"));
+    assert(strstr(data, "librust_gl.so+0x1234")); assert(!strstr(data, "PRIVATE_AUTH_TOKEN"));
+    assert(strlen(data) < 4096);
+    /* Even other normal-log flooding cannot consume the reserved fatal-summary budget. */
+    for (int i = 0; i < 10000; ++i) feed("[RustRenderer] [EGL] ordinary output fills normal budget\n");
+    feed("#  SIGABRT (0x6) LATE_FATAL_AFTER_NORMAL_BUDGET\n");
+    file = fopen(path, "r"); assert(file); memset(data, 0, sizeof(data)); fread(data, 1, sizeof(data)-1, file); fclose(file);
+    assert(strstr(data, "LATE_FATAL_AFTER_NORMAL_BUDGET")); assert(strlen(data) <= 65536);
+    aerix_startup_mirror_configure(NULL, NULL);
     /* Force a partial regular-file write, then EFBIG, then restore available capacity.
        The mirror must stay disabled instead of resuming writes with a stale byte count. */
     file = fopen(path, "w"); assert(file); fclose(file);

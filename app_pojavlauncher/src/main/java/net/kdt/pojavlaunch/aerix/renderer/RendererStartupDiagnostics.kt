@@ -18,7 +18,7 @@ object RendererStartupDiagnostics {
             require(!Files.isSymbolicLink(logs.toPath()) && !Files.isSymbolicLink(latest.toPath()))
             require(logs.canonicalFile.parentFile == root)
             Logger.enableRendererStartupMirror(latest.absolutePath,
-                "bundle=${spec.appVersion} backend=gles namespaceBypass=${spec.useNamespaceBypass}; startup-only trace, not proof of gameplay")
+                "capture=2 bundle=${spec.appVersion} backend=gles namespaceBypass=${spec.useNamespaceBypass}; startup-only trace, not proof of gameplay")
         } catch (error: Exception) {
             Log.w("RendererDiagnostics", "Startup log mirror unavailable; launcher log remains primary", error)
         } catch (error: LinkageError) {
