@@ -43,7 +43,9 @@ void aerix_startup_mirror_configure(const char *path, const char *identity) {
 }
 static void emit(const char *data, size_t size) {
     if (size > LIMIT - written) { enabled = 0; close_output(); return; }
-    if (output >= 0 && write_all(output, data, size)) {
+    if (output >= 0) {
+        // A partial write followed by ENOSPC must not permit repeated attempts past the budget.
+        if (!write_all(output, data, size)) { enabled = 0; close_output(); return; }
         written += size;
         fdatasync(output); /* Startup events only. Pipe capture remains best-effort on abrupt process death. */
     }
