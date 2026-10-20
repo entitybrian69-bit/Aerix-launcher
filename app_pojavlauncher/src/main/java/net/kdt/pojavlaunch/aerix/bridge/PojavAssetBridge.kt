@@ -37,6 +37,7 @@ import net.kdt.pojavlaunch.instances.Instance
 import net.kdt.pojavlaunch.instances.Instances
 import net.kdt.pojavlaunch.modloaders.modpacks.api.ApiHandler
 import net.kdt.pojavlaunch.modloaders.modpacks.api.CurseforgeApi
+import net.kdt.pojavlaunch.modloaders.modpacks.api.CurseForgeApiHandler
 import net.kdt.pojavlaunch.modloaders.modpacks.api.ModrinthApi
 import net.kdt.pojavlaunch.modloaders.modpacks.models.Constants
 import net.kdt.pojavlaunch.modloaders.modpacks.models.ModDetail
@@ -264,12 +265,9 @@ object PojavAssetBridge {
 
     private const val MODRINTH_OFFICIAL_API = "https://api.modrinth.com/v2"
     private const val MODRINTH_MIRROR_API = "https://mod.mcimirror.top/modrinth/v2"
-    private const val CURSEFORGE_OFFICIAL_API = "https://api.curseforge.com/v1"
-    private const val CURSEFORGE_MIRROR_API = "https://mod.mcimirror.top/curseforge/v1"
 
     private val modrinthOfficial = ApiHandler(MODRINTH_OFFICIAL_API)
     private val modrinthMirror = ApiHandler(MODRINTH_MIRROR_API)
-    private val curseForgeMirror = ApiHandler(CURSEFORGE_MIRROR_API)
 
     /** User key (Aerix "curseForgeApiKey") first, then the key baked into the build. */
     fun curseForgeKey(context: Context): String? {
@@ -530,17 +528,8 @@ object PojavAssetBridge {
         install(project.type, file)
     }
 
-    private fun createCurseForgeModpackApi(context: Context): CurseforgeApi {
-        val key = curseForgeKey(context)
-        if (key != null) return CurseforgeApi(key)
-        val cfApi = CurseforgeApi("DUMMY")
-        runCatching {
-            val field = CurseforgeApi::class.java.getDeclaredField("mApiHandler")
-            field.isAccessible = true
-            field.set(cfApi, curseForgeMirror)
-        }
-        return cfApi
-    }
+    private fun createCurseForgeModpackApi(context: Context): CurseforgeApi =
+        CurseforgeApi(curseForgeKey(context))
 
     /**
      * Every instance a file can be installed into, the one the launcher is sitting on first.
@@ -907,21 +896,8 @@ object PojavAssetBridge {
         params: HashMap<String, Any>?,
         tClass: Class<T>
     ): T? {
-        val key = curseForgeKey(context)
-        if (key != null) {
-            val official = ApiHandler(CURSEFORGE_OFFICIAL_API, key)
-            val res = if (params != null) {
-                runCatching { official.get(endpoint, params, tClass) }.getOrNull()
-            } else {
-                runCatching { official.get(endpoint, tClass) }.getOrNull()
-            }
-            if (res != null) return res
-        }
-        return if (params != null) {
-            runCatching { curseForgeMirror.get(endpoint, params, tClass) }.getOrNull()
-        } else {
-            runCatching { curseForgeMirror.get(endpoint, tClass) }.getOrNull()
-        }
+        val handler = CurseForgeApiHandler(curseForgeKey(context))
+        return if (params == null) handler.get(endpoint, tClass) else handler.get(endpoint, params, tClass)
     }
 
     /** Resolve a curated link by its exact platform slug, never by title or first search result. */

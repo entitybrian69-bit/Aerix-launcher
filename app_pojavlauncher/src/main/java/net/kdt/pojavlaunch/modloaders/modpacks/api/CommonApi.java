@@ -36,13 +36,8 @@ public class CommonApi implements ModpackApi {
 
     public CommonApi(String curseforgeApiKey) {
         mModrinthApi = new ModrinthApi();
-        if ("DUMMY".equals(curseforgeApiKey)) {
-            mCurseforgeApi = null;
-            mModpackApis = new ModpackApi[]{mModrinthApi};
-        } else {
-            mCurseforgeApi = new CurseforgeApi(curseforgeApiKey);
-            mModpackApis = new ModpackApi[]{mModrinthApi, mCurseforgeApi};
-        }
+        mCurseforgeApi = new CurseforgeApi(curseforgeApiKey);
+        mModpackApis = new ModpackApi[]{mModrinthApi, mCurseforgeApi};
     }
 
     @Override

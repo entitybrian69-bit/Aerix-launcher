@@ -224,7 +224,6 @@ object PojavGameDownloadsBridge {
     /** Why nothing came back: no connection, a CurseForge that needs a key, or a silent API. */
     private fun failure(context: Context, platform: AssetPlatform): DownloadError = when {
         !isOnline(context) -> DownloadError.OFFLINE
-        platform == AssetPlatform.CURSEFORGE && !hasCurseForgeKey(context) -> DownloadError.KEY
         else -> DownloadError.API
     }
 
