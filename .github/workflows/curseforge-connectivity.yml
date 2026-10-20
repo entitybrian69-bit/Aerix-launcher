@@ -1,0 +1,22 @@
+name: CurseForge live metadata check
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - scripts/check_curseforge.py
+      - .github/workflows/curseforge-connectivity.yml
+
+permissions:
+  contents: read
+
+jobs:
+  metadata:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check exact Discover request and minimal mirror request
+        env:
+          CURSEFORGE_API_KEY: ${{ secrets.CURSEFORGE_API_KEY }}
+        run: python3 scripts/check_curseforge.py
