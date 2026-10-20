@@ -329,8 +329,10 @@ public class GameRunner {
         JREUtils.setGameEnvironment(activity, versionEnvMap);
         JREUtils.chdir(instance.getGameDirectory().getAbsolutePath());
 
-        net.kdt.pojavlaunch.aerix.renderer.RendererStartupDiagnostics.configure(
-                gameRenderer.getCurrentRenderer(), instance.getGameDirectory());
+        if (android.os.Build.VERSION.SDK_INT >= 26) {
+            net.kdt.pojavlaunch.aerix.renderer.RendererStartupDiagnostics.configure(
+                    gameRenderer.getCurrentRenderer(), instance.getGameDirectory());
+        }
         if(!gameRenderer.maybeSetupRenderer()) {
             if(showDialog(activity, R.string.gr_err_renderer_load_Failed)) return;
             System.exit(0);

@@ -80,6 +80,8 @@ jobs:
             echo "::error title=RustGL EGL smoke::$detail"
             exit 1
           fi
+          grep -F '[Aerix startup] eglMakeCurrent returned=1' rustgl-smoke.log
+          grep -F '[Aerix startup] first swap returned=1' rustgl-smoke.log
       - name: Upload authenticated-build input assets
         uses: actions/upload-artifact@v4
         with:
