@@ -144,12 +144,21 @@ public class TouchCharInput extends androidx.appcompat.widget.AppCompatEditText 
 
     private void flushTextChanges() {
         ChatTextMirror.Edit edit = mTextMirror.drain();
-        for (int i = 0; i < edit.backspaces; i++) {
-            CallbackBridge.sendKeyPress(KeyEvent.KEYCODE_DEL);
-        }
-        if (!edit.insertion.isEmpty()) {
-            PLATFORM.sendBulkUnicodeEvent(edit.insertion, CallbackBridge.getCurrentMods());
-        }
+        if (edit.backspaces == 0 && edit.insertion.isEmpty()) return;
+        // Game cursor stays at the mirrored session's end between transactions.
+        // Move around an unchanged suffix instead of deleting/retyping it.
+        for (int i = 0; i < edit.suffixCodePoints; i++) sendImeKey(KeyEvent.KEYCODE_DPAD_LEFT);
+        for (int i = 0; i < edit.backspaces; i++) sendImeKey(KeyEvent.KEYCODE_DEL);
+        if (!edit.insertion.isEmpty()) PLATFORM.sendBulkUnicodeEvent(edit.insertion, 0);
+        for (int i = 0; i < edit.suffixCodePoints; i++) sendImeKey(KeyEvent.KEYCODE_DPAD_RIGHT);
+    }
+
+    private void sendImeKey(int keyCode) {
+        // These are text-editor operations, not hardware/control shortcuts.
+        // Inheriting Ctrl/Shift/Alt can turn Backspace into word deletion or
+        // cursor movement into selection. Physical-key forwarding is unchanged.
+        PLATFORM.sendKeyEvent(keyCode, true, 0);
+        PLATFORM.sendKeyEvent(keyCode, false, 0);
     }
 
     /**
@@ -253,7 +262,7 @@ public class TouchCharInput extends androidx.appcompat.widget.AppCompatEditText 
     /** Send the enter key. */
     private void sendEnter(){
         flushTextChanges();
-        CallbackBridge.sendKeyPress(KeyEvent.KEYCODE_ENTER);
+        sendImeKey(KeyEvent.KEYCODE_ENTER);
         clear();
     }
 

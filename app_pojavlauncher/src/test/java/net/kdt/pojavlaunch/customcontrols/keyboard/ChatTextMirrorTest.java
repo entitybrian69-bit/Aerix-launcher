@@ -87,10 +87,13 @@ public class ChatTextMirrorTest {
         mirror.changed(PAD + "\uD83D\uDE01", PAD.length(), 2, 2);
         expect(1, "\uD83D\uDE01");
     }
-    @Test public void editingInMiddleRebuildsOnlyAffectedSuffix() {
+    @Test public void editingInMiddlePreservesUnchangedSuffix() {
         type("hello world");
         mirror.changed(PAD + "hello brave world", PAD.length() + 6, 0, 6);
-        expect(5, "brave world");
+        ChatTextMirror.Edit edit = mirror.drain();
+        assertEquals(0, edit.backspaces);
+        assertEquals("brave ", edit.insertion);
+        assertEquals(5, edit.suffixCodePoints);
     }
     @Test public void resetDoesNotEmitEditsIntoExistingGameChat() {
         type("hello");
@@ -104,6 +107,24 @@ public class ChatTextMirrorTest {
     @Test public void bulkPaddingRemovalCannotEraseUnknownChatEvenOutsideBatch() {
         mirror.changed("", 0, PAD.length(), 0);
         expect(0, "");
+    }
+
+    @Test public void deletingOneMiddleLetterNeverDeletesRemainingWordOrSentence() {
+        type("hello world and friends");
+        mirror.changed(PAD + "helo world and friends", PAD.length() + 3, 1, 0);
+        ChatTextMirror.Edit edit = mirror.drain();
+        assertEquals(1, edit.backspaces);
+        assertEquals("", edit.insertion);
+        assertEquals(19, edit.suffixCodePoints);
+    }
+
+    @Test public void replacingMiddleEmojiKeepsTheFollowingText() {
+        type("hi \uD83D\uDE00 friends");
+        mirror.changed(PAD + "hi \uD83D\uDE01 friends", PAD.length() + 3, 2, 2);
+        ChatTextMirror.Edit edit = mirror.drain();
+        assertEquals(1, edit.backspaces);
+        assertEquals("\uD83D\uDE01", edit.insertion);
+        assertEquals(8, edit.suffixCodePoints);
     }
 
 }

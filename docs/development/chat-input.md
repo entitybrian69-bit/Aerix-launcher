@@ -12,8 +12,10 @@ Android editor did not even own.
 `ChatTextMirror` tracks the logical text separately from that padding:
 
 - An unchanged commit emits nothing; appending Space emits only Space.
-- A changed suffix deletes only the previously mirrored suffix and inserts its
-  replacement. Prefix comparison and deletion counts respect Unicode code points.
+- A changed range preserves both the common prefix and suffix. The bridge moves
+  left across the unchanged suffix, deletes only the changed old range, inserts
+  only its replacement, then moves right to restore its session-end cursor.
+  Comparisons, cursor movement and deletion counts respect Unicode code points.
 - Whole-editor rewrites can retain or remove the virtual prefix without sending
   it to Minecraft or treating it as thirty game deletions.
 - Explicit IME batch edits are reconciled at the outermost end, including a
@@ -53,3 +55,32 @@ recovery taps, stale visibility, no polling/restart storms, focus, cancellation,
 repeated native requests and UI-thread dispatch. Real Android keyboard opening,
 typing and frame-time testing are still required; JVM tests cannot prove a
 particular keyboard or game/device behaves correctly.
+
+
+## Single-letter correction / Backspace regression
+
+The old common-prefix-only diff rebuilt everything after a middle correction.
+For example, changing `hello world and friends` to `helo world and friends`
+sent 20 Backspaces and reinserted `o world and friends`, even though only one
+letter changed. This created unnecessary destructive edits and could leave a
+word or sentence erased when synthetic retyping was interrupted or suppressed.
+
+The diff now finds a non-overlapping common suffix as well. The same correction
+moves left 19 code points, sends **one** Backspace, sends no replacement text,
+and moves right 19 code points. Unchanged commits still emit no events. Android
+selection changes remain local; each text transaction starts/ends at the known
+mirrored session end in the game. This does not attempt to observe mouse-driven
+Minecraft caret moves or read the game's actual input buffer.
+
+Synthetic IME cursor, deletion, Enter and Unicode events now use zero shortcut
+modifier flags, rather than borrowing global held Ctrl/Alt/Shift flags from
+hardware or touch controls. Physical key forwarding and held-control state are
+not changed. This is not a claim that externally held native keys are released.
+
+Regression tests cover middle deletion and reinsertion, selection replacement,
+forward deletion, composing-word correction, code-point deletion with trailing
+text, unchanged suffix preservation and synthetic event flags with held controls.
+The recording backend models a real cursor instead of only appending/deleting
+at the end, so it verifies the complete resulting message and deletion count.
+Phone checks with the user's keyboard remain necessary; JVM tests are not a
+claim of verified in-game behavior on every Minecraft/mod/keyboard combination.

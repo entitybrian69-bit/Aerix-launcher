@@ -39,12 +39,27 @@ public class TouchCharInputTest {
         final StringBuilder chat = new StringBuilder(HISTORY);
         int deletes;
         int enters;
-        @Override public void sendBulkUnicodeEvent(String text, int mods) { chat.append(text); }
+        int cursor = chat.length();
+        int unsafeMods;
+        @Override public void sendBulkUnicodeEvent(String text, int mods) {
+            unsafeMods |= mods;
+            chat.insert(cursor, text);
+            cursor += text.length();
+        }
         @Override public boolean sendKeyEvent(int key, boolean down, int mods) {
+            unsafeMods |= mods;
             if (!down) return true;
-            if (key == KeyEvent.KEYCODE_DEL) {
+            if (key == KeyEvent.KEYCODE_DPAD_LEFT) {
+                if (cursor > 0) cursor = chat.offsetByCodePoints(cursor, -1);
+            } else if (key == KeyEvent.KEYCODE_DPAD_RIGHT) {
+                if (cursor < chat.length()) cursor = chat.offsetByCodePoints(cursor, 1);
+            } else if (key == KeyEvent.KEYCODE_DEL) {
                 deletes++;
-                if (chat.length() > 0) chat.delete(chat.offsetByCodePoints(chat.length(), -1), chat.length());
+                if (cursor > 0) {
+                    int start = chat.offsetByCodePoints(cursor, -1);
+                    chat.delete(start, cursor);
+                    cursor = start;
+                }
             } else if (key == KeyEvent.KEYCODE_ENTER) enters++;
             return true;
         }
@@ -166,6 +181,81 @@ public class TouchCharInputTest {
         connection.commitText(" ", 1);
         assertEquals(HISTORY + "hello friends ", backend.chat.toString());
         assertEquals(0, backend.deletes);
+    }
+
+    @Test public void singleLetterDeletionInMiddlePreservesEntireSentence() {
+        connection.commitText("hello world and friends", 1);
+        int position = TouchCharInput.TEXT_FILLER.length() + 4;
+        connection.setSelection(position, position);
+        connection.deleteSurroundingText(1, 0);
+        assertEquals(HISTORY + "helo world and friends", backend.chat.toString());
+        assertEquals(1, backend.deletes);
+        // A second edit still uses the Android cursor, not the game's restored end.
+        connection.commitText("l", 1);
+        assertEquals(HISTORY + "hello world and friends", backend.chat.toString());
+        assertEquals(1, backend.deletes);
+        assertEquals(backend.chat.length(), backend.cursor);
+    }
+
+    @Test public void selectingOneWrongLetterOnlyReplacesThatLetter() {
+        connection.commitText("hello wurld and friends", 1);
+        int start = TouchCharInput.TEXT_FILLER.length() + 7;
+        connection.setSelection(start, start + 1);
+        connection.commitText("o", 1);
+        assertEquals(HISTORY + "hello world and friends", backend.chat.toString());
+        assertEquals(1, backend.deletes);
+    }
+
+    @Test public void deletingInsideComposingWordPreservesRestOfMessage() {
+        connection.commitText("say ", 1);
+        connection.setComposingText("helllo", 1);
+        connection.setComposingText("hello", 1);
+        assertEquals(HISTORY + "say hello", backend.chat.toString());
+        assertEquals(1, backend.deletes);
+        connection.commitText("hello ", 1);
+        assertEquals(HISTORY + "say hello ", backend.chat.toString());
+    }
+
+    @Test public void codePointDeletionPreservesFollowingEmojiAndWords() {
+        connection.commitText("hi \uD83D\uDE00 friends", 1);
+        int position = TouchCharInput.TEXT_FILLER.length() + 5;
+        connection.setSelection(position, position);
+        connection.deleteSurroundingTextInCodePoints(1, 0);
+        assertEquals(HISTORY + "hi  friends", backend.chat.toString());
+        assertEquals(1, backend.deletes);
+    }
+
+    @Test public void forwardDeletePreservesTheRestOfTheWord() {
+        connection.commitText("hello world", 1);
+        int position = TouchCharInput.TEXT_FILLER.length() + 3;
+        connection.setSelection(position, position);
+        connection.deleteSurroundingText(0, 1);
+        assertEquals(HISTORY + "helo world", backend.chat.toString());
+        assertEquals(1, backend.deletes);
+    }
+
+    @Test public void imeEditsDoNotInheritShortcutModifierFlags() {
+        boolean ctrl = CallbackBridge.holdingCtrl;
+        boolean shift = CallbackBridge.holdingShift;
+        boolean alt = CallbackBridge.holdingAlt;
+        try {
+            CallbackBridge.holdingCtrl = CallbackBridge.holdingShift = CallbackBridge.holdingAlt = true;
+            connection.commitText("hello world", 1);
+            int position = TouchCharInput.TEXT_FILLER.length() + 4;
+            connection.setSelection(position, position);
+            connection.deleteSurroundingText(1, 0);
+            assertEquals(HISTORY + "helo world", backend.chat.toString());
+            assertEquals(1, backend.deletes);
+            assertEquals(0, backend.unsafeMods);
+            // Do not mutate the held controls; real shortcut handling remains separate.
+            assertTrue(CallbackBridge.holdingCtrl);
+            assertTrue(CallbackBridge.holdingShift);
+            assertTrue(CallbackBridge.holdingAlt);
+        } finally {
+            CallbackBridge.holdingCtrl = ctrl;
+            CallbackBridge.holdingShift = shift;
+            CallbackBridge.holdingAlt = alt;
+        }
     }
 
 }

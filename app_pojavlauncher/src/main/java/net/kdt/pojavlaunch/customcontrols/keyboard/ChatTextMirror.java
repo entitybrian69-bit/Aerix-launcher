@@ -5,9 +5,11 @@ final class ChatTextMirror {
     static final class Edit {
         final int backspaces;
         final String insertion;
-        Edit(int backspaces, String insertion) {
+        final int suffixCodePoints;
+        Edit(int backspaces, String insertion, int suffixCodePoints) {
             this.backspaces = backspaces;
             this.insertion = insertion;
+            this.suffixCodePoints = suffixCodePoints;
         }
     }
 
@@ -64,9 +66,21 @@ final class ChatTextMirror {
             if (previous != text.codePointAt(prefix)) break;
             prefix += Character.charCount(previous);
         }
-        int deletes = sentText.codePointCount(prefix, sentText.length());
+        // Keep the unchanged tail in Minecraft. Rebuilding it with Backspace can
+        // erase the rest of the word/message if reinsertion is interrupted, and
+        // turns a single-letter correction into many destructive key events.
+        int previousEnd = sentText.length();
+        int nextEnd = text.length();
+        while (previousEnd > prefix && nextEnd > prefix) {
+            int previous = sentText.codePointBefore(previousEnd);
+            if (previous != text.codePointBefore(nextEnd)) break;
+            previousEnd -= Character.charCount(previous);
+            nextEnd -= Character.charCount(previous);
+        }
+        int suffix = sentText.codePointCount(previousEnd, sentText.length());
+        int deletes = sentText.codePointCount(prefix, previousEnd);
         if (sentText.isEmpty() && text.isEmpty()) deletes += historyDeletes;
-        Edit edit = new Edit(deletes, text.substring(prefix));
+        Edit edit = new Edit(deletes, text.substring(prefix, nextEnd), suffix);
         sentText = text;
         recoverablePadding = padding;
         historyDeletes = 0;
