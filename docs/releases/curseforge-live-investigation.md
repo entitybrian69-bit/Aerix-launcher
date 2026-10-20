@@ -50,3 +50,13 @@ A contemporaneous independent HTTP check with the corrected 30-result query retu
 The older Java clients also fail against the mirror now, so the check does not support blaming only the new response parser or explicit Aerix headers. This is consistent with previously working mirror-backed access becoming unavailable. It does not prove when it stopped working, whether it is unavailable from every network, or what exact HTTP status the phone received. No rollback, borrowed credential, substituted content provider, or new APK release is justified by these results. A legitimate official API key is an alternative route, not a prerequisite that historically existed for keyless mirror browsing.
 
 Local Python regression suite: 7 tests passed. No launcher production code changed in this comparison.
+
+## After user saved repository secret
+
+User confirmed saving a replacement secret. [Live verification run 39410404439](https://github.com/entitybrian69-bit/Aerix-launcher/actions/runs/39410404439), source `7f986a9`, reported:
+
+```json
+{"build_key_present":true,"mirror_exact_search":{"result":"http_error","status":503},"mirror_minimal_search":{"result":"http_error","status":503},"official":{"result":"http_error","status":403}}
+```
+
+The secret is available to Actions and was sent only to the official origin, without logging its value. Official search returned HTTP 403 (Forbidden); successful access is not established. This status alone does not distinguish an inactive/wrong key, API permissions/restrictions, or a runner-specific denial. Do not describe it as a missing secret or assert the key is invalid based on status alone. Mirror searches still returned 503. No new release was published; rebuilding alone is not a verified remedy for an authorization rejection.
