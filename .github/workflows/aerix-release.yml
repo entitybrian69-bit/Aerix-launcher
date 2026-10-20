@@ -48,13 +48,13 @@ permissions:
 # accessible by integration" even with contents: write - but it can upload the assets of one that
 # exists. Create the release itself (empty) next to the branch, then set RUN_ID / TAG here and push.
 env:
-  RUN_ID: "39379639413"
-  BUILD_SHA: "784c0a8009d686acf3c99725c0520f2e46d1a3be"
-  TAG: "v1.3.3"
+  RUN_ID: "39404082199"
+  BUILD_SHA: "a7fd04bf744890c0b9034fb5621ecbb8f4651694"
+  TAG: "v1.3.4"
   # Name of the release: the version the build carries, and the tag it is published under when TAG
   # is left empty.
-  VERSION: "1.3.3"
-  NOTES: "Aerix Launcher 1.3.3 - Preserve unchanged chat text during letter corrections, avoid inherited IME shortcut flags, and remove the experimental RustGL renderer."
+  VERSION: "1.3.4"
+  NOTES: "Aerix Launcher 1.3.4 - Fix CurseForge response parsing and share validated, credential-isolated official/mirror routing across Discover and modpack installation."
 
 
 jobs:
