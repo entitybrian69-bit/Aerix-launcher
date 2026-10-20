@@ -156,6 +156,10 @@ class RendererToolsTest(unittest.TestCase):
         self.assertEqual(builder.LIFETIME_PATCH_SHA256,
                          builder.digest(SCRIPTS / "patches/rustgl-extension-string-lifetime.patch"))
 
+    def test_startup_patch_matches_reviewed_recipe_hash(self):
+        self.assertEqual(builder.STARTUP_PATCH_SHA256,
+                         builder.digest(SCRIPTS / "patches/rustgl-startup-checkpoints.patch"))
+
     def test_smoke_rejects_missing_egl_entry_point_without_calling_null(self):
         resolver = Mock(return_value=None)
         with patch.dict(smoke.os.environ), patch.object(smoke.c, "CDLL", return_value=types.SimpleNamespace(eglGetProcAddress=resolver)):

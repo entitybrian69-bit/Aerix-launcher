@@ -244,6 +244,14 @@ jobs:
             || { echo "::error title=missing apk::the noruntime apk was not produced"; ls -R app_pojavlauncher/build/outputs/apk || true; exit 1; }
           mv app_pojavlauncher/build/outputs/apk/noruntime/release/app_pojavlauncher-noruntime-release.apk out/app-release-noruntime.apk
 
+      - name: Startup mirror native regression test
+        run: |
+          cc -std=c11 -Wall -Wextra -Werror -pthread -fsanitize=address,undefined \
+            -I app_pojavlauncher/src/main/jni/diagnostics \
+            app_pojavlauncher/src/main/jni/diagnostics/startup_mirror.c \
+            app_pojavlauncher/src/test/native/startup_mirror_test.c -o "$RUNNER_TEMP/startup-mirror-test"
+          "$RUNNER_TEMP/startup-mirror-test"
+
       - name: Native FPS counter regression test
         run: |
           cc -std=c11 -pthread -I app_pojavlauncher/src/main/jni/fps \

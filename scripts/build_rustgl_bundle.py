@@ -15,6 +15,7 @@ import urllib.request
 REVISION = "eb22559581cf400af29470205a9ebbff31e0db33"
 PATCH_SHA256 = "aeaa3bd7362a62d31d46c8b04b9461abacb67a9de21f426417929b22db444885"
 LIFETIME_PATCH_SHA256 = "ba6d4f1bc71bbedea69d3b8a3fa30a2ad37d375db28206bfe955331b82494d12"
+STARTUP_PATCH_SHA256 = "21305badbafc1465cd047e8b9212e4c4e2e925229eb0b2bb0e3aca87c3d1743f"
 TARGETS = {
     "arm64-v8a": ("aarch64-linux-android", "aarch64-linux-android26"),
     "armeabi-v7a": ("armv7-linux-androideabi", "armv7a-linux-androideabi26"),
@@ -81,7 +82,8 @@ def run(args):
     # arbitrary dirty renderer source as if it were the pinned upstream revision.
     patch_dir = Path(__file__).resolve().parent / "patches"
     patches = [(patch_dir / "rustgl-gles-capability-probe.patch", PATCH_SHA256),
-               (patch_dir / "rustgl-extension-string-lifetime.patch", LIFETIME_PATCH_SHA256)]
+               (patch_dir / "rustgl-extension-string-lifetime.patch", LIFETIME_PATCH_SHA256),
+               (patch_dir / "rustgl-startup-checkpoints.patch", STARTUP_PATCH_SHA256)]
     for patch, expected_hash in patches:
         if digest(patch) != expected_hash:
             raise ValueError("RustGL source patch hash mismatch")
@@ -167,7 +169,7 @@ def run(args):
     approval = {"redistributionApproved": False, "experimentalUserAuthorized": True,
                 "reviewedBy": "Experimental build policy: user accepted upstream README MIT basis; no legal clearance claimed",
                 "sourceRevision": REVISION, "components": components, "artifacts": artifacts,
-                "bundleVersion": "0.3.1", "upstreamNativeVersion": "0.3.0",
+                "bundleVersion": "0.3.2", "upstreamNativeVersion": "0.3.0",
                 "integration": "System EGL/GLES namespace; capability-probe and extension-string lifetime fixes",
                 "sourcePatches": [{"file": "evidence/" + patch.name, "sha256": sha} for patch, sha in patches],
                 "toolchain": subprocess.check_output(["rustc", "-Vv"], text=True),
@@ -175,7 +177,7 @@ def run(args):
     approval_path = report / "experimental-approval.json"
     approval_path.write_text(json.dumps(approval, indent=2) + "\n")
     subprocess.run([sys.executable, str(Path(__file__).with_name("prepare_rustgl_bundle.py")),
-                    "--approval", str(approval_path), "--input", str(native), "--version", "0.3.1",
+                    "--approval", str(approval_path), "--input", str(native), "--version", "0.3.2",
                     "--inventory", str(args.inventory.resolve()), "--output", str(args.output.resolve()),
                     "--readelf", str(bin_dir / "llvm-readelf"), "--experimental-mit-declaration"], check=True)
     print("::notice title=RustGL bundled source build::" + json.dumps({"revision": REVISION, "artifacts": artifacts, "licenses": len(components), "experimental": True}))

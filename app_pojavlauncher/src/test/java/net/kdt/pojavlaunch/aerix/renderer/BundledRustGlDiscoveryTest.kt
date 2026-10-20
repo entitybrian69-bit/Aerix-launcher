@@ -37,7 +37,8 @@ class BundledRustGlDiscoveryTest {
         assertEquals("plugin:net.kdt.pojavlaunch.renderer.rustgl", plugin.pluginTag)
         assertEquals("RustGL (Experimental)", plugin.displayName)
         assertEquals("gles", plugin.env["RENDERER_BACKEND"])
-        assertEquals("0.3.1", plugin.appVersion)
+        assertEquals("1", plugin.env["AERIX_RENDERER_STARTUP_TRACE"])
+        assertEquals("0.3.2", plugin.appVersion)
         val plan = plugin.eglLaunchPlan()
         assertEquals(plugin.glName, plan.library)
         assertFalse("System EGL/GLES must not be duplicated into a driver namespace", plan.namespaceBypass)
@@ -60,11 +61,11 @@ class BundledRustGlDiscoveryTest {
         } }
         val old = BundleRelease("0.3.0", entry.get("revision").asString, entry.get("abi").asString, files)
         val store = RendererBundleStore(File(app.noBackupFilesDir, "renderer-bundles/rustgl"))
-        store.install(old) { name -> app.assets.open("renderer-bundles/rustgl/0.3.1/${old.abi}/$name") }
+        store.install(old) { name -> app.assets.open("renderer-bundles/rustgl/0.3.2/${old.abi}/$name") }
         store.activate(old)
         store.beginInit(old).finish(false)
         val restored = requireNotNull(BundledRustGl.discover(app))
-        assertEquals("0.3.1", restored.appVersion)
+        assertEquals("0.3.2", restored.appVersion)
         assertEquals(revised.glName, restored.glName)
         assertTrue("Do not erase the old failure record to restore discovery", store.rejected(old))
         assertFalse(restored.eglLaunchPlan().namespaceBypass)

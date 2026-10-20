@@ -11,7 +11,7 @@ from pathlib import Path
 
 
 def main(library):
-    os.environ.update(EGL_PLATFORM="surfaceless", LIBGL_ALWAYS_SOFTWARE="1", RENDERER_BACKEND="gles")
+    os.environ.update(EGL_PLATFORM="surfaceless", LIBGL_ALWAYS_SOFTWARE="1", RENDERER_BACKEND="gles", AERIX_RENDERER_STARTUP_TRACE="1")
     lib = c.CDLL(str(library.resolve()))
     proc = lib.eglGetProcAddress
     proc.restype, proc.argtypes = c.c_void_p, [c.c_char_p]

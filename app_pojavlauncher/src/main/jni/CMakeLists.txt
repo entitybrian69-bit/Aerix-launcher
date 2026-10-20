@@ -59,6 +59,7 @@ add_library(pojavexec SHARED
         jre_launcher/elf_hinter.c
         jre_launcher/abort_wait.c
         utils.c
+        diagnostics/startup_mirror.c
         stdio_is.c
         minibridge.c
 )

@@ -128,3 +128,36 @@ FPS, full desktop GL, Vulkan or gameplay support based on host smoke results.
 - Locally: 15 Python tooling tests, Python syntax checks, diff whitespace checks
   and the native frame-counter regression passed. Android/Gradle/Rust testing was
   performed in CI, not claimed as local phone testing.
+
+## Phone failure after 0.3.1: diagnostic integration 0.3.2
+
+The user confirmed `latest (6).log` was produced **after** installing the patched
+APK and selecting RustGL. The phone failure remains unresolved. That Minecraft
+log stops at the LWJGL backend banner without a fatal stack, even though host
+smoke and unit tests passed. Do not present 0.3.1 as a working phone fix.
+
+0.3.2 is a **diagnostic candidate**, not a new claimed renderer fix:
+
+- Bundled RustGL has opt-in, bounded entry/return checkpoints around EGL display,
+  initialization/configuration, surface/context creation, make-current and first swap.
+  No signal handler is replaced. No per-frame log writes are added.
+- A startup-only native mirror appends the verified bundle identity and selected
+  native renderer messages to **the same Minecraft `logs/latest.log`** the user
+  can already share. It waits for Minecraft's LWJGL banner, never creates/truncates
+  that log, rejects symlinks/non-regular files, caps output at 64 KiB, excludes
+  arbitrary account/environment/mod stdout and stops after the first successful swap.
+  Pipe capture is best-effort: an immediate native death or a driver using only
+  Android logcat can still lose its final event. This is not full crash-stack capture.
+- Fixed an independent out-of-bounds-read risk in the existing native log reader:
+  it passed an unterminated `read()` buffer to `strstr`. This is a concrete logger
+  bug, **not established as the phone crash's cause**.
+- Only bundled RustGL enables this instrumentation. Other renderer loading policy,
+  instances, mods, worlds and the stable release remain untouched.
+- Local ASan/UBSan C regression checks cover split lines, stale-log preservation,
+  sensitive-line exclusion, missing-file/symlink rejection, oversized lines and
+  output bounds. Python tooling tests also check the new source patch hash.
+
+A useful device report is now the same `latest.log`, looking for
+`[Aerix renderer diagnostics] bundle=0.3.2` and `[Aerix startup]` checkpoints.
+Absence of those lines is an inconclusive capture, not evidence of a particular
+renderer, mod fault or successful startup. No uninstall or data clearing is required.
