@@ -74,8 +74,11 @@ jobs:
           report_gradle_failure() {
             label=$1
             log=$2
-            errors=$(grep -E '^e: |error: |Execution failed|What went wrong|FAILED|Could not|Caused by' "$log" \
-              | head -60 | sed 's/%/%25/g; s/\r//g' | tr '\n' '|' | cut -c1-6000)
+            # Kotlin compiler errors go first: Gradle task lines used to fill the
+            # 6000 character annotation limit and cut the actual error in half.
+            errors=$({ grep -aE '^e: ' "$log" | head -20
+              grep -aE 'error: |Execution failed|What went wrong|FAILED|Could not|Caused by' "$log" | head -40
+            } | sed 's/%/%25/g; s/\r//g' | tr '\n' '|' | cut -c1-6000)
             echo "::error title=gradle $label::${errors:-no error line matched}"
             tailmsg=$(tail -c 1500 "$log" | tr '\n' '|' | sed 's/%/%25/g')
             echo "::error title=gradle $label tail::$tailmsg"

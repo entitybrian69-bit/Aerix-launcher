@@ -117,7 +117,7 @@ fun AerixPrimaryButton(
 ) {
     Surface(
         modifier = modifier
-            .height(46.dp)
+            .height(48.dp)
             .liquidGlass(shape = CircleShape, tint = accent, strength = 0.92f, elevation = AerixMetrics.glassSelectedElevation),
         shape = CircleShape,
         color = if (enabled) accent else accent.copy(alpha = 0.35f),
@@ -149,7 +149,7 @@ fun AerixGhostButton(
 ) {
     Surface(
         modifier = modifier
-            .height(40.dp)
+            .height(48.dp)
             .liquidGlass(shape = CircleShape, strength = 0.6f, elevation = AerixMetrics.glassSubtleElevation),
         shape = CircleShape,
         color = AerixSurface.panelRaised.copy(alpha = 0.54f),
@@ -297,7 +297,7 @@ fun PillTabs(tabs: List<String>, selected: Int, onSelect: (Int) -> Unit, modifie
             val isSelected = index == selected
             Box(
                 modifier = Modifier
-                    .height(AerixMetrics.pillTabHeight - AerixSpacing.sm)
+                    .height(48.dp)
                     .clip(CircleShape)
                     .background(if (isSelected) AerixSurface.accent else Color.Transparent)
                     .clickable(role = Role.Tab) { onSelect(index) }
