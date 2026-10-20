@@ -161,3 +161,25 @@ A useful device report is now the same `latest.log`, looking for
 `[Aerix renderer diagnostics] bundle=0.3.2` and `[Aerix startup]` checkpoints.
 Absence of those lines is an inconclusive capture, not evidence of a particular
 renderer, mod fault or successful startup. No uninstall or data clearing is required.
+
+### Diagnostic APK validation
+
+Source `b24cbc2b22283deff69807d078ae998ede0f0c1c`, CI
+https://github.com/entitybrian69-bit/Aerix-launcher/actions/runs/39354886594
+completed successfully: four-ABI native builds, core/compat tests, actual EGL
+smoke/checkpoint checks, launcher regressions, ASan/UBSan startup-mirror tests,
+both APK builds and final native-payload checks. No device rendering result.
+
+Full APK ZIP (extract `app-release-full.apk`, install as an update):
+https://github.com/entitybrian69-bit/Aerix-launcher/actions/runs/39354886594/artifacts/12234413964
+
+`rustgl-startup-diagnostics-build.json` records native hashes, reviewed patch
+hashes, validation and checksum-artifact link. `rustgl-startup-diagnostics.patch`
+is the code/tooling diff from `3a4b46c`, including the additional partial-write
+regression tested locally after the APK build; production code is identical to
+that tested build. Older crash-fix build records remain historical, not claims
+that 0.3.1 worked on the phone.
+
+Minecraft appenders can rotate or overwrite mirrored tails during later logging;
+this remains a best-effort startup diagnostic, not an exclusive log writer or
+complete crash recorder. The primary Aerix launcher log remains unchanged.

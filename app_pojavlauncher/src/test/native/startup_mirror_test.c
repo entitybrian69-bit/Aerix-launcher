@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/resource.h>
+#include <signal.h>
 static void feed(const char *s) { aerix_startup_mirror_feed(s, strlen(s)); }
 int main(void) {
     char directory[] = "/tmp/aerix-mirror-XXXXXX";
@@ -45,6 +47,23 @@ int main(void) {
     for (int i = 0; i < 10000; ++i) feed("[RustRenderer] [EGL] bounded event\n");
     file = fopen(path, "r"); assert(file); fseek(file, 0, SEEK_END);
     assert(ftell(file) <= 65536 + (long)strlen("bounded\n")); fclose(file);
+    aerix_startup_mirror_configure(NULL, NULL);
+    /* Force a partial regular-file write, then EFBIG, then restore available capacity.
+       The mirror must stay disabled instead of resuming writes with a stale byte count. */
+    file = fopen(path, "w"); assert(file); fclose(file);
+    struct rlimit previous; assert(getrlimit(RLIMIT_FSIZE, &previous) == 0);
+    struct rlimit limited = previous; limited.rlim_cur = 120;
+    void (*old_handler)(int) = signal(SIGXFSZ, SIG_IGN);
+    assert(setrlimit(RLIMIT_FSIZE, &limited) == 0);
+    aerix_startup_mirror_configure(path, "partial failure");
+    feed("Backend library: LWJGL version x\n");
+    for (int i = 0; i < 20; ++i) feed("[RustRenderer] [EGL] simulated file-size failure\n");
+    assert(setrlimit(RLIMIT_FSIZE, &previous) == 0);
+    signal(SIGXFSZ, old_handler);
+    file = fopen(path, "r"); assert(file); fseek(file, 0, SEEK_END); long failed_size = ftell(file); fclose(file);
+    assert(failed_size == 120);
+    feed("[RustRenderer] must remain disabled after capacity returns\n");
+    file = fopen(path, "r"); assert(file); fseek(file, 0, SEEK_END); assert(ftell(file) == failed_size); fclose(file);
     aerix_startup_mirror_configure(NULL, NULL);
     unlink(path); unlink(other); rmdir(directory);
     puts("PASS: startup-only mirror, split lines, stale log preservation, redaction, missing file and symlink rejection");

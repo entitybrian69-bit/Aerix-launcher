@@ -1,0 +1,541 @@
+diff --git a/.github/workflows/android.yml b/.github/workflows/android.yml
+index 4cf0719..6586087 100644
+--- a/.github/workflows/android.yml
++++ b/.github/workflows/android.yml
+@@ -80,6 +80,8 @@ jobs:
+             echo "::error title=RustGL EGL smoke::$detail"
+             exit 1
+           fi
++          grep -F '[Aerix startup] eglMakeCurrent returned=1' rustgl-smoke.log
++          grep -F '[Aerix startup] first swap returned=1' rustgl-smoke.log
+       - name: Upload authenticated-build input assets
+         uses: actions/upload-artifact@v4
+         with:
+@@ -244,6 +246,14 @@ jobs:
+             || { echo "::error title=missing apk::the noruntime apk was not produced"; ls -R app_pojavlauncher/build/outputs/apk || true; exit 1; }
+           mv app_pojavlauncher/build/outputs/apk/noruntime/release/app_pojavlauncher-noruntime-release.apk out/app-release-noruntime.apk
+ 
++      - name: Startup mirror native regression test
++        run: |
++          cc -std=c11 -Wall -Wextra -Werror -pthread -fsanitize=address,undefined \
++            -I app_pojavlauncher/src/main/jni/diagnostics \
++            app_pojavlauncher/src/main/jni/diagnostics/startup_mirror.c \
++            app_pojavlauncher/src/test/native/startup_mirror_test.c -o "$RUNNER_TEMP/startup-mirror-test"
++          "$RUNNER_TEMP/startup-mirror-test"
++
+       - name: Native FPS counter regression test
+         run: |
+           cc -std=c11 -pthread -I app_pojavlauncher/src/main/jni/fps \
+diff --git a/app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/Logger.java b/app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/Logger.java
+index bcd5fb4..6c8d1ac 100644
+--- a/app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/Logger.java
++++ b/app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/Logger.java
+@@ -14,6 +14,9 @@ public class Logger {
+     /** Reset the log file, effectively erasing any previous logs */
+     public static native void begin(String logFilePath);
+ 
++    /** Opt-in startup-only native diagnostics appended after Minecraft opens its current log. */
++    public static native void enableRendererStartupMirror(String latestLogPath, String identity);
++
+     /** Small listener for anything listening to the log */
+     @Keep
+     public interface eventLogListener {
+diff --git a/app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/renderer/BundledRustGl.kt b/app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/renderer/BundledRustGl.kt
+index 44f2e21..a7f5dae 100644
+--- a/app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/renderer/BundledRustGl.kt
++++ b/app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/renderer/BundledRustGl.kt
+@@ -59,6 +59,7 @@ internal object BundledRustGl {
+             minMCVer = null, maxMCVer = null, glName = gl.absolutePath, eglName = gl.absolutePath,
+             nativeLibDir = directory.absolutePath,
+             env = RustGlBackendPolicy.environment(mapOf(
++                "AERIX_RENDERER_STARTUP_TRACE" to "1",
+                 "RENDERER_SPOOF_GL" to "1", "MESA_GL_VERSION_OVERRIDE" to "4.4",
+                 "MESA_GLSL_VERSION_OVERRIDE" to "330", "LIB_MESA_NAME" to "",
+                 "JAVA_TOOL_OPTIONS" to "-Dorg.lwjgl.util.NoChecks=true"
+diff --git a/app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/renderer/RendererStartupDiagnostics.kt b/app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/renderer/RendererStartupDiagnostics.kt
+new file mode 100644
+index 0000000..c79cd47
+--- /dev/null
++++ b/app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/renderer/RendererStartupDiagnostics.kt
+@@ -0,0 +1,28 @@
++package net.kdt.pojavlaunch.aerix.renderer
++
++import android.util.Log
++import net.kdt.pojavlaunch.Logger
++import net.kdt.pojavlaunch.aerix.bridge.AerixRendererPlugin
++import net.kdt.pojavlaunch.game.renderer.RenderSpec
++import java.io.File
++import java.nio.file.Files
++
++/** No timers, JVM classpath injection, crash signal handler, or changes to other renderers. */
++object RendererStartupDiagnostics {
++    @JvmStatic fun configure(spec: RenderSpec, gameDirectory: File) {
++        if (spec !is AerixRendererPlugin || spec.packageName != BundledRustGl.PACKAGE) return
++        try {
++            val root = gameDirectory.canonicalFile
++            val logs = File(root, "logs")
++            val latest = File(logs, "latest.log")
++            require(!Files.isSymbolicLink(logs.toPath()) && !Files.isSymbolicLink(latest.toPath()))
++            require(logs.canonicalFile.parentFile == root)
++            Logger.enableRendererStartupMirror(latest.absolutePath,
++                "bundle=${spec.appVersion} backend=gles namespaceBypass=${spec.useNamespaceBypass}; startup-only trace, not proof of gameplay")
++        } catch (error: Exception) {
++            Log.w("RendererDiagnostics", "Startup log mirror unavailable; launcher log remains primary", error)
++        } catch (error: LinkageError) {
++            Log.w("RendererDiagnostics", "Startup log mirror linkage unavailable", error)
++        }
++    }
++}
+diff --git a/app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/utils/jre/GameRunner.java b/app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/utils/jre/GameRunner.java
+index e83cb3d..9c8c9db 100644
+--- a/app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/utils/jre/GameRunner.java
++++ b/app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/utils/jre/GameRunner.java
+@@ -329,6 +329,10 @@ public class GameRunner {
+         JREUtils.setGameEnvironment(activity, versionEnvMap);
+         JREUtils.chdir(instance.getGameDirectory().getAbsolutePath());
+ 
++        if (android.os.Build.VERSION.SDK_INT >= 26) {
++            net.kdt.pojavlaunch.aerix.renderer.RendererStartupDiagnostics.configure(
++                    gameRenderer.getCurrentRenderer(), instance.getGameDirectory());
++        }
+         if(!gameRenderer.maybeSetupRenderer()) {
+             if(showDialog(activity, R.string.gr_err_renderer_load_Failed)) return;
+             System.exit(0);
+diff --git a/app_pojavlauncher/src/main/jni/CMakeLists.txt b/app_pojavlauncher/src/main/jni/CMakeLists.txt
+index 887fe73..a1f5e03 100644
+--- a/app_pojavlauncher/src/main/jni/CMakeLists.txt
++++ b/app_pojavlauncher/src/main/jni/CMakeLists.txt
+@@ -59,6 +59,7 @@ add_library(pojavexec SHARED
+         jre_launcher/elf_hinter.c
+         jre_launcher/abort_wait.c
+         utils.c
++        diagnostics/startup_mirror.c
+         stdio_is.c
+         minibridge.c
+ )
+diff --git a/app_pojavlauncher/src/main/jni/diagnostics/startup_mirror.c b/app_pojavlauncher/src/main/jni/diagnostics/startup_mirror.c
+new file mode 100644
+index 0000000..e03a3dd
+--- /dev/null
++++ b/app_pojavlauncher/src/main/jni/diagnostics/startup_mirror.c
+@@ -0,0 +1,92 @@
++#define _GNU_SOURCE
++#include "startup_mirror.h"
++#include <fcntl.h>
++#include <pthread.h>
++#include <stdio.h>
++#include <string.h>
++#include <sys/stat.h>
++#include <unistd.h>
++#include <errno.h>
++#include <limits.h>
++
++#define LIMIT (64 * 1024)
++#define LINE 4096
++static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
++static char target[PATH_MAX], pending[LIMIT], line[LINE];
++static size_t used, line_size, written;
++static int output = -1;
++static int enabled, ready, dropping;
++
++static int write_all(int fd, const char *data, size_t size) {
++    while (size) {
++        ssize_t n = write(fd, data, size);
++        if (n < 0 && errno == EINTR) continue;
++        if (n <= 0) return 0;
++        data += n; size -= (size_t)n;
++    }
++    return 1;
++}
++static void close_output(void) {
++    if (output >= 0) close(output);
++    output = -1;
++}
++void aerix_startup_mirror_configure(const char *path, const char *identity) {
++    pthread_mutex_lock(&lock);
++    close_output(); used = line_size = written = 0; ready = dropping = enabled = 0;
++    if (path && identity && path[0] == '/' && strnlen(path, sizeof(target)) < sizeof(target)) {
++        strcpy(target, path);
++        int n = snprintf(pending, sizeof(pending), "\n[Aerix renderer diagnostics] %.480s\n", identity);
++        used = (size_t)n;
++        enabled = 1;
++    }
++    pthread_mutex_unlock(&lock);
++}
++static void emit(const char *data, size_t size) {
++    if (size > LIMIT - written) { enabled = 0; close_output(); return; }
++    if (output >= 0) {
++        // A partial write followed by ENOSPC must not permit repeated attempts past the budget.
++        if (!write_all(output, data, size)) { enabled = 0; close_output(); return; }
++        written += size;
++        fdatasync(output); /* Startup events only. Pipe capture remains best-effort on abrupt process death. */
++    }
++}
++static void process_line(void) {
++    line[line_size] = 0;
++    /* Log4j has already opened this run's latest.log when its backend banner is printed.
++       Never append to yesterday's file merely because it exists before the JVM starts. */
++    if (!ready && strstr(line, "Backend library: LWJGL version")) {
++        int fd = open(target, O_WRONLY | O_APPEND | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK);
++        struct stat status;
++        if (fd >= 0 && fstat(fd, &status) == 0 && S_ISREG(status.st_mode)) {
++            output = fd; ready = 1;
++            emit(pending, used);
++        } else if (fd >= 0) close(fd);
++    }
++    /* Never mirror auth arguments, environment dumps, accounts or arbitrary mod stdout. */
++    int selected = (strncmp(line, "[RustRenderer] ", 15) == 0 ||
++                    strncmp(line, "Renderer native load:", 21) == 0 ||
++                    strncmp(line, "Renderer native provider loaded=", 32) == 0);
++    if (!selected || strstr(line, "Session ID is")) return;
++    if (ready) {
++        emit("[Aerix native] ", 15);
++        emit(line, line_size);
++        emit("\n", 1);
++    } else if (line_size + 1 <= sizeof(pending) - used) {
++        memcpy(pending + used, line, line_size); used += line_size;
++        pending[used++] = '\n';
++    }
++    if (strstr(line, "[Aerix startup] first swap returned=1")) {
++        enabled = 0; close_output();
++    }
++}
++void aerix_startup_mirror_feed(const char *bytes, size_t size) {
++    pthread_mutex_lock(&lock);
++    if (enabled) for (size_t i = 0; i < size && enabled; ++i) {
++        if (bytes[i] == '\n') {
++            if (!dropping) process_line();
++            line_size = 0; dropping = 0;
++        } else if (line_size < sizeof(line) - 1) line[line_size++] = bytes[i];
++        else dropping = 1; /* Drop oversized lines, do not accidentally treat fragments as new events. */
++    }
++    pthread_mutex_unlock(&lock);
++}
+diff --git a/app_pojavlauncher/src/main/jni/diagnostics/startup_mirror.h b/app_pojavlauncher/src/main/jni/diagnostics/startup_mirror.h
+new file mode 100644
+index 0000000..d3f35ac
+--- /dev/null
++++ b/app_pojavlauncher/src/main/jni/diagnostics/startup_mirror.h
+@@ -0,0 +1,7 @@
++#ifndef AERIX_STARTUP_MIRROR_H
++#define AERIX_STARTUP_MIRROR_H
++#include <stddef.h>
++/* Opt-in for bundled RustGL only. No file creation, truncation, signal handler or JNI per frame. */
++void aerix_startup_mirror_configure(const char *path, const char *identity);
++void aerix_startup_mirror_feed(const char *bytes, size_t size);
++#endif
+diff --git a/app_pojavlauncher/src/main/jni/stdio_is.c b/app_pojavlauncher/src/main/jni/stdio_is.c
+index 3f602e3..13a6038 100644
+--- a/app_pojavlauncher/src/main/jni/stdio_is.c
++++ b/app_pojavlauncher/src/main/jni/stdio_is.c
+@@ -8,6 +8,7 @@
+ #include <string.h>
+ #include <errno.h>
+ #include <stdlib.h>
++#include "diagnostics/startup_mirror.h"
+ 
+ //
+ // Created by maks on 17.02.21.
+@@ -22,6 +23,7 @@ static int latestlog_fd = -1;
+ 
+ static bool recordBuffer(char* buf, ssize_t len) {
+     if(strstr(buf, "Session ID is")) return false;
++    aerix_startup_mirror_feed(buf, (size_t)len);
+     if(latestlog_fd != -1) {
+         write(latestlog_fd, buf, len);
+         fdatasync(latestlog_fd);
+@@ -37,6 +39,8 @@ static void *logger_thread(void* param) {
+     ssize_t  rsize;
+     char buf[2050];
+     while((rsize = read(pfd[0], buf, sizeof(buf)-1)) > 0) {
++        // recordBuffer uses strstr: terminate the bytes actually read, not stale stack memory.
++        buf[rsize] = 0;
+         bool shouldRecordString = recordBuffer(buf, rsize); //record with newline int latestlog
+         if(buf[rsize-1]=='\n') {
+             rsize=rsize-1; //truncate
+@@ -117,4 +121,17 @@ Java_net_kdt_pojavlaunch_Logger_setLogListener(JNIEnv *env, __attribute((unused)
+         logListener = (*env)->NewGlobalRef(env, log_listener);
+     }
+     if(logListenerLocal != NULL) (*env)->DeleteGlobalRef(env, logListenerLocal);
+-}
+\ No newline at end of file
++}
++JNIEXPORT void JNICALL
++Java_net_kdt_pojavlaunch_Logger_enableRendererStartupMirror(JNIEnv *env, jclass clazz,
++                                                          jstring path, jstring identity) {
++    (void)clazz;
++    const char *p = (*env)->GetStringUTFChars(env, path, NULL);
++    if (!p) return;
++    const char *id = (*env)->GetStringUTFChars(env, identity, NULL);
++    if (id) {
++        aerix_startup_mirror_configure(p, id);
++        (*env)->ReleaseStringUTFChars(env, identity, id);
++    }
++    (*env)->ReleaseStringUTFChars(env, path, p);
++}
+diff --git a/app_pojavlauncher/src/test/java/net/kdt/pojavlaunch/aerix/renderer/BundledRustGlDiscoveryTest.kt b/app_pojavlauncher/src/test/java/net/kdt/pojavlaunch/aerix/renderer/BundledRustGlDiscoveryTest.kt
+index 7930695..15b610a 100644
+--- a/app_pojavlauncher/src/test/java/net/kdt/pojavlaunch/aerix/renderer/BundledRustGlDiscoveryTest.kt
++++ b/app_pojavlauncher/src/test/java/net/kdt/pojavlaunch/aerix/renderer/BundledRustGlDiscoveryTest.kt
+@@ -37,7 +37,8 @@ class BundledRustGlDiscoveryTest {
+         assertEquals("plugin:net.kdt.pojavlaunch.renderer.rustgl", plugin.pluginTag)
+         assertEquals("RustGL (Experimental)", plugin.displayName)
+         assertEquals("gles", plugin.env["RENDERER_BACKEND"])
+-        assertEquals("0.3.1", plugin.appVersion)
++        assertEquals("1", plugin.env["AERIX_RENDERER_STARTUP_TRACE"])
++        assertEquals("0.3.2", plugin.appVersion)
+         val plan = plugin.eglLaunchPlan()
+         assertEquals(plugin.glName, plan.library)
+         assertFalse("System EGL/GLES must not be duplicated into a driver namespace", plan.namespaceBypass)
+@@ -60,11 +61,11 @@ class BundledRustGlDiscoveryTest {
+         } }
+         val old = BundleRelease("0.3.0", entry.get("revision").asString, entry.get("abi").asString, files)
+         val store = RendererBundleStore(File(app.noBackupFilesDir, "renderer-bundles/rustgl"))
+-        store.install(old) { name -> app.assets.open("renderer-bundles/rustgl/0.3.1/${old.abi}/$name") }
++        store.install(old) { name -> app.assets.open("renderer-bundles/rustgl/0.3.2/${old.abi}/$name") }
+         store.activate(old)
+         store.beginInit(old).finish(false)
+         val restored = requireNotNull(BundledRustGl.discover(app))
+-        assertEquals("0.3.1", restored.appVersion)
++        assertEquals("0.3.2", restored.appVersion)
+         assertEquals(revised.glName, restored.glName)
+         assertTrue("Do not erase the old failure record to restore discovery", store.rejected(old))
+         assertFalse(restored.eglLaunchPlan().namespaceBypass)
+diff --git a/app_pojavlauncher/src/test/native/startup_mirror_test.c b/app_pojavlauncher/src/test/native/startup_mirror_test.c
+new file mode 100644
+index 0000000..c2dc18e
+--- /dev/null
++++ b/app_pojavlauncher/src/test/native/startup_mirror_test.c
+@@ -0,0 +1,70 @@
++#define _GNU_SOURCE
++#include "startup_mirror.h"
++#include <assert.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <unistd.h>
++#include <sys/resource.h>
++#include <signal.h>
++static void feed(const char *s) { aerix_startup_mirror_feed(s, strlen(s)); }
++int main(void) {
++    char directory[] = "/tmp/aerix-mirror-XXXXXX";
++    assert(mkdtemp(directory));
++    char path[256], other[256];
++    snprintf(path, sizeof(path), "%s/latest.log", directory);
++    snprintf(other, sizeof(other), "%s/other.log", directory);
++    FILE *file = fopen(path, "w"); assert(file); fputs("previous log\n", file); fclose(file);
++    aerix_startup_mirror_configure(path, "bundle=TEST");
++    feed("[RustRenderer] [EGL] before JVM\naccount secret\n");
++    file = fopen(path, "r"); char data[100000] = {0}; fread(data, 1, sizeof(data)-1, file); fclose(file);
++    assert(strcmp(data, "previous log\n") == 0);
++    file = fopen(path, "w"); fputs("current Minecraft log\n", file); fclose(file);
++    feed("[main/INFO]: Backend library: LW"); feed("JGL version 3.2.3\n");
++    feed("[RustRenderer] [Aerix startup] eglInitialize enter\n");
++    feed("[RustRenderer] Session ID is SECRET\n");
++    feed("[RustRenderer] [Aerix startup] first swap returned=1\n");
++    feed("[RustRenderer] MUST_NOT_APPEAR\n");
++    file = fopen(path, "r"); memset(data, 0, sizeof(data)); fread(data, 1, sizeof(data)-1, file); fclose(file);
++    assert(strstr(data, "current Minecraft log\n")); assert(strstr(data, "bundle=TEST"));
++    assert(strstr(data, "before JVM")); assert(strstr(data, "eglInitialize enter"));
++    assert(!strstr(data, "secret")); assert(!strstr(data, "SECRET")); assert(!strstr(data, "MUST_NOT_APPEAR"));
++    /* Never create a missing Minecraft log or follow a symlink. */
++    unlink(path); aerix_startup_mirror_configure(path, "missing");
++    feed("Backend library: LWJGL version x\n"); assert(access(path, F_OK) != 0);
++    file = fopen(other, "w"); fputs("untouched", file); fclose(file);
++    assert(symlink(other, path) == 0); aerix_startup_mirror_configure(path, "symlink");
++    feed("Backend library: LWJGL version x\n[RustRenderer] NOT_WRITTEN\n");
++    file = fopen(other, "r"); memset(data, 0, sizeof(data)); fread(data, 1, sizeof(data)-1, file); fclose(file);
++    assert(strcmp(data, "untouched") == 0);
++    unlink(path);
++    file = fopen(path, "w"); assert(file); fputs("bounded\n", file); fclose(file);
++    aerix_startup_mirror_configure(path, "bounded");
++    feed("Backend library: LWJGL version x\n");
++    char huge[10000]; memset(huge, 'x', sizeof(huge));
++    memcpy(huge, "[RustRenderer] ", 15);
++    aerix_startup_mirror_feed(huge, sizeof(huge)); feed("\n");
++    for (int i = 0; i < 10000; ++i) feed("[RustRenderer] [EGL] bounded event\n");
++    file = fopen(path, "r"); assert(file); fseek(file, 0, SEEK_END);
++    assert(ftell(file) <= 65536 + (long)strlen("bounded\n")); fclose(file);
++    aerix_startup_mirror_configure(NULL, NULL);
++    /* Force a partial regular-file write, then EFBIG, then restore available capacity.
++       The mirror must stay disabled instead of resuming writes with a stale byte count. */
++    file = fopen(path, "w"); assert(file); fclose(file);
++    struct rlimit previous; assert(getrlimit(RLIMIT_FSIZE, &previous) == 0);
++    struct rlimit limited = previous; limited.rlim_cur = 120;
++    void (*old_handler)(int) = signal(SIGXFSZ, SIG_IGN);
++    assert(setrlimit(RLIMIT_FSIZE, &limited) == 0);
++    aerix_startup_mirror_configure(path, "partial failure");
++    feed("Backend library: LWJGL version x\n");
++    for (int i = 0; i < 20; ++i) feed("[RustRenderer] [EGL] simulated file-size failure\n");
++    assert(setrlimit(RLIMIT_FSIZE, &previous) == 0);
++    signal(SIGXFSZ, old_handler);
++    file = fopen(path, "r"); assert(file); fseek(file, 0, SEEK_END); long failed_size = ftell(file); fclose(file);
++    assert(failed_size == 120);
++    feed("[RustRenderer] must remain disabled after capacity returns\n");
++    file = fopen(path, "r"); assert(file); fseek(file, 0, SEEK_END); assert(ftell(file) == failed_size); fclose(file);
++    aerix_startup_mirror_configure(NULL, NULL);
++    unlink(path); unlink(other); rmdir(directory);
++    puts("PASS: startup-only mirror, split lines, stale log preservation, redaction, missing file and symlink rejection");
++}
+diff --git a/scripts/build_rustgl_bundle.py b/scripts/build_rustgl_bundle.py
+index 584081d..d0cd0ee 100644
+--- a/scripts/build_rustgl_bundle.py
++++ b/scripts/build_rustgl_bundle.py
+@@ -15,6 +15,7 @@ import urllib.request
+ REVISION = "eb22559581cf400af29470205a9ebbff31e0db33"
+ PATCH_SHA256 = "aeaa3bd7362a62d31d46c8b04b9461abacb67a9de21f426417929b22db444885"
+ LIFETIME_PATCH_SHA256 = "ba6d4f1bc71bbedea69d3b8a3fa30a2ad37d375db28206bfe955331b82494d12"
++STARTUP_PATCH_SHA256 = "21305badbafc1465cd047e8b9212e4c4e2e925229eb0b2bb0e3aca87c3d1743f"
+ TARGETS = {
+     "arm64-v8a": ("aarch64-linux-android", "aarch64-linux-android26"),
+     "armeabi-v7a": ("armv7-linux-androideabi", "armv7a-linux-androideabi26"),
+@@ -81,7 +82,8 @@ def run(args):
+     # arbitrary dirty renderer source as if it were the pinned upstream revision.
+     patch_dir = Path(__file__).resolve().parent / "patches"
+     patches = [(patch_dir / "rustgl-gles-capability-probe.patch", PATCH_SHA256),
+-               (patch_dir / "rustgl-extension-string-lifetime.patch", LIFETIME_PATCH_SHA256)]
++               (patch_dir / "rustgl-extension-string-lifetime.patch", LIFETIME_PATCH_SHA256),
++               (patch_dir / "rustgl-startup-checkpoints.patch", STARTUP_PATCH_SHA256)]
+     for patch, expected_hash in patches:
+         if digest(patch) != expected_hash:
+             raise ValueError("RustGL source patch hash mismatch")
+@@ -167,7 +169,7 @@ def run(args):
+     approval = {"redistributionApproved": False, "experimentalUserAuthorized": True,
+                 "reviewedBy": "Experimental build policy: user accepted upstream README MIT basis; no legal clearance claimed",
+                 "sourceRevision": REVISION, "components": components, "artifacts": artifacts,
+-                "bundleVersion": "0.3.1", "upstreamNativeVersion": "0.3.0",
++                "bundleVersion": "0.3.2", "upstreamNativeVersion": "0.3.0",
+                 "integration": "System EGL/GLES namespace; capability-probe and extension-string lifetime fixes",
+                 "sourcePatches": [{"file": "evidence/" + patch.name, "sha256": sha} for patch, sha in patches],
+                 "toolchain": subprocess.check_output(["rustc", "-Vv"], text=True),
+@@ -175,7 +177,7 @@ def run(args):
+     approval_path = report / "experimental-approval.json"
+     approval_path.write_text(json.dumps(approval, indent=2) + "\n")
+     subprocess.run([sys.executable, str(Path(__file__).with_name("prepare_rustgl_bundle.py")),
+-                    "--approval", str(approval_path), "--input", str(native), "--version", "0.3.1",
++                    "--approval", str(approval_path), "--input", str(native), "--version", "0.3.2",
+                     "--inventory", str(args.inventory.resolve()), "--output", str(args.output.resolve()),
+                     "--readelf", str(bin_dir / "llvm-readelf"), "--experimental-mit-declaration"], check=True)
+     print("::notice title=RustGL bundled source build::" + json.dumps({"revision": REVISION, "artifacts": artifacts, "licenses": len(components), "experimental": True}))
+diff --git a/scripts/patches/rustgl-startup-checkpoints.patch b/scripts/patches/rustgl-startup-checkpoints.patch
+new file mode 100644
+index 0000000..b41c831
+--- /dev/null
++++ b/scripts/patches/rustgl-startup-checkpoints.patch
+@@ -0,0 +1,88 @@
++--- a/crates/gl-compat/src/lib.rs
+++++ b/crates/gl-compat/src/lib.rs
++@@ -3045,6 +3045,9 @@
++     ctx: *mut c_void,
++ ) -> u32 {
++     type F = unsafe extern "C" fn(*mut c_void, *mut c_void, *mut c_void, *mut c_void) -> u32;
+++    static EVENTS: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+++    let traced = aerix_startup_event(&EVENTS, 4);
+++    if traced { log(&format!("[Aerix startup] eglMakeCurrent enter display={dpy:?} draw={draw:?} context={ctx:?}")); }
++     let previous = match egl_sym::<unsafe extern "C" fn() -> *mut c_void>(b"eglGetCurrentContext\0") {
++         Some(get) => get(),
++         None => std::ptr::null_mut(),
++@@ -3053,6 +3056,7 @@
++     match egl_sym::<F>(b"eglMakeCurrent\0") {
++         Some(f) => {
++             let r = f(dpy, draw, read, ctx);
+++            if traced { log(&format!("[Aerix startup] eglMakeCurrent returned={r}")); }
++             if r != 0 && previous != ctx {
++                 clear_driver_cache();
++             }
++@@ -3061,6 +3065,17 @@
++         None => z = 0x3003, // EGL_BAD_MATCH: nothing to call
++     }
++     z
+++}
+++
+++// Opt-in Aerix diagnostics, bounded per EGL operation. No signals are intercepted.
+++fn aerix_startup_event(counter: &std::sync::atomic::AtomicU32, limit: u32) -> bool {
+++    static ENABLED: OnceLock<bool> = OnceLock::new();
+++    if !*ENABLED.get_or_init(|| std::env::var("AERIX_RENDERER_STARTUP_TRACE").as_deref() == Ok("1")) {
+++        return false;
+++    }
+++    // Saturating: never wrap and start printing again after many frames.
+++    counter.fetch_update(Ordering::Relaxed, Ordering::Relaxed,
+++        |value| if value < limit { Some(value + 1) } else { None }).is_ok()
++ }
++ 
++ macro_rules! egl_export {
++@@ -3069,7 +3084,12 @@
++         pub unsafe extern "C" fn $name($($arg : $ty),*) -> $ret {
++             type F = unsafe extern "C" fn($($ty),*) -> $ret;
++             let n = concat!(stringify!($name), "\0");
++-            match egl_sym::<F>(n.as_bytes()) {
+++            static EVENTS: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+++            let traced = matches!(stringify!($name), "eglGetDisplay" | "eglInitialize" | "eglChooseConfig" |
+++                "eglBindAPI" | "eglCreateContext" | "eglCreateWindowSurface" | "eglCreatePbufferSurface") &&
+++                aerix_startup_event(&EVENTS, 4);
+++            if traced { log(&format!("[Aerix startup] {} enter args={:?}", stringify!($name), ($($arg,)*))); }
+++            let result = match egl_sym::<F>(n.as_bytes()) {
++                 Some(f) => f($($arg),*),
++                 None => {
++                     // Safe zero defaults for pointer / int returns
++@@ -3077,7 +3097,9 @@
++                     let mut z: $ret = unsafe { std::mem::zeroed() };
++                     z
++                 }
++-            }
+++            };
+++            if traced { log(&format!("[Aerix startup] {} returned={:?}", stringify!($name), result)); }
+++            result
++         }
++     };
++     // void-ish already covered by -> type
++@@ -3116,6 +3138,9 @@
++ /// Custom `eglSwapBuffers` that draws the debug overlay before presenting.
++ #[no_mangle]
++ pub unsafe extern "C" fn eglSwapBuffers(dpy: *mut c_void, surface: *mut c_void) -> u32 {
+++    static EVENTS: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+++    let traced = aerix_startup_event(&EVENTS, 1);
+++    if traced { log("[Aerix startup] first swap enter"); }
++     // Draw overlay if enabled.
++     if overlay::is_enabled() {
++         let cfg = renderer_core::Config::from_env();
++@@ -3124,10 +3149,12 @@
++     }
++     // Forward to system EGL.
++     type F = unsafe extern "C" fn(*mut c_void, *mut c_void) -> u32;
++-    match egl_sym::<F>(b"eglSwapBuffers\0") {
+++    let result = match egl_sym::<F>(b"eglSwapBuffers\0") {
++         Some(f) => f(dpy, surface),
++         None => 0x3001, // EGL_NOT_INITIALIZED
++-    }
+++    };
+++    if traced { log(&format!("[Aerix startup] first swap returned={result}")); }
+++    result
++ }
++ 
++ /// eglGetProcAddress: our GL symbols first, then system EGL.
+diff --git a/scripts/smoke_rustgl.py b/scripts/smoke_rustgl.py
+index 925062d..83bb57b 100644
+--- a/scripts/smoke_rustgl.py
++++ b/scripts/smoke_rustgl.py
+@@ -11,7 +11,7 @@ from pathlib import Path
+ 
+ 
+ def main(library):
+-    os.environ.update(EGL_PLATFORM="surfaceless", LIBGL_ALWAYS_SOFTWARE="1", RENDERER_BACKEND="gles")
++    os.environ.update(EGL_PLATFORM="surfaceless", LIBGL_ALWAYS_SOFTWARE="1", RENDERER_BACKEND="gles", AERIX_RENDERER_STARTUP_TRACE="1")
+     lib = c.CDLL(str(library.resolve()))
+     proc = lib.eglGetProcAddress
+     proc.restype, proc.argtypes = c.c_void_p, [c.c_char_p]
+diff --git a/scripts/tests/test_renderer_tools.py b/scripts/tests/test_renderer_tools.py
+index 9527923..379ed13 100644
+--- a/scripts/tests/test_renderer_tools.py
++++ b/scripts/tests/test_renderer_tools.py
+@@ -156,6 +156,10 @@ class RendererToolsTest(unittest.TestCase):
+         self.assertEqual(builder.LIFETIME_PATCH_SHA256,
+                          builder.digest(SCRIPTS / "patches/rustgl-extension-string-lifetime.patch"))
+ 
++    def test_startup_patch_matches_reviewed_recipe_hash(self):
++        self.assertEqual(builder.STARTUP_PATCH_SHA256,
++                         builder.digest(SCRIPTS / "patches/rustgl-startup-checkpoints.patch"))
++
+     def test_smoke_rejects_missing_egl_entry_point_without_calling_null(self):
+         resolver = Mock(return_value=None)
+         with patch.dict(smoke.os.environ), patch.object(smoke.c, "CDLL", return_value=types.SimpleNamespace(eglGetProcAddress=resolver)):
