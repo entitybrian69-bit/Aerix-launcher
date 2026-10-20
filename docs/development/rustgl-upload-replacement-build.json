@@ -1,0 +1,43 @@
+{
+  "bundleVersion": "0.3.3",
+  "originalPluginVersion": "0.3.0",
+  "sourceApkSha256": "4ce0d57776132e0d782836d9b5ba7da57b0781b1f15f2eccf0766b239595e73f",
+  "nativeArchiveSha256": "57b1b16929a38f7bb12f282fef759e0a19886ef37c74d965d69645a689469687",
+  "nativeLibraries": [
+    {
+      "abi": "arm64-v8a",
+      "bytes": 1460976,
+      "sha256": "f7d1876591add2c6dcb15aea2e9eae22a7eea3fede68210a539a84075c15b49f"
+    },
+    {
+      "abi": "armeabi-v7a",
+      "bytes": 974036,
+      "sha256": "106e086b6b5b111bdf0eb63f895035ce8911e013775888573487a3092ba3d271"
+    },
+    {
+      "abi": "x86",
+      "bytes": 1594064,
+      "sha256": "d1e43b9f27a39b36c144a71b8555bf881c3347d56fcdc494ace7fb124f54436e"
+    },
+    {
+      "abi": "x86_64",
+      "bytes": 1467656,
+      "sha256": "507ad2e47bec36a33d662f530b91b5ddc67ea8120bc3a2d8d4560cd4582f458d"
+    }
+  ],
+  "nativeBytesRebuiltOrPatched": false,
+  "sourceBuiltPayloadPackaged": false,
+  "sourceRevisionVerified": false,
+  "deviceGameplayVerified": false,
+  "knownMemoryDefectPreserved": true,
+  "redistributionApproved": false,
+  "experimentalUserAuthorized": true,
+  "buildCommit": "4eb58a7cfccd9eb0f4a0611a300846f330127c7d",
+  "ciRun": "https://github.com/entitybrian69-bit/Aerix-launcher/actions/runs/39362612150",
+  "validation": "Both CI jobs succeeded; 20 Python tests, launcher regressions, native helper tests, full/noruntime APK builds and exact uploaded-payload/no-leftover verification passed. No dynamic renderer/device success test claimed.",
+  "downloads": {
+    "full": "https://github.com/entitybrian69-bit/Aerix-launcher/actions/runs/39362612150/artifacts/12238112884",
+    "noruntime": "https://github.com/entitybrian69-bit/Aerix-launcher/actions/runs/39362612150/artifacts/12238242563",
+    "sha256": "https://github.com/entitybrian69-bit/Aerix-launcher/actions/runs/39362612150/artifacts/12238312353"
+  }
+}

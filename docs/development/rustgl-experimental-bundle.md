@@ -219,3 +219,20 @@ prebuilt dependency coverage. Approval flags remain experimental only, with no
 claimed license clearance, stable release, crash fix or phone-success proof.
 The user request does not turn missing third-party notices into a license grant.
 See `third_party/rustgl-upload/README.md` and `scripts/import_uploaded_rustgl.py`.
+
+### Exact uploaded replacement APK: validated build
+
+CI https://github.com/entitybrian69-bit/Aerix-launcher/actions/runs/39362612150
+completed successfully for source `4eb58a7cfccd9eb0f4a0611a300846f330127c7d`.
+The importer, 20 Python tests, launcher regressions, native helpers, both APK
+builds, and final checks against the four original uploaded-library hashes passed.
+Verification also rejected leftover source-built payloads in the packaged bundle.
+No dynamic renderer or device gameplay result is claimed for this binary.
+
+Full APK ZIP:
+https://github.com/entitybrian69-bit/Aerix-launcher/actions/runs/39362612150/artifacts/12238112884
+
+Extract `app-release-full.apk`, install as an update without uninstall/data clearing,
+and select RustGL (Experimental). The summary identifies original plugin 0.3.0 /
+Aerix bundle 0.3.3. `rustgl-upload-replacement-build.json` records exact native hashes,
+build source, validation scope and checksum-artifact link. Stable release unchanged.
