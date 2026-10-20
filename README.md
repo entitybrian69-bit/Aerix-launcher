@@ -143,7 +143,7 @@ Aerix brings Minecraft version and instance management, renderer options, accoun
 <table>
   <tr>
     <td align="center" width="50%">
-      <img src="assets/team/entitybrian.jpg" width="140" alt="entitybrian"><br>
+      <img src="assets/team/owner.png" width="140" alt="entitybrian"><br>
       <strong>entitybrian</strong><br>
       <sub>Owner</sub>
     </td>
