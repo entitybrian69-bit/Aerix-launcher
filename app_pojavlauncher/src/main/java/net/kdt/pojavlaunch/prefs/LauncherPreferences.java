@@ -87,7 +87,12 @@ public class LauncherPreferences {
         Tools.initStorageConstants(ctx);
         boolean isDevicePowerful = isDevicePowerful(ctx);
 
+        net.kdt.pojavlaunch.aerix.bridge.RetiredRendererCleanup.clean(ctx);
         PREF_RENDERER = DEFAULT_PREF.getString("renderer", defaultRendererId(ctx));
+        if (net.kdt.pojavlaunch.aerix.bridge.RetiredRendererCleanup.isRetiredTag(PREF_RENDERER)) {
+            PREF_RENDERER = defaultRendererId(ctx);
+            DEFAULT_PREF.edit().putString("renderer", PREF_RENDERER).apply();
+        }
         PREF_BUTTONSIZE = DEFAULT_PREF.getInt("buttonscale", 100);
         PREF_MOUSESCALE = DEFAULT_PREF.getInt("mousescale", 100)/100f;
         PREF_MOUSESPEED = ((float)DEFAULT_PREF.getInt("mousespeed",100))/100f;

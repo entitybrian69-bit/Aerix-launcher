@@ -59,7 +59,6 @@ add_library(pojavexec SHARED
         jre_launcher/elf_hinter.c
         jre_launcher/abort_wait.c
         utils.c
-        diagnostics/startup_mirror.c
         stdio_is.c
         minibridge.c
 )
@@ -122,7 +121,3 @@ target_link_libraries(mobileglues_info_getter
         ${log-lib}
         dl
 )
-# Loaded only by the non-exported capability-probe service process.
-add_library(aerix_vulkan_probe SHARED renderer/vulkan_probe.cpp)
-target_compile_features(aerix_vulkan_probe PRIVATE cxx_std_17)
-target_link_libraries(aerix_vulkan_probe PRIVATE dl)

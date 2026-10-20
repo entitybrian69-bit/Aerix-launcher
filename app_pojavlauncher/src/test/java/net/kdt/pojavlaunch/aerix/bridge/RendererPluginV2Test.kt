@@ -10,21 +10,21 @@ import java.io.File
 
 class RendererPluginV2Test {
     @get:Rule val temporary = TemporaryFolder()
-    private fun directory() = temporary.newFolder().also { File(it, "librust_gl.so").writeBytes(byteArrayOf()) }
+    private fun directory() = temporary.newFolder().also { File(it, "libexample.so").writeBytes(byteArrayOf()) }
     private fun normal(key: String, value: String) = JsonObject().apply {
         addProperty("type", "NormalEnv"); addProperty("key", key); addProperty("value", value)
     }
     private fun metadata(vararg vars: JsonObject) = JsonObject().apply {
-        addProperty("displayName", "RustGL"); addProperty("rendererId", "opengles3_rust")
-        addProperty("rendererGLPath", "**|librust_gl.so"); addProperty("rendererEGLPath", "librust_gl.so")
+        addProperty("displayName", "Example GLES"); addProperty("rendererId", "opengles3_example")
+        addProperty("rendererGLPath", "**|libexample.so"); addProperty("rendererEGLPath", "libexample.so")
         add("dlopenLibPaths", JsonArray()); add("env", JsonArray().apply { vars.forEach { add(it) } })
     }
-    @Test fun realRustGlSchemaResolvesNativePathsAndKeepsBlankMesaOverrideOnGles() {
+    @Test fun glesPluginSchemaResolvesNativePathsAndKeepsBlankMesaOverrideOnGles() {
         val dir = directory()
         val config = RendererPluginV2.parse(metadata(normal("MESA_LOADER_DRIVER_OVERRIDE", ""),
             normal("LIBGL_ES", "3"), normal("RENDERER_BACKEND", "gles")).toString(), dir)
-        assertEquals("RustGL", config.name)
-        assertEquals(File(dir, "librust_gl.so").canonicalPath, config.gl)
+        assertEquals("Example GLES", config.name)
+        assertEquals(File(dir, "libexample.so").canonicalPath, config.gl)
         assertEquals(config.gl, config.egl)
         assertFalse(RendererPluginV2.usesVulkan(config.id, config.env))
         assertFalse(RendererPluginV2.usesDesktopGl(config.id, config.env))
@@ -59,7 +59,7 @@ class RendererPluginV2Test {
         RendererPluginV2.parse(metadata().toString(), temporary.newFolder())
     }
     @Test(expected = IllegalArgumentException::class) fun pathTraversalIsRejected() {
-        val root = metadata().apply { addProperty("rendererGLPath", "**|../librust_gl.so") }
+        val root = metadata().apply { addProperty("rendererGLPath", "**|../libexample.so") }
         RendererPluginV2.parse(root.toString(), directory())
     }
     @Test(expected = IllegalArgumentException::class) fun arbitraryAbsoluteLibrariesAreRejected() {
@@ -77,8 +77,8 @@ class RendererPluginV2Test {
     }
     @Test fun nativeMarkerInEnvironmentIsResolved() {
         val dir = directory()
-        val config = RendererPluginV2.parse(metadata(normal("LIBGL_NAME", "**|librust_gl.so")).toString(), dir)
-        assertEquals(File(dir, "librust_gl.so").canonicalPath, config.env["LIBGL_NAME"])
+        val config = RendererPluginV2.parse(metadata(normal("LIBGL_NAME", "**|libexample.so")).toString(), dir)
+        assertEquals(File(dir, "libexample.so").canonicalPath, config.env["LIBGL_NAME"])
     }
     @Test(expected = IllegalArgumentException::class) fun invalidSelectableDefaultIsRejected() {
         val variable = JsonObject().apply {
@@ -95,7 +95,7 @@ class RendererPluginV2Test {
         assertEquals("libEGL.so", config.egl)
     }
     @Test fun binaryAbiMustMatchTheActualProcessArchitecture() {
-        val library = File(directory(), "librust_gl.so")
+        val library = File(directory(), "libexample.so")
         val header = ByteArray(20).apply {
             this[0] = 0x7f; this[1] = 'E'.code.toByte(); this[2] = 'L'.code.toByte(); this[3] = 'F'.code.toByte()
             this[4] = 2; this[5] = 1; this[6] = 1; this[16] = 3; this[18] = 183.toByte()
@@ -112,7 +112,7 @@ class RendererPluginV2Test {
     @Test fun missingTruncatedOrNonElfLibrariesDoNotPassAbiChecks() {
         val dir = directory()
         assertFalse(RendererPluginV2.matchesElfAbi(File(dir, "missing.so"), "arm64-v8a"))
-        val file = File(dir, "librust_gl.so")
+        val file = File(dir, "libexample.so")
         assertFalse(RendererPluginV2.matchesElfAbi(file, "arm64-v8a"))
         file.writeText("This is not an ELF binary even if its filename ends with .so")
         assertFalse(RendererPluginV2.matchesElfAbi(file, "arm64-v8a"))

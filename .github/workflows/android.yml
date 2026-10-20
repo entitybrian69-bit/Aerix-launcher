@@ -7,37 +7,7 @@ on:
     types: [labeled]
 
 jobs:
-  rustgl-native:
-    name: Import user-provided experimental RustGL bundle
-    runs-on: ubuntu-22.04
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-      - name: Import exact user-provided RustGL libraries (no source build)
-        run: python3 scripts/import_uploaded_rustgl.py --experimental-user-prebuilt
-      - name: Upload authenticated-build input assets
-        uses: actions/upload-artifact@v4
-        with:
-          name: rustgl-bundle-assets
-          path: app_pojavlauncher/src/main/assets/renderer-bundles/rustgl/
-          if-no-files-found: error
-      - name: Upload experimental licensing and provenance evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: rustgl-build-evidence
-          include-hidden-files: true
-          path: |
-            docs/development/renderer-apk-review/
-            third_party/rustgl-upload/README.md
-            app_pojavlauncher/src/main/assets/renderer-bundles/rustgl/index.json
-
-
   build:
-    needs: rustgl-native
     runs-on: ubuntu-22.04
     env:
       POJAV_GPLAY_KEYSTORE_PASSWORD: ${{ secrets.POJAV_GPLAY_KEYSTORE_PASSWORD }}
@@ -47,12 +17,6 @@ jobs:
         uses: actions/checkout@v3
         with:
           submodules: recursive
-
-      - name: Download this run's verified RustGL bundle
-        uses: actions/download-artifact@v4
-        with:
-          name: rustgl-bundle-assets
-          path: app_pojavlauncher/src/main/assets/renderer-bundles/rustgl
 
       - name: Set up JDK 21
         uses: actions/setup-java@v3
@@ -119,7 +83,7 @@ jobs:
           HELPER
           cat report_gradle_failure.sh
 
-      - name: Renderer importer and benchmark tool tests
+      - name: Packaging policy tests
         run: python3 -m unittest discover -s scripts/tests -p 'test_*.py' -v
 
       - name: Launcher regression tests
@@ -181,14 +145,6 @@ jobs:
             || { echo "::error title=missing apk::the noruntime apk was not produced"; ls -R app_pojavlauncher/build/outputs/apk || true; exit 1; }
           mv app_pojavlauncher/build/outputs/apk/noruntime/release/app_pojavlauncher-noruntime-release.apk out/app-release-noruntime.apk
 
-      - name: Startup mirror native regression test
-        run: |
-          cc -std=c11 -Wall -Wextra -Werror -pthread -fsanitize=address,undefined \
-            -I app_pojavlauncher/src/main/jni/diagnostics \
-            app_pojavlauncher/src/main/jni/diagnostics/startup_mirror.c \
-            app_pojavlauncher/src/test/native/startup_mirror_test.c -o "$RUNNER_TEMP/startup-mirror-test"
-          "$RUNNER_TEMP/startup-mirror-test"
-
       - name: Native FPS counter regression test
         run: |
           cc -std=c11 -pthread -I app_pojavlauncher/src/main/jni/fps \
@@ -196,8 +152,8 @@ jobs:
             app_pojavlauncher/src/test/native/frame_counter_test.c -o "$RUNNER_TEMP/fps-counter-test"
           "$RUNNER_TEMP/fps-counter-test"
 
-      - name: Verify final APKs contain RustGL for every ABI
-        run: python3 scripts/verify_rustgl_apk.py out/app-release-full.apk out/app-release-noruntime.apk
+      - name: Verify removed renderer is absent from APKs
+        run: python3 scripts/verify_removed_renderer.py out/app-release-full.apk out/app-release-noruntime.apk
 
       - name: Gen md5sums
         run: |

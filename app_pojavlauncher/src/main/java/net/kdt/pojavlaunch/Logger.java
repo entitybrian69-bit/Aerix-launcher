@@ -14,9 +14,6 @@ public class Logger {
     /** Reset the log file, effectively erasing any previous logs */
     public static native void begin(String logFilePath);
 
-    /** Opt-in startup-only native diagnostics appended after Minecraft opens its current log. */
-    public static native void enableRendererStartupMirror(String latestLogPath, String identity);
-
     /** Small listener for anything listening to the log */
     @Keep
     public interface eventLogListener {

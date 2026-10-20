@@ -510,7 +510,6 @@ private fun RendererTabContent(activity: FragmentActivity) {
             }
         }
 
-        item { VulkanCapabilityCard(activity) }
 
         // 3. Compact Footer Updater Card (Mirai RendererSettingsScreen lines 428-469)
         item {
@@ -759,52 +758,12 @@ private fun RendererTabContent(activity: FragmentActivity) {
 }
 
 @Composable
-private fun VulkanCapabilityCard(activity: FragmentActivity) {
-    var probing by remember { mutableStateOf(false) }
-    var report by remember { mutableStateOf<String?>(null) }
-    Surface(shape = RoundedCornerShape(AerixRadii.control), color = AerixSurface.panel) {
-        Column(Modifier.fillMaxWidth().padding(AerixSpacing.mdPlus), verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm)) {
-            Text("System Vulkan diagnostics", style = MaterialTheme.typography.titleSmall)
-            Text("Isolated capability check only. Does not enable or validate RustGL Vulkan rendering.", style = MaterialTheme.typography.bodySmall)
-            Button(enabled = !probing, onClick = {
-                probing = true
-                net.kdt.pojavlaunch.aerix.renderer.VulkanProbeClient.query(activity) {
-                    report = "Device: ${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}\nAndroid: ${android.os.Build.VERSION.SDK_INT}\nDriver source: system\n$it"
-                    probing = false
-                }
-            }) { Text(if (probing) "Checking…" else "Check system Vulkan") }
-        }
-    }
-    report?.let { result ->
-        AlertDialog(onDismissRequest = { report = null }, title = { Text("Vulkan capability report") },
-            text = { Column(Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState())) { Text(result) } },
-            confirmButton = { TextButton(onClick = {
-                val clipboard = activity.getSystemService(android.content.ClipboardManager::class.java)
-                clipboard?.setPrimaryClip(android.content.ClipData.newPlainText("Aerix Vulkan capability report", result))
-            }) { Text("Copy report") } },
-            dismissButton = { TextButton(onClick = { report = null }) { Text("Close") } })
-    }
-}
-
-@Composable
 private fun RendererPluginCard(
     plugin: AerixRendererPlugin,
     selected: Boolean,
     onSelect: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var confirmExperimental by remember { mutableStateOf(false) }
-    val isRustGl = plugin.packageName == "dev.rustrenderer.plugin" || plugin.packageName == "net.kdt.pojavlaunch.renderer.rustgl"
-    val select = {
-        if (isRustGl && !selected) confirmExperimental = true else onSelect()
-    }
-    if (confirmExperimental) AlertDialog(
-        onDismissRequest = { confirmExperimental = false },
-        title = { Text("Experimental RustGL renderer") },
-        text = { Text("This experimental renderer uses GLES translation. Its advertised GL 4.5 version does not mean complete GL 4.5 support. Android gameplay and performance are not verified by Aerix. RustGL compatibility defaults disable LWJGL pointer checks; use only trusted builds. Bundled releases require APK-authenticated checksums. Vulkan rendering is not established.") },
-        confirmButton = { TextButton(onClick = { confirmExperimental = false; onSelect() }) { Text("Use experimental renderer") } },
-        dismissButton = { TextButton(onClick = { confirmExperimental = false }) { Text("Cancel") } }
-    )
     val borderColor by animateColorAsState(
         targetValue = if (selected) AerixThemeManager.currentAccent() else AerixSurface.panelRaised,
         animationSpec = tween(160),
@@ -820,7 +779,7 @@ private fun RendererPluginCard(
         shape = RoundedCornerShape(AerixRadii.control),
         color = cardBg,
         border = BorderStroke(if (selected) 1.5.dp else AerixSpacing.hairline, borderColor),
-        onClick = select
+        onClick = onSelect
     ) {
         Row(
             modifier = Modifier
@@ -831,7 +790,7 @@ private fun RendererPluginCard(
         ) {
             RadioButton(
                 selected = selected,
-                onClick = select,
+                onClick = onSelect,
                 colors = RadioButtonDefaults.colors(
                     selectedColor = AerixThemeManager.currentAccent(),
                     unselectedColor = AerixSurface.textSecondary
@@ -848,7 +807,7 @@ private fun RendererPluginCard(
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = if (isRustGl) plugin.summary else plugin.packageName,
+                    text = plugin.packageName,
                     style = MaterialTheme.typography.labelSmall,
                     color = AerixSurface.textSecondary,
                     maxLines = 1,

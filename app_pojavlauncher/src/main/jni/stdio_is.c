@@ -8,7 +8,6 @@
 #include <string.h>
 #include <errno.h>
 #include <stdlib.h>
-#include "diagnostics/startup_mirror.h"
 
 //
 // Created by maks on 17.02.21.
@@ -23,7 +22,6 @@ static int latestlog_fd = -1;
 
 static bool recordBuffer(char* buf, ssize_t len) {
     if(strstr(buf, "Session ID is")) return false;
-    aerix_startup_mirror_feed(buf, (size_t)len);
     if(latestlog_fd != -1) {
         write(latestlog_fd, buf, len);
         fdatasync(latestlog_fd);
@@ -121,17 +119,4 @@ Java_net_kdt_pojavlaunch_Logger_setLogListener(JNIEnv *env, __attribute((unused)
         logListener = (*env)->NewGlobalRef(env, log_listener);
     }
     if(logListenerLocal != NULL) (*env)->DeleteGlobalRef(env, logListenerLocal);
-}
-JNIEXPORT void JNICALL
-Java_net_kdt_pojavlaunch_Logger_enableRendererStartupMirror(JNIEnv *env, jclass clazz,
-                                                          jstring path, jstring identity) {
-    (void)clazz;
-    const char *p = (*env)->GetStringUTFChars(env, path, NULL);
-    if (!p) return;
-    const char *id = (*env)->GetStringUTFChars(env, identity, NULL);
-    if (id) {
-        aerix_startup_mirror_configure(p, id);
-        (*env)->ReleaseStringUTFChars(env, identity, id);
-    }
-    (*env)->ReleaseStringUTFChars(env, path, p);
 }

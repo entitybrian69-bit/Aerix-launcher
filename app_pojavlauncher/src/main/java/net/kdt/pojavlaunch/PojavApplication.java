@@ -69,10 +69,6 @@ public class PojavApplication extends MGApplication {
 
 	@Override
 	public void onCreate() {
-        if (getApplicationInfo().uid != android.os.Process.myUid()) {
-            super.onCreate();
-            return;
-        }
 		ContextExecutor.setApplication(this);
 		// Disable fatal errors on gplay. This is necessary so that google can collect crash report data and send it to me
 		// (where i can find the cause and fix it)
@@ -115,12 +111,12 @@ public class PojavApplication extends MGApplication {
 
 	@Override
     protected void attachBaseContext(Context base) {
-        super.attachBaseContext(base.getApplicationInfo().uid != android.os.Process.myUid() ? base : LocaleUtils.setLocale(base));
+        super.attachBaseContext(LocaleUtils.setLocale(base));
     }
 
     @Override
     public void onConfigurationChanged(@NonNull Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
-        if (getApplicationInfo().uid == android.os.Process.myUid()) LocaleUtils.setLocale(this);
+        LocaleUtils.setLocale(this);
     }
 }

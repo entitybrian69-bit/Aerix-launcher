@@ -60,7 +60,6 @@ class AerixRendererPlugin(
     val env: Map<String, String>,
     val dlopen: List<String>,
     val metadataVersion: Int = 1,
-    val initializeBundle: ((() -> Boolean) -> Boolean)? = null,
     val useNamespaceBypass: Boolean = true
 ) : RenderSpec {
     val pluginTag: String = "$TAG_PREFIX$packageName"
@@ -117,7 +116,7 @@ class AerixRendererPlugin(
             Logger.appendToLog("Renderer native provider loaded=$loaded tag=$pluginTag; EGL context/gameplay not yet verified")
             loaded
         }
-        initializeBundle?.invoke(initialize) ?: initialize()
+        initialize()
     } catch (error: Exception) {
         Logger.appendToLog("Renderer initialization failed: tag=$pluginTag ${error.javaClass.simpleName}: ${error.message}")
         Log.e("AerixRendererPlugin", "Renderer initialization failed", error); false
@@ -145,10 +144,8 @@ object PojavPluginBridge {
         }
         val pm = context.packageManager
         val discovered = ArrayList<AerixRendererPlugin>()
-        val seen = hashSetOf(net.kdt.pojavlaunch.aerix.renderer.BundledRustGl.PACKAGE)
-        runCatching { net.kdt.pojavlaunch.aerix.renderer.BundledRustGl.discover(context) }
-            .onFailure { Log.e("AerixRendererPlugin", "Bundled RustGL rejected", it) }
-            .getOrNull()?.let { discovered.add(it); seen.add(it.packageName) }
+        RetiredRendererCleanup.clean(context)
+        val seen = hashSetOf<String>()
 
         runCatching {
             val activities = pm.queryIntentActivities(Intent(Intent.ACTION_MAIN), PACKAGE_FLAGS)
@@ -166,9 +163,6 @@ object PojavPluginBridge {
             }
         }
 
-        if (discovered.any { it.packageName == RendererPluginV2.RUSTGL_PACKAGE || it.packageName == net.kdt.pojavlaunch.aerix.renderer.BundledRustGl.PACKAGE }) {
-            net.kdt.pojavlaunch.aerix.renderer.VulkanProbeClient.ensureProbed(context)
-        }
         plugins = discovered.sortedBy { it.displayName.lowercase() }
         injectIntoRendererCache(context, plugins)
         return plugins
@@ -186,7 +180,7 @@ object PojavPluginBridge {
     @JvmStatic
     fun applyLaunchOverride(context: Context, gameRenderer: GameRenderer, rendererTag: String?) {
         if (rendererTag == null || !rendererTag.startsWith(AerixRendererPlugin.TAG_PREFIX)) return
-        if (plugins.isEmpty() || rendererTag == "${AerixRendererPlugin.TAG_PREFIX}${net.kdt.pojavlaunch.aerix.renderer.BundledRustGl.PACKAGE}") loadPlugins(context, force = true)
+        if (plugins.isEmpty()) loadPlugins(context, force = true)
         val plugin = findByTag(rendererTag)
         if (plugin == null || !plugin.compatibleDevice(context)) {
             Log.w("AerixRendererPlugin", "Selected renderer unavailable; keeping built-in fallback before environment setup")
@@ -201,7 +195,7 @@ object PojavPluginBridge {
         pm: PackageManager,
         info: ApplicationInfo
     ): AerixRendererPlugin? = runCatching {
-        if (info.flags and ApplicationInfo.FLAG_SYSTEM != 0) return null
+        if (info.flags and ApplicationInfo.FLAG_SYSTEM != 0 || RetiredRendererCleanup.isRetiredPackage(info.packageName)) return null
         val meta = info.metaData ?: return null
         val isFcl = meta.getBoolean("fclPlugin", false)
         val isZalith = meta.getBoolean("zalithRendererPlugin", false)
@@ -215,16 +209,15 @@ object PojavPluginBridge {
                 }
                 val nativeDir = requireNotNull(info.nativeLibraryDir)
                 val config = RendererPluginV2.parse(metadata, File(nativeDir))
-                val rustGl = info.packageName == RendererPluginV2.RUSTGL_PACKAGE
                 AerixRendererPlugin(
                     packageName = info.packageName, appName = info.loadLabel(pm).toString(),
                     appVersion = pm.getPackageInfo(info.packageName, 0).versionName.orEmpty(),
                     rendererId = config.id,
-                    displayName = config.name + if (rustGl) " (Experimental)" else "",
-                    summary = if (rustGl) "External RustGL · Experimental GLES translation" else "External V2 renderer plugin",
+                    displayName = config.name,
+                    summary = "External V2 renderer plugin",
                     minMCVer = config.minVersion, maxMCVer = config.maxVersion,
                     glName = config.gl, eglName = config.egl, nativeLibDir = nativeDir,
-                    env = if (rustGl) net.kdt.pojavlaunch.aerix.renderer.RustGlBackendPolicy.environment(config.env) else config.env,
+                    env = config.env,
                     dlopen = emptyList(), metadataVersion = 2
                 ).also { require(it.compatibleDevice(context)) { "Plugin requires Android 8+, GLES 3 and matching native libraries" } }
             }.onFailure { Log.w("AerixRendererPlugin", "Cannot load V2 renderer ${info.packageName}: ${it.message}") }.getOrNull()

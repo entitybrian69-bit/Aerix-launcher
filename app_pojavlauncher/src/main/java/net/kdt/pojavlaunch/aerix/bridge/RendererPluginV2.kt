@@ -4,14 +4,13 @@ import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import java.io.File
 
-/** V2 metadata interoperability. This is Aerix code, not vendored RustGL renderer source. */
+/** V2 metadata interoperability. For installed external renderer plugins. */
 internal data class RendererPluginConfig(
     val name: String, val id: String, val gl: String, val egl: String,
     val env: Map<String, String>, val minVersion: String?, val maxVersion: String?
 )
 
 internal object RendererPluginV2 {
-    const val RUSTGL_PACKAGE = "dev.rustrenderer.plugin"
     private val libraryName = Regex("lib[A-Za-z0-9_.+-]+\\.so")
     private val environmentKey = Regex("[A-Za-z_][A-Za-z0-9_]*")
 
@@ -20,7 +19,7 @@ internal object RendererPluginV2 {
             env["MESA_LOADER_DRIVER_OVERRIDE"].orEmpty().trim().equals("zink", true)
 
     // Legacy Mesa plugins may need desktop EGL without being Vulkan renderers.
-    // Keep their context selection intact while ignoring RustGL's blank override.
+    // A blank Mesa override must not select a desktop context.
     fun usesDesktopGl(id: String, env: Map<String, String>): Boolean =
         usesVulkan(id, env) || !env["MESA_LOADER_DRIVER_OVERRIDE"].isNullOrBlank()
 
@@ -67,7 +66,7 @@ internal object RendererPluginV2 {
         val id = root.required("rendererId").also { require(Regex("[A-Za-z0-9_.-]{1,128}").matches(it)) }
         val gl = nativeLibrary(root.required("rendererGLPath"), nativeDirectory)
         val egl = nativeLibrary(root.required("rendererEGLPath"), nativeDirectory, systemEgl = true)
-        // RustGL requires none. Do not silently ignore libraries another plugin needs preloaded.
+        // Do not silently ignore libraries a plugin needs preloaded.
         require(root.getAsJsonArray("dlopenLibPaths")?.size()?.let { it == 0 } != false) {
             "This V2 plugin requires preloading, which this adapter does not yet support"
         }

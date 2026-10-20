@@ -11,8 +11,5 @@ app_pojavlauncher/.cxx/
 /curseforge_key.txt
 /app_pojavlauncher/libs/ltw-release.aar
 
-# Python renderer tooling
+# Python tooling
 __pycache__/
-
-# Generated, pinned RustGL build outputs; source recipe and hashes live in CI artifacts.
-/app_pojavlauncher/src/main/assets/renderer-bundles/rustgl/
