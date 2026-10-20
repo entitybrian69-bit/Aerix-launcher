@@ -1,1 +1,39 @@
-PLACEHOLDER_STRINGS
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Aerix Launcher UI strings.
+  Wording taken from mirai-launcher- (Zalith Launcher 2 fork):
+    MiraiLauncher/src/main/res/values/strings.xml
+    MiraiLauncher/src/main/res/values/strings_ui.xml
+    MiraiLauncher/src/main/res/values/strings_settings.xml
+    MiraiLauncher/src/main/res/values/strings_download.xml
+    MiraiLauncher/src/main/res/values/strings_library.xml
+    MiraiLauncher/src/main/res/values/strings_accounts.xml
+    MiraiLauncher/src/main/res/values/strings_renderer.xml
+    MiraiLauncher/src/main/res/values/strings_control.xml
+    MiraiLauncher/src/main/res/values/strings_about.xml
+  and the English values-en variants of those files.
+-->
+<resources>
+    <!-- Top-level navigation -->
+    <string name="aerix_nav_home">Home</string>
+    <string name="aerix_nav_instances">Instances</string>
+    <string name="aerix_nav_library">Library</string>
+    <string name="aerix_nav_discover">Discover</string>
+    <string name="aerix_nav_launch">Launch</string>
+    <string name="aerix_nav_accounts">Accounts</string>
+    <string name="aerix_nav_settings">Settings</string>
+
+    <!-- Home -->
+    <string name="aerix_home_title">Aerix</string>
+    <string name="aerix_home_subtitle">Minecraft: Java Edition on Android</string>
+    <string name="aerix_home_play">Play</string>
+    <string name="aerix_home_create">Create a World</string>
+    <string name="aerix_home_open_library">Open Library</string>
+    <string name="aerix_home_recent">Recent</string>
+    <string name="aerix_home_no_instance">No instance selected</string>
+
+    <!-- Discover / download error -->
+    <string name="aerix_download_error">Unable to reach the platform</string>
+    <string name="aerix_curseforge_needs_key">CurseForge needs an API key. Open Settings → CurseForge API key, paste a key from console.curseforge.com, then retry.</string>
+    <string name="aerix_library_refresh">Refresh</string>
+</resources>
