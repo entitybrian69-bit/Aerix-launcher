@@ -41,7 +41,7 @@ def main():
     if key.upper() == "DUMMY":
         key = ""
     full = {"gameId": 432, "classId": 6, "searchFilter": "", "sortField": 1,
-            "sortOrder": "desc", "pageSize": 20, "index": 0}
+            "sortOrder": "desc", "pageSize": 30, "index": 0}
     minimal = {"gameId": 432, "classId": 6, "pageSize": 1}
     report = {"build_key_present": bool(key)}
     report["official"] = probe("https://api.curseforge.com/v1", key, full) if key else {"result": "not_configured"}
