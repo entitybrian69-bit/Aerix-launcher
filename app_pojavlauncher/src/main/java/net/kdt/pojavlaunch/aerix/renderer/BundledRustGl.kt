@@ -55,14 +55,14 @@ internal object BundledRustGl {
         return AerixRendererPlugin(
             packageName = PACKAGE, appName = "Aerix RustGL", appVersion = release.version,
             rendererId = "opengles3_rust", displayName = "RustGL (Experimental)",
-            summary = "APK-authenticated RustGL bundle ${release.version} · GLES",
+            summary = "User-provided RustGL 0.3.0 · bundle ${release.version} · Experimental",
             minMCVer = null, maxMCVer = null, glName = gl.absolutePath, eglName = gl.absolutePath,
             nativeLibDir = directory.absolutePath,
             env = RustGlBackendPolicy.environment(mapOf(
-                "AERIX_RENDERER_STARTUP_TRACE" to "1",
                 "RENDERER_SPOOF_GL" to "1", "MESA_GL_VERSION_OVERRIDE" to "4.4",
                 "MESA_GLSL_VERSION_OVERRIDE" to "330", "LIB_MESA_NAME" to "",
-                "JAVA_TOOL_OPTIONS" to "-Dorg.lwjgl.util.NoChecks=true"
+                "JAVA_TOOL_OPTIONS" to "-Dorg.lwjgl.util.NoChecks=true",
+                "RENDERER_TRACE_GL" to "0", "RENDERER_DEBUG" to "0"
             )),
             dlopen = emptyList(), metadataVersion = 2,
             // This bundle depends on public system EGL/GLES, not private custom-driver libraries.

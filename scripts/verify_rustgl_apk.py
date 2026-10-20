@@ -12,15 +12,27 @@ def verify(path):
         index = json.loads(archive.read(base + "/index.json"))
         assert index["schema"] == 1 and index["backend"] == "gles"
         assert index.get("redistributionApproved") or index.get("experimentalUserAuthorized")
+        uploaded = index.get("payloadKind") == "user-provided-prebuilt"
+        if uploaded:
+            from import_uploaded_rustgl import LIBRARIES, APK_SHA256, VERSION
+            assert index["sourceApkSha256"] == APK_SHA256
+            assert len(index["releases"]) == 4
+            assert all(r["version"] == VERSION for r in index["releases"])
         seen = set()
+        expected_paths = {base + "/index.json"}
         for release in index["releases"]:
             abi = release["abi"]
             for entry in release["files"]:
+                expected_paths.add(f"{base}/{release['version']}/{abi}/{entry['name']}")
                 data = archive.read(f"{base}/{release['version']}/{abi}/{entry['name']}")
                 assert len(data) == entry["bytes"] and hashlib.sha256(data).hexdigest() == entry["sha256"], entry["name"]
                 if entry["name"] == "librust_gl.so":
+                    if uploaded:
+                        assert (len(data), hashlib.sha256(data).hexdigest()) == LIBRARIES[abi][:2]
                     assert data[:4] == b"\x7fELF"
                     seen.add(abi)
+        if uploaded:
+            assert {n for n in archive.namelist() if n.startswith(base + "/") and not n.endswith("/")} == expected_paths
         assert seen == {"arm64-v8a", "armeabi-v7a", "x86", "x86_64"}, seen
     print(f"{path}: RustGL GLES bundle present and checksummed for all four ABIs")
 

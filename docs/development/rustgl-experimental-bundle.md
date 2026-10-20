@@ -183,3 +183,39 @@ that 0.3.1 worked on the phone.
 Minecraft appenders can rotate or overwrite mirrored tails during later logging;
 this remains a best-effort startup diagnostic, not an exclusive log writer or
 complete crash recorder. The primary Aerix launcher log remains unchanged.
+
+## User-directed replacement: original plugin binary, bundle 0.3.3
+
+The user explicitly requested removing our source-built renderer and using their
+uploaded APK instead, after disclosure of its retained memory bug. This supersedes
+the previous source-build/default diagnostic candidates **for experimental builds**.
+
+Active Android CI now imports `third_party/rustgl-upload/native-libraries.zip`,
+which contains only the four exact native libraries from that upload. It no longer
+checks out or builds upstream RustGL or applies our patches. Plugin DEX/UI/resources
+and debug signing identity are not installed or included. The selector stays
+**RustGL (Experimental)**; its summary identifies the user-provided 0.3.0 payload
+and Aerix packaging generation 0.3.3. No extra plugin APK is required.
+
+All four bytes/size/SHA256 values are pinned independently. The importer validates
+archive identity, ELF ABI/type, native dependencies and segment permissions, and
+uses the original ABI-appropriate 16-KiB (64-bit)/4-KiB (32-bit) alignments. The
+existing source-built importer is not weakened. Final APK verification checks the
+native bytes against the uploaded hashes, requires only the four new generations
+and rejects any leftover source-built payload under the bundle asset directory.
+
+Normal system EGL namespace loading and the existing private verified bundle
+store are retained. Old installed generations are not selected by the new manifest;
+they are not deleted from under any running process. Worlds, instances, account
+data, mods and other renderers are untouched. Source recipes remain historical/
+manual tools, not active build inputs. The uploaded binary does not implement our
+custom EGL trace checkpoints, so their environment flag is removed. The existing
+bounded launcher-log mirror may still capture original renderer stderr, but lacks
+that custom first-swap stop signal; its 64-KiB cap remains enforced.
+
+Known risks are intentionally unchanged: ARM64/x86_64 glGetStringi use-after-free,
+unverified source/signature provenance, missing APK license notices and unknown
+prebuilt dependency coverage. Approval flags remain experimental only, with no
+claimed license clearance, stable release, crash fix or phone-success proof.
+The user request does not turn missing third-party notices into a license grant.
+See `third_party/rustgl-upload/README.md` and `scripts/import_uploaded_rustgl.py`.

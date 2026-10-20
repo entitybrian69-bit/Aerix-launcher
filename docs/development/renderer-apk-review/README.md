@@ -1,5 +1,9 @@
 # User-uploaded RustGL APK: static inspection
 
+> Historical inspection. The user subsequently explicitly requested the exact
+> prebuilt replacement despite these findings; see the 0.3.3 section in
+> `../rustgl-experimental-bundle.md`. The findings below remain valid.
+
 The upload was named `app-debug.log` solely to pass the upload filter. Its contents
 are a 2,376,934-byte APK, SHA256
 `4ce0d57776132e0d782836d9b5ba7da57b0781b1f15f2eccf0766b239595e73f`.

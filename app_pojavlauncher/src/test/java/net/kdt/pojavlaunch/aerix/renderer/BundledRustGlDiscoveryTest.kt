@@ -21,8 +21,8 @@ class BundledRustGlDiscoveryTest {
     private fun context(gles: Int): Application {
         val app = RuntimeEnvironment.getApplication()
         val present = app.assets.list("renderer-bundles/rustgl")?.contains("index.json") == true
-        if (System.getenv("GITHUB_ACTIONS") == "true") assertTrue("CI must build a real RustGL payload", present)
-        assumeTrue("Generate source-built assets before running this integration test locally", present)
+        if (System.getenv("GITHUB_ACTIONS") == "true") assertTrue("CI must import a real RustGL payload", present)
+        assumeTrue("Import user-provided assets before running this integration test locally", present)
         ReflectionHelpers.setStaticField(Build::class.java, "SUPPORTED_32_BIT_ABIS", arrayOf("armeabi-v7a"))
         ReflectionHelpers.setStaticField(Build::class.java, "SUPPORTED_64_BIT_ABIS", arrayOf("arm64-v8a"))
         shadowOf(app.getSystemService(ActivityManager::class.java)).setDeviceConfigurationInfo(
@@ -30,20 +30,25 @@ class BundledRustGlDiscoveryTest {
         return app
     }
 
-    @Test fun sourceBuiltPayloadRegistersRealSelectableRendererWithoutPluginApk() {
+    @Test fun uploadedPayloadRegistersRealSelectableRendererWithoutPluginApk() {
         val plugin = BundledRustGl.discover(context(0x30000))
         assertNotNull("Generated assets must produce an actual RenderSpec", plugin)
         requireNotNull(plugin)
         assertEquals("plugin:net.kdt.pojavlaunch.renderer.rustgl", plugin.pluginTag)
         assertEquals("RustGL (Experimental)", plugin.displayName)
         assertEquals("gles", plugin.env["RENDERER_BACKEND"])
-        assertEquals("1", plugin.env["AERIX_RENDERER_STARTUP_TRACE"])
-        assertEquals("0.3.2", plugin.appVersion)
+        assertFalse(plugin.env.containsKey("AERIX_RENDERER_STARTUP_TRACE"))
+        assertEquals("0", plugin.env["RENDERER_DEBUG"])
+        assertEquals("0.3.3", plugin.appVersion)
         val plan = plugin.eglLaunchPlan()
         assertEquals(plugin.glName, plan.library)
         assertFalse("System EGL/GLES must not be duplicated into a driver namespace", plan.namespaceBypass)
         assertTrue(plan.gles)
         assertEquals(3, plan.major)
+        val expected = if (android.os.Process.is64Bit())
+            "f7d1876591add2c6dcb15aea2e9eae22a7eea3fede68210a539a84075c15b49f" else
+            "106e086b6b5b111bdf0eb63f895035ce8911e013775888573487a3092ba3d271"
+        assertEquals("Uploaded library must not be rebuilt or patched", expected, sha256(File(plugin.glName).readBytes()))
         assertTrue(File(plugin.glName).length() > 64)
         assertEquals(plugin.glName, plugin.eglName)
         assertEquals(File(plugin.glName).parentFile.canonicalPath, plugin.librarySearchPath())
@@ -61,11 +66,11 @@ class BundledRustGlDiscoveryTest {
         } }
         val old = BundleRelease("0.3.0", entry.get("revision").asString, entry.get("abi").asString, files)
         val store = RendererBundleStore(File(app.noBackupFilesDir, "renderer-bundles/rustgl"))
-        store.install(old) { name -> app.assets.open("renderer-bundles/rustgl/0.3.2/${old.abi}/$name") }
+        store.install(old) { name -> app.assets.open("renderer-bundles/rustgl/0.3.3/${old.abi}/$name") }
         store.activate(old)
         store.beginInit(old).finish(false)
         val restored = requireNotNull(BundledRustGl.discover(app))
-        assertEquals("0.3.2", restored.appVersion)
+        assertEquals("0.3.3", restored.appVersion)
         assertEquals(revised.glName, restored.glName)
         assertTrue("Do not erase the old failure record to restore discovery", store.rejected(old))
         assertFalse(restored.eglLaunchPlan().namespaceBypass)
