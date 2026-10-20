@@ -5,11 +5,13 @@ final class ChatTextMirror {
     static final class Edit {
         final int backspaces;
         final String insertion;
-        final int suffixCodePoints;
-        Edit(int backspaces, String insertion, int suffixCodePoints) {
+        final int moveLeft, moveRight, forwardDeletes;
+        Edit(int backspaces, String insertion, int moveLeft, int moveRight, int forwardDeletes) {
             this.backspaces = backspaces;
             this.insertion = insertion;
-            this.suffixCodePoints = suffixCodePoints;
+            this.moveLeft = moveLeft;
+            this.moveRight = moveRight;
+            this.forwardDeletes = forwardDeletes;
         }
     }
 
@@ -19,6 +21,7 @@ final class ChatTextMirror {
     private String text = "";
     private String sentText = "";
     private int historyDeletes;
+    private int sentCursor;
 
     ChatTextMirror(String filler) {
         this.filler = filler;
@@ -28,7 +31,7 @@ final class ChatTextMirror {
     void reset() {
         padding = recoverablePadding = filler.length();
         text = sentText = "";
-        historyDeletes = 0;
+        historyDeletes = sentCursor = 0;
     }
 
     void changed(CharSequence buffer, int start, int removed, int inserted) {
@@ -77,10 +80,26 @@ final class ChatTextMirror {
             previousEnd -= Character.charCount(previous);
             nextEnd -= Character.charCount(previous);
         }
-        int suffix = sentText.codePointCount(previousEnd, sentText.length());
-        int deletes = sentText.codePointCount(prefix, previousEnd);
-        if (sentText.isEmpty() && text.isEmpty()) deletes += historyDeletes;
-        Edit edit = new Edit(deletes, text.substring(prefix, nextEnd), suffix);
+        String insertion = text.substring(prefix, nextEnd);
+        int left = 0, right = 0, backspaces = 0, forwards = 0;
+        if (previousEnd != prefix || !insertion.isEmpty()) {
+            // Track the game caret instead of returning over the entire suffix.
+            // Besides matching middle edits, this avoids doubling the key burst
+            // into GLFW's bounded native input queue for long messages.
+            if (sentCursor <= prefix) {
+                right = sentText.codePointCount(sentCursor, prefix);
+                forwards = sentText.codePointCount(prefix, previousEnd);
+            } else if (sentCursor >= previousEnd) {
+                left = sentText.codePointCount(previousEnd, sentCursor);
+                backspaces = sentText.codePointCount(prefix, previousEnd);
+            } else {
+                backspaces = sentText.codePointCount(prefix, sentCursor);
+                forwards = sentText.codePointCount(sentCursor, previousEnd);
+            }
+            sentCursor = nextEnd;
+        }
+        if (sentText.isEmpty() && text.isEmpty()) backspaces += historyDeletes;
+        Edit edit = new Edit(backspaces, insertion, left, right, forwards);
         sentText = text;
         recoverablePadding = padding;
         historyDeletes = 0;

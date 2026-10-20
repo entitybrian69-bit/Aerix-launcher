@@ -93,7 +93,7 @@ public class ChatTextMirrorTest {
         ChatTextMirror.Edit edit = mirror.drain();
         assertEquals(0, edit.backspaces);
         assertEquals("brave ", edit.insertion);
-        assertEquals(5, edit.suffixCodePoints);
+        assertEquals(5, edit.moveLeft);
     }
     @Test public void resetDoesNotEmitEditsIntoExistingGameChat() {
         type("hello");
@@ -115,7 +115,7 @@ public class ChatTextMirrorTest {
         ChatTextMirror.Edit edit = mirror.drain();
         assertEquals(1, edit.backspaces);
         assertEquals("", edit.insertion);
-        assertEquals(19, edit.suffixCodePoints);
+        assertEquals(19, edit.moveLeft);
     }
 
     @Test public void replacingMiddleEmojiKeepsTheFollowingText() {
@@ -124,7 +124,21 @@ public class ChatTextMirrorTest {
         ChatTextMirror.Edit edit = mirror.drain();
         assertEquals(1, edit.backspaces);
         assertEquals("\uD83D\uDE01", edit.insertion);
-        assertEquals(8, edit.suffixCodePoints);
+        assertEquals(8, edit.moveLeft);
+    }
+
+    @Test public void unchangedCommitAfterMiddleEditDoesNotLoseTheGameCaret() {
+        type("hello world");
+        mirror.changed(PAD + "helo world", PAD.length() + 3, 1, 0);
+        ChatTextMirror.Edit deletion = mirror.drain();
+        assertEquals(1, deletion.backspaces);
+        mirror.changed(PAD + "helo world", 0, PAD.length() + 10, PAD.length() + 10);
+        ChatTextMirror.Edit unchanged = mirror.drain();
+        assertEquals(0, unchanged.moveLeft + unchanged.moveRight + unchanged.backspaces + unchanged.forwardDeletes);
+        mirror.changed(PAD + "helo world!", PAD.length() + 10, 0, 1);
+        ChatTextMirror.Edit append = mirror.drain();
+        assertEquals(7, append.moveRight);
+        assertEquals("!", append.insertion);
     }
 
 }

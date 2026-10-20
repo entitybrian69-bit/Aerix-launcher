@@ -53,6 +53,9 @@ public class TouchCharInputTest {
                 if (cursor > 0) cursor = chat.offsetByCodePoints(cursor, -1);
             } else if (key == KeyEvent.KEYCODE_DPAD_RIGHT) {
                 if (cursor < chat.length()) cursor = chat.offsetByCodePoints(cursor, 1);
+            } else if (key == KeyEvent.KEYCODE_FORWARD_DEL) {
+                deletes++;
+                if (cursor < chat.length()) chat.delete(cursor, chat.offsetByCodePoints(cursor, 1));
             } else if (key == KeyEvent.KEYCODE_DEL) {
                 deletes++;
                 if (cursor > 0) {
@@ -190,11 +193,11 @@ public class TouchCharInputTest {
         connection.deleteSurroundingText(1, 0);
         assertEquals(HISTORY + "helo world and friends", backend.chat.toString());
         assertEquals(1, backend.deletes);
-        // A second edit still uses the Android cursor, not the game's restored end.
+        // A second edit must retain the same logical caret.
         connection.commitText("l", 1);
         assertEquals(HISTORY + "hello world and friends", backend.chat.toString());
         assertEquals(1, backend.deletes);
-        assertEquals(backend.chat.length(), backend.cursor);
+        assertEquals(HISTORY.length() + 4, backend.cursor);
     }
 
     @Test public void selectingOneWrongLetterOnlyReplacesThatLetter() {
@@ -256,6 +259,18 @@ public class TouchCharInputTest {
             CallbackBridge.holdingShift = shift;
             CallbackBridge.holdingAlt = alt;
         }
+    }
+
+    @Test public void movingToEndAfterMiddleCorrectionAppendsAtEnd() {
+        connection.commitText("hello world", 1);
+        int position = TouchCharInput.TEXT_FILLER.length() + 4;
+        connection.setSelection(position, position);
+        connection.deleteSurroundingText(1, 0);
+        connection.setSelection(input.length(), input.length());
+        connection.commitText("!", 1);
+        assertEquals(HISTORY + "helo world!", backend.chat.toString());
+        assertEquals(1, backend.deletes);
+        assertEquals(backend.chat.length(), backend.cursor);
     }
 
 }

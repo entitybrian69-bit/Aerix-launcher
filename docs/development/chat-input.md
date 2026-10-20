@@ -14,7 +14,8 @@ Android editor did not even own.
 - An unchanged commit emits nothing; appending Space emits only Space.
 - A changed range preserves both the common prefix and suffix. The bridge moves
   left across the unchanged suffix, deletes only the changed old range, inserts
-  only its replacement, then moves right to restore its session-end cursor.
+  only its replacement. The resulting game caret is tracked for later edits;
+  unchanged suffixes are neither deleted/retyped nor needlessly traversed twice.
   Comparisons, cursor movement and deletion counts respect Unicode code points.
 - Whole-editor rewrites can retain or remove the virtual prefix without sending
   it to Minecraft or treating it as thirty game deletions.
@@ -67,10 +68,15 @@ word or sentence erased when synthetic retyping was interrupted or suppressed.
 
 The diff now finds a non-overlapping common suffix as well. The same correction
 moves left 19 code points, sends **one** Backspace, sends no replacement text,
-and moves right 19 code points. Unchanged commits still emit no events. Android
-selection changes remain local; each text transaction starts/ends at the known
-mirrored session end in the game. This does not attempt to observe mouse-driven
-Minecraft caret moves or read the game's actual input buffer.
+and leaves the tracked game caret at the correction. A subsequent Android
+edit moves from that known caret only as far as necessary. If the caret is before
+or inside a replacement range, Forward Delete removes the right-hand changed
+portion without deleting/retyping the unchanged tail. Unchanged commits emit no
+events and do not silently reset the tracked caret. Avoiding a return across the
+suffix also avoids doubling the key burst into GLFW's bounded native input queue.
+Android selection changes remain local until the next text edit. This does not
+attempt to observe mouse-driven Minecraft caret moves or read the game's actual
+input buffer.
 
 Synthetic IME cursor, deletion, Enter and Unicode events now use zero shortcut
 modifier flags, rather than borrowing global held Ctrl/Alt/Shift flags from

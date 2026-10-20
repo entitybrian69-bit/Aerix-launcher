@@ -144,13 +144,11 @@ public class TouchCharInput extends androidx.appcompat.widget.AppCompatEditText 
 
     private void flushTextChanges() {
         ChatTextMirror.Edit edit = mTextMirror.drain();
-        if (edit.backspaces == 0 && edit.insertion.isEmpty()) return;
-        // Game cursor stays at the mirrored session's end between transactions.
-        // Move around an unchanged suffix instead of deleting/retyping it.
-        for (int i = 0; i < edit.suffixCodePoints; i++) sendImeKey(KeyEvent.KEYCODE_DPAD_LEFT);
+        for (int i = 0; i < edit.moveLeft; i++) sendImeKey(KeyEvent.KEYCODE_DPAD_LEFT);
+        for (int i = 0; i < edit.moveRight; i++) sendImeKey(KeyEvent.KEYCODE_DPAD_RIGHT);
+        for (int i = 0; i < edit.forwardDeletes; i++) sendImeKey(KeyEvent.KEYCODE_FORWARD_DEL);
         for (int i = 0; i < edit.backspaces; i++) sendImeKey(KeyEvent.KEYCODE_DEL);
         if (!edit.insertion.isEmpty()) PLATFORM.sendBulkUnicodeEvent(edit.insertion, 0);
-        for (int i = 0; i < edit.suffixCodePoints; i++) sendImeKey(KeyEvent.KEYCODE_DPAD_RIGHT);
     }
 
     private void sendImeKey(int keyCode) {
