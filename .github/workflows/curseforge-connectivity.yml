@@ -25,7 +25,8 @@ jobs:
           java-version: '21'
       - name: Compare historical and current real Java clients (no API keys)
         run: python3 scripts/compare_curseforge_clients.py
-      - name: Check exact Discover request and minimal mirror request
+      # Recheck official access after repository credential configuration; never log the secret.
+      - name: Check configured official access and mirror metadata
         env:
           CURSEFORGE_API_KEY: ${{ secrets.CURSEFORGE_API_KEY }}
         run: python3 scripts/check_curseforge.py
