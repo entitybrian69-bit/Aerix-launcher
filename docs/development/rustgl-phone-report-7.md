@@ -48,3 +48,24 @@ This improves the next capture. It is NOT a renderer crash fix or a full crash
 recorder: abrupt native death can lose pipe output, Android-only logcat faults
 may not appear, and Minecraft appenders can overwrite/rotate mirrored tails.
 No signal handlers are replaced. No userdata/mods/worlds/renderers are removed.
+
+## Validated capture-only APK
+
+Source `47d0f52bb8c128842345cd39c65f79c5c0eca01c`; CI
+https://github.com/entitybrian69-bit/Aerix-launcher/actions/runs/39367966825
+completed successfully. Both APKs, launcher regressions, native ASan/UBSan mirror
+regressions and exact-original-native/no-leftover checks passed. This validates
+capture code and packaging, NOT resolution of the reported device crash.
+
+Full APK ZIP:
+https://github.com/entitybrian69-bit/Aerix-launcher/actions/runs/39367966825/artifacts/12240356896
+
+Checksums:
+https://github.com/entitybrian69-bit/Aerix-launcher/actions/runs/39367966825/artifacts/12240631088
+
+Extract `app-release-full.apk` and install as an update; no uninstall/data reset.
+Keep RustGL (Experimental) selected. All four original uploaded native hashes and
+bundle 0.3.3 are unchanged. The launcher-side header now says `capture=2`; repeated
+lookup warnings are summarized. A later same-attempt `latest.log` may contain the
+missing fatal summary, but capture remains best-effort and no new engine fix or
+device-success claim is made.
