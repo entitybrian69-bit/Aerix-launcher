@@ -1,0 +1,41 @@
+{
+  "uploadName": "app-debug.log",
+  "fileType": "APK ZIP, despite renamed extension",
+  "bytes": 2376934,
+  "sha256": "4ce0d57776132e0d782836d9b5ba7da57b0781b1f15f2eccf0766b239595e73f",
+  "package": "dev.rustrenderer.plugin",
+  "versionName": "0.3.0",
+  "versionCode": 23,
+  "minSdk": 26,
+  "targetSdk": 34,
+  "debuggable": true,
+  "signerCertificateSha256": "d1aff7e52448070adbbf03ea3a24b2b0fb82de3c72dfed397b0f86b0c19c1737",
+  "signerSubject": "CN=Android Debug,O=Android,C=US",
+  "signatureVerification": "Signing-block/certificate extraction only; cryptographic signature and upstream signer authenticity NOT verified",
+  "libraries": [
+    {
+      "path": "lib/arm64-v8a/librust_gl.so",
+      "bytes": 1460976,
+      "sha256": "f7d1876591add2c6dcb15aea2e9eae22a7eea3fede68210a539a84075c15b49f"
+    },
+    {
+      "path": "lib/armeabi-v7a/librust_gl.so",
+      "bytes": 974036,
+      "sha256": "106e086b6b5b111bdf0eb63f895035ce8911e013775888573487a3092ba3d271"
+    },
+    {
+      "path": "lib/x86/librust_gl.so",
+      "bytes": 1594064,
+      "sha256": "d1e43b9f27a39b36c144a71b8555bf881c3347d56fcdc494ace7fb124f54436e"
+    },
+    {
+      "path": "lib/x86_64/librust_gl.so",
+      "bytes": 1467656,
+      "sha256": "507ad2e47bec36a33d662f530b91b5ddc67ea8120bc3a2d8d4560cd4582f458d"
+    }
+  ],
+  "binaryReplacementPerformed": false,
+  "executedOrInstalled": false,
+  "sourceRevisionVerified": false,
+  "licenseNoticesInApk": false
+}

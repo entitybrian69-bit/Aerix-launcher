@@ -1,0 +1,79 @@
+{
+  "displayName": "RustGL",
+  "rendererId": "opengles3_rust",
+  "rendererGLPath": "**|librust_gl.so",
+  "rendererEGLPath": "librust_gl.so",
+  "dlopenLibPaths": [],
+  "env": [
+    {
+      "type": "NormalEnv",
+      "key": "LIBGL_ES",
+      "value": "3"
+    },
+    {
+      "type": "NormalEnv",
+      "key": "MESA_GL_VERSION_OVERRIDE",
+      "value": "4.4"
+    },
+    {
+      "type": "NormalEnv",
+      "key": "MESA_GLSL_VERSION_OVERRIDE",
+      "value": "330"
+    },
+    {
+      "type": "NormalEnv",
+      "key": "MESA_LOADER_DRIVER_OVERRIDE",
+      "value": ""
+    },
+    {
+      "type": "NormalEnv",
+      "key": "LIB_MESA_NAME",
+      "value": ""
+    },
+    {
+      "type": "NormalEnv",
+      "key": "RENDERER_BACKEND",
+      "value": "gles"
+    },
+    {
+      "type": "NormalEnv",
+      "key": "RENDERER_SPOOF_GL",
+      "value": "1"
+    },
+    {
+      "type": "SelectableEnv",
+      "key": "JAVA_TOOL_OPTIONS",
+      "items": {
+        "defaultValue": "-Dorg.lwjgl.util.NoChecks=true",
+        "values": [
+          "-Dorg.lwjgl.util.NoChecks=true",
+          "-Dorg.lwjgl.util.NoChecks=false"
+        ]
+      }
+    },
+    {
+      "type": "SelectableEnv",
+      "key": "RENDERER_TRACE_GL",
+      "items": {
+        "defaultValue": "0",
+        "values": [
+          "0",
+          "1"
+        ]
+      }
+    },
+    {
+      "type": "SelectableEnv",
+      "key": "RENDERER_DEBUG",
+      "items": {
+        "defaultValue": "0",
+        "values": [
+          "0",
+          "1"
+        ]
+      }
+    }
+  ],
+  "minMCVer": null,
+  "maxMCVer": null
+}
