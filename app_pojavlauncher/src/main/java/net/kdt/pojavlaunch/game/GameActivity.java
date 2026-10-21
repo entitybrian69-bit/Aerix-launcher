@@ -550,6 +550,20 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
 
     @Override
     public void onClickedMenu() {
+        // The controls editor keeps its drawer; in game the overlay offers
+        // Settings and Social first, with the classic drawer behind it.
+        if(isInEditor) {
+            openActionDrawer();
+            return;
+        }
+        SocialInGameOverlay.INSTANCE.show(
+                this,
+                this::openQuickSettings,
+                this::openActionDrawer
+        );
+    }
+
+    private void openActionDrawer() {
         drawerLayout.openDrawer(navDrawer);
         navDrawer.requestLayout();
     }
