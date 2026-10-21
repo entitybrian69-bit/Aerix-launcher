@@ -75,6 +75,8 @@ import net.kdt.pojavlaunch.aerix.ui.screens.LogScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.OfflineAccountScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.SettingsScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.WallpapersScreen
+import net.kdt.pojavlaunch.aerix.ui.screens.social.SocialShell
+import net.kdt.pojavlaunch.aerix.ui.screens.social.SocialShellState
 
 @Composable
 fun AerixLauncherScreen(activity: FragmentActivity) {

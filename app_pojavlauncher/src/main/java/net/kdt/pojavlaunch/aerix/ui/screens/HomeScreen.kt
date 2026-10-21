@@ -111,6 +111,10 @@ import net.kdt.pojavlaunch.aerix.theme.AerixSurface
 import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
 import net.kdt.pojavlaunch.aerix.ui.AerixNav
 import net.kdt.pojavlaunch.aerix.ui.LauncherSection
+import net.kdt.pojavlaunch.aerix.ui.screens.social.SocialAvatar
+import net.kdt.pojavlaunch.aerix.ui.screens.social.SocialHubStore
+import net.kdt.pojavlaunch.aerix.ui.screens.social.SocialPalette
+import net.kdt.pojavlaunch.aerix.ui.screens.social.SocialShellState
 import net.kdt.pojavlaunch.contracts.OpenDocumentWithExtension
 import kotlin.math.abs
 import kotlin.math.exp
