@@ -79,6 +79,12 @@ import net.kdt.pojavlaunch.aerix.ui.screens.WallpapersScreen
 @Composable
 fun AerixLauncherScreen(activity: FragmentActivity) {
     AerixNav.init()
+    // The Social shell replaces the launcher wholesale: no rail, wallpaper, accent or
+    // page animations are composed while it is open. It is not a LauncherSection.
+    if (SocialShellState.isOpen) {
+        SocialShell(onExit = { SocialShellState.exit() })
+        return
+    }
     val section = AerixNav.section
     val navigate: (LauncherSection) -> Unit = { target ->
         when (target) {
