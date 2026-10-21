@@ -356,7 +356,7 @@ private fun SettingRowFrame(
 }
 
 @Composable
-fun SwitchSettingRow(title: String, summary: String?, checked: Boolean, onCheckedChange: (Boolean) -> Unit, @DrawableRes iconRes: Int? = null) {
+fun SwitchSettingRow(title: String, summary: String?, checked: Boolean, onCheckedChange: (Boolean) -> Unit, @DrawableRes iconRes: Int? = null, accent: Color = AerixSurface.accent) {
     SettingRowFrame(
         title = title,
         summary = summary,
@@ -368,7 +368,7 @@ fun SwitchSettingRow(title: String, summary: String?, checked: Boolean, onChecke
                 onCheckedChange = onCheckedChange,
                 colors = SwitchDefaults.colors(
                     checkedThumbColor = AerixSurface.onAccent,
-                    checkedTrackColor = AerixSurface.accent,
+                    checkedTrackColor = accent,
                     uncheckedThumbColor = AerixSurface.textSecondary,
                     uncheckedTrackColor = AerixSurface.panelTrack,
                     uncheckedBorderColor = AerixSurface.borderSoft

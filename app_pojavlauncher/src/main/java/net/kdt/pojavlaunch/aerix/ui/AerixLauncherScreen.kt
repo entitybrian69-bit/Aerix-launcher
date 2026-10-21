@@ -78,6 +78,21 @@ import net.kdt.pojavlaunch.aerix.ui.screens.WallpapersScreen
 
 @Composable
 fun AerixLauncherScreen(activity: FragmentActivity) {
+    net.kdt.pojavlaunch.aerix.ui.screens.social.SocialStore.attach(activity)
+    AnimatedContent(
+        targetState = net.kdt.pojavlaunch.aerix.ui.screens.social.SocialShellState.isOpen,
+        transitionSpec = {
+            (fadeIn(tween(240)) + scaleIn(tween(240), initialScale = 0.98f)) togetherWith fadeOut(tween(200))
+        }, label = "socialShell"
+    ) { socialOpen ->
+        if (socialOpen) net.kdt.pojavlaunch.aerix.ui.screens.social.SocialShell {
+            net.kdt.pojavlaunch.aerix.ui.screens.social.SocialShellState.close()
+        } else LauncherChrome(activity)
+    }
+}
+
+@Composable
+private fun LauncherChrome(activity: FragmentActivity) {
     AerixNav.init()
     val section = AerixNav.section
     val navigate: (LauncherSection) -> Unit = { target ->
@@ -105,7 +120,7 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
     val extent = AerixPreferences.extentScale()
     val festivals = rememberTodayFestivals()
 
-    BackHandler(enabled = AerixNav.canGoBack) { AerixNav.back() }
+    BackHandler(enabled = !net.kdt.pojavlaunch.aerix.ui.screens.social.SocialShellState.isOpen && AerixNav.canGoBack) { AerixNav.back() }
 
     AerixBackground {
       FestivalEffectsHost(festivals = festivals, modifier = Modifier.fillMaxSize()) {

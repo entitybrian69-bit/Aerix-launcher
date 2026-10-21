@@ -496,6 +496,7 @@ private fun WideHomeDashboard(
                 verticalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus)
             ) {
                 ActiveWorldPanel(selected, accent, actions, Modifier.weight(1f))
+                net.kdt.pojavlaunch.aerix.ui.screens.social.SocialWidgetCard()
                 TaskSummaryPanel(taskCount, accent, Modifier.height(74.dp))
             }
         }
@@ -527,6 +528,7 @@ private fun CompactHomeDashboard(
         verticalArrangement = Arrangement.spacedBy(AerixSpacing.md)
     ) {
         item { LiquidHomeHero(selected, count, accent, actions, Modifier.fillMaxWidth().height(312.dp)) }
+        item { net.kdt.pojavlaunch.aerix.ui.screens.social.SocialWidgetCard() }
         item {
             Column(verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm)) {
                 HomeSectionLabel(stringResource(R.string.aerix_home_your_space), null)

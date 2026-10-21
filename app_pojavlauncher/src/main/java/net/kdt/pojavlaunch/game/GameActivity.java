@@ -550,6 +550,14 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
 
     @Override
     public void onClickedMenu() {
+        if (!isInEditor) {
+            net.kdt.pojavlaunch.aerix.ui.game.GameMenuHost.show(this, this::openLegacyMenu);
+            return;
+        }
+        openLegacyMenu();
+    }
+
+    private void openLegacyMenu() {
         drawerLayout.openDrawer(navDrawer);
         navDrawer.requestLayout();
     }

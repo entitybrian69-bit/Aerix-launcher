@@ -174,7 +174,11 @@ fun AerixSkinPreview3D(
     azimuth: Int = 28,
     pitch: Int = 10,
     interactionEnabled: Boolean = false,
-    isVisible: Boolean = true
+    isVisible: Boolean = true,
+    localSkin: ByteArray? = null,
+    localCape: ByteArray? = null,
+    localSlim: Boolean? = null,
+    loadingColor: androidx.compose.ui.graphics.Color? = null
 ) {
     val context = LocalContext.current
     val playerSkin = remember { AerixPlayerSkin(context.applicationContext) }
@@ -225,13 +229,13 @@ fun AerixSkinPreview3D(
             playerSkin.setInteractionEnabled(interactionEnabled && isVisible)
         }
         val wardrobeRevision = PojavAccountBridge.wardrobeRevision
-        LaunchedEffect(pageFinished, account?.username, account?.authType, wardrobeRevision) {
+        LaunchedEffect(pageFinished, account?.username, account?.authType, wardrobeRevision, localSkin, localCape, localSlim) {
             if (!pageFinished) return@LaunchedEffect
             val (skinBytes, capeBytes, model) = withContext(Dispatchers.IO) {
                 Triple(
-                    resolveSkinBytes(account),
-                    PojavAccountBridge.resolveCapeBytes(account),
-                    if (PojavAccountBridge.isSlimModel(account)) "slim" else "default"
+                    localSkin ?: resolveSkinBytes(account),
+                    localCape ?: PojavAccountBridge.resolveCapeBytes(account),
+                    if (localSlim ?: PojavAccountBridge.isSlimModel(account)) "slim" else "default"
                 )
             }
             playerSkin.loadSkinBytes(skinBytes, model)
@@ -243,7 +247,7 @@ fun AerixSkinPreview3D(
                 modifier = Modifier
                     .size(24.dp)
                     .align(Alignment.Center),
-                color = AerixThemeManager.currentAccent(),
+                color = loadingColor ?: AerixThemeManager.currentAccent(),
                 strokeWidth = 2.dp
             )
         }

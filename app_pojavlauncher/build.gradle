@@ -145,7 +145,7 @@ android {
             // Don't set to true or java.awt will be a.a or something similar.
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-            signingConfig signingConfigs.customRelease
+            signingConfig project.hasProperty('aerixTestSigning') ? signingConfigs.customDebug : signingConfigs.customRelease
             resValue "string", "app_name", "Aerix Launcher"
             resValue "string", "app_short_name", "PojavLauncher"
             resValue "string", "aerix_app_label", "Aerix Launcher"
