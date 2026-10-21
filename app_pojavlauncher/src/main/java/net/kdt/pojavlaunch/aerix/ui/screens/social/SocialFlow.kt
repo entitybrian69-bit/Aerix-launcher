@@ -5,6 +5,7 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -28,16 +29,20 @@ fun SocialWidgetCard(modifier: Modifier = Modifier) {
         SocialStore.attach(context); SocialShellState.open()
     }) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("♧", Modifier.background(SocialPalette.accent.copy(alpha = .4f), RoundedCornerShape(10.dp)).padding(8.dp),
-                color = Color.White, fontSize = 22.sp)
+            Box(Modifier.size(30.dp).background(SocialPalette.accent.copy(alpha = .4f), RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) {
+                SocialIcon(net.kdt.pojavlaunch.R.drawable.aerix_social_people, null)
+            }
             Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) { SocialHeading("Social"); SocialCaption("4 friends online") }
+            Column(Modifier.weight(1f)) {
+                Text("Social", color = SocialPalette.text, fontSize = 14.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                Text("4 friends online", color = SocialPalette.secondary, fontSize = 12.sp)
+            }
             Box(Modifier.width(78.dp).height(32.dp)) {
-                repeat(3) { SocialAvatar(it, Modifier.padding(start = (it * 22).dp).size(30.dp)) }
+                repeat(3) { SocialAvatar(it, Modifier.padding(start = (it * 18).dp).size(26.dp).border(2.dp, SocialPalette.background, RoundedCornerShape(8.dp))) }
             }
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            SocialCaption("Open social"); Text("›", color = SocialPalette.bright)
+            Text("Open social", color = SocialPalette.secondary, fontSize = 11.sp); Text("›", color = SocialPalette.bright)
         }
     }
 }
@@ -102,14 +107,17 @@ private fun SocialRail(onExit: () -> Unit) {
         Column(Modifier.width(if (narrow) 64.dp else 84.dp).fillMaxHeight()
             .background(Color(0x55304256)).padding(8.dp).verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            TextButton(onClick = { if (!SocialShellNav.back()) onExit() }, modifier = Modifier.size(48.dp)) { Text("←", fontSize = 24.sp, color = Color.White) }
+            TextButton(onClick = { if (!SocialShellNav.back()) onExit() }, modifier = Modifier.size(48.dp)) { SocialIcon(net.kdt.pojavlaunch.R.drawable.aerix_ic_arrow_back, "Back") }
             listOf("Friends", "Chats", "Party", "Profile").forEachIndexed { i, label ->
                 val selected = if (i == 3) SocialShellNav.route == SocialRoute.PROFILE
                     else SocialShellNav.route == SocialRoute.DASHBOARD && SocialShellNav.tab == i
                 Surface(onClick = { if (i == 3) SocialShellNav.push(SocialRoute.PROFILE) else SocialShellNav.showTab(i) },
                     color = if (selected) SocialPalette.accent else Color.White.copy(alpha = .08f), shape = RoundedCornerShape(14.dp)) {
                     Column(Modifier.widthIn(min = 48.dp).heightIn(min = 48.dp).padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(listOf("♧", "☏", "♬", "☺")[i], color = Color.White, fontSize = 22.sp)
+                        SocialIcon(listOf(net.kdt.pojavlaunch.R.drawable.aerix_social_people,
+                            net.kdt.pojavlaunch.R.drawable.aerix_social_chat,
+                            net.kdt.pojavlaunch.R.drawable.aerix_social_headphones,
+                            net.kdt.pojavlaunch.R.drawable.aerix_ic_person_outlined)[i], label)
                         if (!narrow) Text(label, fontSize = 9.sp, color = SocialPalette.text)
                     }
                 }
@@ -124,7 +132,7 @@ private fun SocialTopBar(route: SocialRoute, back: () -> Unit) {
     var menu by remember { mutableStateOf(false) }
     var signOut by remember { mutableStateOf(false) }
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        TextButton(onClick = back, modifier = Modifier.size(48.dp)) { Text("←", fontSize = 24.sp, color = SocialPalette.text) }
+        TextButton(onClick = back, modifier = Modifier.size(48.dp)) { SocialIcon(net.kdt.pojavlaunch.R.drawable.aerix_ic_arrow_back, "Back") }
         Text(when (route) {
             SocialRoute.AUTH -> "Aerix account"
             SocialRoute.APPEARANCE -> "Create your Aerix profile"
@@ -147,7 +155,7 @@ private fun SocialTopBar(route: SocialRoute, back: () -> Unit) {
                 Text(SocialStore.data.name, Modifier.padding(start = 8.dp), color = Color.White)
             }
             Box {
-                TextButton(onClick = { menu = true }, modifier = Modifier.size(48.dp)) { Text("⋮", fontSize = 24.sp) }
+                TextButton(onClick = { menu = true }, modifier = Modifier.size(48.dp)) { SocialIcon(net.kdt.pojavlaunch.R.drawable.aerix_ic_more_vert, "Social options") }
                 DropdownMenu(menu, { menu = false }) {
                     listOf("My profile" to SocialRoute.PROFILE, "Privacy and presence" to SocialRoute.PRIVACY,
                         "Notifications" to SocialRoute.NOTIFICATIONS, "Voice chat" to SocialRoute.VOICE,

@@ -27,9 +27,7 @@ import net.kdt.pojavlaunch.aerix.components.AerixSkinPreview3D
 fun SocialAuthScreen(onExit: () -> Unit) {
     SocialColumns(left = {
         Spacer(Modifier.height(32.dp)); SocialHeading("Your friends, together.", true)
-        Row(Modifier.fillMaxWidth().padding(vertical = 40.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
-            repeat(4) { SocialAvatar(it, Modifier.size(64.dp)) }
-        }
+        SocialFriendArtwork()
     }, right = {
         SocialPanel {
             SocialHeading("Connect with Aerix", true)
@@ -64,15 +62,23 @@ fun SocialModel(modifier: Modifier = Modifier, skin: String = SocialStore.data.s
             val skinFile = context.filesDir.resolve(if (previewImport && context.filesDir.resolve("social_skin_pending.png").exists()) "social_skin_pending.png" else "social_skin.png")
             val capeFile = context.filesDir.resolve(if (previewImport && context.filesDir.resolve("social_cape_pending.png").exists()) "social_cape_pending.png" else "social_cape.png")
             val skinBytes = if (skin == "Imported skin" && skinFile.exists()) skinFile.readBytes()
-                else runCatching { context.assets.open("social/skin_${if (skin == "Explorer") 2 else if (skin == "Midnight") 3 else 1}.png").use { it.readBytes() } }.getOrNull()
+                else runCatching { context.assets.open("social/skin_${socialSkinIndex(skin)}.png").use { it.readBytes() } }.getOrNull()
             val capeBytes = if (cape == "Imported cape" && capeFile.exists()) capeFile.readBytes()
-                else if (cape != "None") runCatching { context.assets.open("social/cape.png").use { it.readBytes() } }.getOrNull() else null
+                else if (cape != "None") runCatching { context.assets.open("social/cape_${socialCapeIndex(cape)}.png").use { it.readBytes() } }.getOrNull() else null
             skinBytes to capeBytes
         }
     }
     SocialPanel(modifier) {
-        AerixSkinPreview3D(null, Modifier.fillMaxWidth().height(260.dp), azimuth = if (back) 180 else 0,
-            localSkin = bytes.first, localCape = bytes.second, localSlim = slim, loadingColor = SocialPalette.accent)
+        Box(Modifier.fillMaxWidth().height(280.dp)) {
+            androidx.compose.foundation.Canvas(Modifier.matchParentSize()) {
+                val base = androidx.compose.ui.geometry.Offset(size.width * .16f, size.height - 33.dp.toPx())
+                val extent = androidx.compose.ui.geometry.Size(size.width * .68f, 28.dp.toPx())
+                drawOval(Color(0xFF1D2B44), base + androidx.compose.ui.geometry.Offset(0f, 8.dp.toPx()), extent)
+                drawOval(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color(0xFF617696), Color(0xFF2C3B54))), base, extent)
+            }
+            AerixSkinPreview3D(null, Modifier.fillMaxSize().padding(bottom = 16.dp), azimuth = if (back) 180 else 0,
+                localSkin = bytes.first, localCape = bytes.second, localSlim = slim, loadingColor = SocialPalette.accent)
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             SocialButton("Front", { back = false }, Modifier.weight(1f), secondary = back)
             SocialButton("Back", { back = true }, Modifier.weight(1f), secondary = !back)
@@ -175,18 +181,35 @@ private fun SocialWardrobe(capeMode: Boolean) {
         SocialPanel {
             SocialHeading(if (capeMode) "Your capes" else "Your skins")
             SocialButton(if (importing) "Importing…" else "Import PNG", { importer.launch(arrayOf("image/png")) }, Modifier.fillMaxWidth(), enabled = !importing)
-            val choices = if (capeMode) listOf("None", "Blue cape", "Imported cape") else listOf("Current skin", "Explorer", "Midnight", "Imported skin")
-            choices.chunked(2).forEach { row ->
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    row.forEach { choice ->
-                        Column(Modifier.weight(1f).heightIn(min = 110.dp)
-                            .background(if (selected == choice) SocialPalette.accent.copy(alpha = .4f) else Color.White.copy(alpha = .07f), RoundedCornerShape(14.dp))
-                            .clickable { if (!choice.startsWith("Imported") || (context.filesDir.resolve(if (capeMode) "social_cape.png" else "social_skin.png").exists() || context.filesDir.resolve(if (capeMode) "social_cape_pending.png" else "social_skin_pending.png").exists())) selected = choice }
-                            .padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                            SocialCosmeticThumbnail(choice, capeMode, Modifier.size(72.dp))
-                            SocialCaption((if (selected == choice) "✓ " else "") + choice)
+            val importedFile = context.filesDir.resolve(if (capeMode) "social_cape.png" else "social_skin.png")
+            val pendingFile = context.filesDir.resolve(if (capeMode) "social_cape_pending.png" else "social_skin_pending.png")
+            val builtin = if (capeMode) listOf("None", "Blue cape", "Violet cape", "Cyan cape")
+                else listOf("Current skin", "Explorer", "Crimson", "Midnight", "Forest", "Snow")
+            val choices = builtin + if (importedFile.exists() || pendingFile.exists()) listOf(if (capeMode) "Imported cape" else "Imported skin") else emptyList()
+            BoxWithConstraints {
+                val columns = if (capeMode && maxWidth >= 380.dp) 4 else if (!capeMode && maxWidth >= 360.dp) 3 else 2
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    choices.chunked(columns).forEach { row ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            row.forEach { choice ->
+                                Column(Modifier.weight(1f).heightIn(min = 110.dp)
+                                    .background(if (selected == choice) SocialPalette.accent.copy(alpha = .4f) else Color.White.copy(alpha = .07f), RoundedCornerShape(14.dp))
+                                    .clickable { if (!choice.startsWith("Imported") || (context.filesDir.resolve(if (capeMode) "social_cape.png" else "social_skin.png").exists() || context.filesDir.resolve(if (capeMode) "social_cape_pending.png" else "social_skin_pending.png").exists())) selected = choice }
+                                    .padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                    SocialCosmeticThumbnail(choice, capeMode, Modifier.size(72.dp))
+                                    SocialCaption((if (selected == choice) "✓ " else "") + choice)
+                                }
+                            }
+                            repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
                         }
                     }
+                }
+            }
+            if (capeMode) {
+                SocialHeading("Selected cape details")
+                Row(horizontalArrangement = Arrangement.spacedBy(20.dp), verticalAlignment = Alignment.CenterVertically) {
+                    SocialCosmeticThumbnail(selected, true, Modifier.size(80.dp))
+                    Column { SocialCaption(selected); SocialCaption("Profile preview") }
                 }
             }
             error?.let { Text(it, color = SocialPalette.danger) }
@@ -238,7 +261,7 @@ private fun SocialCosmeticThumbnail(choice: String, cape: Boolean, modifier: Mod
                     val pending = context.filesDir.resolve(if (cape) "social_cape_pending.png" else "social_skin_pending.png")
                     (if (pending.exists()) pending else context.filesDir.resolve(if (cape) "social_cape.png" else "social_skin.png")).readBytes()
                 }
-                    else context.assets.open(if (cape) "social/cape_preview.png" else "social/skin_preview_${if (choice == "Explorer") 2 else if (choice == "Midnight") 3 else 1}.png").use { it.readBytes() }
+                    else context.assets.open(if (cape) "social/cape_preview_${socialCapeIndex(choice)}.png" else "social/skin_preview_${socialSkinIndex(choice)}.png").use { it.readBytes() }
                 val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
                 bitmap?.let { it.asImageBitmap() }
             }.getOrNull()
@@ -248,4 +271,29 @@ private fun SocialCosmeticThumbnail(choice: String, cape: Boolean, modifier: Mod
     else image?.let { androidx.compose.foundation.Image(it, contentDescription = choice, modifier = modifier,
         contentScale = androidx.compose.ui.layout.ContentScale.Fit) }
         ?: Box(modifier, contentAlignment = Alignment.Center) { SocialCaption("Import PNG") }
+}
+
+private fun socialSkinIndex(name: String): Int =
+    (listOf("Current skin", "Explorer", "Crimson", "Midnight", "Forest", "Snow").indexOf(name) + 1).coerceAtLeast(1)
+private fun socialCapeIndex(name: String): Int =
+    (listOf("Blue cape", "Violet cape", "Cyan cape").indexOf(name) + 1).coerceAtLeast(1)
+
+@Composable
+private fun SocialFriendArtwork() {
+    BoxWithConstraints(Modifier.fillMaxWidth().height(260.dp)) {
+        val points = listOf(.27f to .23f, .73f to .32f, .23f to .7f, .7f to .75f)
+        androidx.compose.foundation.Canvas(Modifier.matchParentSize()) {
+            val locations = points.map { androidx.compose.ui.geometry.Offset(size.width * it.first, size.height * it.second) }
+            for (i in locations.indices) {
+                val start = locations[i]
+                val end = locations[(i + 1) % locations.size]
+                drawLine(SocialPalette.bright.copy(alpha = .45f), start, end, 2.dp.toPx())
+                drawCircle(androidx.compose.ui.graphics.Brush.radialGradient(listOf(SocialPalette.bright.copy(alpha = .3f), Color.Transparent),
+                    center = start, radius = 64.dp.toPx()), radius = 64.dp.toPx(), center = start)
+            }
+        }
+        points.forEachIndexed { index, point ->
+            SocialAvatar(index, Modifier.offset(x = maxWidth * point.first - 32.dp, y = 260.dp * point.second - 32.dp).size(64.dp))
+        }
+    }
 }

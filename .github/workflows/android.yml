@@ -42,7 +42,7 @@ jobs:
         uses: dawidd6/action-download-artifact@v6
         continue-on-error: true
         with:
-          github_token: ${{ secrets.MESA_ACTIONS }}
+          github_token: ${{ secrets.MESA_ACTIONS || github.token }}
           repo: MojoLauncher/mesa-unified2
           workflow: android.yml
           workflow_conclusion: success
@@ -68,6 +68,16 @@ jobs:
           gradle :app_pojavlauncher:assembleFullRelease :app_pojavlauncher:assembleNoruntimeRelease "${signing[@]}" --console=plain --stacktrace 2>&1 | tee build-release.log
           cp app_pojavlauncher/build/outputs/apk/full/release/*.apk out/Aerix-full-release.apk
           cp app_pojavlauncher/build/outputs/apk/noruntime/release/*.apk out/Aerix-noruntime-release.apk
+          signer=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)
+          aapt=$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -1)
+          for apk in out/*.apk; do
+            "$signer" verify --verbose --print-certs "$apk" > "$apk.signing.txt"
+            "$aapt" dump badging "$apk" > "$apk.manifest.txt"
+            if grep -q '^application-debuggable' "$apk.manifest.txt"; then
+              echo "::error::Release APK is unexpectedly debuggable"
+              exit 1
+            fi
+          done
           sha256sum out/*.apk > out/SHA256SUMS
           echo "Release APKs are workflow artifacts only. No GitHub Release or Play upload was created." >> "$GITHUB_STEP_SUMMARY"
       - name: Summarize compiler errors

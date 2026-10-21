@@ -366,6 +366,7 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
 
     @Override
     protected void onDestroy() {
+        net.kdt.pojavlaunch.aerix.ui.game.GameMenuHost.dismiss();
         super.onDestroy();
         ContextExecutor.clearActivity();
     }

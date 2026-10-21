@@ -88,6 +88,23 @@ class SocialContract(unittest.TestCase):
                       for name in re.findall(r'R\.plurals\.(\w+)', path.read_text())}
         self.assertEqual(set(), referenced - defined)
 
+    def test_cosmetic_fixtures_exist(self):
+        assets = ROOT / 'app_pojavlauncher/src/main/assets/social'
+        for index in range(1, 7):
+            for prefix in ['skin_', 'skin_preview_']:
+                data = (assets / f'{prefix}{index}.png').read_bytes()
+                self.assertEqual(b'\x89PNG\r\n\x1a\n', data[:8])
+        for index in range(1, 4):
+            self.assertTrue((assets / f'cape_{index}.png').exists())
+            self.assertTrue((assets / f'cape_preview_{index}.png').exists())
+
+    def test_imports_are_staged_until_apply(self):
+        code = (SOCIAL / 'SocialProfileScreens.kt').read_text()
+        self.assertIn('social_skin_pending.png', code)
+        self.assertIn('pending.copyTo(', code)
+        self.assertIn('onDispose', code)
+        self.assertIn('readBytesLimited(1024 * 1024)', code)
+
     def test_workflow_does_not_publish(self):
         workflow = (ROOT / '.github/workflows/android.yml').read_text()
         self.assertNotIn('gh release create', workflow)
@@ -95,6 +112,8 @@ class SocialContract(unittest.TestCase):
         self.assertIn('assembleFullRelease', workflow)
         self.assertIn('assembleNoruntimeRelease', workflow)
         self.assertIn('actions/upload-artifact@v4', workflow)
+        self.assertIn('verify --verbose --print-certs', workflow)
+        self.assertIn('application-debuggable', workflow)
 
 if __name__ == '__main__':
     unittest.main()

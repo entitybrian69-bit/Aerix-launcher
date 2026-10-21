@@ -32,14 +32,14 @@ fun SocialCompactPanel(onBack: () -> Unit, onResume: () -> Unit, onLeaveGame: ()
     var localReport by remember { mutableStateOf(false) }
     var voiceHelp by remember { mutableStateOf(false) }
     val context = LocalContext.current
-    fun back() { if (mode == "Friends") onBack() else { mode = "Friends"; localReport = false } }
+    fun back() { if (localReport) localReport = false else if (mode == "Friends") onBack() else mode = "Friends" }
     androidx.activity.compose.BackHandler { back() }
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = { back() }, modifier = Modifier.size(48.dp)) { Text("←", fontSize = 24.sp) }
+            TextButton(onClick = { back() }, modifier = Modifier.size(48.dp)) { SocialIcon(R.drawable.aerix_ic_arrow_back, "Back") }
             Text(if (mode == "Chat") person else if (mode == "Invite") "Server invitation" else "Social${if (mode == "Party") " / Voice party" else ""}",
                 Modifier.weight(1f), color = SocialPalette.text, fontSize = 20.sp)
-            TextButton(onClick = onResume, modifier = Modifier.size(48.dp)) { Text("×", fontSize = 28.sp) }
+            TextButton(onClick = onResume, modifier = Modifier.size(48.dp)) { SocialIcon(R.drawable.aerix_ic_close, "Back to game") }
         }
         if (!SocialStore.data.signedIn || !SocialStore.data.appearanceComplete) {
             Column(Modifier.weight(1f).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {

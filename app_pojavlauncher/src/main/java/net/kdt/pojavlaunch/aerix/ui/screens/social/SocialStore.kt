@@ -65,7 +65,7 @@ object SocialStore {
     }
     fun deleteAccount() {
         val files = context?.filesDir
-        listOf("social_skin.png", "social_cape.png").forEach { name -> files?.resolve(name)?.delete() }
+        listOf("social_skin.png", "social_cape.png", "social_skin_pending.png", "social_cape_pending.png").forEach { name -> files?.resolve(name)?.delete() }
         update { SocialData(friends = emptyList(), incoming = emptyList(), blocked = emptyList()) }
         SocialShellNav.reset()
     }

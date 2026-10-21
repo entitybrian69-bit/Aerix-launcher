@@ -78,7 +78,7 @@ fun SocialPanel(modifier: Modifier = Modifier, content: @Composable ColumnScope.
 }
 @Composable
 fun SocialButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, secondary: Boolean = false) {
-    // Existing launcher pills have fixed 40/46dp heights; pad the enclosing target to at least 48dp.
+    // Reuse the launcher pills with an explicit 48dp clickable surface.
     Box(modifier.heightIn(min = SocialDimens.touch), contentAlignment = Alignment.Center) {
         if (secondary) AerixGhostButton(text, null, onClick, Modifier.fillMaxWidth(), tint = SocialPalette.text, targetHeight = 48.dp)
         else AerixPrimaryButton(text, null, onClick, Modifier.fillMaxWidth(), enabled, SocialPalette.accent, targetHeight = 48.dp)
@@ -110,4 +110,9 @@ fun SocialColumns(left: @Composable ColumnScope.() -> Unit, right: @Composable C
             Column(Modifier.weight(1.12f), verticalArrangement = Arrangement.spacedBy(12.dp), content = right)
         } else Column(verticalArrangement = Arrangement.spacedBy(20.dp)) { left(); right() }
     }
+}
+
+@Composable
+fun SocialIcon(resource: Int, description: String?, modifier: Modifier = Modifier, color: Color = SocialPalette.text) {
+    Icon(painterResource(resource), description, modifier.size(24.dp), tint = color)
 }

@@ -25,10 +25,18 @@ import net.kdt.pojavlaunch.game.GameActivity
 import net.kdt.pojavlaunch.aerix.ui.screens.social.*
 
 object GameMenuHost {
+    private var active = java.lang.ref.WeakReference<ComponentDialog>(null)
+
+    @JvmStatic
+    fun dismiss() { active.get()?.dismiss(); active.clear() }
+
     @JvmStatic
     fun show(activity: GameActivity, legacySettings: Runnable) {
+        if (activity.isFinishing || activity.isDestroyed || active.get()?.isShowing == true) return
         SocialStore.attach(activity)
         val dialog = ComponentDialog(activity)
+        active = java.lang.ref.WeakReference(dialog)
+        dialog.setOnDismissListener { if (active.get() === dialog) active.clear() }
         val view = ComposeView(dialog.context).apply {
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
             setContent { GameMenuScreen({ dialog.dismiss() }, { dialog.dismiss(); legacySettings.run() }) }
