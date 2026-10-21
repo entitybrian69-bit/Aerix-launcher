@@ -789,7 +789,7 @@ internal fun SocialChoiceDialog(
     onDismiss: () -> Unit
 ) {
     Dialog(onDismissRequest = onDismiss) {
-        SocialCard(modifier = Modifier.width(360.dp), contentPadding = AerixSpacing.md) {
+        SocialCard(modifier = Modifier.fillMaxWidth(0.92f).widthIn(max = 360.dp).then(socialDialogModifier()), contentPadding = AerixSpacing.md) {
             Text(title, style = MaterialTheme.typography.titleLarge, color = SocialPalette.textPrimary)
             Text(subtitle, color = SocialPalette.textMuted, fontSize = 12.sp)
             options.forEachIndexed { index, option ->
@@ -832,7 +832,7 @@ internal fun SocialAddFriendDialog(onDismiss: () -> Unit, onSend: (String) -> Un
     val trimmed = name.trim()
     val valid = isValidAerixName(trimmed)
     Dialog(onDismissRequest = onDismiss) {
-        SocialCard(modifier = Modifier.width(360.dp), contentPadding = AerixSpacing.md) {
+        SocialCard(modifier = Modifier.fillMaxWidth(0.92f).widthIn(max = 360.dp).then(socialDialogModifier()), contentPadding = AerixSpacing.md) {
             Text("Add friend", style = MaterialTheme.typography.titleLarge, color = SocialPalette.textPrimary)
             Text("Friends are added by their unique Aerix name.", color = SocialPalette.textMuted, fontSize = 12.sp)
             OutlinedTextField(

@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -871,7 +872,7 @@ private fun SocialNameDialog(current: String, onDismiss: () -> Unit, onSave: (St
     var name by remember { mutableStateOf(current) }
     val valid = isValidAerixName(name.trim())
     androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
-        SocialCard(modifier = Modifier.width(360.dp), contentPadding = AerixSpacing.md) {
+        SocialCard(modifier = Modifier.fillMaxWidth(0.92f).widthIn(max = 360.dp).then(socialDialogModifier()), contentPadding = AerixSpacing.md) {
             Text("Edit Aerix name", style = MaterialTheme.typography.titleLarge, color = SocialPalette.textPrimary)
             OutlinedTextField(
                 value = name,

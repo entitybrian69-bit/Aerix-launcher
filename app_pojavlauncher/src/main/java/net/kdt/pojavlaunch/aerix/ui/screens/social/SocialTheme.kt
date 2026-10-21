@@ -35,7 +35,14 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -124,6 +131,27 @@ object SocialMotion {
     const val SHELL_MS = 180
     const val DIALOG_MS = 160
     const val DIALOG_INITIAL_SCALE = 0.96f
+}
+
+/**
+ * Entry motion for Social dialogs: 160 ms fade from 0.96 scale, tween only.
+ * Apply to the dialog card so every dialog enters the same way.
+ */
+@Composable
+fun socialDialogModifier(): Modifier {
+    var shown by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { shown = true }
+    val progress by animateFloatAsState(
+        targetValue = if (shown) 1f else 0f,
+        animationSpec = tween(SocialMotion.DIALOG_MS),
+        label = "socialDialogEnter"
+    )
+    return Modifier.graphicsLayer {
+        alpha = progress
+        val scale = SocialMotion.DIALOG_INITIAL_SCALE + (1f - SocialMotion.DIALOG_INITIAL_SCALE) * progress
+        scaleX = scale
+        scaleY = scale
+    }
 }
 
 /** Card surface for Social. Fixed panel color and border; no glass, no wallpaper. */
