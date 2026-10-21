@@ -502,6 +502,7 @@ private fun WideHomeDashboard(
                 verticalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus)
             ) {
                 ActiveWorldPanel(selected, accent, actions, Modifier.weight(1f))
+                SocialWidgetCard(modifier = Modifier.fillMaxWidth().height(84.dp), onClick = actions.social)
                 TaskSummaryPanel(taskCount, accent, Modifier.height(74.dp))
             }
         }
