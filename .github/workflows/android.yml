@@ -151,7 +151,7 @@ jobs:
         # A workflow artifact needs a signed-in GitHub session to download, and the phone that
         # installs this build does not have one. A pre-release puts the APK behind a plain link.
         # Release variant only: it is the one that ships, not debuggable, package net.kdt.pojavlaunch.
-        if: github.event_name == 'push' && github.ref_name == 'arena/da25bc48-aerix-launcher'
+        if: github.event_name == 'push' && github.ref_name == 'arena/78fd95f3-aerix-launcher'
         continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
