@@ -726,7 +726,10 @@ internal fun SocialProfilePanel(
     onSignedOut: () -> Unit
 ) {
     var confirmSignOut by remember { mutableStateOf(false) }
+    var confirmDelete by remember { mutableStateOf(false) }
     var editName by remember { mutableStateOf(false) }
+    var showSkinPicker by remember { mutableStateOf(false) }
+    var showCapePicker by remember { mutableStateOf(false) }
 
     SocialPage {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -766,9 +769,12 @@ internal fun SocialProfilePanel(
                         SocialCard(modifier = Modifier.weight(1.2f).fillMaxHeight(), contentPadding = AerixSpacing.md) {
                             ProfileActions(
                                 onEditName = { editName = true },
+                                onChooseSkin = { showSkinPicker = true },
+                                onChooseCape = { showCapePicker = true },
                                 onPrivacy = onPrivacy,
                                 onNotifications = onNotifications,
-                                onSignOut = { confirmSignOut = true }
+                                onSignOut = { confirmSignOut = true },
+                                onDelete = { confirmDelete = true }
                             )
                         }
                     }
@@ -805,9 +811,12 @@ internal fun SocialProfilePanel(
                         SocialCard(modifier = Modifier.fillMaxWidth(), contentPadding = AerixSpacing.md) {
                             ProfileActions(
                                 onEditName = { editName = true },
+                                onChooseSkin = { showSkinPicker = true },
+                                onChooseCape = { showCapePicker = true },
                                 onPrivacy = onPrivacy,
                                 onNotifications = onNotifications,
-                                onSignOut = { confirmSignOut = true }
+                                onSignOut = { confirmSignOut = true },
+                                onDelete = { confirmDelete = true }
                             )
                         }
                     }
@@ -844,9 +853,12 @@ internal fun SocialProfilePanel(
 @Composable
 private fun ProfileActions(
     onEditName: () -> Unit,
+    onChooseSkin: () -> Unit,
+    onChooseCape: () -> Unit,
     onPrivacy: () -> Unit,
     onNotifications: () -> Unit,
-    onSignOut: () -> Unit
+    onSignOut: () -> Unit,
+    onDelete: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -855,10 +867,55 @@ private fun ProfileActions(
         verticalArrangement = Arrangement.spacedBy(AerixSpacing.xs)
     ) {
         SocialGhostButton(text = "Edit name", iconRes = null, onClick = onEditName)
+        SocialGhostButton(text = "Change skin", iconRes = null, onClick = onChooseSkin)
+        SocialGhostButton(text = "Change cape", iconRes = null, onClick = onChooseCape)
         SocialGhostButton(text = "Privacy and presence", iconRes = null, onClick = onPrivacy)
         SocialGhostButton(text = "Notifications", iconRes = null, onClick = onNotifications)
         HorizontalDivider(color = SocialPalette.borderSoft)
+        Text(
+            text = "Safety",
+            color = SocialPalette.textPrimary,
+            fontSize = SocialType.section,
+            fontWeight = FontWeight.SemiBold
+        )
+        if (SocialHubStore.blocked.isEmpty()) {
+            Text(
+                text = "Nobody is blocked. Block a player from their message menu.",
+                color = SocialPalette.textSecondary,
+                fontSize = SocialType.secondary
+            )
+        } else {
+            SocialHubStore.blocked.forEach { name ->
+                Row(
+                    modifier = Modifier.fillMaxWidth().heightIn(min = SocialDimens.listRowMin),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
+                ) {
+                    SocialAvatar(size = 36, name = name)
+                    Text(
+                        text = name,
+                        modifier = Modifier.weight(1f),
+                        color = SocialPalette.textPrimary,
+                        fontSize = SocialType.body
+                    )
+                    SocialGhostButton(
+                        text = "Unblock",
+                        iconRes = null,
+                        onClick = { SocialHubStore.unblock(name) }
+                    )
+                }
+            }
+        }
+        if (SocialHubStore.reported.isNotEmpty()) {
+            Text(
+                text = "Reported: ${SocialHubStore.reported.joinToString(", ")}",
+                color = SocialPalette.textMuted,
+                fontSize = SocialType.caption
+            )
+        }
+        HorizontalDivider(color = SocialPalette.borderSoft)
         SocialGhostButton(text = "Sign out", iconRes = null, onClick = onSignOut)
+        SocialGhostButton(text = "Delete account", iconRes = null, onClick = onDelete)
         Text(
             text = "Aerix accounts are separate from your Minecraft account.",
             color = SocialPalette.textMuted,
