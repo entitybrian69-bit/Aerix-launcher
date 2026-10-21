@@ -149,7 +149,8 @@ private class HomeActions(
     val downloads: () -> Unit,
     val fileManager: () -> Unit,
     val logs: () -> Unit,
-    val accounts: () -> Unit
+    val accounts: () -> Unit,
+    val social: () -> Unit
 )
 
 @Composable
