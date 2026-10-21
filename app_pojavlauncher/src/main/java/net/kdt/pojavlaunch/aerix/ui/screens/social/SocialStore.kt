@@ -24,7 +24,7 @@ data class SocialData(
     val blocked: List<String> = listOf("FrostByte", "EchoFox"),
     val messages: List<SocialMessage> = emptyList(), val reports: List<String> = emptyList(),
     val party: List<String> = emptyList(), val muted: Boolean = true, val deafened: Boolean = false,
-    val preferences: SocialPreferences = SocialPreferences()
+    val voiceMode: String = "Push-to-talk", val preferences: SocialPreferences = SocialPreferences()
 )
 fun sampleFriends() = listOf(
     SocialPerson("Kai", "Minecraft running", 0), SocialPerson("Mira", "In a voice party", 1),
@@ -36,6 +36,8 @@ object SocialStore {
     private var context: Context? = null
     var data by mutableStateOf(SocialData()); private set
     var connectionError by mutableStateOf(false)
+    var emptyPreview by mutableStateOf(false)
+    var cosmeticRevision by androidx.compose.runtime.mutableIntStateOf(0)
     var voiceReconnecting by mutableStateOf(false)
     var notice by mutableStateOf<String?>(null)
     private val gson = Gson()
@@ -95,6 +97,7 @@ object SocialStore {
     fun like(id: Long) = update { it.copy(messages = it.messages.map { m -> if (m.id == id) m.copy(likes = m.likes + 1) else m }) }
     fun messages(person: String): List<SocialMessage> = data.messages.filter { it.person == person }
     fun seedChat(person: String) {
+        if (data.friends.none { it.name == person } || person in data.blocked) return
         if (messages(person).isNotEmpty()) return
         update { it.copy(messages = it.messages + listOf(
             SocialMessage(System.nanoTime(), person, "Want to play together?", false),

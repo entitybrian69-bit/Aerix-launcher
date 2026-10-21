@@ -80,6 +80,14 @@ class SocialContract(unittest.TestCase):
                 referenced.update(re.findall(r'(?<!android\.)R\.string\.(\w+)', path.read_text()))
         self.assertEqual(set(), referenced - defined)
 
+    def test_quantity_string_references_resolve(self):
+        values = ROOT / 'app_pojavlauncher/src/main/res/values'
+        defined = {name for path in values.glob('*.xml')
+                   for name in re.findall(r'<plurals[^>]*name="([^"]+)"', path.read_text())}
+        referenced = {name for path in JAVA.rglob('*') if path.suffix in {'.java', '.kt'}
+                      for name in re.findall(r'R\.plurals\.(\w+)', path.read_text())}
+        self.assertEqual(set(), referenced - defined)
+
     def test_workflow_does_not_publish(self):
         workflow = (ROOT / '.github/workflows/android.yml').read_text()
         self.assertNotIn('gh release create', workflow)

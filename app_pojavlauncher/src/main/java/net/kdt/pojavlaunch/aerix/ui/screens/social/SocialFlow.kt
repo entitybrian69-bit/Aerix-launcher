@@ -154,6 +154,9 @@ private fun SocialTopBar(route: SocialRoute, back: () -> Unit) {
                         "Safety" to SocialRoute.SAFETY).forEach { (title, page) ->
                         DropdownMenuItem(text = { Text(title) }, onClick = { menu = false; SocialShellNav.push(page) })
                     }
+                    DropdownMenuItem(text = { Text("Preview connection error") }, onClick = { menu = false; SocialStore.connectionError = true })
+                    DropdownMenuItem(text = { Text("Preview empty list") }, onClick = { menu = false; SocialStore.emptyPreview = true })
+                    DropdownMenuItem(text = { Text("Restore list") }, onClick = { menu = false; SocialStore.emptyPreview = false; SocialStore.connectionError = false })
                     DropdownMenuItem(text = { Text("Sign out") }, onClick = { menu = false; signOut = true })
                 }
             }

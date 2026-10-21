@@ -95,7 +95,9 @@ fun SocialNotificationsScreen() {
             SocialSwitch("In-game social alerts", "Small notices while playing", prefs.gameAlerts) { prefs = prefs.copy(gameAlerts = it) }
             SocialSwitch("Message preview", "Hide message text in alerts", prefs.previews) { prefs = prefs.copy(previews = it) }
             SocialActionRow("Android notifications", "Device notification permission is controlled by Android.") {
-                context.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName))
+                context.startActivity(if (android.os.Build.VERSION.SDK_INT >= 26)
+                    Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                    else Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}")))
             }
         }
     })
@@ -116,6 +118,17 @@ fun SocialVoiceScreen() {
     val request = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         permission = granted; denied = !granted
         SocialStore.update { it.copy(muted = true) }
+    }
+    val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+    DisposableEffect(lifecycle) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                permission = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+                if (permission) denied = false
+            }
+        }
+        lifecycle.addObserver(observer)
+        onDispose { lifecycle.removeObserver(observer) }
     }
     SocialColumns(left = {
         SocialPanel {
@@ -141,7 +154,7 @@ fun SocialVoiceScreen() {
                 SocialSwitch("Muted", "Start every party muted", SocialStore.data.muted) {
                     SocialStore.update { data -> data.copy(muted = it, deafened = if (!it) false else data.deafened) }
                 }
-                SocialChoice("Input mode", "Push-to-talk", listOf("Push-to-talk", "Voice activity")) { SocialStore.notice = "$it selected for this demo." }
+                SocialChoice("Input mode", SocialStore.data.voiceMode, listOf("Push-to-talk", "Voice activity")) { mode -> SocialStore.update { it.copy(voiceMode = mode) } }
             }
         }
     })

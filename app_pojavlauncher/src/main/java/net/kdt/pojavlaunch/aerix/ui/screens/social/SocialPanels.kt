@@ -27,7 +27,6 @@ fun SocialDashboardScreen() {
     val tab = SocialShellNav.tab
     var search by remember { mutableStateOf("") }
     var add by remember { mutableStateOf(false) }
-    var menu by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             listOf("Friends", "Chats", "Party").forEachIndexed { i, label ->
@@ -37,14 +36,7 @@ fun SocialDashboardScreen() {
                 }
             }
             Spacer(Modifier.weight(1f))
-            Box {
-                TextButton(onClick = { menu = true }) { Text("⋮", fontSize = 22.sp) }
-                DropdownMenu(menu, { menu = false }) {
-                    DropdownMenuItem(text = { Text("Preview connection error") }, onClick = { menu = false; SocialStore.connectionError = true })
-                    DropdownMenuItem(text = { Text("Preview empty list") }, onClick = { menu = false; search = "__empty_preview__" })
-                    DropdownMenuItem(text = { Text("Restore list") }, onClick = { menu = false; search = ""; SocialStore.connectionError = false })
-                }
-            }
+            if (SocialStore.connectionError) SocialCaption("Connection unavailable")
         }
         Crossfade(tab, animationSpec = tween(120), modifier = Modifier.weight(1f), label = "socialTab") { selected ->
             Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -55,8 +47,8 @@ fun SocialDashboardScreen() {
                         SocialField(search, { search = it }, "Search friends", Modifier.weight(1f))
                         SocialButton("Add friend", { add = true }, Modifier.widthIn(min = 100.dp))
                     }
-                    val people = SocialStore.data.friends.filter { it.name.contains(search, true) }
-                    if (people.isEmpty()) SocialEmptyPanel(false, { add = true }, { search = "" })
+                    val people = if (SocialStore.emptyPreview) emptyList() else SocialStore.data.friends.filter { it.name.contains(search, true) }
+                    if (people.isEmpty()) SocialEmptyPanel(false, { add = true }, { search = ""; SocialStore.emptyPreview = false })
                     else SocialColumns(left = {
                         SocialPanel {
                             people.forEach { person -> SocialFriendRow(person, onMessage = { SocialShellNav.chat(person.name) }, onProfile = {

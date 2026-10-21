@@ -55,14 +55,14 @@ fun SocialAuthScreen(onExit: () -> Unit) {
 
 @Composable
 fun SocialModel(modifier: Modifier = Modifier, skin: String = SocialStore.data.skin,
-    cape: String = SocialStore.data.cape, slim: Boolean = SocialStore.data.slim) {
+    cape: String = SocialStore.data.cape, slim: Boolean = SocialStore.data.slim, previewImport: Boolean = false) {
     val context = LocalContext.current
     var back by remember { mutableStateOf(false) }
     var bytes by remember { mutableStateOf<Pair<ByteArray?, ByteArray?>>(null to null) }
-    LaunchedEffect(skin, cape) {
+    LaunchedEffect(skin, cape, SocialStore.cosmeticRevision) {
         bytes = withContext(Dispatchers.IO) {
-            val skinFile = context.filesDir.resolve("social_skin.png")
-            val capeFile = context.filesDir.resolve("social_cape.png")
+            val skinFile = context.filesDir.resolve(if (previewImport && context.filesDir.resolve("social_skin_pending.png").exists()) "social_skin_pending.png" else "social_skin.png")
+            val capeFile = context.filesDir.resolve(if (previewImport && context.filesDir.resolve("social_cape_pending.png").exists()) "social_cape_pending.png" else "social_cape.png")
             val skinBytes = if (skin == "Imported skin" && skinFile.exists()) skinFile.readBytes()
                 else runCatching { context.assets.open("social/skin_${if (skin == "Explorer") 2 else if (skin == "Midnight") 3 else 1}.png").use { it.readBytes() } }.getOrNull()
             val capeBytes = if (cape == "Imported cape" && capeFile.exists()) capeFile.readBytes()
@@ -152,16 +152,21 @@ private fun SocialWardrobe(capeMode: Boolean) {
                 BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
                 check(if (capeMode) options.outWidth == 64 && options.outHeight == 32
                     else options.outWidth == 64 && options.outHeight in listOf(32, 64)) { if (capeMode) "Capes must be 64×32 PNG." else "Skins must be 64×64 or 64×32 PNG." }
-                context.filesDir.resolve(if (capeMode) "social_cape.png" else "social_skin.png").writeBytes(bytes)
+                context.filesDir.resolve(if (capeMode) "social_cape_pending.png" else "social_skin_pending.png").writeBytes(bytes)
             } }
             importing = false
-            if (result.isSuccess) selected = if (capeMode) "Imported cape" else "Imported skin"
-            else error = result.exceptionOrNull()?.message
+            if (result.isSuccess) {
+                selected = if (capeMode) "Imported cape" else "Imported skin"
+                SocialStore.cosmeticRevision++
+            } else error = result.exceptionOrNull()?.message
         }
+    }
+    DisposableEffect(capeMode) {
+        onDispose { context.filesDir.resolve(if (capeMode) "social_cape_pending.png" else "social_skin_pending.png").delete() }
     }
     SocialColumns(left = {
         SocialModel(skin = if (capeMode) SocialStore.data.skin else selected,
-            cape = if (capeMode) selected else SocialStore.data.cape, slim = slim)
+            cape = if (capeMode) selected else SocialStore.data.cape, slim = slim, previewImport = true)
         if (!capeMode) Row {
             SocialButton("Classic", { slim = false }, Modifier.weight(1f), secondary = slim)
             SocialButton("Slim", { slim = true }, Modifier.weight(1f), secondary = !slim)
@@ -176,7 +181,7 @@ private fun SocialWardrobe(capeMode: Boolean) {
                     row.forEach { choice ->
                         Column(Modifier.weight(1f).heightIn(min = 110.dp)
                             .background(if (selected == choice) SocialPalette.accent.copy(alpha = .4f) else Color.White.copy(alpha = .07f), RoundedCornerShape(14.dp))
-                            .clickable { if (!choice.startsWith("Imported") || context.filesDir.resolve(if (capeMode) "social_cape.png" else "social_skin.png").exists()) selected = choice }
+                            .clickable { if (!choice.startsWith("Imported") || (context.filesDir.resolve(if (capeMode) "social_cape.png" else "social_skin.png").exists() || context.filesDir.resolve(if (capeMode) "social_cape_pending.png" else "social_skin_pending.png").exists())) selected = choice }
                             .padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                             SocialCosmeticThumbnail(choice, capeMode, Modifier.size(72.dp))
                             SocialCaption((if (selected == choice) "✓ " else "") + choice)
@@ -188,6 +193,11 @@ private fun SocialWardrobe(capeMode: Boolean) {
             SocialCaption(if (capeMode) "For your Aerix profile. In-game cape visibility requires supported integration." else "PNG skin files • 64×64 or legacy 64×32. Changes your Aerix profile only.")
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 SocialButton(if (capeMode) "Apply cape" else "Apply skin", {
+                    val pending = context.filesDir.resolve(if (capeMode) "social_cape_pending.png" else "social_skin_pending.png")
+                    if (selected.startsWith("Imported") && pending.exists()) {
+                        pending.copyTo(context.filesDir.resolve(if (capeMode) "social_cape.png" else "social_skin.png"), overwrite = true)
+                    }
+                    SocialStore.cosmeticRevision++
                     SocialStore.update { if (capeMode) it.copy(cape = selected) else it.copy(skin = selected, slim = slim) }
                     SocialShellNav.back()
                 }, Modifier.weight(1f), enabled = !importing)
@@ -220,11 +230,14 @@ fun SocialSignOutDialog(onDismiss: () -> Unit) {
 @Composable
 private fun SocialCosmeticThumbnail(choice: String, cape: Boolean, modifier: Modifier) {
     val context = LocalContext.current
-    val image by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, choice, cape) {
+    val image by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, choice, cape, SocialStore.cosmeticRevision) {
         value = withContext(Dispatchers.IO) {
             runCatching {
                 val imported = choice.startsWith("Imported")
-                val bytes = if (imported) context.filesDir.resolve(if (cape) "social_cape.png" else "social_skin.png").readBytes()
+                val bytes = if (imported) {
+                    val pending = context.filesDir.resolve(if (cape) "social_cape_pending.png" else "social_skin_pending.png")
+                    (if (pending.exists()) pending else context.filesDir.resolve(if (cape) "social_cape.png" else "social_skin.png")).readBytes()
+                }
                     else context.assets.open(if (cape) "social/cape_preview.png" else "social/skin_preview_${if (choice == "Explorer") 2 else if (choice == "Midnight") 3 else 1}.png").use { it.readBytes() }
                 val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
                 bitmap?.let { it.asImageBitmap() }
