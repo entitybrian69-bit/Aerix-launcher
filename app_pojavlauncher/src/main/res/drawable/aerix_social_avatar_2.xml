@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generic human placeholder avatar for the Aerix Social UI (no photo assets). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+  <!-- Circular background -->
+  <path
+      android:pathData="M12,12m-12,0a12,12 0 1,0 24,0a12,12 0 1,0 -24,0"
+      android:fillColor="#3A2B4E" />
+  <!-- Shoulders -->
+  <path
+      android:pathData="M12,13.6c-4.5,0 -8.2,2.6 -8.2,5.8V24h16.4v-4.6c0,-3.2 -3.7,-5.8 -8.2,-5.8z"
+      android:fillColor="#8B5CF6" />
+  <!-- Head -->
+  <path
+      android:pathData="M12,5.2m-3.7,0a3.7,3.7 0 1,0 7.4,0a3.7,3.7 0 1,0 -7.4,0"
+      android:fillColor="#F0C8A0" />
+  <!-- Hair -->
+  <path
+      android:pathData="M7.6,9.4c-0.4,-4.2 1.8,-6.8 4.4,-6.8s4.8,2.6 4.4,6.8c-0.3,1 -0.9,0.6 -0.9,-0.6c0,-2.2 -1.4,-3.4 -3.5,-3.4s-3.5,1.2 -3.5,3.4c0,1.2 -0.6,1.6 -0.9,0.6z"
+      android:fillColor="#6B4A2F" />
+</vector>
