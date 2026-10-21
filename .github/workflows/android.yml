@@ -9,6 +9,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-22.04
+    permissions:
+      contents: write   # publish the finished APK as a pre-release
     env:
       POJAV_GPLAY_KEYSTORE_PASSWORD: ${{ secrets.POJAV_GPLAY_KEYSTORE_PASSWORD }}
       CURSEFORGE_API_KEY: ${{ secrets.CURSEFORGE_API_KEY }}
@@ -60,16 +62,36 @@ jobs:
           mv app_pojavlauncher/build/outputs/bundle/fullGplay/app_pojavlauncher-full-gplay.aab out/app-gplay.aab
 
       - name: Build Debug .apk (Full)
+        shell: bash
         run: |
-          # Build the launcher
-          gradle :app_pojavlauncher:assembleFullDebug
+          # Build the launcher. tee keeps the log: a failed Gradle run otherwise leaves only
+          # "Process completed with exit code 1" and the compiler errors are unreachable.
+          set -o pipefail
+          gradle :app_pojavlauncher:assembleFullDebug 2>&1 | tee build-full.log
           mv app_pojavlauncher/build/outputs/apk/full/debug/app_pojavlauncher-full-debug.apk out/app-debug-full.apk
 
       - name: Build Debug .apk (No runtime)
+        shell: bash
         run: |
-         # Build the launcher (without jre8 installed)
-          gradle :app_pojavlauncher:assembleNoruntimeDebug
+          # Build the launcher (without jre8 installed)
+          set -o pipefail
+          gradle :app_pojavlauncher:assembleNoruntimeDebug 2>&1 | tee build-noruntime.log
           mv app_pojavlauncher/build/outputs/apk/noruntime/debug/app_pojavlauncher-noruntime-debug.apk out/app-debug-noruntime.apk
+
+      - name: Report Gradle errors
+        if: failure()
+        shell: bash
+        run: |
+          # One annotation carries every matching line; GitHub only shows ten annotations per
+          # step, and a Kotlin build can produce more errors than that.
+          errors=$({ grep -aEh '^e: ' build-full.log build-noruntime.log 2>/dev/null | head -25
+            grep -aEh 'error: |Execution failed|What went wrong|FAILED|Could not|Caused by' build-full.log build-noruntime.log 2>/dev/null | head -35
+          } | sed 's/%/%25/g' | tr '\n' '|' | cut -c1-6000)
+          echo "::error title=gradle errors::${errors:-no error line matched}"
+          for log in build-full.log build-noruntime.log; do
+            [ -f "$log" ] && echo "::error title=gradle $log tail::$(tail -c 1200 "$log" | tr '\n' '|' | sed 's/%/%25/g')"
+          done
+          exit 0
 
       - name: Gen md5sums
         run: |
@@ -93,6 +115,24 @@ jobs:
         with:
           name: app-release-aab
           path: out/app-gplay.aab
+
+      - name: Publish build APK
+        # A workflow artifact needs a signed-in GitHub session to download, and the phone that
+        # installs this build does not have one. A pre-release puts the APK behind a plain link.
+        if: github.event_name == 'push' && github.ref_name == 'arena/da25bc48-aerix-launcher'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          tag="build-${GITHUB_RUN_ID}"
+          notes="Debug build of ${GITHUB_SHA:0:7} from ${GITHUB_REF_NAME}. No-runtime APK: it fetches the Java runtime it needs on first launch, so the download stays small. Installs next to a release build because the debug variant uses the .debug application id."
+          gh release create "$tag" out/app-debug-noruntime.apk \
+            --title "Aerix build ${GITHUB_RUN_NUMBER} (debug)" \
+            --notes "$notes" \
+            --prerelease \
+            --target "$GITHUB_SHA"
+          echo "Published: $(gh release view "$tag" --json url --jq .url)"
 
       - name: Upload onto the Google Play testing track
         continue-on-error: true
