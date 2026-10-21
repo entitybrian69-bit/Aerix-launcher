@@ -9,6 +9,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-22.04
+    permissions:
+      contents: write   # publish the finished APK as a pre-release
     env:
       POJAV_GPLAY_KEYSTORE_PASSWORD: ${{ secrets.POJAV_GPLAY_KEYSTORE_PASSWORD }}
       CURSEFORGE_API_KEY: ${{ secrets.CURSEFORGE_API_KEY }}
@@ -187,6 +189,70 @@ jobs:
         with:
           name: app-release-aab
           path: out/app-gplay.aab
+
+      - name: Verify the release signing identity
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Android refuses an update whose certificate differs from the installed one, and the
+          # package installer reports that as "can't be installed as it is incompatible". Read the
+          # certificate out of the finished APK and compare it with the published v1.3.5 build
+          # instead of trusting that Gradle picked the keystore that ships in the tree.
+          build_tools=$(ls -d "$ANDROID_HOME"/build-tools/* 2>/dev/null | sort -V | tail -1)
+          cert_of() {
+            if [ -n "$build_tools" ] && [ -x "$build_tools/apksigner" ]; then
+              "$build_tools/apksigner" verify --print-certs "$1" | grep -m1 -i 'SHA-256 digest' | awk '{print $NF}'
+            else
+              keytool -printcert -jarfile "$1" | grep -m1 'SHA256:' | sed 's/.*SHA256: //; s/ .*//'
+            fi
+          }
+          new_cert=$(cert_of out/app-release-full.apk)
+          gh release download v1.3.5 --pattern 'Aerix-Launcher.apk' --dir refapk --clobber
+          ref_cert=$(cert_of refapk/Aerix-Launcher.apk)
+          echo "this build : ${new_cert:-<unreadable>}"
+          echo "v1.3.5     : ${ref_cert:-<unreadable>}"
+          if [ -n "$new_cert" ] && [ "$new_cert" = "$ref_cert" ]; then
+            echo "SIGNING_MATCH=true" >> "$GITHUB_ENV"
+            echo "Certificate matches the published v1.3.5 APK, so this build upgrades an existing install."
+          else
+            echo "SIGNING_MATCH=false" >> "$GITHUB_ENV"
+            echo "::error title=signing mismatch::this build ${new_cert:-unreadable} vs published v1.3.5 ${ref_cert:-unreadable}"
+          fi
+
+      - name: Publish build APK
+        # A workflow artifact needs a signed-in GitHub session to download, and the phone that
+        # installs this build does not have one. A pre-release puts the APK behind a plain link.
+        # Pre-release on purpose: the in-app updater reads the latest stable release only.
+        if: github.event_name == 'push' && github.ref_name == 'arena/78fd95f3-aerix-launcher'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          tag="build-${GITHUB_RUN_ID}"
+          version=$(sed -n 's/^versionName=//p' version.properties)
+          version=${version:-unknown}
+          if [ "${SIGNING_MATCH:-}" = "true" ]; then
+            signing="Signed with the Aerix release key, and the certificate matches the published v1.3.5 APK, so this installs over an existing Aerix without uninstalling it."
+          else
+            signing="The signing certificate could not be confirmed against the published v1.3.5 APK. If the install is refused as incompatible, uninstall the existing Aerix first."
+          fi
+          notes="Release build of ${GITHUB_SHA:0:7} from ${GITHUB_REF_NAME}, version ${version}. ${signing}
+
+          Two APKs: the full one bundles the Java runtime, the no-runtime one downloads it on first launch and is much smaller. Both are the release variant, not debuggable, package id net.kdt.pojavlaunch."
+          cp out/app-release-full.apk "Aerix-Launcher-${version}-b${GITHUB_RUN_NUMBER}-release.apk"
+          cp out/app-release-noruntime.apk "Aerix-Launcher-${version}-b${GITHUB_RUN_NUMBER}-release-noruntime.apk"
+          gh release create "$tag" \
+            "Aerix-Launcher-${version}-b${GITHUB_RUN_NUMBER}-release.apk" \
+            "Aerix-Launcher-${version}-b${GITHUB_RUN_NUMBER}-release-noruntime.apk" \
+            out/SHA256SUMS \
+            --title "Aerix Launcher ${version} build ${GITHUB_RUN_NUMBER} (release)" \
+            --notes "$notes" \
+            --prerelease \
+            --target "$GITHUB_SHA"
+          echo "Published: $(gh release view "$tag" --json url --jq .url)"
 
       - name: Upload onto the Google Play testing track
         continue-on-error: true
