@@ -768,6 +768,7 @@ internal fun SocialProfilePanel(
                         }
                         SocialCard(modifier = Modifier.weight(1.2f).fillMaxHeight(), contentPadding = AerixSpacing.md) {
                             ProfileActions(
+                                scrollable = true,
                                 onEditName = { editName = true },
                                 onChooseSkin = { showSkinPicker = true },
                                 onChooseCape = { showCapePicker = true },
@@ -810,6 +811,7 @@ internal fun SocialProfilePanel(
                         }
                         SocialCard(modifier = Modifier.fillMaxWidth(), contentPadding = AerixSpacing.md) {
                             ProfileActions(
+                                scrollable = false,
                                 onEditName = { editName = true },
                                 onChooseSkin = { showSkinPicker = true },
                                 onChooseCape = { showCapePicker = true },
@@ -835,18 +837,67 @@ internal fun SocialProfilePanel(
             }
         )
     }
-    if (confirmSignOut) {
+    if (showSkinPicker) {
         SocialChoiceDialog(
-            title = "Sign out of Aerix?",
-            subtitle = "Your friends and chats stay on your account.",
-            options = listOf("Sign out on this device"),
-            selected = -1,
-            onSelect = {
-                confirmSignOut = false
-                onSignedOut()
+            title = "Choose skin",
+            subtitle = "PNG skins, 64x64 or legacy 64x32.",
+            options = listOf("Current skin (Classic)", "Current skin (Slim)"),
+            selected = if (SocialProfileStore.skinName.contains("Slim")) 1 else 0,
+            onSelect = { index ->
+                SocialProfileStore.skinName = if (index == 1) "Current skin · Slim" else "Current skin"
+                showSkinPicker = false
             },
-            onDismiss = { confirmSignOut = false }
+            onDismiss = { showSkinPicker = false }
         )
+    }
+    if (showCapePicker) {
+        SocialChoiceDialog(
+            title = "Choose cape",
+            subtitle = "Optional. For your Aerix profile.",
+            options = listOf("None", "Aerix cape"),
+            selected = if (SocialProfileStore.capeName == "None") 0 else 1,
+            onSelect = { index ->
+                SocialProfileStore.capeName = if (index == 0) "None" else "Aerix cape"
+                showCapePicker = false
+            },
+            onDismiss = { showCapePicker = false }
+        )
+    }
+    if (confirmSignOut) {
+        androidx.compose.ui.window.Dialog(onDismissRequest = { confirmSignOut = false }) {
+            Box(modifier = Modifier.fillMaxWidth(0.92f).widthIn(max = 420.dp).then(socialDialogModifier())) {
+                SignOutAerixPanel(
+                    onConfirm = {
+                        confirmSignOut = false
+                        onSignedOut()
+                    },
+                    onCancel = { confirmSignOut = false }
+                )
+            }
+        }
+    }
+    if (confirmDelete) {
+        androidx.compose.ui.window.Dialog(onDismissRequest = { confirmDelete = false }) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth(0.92f)
+                    .widthIn(max = 420.dp)
+                    .then(socialDialogModifier())
+                    .verticalScroll(rememberScrollState())
+            ) {
+                // DECISION: no account backend exists yet; confirming deletion clears the
+                // mock session and returns to sign-in instead of deleting anything.
+                DeleteAerixAccountPanel(
+                    onConfirm = {
+                        confirmDelete = false
+                        SocialHubStore.reset()
+                        onSignedOut()
+                    },
+                    onCancel = { confirmDelete = false },
+                    onReadPolicy = { }
+                )
+            }
+        }
     }
 }
 
@@ -858,12 +909,16 @@ private fun ProfileActions(
     onPrivacy: () -> Unit,
     onNotifications: () -> Unit,
     onSignOut: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    scrollable: Boolean
 ) {
+    // Same rule as the setup form: never scroll inside a page that already scrolls.
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .verticalScroll(rememberScrollState()),
+        modifier = if (scrollable) {
+            Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
+        } else {
+            Modifier.fillMaxWidth()
+        },
         verticalArrangement = Arrangement.spacedBy(AerixSpacing.xs)
     ) {
         SocialGhostButton(text = "Edit name", iconRes = null, onClick = onEditName)

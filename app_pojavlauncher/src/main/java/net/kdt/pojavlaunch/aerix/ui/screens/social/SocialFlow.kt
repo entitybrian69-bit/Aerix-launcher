@@ -518,7 +518,8 @@ internal fun SocialProfileSetupScreen(onBack: () -> Unit, onFinish: () -> Unit) 
                         onFinish = {
                             SocialProfileStore.aerixName = trimmed
                             onFinish()
-                        }
+                        },
+                        scrollable = wide
                     )
                 }
                 if (wide) {
@@ -635,13 +636,19 @@ private fun ProfileFormCard(
     onNameChange: (String) -> Unit,
     onChooseSkin: () -> Unit,
     onChooseCape: () -> Unit,
-    onFinish: () -> Unit
+    onFinish: () -> Unit,
+    scrollable: Boolean
 ) {
     SocialCard(modifier = modifier, contentPadding = AerixSpacing.md) {
+        // Only scroll inside the card when the card itself has a bounded height (wide
+        // layout). In the narrow layout the page already scrolls; a scrollable here
+        // would be measured with infinite max height and crash (device report 2026-10-21).
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState()),
+            modifier = if (scrollable) {
+                Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+            } else {
+                Modifier.fillMaxWidth()
+            },
             verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
         ) {
             Text("Aerix name", color = SocialPalette.textSecondary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
