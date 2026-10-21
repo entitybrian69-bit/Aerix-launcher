@@ -50,7 +50,7 @@ fun SocialCompactPanel(onBack: () -> Unit, onResume: () -> Unit, onLeaveGame: ()
             }
             SocialCaption("Return to the launcher when you are ready. Switching apps may interrupt your game session.")
         } else if (localReport) {
-            Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) { SocialReportScreen(person) }
+            Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) { SocialReportScreen(person) { localReport = false } }
             SocialButton("Back to Social", { localReport = false }, Modifier.fillMaxWidth(), secondary = true)
         } else when (mode) {
             "Chat" -> {
@@ -137,7 +137,7 @@ fun SocialCompactPanel(onBack: () -> Unit, onResume: () -> Unit, onLeaveGame: ()
         if (SocialStore.data.signedIn && SocialStore.data.appearanceComplete) SocialButton("Back to game", onResume, Modifier.fillMaxWidth(), secondary = true)
     }
     if (add) SocialAddFriendDialog { add = false }
-    if (block) SocialBlockDialog(person, { block = false }) { mode = "Friends" }
+    if (block) SocialBlockDialog(person, { block = false }, onReport = { localReport = true }) { mode = "Friends" }
     if (leave) SocialLeaveGameDialog({ leave = false }) {
         leave = false
         // A mock server invite must never terminate or reconnect a real Minecraft session.

@@ -100,8 +100,8 @@ fun SocialNotificationsScreen() {
         }
     })
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End)) {
-        SocialButton("Cancel", { SocialShellNav.back() }, Modifier.width(140.dp), secondary = true)
-        SocialButton("Save changes", { SocialStore.update { it.copy(preferences = prefs) }; SocialShellNav.back() }, Modifier.width(180.dp))
+        SocialButton("Cancel", { SocialShellNav.back() }, Modifier.weight(1f), secondary = true)
+        SocialButton("Save changes", { SocialStore.update { it.copy(preferences = prefs) }; SocialShellNav.back() }, Modifier.weight(1f))
     }
 }
 
@@ -121,7 +121,10 @@ fun SocialVoiceScreen() {
         SocialPanel {
             SocialHeading(if (denied) "Microphone access is off" else "Talk with your party", true)
             Box(Modifier.fillMaxWidth().height(180.dp), contentAlignment = Alignment.Center) {
-                Text(if (denied) "♩̸" else "♩", fontSize = 110.sp, color = SocialPalette.bright)
+                androidx.compose.foundation.Image(
+                    androidx.compose.ui.res.painterResource(net.kdt.pojavlaunch.R.drawable.aerix_social_microphone),
+                    contentDescription = if (denied) "Microphone disabled" else "Microphone", modifier = Modifier.size(180.dp))
+                if (denied) Text("╱", fontSize = 130.sp, color = SocialPalette.bright)
             }
             SocialCaption("Microphone access is optional")
         }
@@ -219,7 +222,7 @@ fun SocialDeletionScreen() {
 // Report reference: three-step reason, optional details and final review, never combined with Block.
 // White title at top of a single dark glass panel, bottom Continue/Cancel actions.
 @Composable
-fun SocialReportScreen(person: String) {
+fun SocialReportScreen(person: String, onDone: () -> Unit = { SocialShellNav.back() }) {
     var step by remember { mutableIntStateOf(0) }
     var reason by remember { mutableStateOf("Harassment") }
     var details by remember { mutableStateOf("") }
@@ -232,8 +235,8 @@ fun SocialReportScreen(person: String) {
         else { SocialHeading(person); SocialCaption(reason); SocialCaption(details.ifBlank { "No additional details." }) }
         SocialCaption("Reports are private. Demo reports are saved only on this device, not sent to moderators.")
         SocialButton(if (step == 2) "Save report locally" else "Continue", {
-            if (step < 2) step++ else { SocialStore.report(person, reason, details); SocialShellNav.back() }
+            if (step < 2) step++ else { SocialStore.report(person, reason, details); onDone() }
         }, Modifier.fillMaxWidth())
-        SocialButton("Cancel", { SocialShellNav.back() }, Modifier.fillMaxWidth(), secondary = true)
+        SocialButton("Cancel", onDone, Modifier.fillMaxWidth(), secondary = true)
     }
 }

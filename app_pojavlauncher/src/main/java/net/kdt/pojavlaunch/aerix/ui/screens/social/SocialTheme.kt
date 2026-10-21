@@ -80,8 +80,8 @@ fun SocialPanel(modifier: Modifier = Modifier, content: @Composable ColumnScope.
 fun SocialButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, secondary: Boolean = false) {
     // Existing launcher pills have fixed 40/46dp heights; pad the enclosing target to at least 48dp.
     Box(modifier.heightIn(min = SocialDimens.touch), contentAlignment = Alignment.Center) {
-        if (secondary) AerixGhostButton(text, null, onClick, Modifier.fillMaxWidth(), tint = SocialPalette.text)
-        else AerixPrimaryButton(text, null, onClick, Modifier.fillMaxWidth(), enabled, SocialPalette.accent)
+        if (secondary) AerixGhostButton(text, null, onClick, Modifier.fillMaxWidth(), tint = SocialPalette.text, targetHeight = 48.dp)
+        else AerixPrimaryButton(text, null, onClick, Modifier.fillMaxWidth(), enabled, SocialPalette.accent, targetHeight = 48.dp)
     }
 }
 @Composable

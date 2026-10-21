@@ -245,7 +245,7 @@ fun SocialAddFriendDialog(onDismiss: () -> Unit) {
 // Image 21: Block confirmation centered above the panel with a separate optional report checkbox.
 // Red destructive action; a muted explanation makes the loss of friendship explicit.
 @Composable
-fun SocialBlockDialog(name: String, onDismiss: () -> Unit, onBlocked: () -> Unit) {
+fun SocialBlockDialog(name: String, onDismiss: () -> Unit, onReport: (() -> Unit)? = null, onBlocked: () -> Unit) {
     var report by remember { mutableStateOf(false) }
     AlertDialog(onDismissRequest = onDismiss, title = { Text("Block $name?") }, text = {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -255,6 +255,9 @@ fun SocialBlockDialog(name: String, onDismiss: () -> Unit, onBlocked: () -> Unit
         }
     }, confirmButton = { TextButton(onClick = {
         SocialStore.block(name); onDismiss(); onBlocked()
-        if (report) { SocialShellNav.selectedPerson = name; SocialShellNav.push(SocialRoute.REPORT) }
+        if (report) {
+            if (onReport != null) onReport()
+            else { SocialShellNav.selectedPerson = name; SocialShellNav.push(SocialRoute.REPORT) }
+        }
     }) { Text("Block", color = SocialPalette.danger) } }, dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } })
 }

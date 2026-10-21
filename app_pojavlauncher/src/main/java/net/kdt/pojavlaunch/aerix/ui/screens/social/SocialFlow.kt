@@ -142,8 +142,10 @@ private fun SocialTopBar(route: SocialRoute, back: () -> Unit) {
             else -> "Social"
         }, Modifier.weight(1f), fontSize = 22.sp, color = SocialPalette.text)
         if (route == SocialRoute.DASHBOARD) {
-            SocialAvatar(0, Modifier.size(32.dp))
-            Text(SocialStore.data.name, Modifier.padding(start = 8.dp), color = Color.White)
+            if (androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp >= 600) {
+                SocialAvatar(0, Modifier.size(32.dp))
+                Text(SocialStore.data.name, Modifier.padding(start = 8.dp), color = Color.White)
+            }
             Box {
                 TextButton(onClick = { menu = true }, modifier = Modifier.size(48.dp)) { Text("⋮", fontSize = 24.sp) }
                 DropdownMenu(menu, { menu = false }) {

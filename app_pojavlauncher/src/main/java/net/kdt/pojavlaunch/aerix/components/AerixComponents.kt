@@ -113,11 +113,12 @@ fun AerixPrimaryButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    accent: Color = AerixSurface.accent
+    accent: Color = AerixSurface.accent,
+    targetHeight: Dp = 46.dp
 ) {
     Surface(
         modifier = modifier
-            .height(46.dp)
+            .height(targetHeight)
             .liquidGlass(shape = CircleShape, tint = accent, strength = 0.92f, elevation = AerixMetrics.glassSelectedElevation),
         shape = CircleShape,
         color = if (enabled) accent else accent.copy(alpha = 0.35f),
@@ -145,11 +146,12 @@ fun AerixGhostButton(
     @DrawableRes iconRes: Int?,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    tint: Color = AerixSurface.textPrimary
+    tint: Color = AerixSurface.textPrimary,
+    targetHeight: Dp = 40.dp
 ) {
     Surface(
         modifier = modifier
-            .height(40.dp)
+            .height(targetHeight)
             .liquidGlass(shape = CircleShape, strength = 0.6f, elevation = AerixMetrics.glassSubtleElevation),
         shape = CircleShape,
         color = AerixSurface.panelRaised.copy(alpha = 0.54f),

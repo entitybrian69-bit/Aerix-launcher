@@ -12,6 +12,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -177,7 +178,7 @@ private fun SocialWardrobe(capeMode: Boolean) {
                             .background(if (selected == choice) SocialPalette.accent.copy(alpha = .4f) else Color.White.copy(alpha = .07f), RoundedCornerShape(14.dp))
                             .clickable { if (!choice.startsWith("Imported") || context.filesDir.resolve(if (capeMode) "social_cape.png" else "social_skin.png").exists()) selected = choice }
                             .padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                            SocialAvatar(choices.indexOf(choice), Modifier.size(48.dp))
+                            SocialCosmeticThumbnail(choice, capeMode, Modifier.size(72.dp))
                             SocialCaption((if (selected == choice) "✓ " else "") + choice)
                         }
                     }
@@ -214,4 +215,24 @@ fun SocialSignOutDialog(onDismiss: () -> Unit) {
             SocialCaption("Demo: data is stored only on this device.")
         } }, confirmButton = { TextButton(onClick = { SocialStore.signOut(); onDismiss() }) { Text("Sign out") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } })
+}
+
+@Composable
+private fun SocialCosmeticThumbnail(choice: String, cape: Boolean, modifier: Modifier) {
+    val context = LocalContext.current
+    val image by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, choice, cape) {
+        value = withContext(Dispatchers.IO) {
+            runCatching {
+                val imported = choice.startsWith("Imported")
+                val bytes = if (imported) context.filesDir.resolve(if (cape) "social_cape.png" else "social_skin.png").readBytes()
+                    else context.assets.open(if (cape) "social/cape_preview.png" else "social/skin_preview_${if (choice == "Explorer") 2 else if (choice == "Midnight") 3 else 1}.png").use { it.readBytes() }
+                val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                bitmap?.let { it.asImageBitmap() }
+            }.getOrNull()
+        }
+    }
+    if (choice == "None") Box(modifier, contentAlignment = Alignment.Center) { SocialCaption("None") }
+    else image?.let { androidx.compose.foundation.Image(it, contentDescription = choice, modifier = modifier,
+        contentScale = androidx.compose.ui.layout.ContentScale.Fit) }
+        ?: Box(modifier, contentAlignment = Alignment.Center) { SocialCaption("Import PNG") }
 }

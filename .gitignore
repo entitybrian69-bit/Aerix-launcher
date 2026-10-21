@@ -10,3 +10,7 @@ app_pojavlauncher/.cxx/
 .vs/
 /curseforge_key.txt
 /app_pojavlauncher/libs/ltw-release.aar
+
+# Local Python validation
+__pycache__/
+*.pyc
