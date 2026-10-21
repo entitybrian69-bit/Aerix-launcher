@@ -67,6 +67,19 @@ class SocialContract(unittest.TestCase):
                      'SocialBlockDialog', 'SocialLeaveGameDialog', 'SocialReportScreen']:
             self.assertRegex(code, r'fun '+name+r'\(')
 
+    def test_app_string_references_resolve(self):
+        resources = ROOT / 'app_pojavlauncher/src/main/res/values'
+        defined = set()
+        for path in resources.glob('*.xml'):
+            defined.update(re.findall(r'<string[^>]*name="([^"]+)"', path.read_text()))
+        defined.update({'app_name', 'app_short_name', 'aerix_app_label', 'application_package',
+                        'curseforge_api_key', 'group_id', 'storageProviderAuthorities'})
+        referenced = set()
+        for path in JAVA.rglob('*'):
+            if path.suffix in {'.java', '.kt'}:
+                referenced.update(re.findall(r'(?<!android\.)R\.string\.(\w+)', path.read_text()))
+        self.assertEqual(set(), referenced - defined)
+
     def test_workflow_does_not_publish(self):
         workflow = (ROOT / '.github/workflows/android.yml').read_text()
         self.assertNotIn('gh release create', workflow)
