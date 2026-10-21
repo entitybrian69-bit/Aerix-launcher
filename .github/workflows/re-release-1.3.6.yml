@@ -26,59 +26,93 @@ jobs:
           set -u
           repo="${{ github.repository }}"
           export repo TARGET_SHA
-          mkdir -p sums scan out results
+          mkdir -p scan out results art
 
-          echo "== Build the unique APK candidate list (deduped by tag+size)"
-          gh api "repos/$repo/releases?per_page=100" --paginate \
-            --jq '.[] | .tag_name as $t | .published_at as $p | .assets[] | select(.name | endswith(".apk")) | "\($p)\t\($t)\t\(.name)\t\(.size)"' < /dev/null \
-            | sort -r | awk -F'\t' '!seen[$2 FS $4]++' > apks.tsv
-          # tags fully verified in the previous run, skip them
-          grep -v -E '\t(build-39597412773|build-39554531592|v1\.3\.5)\t' apks.tsv > remaining.tsv || true
-          wc -l remaining.tsv
+          record_match() { # source_desc path
+            echo "$1" > results/match_src
+            echo "$2" > results/match_file
+          }
+          export -f record_match
 
-          scan_one() {
-            local pub="$1" tag="$2" name="$3" size="$4"
-            echo "--- $tag / $name ($size bytes)"
-            if gh release download "$tag" -p "$name" -D scan --clobber -R "$repo" < /dev/null; then
-              sha=$(sha256sum "scan/$name" | awk '{print $1}')
-              echo "$tag|$name|$sha" >> results/hashes.txt
-              echo "::notice title=apk-sha::$tag / $name = $sha"
-              if [ "$sha" = "$TARGET_SHA" ]; then
-                echo "$tag" > results/match_tag
-                echo "$name" > results/match_name
-              fi
-              rm -f "scan/$name"
-            else
-              echo "::warning title=dl-fail::$tag / $name"
+          scan_file() { # path source_desc
+            local f="$1" src="$2"
+            [ -f "$f" ] || return 0
+            local sha
+            sha=$(sha256sum "$f" | awk '{print $1}')
+            echo "$src|$sha" >> results/hashes.txt
+            echo "::notice title=apk-sha::$src = $sha"
+            if [ "$sha" = "$TARGET_SHA" ] && [ ! -f results/match_src ]; then
+              record_match "$src" "$f"
             fi
           }
-          export -f scan_one
+          export -f scan_file
 
-          echo "== Parallel sha256 scan (4 downloads at a time)"
-          while IFS=$'\t' read -r pub tag name size; do
-            printf '%s\0%s\0%s\0%s\0' "$pub" "$tag" "$name" "$size"
-          done < remaining.tsv | xargs -0 -P 4 -n 4 bash -c 'scan_one "$@"' _
+          echo "== Pass 1: release assets (per-tag dirs, parallel)"
+          gh api "repos/$repo/releases?per_page=100" --paginate \
+            --jq '.[] | .tag_name as $t | .assets[] | select(.name | endswith(".apk")) | "\($t)\t\(.name)"' < /dev/null \
+            | sort -u > assets.tsv
+          wc -l assets.tsv
 
-          if [ ! -f results/match_tag ]; then
-            echo "::error title=no-match::no release APK matched sha256 $TARGET_SHA anywhere (scanned hashes are in apk-sha notices)"
+          dl_one() {
+            local tag="$1" name="$2"
+            mkdir -p "scan/$tag"
+            if gh release download "$tag" -p "$name" -D "scan/$tag" --clobber -R "$repo" < /dev/null; then
+              scan_file "scan/$tag/$name" "$tag/$name"
+              rm -f "scan/$tag/$name"
+            else
+              echo "::warning title=dl-fail::$tag/$name"
+            fi
+          }
+          export -f dl_one
+
+          while IFS=$'\t' read -r tag name; do
+            printf '%s\0%s\0' "$tag" "$name"
+          done < assets.tsv | xargs -0 -P 4 -n 2 bash -c 'dl_one "$@"' _
+
+          echo "== Pass 2: GitHub Actions artifacts from CI builds"
+          if [ ! -f results/match_src ]; then
+            gh api "repos/$repo/actions/artifacts?per_page=60" --paginate \
+              --jq '.artifacts[] | select(.expired == false) | "\(.id)\t\(.name)"' < /dev/null | sort -u > arts.tsv
+            wc -l arts.tsv
+            art_one() {
+              local id="$1" name="$2"
+              mkdir -p "art/$id"
+              if gh api "repos/$repo/actions/artifacts/$id/zip" < /dev/null > "art/$id/z.zip" 2>/dev/null; then
+                unzip -o -q "art/$id/z.zip" -d "art/$id" 2>/dev/null
+                find "art/$id" -name '*.apk' -type f | while read -r f; do
+                  scan_file "$f" "artifact:$name($id)/$(basename "$f")"
+                done
+              fi
+              rm -rf "art/$id"
+            }
+            export -f art_one
+            while IFS=$'\t' read -r id name; do
+              printf '%s\0%s\0' "$id" "$name"
+            done < arts.tsv | xargs -0 -P 4 -n 2 bash -c 'art_one "$@"' _
+          fi
+
+          if [ ! -f results/match_src ]; then
+            echo "::error title=no-match::sha256 $TARGET_SHA not found in ANY release asset or CI artifact (all scanned hashes are in apk-sha notices)"
             exit 1
           fi
-          found_tag=$(cat results/match_tag)
-          found_name=$(cat results/match_name)
-          echo "MATCH: $found_tag / $found_name"
 
-          echo "== Collect the full + noruntime pair from the same source release"
+          found_src=$(cat results/match_src)
+          echo "MATCH: $found_src"
+
+          echo "== Resolve the full + noruntime pair"
+          # source form: "<tag>/<asset>" for releases, "artifact:<name>(<id>)/<file>" for artifacts
+          found_tag="${found_src%%/*}"
+          : > SHA256SUMS
+          if printf '%s' "$found_tag" | grep -q '^artifact:'; then
+            echo "::error title=artifact-source::match came from a CI artifact ($found_src); pair resolution for artifacts is not wired up"
+            exit 2
+          fi
           src_body=$(gh api "repos/$repo/releases/tags/$found_tag" --jq '.body // ""' < /dev/null)
           gh api "repos/$repo/releases/tags/$found_tag" --jq '.assets[] | select(.name | endswith(".apk")) | .name' < /dev/null | sort -u > siblings.txt
-          : > SHA256SUMS
           while read -r sib; do
             [ -z "$sib" ] && continue
-            if [ "$sib" = "$found_name" ] && [ -f "scan/$found_name" ]; then
-              f="scan/$found_name"
-            else
-              gh release download "$found_tag" -p "$sib" -D scan --clobber -R "$repo" < /dev/null
-              f="scan/$sib"
-            fi
+            gh release download "$found_tag" -p "$sib" -D "scan/$found_tag" --clobber -R "$repo" < /dev/null
+            f="scan/$found_tag/$sib"
             ssha=$(sha256sum "$f" | awk '{print $1}')
             case "$sib" in
               *noruntime*) base="Aerix-Launcher-$NEW_VERSION-noruntime.apk";;
@@ -105,7 +139,7 @@ jobs:
             echo "Re-release of the exact binary identified by"
             echo "\`sha256:$TARGET_SHA\` as version $NEW_VERSION."
             echo ""
-            echo "Source artifact: \`$found_name\` from release \`$found_tag\`."
+            echo "Source artifact: \`$found_src\`."
             if [ -n "$target" ]; then echo "Built from commit \`$target\`."; fi
             echo ""
             echo "Checksums for every attachment are in \`SHA256SUMS\`."
@@ -114,4 +148,4 @@ jobs:
           create_args=(--repo "$repo" --title "Aerix Launcher $NEW_VERSION" --notes-file "$notes" --latest)
           if [ -n "$target" ]; then create_args+=(--target "$target"); fi
           gh release create "$NEW_TAG" "${create_args[@]}" out/*.apk SHA256SUMS < /dev/null
-          echo "::notice title=done::released $NEW_TAG from $found_tag / $found_name"
+          echo "::notice title=done::released $NEW_TAG from $found_src"
