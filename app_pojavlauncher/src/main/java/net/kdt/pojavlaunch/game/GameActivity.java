@@ -46,6 +46,7 @@ import com.kdt.LoggerView;
 
 import net.kdt.pojavlaunch.BaseActivity;
 import net.kdt.pojavlaunch.CallbackBridge;
+import net.kdt.pojavlaunch.aerix.ui.screens.social.SocialInGameOverlay;
 import net.kdt.pojavlaunch.game.renderer.def.Renderers;
 import net.kdt.pojavlaunch.game.renderer.impl.GLESRenderSpec;
 import net.kdt.pojavlaunch.game.renderer.RenderSpec;
