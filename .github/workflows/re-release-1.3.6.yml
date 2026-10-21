@@ -1,0 +1,112 @@
+name: manual re-release 1.3.6
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  TARGET_SHA: a75fdfeb6c22ebf0c772c0a4f83ab53c103e4ad81d8105789deb0df9ebc232f3
+  NEW_TAG: v1.3.6
+  NEW_VERSION: "1.3.6"
+
+jobs:
+  rerelease:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Locate APK by sha256 and re-release as 1.3.6
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -u
+          repo="${{ github.repository }}"
+          mkdir -p sums scan out
+
+          echo "== Pass 1: scan checksum assets (tiny files)"
+          gh api "repos/$repo/releases?per_page=100" --paginate \
+            --jq '.[] | .tag_name as $t | .assets[] | select(.name | test("SHA256|sha256|checksum"; "i")) | "\($t)\t\(.name)"' > sums_index.tsv || true
+          while IFS=$'\t' read -r tag name; do
+            [ -z "$tag" ] && continue
+            if gh release download "$tag" -p "$name" -D sums --clobber -R "$repo" 2>/dev/null; then
+              echo "::notice title=sums::$tag / $name: $(cat sums/"$name" | tr '\n' ';')"
+              grep -qi "$TARGET_SHA" "sums/$name" && echo "::notice title=index-hit::$TARGET_SHA appears in $tag / $name"
+            fi
+          done < sums_index.tsv
+
+          echo "== Pass 2: scan APK assets, newest release first, deduped by (tag,size)"
+          gh api "repos/$repo/releases?per_page=100" --paginate \
+            --jq '.[] | .tag_name as $t | .published_at as $p | .assets[] | select(.name | endswith(".apk")) | "\($p)\t\($t)\t\(.name)\t\(.size)"' \
+            | sort -r | awk -F'\t' '!seen[$2 FS $4]++' > apks.tsv
+          wc -l apks.tsv
+
+          found_tag=""; found_name=""; found_file=""
+          while IFS=$'\t' read -r pub tag name size; do
+            [ -z "$tag" ] && continue
+            echo "--- trying $tag / $name ($size bytes)"
+            if ! gh release download "$tag" -p "$name" -D scan --clobber -R "$repo"; then
+              echo "::warning title=dl-fail::$tag / $name"
+              continue
+            fi
+            sha=$(sha256sum "scan/$name" | awk '{print $1}')
+            echo "::notice title=apk-sha::$tag / $name = $sha"
+            if [ "$sha" = "$TARGET_SHA" ]; then
+              found_tag="$tag"; found_name="$name"; found_file="scan/$name"
+              break
+            fi
+            rm -f "scan/$name"
+          done < apks.tsv
+
+          if [ -z "$found_tag" ]; then
+            echo "::error title=no-match::no release APK matched sha256 $TARGET_SHA (scanned hashes are in apk-sha notices)"
+            exit 1
+          fi
+          echo "MATCH: $found_tag / $found_name"
+
+          echo "== Collect the full + noruntime pair from the same source release"
+          src_body=$(gh api "repos/$repo/releases/tags/$found_tag" --jq '.body // ""')
+          gh api "repos/$repo/releases/tags/$found_tag" --jq '.assets[] | select(.name | endswith(".apk")) | .name' | sort -u > siblings.txt
+          : > SHA256SUMS
+          while read -r sib; do
+            [ -z "$sib" ] && continue
+            if [ "$sib" = "$found_name" ]; then f="$found_file"; else
+              gh release download "$found_tag" -p "$sib" -D scan --clobber -R "$repo"
+              f="scan/$sib"
+            fi
+            ssha=$(sha256sum "$f" | awk '{print $1}')
+            case "$sib" in
+              *noruntime*) base="Aerix-Launcher-$NEW_VERSION-noruntime.apk";;
+              *) base="Aerix-Launcher-$NEW_VERSION.apk";;
+            esac
+            cp "$f" "out/$base"
+            echo "$ssha  $base" >> SHA256SUMS
+          done < siblings.txt
+
+          echo "== Mirror the v1.3.x unversioned duplicate names"
+          for f in out/*.apk; do
+            b=$(basename "$f")
+            unv=$(printf '%s' "$b" | sed "s/-$NEW_VERSION//")
+            cp "$f" "out/$unv"
+            grep "  $b\$" SHA256SUMS | sed "s/  $b\$/  $unv/" >> SHA256SUMS
+          done
+          sort -u SHA256SUMS -o SHA256SUMS
+          cat SHA256SUMS
+
+          target=$(printf '%s' "$src_body" | grep -oE 'build of [0-9a-f]{7,40}' | awk '{print $3}' | head -1)
+
+          notes=$(mktemp)
+          {
+            echo "Re-release of the exact binary identified by"
+            echo "\`sha256:$TARGET_SHA\` as version $NEW_VERSION."
+            echo ""
+            echo "Source artifact: \`$found_name\` from release \`$found_tag\`."
+            if [ -n "$target" ]; then echo "Built from commit \`$target\`."; fi
+            echo ""
+            echo "Checksums for every attachment are in \`SHA256SUMS\`."
+          } > "$notes"
+
+          create_args=(--repo "$repo" --title "Aerix Launcher $NEW_VERSION" --notes-file "$notes" --latest)
+          if [ -n "$target" ]; then create_args+=(--target "$target"); fi
+          gh release create "$NEW_TAG" "${create_args[@]}" out/*.apk SHA256SUMS
+          echo "::notice title=done::released $NEW_TAG from $found_tag / $found_name"
