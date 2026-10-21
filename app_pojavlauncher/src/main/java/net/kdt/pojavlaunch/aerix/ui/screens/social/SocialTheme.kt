@@ -146,12 +146,8 @@ fun socialDialogModifier(): Modifier {
         animationSpec = tween(SocialMotion.DIALOG_MS),
         label = "socialDialogEnter"
     )
-    return Modifier.graphicsLayer {
-        alpha = progress
-        val scale = SocialMotion.DIALOG_INITIAL_SCALE + (1f - SocialMotion.DIALOG_INITIAL_SCALE) * progress
-        scaleX = scale
-        scaleY = scale
-    }
+    val scale = SocialMotion.DIALOG_INITIAL_SCALE + (1f - SocialMotion.DIALOG_INITIAL_SCALE) * progress
+    return Modifier.graphicsLayer(scaleX = scale, scaleY = scale, alpha = progress)
 }
 
 /** Card surface for Social. Fixed panel color and border; no glass, no wallpaper. */
