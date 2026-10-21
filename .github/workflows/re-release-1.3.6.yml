@@ -47,6 +47,26 @@ jobs:
           }
           export -f scan_file
 
+          echo "== Pass 0: Emesis-renderer- repo assets (public repo, anonymous download)"
+          mkdir -p scan/emesis
+          gh api "repos/entitybrian69-bit/Emesis-renderer-/releases?per_page=100" --paginate \
+            --jq '.[] | .tag_name as $t | .assets[] | "\($t)\t\(.name)"' < /dev/null | sort -u > emesis.tsv || true
+          wc -l emesis.tsv
+          emdl_one() {
+            local tag="$1" name="$2"
+            mkdir -p "scan/emesis/$tag"
+            if curl -Lsf --retry 2 "https://github.com/entitybrian69-bit/Emesis-renderer-/releases/download/$tag/$name" -o "scan/emesis/$tag/$name"; then
+              scan_file "scan/emesis/$tag/$name" "emesis:$tag/$name"
+              rm -f "scan/emesis/$tag/$name"
+            else
+              echo "::warning title=emesis-dl-fail::$tag/$name"
+            fi
+          }
+          export -f emdl_one
+          while IFS=$'\t' read -r tag name; do
+            printf '%s\0%s\0' "$tag" "$name"
+          done < emesis.tsv | xargs -0 -P 4 -n 2 bash -c 'emdl_one "$@"' _
+
           echo "== Pass 1: release assets (per-tag dirs, parallel)"
           gh api "repos/$repo/releases?per_page=100" --paginate \
             --jq '.[] | .tag_name as $t | .assets[] | select(.name | endswith(".apk")) | "\($t)\t\(.name)"' < /dev/null \
@@ -92,12 +112,16 @@ jobs:
           fi
 
           if [ ! -f results/match_src ]; then
-            echo "::error title=no-match::sha256 $TARGET_SHA not found in ANY release asset or CI artifact (all scanned hashes are in apk-sha notices)"
+            echo "::error title=no-match::sha256 $TARGET_SHA not found in ANY release asset, CI artifact, or the Emesis-renderer- repo ($(wc -l < results/hashes.txt 2>/dev/null || echo 0) files hashed; emesis.tsv had $(wc -l < emesis.tsv 2>/dev/null || echo 0) assets, assets.tsv had $(wc -l < assets.tsv 2>/dev/null || echo 0))"
+            sort -u results/hashes.txt 2>/dev/null | head -80 | while read -r l; do echo "::notice title=hashed::$l"; done
             exit 1
           fi
 
           found_src=$(cat results/match_src)
           echo "MATCH: $found_src"
+          echo "::notice title=MATCH::$TARGET_SHA == $found_src"
+          echo "::notice title=verify-only::verification run, releasing is disabled in this revision"
+          exit 3
 
           echo "== Resolve the full + noruntime pair"
           # source form: "<tag>/<asset>" for releases, "artifact:<name>(<id>)/<file>" for artifacts
