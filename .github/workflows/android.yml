@@ -13,6 +13,7 @@ jobs:
       contents: write   # publish the finished APK as a pre-release
     env:
       POJAV_GPLAY_KEYSTORE_PASSWORD: ${{ secrets.POJAV_GPLAY_KEYSTORE_PASSWORD }}
+      POJAV_KEYSTORE_PASSWORD: ${{ secrets.POJAV_KEYSTORE_PASSWORD }}
       CURSEFORGE_API_KEY: ${{ secrets.CURSEFORGE_API_KEY }}
     steps:
       - name: Checkout
@@ -78,17 +79,33 @@ jobs:
           gradle :app_pojavlauncher:assembleNoruntimeDebug 2>&1 | tee build-noruntime.log
           mv app_pojavlauncher/build/outputs/apk/noruntime/debug/app_pojavlauncher-noruntime-debug.apk out/app-debug-noruntime.apk
 
+      - name: Build Release .apk (Full)
+        shell: bash
+        run: |
+          # The release variant is what ships: not debuggable, package id net.kdt.pojavlaunch.
+          set -o pipefail
+          gradle :app_pojavlauncher:assembleFullRelease 2>&1 | tee build-release-full.log
+          mv app_pojavlauncher/build/outputs/apk/full/release/app_pojavlauncher-full-release.apk out/app-release-full.apk
+
+      - name: Build Release .apk (No runtime)
+        shell: bash
+        run: |
+          set -o pipefail
+          gradle :app_pojavlauncher:assembleNoruntimeRelease 2>&1 | tee build-release-noruntime.log
+          mv app_pojavlauncher/build/outputs/apk/noruntime/release/app_pojavlauncher-noruntime-release.apk out/app-release-noruntime.apk
+
       - name: Report Gradle errors
         if: failure()
         shell: bash
         run: |
           # One annotation carries every matching line; GitHub only shows ten annotations per
           # step, and a Kotlin build can produce more errors than that.
-          errors=$({ grep -aEh '^e: ' build-full.log build-noruntime.log 2>/dev/null | head -25
-            grep -aEh 'error: |Execution failed|What went wrong|FAILED|Could not|Caused by' build-full.log build-noruntime.log 2>/dev/null | head -35
+          logs="build-full.log build-noruntime.log build-release-full.log build-release-noruntime.log"
+          errors=$({ grep -aEh '^e: ' $logs 2>/dev/null | head -25
+            grep -aEh 'error: |Execution failed|What went wrong|FAILED|Could not|Caused by' $logs 2>/dev/null | head -35
           } | sed 's/%/%25/g' | tr '\n' '|' | cut -c1-6000)
           echo "::error title=gradle errors::${errors:-no error line matched}"
-          for log in build-full.log build-noruntime.log; do
+          for log in $logs; do
             [ -f "$log" ] && echo "::error title=gradle $log tail::$(tail -c 1200 "$log" | tr '\n' '|' | sed 's/%/%25/g')"
           done
           exit 0
@@ -97,6 +114,8 @@ jobs:
         run: |
           md5sum out/app-debug-full.apk > out/app-debug-full.md5
           md5sum out/app-debug-noruntime.apk > out/app-debug-noruntime.md5
+          md5sum out/app-release-full.apk > out/app-release-full.md5
+          md5sum out/app-release-noruntime.apk > out/app-release-noruntime.md5
 
       - name: Upload Debug APK (Full)
         uses: actions/upload-artifact@v4
@@ -110,6 +129,18 @@ jobs:
           name: app-debug-noruntime
           path: out/app-debug-noruntime.apk
 
+      - name: Upload Release APK (Full)
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-full
+          path: out/app-release-full.apk
+
+      - name: Upload Release APK (No runtime)
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-noruntime
+          path: out/app-release-noruntime.apk
+
       - name: Upload AAB
         uses: actions/upload-artifact@v4
         with:
@@ -119,16 +150,31 @@ jobs:
       - name: Publish build APK
         # A workflow artifact needs a signed-in GitHub session to download, and the phone that
         # installs this build does not have one. A pre-release puts the APK behind a plain link.
+        # Release variant only: it is the one that ships, not debuggable, package net.kdt.pojavlaunch.
         if: github.event_name == 'push' && github.ref_name == 'arena/da25bc48-aerix-launcher'
         continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Empty when the repository has no release keystore secret, in which case build.gradle
+          # signs the release variant with the committed debug key and this note tells the truth.
+          RELEASE_KEY: ${{ secrets.POJAV_KEYSTORE_PASSWORD }}
         shell: bash
         run: |
           tag="build-${GITHUB_RUN_ID}"
-          notes="Debug build of ${GITHUB_SHA:0:7} from ${GITHUB_REF_NAME}. No-runtime APK: it fetches the Java runtime it needs on first launch, so the download stays small. Installs next to a release build because the debug variant uses the .debug application id."
-          gh release create "$tag" out/app-debug-noruntime.apk \
-            --title "Aerix build ${GITHUB_RUN_NUMBER} (debug)" \
+          if [ -n "$RELEASE_KEY" ]; then
+            signing="Signed with the repository release key, so it upgrades the installed release build."
+          else
+            signing="No release keystore password is configured for this repository, so the release variant is signed with the debug key: uninstall an existing Aerix release build before installing this one."
+          fi
+          notes="Release build of ${GITHUB_SHA:0:7} from ${GITHUB_REF_NAME}. $signing
+
+          Two APKs: the full one bundles the Java runtime, the no-runtime one downloads it on first launch and is much smaller. Both are the release variant, not debuggable."
+          cp out/app-release-noruntime.apk "Aerix-Launcher-${GITHUB_RUN_NUMBER}-release-noruntime.apk"
+          cp out/app-release-full.apk "Aerix-Launcher-${GITHUB_RUN_NUMBER}-release.apk"
+          gh release create "$tag" \
+            "Aerix-Launcher-${GITHUB_RUN_NUMBER}-release.apk" \
+            "Aerix-Launcher-${GITHUB_RUN_NUMBER}-release-noruntime.apk" \
+            --title "Aerix Launcher ${GITHUB_RUN_NUMBER} (release)" \
             --notes "$notes" \
             --prerelease \
             --target "$GITHUB_SHA"

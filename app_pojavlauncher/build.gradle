@@ -60,6 +60,19 @@ android {
         abortOnError false
     }
 
+    // The release keystore is committed, but its password is a repository secret. Signing with a
+    // null password fails only after the whole APK has been assembled, which wastes a full build;
+    // when the secret is missing (local builds, forks, a repository without it) the release
+    // variant is signed with the committed debug keystore instead, and the build says so.
+    // An APK signed that way installs fine but cannot upgrade an APK signed with the real key.
+    def releaseStorePassword = System.getenv("POJAV_KEYSTORE_PASSWORD")
+    def releaseKeyStore = releaseStorePassword ? "pojav_release.jks" : "debug.keystore"
+    def releaseKeyAlias = releaseStorePassword ? "android_github_release" : "androiddebugkey"
+    def releaseKeyPassword = releaseStorePassword ?: "android"
+    if (!releaseStorePassword) {
+        logger.warn('BUILD: POJAV_KEYSTORE_PASSWORD is not set; the release variant will be signed with the debug key')
+    }
+
     signingConfigs {
         customDebug {
             storeFile file("debug.keystore")
@@ -68,10 +81,10 @@ android {
             keyPassword "android"
         }
         customRelease {
-            storeFile file("pojav_release.jks")
-            storePassword System.getenv("POJAV_KEYSTORE_PASSWORD")
-            keyAlias "android_github_release"
-            keyPassword System.getenv("POJAV_KEYSTORE_PASSWORD")
+            storeFile file(releaseKeyStore)
+            storePassword releaseKeyPassword
+            keyAlias releaseKeyAlias
+            keyPassword releaseKeyPassword
         }
         googlePlayBuild {
             storeFile file("pojav_gplay.jks")
