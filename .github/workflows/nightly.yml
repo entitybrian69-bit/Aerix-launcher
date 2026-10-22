@@ -1,22 +1,13 @@
 name: Nightly CI
 
-# Publishes a prerelease on GitHub. Like Release CI, it needs the owner's
-# confirmation; testing builds come from aerix-debug.yml instead.
-
 on:
   workflow_dispatch:
-    inputs:
-      confirm:
-        description: 'Type NIGHTLY to publish a prerelease'
-        required: true
-        default: ''
 
 permissions:
   contents: write
 
 jobs:
   build:
-    if: github.event.inputs.confirm == 'NIGHTLY'
     runs-on: ubuntu-22.04
     env:
       POJAVPUB_KEYSTORE_PASSWORD: ${{ secrets.POJAVPUB_KEYSTORE_PASSWORD }}

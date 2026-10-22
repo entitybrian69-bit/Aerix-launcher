@@ -4,9 +4,7 @@
  *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/game/plugin/PluginLoader.kt
  *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/game/plugin/renderer/RendererPlugin.kt
  *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/game/plugin/renderer/RendererPluginManager.kt
- * Discovers every installed renderer plugin APK. A host opts in with one of these meta-data markers:
- *   fclPlugin, fclPlugin_V2 (Fold Craft Launcher), zalithRendererPlugin (Zalith Launcher 2),
- *   pojavRendererPlugin, aerixPlugin, emesisPlugin (the com.emesis package space counts implicitly)
+ * Discovers installed FCL / Zalith renderer plugin APKs (meta-data fclPlugin or zalithRendererPlugin)
  * and registers each one in PojavLauncher's RendererCache as an external RenderSpec (tag
  * "plugin:<packageName>") without modifying Pojav's backend classes. When a plugin renderer is
  * selected, applyLaunchOverride() replaces the instance's GameRenderer spec at launch time so
@@ -134,25 +132,10 @@ class AerixRendererPlugin(
 
 object PojavPluginBridge {
     private const val PACKAGE_FLAGS = PackageManager.GET_META_DATA or PackageManager.GET_SHARED_LIBRARY_FILES
-    private const val EMESIS_PACKAGE_PREFIX = "com.emesis"
-    private const val EMESIS_RENDERER_ID = "emesis"
-    private const val EMESIS_LIBRARY = "libemesis.so"
-
-    /** Meta-data keys that mark an APK as a renderer plugin, checked in this order. */
-    private val PLUGIN_MARKERS = listOf(
-        "fclPlugin",
-        "fclPlugin_V2",
-        "zalithRendererPlugin",
-        "pojavRendererPlugin",
-        "aerixPlugin",
-        "emesisPlugin"
-    )
 
     var plugins: List<AerixRendererPlugin> = emptyList()
         private set
 
-    @JvmStatic
-    @JvmOverloads
     @SuppressLint("QueryPermissionsNeeded")
     fun loadPlugins(context: Context, force: Boolean = false): List<AerixRendererPlugin> {
         if (plugins.isNotEmpty() && !force) {
@@ -185,16 +168,6 @@ object PojavPluginBridge {
         return plugins
     }
 
-    /** Rescans installed packages and rebuilds the renderer list, used when a plugin APK changes. */
-    @JvmStatic
-    fun refreshPlugins(context: Context) {
-        runCatching { RendererCache.releaseRendererCache() }
-        loadPlugins(context.applicationContext ?: context, force = true)
-    }
-
-    /** Display name for a renderer tag, including the "plugin:" tags. */
-    fun labelForTag(tag: String?): String? = findByTag(tag)?.displayName
-
     fun findByTag(tag: String?): AerixRendererPlugin? {
         if (tag == null || !tag.startsWith(AerixRendererPlugin.TAG_PREFIX)) return null
         return plugins.firstOrNull { it.pluginTag == tag }
@@ -217,18 +190,6 @@ object PojavPluginBridge {
         gameRenderer.setCurrentRenderer(plugin)
     }
 
-    /** First meta-data marker declaring the package a renderer plugin, or the implicit Emesis one. */
-    private fun pluginMarker(meta: Bundle, packageName: String): String? {
-        for (key in PLUGIN_MARKERS) {
-            if (key == "fclPlugin_V2") {
-                if (meta.containsKey(key)) return key
-                continue
-            }
-            if (meta.getBoolean(key, false)) return key
-        }
-        return if (packageName.startsWith(EMESIS_PACKAGE_PREFIX)) "emesisPlugin" else null
-    }
-
     private fun parsePlugin(
         context: Context,
         pm: PackageManager,
@@ -236,8 +197,9 @@ object PojavPluginBridge {
     ): AerixRendererPlugin? = runCatching {
         if (info.flags and ApplicationInfo.FLAG_SYSTEM != 0 || RetiredRendererCleanup.isRetiredPackage(info.packageName)) return null
         val meta = info.metaData ?: return null
-        val marker = pluginMarker(meta, info.packageName) ?: return null
-        val emesisStyle = marker == "emesisPlugin" || marker == "aerixPlugin"
+        val isFcl = meta.getBoolean("fclPlugin", false)
+        val isZalith = meta.getBoolean("zalithRendererPlugin", false)
+        if (!isFcl && !isZalith && !meta.containsKey("fclPlugin_V2")) return null
         if (meta.containsKey("fclPlugin_V2")) {
             val plugin = runCatching {
                 val metadata = when (val value = meta.get("fclPlugin_V2")) {
@@ -263,15 +225,16 @@ object PojavPluginBridge {
             // A malformed/unsupported V2 config may still supply valid legacy metadata.
         }
 
-        val parts = meta.getString("renderer")?.split(":") ?: emptyList()
-        if (!emesisStyle && parts.size < 3) return null
-        val des = meta.getString("des") ?: if (emesisStyle) "Emesis" else info.loadLabel(pm).toString()
+        val rendererRaw = meta.getString("renderer") ?: return null
+        val parts = rendererRaw.split(":")
+        if (parts.size < 3) return null
+        val des = meta.getString("des") ?: info.loadLabel(pm).toString()
         val pojavEnv = meta.getString("pojavEnv") ?: ""
         val nativeDir = info.nativeLibraryDir ?: return null
         val appName = info.loadLabel(pm).toString()
         val appVersion = runCatching { pm.getPackageInfo(info.packageName, 0).versionName ?: "" }.getOrDefault("")
 
-        var rendererId = if (parts.size >= 3) parts[0] else EMESIS_RENDERER_ID
+        var rendererId = parts[0]
         val env = LinkedHashMap<String, String>()
         val dlopen = ArrayList<String>()
         pojavEnv.split(":").forEach { pair ->
@@ -288,9 +251,7 @@ object PojavPluginBridge {
             }
         }
 
-        val glName = if (parts.size >= 3) parts[1] else EMESIS_LIBRARY
-        val eglRaw = if (parts.size >= 3) parts[2] else EMESIS_LIBRARY
-        if (parts.size < 3 && EMESIS_LIBRARY !in dlopen) dlopen.add(EMESIS_LIBRARY)
+        val eglRaw = parts[2]
         val eglName = if (eglRaw.startsWith("/")) "$nativeDir$eglRaw" else eglRaw
 
         AerixRendererPlugin(
@@ -302,7 +263,7 @@ object PojavPluginBridge {
             summary = "Plugin: $appName",
             minMCVer = meta.versionString("minMCVer"),
             maxMCVer = meta.versionString("maxMCVer"),
-            glName = glName,
+            glName = parts[1],
             eglName = eglName,
             nativeLibDir = nativeDir,
             env = env,

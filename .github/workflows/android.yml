@@ -28,6 +28,7 @@ jobs:
         uses: dawidd6/action-download-artifact@v6
         continue-on-error: true
         with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
           repo: MojoLauncher/LTW
           workflow: android.yml
           workflow_conclusion: success
@@ -59,34 +60,124 @@ jobs:
           gradle :app_pojavlauncher:bundleFullGplay
           mv app_pojavlauncher/build/outputs/bundle/fullGplay/app_pojavlauncher-full-gplay.aab out/app-gplay.aab
 
-      - name: Build Debug .apk (Full)
+      # A failed Gradle build only leaves "Process completed with exit code 1" in the job, and the
+      # log files themselves are not reachable from everywhere, so the compiler errors are repeated
+      # as annotations: those are always readable through the API.
+      # A failed Gradle build only leaves "Process completed with exit code 1" in the job, and the
+      # log files themselves are not reachable from everywhere, so the compiler errors are repeated
+      # as annotations: those are always readable through the API. One annotation carries all of
+      # them, because GitHub only shows ten annotations per step and a build can carry more errors.
+      - name: Prepare the failure reporter
+        shell: bash
         run: |
-          # Build the launcher
-          gradle :app_pojavlauncher:assembleFullDebug
-          mv app_pojavlauncher/build/outputs/apk/full/debug/app_pojavlauncher-full-debug.apk out/app-debug-full.apk
+          cat > report_gradle_failure.sh <<'HELPER'
+          report_gradle_failure() {
+            label=$1
+            log=$2
+            errors=$(grep -E '^e: |error: |Execution failed|What went wrong|FAILED|Could not|Caused by' "$log" \
+              | head -60 | sed 's/%/%25/g; s/\r//g' | tr '\n' '|' | cut -c1-6000)
+            echo "::error title=gradle $label::${errors:-no error line matched}"
+            tailmsg=$(tail -c 1500 "$log" | tr '\n' '|' | sed 's/%/%25/g')
+            echo "::error title=gradle $label tail::$tailmsg"
+          }
+          HELPER
+          cat report_gradle_failure.sh
 
-      - name: Build Debug .apk (No runtime)
+      - name: Packaging policy tests
+        run: python3 -m unittest discover -s scripts/tests -p 'test_*.py' -v
+
+      - name: Launcher regression tests
+        shell: bash
         run: |
-         # Build the launcher (without jre8 installed)
-          gradle :app_pojavlauncher:assembleNoruntimeDebug
-          mv app_pojavlauncher/build/outputs/apk/noruntime/debug/app_pojavlauncher-noruntime-debug.apk out/app-debug-noruntime.apk
+          if ! gradle :app_pojavlauncher:testNoruntimeReleaseUnitTest 2>&1 | tee regression-tests.log; then
+            python3 - <<'PYREPORT'
+          import glob, xml.etree.ElementTree as ET
+          def annotate(title, text):
+              text = text[:5000].replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+              print(f'::error title={title}::{text}')
+          count = 0
+          for file in glob.glob('app_pojavlauncher/build/test-results/**/*.xml', recursive=True):
+              for case in ET.parse(file).getroot().iter('testcase'):
+                  failure = case.find('failure')
+                  if failure is None:
+                      failure = case.find('error')
+                  if failure is not None and count < 8:
+                      annotate(case.get('classname', '') + '.' + case.get('name', ''), failure.get('message', '') + '\n' + (failure.text or ''))
+                      count += 1
+          if not count:
+              annotate('regression test failure', open('regression-tests.log').read()[-5000:])
+          PYREPORT
+            exit 1
+          fi
+
+      - name: Upload regression test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: launcher-regression-reports
+          path: app_pojavlauncher/build/test-results/
+
+      - name: Build Release .apk (Full)
+        shell: bash
+        run: |
+          . ./report_gradle_failure.sh
+          assert_apk() {
+            [ -f "$2" ] || { echo "::error title=missing apk::$2 was not produced"; ls -R app_pojavlauncher/build/outputs/apk || true; exit 1; }
+            mv "$2" "$3"
+          }
+          if ! gradle :app_pojavlauncher:assembleFullRelease 2>&1 | tee build-full.log; then
+            report_gradle_failure full build-full.log
+            exit 1
+          fi
+          # Build the launcher
+          assert_apk full app_pojavlauncher/build/outputs/apk/full/release/app_pojavlauncher-full-release.apk out/app-release-full.apk
+
+      - name: Build Release .apk (No runtime)
+        shell: bash
+        run: |
+          . ./report_gradle_failure.sh
+          if ! gradle :app_pojavlauncher:assembleNoruntimeRelease 2>&1 | tee build-noruntime.log; then
+            report_gradle_failure noruntime build-noruntime.log
+            exit 1
+          fi
+          # Build the launcher (without jre8 installed)
+          [ -f app_pojavlauncher/build/outputs/apk/noruntime/release/app_pojavlauncher-noruntime-release.apk ] \
+            || { echo "::error title=missing apk::the noruntime apk was not produced"; ls -R app_pojavlauncher/build/outputs/apk || true; exit 1; }
+          mv app_pojavlauncher/build/outputs/apk/noruntime/release/app_pojavlauncher-noruntime-release.apk out/app-release-noruntime.apk
+
+      - name: Native FPS counter regression test
+        run: |
+          cc -std=c11 -pthread -I app_pojavlauncher/src/main/jni/fps \
+            app_pojavlauncher/src/main/jni/fps/frame_counter.c \
+            app_pojavlauncher/src/test/native/frame_counter_test.c -o "$RUNNER_TEMP/fps-counter-test"
+          "$RUNNER_TEMP/fps-counter-test"
+
+      - name: Verify removed renderer is absent from APKs
+        run: python3 scripts/verify_removed_renderer.py out/app-release-full.apk out/app-release-noruntime.apk
 
       - name: Gen md5sums
         run: |
-          md5sum out/app-debug-full.apk > out/app-debug-full.md5
-          md5sum out/app-debug-noruntime.apk > out/app-debug-noruntime.md5
+          sha256sum out/app-release-full.apk out/app-release-noruntime.apk > out/SHA256SUMS
+          md5sum out/app-release-full.apk > out/app-release-full.md5
+          md5sum out/app-release-noruntime.apk > out/app-release-noruntime.md5
 
-      - name: Upload Debug APK (Full)
+      - name: Upload APK SHA-256 checksums
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug
-          path: out/app-debug-full.apk
+          name: apk-sha256
+          path: out/SHA256SUMS
 
-      - name: Upload Debug APK (No runtime)
+      - name: Upload Release APK (Full)
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug-noruntime
-          path: out/app-debug-noruntime.apk
+          name: app-release
+          path: out/app-release-full.apk
+
+      - name: Upload Release APK (No runtime)
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-noruntime
+          path: out/app-release-noruntime.apk
 
       - name: Upload AAB
         uses: actions/upload-artifact@v4

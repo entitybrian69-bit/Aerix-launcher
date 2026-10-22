@@ -1,159 +1,158 @@
-# Aerix Launcher — Minecraft: Java Edition on Android
+<div align="center">
 
-<p align="center">
-  <img src="assets/aerix-logo.png" alt="Aerix Launcher logo" width="160" />
-</p>
+<img src="assets/aerix-logo.png" alt="Aerix Launcher logo" width="160" />
 
-<p align="center">
-  <strong>✨ 🚀 AERIX LAUNCHER</strong><br>
-  <em>Minecraft: Java Edition on Android</em><br>
-  Hand-built. Privately kept. Tested on real phones. Maintained by its owner.
-</p>
+# ✨ 🚀 AERIX LAUNCHER
+### Minecraft: Java Edition on Android
 
-<p align="center">
-  <a href="https://github.com/entitybrian69-bit/Aerix-launcher/releases"><img src="https://img.shields.io/badge/Platform-Android%208.0%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Platform"></a>
-  <a href="#-quality-bar"><img src="https://img.shields.io/badge/100%25-Human%20Made-7C3AED?style=for-the-badge" alt="Human Made"></a>
-  <a href="#-the-team"><img src="https://img.shields.io/badge/Maintained%20by-entitybrian-F59E0B?style=for-the-badge" alt="Team"></a>
-  <a href="#%EF%B8%8F-private-on-purpose"><img src="https://img.shields.io/badge/Privacy-No%20Trackers-111827?style=for-the-badge" alt="Privacy"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPL--3.0-blue?style=for-the-badge" alt="License"></a>
-  <a href="https://github.com/entitybrian69-bit/Aerix-launcher/releases"><img src="https://img.shields.io/github/downloads/entitybrian69-bit/Aerix-launcher/total?style=for-the-badge&logo=github&color=green" alt="Downloads"></a>
-  <a href="https://discord.gg/RS7q9KaCm6"><img src="https://img.shields.io/badge/Discord-Community%20%26%20suggestions-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord"></a>
-</p>
+**Hand-built. Privately kept. Tested on real phones. Maintained by its owners.**
 
-***
+[![Release](https://img.shields.io/github/v/release/entitybrian69-bit/Aerix-launcher?style=for-the-badge&label=release&color=0EA5A0)](https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest)
+[![Platform](https://img.shields.io/badge/Platform-Android%208.0%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest)
+[![Human Made](https://img.shields.io/badge/100%25-Human%20Made-7C3AED?style=for-the-badge)](https://github.com/entitybrian69-bit/Aerix-launcher)
+[![Team](https://img.shields.io/badge/Maintained%20by-entitybrian-F59E0B?style=for-the-badge)](https://github.com/entitybrian69-bit)
+[![Privacy](https://img.shields.io/badge/Privacy-No%20Trackers-111827?style=for-the-badge)](https://github.com/entitybrian69-bit/Aerix-launcher)
+[![License](https://img.shields.io/badge/License-GPL--3.0-blue?style=for-the-badge)](LICENSE)
+[![Discord](https://img.shields.io/badge/Discord-Community%20%26%20suggestions-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/RS7q9KaCm6)
 
-> ⚠️ **CRITICAL PROJECT REBOOT NOTICE (READ FIRST)**  
-> The legacy codebase of Aerix Launcher was completely discontinued and deleted by the developer due to unfixable internal architectural bugs. **This repository represents a completely fresh, optimized, written-from-scratch codebase.** Any historical download pages, third-party mirrors (such as old Appteka links), or legacy forks referencing old builds are completely obsolete and broken. **This is the single official, live, and actively maintained repository for Aerix Launcher.**
+▶ Play &nbsp;·&nbsp; 🔍 Discover &nbsp;·&nbsp; ⚙️ Settings &nbsp;·&nbsp; 👤 Offline accounts & capes &nbsp;·&nbsp; 🔒 Private by design
 
-***
+**[📥 Download Aerix Launcher](https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest/download/Aerix-Launcher.apk)** — the newest build, straight to the file
 
-## 🗺️ Quick Links
-<p align="center">
-  <strong>
-    <a href="#-install">▶ Play</a> &nbsp;·&nbsp; 
-    <a href="#-discover">🔍 Discover</a> &nbsp;·&nbsp; 
-    <a href="#%EF%B8%8F-settings">⚙️ Settings</a> &nbsp;·&nbsp; 
-    <a href="#-accounts-skins-and-capes">👤 Offline Accounts & Capes</a> &nbsp;·&nbsp; 
-    <a href="#%EF%B8%8F-private-on-purpose">🔒 Private by Design</a>
-  </strong>
-</p>
+Smaller download: **[no bundled runtime](https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest/download/Aerix-Launcher-noruntime.apk)** &nbsp;·&nbsp; [release notes](https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest)
+
+</div>
+
+---
 
 ## 📸 Screenshots
 
-**Home (No Top Bar):** The page starts cleanly at the very top of your mobile screen, keeping *Create a World*, *Open Library*, and *PLAY* exactly one touch away.  
+**Home** — no top bar: the page starts at the top of the screen, with Create a World, Open Library and PLAY one touch away.
 ![Home](assets/screenshots/shot-home.jpg)
 
-**Create New Instance:** The Minecraft version list takes over the left column (with the selected version clearly outlined by a check mark), flanked beautifully by a responsive modloader grid.  
+**Create New Instance** — the Minecraft version list owns the left column, the selected version is outlined with a check mark, and the modloader grid sits beside it.
 ![Create New Instance](assets/screenshots/shot-instances.jpg)
 
-**Discover:** Fully integrated window to browse and natively install mods, modpacks, shaders, and resource packs with modular filters for platform, category, game version, and loader framework.  
+**Discover** — browse and install mods, modpacks, shaders and resource packs, with filters for platform, category, game version and loader.
 ![Discover](assets/screenshots/shot-discover.jpg)
 
-**Wallpapers:** 25 built-in, HD custom Minecraft wallpapers—each housing its own tailored accent theme, dim controls, and support for external user imports.  
+**Wallpapers** — 25 built-in HD Minecraft wallpapers, each with its own accent theme, plus dim control and custom imports.
 ![Wallpapers](assets/screenshots/shot-wallpapers.jpg)
 
-**Renderers:** Pick your renderer, Vulkan driver configuration, and graphics API per-version, backed by a smart, automated recommended default template.  
+**Renderers** — renderer, Vulkan driver and graphics API, chosen per version with a recommended default.
 ![Renderers](assets/screenshots/shot-renderer.jpg)
 
-**Accounts & Skins:** Authenticate Microsoft, offline, or external auth-server accounts in tandem with a searchable three-column skin library featuring one-tap installations.  
-![Accounts & Skins](assets/screenshots/shot-accounts.jpg)
+**Accounts & skins** — add Microsoft, offline or auth-server accounts, then browse a searchable three-column skin library and install a skin in one tap.
+![Accounts and skins](assets/screenshots/shot-accounts.jpg)
 
 ---
 
-## 🏆 Why Aerix?
-Aerix Launcher brings Minecraft: Java Edition instances, renderers, accounts, and optimization tools neatly together under a single native Android client. 
+## 🏆 Why Aerix
 
-This is **not** a generic, automated app template. This is **not** a bloated team product with commercial analytics trackers bolted onto the side. It is a well-developed, frequently optimized launcher written and deeply tested by its sole owner on multiple physical test phones to ensure that the code which ships is the code that actually runs fluidly in your hands.
+Aerix Launcher brings Minecraft: Java Edition instances, renderers, accounts, and launcher tools together on Android.
 
-> ✨ **One Developer. Zero AI-generation. Real-device verified. Private by default.**
+It is not a generated app. It is not a team product with a tracker bolted on. It is a **well-developed, frequently updated** launcher, written and tested by **its owners** on more than one phone, so the thing that ships is the thing that actually runs in a hand.
 
----
-
-## ⚙️ Tools For Your Setup
-Aerix natively organizes launcher layouts, renderer stacks, and instance folders inside one clean workspace.
-
-*   **⚡ Quick Access:** Your most recently launched singleplayer worlds and instances stay right on the main dashboard.
-*   **🧩 Serious Render Stack:** Pick the exact engine that maps to your SoC. LTW and LTW Legacy are built completely from source in this repository (covering Minecraft 1.17+ and 1.8–1.16.5 respectively), alongside GL4ES, VirGL, Zink-class (Vulkan), and Mesa architectures. Aerix also bundles MobileGlues for 1.17+, dual VGPU parameters for 1.16.5 and older, and automatically configures the best default renderer on boot.
-*   **🧮 Smart RAM Allocation:** A global memory allocation slider paired with per-instance overrides for running dense modpacks.
-*   **📱 Universal UI Pass:** Responsive UI scaling, menu layouts, skins, and launch hooks are verified across multiple device displays.
-*   **🛠️ Agile Deployment:** Polish passes and bug fixes land regularly, with an open automated check hook mapping straight to the GitHub Releases API.
+> ✨ One developer. Zero AI. Real devices. Private by default.
 
 ---
 
-## 🛡️ Private. On Purpose.
-Aerix respects user privacy. Your worlds are yours. Your accounts are yours. Aerix does not take a cut or a look at either.
+## ⚙️ Tools for your setup
 
-*   🚫 **No Ads:** No popups, banners, or monetization layers.
-*   🚫 **No Telemetry:** Zero analytics trackers, hidden logs, or user reporting data streams.
-*   🚫 **No Harvesting:** No profiling, credential logging, or account caching.
-*   🔒 **Local-First Security:** Profiles, custom skins, and capes remain strictly isolated on your device storage unless you deliberately initiate a login that explicitly requests a remote server connection.
-*   📦 **GPL-3.0 Verification:** Fully open-source code so the internal application mechanics are completely inspectable by anyone.
+Aerix keeps launcher controls, renderer options, and instance management in one place.
 
----
-
-## 👤 Accounts, Skins, and Capes
-*   **👤 Offline Profiles:** Create an instantaneous local username without region restrictions or network locks. 
-*   **👕 Skin Customization:** Equip any standard Java format skin onto offline accounts.
-*   **🧥 Cape Customization:** Full companion support for rendering local capes on local offline profiles.
-*   **🌐 Microsoft Integration:** Secure OAuth login endpoints for native Java Edition accounts that legitimately own the game.
-*   **🔑 Yggdrasil Support:** Native integration for authenticating against alternative third-party login/auth servers.
-*   **🖼️ 3D Previews:** Includes a fully animated 3D skin viewer so you can check your character cosmetics before spinning up the Java engine.
+- ⚡ **Quick access** — recent worlds and instances stay one tap away.
+- 🧩 **Serious render stack** — choose the renderer that fits the device. LTW and LTW Legacy are built from source in this repository and cover Minecraft 1.17+ and 1.8–1.16.5 respectively, alongside GL4ES, VirGL, Zink-class, and Mesa options. Aerix also bundles **MobileGlues** for Minecraft 1.17+, two **VGPU** options for 1.16.5 and older, and selects the right renderer for each version automatically.
+- 🧮 **RAM that you control** — a global memory slider, plus per-instance overrides when a pack needs more.
+- 📱 **Checked across devices** — layouts, accounts, skins, and launch flow are tested beyond a single handset.
+- 🛠️ **Updated often** — fixes and polish land on a regular cadence, with a built-in update check against GitHub Releases.
 
 ---
 
-## 📋 Full Feature List
+## 🛡️ Private. On purpose.
+
+Aerix keeps your launcher private.
+
+- 🚫 **No ads**
+- 🚫 **No telemetry**
+- 🚫 **No account resale, no profile harvesting**
+- 🔒 Accounts, skins, and capes stay on the device unless you choose a login that needs the network
+- 📦 Open source under **GPL-3.0**, so the behavior is inspectable
+
+Your worlds are yours. Your accounts are yours. Aerix does not take a cut of either.
+
+---
+
+## 👤 Accounts, skins, and capes
+
+- 👤 **Offline accounts** — create a local username and select it. The radio stays selected. Worldwide. No region lock.
+- 👕 **Equip a skin** on that offline account.
+- 🧥 **Equip a cape** on that offline account.
+- 🌐 **Microsoft login** for Java Edition accounts that own the game.
+- 🔑 **Yggdrasil / auth-server login** for third-party servers.
+- 🖼️ **3D skin preview** so you can see the skin and cape before you launch.
+
+---
+
+## 📋 Full feature list
 
 ### ▶ Play
-*   Unified Play hub linking your file path library and recent worlds together.
-*   Instantly boot, tweak, duplicate, delete, and manage local directory instances.
-*   Personalize profiles using specialized instance icons (colors, symbols, or emojis).
-*   Sort directory structures using instance groups to segregate survival worlds from pack directories.
-*   Seamless manual version installations alongside individual game adjustments.
+- Unified Play hub for recent worlds and your library
+- Launch, edit, duplicate, delete, and manage instances
+- Instance icons — color, symbol, or emoji
+- Instance groups, so modpacks and survival worlds stay sorted
+- Version install and version settings
+- Per-instance and global game options
 
 ### 🔍 Discover
-*   Browse and install modpacks, standalone mods, resource packs, shaders, and custom maps.
-*   Sift through databases using full text searching, strict categories, and item favorites.
-*   Intelligent target down-patching: assets land directly into their corresponding instance directories rather than a generic downloads folder.
+- Browse and install **modpacks, mods, resource packs, shaders, and saves**
+- Search, filters, and favorites
+- Downloads that land in the right instance, not in a random folder
 
 ### ⚙️ Settings
-*   Full Material You / Material 3 interface integration supporting automatic light and dark styling matching your Android OS theme.
-*   Granular accent and background theme coloring controls.
-*   Direct version-by-version engine adjustments.
-*   Global memory sliders alongside discrete system profiling tools.
-*   Multi-language file maps.
-*   Clean about documentation confirming project ownership under **entitybrian**.
-*   Direct version updates using a strict GitHub Releases API lookup.
+- Material 3 interface, dark and light
+- Theme and accent control
+- Renderer selection
+- Global and per-instance RAM
+- Background and launcher appearance
+- Language support
+- About page — owner: **entitybrian**
+- Update checker via the GitHub Releases API
 
-### 🎮 In-Game Controls & System Utilities
-*   Modular touch control canvas editor allowing you to draft, position, and scale fully customized buttons and layouts.
-*   Native physical gamepad translation and controller remapping parameters.
-*   Integrated high-level file browser allowing users to tweak configurations, drop mods, move worlds, or run data backups directly inside the application.
-*   Per-instance multiplayer server tables supporting instant-connect shortcuts.
-*   Real-time system log output terminal for checking runtime exceptions or crash dumps.
-*   Direct zip/archive modpack imports.
-*   Uncompromised credit matrices—nothing is obscured to force an artificial "minimalist" appearance.
+### 🎮 In game and around it
+- Touch control editor, including custom layouts
+- Gamepad support and remapping
+- File manager inside the launcher — configs, mods, worlds, backups
+- Server list per instance, with quick connect
+- Log viewer when something goes wrong
+- Modpack import
+- License and credits screens kept reachable — nothing useful is stripped out to look “simpler”
 
----
-
-## 🛡️ Quality Bar
-*   **100% Human-Coded:** Pure handcrafted layout structure. No automated wrappers, no AI passes filling in layouts, and no generated scrap.
-*   **Owner Maintained:** The person who writes the modules is the person tracking issues, fixing dependencies, and addressing community reports.
-*   **Multi-Device Validation:** Built builds are rigorously evaluated on a cluster of different hardware configurations before moving into stable branches.
-*   **Continuous Debugging:** Automated Debug CI compiles on every commit and incoming pull request to safeguard against silent deployment breaks.
-
----
-
-## 🧰 Aerix at a Glance
-Aerix consolidates instance optimization, engine selection, profile customization, and in-app asset downloads inside an easy-to-use Android application packaging. Our code is distributed under the GNU General Public License v3.0, and our statements outline real capabilities without making generic, platform-wide marketing performance claims.
+### 🛡️ Quality bar
+- **100% human-made. Non-AI.** Every screen is developed, not generated.
+- **Owner maintenance** — the people who own the bugs are the people who fix them.
+- **Real-phone testing** on more than one device before a build is treated as good.
+- **Frequent updates**, with Debug CI on push and pull request so broken builds do not silently ship.
 
 ---
 
-## 👥 The Team
-<p align="center">
-  <img src="assets/team/entitybrian.jpg" width="140" alt="entitybrian"><br>
-  <strong>entitybrian</strong><br>
-  <sub>Owner, Core Developer, Tester, and Maintainer</sub>
-</p>
+## 🧰 Aerix at a glance
+
+Aerix brings Minecraft version and instance management, renderer options, account tools, content discovery, and launcher settings together in one Android app. Its source is available under GPL-3.0, and the feature details above describe what is included without making device-wide performance comparisons.
+
+---
+
+## 👥 The team
+
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <img src="assets/team/entitybrian.jpg" width="140" alt="entitybrian"><br>
+      <strong>entitybrian</strong><br>
+      <sub>Owner</sub>
+    </td>
+  </tr>
+</table>
 
 entitybrian designs, writes, tests, and ships Aerix Launcher.
 
@@ -165,7 +164,7 @@ That is why the product stays coherent: the people who add offline capes are the
 
 ## 📥 Install
 
-1. Download the latest APK from [Releases](https://github.com/entitybrian69-bit/Aerix-launcher/releases).
+1. Download the APK: **[Aerix-Launcher.apk](https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest/download/Aerix-Launcher.apk)** — the link always serves the newest build, and the download starts from it directly. No bundled runtime, smaller download: [Aerix-Launcher-noruntime.apk](https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest/download/Aerix-Launcher-noruntime.apk).
 2. Allow install from this source in Android settings.
 3. Open Aerix, add an offline account or sign in with Microsoft, equip a skin and cape, and play.
 
@@ -198,7 +197,8 @@ This is a small project. Help is still welcome.
 
 ## 💬 Community and suggestions
 
-**Discord channel** — join to talk with other Aerix users, report a problem, and suggest what should land next.
+**Discord channel** — join to talk with other Aerix users, report a problem, and suggest what
+should land next.
 
 [![Discord](https://img.shields.io/badge/Discord-Join%20the%20channel-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/RS7q9KaCm6)
 
@@ -220,6 +220,6 @@ Minecraft is a trademark of Mojang Synergies AB. Aerix Launcher is an independen
 
 **Configurable renderers. Private by design. Offline accounts and capes. Updated with care.**
 
-🌐 **[Website](https://entitybrian69-bit.github.io/Aerix-launcher/)** · 💬 **[Discord](https://discord.gg/RS7q9KaCm6)** · ⭐ [Star Aerix](https://github.com/entitybrian69-bit/Aerix-launcher) · 📦 [Get the APK](https://github.com/entitybrian69-bit/Aerix-launcher/releases)
+🌐 **[Website](https://entitybrian69-bit.github.io/Aerix-launcher/)** · 💬 **[Discord](https://discord.gg/RS7q9KaCm6)** · ⭐ [Star Aerix](https://github.com/entitybrian69-bit/Aerix-launcher) · 📦 [Get the APK](https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest/download/Aerix-Launcher.apk)
 
 </div>

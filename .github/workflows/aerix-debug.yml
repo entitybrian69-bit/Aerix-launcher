@@ -1,6 +1,8 @@
 name: Aerix debug (testing)
 
 # Builds the APK that all testing happens on and stores it in apk/.
+# The sources are the ones released as v1.3.6, so a debug build and the public
+# release are the same launcher; only the applicationId and signing differ.
 # This workflow only ever builds the "noruntime" debug variant:
 #   applicationId net.kdt.pojavlaunch.debug, signed with app_pojavlauncher/debug.keystore
 # so it installs next to the public launcher and can never be mistaken for, or
@@ -132,9 +134,7 @@ jobs:
             echo "commit: $GITHUB_SHA"
             echo "run: $GITHUB_RUN_ID"
             echo "built: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
-            # The fingerprint Google matches against the Android OAuth client for this package.
             echo 'package: net.kdt.pojavlaunch.debug'
-            echo "sha1: $(cat app_pojavlauncher/debug-cert.sha1 2>/dev/null || echo unknown)"
             echo "note: not a public release; the release APKs live in GitHub Releases"
           } > apk/DEBUG_BUILD.txt
           git config user.name "github-actions[bot]"

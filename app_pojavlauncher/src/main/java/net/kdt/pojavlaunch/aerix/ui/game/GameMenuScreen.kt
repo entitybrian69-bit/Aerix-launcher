@@ -42,7 +42,6 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -56,17 +55,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.lifecycle.viewmodel.initializer
-import androidx.lifecycle.viewmodel.viewModelFactory
-import net.kdt.pojavlaunch.aerix.social.SocialGraph
-import net.kdt.pojavlaunch.aerix.social.ui.SocialColors
-import net.kdt.pojavlaunch.aerix.social.ui.ingame.SocialCompactPanel
-import net.kdt.pojavlaunch.aerix.social.vm.CompactMode
-import net.kdt.pojavlaunch.aerix.social.vm.InGameSocialViewModel
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -161,15 +151,6 @@ fun GameMenuScreen(
     val account = remember { PojavAccountBridge.current }
     var page by remember { mutableStateOf(GameMenuPage.MAIN) }
     var shown by remember { mutableStateOf(false) }
-    var socialOpen by remember { mutableStateOf(false) }
-    val socialFactory = remember {
-        viewModelFactory {
-            initializer { InGameSocialViewModel(SocialGraph.repository, SocialGraph.store) }
-        }
-    }
-    val socialViewModel: InGameSocialViewModel = viewModel(factory = socialFactory)
-    val socialState by socialViewModel.state.collectAsState()
-    val socialUnread = socialState.unread
 
     LaunchedEffect(revision) {
         page = GameMenuPage.MAIN
@@ -208,14 +189,7 @@ fun GameMenuScreen(
                     account = account,
                     versionLine = versionLine,
                     onCloseRequest = onCloseRequest,
-                    onOpenDownloads = { page = GameMenuPage.DOWNLOADS },
-                    socialUnread = socialUnread,
-                    onOpenSocial = {
-                        socialOpen = true
-                        // Opening the overlay is what "checking" means: the badge clears.
-                        socialViewModel.show(CompactMode.CHAT)
-                        socialViewModel.markRead()
-                    }
+                    onOpenDownloads = { page = GameMenuPage.DOWNLOADS }
                 )
                 GameMenuPage.DOWNLOADS -> Box(
                     modifier = Modifier
@@ -231,12 +205,6 @@ fun GameMenuScreen(
                 }
             }
         }
-        if (socialOpen) {
-            SocialCompactPanel(
-                viewModel = socialViewModel,
-                onClose = { socialOpen = false }
-            )
-        }
     }
 }
 
@@ -247,9 +215,7 @@ private fun GameMenuMainPage(
     account: AerixAccount?,
     versionLine: String,
     onCloseRequest: () -> Unit,
-    onOpenDownloads: () -> Unit,
-    onOpenSocial: () -> Unit,
-    socialUnread: Int = 0
+    onOpenDownloads: () -> Unit
 ) {
     BoxWithConstraints(
         modifier = Modifier.fillMaxSize(),
@@ -331,26 +297,13 @@ private fun GameMenuMainPage(
             }
 
             Spacer(Modifier.height(if (compact) AerixSpacing.smPlus else AerixSpacing.md))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus)
-            ) {
-                MenuTile(
-                    label = if (net.kdt.pojavlaunch.recording.RecordingState.isActive()) "Stop recording" else "Screen recorder",
-                    iconRes = R.drawable.aerix_ic_record,
-                    color = palette.tiles[0], compact = compact,
-                    onClick = { onCloseRequest(); callbacks.onScreenRecorder() },
-                    modifier = Modifier.weight(1f).height(if (compact) 48.dp else 60.dp)
-                )
-                MenuTile(
-                    label = "Social",
-                    iconRes = R.drawable.aerix_social_ic_friends,
-                    color = SocialColors.accent, compact = compact,
-                    onClick = onOpenSocial,
-                    badge = socialUnread,
-                    modifier = Modifier.weight(1f).height(if (compact) 48.dp else 60.dp)
-                )
-            }
+            MenuTile(
+                label = if (net.kdt.pojavlaunch.recording.RecordingState.isActive()) "Stop recording" else "Screen recorder",
+                iconRes = R.drawable.aerix_ic_record,
+                color = palette.tiles[0], compact = compact,
+                onClick = { onCloseRequest(); callbacks.onScreenRecorder() },
+                modifier = Modifier.fillMaxWidth().height(if (compact) 48.dp else 60.dp)
+            )
             Spacer(Modifier.height(AerixSpacing.sm))
             ResumeButton(
                 color = palette.resume,
@@ -401,81 +354,57 @@ private fun MenuTile(
     color: Color,
     compact: Boolean,
     onClick: () -> Unit,
-    modifier: Modifier,
-    badge: Int = 0
+    modifier: Modifier
 ) {
     val shape = RoundedCornerShape(AerixRadii.cardLarge)
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val scale by animateFloatAsState(if (pressed) 0.95f else 1f, label = "menuTile")
 
-    Box(modifier = modifier) {
-        Column(
+    Column(
+        modifier = modifier
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .clip(shape)
+            .background(
+                Brush.verticalGradient(
+                    listOf(color.copy(alpha = 0.22f), color.copy(alpha = 0.06f))
+                )
+            )
+            .border(1.dp, color.copy(alpha = 0.45f), shape)
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                role = Role.Button,
+                onClick = onClick
+            )
+            .padding(AerixSpacing.smCompact),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Box(
             modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer { scaleX = scale; scaleY = scale }
-                .clip(shape)
-                .background(
-                    Brush.verticalGradient(
-                        listOf(color.copy(alpha = 0.22f), color.copy(alpha = 0.06f))
-                    )
-                )
-                .border(1.dp, color.copy(alpha = 0.45f), shape)
-                .clickable(
-                    interactionSource = interaction,
-                    indication = null,
-                    role = Role.Button,
-                    onClick = onClick
-                )
-                .padding(AerixSpacing.smCompact),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+                .size(if (compact) 36.dp else 44.dp)
+                .clip(RoundedCornerShape(AerixRadii.control))
+                .background(color.copy(alpha = 0.2f)),
+            contentAlignment = Alignment.Center
         ) {
-            Box(
-                modifier = Modifier
-                    .size(if (compact) 36.dp else 44.dp)
-                    .clip(RoundedCornerShape(AerixRadii.control))
-                    .background(color.copy(alpha = 0.2f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    painter = painterResource(iconRes),
-                    contentDescription = null,
-                    tint = color,
-                    modifier = Modifier.size(if (compact) 20.dp else 24.dp)
-                )
-            }
-            Spacer(Modifier.height(AerixSpacing.xsPlus))
-            Text(
-                text = label,
-                color = AerixSurface.textPrimary,
-                fontSize = if (compact) 10.sp else 12.sp,
-                fontWeight = FontWeight.SemiBold,
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+            Icon(
+                painter = painterResource(iconRes),
+                contentDescription = null,
+                tint = color,
+                modifier = Modifier.size(if (compact) 20.dp else 24.dp)
             )
         }
-        // Unread Social messages: a red dot with the count, cleared once the overlay is opened.
-        if (badge > 0) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(AerixSpacing.xs)
-                    .defaultMinSize(minWidth = 18.dp, minHeight = 18.dp)
-                    .clip(CircleShape)
-                    .background(SocialColors.danger)
-                    .padding(horizontal = 4.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = if (badge > 9) "9+" else badge.toString(),
-                    color = Color.White,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
+        Spacer(Modifier.height(AerixSpacing.xsPlus))
+        Text(
+            text = label,
+            color = AerixSurface.textPrimary,
+            fontSize = if (compact) 10.sp else 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
