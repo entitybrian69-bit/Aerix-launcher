@@ -5,15 +5,13 @@ on:
   push:
     paths:
       - '.github/workflows/re-release-1.3.6.yml'
+      - 'incoming/**'
 
 permissions:
   contents: write
-  actions: read
 
 env:
   TARGET_SHA: a75fdfeb6c22ebf0c772c0a4f83ab53c103e4ad81d8105789deb0df9ebc232f3
-  SRC_RUN: "39413488311"
-  SRC_SHA: ba3e4c230a81275dfda296a121172a3752f9a913
   NEW_TAG: v1.3.6
   NEW_VERSION: "1.3.6"
 
@@ -22,87 +20,53 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
-      - name: Fetch APKs from Android CI run 39413488311, verify sha256, release as v1.3.6
+      - uses: actions/checkout@v4
+
+      - name: Reassemble uploaded APK, verify sha256, release as v1.3.6
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -u
           repo="${{ github.repository }}"
-          mkdir -p art out
+          mkdir -p out
 
-          echo "== List artifacts of run $SRC_RUN"
-          gh api "repos/$repo/actions/runs/$SRC_RUN/artifacts?per_page=50" < /dev/null \
-            --jq '.artifacts[] | select(.expired == false) | "\(.id)\t\(.name)"' | sort -u > arts.tsv
-          cat arts.tsv
-
-          dl_art() { # id name
-            mkdir -p "art/$2"
-            gh api "repos/$repo/actions/artifacts/$1/zip" < /dev/null > "art/$2/z.zip"
-            unzip -o -q "art/$2/z.zip" -d "art/$2"
-            rm -f "art/$2/z.zip"
-          }
-
-          echo "== Download checksum artifact"
-          sha_art_id=$(awk -F'\t' '$2=="apk-sha256"{print $1; exit}' arts.tsv)
-          if [ -n "$sha_art_id" ]; then
-            dl_art "$sha_art_id" "apk-sha256"
-            echo "== recorded checksums in CI:"
-            find art/apk-sha256 -type f -exec cat {} +
+          if ! ls incoming/*.part* >/dev/null 2>&1; then
+            echo "::notice title=skipping::no APK chunks in incoming/ yet - nothing to do"
+            exit 0
           fi
 
-          echo "== Download both APK artifacts"
-          full_id=$(awk -F'\t' '$2=="app-release"{print $1; exit}' arts.tsv)
-          nort_id=$(awk -F'\t' '$2=="app-release-noruntime"{print $1; exit}' arts.tsv)
-          [ -n "$full_id" ] && dl_art "$full_id" "app-release"
-          [ -n "$nort_id" ] && dl_art "$nort_id" "app-release-noruntime"
-          find art -type f -name '*.apk' -exec ls -la {} +
+          echo "== Reassemble chunks"
+          ls -la incoming/
+          apktmp=/tmp/Aerix-Launcher-$NEW_VERSION.apk
+          cat $(ls -v incoming/*.part*) > "$apktmp"
 
-          echo "== Verify"
-          sha_full=$(find art/app-release -name '*.apk' -type f -exec sha256sum {} + | awk '{print $1}')
-          echo "app-release          = $sha_full"
-          echo "::notice title=sha::app-release = $sha_full"
-          if [ "$sha_full" != "$TARGET_SHA" ]; then
-            echo "::error title=sha-mismatch::artifact app-release is $sha_full but you asked for $TARGET_SHA"
-            if [ -n "$nort_id" ]; then
-              sha_nort=$(find art/app-release-noruntime -name '*.apk' -type f -exec sha256sum {} + | awk '{print $1}')
-              echo "::notice title=sha::app-release-noruntime = $sha_nort"
-              if [ "$sha_nort" = "$TARGET_SHA" ]; then
-                echo "::error title=wrong-variant::your hash matches the NO-RUNTIME apk, not the full one"
-              fi
-            fi
+          echo "== Verify sha256"
+          sha=$(sha256sum "$apktmp" | awk '{print $1}')
+          echo "$sha  $apktmp"
+          echo "::notice title=sha::reassembled apk = $sha ($(stat -c%s "$apktmp") bytes)"
+          if [ "$sha" != "$TARGET_SHA" ]; then
+            echo "::error title=sha-mismatch::uploaded apk is $sha but you asked for $TARGET_SHA - refusing to publish wrong bytes"
             exit 1
           fi
 
-          echo "== Match confirmed. Assemble v1.3.6 assets"
+          echo "== Match confirmed. Prepare assets"
+          cp "$apktmp" "out/Aerix-Launcher-$NEW_VERSION.apk"
+          cp "$apktmp" "out/Aerix-Launcher.apk"
           : > SHA256SUMS
-          cp "$(find art/app-release -name '*.apk' -type f | head -1)" "out/Aerix-Launcher-$NEW_VERSION.apk"
-          echo "$sha_full  Aerix-Launcher-$NEW_VERSION.apk" >> SHA256SUMS
-          if [ -n "$nort_id" ]; then
-            sha_nort=$(find art/app-release-noruntime -name '*.apk' -type f -exec sha256sum {} + | awk '{print $1}')
-            cp "$(find art/app-release-noruntime -name '*.apk' -type f | head -1)" "out/Aerix-Launcher-$NEW_VERSION-noruntime.apk"
-            echo "$sha_nort  Aerix-Launcher-$NEW_VERSION-noruntime.apk" >> SHA256SUMS
-          fi
           for f in out/*.apk; do
-            b=$(basename "$f")
-            unv=$(printf '%s' "$b" | sed "s/-$NEW_VERSION//")
-            cp "$f" "out/$unv"
-            grep "  $b\$" SHA256SUMS | sed "s/  $b\$/  $unv/" >> SHA256SUMS
+            echo "$(sha256sum "$f" | awk '{print $1}')  $(basename "$f")" >> SHA256SUMS
           done
-          sort -u SHA256SUMS -o SHA256SUMS
           cat SHA256SUMS
 
           notes=$(mktemp)
           {
-            echo "Re-release of the exact binary identified by"
+            echo "Release of the exact binary identified by"
             echo "\`sha256:$TARGET_SHA\` as version $NEW_VERSION."
-            echo ""
-            echo "Source: Android CI run [$SRC_RUN](https://github.com/$repo/actions/runs/$SRC_RUN)"
-            echo "(artifact \`app-release\`), built from commit \`$SRC_SHA\`."
             echo ""
             echo "Checksums for every attachment are in \`SHA256SUMS\`."
           } > "$notes"
 
-          gh release create "$NEW_TAG" --repo "$repo" --target "$SRC_SHA" \
+          gh release create "$NEW_TAG" --repo "$repo" \
             --title "Aerix Launcher $NEW_VERSION" --notes-file "$notes" --latest \
             out/*.apk SHA256SUMS < /dev/null
-          echo "::notice title=done::$NEW_TAG published from CI run $SRC_RUN"
+          echo "::notice title=done::$NEW_TAG published"
