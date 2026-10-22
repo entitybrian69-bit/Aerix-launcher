@@ -297,9 +297,12 @@ class SocialProfileViewModel(
                         googleStage = null,
                         googleError = buildString {
                             append("Google closed before the account was confirmed.")
-                            append(" If this happens every time, this build's signing key is not ")
-                            append("registered as an Android OAuth client in the same project as ")
-                            append("the Web client — see Settings → Account → Sign-in diagnostics.")
+                            append(" Closing the sheet yourself is fine — tap again.")
+                            append(" If it closes every single time, Play services is refusing this ")
+                            append("app, which is a Google Cloud setting, not a launcher bug:")
+                            append(" add an Android OAuth client with this build's package and ")
+                            append("SHA-1 (Settings → Account → Sign-in diagnostics), and make ")
+                            append("sure this Gmail is under Audience → Test users.")
                             val detail = result.detail
                             if (detail.isNotBlank()) append(" · ").append(detail)
                         }
