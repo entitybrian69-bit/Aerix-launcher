@@ -267,6 +267,7 @@ class LocalSocialRepository(
             _chats.update { chats -> chats + (friendId to (chats[friendId].orEmpty() + message)) }
             persist()
             onIncoming?.invoke(author, text)
+            Unit
         }
 
     override suspend fun toggleReaction(friendId: String, messageId: String, emoji: String) = withContext(io) {
