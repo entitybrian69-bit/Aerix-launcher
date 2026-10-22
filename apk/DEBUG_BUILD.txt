@@ -1,6 +1,6 @@
 kind: debug (testing only)
 name: Aerix-Launcher-debug.apk
-commit: d81d8fa1c48ab72ddc716f72033c8e4ad0e4e44a
-run: 39730501582
-built: 2026-10-22T05:58:29Z
+commit: db8f7cca072f9045f6d8a768853ae5869075311a
+run: 39741002187
+built: 2026-10-22T07:35:19Z
 note: not a public release; the release APKs live in GitHub Releases
