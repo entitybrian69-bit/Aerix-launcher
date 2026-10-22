@@ -145,7 +145,9 @@ object PojavPluginBridge {
         "zalithRendererPlugin",
         "pojavRendererPlugin",
         "aerixPlugin",
-        "emesisPlugin"
+        "emesisPlugin",
+        // Emesis builds also declare this one; without it they only matched by package prefix.
+        "pgwRendererPlugin"
     )
 
     var plugins: List<AerixRendererPlugin> = emptyList()
@@ -251,8 +253,9 @@ object PojavPluginBridge {
                     packageName = info.packageName, appName = info.loadLabel(pm).toString(),
                     appVersion = pm.getPackageInfo(info.packageName, 0).versionName.orEmpty(),
                     rendererId = config.id,
-                    displayName = config.name,
-                    summary = "External V2 renderer plugin",
+                    displayName = AerixRendererBrands.nameFor(info.packageName) ?: config.name,
+                    summary = AerixRendererBrands.descriptionFor(info.packageName)
+                        ?: "External V2 renderer plugin",
                     minMCVer = config.minVersion, maxMCVer = config.maxVersion,
                     glName = config.gl, eglName = config.egl, nativeLibDir = nativeDir,
                     env = config.env,
@@ -293,13 +296,15 @@ object PojavPluginBridge {
         if (parts.size < 3 && EMESIS_LIBRARY !in dlopen) dlopen.add(EMESIS_LIBRARY)
         val eglName = if (eglRaw.startsWith("/")) "$nativeDir$eglRaw" else eglRaw
 
+        val brand = AerixRendererBrands.forPackage(info.packageName)
         AerixRendererPlugin(
             packageName = info.packageName,
             appName = appName,
             appVersion = appVersion,
             rendererId = rendererId,
-            displayName = "$des ($appName)",
-            summary = "Plugin: $appName",
+            // A known plugin is shown under its own name; anything else keeps "<des> (<app>)".
+            displayName = brand?.name ?: "$des ($appName)",
+            summary = brand?.description ?: "Plugin: $appName",
             minMCVer = meta.versionString("minMCVer"),
             maxMCVer = meta.versionString("maxMCVer"),
             glName = glName,

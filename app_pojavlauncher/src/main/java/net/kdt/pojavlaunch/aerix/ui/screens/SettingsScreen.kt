@@ -121,6 +121,7 @@ import net.kdt.pojavlaunch.aerix.bridge.PojavNavigator
 import net.kdt.pojavlaunch.aerix.bridge.PojavPluginBridge
 import net.kdt.pojavlaunch.aerix.bridge.PojavSetting
 import net.kdt.pojavlaunch.aerix.bridge.PojavSettingCategory
+import net.kdt.pojavlaunch.aerix.bridge.AerixRendererBrands
 import net.kdt.pojavlaunch.aerix.bridge.PojavSettingsBridge
 import net.kdt.pojavlaunch.aerix.components.AerixGhostButton
 import net.kdt.pojavlaunch.aerix.components.AerixPillTab
@@ -214,14 +215,17 @@ private fun runtimeLabel(runtime: Runtime): String {
     return if (actual > 0 && actual != declared) "Internal $actual" else "Internal $declared"
 }
 
-/** One renderer's mark (Vulkan, OpenGL, vGPU, LTW, plugin), sized to sit beside its name. */
+/**
+ * One renderer's mark (Vulkan, OpenGL, vGPU, LTW, Emesis, Proton), sized to sit beside its name.
+ * A wordmark is wider than it is tall, so [wide] gives it room instead of shrinking it to a dot.
+ */
 @Composable
-private fun RendererLogo(@DrawableRes logoRes: Int, tint: Color) {
+private fun RendererLogo(@DrawableRes logoRes: Int, tint: Color, wide: Boolean = false) {
     Icon(
         painter = painterResource(logoRes),
         contentDescription = null,
         tint = tint,
-        modifier = Modifier.size(20.dp)
+        modifier = if (wide) Modifier.size(width = 38.dp, height = 20.dp) else Modifier.size(20.dp)
     )
 }
 
@@ -831,9 +835,11 @@ private fun RendererPluginCard(
                 ),
                 modifier = Modifier.size(20.dp)
             )
+            // The plugin's own mark when the launcher knows it, a puzzle piece otherwise.
             RendererLogo(
-                logoRes = R.drawable.aerix_logo_plugin,
-                tint = if (selected) AerixThemeManager.currentAccent() else Color.White
+                logoRes = AerixRendererBrands.logoFor(plugin.packageName) ?: R.drawable.aerix_logo_plugin,
+                tint = if (selected) AerixThemeManager.currentAccent() else Color.White,
+                wide = true
             )
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -844,11 +850,12 @@ private fun RendererPluginCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+                // A known plugin explains itself; an unknown one shows which APK it came from.
                 Text(
-                    text = plugin.packageName,
+                    text = AerixRendererBrands.descriptionFor(plugin.packageName) ?: plugin.packageName,
                     style = MaterialTheme.typography.labelSmall,
                     color = AerixSurface.textSecondary,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
             }
