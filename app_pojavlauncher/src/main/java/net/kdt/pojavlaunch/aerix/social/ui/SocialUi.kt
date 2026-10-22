@@ -1,9 +1,9 @@
 /*
  * Aerix Launcher Social layer.
  *
- * The Social palette is deliberately independent from AerixSurface: it never reads the
- * launcher accent, so the second launcher keeps its own identity whatever theme the
- * user picked for the Play dashboard.
+ * The Social surface now uses the launcher's own glass theme: the same wallpaper, the same
+ * AerixSurface tokens and the same accent the Play dashboard uses, so Social looks like a
+ * second screen of Aerix instead of a different app.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -38,9 +38,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -54,10 +57,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -65,25 +69,35 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import net.kdt.pojavlaunch.R
+import net.kdt.pojavlaunch.aerix.components.AerixBackground
+import net.kdt.pojavlaunch.aerix.social.data.SocialLink
+import net.kdt.pojavlaunch.aerix.theme.AerixSurface
 
-/** Fixed Social palette from the reference screens. */
+/**
+ * Social palette. Everything is the launcher's own token; the accent follows the wallpaper
+ * the player picked on the Play dashboard, so both launchers stay in sync.
+ */
 object SocialColors {
-    val accent = Color(0xFF8B5CF6)
-    val accentBright = Color(0xFFA78BFA)
-    val backgroundTop = Color(0xFF140F26)
-    val backgroundBottom = Color(0xFF1B1436)
-    val panel = Color(0xFF241C42)
-    val panelRaised = Color(0xFF2E2452)
-    val panelSoft = Color(0xFF1E1738)
-    val textPrimary = Color(0xFFF3F0FF)
-    val textSecondary = Color(0xFFB4A9D6)
-    val textMuted = Color(0xFF8A7FB0)
-    val border = Color(0x33A78BFA)
-    val borderStrong = Color(0x66A78BFA)
-    val danger = Color(0xFFE4576C)
-    val success = Color(0xFF4ADE80)
-    val online = Color(0xFF4ADE80)
-    val scrim = Color(0xCC0B0718)
+    val accent: Color @Composable get() = AerixSurface.accent
+    val accentBright: Color @Composable get() = AerixSurface.accentSecondary
+    val backgroundTop: Color get() = AerixSurface.canvas
+    val backgroundBottom: Color get() = AerixSurface.canvas
+    val panel: Color get() = AerixSurface.panel
+    val panelRaised: Color get() = AerixSurface.panelRaised
+    val panelSoft: Color get() = AerixSurface.panelTrack
+    val textPrimary: Color get() = AerixSurface.textPrimary
+    val textSecondary: Color get() = AerixSurface.textSecondary
+    val textMuted: Color get() = AerixSurface.textMuted
+    val border: Color get() = AerixSurface.borderSoft
+    val borderStrong: Color get() = AerixSurface.border
+    val danger: Color get() = AerixSurface.danger
+    val success: Color get() = AerixSurface.success
+    val warning: Color get() = AerixSurface.warning
+    val online: Color get() = AerixSurface.success
+    val scrim: Color get() = Color(0xD9060F16)
+    val onAccent: Color @Composable get() = AerixSurface.onAccent
+    val glassShine: Color get() = AerixSurface.glassShine
+    val storyRing: Color get() = Color(0xFFE11D48)
 }
 
 object SocialMotion {
@@ -104,18 +118,21 @@ object SocialDimens {
     val controlRadius = 14.dp
 }
 
+/** The launcher wallpaper, with the Social glass panels drawn on top of it. */
 @Composable
 fun SocialBackground(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    listOf(SocialColors.backgroundTop, SocialColors.backgroundBottom, Color(0xFF221A3F))
+    AerixBackground(modifier = modifier) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(Color(0x4D04101A), Color(0x73060F16), Color(0x8C04101A))
+                    )
                 )
-            )
-    ) {
-        content()
+        ) {
+            content()
+        }
     }
 }
 
@@ -128,7 +145,7 @@ fun SocialPanel(
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(SocialDimens.cardRadius))
-            .background(SocialColors.panel)
+            .background(Brush.verticalGradient(listOf(SocialColors.panelRaised, SocialColors.panel)))
             .border(BorderStroke(1.dp, SocialColors.border), RoundedCornerShape(SocialDimens.cardRadius))
             .padding(padding),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -183,16 +200,31 @@ fun socialAvatarRes(index: Int): Int = when (index) {
     else -> R.drawable.aerix_social_avatar_1
 }
 
+/** Generic avatar. [story] adds the crimson 24h story ring. */
 @Composable
-fun SocialAvatar(avatar: Int, size: Dp = 44.dp, modifier: Modifier = Modifier) {
-    Image(
-        painter = painterResource(socialAvatarRes(avatar)),
-        contentDescription = null,
+fun SocialAvatar(
+    avatar: Int,
+    size: Dp = 44.dp,
+    modifier: Modifier = Modifier,
+    story: Boolean = false
+) {
+    Box(
         modifier = modifier
             .size(size)
             .clip(CircleShape)
-            .background(SocialColors.panelRaised)
-    )
+            .background(if (story) SocialColors.storyRing else Color.Transparent)
+            .padding(if (story) 2.dp else 0.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Image(
+            painter = painterResource(socialAvatarRes(avatar)),
+            contentDescription = null,
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(CircleShape)
+                .background(SocialColors.panelRaised)
+        )
+    }
 }
 
 @Composable
@@ -204,16 +236,17 @@ fun SocialPrimaryButton(
     @DrawableRes iconRes: Int? = null,
     danger: Boolean = false
 ) {
+    val accent = SocialColors.accent
     val fill = when {
-        !enabled -> SocialColors.accent.copy(alpha = 0.35f)
+        !enabled -> accent.copy(alpha = 0.35f)
         danger -> SocialColors.danger
-        else -> SocialColors.accent
+        else -> accent
     }
     Surface(
         modifier = modifier.heightIn(min = SocialDimens.touch),
         shape = RoundedCornerShape(SocialDimens.controlRadius),
         color = fill,
-        contentColor = Color.White,
+        contentColor = if (danger) Color.White else SocialColors.onAccent,
         enabled = enabled,
         onClick = onClick
     ) {
@@ -249,7 +282,7 @@ fun SocialGhostButton(
     Surface(
         modifier = modifier.heightIn(min = SocialDimens.touch),
         shape = RoundedCornerShape(SocialDimens.controlRadius),
-        color = SocialColors.panelRaised,
+        color = SocialColors.panelSoft,
         contentColor = SocialColors.textPrimary,
         border = BorderStroke(1.dp, SocialColors.border),
         enabled = enabled,
@@ -276,6 +309,49 @@ fun SocialGhostButton(
     }
 }
 
+/** Small square icon button used by the top bar and the chat composer. */
+@Composable
+fun SocialIconButton(
+    @DrawableRes iconRes: Int,
+    contentDescription: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    selected: Boolean = false
+) {
+    Surface(
+        modifier = modifier.size(SocialDimens.touch),
+        shape = CircleShape,
+        color = if (selected) SocialColors.accent else SocialColors.panelSoft,
+        contentColor = if (selected) SocialColors.onAccent else SocialColors.textPrimary,
+        border = BorderStroke(1.dp, SocialColors.border),
+        onClick = onClick
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                painter = painterResource(iconRes),
+                contentDescription = contentDescription,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+    }
+}
+
+@Composable
+fun SocialChip(text: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier.heightIn(min = 40.dp),
+        shape = CircleShape,
+        color = if (selected) SocialColors.accent.copy(alpha = 0.28f) else SocialColors.panelSoft,
+        contentColor = if (selected) SocialColors.textPrimary else SocialColors.textSecondary,
+        border = BorderStroke(1.dp, if (selected) SocialColors.accent else SocialColors.border),
+        onClick = onClick
+    ) {
+        Box(modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp), contentAlignment = Alignment.Center) {
+            Text(text = text, fontSize = 13.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
+        }
+    }
+}
+
 @Composable
 fun SocialToggle(
     checked: Boolean,
@@ -287,7 +363,7 @@ fun SocialToggle(
         onCheckedChange = onCheckedChange,
         modifier = modifier,
         colors = SwitchDefaults.colors(
-            checkedThumbColor = Color.White,
+            checkedThumbColor = SocialColors.onAccent,
             checkedTrackColor = SocialColors.accent,
             checkedBorderColor = SocialColors.accent,
             uncheckedThumbColor = SocialColors.textMuted,
@@ -402,6 +478,113 @@ fun SocialDropdownRow(
 }
 
 @Composable
+fun SocialSliderRow(
+    title: String,
+    value: Int,
+    onValueChange: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            SocialBody(title, color = SocialColors.textPrimary, size = 14.sp, weight = FontWeight.Medium, modifier = Modifier.weight(1f))
+            SocialBody("$value%", size = 12.sp, color = SocialColors.textMuted)
+        }
+        Slider(
+            value = value.toFloat(),
+            onValueChange = { onValueChange(it.toInt()) },
+            valueRange = 0f..100f,
+            colors = SliderDefaults.colors(
+                thumbColor = SocialColors.accent,
+                activeTrackColor = SocialColors.accent,
+                inactiveTrackColor = SocialColors.panelSoft
+            )
+        )
+    }
+}
+
+/** A text field in the Social glass style. */
+@Composable
+fun SocialTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    modifier: Modifier = Modifier,
+    singleLine: Boolean = true
+) {
+    BasicTextField(
+        value = value,
+        onValueChange = onValueChange,
+        singleLine = singleLine,
+        textStyle = TextStyle(color = SocialColors.textPrimary, fontSize = 15.sp),
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(SocialDimens.controlRadius))
+            .background(SocialColors.panelSoft)
+            .border(BorderStroke(1.dp, SocialColors.border), RoundedCornerShape(SocialDimens.controlRadius))
+            .padding(horizontal = 14.dp, vertical = 14.dp),
+        decorationBox = { inner ->
+            Box {
+                if (value.isEmpty()) SocialBody(placeholder, size = 14.sp, color = SocialColors.textMuted)
+                inner()
+            }
+        }
+    )
+}
+
+/** Row showing one platform link; tapping opens the destination. */
+@Composable
+fun SocialLinkRow(link: SocialLink, onOpen: () -> Unit, onRemove: (() -> Unit)? = null) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = SocialDimens.touch)
+            .clip(RoundedCornerShape(SocialDimens.controlRadius))
+            .background(SocialColors.panelSoft)
+            .clickable(onClick = onOpen)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Icon(
+            painter = painterResource(linkPlatformIcon(link.platform)),
+            contentDescription = link.platform.label,
+            tint = SocialColors.accentBright,
+            modifier = Modifier.size(20.dp)
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            SocialBody(link.platform.label, size = 13.sp, color = SocialColors.textPrimary, weight = FontWeight.Medium)
+            SocialBody(link.url, size = 11.sp, color = SocialColors.textMuted, maxLines = 1)
+        }
+        if (onRemove != null) {
+            SocialIconButton(
+                iconRes = R.drawable.aerix_ic_close,
+                contentDescription = "Remove link",
+                onClick = onRemove,
+                modifier = Modifier.size(36.dp)
+            )
+        } else {
+            Icon(
+                painter = painterResource(R.drawable.aerix_social_ic_chevron),
+                contentDescription = null,
+                tint = SocialColors.textMuted,
+                modifier = Modifier.size(16.dp)
+            )
+        }
+    }
+}
+
+@DrawableRes
+fun linkPlatformIcon(platform: net.kdt.pojavlaunch.aerix.social.data.LinkPlatform): Int = when (platform) {
+    net.kdt.pojavlaunch.aerix.social.data.LinkPlatform.YOUTUBE -> R.drawable.aerix_social_ic_youtube
+    net.kdt.pojavlaunch.aerix.social.data.LinkPlatform.INSTAGRAM -> R.drawable.aerix_social_ic_instagram
+    net.kdt.pojavlaunch.aerix.social.data.LinkPlatform.DISCORD -> R.drawable.aerix_social_ic_discord
+    net.kdt.pojavlaunch.aerix.social.data.LinkPlatform.X -> R.drawable.aerix_social_ic_x
+    net.kdt.pojavlaunch.aerix.social.data.LinkPlatform.TIKTOK -> R.drawable.aerix_social_ic_tiktok
+    net.kdt.pojavlaunch.aerix.social.data.LinkPlatform.TWITCH -> R.drawable.aerix_social_ic_twitch
+    net.kdt.pojavlaunch.aerix.social.data.LinkPlatform.WEB -> R.drawable.aerix_ic_public
+}
+
+@Composable
 fun SocialTopBar(
     title: String,
     onBack: () -> Unit,
@@ -416,22 +599,11 @@ fun SocialTopBar(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Surface(
-            modifier = Modifier.size(SocialDimens.touch),
-            shape = CircleShape,
-            color = SocialColors.panelRaised,
-            border = BorderStroke(1.dp, SocialColors.border),
+        SocialIconButton(
+            iconRes = R.drawable.aerix_ic_arrow_back,
+            contentDescription = "Back",
             onClick = onBack
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    painter = painterResource(R.drawable.aerix_ic_arrow_back),
-                    contentDescription = "Back",
-                    tint = SocialColors.textPrimary,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-        }
+        )
         Column(modifier = Modifier.weight(1f)) {
             SocialTitle(title)
             if (subtitle != null) SocialBody(subtitle, size = 13.sp, color = SocialColors.textSecondary)
@@ -453,7 +625,7 @@ fun SocialDialog(onDismiss: () -> Unit, content: @Composable ColumnScope.() -> U
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(SocialColors.scrim.copy(alpha = SocialColors.scrim.alpha * progress))
+            .background(SocialColors.scrim.copy(alpha = 0.85f * progress))
             .clickable(onClick = onDismiss),
         contentAlignment = Alignment.Center
     ) {
@@ -467,7 +639,7 @@ fun SocialDialog(onDismiss: () -> Unit, content: @Composable ColumnScope.() -> U
                 }
                 .padding(horizontal = 24.dp)
                 .clip(RoundedCornerShape(22.dp))
-                .background(SocialColors.panelRaised)
+                .background(Brush.verticalGradient(listOf(SocialColors.panelRaised, SocialColors.panel)))
                 .border(BorderStroke(1.dp, SocialColors.borderStrong), RoundedCornerShape(22.dp))
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -476,9 +648,12 @@ fun SocialDialog(onDismiss: () -> Unit, content: @Composable ColumnScope.() -> U
     }
 }
 
-/** Wrapper that animates the entrance of a page the way the reference flow does. */
+/** Page wrapper: fixed 20/16dp padding and a 16dp rhythm between blocks. */
 @Composable
-fun SocialPage(padding: PaddingValues = PaddingValues(SocialDimens.pagePaddingH, SocialDimens.pagePaddingV), content: @Composable ColumnScope.() -> Unit) {
+fun SocialPage(
+    padding: PaddingValues = PaddingValues(SocialDimens.pagePaddingH, SocialDimens.pagePaddingV),
+    content: @Composable ColumnScope.() -> Unit
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -487,5 +662,3 @@ fun SocialPage(padding: PaddingValues = PaddingValues(SocialDimens.pagePaddingH,
         content = content
     )
 }
-
-internal val socialFadeSpec = tween<Float>(SocialMotion.SCREEN_MS)

@@ -13,6 +13,7 @@
 
 package net.kdt.pojavlaunch.aerix.social.data
 
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,17 +31,37 @@ interface SocialRepository {
     val connection: StateFlow<SocialConnection>
     val blocked: StateFlow<List<AerixUser>>
     val invite: StateFlow<ServerInvite?>
+    val posts: StateFlow<List<ActivityPost>>
+    val shares: StateFlow<Map<String, InstanceShare>>
 
     suspend fun refresh()
     suspend fun acceptRequest(id: String)
     suspend fun declineRequest(id: String)
     suspend fun addFriend(query: String): Boolean
+
+    /** Directory search: by Aerix username or by the Gmail address on the account. */
+    suspend fun search(query: String, byEmail: Boolean): List<UserSearchResult>
+    suspend fun sendRequest(userId: String): Boolean
+
     suspend fun ensureChat(friendId: String)
-    suspend fun sendMessage(friendId: String, text: String)
+    suspend fun sendMessage(friendId: String, text: String, attachment: ChatAttachment? = null)
     suspend fun toggleReaction(friendId: String, messageId: String, emoji: String)
-    suspend fun createParty()
+
+    /** Starts "downloading" a shared instance; the UI shows progress then selects it. */
+    suspend fun installSharedInstance(messageId: String, share: InstanceShare)
+
+    suspend fun createParty(name: String = "Nova's party", logo: Int = 3)
+    suspend fun renameParty(name: String)
+    suspend fun setPartyLogo(logo: Int)
+    suspend fun startGroupCall()
     suspend fun leaveParty()
     suspend fun toggleMute()
+
+    suspend fun addPost(caption: String, kind: PostKind)
+    suspend fun toggleLike(postId: String)
+    suspend fun comment(postId: String, text: String)
+    suspend fun toggleFollow(userId: String)
+
     suspend fun block(userId: String)
     suspend fun report(userId: String, reason: String)
     suspend fun expireInvite()
@@ -51,34 +72,83 @@ interface SocialRepository {
  * states of the UI are real instead of decorative.
  */
 class MockSocialRepository(
-    private val io: kotlinx.coroutines.CoroutineDispatcher = Dispatchers.IO
+    private val io: CoroutineDispatcher = Dispatchers.IO
 ) : SocialRepository {
-    private val _friends = MutableStateFlow(
-        listOf(
-            AerixUser("kai", "Kai", 1, UserStatus.PLAYING, "Minecraft running"),
-            AerixUser("luna", "Luna", 2, UserStatus.ONLINE, "Online in Aerix"),
-            AerixUser("alex", "Alex", 3, UserStatus.IN_VOICE, "In a voice party"),
-            AerixUser("frost", "FrostByte", 4, UserStatus.ONLINE, "Online in Aerix"),
-            AerixUser("echo", "EchoFox", 5, UserStatus.OFFLINE, "Offline")
-        )
+    private val kai = AerixUser(
+        "kai", "Kai", 1, UserStatus.PLAYING, "Minecraft running",
+        email = "kai@gmail.com", bio = "Survival and shaders.",
+        links = listOf(SocialLink(LinkPlatform.YOUTUBE, "@kaiplays"), SocialLink(LinkPlatform.DISCORD, "kai")),
+        followers = 128, following = 64, posts = 22, likes = 940, hasStory = true, friend = true
     )
+    private val luna = AerixUser(
+        "luna", "Luna", 2, UserStatus.ONLINE, "Online in Aerix",
+        email = "luna@gmail.com", bio = "Building a floating city.",
+        links = listOf(SocialLink(LinkPlatform.INSTAGRAM, "luna.builds")),
+        followers = 402, following = 91, posts = 51, likes = 3120, friend = true, closeFriend = true
+    )
+    private val alex = AerixUser(
+        "alex", "Alex", 3, UserStatus.IN_VOICE, "In a voice party",
+        email = "alex@gmail.com", followers = 36, following = 120, posts = 8, likes = 210, friend = true
+    )
+    private val frost = AerixUser("frost", "FrostByte", 4, UserStatus.OFFLINE, "Offline", email = "frost@gmail.com", followers = 12, following = 30, posts = 3, likes = 44)
+    private val echo = AerixUser("echo", "EchoFox", 5, UserStatus.OFFLINE, "Offline", email = "echo@gmail.com", followers = 9, following = 18, posts = 1, likes = 12, hasStory = true)
+    private val nova = AerixUser("nova", "Nova", 6, UserStatus.ONLINE, "Online in Aerix", email = "nova@gmail.com", followers = 58, following = 74, posts = 6, likes = 320)
+
+    /** Everyone the search can find, friends and strangers alike. */
+    private val directory = MutableStateFlow(listOf(kai, luna, alex, frost, echo, nova))
+
+    private val _friends = MutableStateFlow(listOf(kai, luna, alex, frost, echo))
     private val _requests = MutableStateFlow(
         listOf(
-            FriendRequest("req_kai", "Kai", 1),
-            FriendRequest("req_nova", "Nova", 6)
+            FriendRequest("req_kai", "Kai", 1, fromUserId = "kai"),
+            FriendRequest("req_nova", "Nova", 6, fromUserId = "nova")
         )
     )
     private val _party = MutableStateFlow(PartyState())
     private val _connection = MutableStateFlow(SocialConnection.OK)
-    private val _blocked = MutableStateFlow(listOf(AerixUser("frost", "FrostByte", 4), AerixUser("echo", "EchoFox", 5)))
+    private val _blocked = MutableStateFlow(listOf(frost, echo))
     private val _invite = MutableStateFlow<ServerInvite?>(ServerInvite(fromName = "Kai", avatar = 1))
+    private val _shares = MutableStateFlow<Map<String, InstanceShare>>(emptyMap())
+
+    private val _posts = MutableStateFlow(
+        listOf(
+            ActivityPost(
+                "p1", "kai", "Kai", 1, "Finished the castle at sunset. 4000 blocks of deepslate.",
+                PostKind.PHOTO, 0, likes = 128, hoursAgo = 2, following = true
+            ),
+            ActivityPost(
+                "p2", "luna", "Luna", 2, "New story: building the harbour wall live.",
+                PostKind.STORY, 1, likes = 64, hoursAgo = 4, following = true
+            ),
+            ActivityPost(
+                "p3", "alex", "Alex", 3, "Sound on. This shader pack is unreal.",
+                PostKind.VIDEO, 2, likes = 210, hoursAgo = 7, following = false
+            ),
+            ActivityPost(
+                "p4", "echo", "EchoFox", 5, "Anyone up for a party later?",
+                PostKind.TEXT, 3, likes = 12, hoursAgo = 9, following = false
+            )
+        )
+    )
+
     private val _chats = MutableStateFlow(
         mapOf(
             "kai" to listOf(
                 ChatMessage("m1", "Kai", "Want to play together?", false, "10:41 AM"),
                 ChatMessage("m2", "You", "Sure!", true, "10:42 AM"),
                 ChatMessage("m3", "Kai", "I'll send you a server invite.", false, "10:45 AM"),
-                ChatMessage("m4", "You", "Ready when you are.", true, "10:46 AM")
+                ChatMessage(
+                    "m4", "Kai", "Here is the instance we use.", false, "10:46 AM",
+                    attachments = listOf(
+                        ChatAttachment(AttachmentKind.INSTANCE, "Remarkably Optimized", "Fabric 0.16.10", "remarkably-optimized", "412 MB")
+                    )
+                )
+            ),
+            "luna" to listOf(
+                ChatMessage(
+                    "l1", "Luna", "This track fits the castle build.", false, "9:12 AM",
+                    attachments = listOf(ChatAttachment(AttachmentKind.MUSIC, "Aurora", "Luna · 3:12", "aurora.mp3", "6.2 MB"))
+                )
             )
         )
     )
@@ -90,10 +160,12 @@ class MockSocialRepository(
     override val connection: StateFlow<SocialConnection> = _connection.asStateFlow()
     override val blocked: StateFlow<List<AerixUser>> = _blocked.asStateFlow()
     override val invite: StateFlow<ServerInvite?> = _invite.asStateFlow()
+    override val posts: StateFlow<List<ActivityPost>> = _posts.asStateFlow()
+    override val shares: StateFlow<Map<String, InstanceShare>> = _shares.asStateFlow()
 
     override suspend fun refresh() = withContext(io) {
         _connection.value = SocialConnection.LOADING
-        delay(350)
+        delay(180)
         _connection.value = SocialConnection.OK
     }
 
@@ -101,10 +173,10 @@ class MockSocialRepository(
         val request = _requests.value.firstOrNull { it.id == id } ?: return@withContext
         delay(120)
         _requests.update { list -> list.filterNot { it.id == id } }
-        _friends.update { list ->
-            if (list.any { it.name.equals(request.fromName, true) }) list
-            else list + AerixUser(request.fromName.lowercase(), request.fromName, request.avatar, UserStatus.ONLINE, "Online in Aerix")
-        }
+        val user = directory.value.firstOrNull { it.id == request.fromUserId }
+            ?: directory.value.firstOrNull { it.name.equals(request.fromName, true) }
+            ?: AerixUser(request.fromName.lowercase(), request.fromName, request.avatar, UserStatus.ONLINE, "Online in Aerix")
+        _friends.update { list -> if (list.any { it.id == user.id }) list else list + user.copy(friend = true) }
     }
 
     override suspend fun declineRequest(id: String) = withContext(io) {
@@ -122,18 +194,59 @@ class MockSocialRepository(
         true
     }
 
+    override suspend fun search(query: String, byEmail: Boolean): List<UserSearchResult> = withContext(io) {
+        val needle = query.trim()
+        if (needle.length < 3) return@withContext emptyList()
+        delay(220)
+        val field = if (byEmail) MatchField.EMAIL else MatchField.USERNAME
+        directory.value
+            .filter { user ->
+                val haystack = if (byEmail) user.email.orEmpty() else user.name
+                haystack.contains(needle, ignoreCase = true)
+            }
+            .filterNot { user -> _friends.value.any { it.id == user.id } }
+            .map { user ->
+                UserSearchResult(
+                    user = user,
+                    matchedBy = field,
+                    requestSent = _requests.value.any { it.fromUserId == user.id }
+                )
+            }
+    }
+
+    override suspend fun sendRequest(userId: String): Boolean = withContext(io) {
+        val user = directory.value.firstOrNull { it.id == userId } ?: return@withContext false
+        delay(160)
+        if (_requests.value.none { it.fromUserId == userId }) {
+            _requests.update { it + FriendRequest("req_${UUID.randomUUID()}", user.name, user.avatar, fromUserId = user.id) }
+        }
+        true
+    }
+
     override suspend fun ensureChat(friendId: String) = withContext(io) {
         if (_chats.value[friendId] == null) {
             _chats.update { it + (friendId to emptyList()) }
         }
     }
 
-    override suspend fun sendMessage(friendId: String, text: String) = withContext(io) {
+    override suspend fun sendMessage(friendId: String, text: String, attachment: ChatAttachment?) = withContext(io) {
         val body = text.trim()
-        if (body.isEmpty()) return@withContext
+        if (body.isEmpty() && attachment == null) return@withContext
         delay(80)
-        val message = ChatMessage(UUID.randomUUID().toString(), "You", body, true, now())
+        val message = ChatMessage(
+            id = UUID.randomUUID().toString(),
+            author = "You",
+            text = body,
+            mine = true,
+            timestamp = now(),
+            attachments = listOfNotNull(attachment)
+        )
         _chats.update { chats -> chats + (friendId to (chats[friendId].orEmpty() + message)) }
+        if (attachment?.kind == AttachmentKind.INSTANCE) {
+            _shares.update {
+                it + (message.id to InstanceShare(message.id, attachment.title, attachment.subtitle, attachment.sizeLabel))
+            }
+        }
     }
 
     override suspend fun toggleReaction(friendId: String, messageId: String, emoji: String) = withContext(io) {
@@ -145,12 +258,12 @@ class MockSocialRepository(
                 var mine = message.myReaction
                 if (mine == emoji) {
                     counts[emoji] = (counts[emoji] ?: 1) - 1
-                    if (counts[emoji]!! <= 0) counts.remove(emoji)
+                    if ((counts[emoji] ?: 0) <= 0) counts.remove(emoji)
                     mine = null
                 } else {
                     mine?.let { previous ->
                         counts[previous] = (counts[previous] ?: 1) - 1
-                        if (counts[previous]!! <= 0) counts.remove(previous)
+                        if ((counts[previous] ?: 0) <= 0) counts.remove(previous)
                     }
                     counts[emoji] = (counts[emoji] ?: 0) + 1
                     mine = emoji
@@ -161,10 +274,16 @@ class MockSocialRepository(
         }
     }
 
-    override suspend fun createParty() = withContext(io) {
+    override suspend fun installSharedInstance(messageId: String, share: InstanceShare) = withContext(io) {
+        _shares.update { it + (messageId to share.copy(state = InstanceShareState.DOWNLOADING)) }
+        delay(1500)
+        _shares.update { it + (messageId to share.copy(state = InstanceShareState.READY)) }
+    }
+
+    override suspend fun createParty(name: String, logo: Int) = withContext(io) {
         delay(180)
         _party.value = PartyState(
-            joined = true, name = "Nova's party", connecting = true,
+            joined = true, name = name, logo = logo, connecting = true,
             members = listOf(PartyMember("you", "Nova (You)", 6, isYou = true))
         )
         delay(400)
@@ -181,19 +300,81 @@ class MockSocialRepository(
         }
     }
 
+    override suspend fun renameParty(name: String) = withContext(io) {
+        _party.update { it.copy(name = name.take(32)) }
+    }
+
+    override suspend fun setPartyLogo(logo: Int) = withContext(io) {
+        _party.update { it.copy(logo = logo) }
+    }
+
+    override suspend fun startGroupCall() = withContext(io) {
+        delay(120)
+        _party.update { it.copy(inCall = true, reconnecting = false) }
+    }
+
     override suspend fun leaveParty() = withContext(io) {
         delay(100)
         _party.value = PartyState()
     }
 
     override suspend fun toggleMute() = withContext(io) {
-        _party.update { it.copy(muted = !it.muted) }
+        _party.update { it.copy(muted = !it.muted, callMuted = !it.muted) }
+    }
+
+    override suspend fun addPost(caption: String, kind: PostKind) = withContext(io) {
+        delay(140)
+        _posts.update {
+            listOf(
+                ActivityPost(
+                    id = UUID.randomUUID().toString(),
+                    authorId = "me",
+                    authorName = "You",
+                    authorAvatar = 6,
+                    caption = caption.trim(),
+                    kind = kind,
+                    accentSeed = 4,
+                    hoursAgo = 0
+                )
+            ) + it
+        }
+    }
+
+    override suspend fun toggleLike(postId: String) = withContext(io) {
+        _posts.update { posts ->
+            posts.map { post ->
+                if (post.id != postId) post
+                else post.copy(liked = !post.liked, likes = post.likes + if (post.liked) -1 else 1)
+            }
+        }
+    }
+
+    override suspend fun comment(postId: String, text: String) = withContext(io) {
+        val body = text.trim()
+        if (body.isEmpty()) return@withContext
+        _posts.update { posts ->
+            posts.map { post ->
+                if (post.id != postId) post
+                else post.copy(comments = post.comments + ActivityComment(UUID.randomUUID().toString(), "You", body))
+            }
+        }
+    }
+
+    override suspend fun toggleFollow(userId: String) = withContext(io) {
+        _posts.update { posts ->
+            posts.map { if (it.authorId == userId) it.copy(following = !it.following) else it }
+        }
+        directory.update { users -> users.map { if (it.id == userId) it.copy(followers = it.followers + 1) else it } }
     }
 
     override suspend fun block(userId: String) = withContext(io) {
         delay(120)
-        _friends.update { list -> list.filterNot { it.id == userId } }
-        _blocked.update { list -> list + _friends.value.filter { it.id == userId } }
+        val user = _friends.value.firstOrNull { it.id == userId }
+            ?: directory.value.firstOrNull { it.id == userId }
+        if (user != null) {
+            _friends.update { list -> list.filterNot { it.id == userId } }
+            _blocked.update { list -> if (list.any { it.id == userId }) list else list + user }
+        }
     }
 
     override suspend fun report(userId: String, reason: String) = withContext(io) {

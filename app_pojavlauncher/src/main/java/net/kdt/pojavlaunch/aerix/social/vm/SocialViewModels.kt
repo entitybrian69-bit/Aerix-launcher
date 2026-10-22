@@ -2,7 +2,7 @@
  * Aerix Launcher Social layer.
  *
  * ViewModels. Each one owns a StateFlow of immutable UI state, receives events from the
- * Composables and performs every mutation in viewModelScope on Dispatchers.IO.
+ * Composables and performs every mutation in viewModelScope on the IO dispatcher.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -22,26 +22,47 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import net.kdt.pojavlaunch.aerix.social.data.ActivityPost
 import net.kdt.pojavlaunch.aerix.social.data.AerixUser
+import net.kdt.pojavlaunch.aerix.social.data.AttachmentKind
+import net.kdt.pojavlaunch.aerix.social.data.ChatAttachment
 import net.kdt.pojavlaunch.aerix.social.data.ChatMessage
+import net.kdt.pojavlaunch.aerix.social.data.ChatSettings
 import net.kdt.pojavlaunch.aerix.social.data.FriendRequest
+import net.kdt.pojavlaunch.aerix.social.data.InstanceShare
+import net.kdt.pojavlaunch.aerix.social.data.LinkPlatform
+import net.kdt.pojavlaunch.aerix.social.data.MicSettings
 import net.kdt.pojavlaunch.aerix.social.data.NotificationSettings
 import net.kdt.pojavlaunch.aerix.social.data.PartyState
+import net.kdt.pojavlaunch.aerix.social.data.PostKind
 import net.kdt.pojavlaunch.aerix.social.data.PrivacySettings
 import net.kdt.pojavlaunch.aerix.social.data.ServerInvite
 import net.kdt.pojavlaunch.aerix.social.data.SocialConnection
+import net.kdt.pojavlaunch.aerix.social.data.SocialLink
 import net.kdt.pojavlaunch.aerix.social.data.SocialPersisted
 import net.kdt.pojavlaunch.aerix.social.data.SocialRepository
 import net.kdt.pojavlaunch.aerix.social.data.SocialStore
+import net.kdt.pojavlaunch.aerix.social.data.UserSearchResult
+import net.kdt.pojavlaunch.aerix.social.data.formatCooldown
 import net.kdt.pojavlaunch.aerix.social.data.validateAerixName
 
 /* ------------------------------------------------------------------ shell ----- */
 
-enum class SocialRoute { AUTH, APPEARANCE, DASHBOARD, CHAT, PROFILE, PRIVACY, NOTIFICATIONS, SAFETY, SKIN, CAPE, VOICE }
+enum class SocialRoute {
+    AUTH, CHARACTER, DASHBOARD, ADD_FRIEND, ACTIVITY, THEME, CHAT, PARTY, PROFILE,
+    EDIT_PROFILE, SETTINGS, SETTINGS_PRIVACY, SETTINGS_MIC, SETTINGS_CHATS,
+    SETTINGS_ACCOUNT, SETTINGS_NOTIFICATIONS, SAFETY, SKIN, CAPE
+}
 
 enum class SocialTab { FRIENDS, CHATS, PARTY }
 
-/** Navigation and open/closed state of the second launcher. */
+/**
+ * Navigation and open/closed state of the second launcher.
+ *
+ * [open] decides the first screen: a returning player lands on the dashboard, a fresh
+ * install starts on the Google sign-in page, and a player who signed up but never finished
+ * the character screen goes back to it.
+ */
 class SocialShellViewModel : ViewModel() {
     private val _isOpen = MutableStateFlow(false)
     val isOpen: StateFlow<Boolean> = _isOpen.asStateFlow()
@@ -49,14 +70,15 @@ class SocialShellViewModel : ViewModel() {
     private val _route = MutableStateFlow(SocialRoute.AUTH)
     val route: StateFlow<SocialRoute> = _route.asStateFlow()
 
-    private val _tab = MutableStateFlow(SocialTab.FRIENDS)
-    val tab: StateFlow<SocialTab> = _tab.asStateFlow()
-
     private val stack = ArrayDeque<SocialRoute>()
 
-    fun open(signedIn: Boolean) {
+    fun open(signedIn: Boolean, characterReady: Boolean = signedIn) {
         stack.clear()
-        _route.value = if (signedIn) SocialRoute.DASHBOARD else SocialRoute.AUTH
+        _route.value = when {
+            signedIn && characterReady -> SocialRoute.DASHBOARD
+            signedIn -> SocialRoute.CHARACTER
+            else -> SocialRoute.AUTH
+        }
         _isOpen.value = true
     }
 
@@ -70,7 +92,7 @@ class SocialShellViewModel : ViewModel() {
         _route.value = target
     }
 
-    /** Replaces the current root route, used by sign-in and the appearance setup. */
+    /** Replaces the current root route, used by sign-in, character setup and sign-out. */
     fun reset(target: SocialRoute) {
         stack.clear()
         _route.value = target
@@ -82,12 +104,6 @@ class SocialShellViewModel : ViewModel() {
         _route.value = previous
         return true
     }
-
-    fun selectTab(value: SocialTab) {
-        _tab.value = value
-        stack.clear()
-        _route.value = SocialRoute.DASHBOARD
-    }
 }
 
 /* ---------------------------------------------------------------- profile ----- */
@@ -95,12 +111,24 @@ class SocialShellViewModel : ViewModel() {
 data class ProfileUiState(
     val signedIn: Boolean = false,
     val name: String = "",
+    val username: String = "",
+    val usernameChangedAt: Long = 0L,
+    val bio: String = "",
+    val links: List<SocialLink> = emptyList(),
+    val avatar: Int = 6,
     val skinId: String = "skin_1",
     val capeId: String = "cape_none",
+    val themeWallpaperId: String = "",
     val nameError: String? = null,
     val signInInProgress: Boolean = false,
     val saved: Boolean = false
-)
+) {
+    fun canChangeUsername(now: Long = System.currentTimeMillis()): Boolean =
+        now >= usernameChangedAt + SocialPersisted.USERNAME_COOLDOWN_MS
+
+    fun cooldownRemaining(now: Long = System.currentTimeMillis()): Long =
+        (usernameChangedAt + SocialPersisted.USERNAME_COOLDOWN_MS - now).coerceAtLeast(0L)
+}
 
 class SocialProfileViewModel(
     private val store: SocialStore,
@@ -116,8 +144,14 @@ class SocialProfileViewModel(
                     it.copy(
                         signedIn = persisted.signedIn,
                         name = persisted.name,
+                        username = persisted.username.ifBlank { persisted.name },
+                        usernameChangedAt = persisted.usernameChangedAt,
+                        bio = persisted.bio,
+                        links = persisted.links,
+                        avatar = persisted.avatar,
                         skinId = persisted.skinId,
-                        capeId = persisted.capeId
+                        capeId = persisted.capeId,
+                        themeWallpaperId = persisted.themeWallpaperId
                     )
                 }
             }
@@ -126,23 +160,58 @@ class SocialProfileViewModel(
 
     /**
      * Existing account: the stored profile is kept, so the player lands straight on the
-     * dashboard. A blank name (first sign-in on a fresh install) falls back to the account
-     * display name instead of asking for the appearance setup again.
+     * dashboard. A blank name (fresh install) falls back to the account display name.
      */
-    fun signIn(accountName: String = "Nova") = viewModelScope.launch {
+    fun signIn(accountName: String = "Nova", onDone: () -> Unit = {}) = viewModelScope.launch {
         _state.update { it.copy(signInInProgress = true) }
         withContext(io) {
-            store.update { it.copy(signedIn = true, name = it.name.ifBlank { accountName }) }
+            store.update {
+                it.copy(
+                    signedIn = true,
+                    name = it.name.ifBlank { accountName },
+                    username = it.username.ifBlank { it.name.ifBlank { accountName } }
+                )
+            }
         }
         _state.update { it.copy(signInInProgress = false) }
+        onDone()
+    }
+
+    /** New account: never touches an existing profile, the character screen fills it in. */
+    fun createAccount() = viewModelScope.launch {
+        withContext(io) { store.update { it.copy(signedIn = true) } }
     }
 
     fun signOut() = viewModelScope.launch {
         withContext(io) { store.update { it.copy(signedIn = false) } }
     }
 
+    fun disableAccount() = viewModelScope.launch {
+        withContext(io) { store.update { it.copy(signedIn = false) } }
+    }
+
+    fun deleteAccount() = viewModelScope.launch {
+        withContext(io) { store.update { SocialPersisted() } }
+    }
+
     fun onNameChange(value: String) {
         _state.update { it.copy(name = value.take(16), nameError = null, saved = false) }
+    }
+
+    fun onUsernameChange(value: String) {
+        _state.update { it.copy(username = value.take(16), nameError = null, saved = false) }
+    }
+
+    fun onBioChange(value: String) {
+        _state.update { it.copy(bio = value.take(140)) }
+        viewModelScope.launch {
+            withContext(io) { store.update { it.copy(bio = value.take(140)) } }
+        }
+    }
+
+    fun selectAvatar(index: Int) = viewModelScope.launch {
+        _state.update { it.copy(avatar = index) }
+        withContext(io) { store.update { it.copy(avatar = index) } }
     }
 
     fun selectSkin(id: String) = viewModelScope.launch {
@@ -153,20 +222,75 @@ class SocialProfileViewModel(
         withContext(io) { store.update { it.copy(capeId = id) } }
     }
 
-    /** Validates and persists the appearance. Returns true when the caller may move on. */
-    fun saveAppearance(onSaved: () -> Unit = {}): Boolean {
+    fun selectTheme(wallpaperId: String) = viewModelScope.launch {
+        _state.update { it.copy(themeWallpaperId = wallpaperId) }
+        withContext(io) { store.update { it.copy(themeWallpaperId = wallpaperId) } }
+    }
+
+    fun addLink(platform: LinkPlatform, value: String) {
+        val handle = value.trim().removePrefix("@")
+        if (handle.isBlank()) return
+        viewModelScope.launch {
+            withContext(io) {
+                store.update { current ->
+                    val links = current.links.filterNot { it.platform == platform } + SocialLink(platform, handle)
+                    current.copy(links = links)
+                }
+            }
+        }
+    }
+
+    fun removeLink(platform: LinkPlatform) = viewModelScope.launch {
+        withContext(io) { store.update { current -> current.copy(links = current.links.filterNot { it.platform == platform }) } }
+    }
+
+    /** Validates and persists the character screen. Returns true when the caller may move on. */
+    fun saveCharacter(onSaved: () -> Unit = {}): Boolean {
         val name = _state.value.name.trim()
-        val error = validateAerixName(name)
+        val username = _state.value.username.trim().ifBlank { name }
+        val error = validateAerixName(name) ?: validateAerixName(username)?.let { "Username: $it" }
         if (error != null) {
             _state.update { it.copy(nameError = error) }
             return false
         }
         viewModelScope.launch {
             withContext(io) {
-                store.update { it.copy(name = name, signedIn = true) }
+                store.update {
+                    it.copy(
+                        name = name,
+                        username = username,
+                        signedIn = true,
+                        usernameChangedAt = if (it.username.isBlank()) System.currentTimeMillis() else it.usernameChangedAt
+                    )
+                }
             }
-            _state.update { it.copy(saved = true, nameError = null, name = name) }
+            _state.update { it.copy(saved = true, nameError = null, name = name, username = username) }
             onSaved()
+        }
+        return true
+    }
+
+    /**
+     * Username changes are limited to once a week. Returns false (and surfaces the cooldown
+     * in [ProfileUiState]) when the week is not over yet.
+     */
+    fun changeUsername(value: String): Boolean {
+        val now = System.currentTimeMillis()
+        val state = _state.value
+        if (!state.canChangeUsername(now)) {
+            _state.update { it.copy(nameError = "Username can be changed again in ${formatCooldown(state.cooldownRemaining(now))}") }
+            return false
+        }
+        val error = validateAerixName(value.trim())
+        if (error != null) {
+            _state.update { it.copy(nameError = error) }
+            return false
+        }
+        viewModelScope.launch {
+            withContext(io) {
+                store.update { it.copy(username = value.trim(), usernameChangedAt = now) }
+            }
+            _state.update { it.copy(username = value.trim(), usernameChangedAt = now, nameError = null) }
         }
         return true
     }
@@ -174,9 +298,16 @@ class SocialProfileViewModel(
     fun snapshot(): SocialPersisted = SocialPersisted(
         signedIn = _state.value.signedIn,
         name = _state.value.name,
+        username = _state.value.username,
+        usernameChangedAt = _state.value.usernameChangedAt,
+        bio = _state.value.bio,
+        links = _state.value.links,
+        avatar = _state.value.avatar,
         skinId = _state.value.skinId,
-        capeId = _state.value.capeId
+        capeId = _state.value.capeId,
+        themeWallpaperId = _state.value.themeWallpaperId
     )
+
 }
 
 /* -------------------------------------------------------------- dashboard ----- */
@@ -188,7 +319,10 @@ data class DashboardUiState(
     val connection: SocialConnection = SocialConnection.LOADING,
     val query: String = "",
     val addFriendSentTo: String? = null
-)
+) {
+    val online: List<AerixUser> get() = friends.filter { it.status != net.kdt.pojavlaunch.aerix.social.data.UserStatus.OFFLINE }
+    val offline: List<AerixUser> get() = friends.filter { it.status == net.kdt.pojavlaunch.aerix.social.data.UserStatus.OFFLINE }
+}
 
 class SocialDashboardViewModel(private val repository: SocialRepository) : ViewModel() {
     private val _state = MutableStateFlow(DashboardUiState())
@@ -218,7 +352,7 @@ class SocialDashboardViewModel(private val repository: SocialRepository) : ViewM
 
     fun accept(id: String) = viewModelScope.launch { repository.acceptRequest(id) }
     fun decline(id: String) = viewModelScope.launch { repository.declineRequest(id) }
-    fun createParty() = viewModelScope.launch { repository.createParty() }
+    fun createParty(name: String = "Nova's party", logo: Int = 3) = viewModelScope.launch { repository.createParty(name, logo) }
     fun leaveParty() = viewModelScope.launch { repository.leaveParty() }
 
     fun addFriend(name: String) = viewModelScope.launch {
@@ -237,6 +371,49 @@ class SocialDashboardViewModel(private val repository: SocialRepository) : ViewM
         }
 }
 
+/* -------------------------------------------------------------- add friend ----- */
+
+data class AddFriendUiState(
+    val query: String = "",
+    val byEmail: Boolean = false,
+    val searching: Boolean = false,
+    val results: List<UserSearchResult> = emptyList(),
+    val sentTo: Set<String> = emptySet(),
+    val error: String? = null
+)
+
+class SocialAddFriendViewModel(private val repository: SocialRepository) : ViewModel() {
+    private val _state = MutableStateFlow(AddFriendUiState())
+    val state: StateFlow<AddFriendUiState> = _state.asStateFlow()
+
+    fun onQueryChange(value: String) = _state.update { it.copy(query = value, error = null) }
+
+    fun setByEmail(value: Boolean) = _state.update { it.copy(byEmail = value, results = emptyList(), error = null) }
+
+    fun search() = viewModelScope.launch {
+        val query = _state.value.query.trim()
+        if (query.length < 3) {
+            _state.update { it.copy(error = if (_state.value.byEmail) "Enter the full Gmail address" else "Enter at least 3 characters") }
+            return@launch
+        }
+        _state.update { it.copy(searching = true, error = null) }
+        val results = repository.search(query, _state.value.byEmail)
+        _state.update {
+            it.copy(
+                searching = false,
+                results = results,
+                error = if (results.isEmpty()) "No Aerix account matches that ${if (it.byEmail) "Gmail" else "username"}" else null
+            )
+        }
+    }
+
+    fun send(userId: String) = viewModelScope.launch {
+        if (repository.sendRequest(userId)) {
+            _state.update { it.copy(sentTo = it.sentTo + userId) }
+        }
+    }
+}
+
 /* ------------------------------------------------------------------- chat ----- */
 
 data class ChatUiState(
@@ -244,7 +421,9 @@ data class ChatUiState(
     val friendName: String = "",
     val friendAvatar: Int = 1,
     val messages: List<ChatMessage> = emptyList(),
-    val draft: String = ""
+    val draft: String = "",
+    val shares: Map<String, InstanceShare> = emptyMap(),
+    val playingMusicId: String? = null
 )
 
 class SocialChatViewModel(private val repository: SocialRepository) : ViewModel() {
@@ -258,12 +437,13 @@ class SocialChatViewModel(private val repository: SocialRepository) : ViewModel(
                 _state.update { it.copy(messages = chats[id].orEmpty()) }
             }
         }
+        viewModelScope.launch {
+            repository.shares.collect { shares -> _state.update { it.copy(shares = shares) } }
+        }
     }
 
     fun open(friend: AerixUser) = viewModelScope.launch {
         repository.ensureChat(friend.id)
-        // Seed the existing history immediately: the chats flow only emits on the next change,
-        // so without this a chat with history would open empty.
         _state.update {
             it.copy(
                 friendId = friend.id,
@@ -286,17 +466,115 @@ class SocialChatViewModel(private val repository: SocialRepository) : ViewModel(
         viewModelScope.launch { repository.sendMessage(id, text) }
     }
 
+    /** Sends a demo attachment of [kind]; the payload mirrors what a real upload would carry. */
+    fun attach(kind: AttachmentKind) {
+        val id = _state.value.friendId ?: return
+        val attachment = when (kind) {
+            AttachmentKind.IMAGE -> ChatAttachment(kind, "screenshot.png", "1440 × 900", "screenshot.png", "2.4 MB")
+            AttachmentKind.GIF -> ChatAttachment(kind, "creeper.gif", "Animated", "creeper.gif", "1.1 MB")
+            AttachmentKind.FILE -> ChatAttachment(kind, "modpack-notes.pdf", "Any file, any size", "modpack-notes.pdf", "8.7 MB")
+            AttachmentKind.LINK -> ChatAttachment(kind, "Aerix Launcher", "github.com/entitybrian69-bit/Aerix-launcher", "https://github.com/entitybrian69-bit/Aerix-launcher")
+            AttachmentKind.INSTANCE -> ChatAttachment(kind, "Remarkably Optimized", "Fabric 0.16.10 • 1.21.1", "remarkably-optimized", "412 MB")
+            AttachmentKind.MUSIC -> ChatAttachment(kind, "Aurora", "Shared track · 3:12", "aurora.mp3", "6.2 MB")
+        }
+        viewModelScope.launch { repository.sendMessage(id, "", attachment) }
+    }
+
+    fun install(messageId: String) = viewModelScope.launch {
+        val share = _state.value.shares[messageId] ?: return@launch
+        repository.installSharedInstance(messageId, share)
+    }
+
+    fun toggleMusic(messageId: String) {
+        _state.update { it.copy(playingMusicId = if (it.playingMusicId == messageId) null else messageId) }
+    }
+
     fun react(messageId: String, emoji: String) = viewModelScope.launch {
         val id = _state.value.friendId ?: return@launch
         repository.toggleReaction(id, messageId, emoji)
     }
 }
 
-/* --------------------------------------------------------------- settings ----- */
+/* ---------------------------------------------------------------- activity ----- */
+
+data class ActivityUiState(
+    val posts: List<ActivityPost> = emptyList(),
+    val composerOpen: Boolean = false,
+    val composerCaption: String = "",
+    val storyOpen: ActivityPost? = null,
+    val profileOpen: AerixUser? = null,
+    val commentTarget: String? = null,
+    val commentDraft: String = ""
+)
+
+class SocialActivityViewModel(
+    private val repository: SocialRepository,
+    private val people: () -> List<AerixUser> = { emptyList() }
+) : ViewModel() {
+    private val _state = MutableStateFlow(ActivityUiState())
+    val state: StateFlow<ActivityUiState> = _state.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            repository.posts.collect { posts -> _state.update { it.copy(posts = posts) } }
+        }
+    }
+
+    fun openComposer() = _state.update { it.copy(composerOpen = true) }
+    fun closeComposer() = _state.update { it.copy(composerOpen = false, composerCaption = "") }
+    fun onCaptionChange(value: String) = _state.update { it.copy(composerCaption = value.take(220)) }
+
+    fun publish(kind: PostKind) {
+        val caption = _state.value.composerCaption
+        viewModelScope.launch {
+            repository.addPost(caption.ifBlank { "New post" }, kind)
+            _state.update { it.copy(composerOpen = false, composerCaption = "") }
+        }
+    }
+
+    fun openStory(post: ActivityPost) = _state.update { it.copy(storyOpen = post) }
+    fun closeStory() = _state.update { it.copy(storyOpen = null) }
+
+    fun openProfile(userId: String, posts: List<ActivityPost>) {
+        val post = posts.firstOrNull { it.authorId == userId }
+        val known = people().firstOrNull { it.id == userId }
+        val user = known ?: AerixUser(
+            id = userId,
+            name = post?.authorName ?: "Aerix user",
+            avatar = post?.authorAvatar ?: 1,
+            hasStory = posts.any { it.authorId == userId && it.kind == PostKind.STORY },
+            followers = post?.likes ?: 0,
+            posts = posts.count { it.authorId == userId }
+        )
+        _state.update { it.copy(profileOpen = user) }
+    }
+
+    fun closeProfile() = _state.update { it.copy(profileOpen = null) }
+
+    fun toggleLike(postId: String) = viewModelScope.launch { repository.toggleLike(postId) }
+    fun toggleFollow(userId: String) = viewModelScope.launch { repository.toggleFollow(userId) }
+
+    fun openComments(postId: String) = _state.update { it.copy(commentTarget = postId, commentDraft = "") }
+    fun closeComments() = _state.update { it.copy(commentTarget = null, commentDraft = "") }
+    fun onCommentChange(value: String) = _state.update { it.copy(commentDraft = value) }
+    fun submitComment() {
+        val postId = _state.value.commentTarget ?: return
+        val text = _state.value.commentDraft
+        if (text.isBlank()) return
+        viewModelScope.launch {
+            repository.comment(postId, text)
+            _state.update { it.copy(commentTarget = null, commentDraft = "") }
+        }
+    }
+}
+
+/* ---------------------------------------------------------------- settings ----- */
 
 data class SettingsUiState(
     val privacy: PrivacySettings = PrivacySettings(),
-    val notifications: NotificationSettings = NotificationSettings()
+    val notifications: NotificationSettings = NotificationSettings(),
+    val chat: ChatSettings = ChatSettings(),
+    val mic: MicSettings = MicSettings()
 )
 
 class SocialSettingsViewModel(
@@ -309,18 +587,27 @@ class SocialSettingsViewModel(
     init {
         viewModelScope.launch {
             store.data.collect { persisted ->
-                _state.value = SettingsUiState(persisted.privacy, persisted.notifications)
+                _state.value = SettingsUiState(
+                    privacy = persisted.privacy,
+                    notifications = persisted.notifications,
+                    chat = persisted.chat,
+                    mic = persisted.mic
+                )
             }
         }
     }
 
+    /* privacy -- */
     fun setOnlineStatus(value: Boolean) = persistPrivacy { it.copy(onlineStatus = value) }
     fun setShareActivity(value: Boolean) = persistPrivacy { it.copy(shareActivity = value) }
     fun setShowServerDetails(value: Boolean) = persistPrivacy { it.copy(showServerDetails = value) }
+    fun setProfileLock(value: Boolean) = persistPrivacy { it.copy(profileLock = value) }
+    fun setStatus(value: String) = persistPrivacy { it.copy(status = value) }
     fun setFriendRequests(value: String) = persistPrivacy { it.copy(friendRequests = value) }
     fun setPrivateMessages(value: String) = persistPrivacy { it.copy(privateMessages = value) }
     fun setPartyInvites(value: String) = persistPrivacy { it.copy(partyInvites = value) }
 
+    /* notifications -- */
     fun setFriendRequestNotifications(value: Boolean) = persistNotifications { it.copy(friendRequests = value) }
     fun setPrivateMessageNotifications(value: Boolean) = persistNotifications { it.copy(privateMessages = value) }
     fun setPartyInviteNotifications(value: Boolean) = persistNotifications { it.copy(partyInvites = value) }
@@ -330,6 +617,24 @@ class SocialSettingsViewModel(
     fun setMessagePreview(value: Boolean) = persistNotifications { it.copy(messagePreview = value) }
     fun setAndroidNotifications(value: Boolean) = persistNotifications { it.copy(androidNotifications = value) }
 
+    /* chats -- */
+    fun setAllowStrangers(value: Boolean) = persistChat { it.copy(allowStrangers = value) }
+    fun setAllowFriends(value: Boolean) = persistChat { it.copy(allowFriends = value) }
+    fun setAllowCloseFriends(value: Boolean) = persistChat { it.copy(allowCloseFriends = value) }
+    fun setAllowParty(value: Boolean) = persistChat { it.copy(allowParty = value) }
+    fun setAutoDownloadMedia(value: Boolean) = persistChat { it.copy(autoDownloadMedia = value) }
+    fun setReadReceipts(value: Boolean) = persistChat { it.copy(readReceipts = value) }
+    fun setKeepMedia(value: Boolean) = persistChat { it.copy(keepMediaOnDevice = value) }
+
+    /* microphone -- */
+    fun setMuteOnJoin(value: Boolean) = persistMic { it.copy(muteOnJoin = value) }
+    fun setPushToTalk(value: Boolean) = persistMic { it.copy(pushToTalk = value) }
+    fun setNoiseSuppression(value: Boolean) = persistMic { it.copy(noiseSuppression = value) }
+    fun setEchoCancellation(value: Boolean) = persistMic { it.copy(echoCancellation = value) }
+    fun setVoiceActivity(value: Boolean) = persistMic { it.copy(voiceActivity = value) }
+    fun setInputVolume(value: Int) = persistMic { it.copy(inputVolume = value.coerceIn(0, 100)) }
+    fun setOutputVolume(value: Int) = persistMic { it.copy(outputVolume = value.coerceIn(0, 100)) }
+
     private fun persistPrivacy(transform: (PrivacySettings) -> PrivacySettings) = viewModelScope.launch {
         withContext(io) { store.update { it.copy(privacy = transform(it.privacy)) } }
     }
@@ -337,9 +642,17 @@ class SocialSettingsViewModel(
     private fun persistNotifications(transform: (NotificationSettings) -> NotificationSettings) = viewModelScope.launch {
         withContext(io) { store.update { it.copy(notifications = transform(it.notifications)) } }
     }
+
+    private fun persistChat(transform: (ChatSettings) -> ChatSettings) = viewModelScope.launch {
+        withContext(io) { store.update { it.copy(chat = transform(it.chat)) } }
+    }
+
+    private fun persistMic(transform: (MicSettings) -> MicSettings) = viewModelScope.launch {
+        withContext(io) { store.update { it.copy(mic = transform(it.mic)) } }
+    }
 }
 
-/* --------------------------------------------------------------- in game ----- */
+/* ---------------------------------------------------------------- in game ----- */
 
 enum class CompactMode { CHAT, VOICE, INVITE, AUTH_REQUIRED }
 
@@ -388,6 +701,7 @@ class InGameSocialViewModel(
     fun joinParty() = viewModelScope.launch { repository.createParty() }
     fun leaveParty() = viewModelScope.launch { repository.leaveParty() }
     fun toggleMute() = viewModelScope.launch { repository.toggleMute() }
+    fun startGroupCall() = viewModelScope.launch { repository.startGroupCall() }
 
     fun send(text: String) = viewModelScope.launch {
         repository.ensureChat("kai")

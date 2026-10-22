@@ -8,8 +8,10 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import net.kdt.pojavlaunch.aerix.social.data.DataStoreSocialStore
+import net.kdt.pojavlaunch.aerix.social.data.LinkPlatform
 import net.kdt.pojavlaunch.aerix.social.data.NotificationSettings
 import net.kdt.pojavlaunch.aerix.social.data.PrivacySettings
+import net.kdt.pojavlaunch.aerix.social.data.SocialLink
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -19,8 +21,8 @@ import org.junit.rules.TemporaryFolder
 import java.io.File
 
 /**
- * The real DataStore implementation, exercised on the JVM. This is the test that proves the
- * settings a player toggles are actually written somewhere durable.
+ * The real DataStore implementation, exercised on the JVM. These are the tests that prove the
+ * profile, links, chat rules and microphone settings a player picks survive a restart.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class DataStoreSocialStoreTest {
@@ -42,20 +44,23 @@ class DataStoreSocialStoreTest {
         assertFalse(defaults.signedIn)
         assertEquals("skin_1", defaults.skinId)
         assertEquals("cape_none", defaults.capeId)
+        assertEquals("", defaults.username)
+        assertEquals(0L, defaults.usernameChangedAt)
         assertTrue(defaults.privacy.onlineStatus)
-        assertTrue(defaults.privacy.shareActivity)
-        assertFalse(defaults.privacy.showServerDetails)
+        assertFalse(defaults.privacy.profileLock)
         assertEquals("Everyone", defaults.privacy.friendRequests)
         assertEquals("Accepted friends only", defaults.privacy.privateMessages)
-        assertEquals("Accepted friends only", defaults.privacy.partyInvites)
         assertTrue(defaults.notifications.friendRequests)
         assertFalse(defaults.notifications.messagePreview)
-        assertFalse(defaults.notifications.androidNotifications)
+        assertFalse(defaults.chat.allowStrangers)
+        assertTrue(defaults.chat.allowFriends)
+        assertTrue(defaults.mic.muteOnJoin)
+        assertEquals(70, defaults.mic.inputVolume)
         scope.coroutineContext[Job]?.cancel()
     }
 
     @Test
-    fun profileAndSettingsAreWrittenAndReadBack() = runTest {
+    fun profileLinksAndSettingsAreWrittenAndReadBack() = runTest {
         val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler) + Job())
         val file = File(temporary.newFolder(), "social.preferences_pb")
         val socialStore = store(scope, file)
@@ -64,30 +69,50 @@ class DataStoreSocialStoreTest {
             it.copy(
                 signedIn = true,
                 name = "Nova",
+                username = "nova_plays",
+                usernameChangedAt = 1_700_000_000_000L,
+                bio = "Survival builder",
+                links = listOf(
+                    SocialLink(LinkPlatform.YOUTUBE, "@nova"),
+                    SocialLink(LinkPlatform.DISCORD, "nova")
+                ),
+                avatar = 3,
                 skinId = "skin_3",
                 capeId = "cape_aerix",
-                privacy = it.privacy.copy(onlineStatus = false, showServerDetails = true, partyInvites = "Nobody"),
-                notifications = it.notifications.copy(messagePreview = true, androidNotifications = true)
+                themeWallpaperId = "wp_06_the_end",
+                privacy = it.privacy.copy(profileLock = true, status = "In a party", onlineStatus = false),
+                notifications = it.notifications.copy(messagePreview = true),
+                chat = it.chat.copy(allowStrangers = true, allowParty = false),
+                mic = it.mic.copy(muteOnJoin = false, inputVolume = 45)
             )
         }
 
         val persisted = socialStore.data.first()
         assertTrue(persisted.signedIn)
         assertEquals("Nova", persisted.name)
-        assertEquals("skin_3", persisted.skinId)
-        assertEquals("cape_aerix", persisted.capeId)
+        assertEquals("nova_plays", persisted.username)
+        assertEquals(1_700_000_000_000L, persisted.usernameChangedAt)
+        assertEquals("Survival builder", persisted.bio)
+        assertEquals(2, persisted.links.size)
+        assertEquals("https://youtube.com/@nova", persisted.links.first().url)
+        assertEquals(3, persisted.avatar)
+        assertEquals("wp_06_the_end", persisted.themeWallpaperId)
+        assertTrue(persisted.privacy.profileLock)
+        assertEquals("In a party", persisted.privacy.status)
         assertFalse(persisted.privacy.onlineStatus)
-        assertTrue(persisted.privacy.showServerDetails)
-        assertEquals("Nobody", persisted.privacy.partyInvites)
         assertTrue(persisted.notifications.messagePreview)
-        assertTrue(persisted.notifications.androidNotifications)
+        assertTrue(persisted.chat.allowStrangers)
+        assertFalse(persisted.chat.allowParty)
+        assertFalse(persisted.mic.muteOnJoin)
+        assertEquals(45, persisted.mic.inputVolume)
 
         // A second update must merge with what is already there, not reset it.
         socialStore.update { it.copy(privacy = it.privacy.copy(onlineStatus = true)) }
         val merged = socialStore.data.first()
         assertTrue(merged.privacy.onlineStatus)
-        assertEquals("Nova", merged.name)
-        assertEquals("skin_3", merged.skinId)
+        assertEquals("nova_plays", merged.username)
+        assertEquals(2, merged.links.size)
+        assertEquals("wp_06_the_end", merged.themeWallpaperId)
         scope.coroutineContext[Job]?.cancel()
     }
 
@@ -96,6 +121,7 @@ class DataStoreSocialStoreTest {
         val privacy = PrivacySettings()
         val notifications = NotificationSettings()
         assertFalse(privacy.showServerDetails)
+        assertFalse(privacy.profileLock)
         assertFalse(notifications.messagePreview)
     }
 }

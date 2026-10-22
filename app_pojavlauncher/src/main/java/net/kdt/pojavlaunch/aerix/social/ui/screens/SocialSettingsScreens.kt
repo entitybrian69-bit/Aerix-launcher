@@ -1,8 +1,8 @@
 /*
  * Aerix Launcher Social layer.
  *
- * Profile, privacy, notifications and safety. Every toggle writes straight through to
- * DataStore, which is why the values survive a restart.
+ * Settings, opened from the gear in the top right: Privacy, Microphone, Chats and Account
+ * settings, plus notifications and safety. Every value is written straight to DataStore.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -12,9 +12,7 @@
 
 package net.kdt.pojavlaunch.aerix.social.ui.screens
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -49,8 +47,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import net.kdt.pojavlaunch.R
-import net.kdt.pojavlaunch.aerix.social.data.SocialWardrobe
-import net.kdt.pojavlaunch.aerix.social.ui.SocialAvatar
+import net.kdt.pojavlaunch.aerix.social.data.SocialPersisted
+import net.kdt.pojavlaunch.aerix.social.data.formatCooldown
 import net.kdt.pojavlaunch.aerix.social.ui.SocialBody
 import net.kdt.pojavlaunch.aerix.social.ui.SocialColors
 import net.kdt.pojavlaunch.aerix.social.ui.SocialDialog
@@ -60,91 +58,87 @@ import net.kdt.pojavlaunch.aerix.social.ui.SocialGhostButton
 import net.kdt.pojavlaunch.aerix.social.ui.SocialPage
 import net.kdt.pojavlaunch.aerix.social.ui.SocialPanel
 import net.kdt.pojavlaunch.aerix.social.ui.SocialPrimaryButton
+import net.kdt.pojavlaunch.aerix.social.ui.SocialSectionCard
 import net.kdt.pojavlaunch.aerix.social.ui.SocialSectionTitle
+import net.kdt.pojavlaunch.aerix.social.ui.SocialSliderRow
+import net.kdt.pojavlaunch.aerix.social.ui.SocialTextField
 import net.kdt.pojavlaunch.aerix.social.ui.SocialTitle
 import net.kdt.pojavlaunch.aerix.social.ui.SocialToggleRow
 import net.kdt.pojavlaunch.aerix.social.vm.ProfileUiState
+import net.kdt.pojavlaunch.aerix.social.vm.SocialProfileViewModel
 import net.kdt.pojavlaunch.aerix.social.vm.SocialSettingsViewModel
 
-/* ------------------------------------------------------------------ profile ----- */
+/* ------------------------------------------------------------------ hub ----- */
 
 @Composable
-fun SocialProfileScreen(
+fun SocialSettingsHubScreen(
     profile: ProfileUiState,
     onBack: () -> Unit,
     onOpenPrivacy: () -> Unit,
-    onOpenNotifications: () -> Unit,
-    onOpenSafety: () -> Unit,
-    onOpenSkin: () -> Unit,
-    onOpenCape: () -> Unit,
-    onSignOut: () -> Unit
+    onOpenMic: () -> Unit,
+    onOpenChats: () -> Unit,
+    onOpenAccount: () -> Unit,
+    onOpenNotifications: () -> Unit
 ) {
-    var confirmSignOut by remember { mutableStateOf(false) }
-
     SocialPage {
-        Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            SocialPanel(modifier = Modifier.weight(0.9f).fillMaxSize()) {
-                Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    SocialAvatar(avatar = SocialWardrobe.skins.firstOrNull { it.id == profile.skinId }?.avatar ?: 1, size = 132.dp)
-                }
-                SocialBody("Skin · ${SocialWardrobe.skinName(profile.skinId)}", size = 12.sp, color = SocialColors.textMuted)
-            }
-            SocialPanel(modifier = Modifier.weight(1.1f).fillMaxSize()) {
-                SocialSectionTitle("Aerix profile")
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    SocialAvatar(avatar = 6, size = 42.dp)
-                    Column(modifier = Modifier.weight(1f)) {
-                        SocialBody(profile.name.ifBlank { "Nova" }, size = 16.sp, color = SocialColors.textPrimary, weight = FontWeight.SemiBold)
-                        SocialBody("Google account", size = 12.sp, color = SocialColors.textMuted)
-                    }
-                    SocialGhostButton("Edit name", onClick = {})
-                }
-                ProfileRow("Skin", SocialWardrobe.skinName(profile.skinId), onOpenSkin)
-                ProfileRow("Cape (optional)", SocialWardrobe.capeName(profile.capeId), onOpenCape)
-                ProfileRow("Privacy & presence", "Control what your friends can see", onOpenPrivacy)
-                ProfileRow("Notifications", "Choose what Aerix notifies you about", onOpenNotifications)
-                ProfileRow("Safety", "Blocked accounts and reports", onOpenSafety)
-                Spacer(Modifier.weight(1f))
-                SocialGhostButton(
-                    text = "Sign out",
-                    onClick = { confirmSignOut = true },
-                    iconRes = R.drawable.aerix_social_ic_logout,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-        }
-    }
-
-    if (confirmSignOut) {
-        SocialDialog(onDismiss = { confirmSignOut = false }) {
-            SocialTitle("Sign out of Aerix?")
-            SocialBody("Friends, requests and accepted-friend messages stay on your account. Sign in again to access them on this device.")
-            SocialBody("Your Minecraft account and local instances are not deleted.")
-            SocialBody("Unsaved changes will be discarded.", size = 12.sp, color = SocialColors.textSecondary)
-            SocialBody("Other signed-in devices are not affected.", size = 12.sp, color = SocialColors.textMuted)
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                SocialPrimaryButton("Sign out", onClick = { confirmSignOut = false; onSignOut() }, modifier = Modifier.weight(1f))
-                SocialGhostButton("Cancel", onClick = { confirmSignOut = false }, modifier = Modifier.weight(1f))
-            }
+        Column(modifier = Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            SocialBody("Settings for ${profile.username.ifBlank { profile.name }} · signed in with Google", size = 12.sp, color = SocialColors.textMuted)
+            SocialSectionCard(
+                title = "Privacy",
+                subtitle = "Status, profile lock and who can reach you",
+                iconRes = R.drawable.aerix_social_ic_shield,
+                onClick = onOpenPrivacy
+            )
+            MicrophoneCard(onClick = onOpenMic)
+            SocialSectionCard(
+                title = "Chats",
+                subtitle = "Strangers, friends, close friends, parties and media",
+                iconRes = R.drawable.aerix_social_ic_chat,
+                onClick = onOpenChats
+            )
+            SocialSectionCard(
+                title = "Account settings",
+                subtitle = "Username, disable or delete the account, safety",
+                iconRes = R.drawable.aerix_social_ic_profile,
+                onClick = onOpenAccount
+            )
+            Spacer(Modifier.height(4.dp))
+            SocialGhostButton("Notifications", onClick = onOpenNotifications, iconRes = R.drawable.aerix_ic_info_outlined, modifier = Modifier.fillMaxWidth())
+            SocialGhostButton("Back to Social", onClick = onBack, modifier = Modifier.fillMaxWidth())
         }
     }
 }
 
+/** The microphone section, with the mic itself in the middle of the card. */
 @Composable
-private fun ProfileRow(title: String, subtitle: String, onClick: () -> Unit) {
+private fun MicrophoneCard(onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 56.dp)
-            .clip(RoundedCornerShape(SocialDimens.controlRadius))
+            .clip(RoundedCornerShape(SocialDimens.cardRadius))
             .background(SocialColors.panelSoft)
             .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp)
     ) {
+        Box(
+            modifier = Modifier
+                .size(52.dp)
+                .clip(CircleShape)
+                .background(SocialColors.accent.copy(alpha = 0.25f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                painter = painterResource(R.drawable.aerix_social_ic_mic),
+                contentDescription = null,
+                tint = SocialColors.accentBright,
+                modifier = Modifier.size(28.dp)
+            )
+        }
         Column(modifier = Modifier.weight(1f)) {
-            SocialBody(title, size = 14.sp, color = SocialColors.textPrimary, weight = FontWeight.Medium)
-            SocialBody(subtitle, size = 11.sp, color = SocialColors.textMuted, maxLines = 1)
+            SocialBody("Microphone", color = SocialColors.textPrimary, size = 15.sp, weight = FontWeight.SemiBold)
+            SocialBody("Mute on join, push-to-talk, noise and volume", size = 12.sp, color = SocialColors.textMuted)
         }
         Icon(
             painter = painterResource(R.drawable.aerix_social_ic_chevron),
@@ -155,118 +149,109 @@ private fun ProfileRow(title: String, subtitle: String, onClick: () -> Unit) {
     }
 }
 
-/* ------------------------------------------------------------------ privacy ----- */
-
-private val contactOptions = listOf("Everyone", "Accepted friends only", "Nobody")
+/* --------------------------------------------------------------- privacy ----- */
 
 @Composable
-fun SocialPrivacyScreen(viewModel: SocialSettingsViewModel, onBack: () -> Unit) {
+fun SocialSettingsPrivacyScreen(viewModel: SocialSettingsViewModel, onBack: () -> Unit) {
     val state by viewModel.state.collectAsState()
     val privacy = state.privacy
 
     SocialPage {
         Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            SocialPanel(modifier = Modifier.weight(1f).fillMaxSize()) {
-                SocialSectionTitle("Presence")
-                SocialToggleRow(
-                    title = "Online status",
-                    subtitle = "Friends can see when you are online",
-                    checked = privacy.onlineStatus,
-                    onCheckedChange = viewModel::setOnlineStatus,
-                    iconRes = R.drawable.aerix_social_ic_profile
-                )
-                SocialToggleRow(
-                    title = "Share game activity",
-                    subtitle = "Friends see Playing Minecraft, never a server address",
-                    checked = privacy.shareActivity,
-                    onCheckedChange = viewModel::setShareActivity,
-                    iconRes = R.drawable.aerix_social_ic_party
-                )
-                SocialToggleRow(
-                    title = "Show server details",
-                    subtitle = "Off by default; friends see the server name only when you choose",
-                    checked = privacy.showServerDetails,
-                    onCheckedChange = viewModel::setShowServerDetails,
+            SocialPanel(modifier = Modifier.weight(1f).fillMaxSize().verticalScroll(rememberScrollState())) {
+                SocialSectionTitle("Status")
+                SocialBody("What friends see next to your name.", size = 12.sp, color = SocialColors.textMuted)
+                SocialDropdownRow(
+                    title = "Status",
+                    value = privacy.status,
+                    options = listOf("Available to play", "In a party", "Busy", "Do not disturb", "Looking for friends"),
+                    onSelect = viewModel::setStatus,
                     iconRes = R.drawable.aerix_social_ic_shield
                 )
+                SocialToggleRow("Profile lock", privacy.profileLock, viewModel::setProfileLock, subtitle = "Only followers can open your profile")
+                SocialGhostButton("Back", onClick = onBack, modifier = Modifier.fillMaxWidth())
             }
-            SocialPanel(modifier = Modifier.weight(1f).fillMaxSize()) {
-                SocialSectionTitle("Who can contact you")
-                SocialDropdownRow(
-                    title = "Friend requests",
-                    value = privacy.friendRequests,
-                    options = contactOptions,
-                    onSelect = viewModel::setFriendRequests,
-                    iconRes = R.drawable.aerix_social_ic_friends
-                )
-                SocialDropdownRow(
-                    title = "Private messages",
-                    value = privacy.privateMessages,
-                    options = contactOptions,
-                    onSelect = viewModel::setPrivateMessages,
-                    iconRes = R.drawable.aerix_social_ic_chat
-                )
-                SocialDropdownRow(
-                    title = "Party invitations",
-                    value = privacy.partyInvites,
-                    options = contactOptions,
-                    onSelect = viewModel::setPartyInvites,
-                    iconRes = R.drawable.aerix_social_ic_party
-                )
-                Spacer(Modifier.weight(1f))
-                SocialBody("Changes are saved as you make them.", size = 11.sp, color = SocialColors.textMuted)
+            SocialPanel(modifier = Modifier.weight(1f).fillMaxSize().verticalScroll(rememberScrollState())) {
+                SocialSectionTitle("Personal settings")
+                SocialToggleRow("Show online status", privacy.onlineStatus, viewModel::setOnlineStatus, iconRes = R.drawable.aerix_social_ic_friends)
+                SocialToggleRow("Share activity", privacy.shareActivity, viewModel::setShareActivity, iconRes = R.drawable.aerix_social_ic_activity)
+                SocialToggleRow("Show server details", privacy.showServerDetails, viewModel::setShowServerDetails, iconRes = R.drawable.aerix_social_ic_instance)
+                SocialDropdownRow("Friend requests", privacy.friendRequests, listOf("Everyone", "Friends of friends", "Nobody"), viewModel::setFriendRequests)
+                SocialDropdownRow("Private messages", privacy.privateMessages, listOf("Everyone", "Accepted friends only", "Close friends", "Nobody"), viewModel::setPrivateMessages)
+                SocialDropdownRow("Party invitations", privacy.partyInvites, listOf("Everyone", "Accepted friends only", "Nobody"), viewModel::setPartyInvites)
+            }
+        }
+    }
+}
+
+/* ----------------------------------------------------------- microphone ----- */
+
+@Composable
+fun SocialSettingsMicScreen(viewModel: SocialSettingsViewModel, onBack: () -> Unit) {
+    val state by viewModel.state.collectAsState()
+    val mic = state.mic
+
+    SocialPage {
+        Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            SocialPanel(modifier = Modifier.weight(0.8f).fillMaxSize()) {
+                Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Box(
+                            modifier = Modifier
+                                .size(96.dp)
+                                .clip(CircleShape)
+                                .background(SocialColors.accent.copy(alpha = 0.28f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                painter = painterResource(if (mic.muteOnJoin) R.drawable.aerix_social_ic_mic_off else R.drawable.aerix_social_ic_mic),
+                                contentDescription = null,
+                                tint = SocialColors.accentBright,
+                                modifier = Modifier.size(52.dp)
+                            )
+                        }
+                        SocialTitle(if (mic.muteOnJoin) "Join muted" else "Join with mic on")
+                        SocialBody("Android asks for microphone permission the first time you join a call.", size = 11.sp, color = SocialColors.textMuted)
+                    }
+                }
+            }
+            SocialPanel(modifier = Modifier.weight(1.2f).fillMaxSize().verticalScroll(rememberScrollState())) {
+                SocialSectionTitle("What the microphone does")
+                SocialToggleRow("Join muted", mic.muteOnJoin, viewModel::setMuteOnJoin, subtitle = "You unmute when you want to talk")
+                SocialToggleRow("Push to talk", mic.pushToTalk, viewModel::setPushToTalk, subtitle = "Hold the talk button instead of an open mic")
+                SocialToggleRow("Voice activity", mic.voiceActivity, viewModel::setVoiceActivity, subtitle = "Unmute automatically when you speak")
+                SocialToggleRow("Noise suppression", mic.noiseSuppression, viewModel::setNoiseSuppression)
+                SocialToggleRow("Echo cancellation", mic.echoCancellation, viewModel::setEchoCancellation)
+                SocialSliderRow("Input volume", mic.inputVolume, viewModel::setInputVolume)
+                SocialSliderRow("Output volume", mic.outputVolume, viewModel::setOutputVolume)
                 SocialPrimaryButton("Done", onClick = onBack, modifier = Modifier.fillMaxWidth())
             }
         }
     }
 }
 
-/* ------------------------------------------------------------ notifications ----- */
+/* ---------------------------------------------------------------- chats ----- */
 
 @Composable
-fun SocialNotificationsScreen(viewModel: SocialSettingsViewModel, onBack: () -> Unit) {
+fun SocialSettingsChatsScreen(viewModel: SocialSettingsViewModel, onBack: () -> Unit) {
     val state by viewModel.state.collectAsState()
-    val notifications = state.notifications
+    val chat = state.chat
 
     SocialPage {
         Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            SocialPanel(modifier = Modifier.weight(1f).fillMaxSize()) {
-                SocialSectionTitle("Notify me about")
-                SocialToggleRow("Friend requests", notifications.friendRequests, viewModel::setFriendRequestNotifications, iconRes = R.drawable.aerix_social_ic_friends)
-                SocialToggleRow(
-                    "Private messages",
-                    notifications.privateMessages,
-                    viewModel::setPrivateMessageNotifications,
-                    subtitle = "Accepted friends only",
-                    iconRes = R.drawable.aerix_social_ic_chat
-                )
-                SocialToggleRow("Party invitations", notifications.partyInvites, viewModel::setPartyInviteNotifications, iconRes = R.drawable.aerix_social_ic_party)
-                SocialToggleRow("Server invitations", notifications.serverInvites, viewModel::setServerInviteNotifications, iconRes = R.drawable.aerix_social_ic_link)
+            SocialPanel(modifier = Modifier.weight(1f).fillMaxSize().verticalScroll(rememberScrollState())) {
+                SocialSectionTitle("Receive messages from")
+                SocialToggleRow("Strangers", chat.allowStrangers, viewModel::setAllowStrangers, subtitle = "People who are not in your friends list")
+                SocialToggleRow("Friends", chat.allowFriends, viewModel::setAllowFriends)
+                SocialToggleRow("Close friends", chat.allowCloseFriends, viewModel::setAllowCloseFriends)
+                SocialToggleRow("Party", chat.allowParty, viewModel::setAllowParty, subtitle = "Everyone in a party you joined")
+                SocialBody("Blocked accounts never reach you, whatever is set here.", size = 11.sp, color = SocialColors.textMuted)
             }
-            SocialPanel(modifier = Modifier.weight(1f).fillMaxSize()) {
-                SocialSectionTitle("Delivery")
-                SocialToggleRow("In-launcher alerts", notifications.inLauncher, viewModel::setInLauncher, iconRes = R.drawable.aerix_ic_info_outlined)
-                SocialToggleRow(
-                    "In-game social alerts",
-                    notifications.inGame,
-                    viewModel::setInGame,
-                    subtitle = "Small notices while playing",
-                    iconRes = R.drawable.aerix_social_ic_party
-                )
-                SocialToggleRow(
-                    "Message preview",
-                    notifications.messagePreview,
-                    viewModel::setMessagePreview,
-                    subtitle = "Hide message text in alerts",
-                    iconRes = R.drawable.aerix_social_ic_chat
-                )
-                SocialToggleRow(
-                    "Android notifications",
-                    notifications.androidNotifications,
-                    viewModel::setAndroidNotifications,
-                    subtitle = "Device notification permission is controlled by Android",
-                    iconRes = R.drawable.aerix_social_ic_shield
-                )
+            SocialPanel(modifier = Modifier.weight(1f).fillMaxSize().verticalScroll(rememberScrollState())) {
+                SocialSectionTitle("Media and receipts")
+                SocialToggleRow("Auto-download media", chat.autoDownloadMedia, viewModel::setAutoDownloadMedia, subtitle = "Images, GIFs, files, instances and music")
+                SocialToggleRow("Read receipts", chat.readReceipts, viewModel::setReadReceipts)
+                SocialToggleRow("Keep media on device", chat.keepMediaOnDevice, viewModel::setKeepMedia)
                 Spacer(Modifier.weight(1f))
                 SocialPrimaryButton("Save changes", onClick = onBack, modifier = Modifier.fillMaxWidth())
             }
@@ -274,83 +259,99 @@ fun SocialNotificationsScreen(viewModel: SocialSettingsViewModel, onBack: () -> 
     }
 }
 
-/* ------------------------------------------------------------------- safety ----- */
+/* -------------------------------------------------------------- account ----- */
 
 @Composable
-fun SocialSafetyScreen(onBack: () -> Unit, onDeleteAccount: () -> Unit) {
-    var confirmDelete by remember { mutableStateOf(false) }
+fun SocialSettingsAccountScreen(
+    profile: SocialProfileViewModel,
+    state: ProfileUiState,
+    onBack: () -> Unit,
+    onOpenSafety: () -> Unit,
+    onDeleted: () -> Unit
+) {
+    var usernameDialog by remember { mutableStateOf(false) }
+    var disableDialog by remember { mutableStateOf(false) }
+    var deleteDialog by remember { mutableStateOf(false) }
     var typed by remember { mutableStateOf("") }
-    var reportOpen by remember { mutableStateOf(false) }
-    var blocked by remember { mutableStateOf(listOf("FrostByte", "EchoFox")) }
+    var newUsername by remember { mutableStateOf(state.username) }
+    val canChange = state.canChangeUsername()
 
     SocialPage {
         Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            SocialPanel(modifier = Modifier.weight(1.2f).fillMaxSize()) {
-                SocialSectionTitle("Blocked accounts")
-                if (blocked.isEmpty()) {
-                    SocialBody("Nobody is blocked.", size = 12.sp, color = SocialColors.textMuted)
-                } else {
-                    blocked.forEach { name ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = SocialDimens.row)
-                                .clip(RoundedCornerShape(SocialDimens.controlRadius))
-                                .background(SocialColors.panelSoft)
-                                .padding(horizontal = 12.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            SocialAvatar(avatar = 4, size = 36.dp)
-                            Column(modifier = Modifier.weight(1f)) {
-                                SocialBody(name, size = 14.sp, color = SocialColors.textPrimary)
-                                SocialBody("@${name.lowercase()}", size = 11.sp, color = SocialColors.textMuted)
-                            }
-                            SocialGhostButton("Unblock", onClick = { blocked = blocked - name })
-                        }
-                    }
-                }
-                SocialBody("Blocked accounts cannot message you or send friend and party invitations.", size = 11.sp, color = SocialColors.textMuted)
-                Spacer(Modifier.weight(1f))
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(SocialDimens.controlRadius))
-                        .background(SocialColors.danger.copy(alpha = 0.16f))
-                        .clickable { confirmDelete = true }
-                        .padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Delete Aerix account", color = SocialColors.danger, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                    Spacer(Modifier.weight(1f))
-                    Icon(
-                        painter = painterResource(R.drawable.aerix_social_ic_chevron),
-                        contentDescription = null,
-                        tint = SocialColors.danger,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
+            SocialPanel(modifier = Modifier.weight(1f).fillMaxSize().verticalScroll(rememberScrollState())) {
+                SocialSectionTitle("Profile")
+                SocialBody("Username · ${state.username.ifBlank { "not set" }}", size = 13.sp, color = SocialColors.textPrimary)
+                SocialBody(
+                    if (canChange) "You can change your username now."
+                    else "Next change in ${formatCooldown(state.cooldownRemaining())}.",
+                    size = 12.sp,
+                    color = if (canChange) SocialColors.success else SocialColors.textMuted
+                )
+                SocialGhostButton(
+                    text = if (canChange) "Change username" else "Username locked",
+                    onClick = { if (canChange) usernameDialog = true },
+                    enabled = canChange,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                SocialBody("A username can only be changed once a week.", size = 11.sp, color = SocialColors.textMuted)
+                Spacer(Modifier.height(8.dp))
+                SocialStageRow("Blocked accounts and reports", onOpenSafety)
             }
-            SocialPanel(modifier = Modifier.weight(0.9f).fillMaxSize()) {
-                SocialSectionTitle("Get help")
-                ProfileRow("Report a concern", "Report a profile or conversation") { reportOpen = true }
-                ProfileRow("Social guidelines", "How Aerix keeps play safe") {}
-                ProfileRow("Explain", "Muting hides alerts. Blocking stops contact.") {}
+            SocialPanel(modifier = Modifier.weight(1f).fillMaxSize().verticalScroll(rememberScrollState())) {
+                SocialSectionTitle("Account")
+                SocialBody("Signed in with Google · ${state.name.ifBlank { "Aerix member" }}", size = 12.sp, color = SocialColors.textMuted)
+                SocialStageRow("Disable account") { disableDialog = true }
+                SocialBody("Disabling signs you out everywhere and hides your profile. Nothing is deleted.", size = 11.sp, color = SocialColors.textMuted)
+                SocialStageRow("Delete account") { deleteDialog = true }
+                SocialBody("Deleting removes your profile, friends, messages, posts and links permanently.", size = 11.sp, color = SocialColors.textMuted)
                 Spacer(Modifier.weight(1f))
-                SocialBody("Confirmation required. Unblocking does not restore a friendship.", size = 11.sp, color = SocialColors.textMuted)
-                SocialGhostButton("Back", onClick = onBack, modifier = Modifier.fillMaxWidth())
+                SocialGhostButton("Done", onClick = onBack, modifier = Modifier.fillMaxWidth())
             }
         }
     }
 
-    if (confirmDelete) {
-        SocialDialog(onDismiss = { confirmDelete = false }) {
-            SocialTitle("Delete Aerix account?")
-            SocialBody("This permanently deletes your Aerix profile, friends, requests, accepted-friend messages, blocked list, and uploaded skin or cape data.")
-            SocialBody("Friends and messages are removed from Aerix.", size = 12.sp)
-            SocialBody("Blocked and report records are handled under our privacy policy.", size = 12.sp)
+    if (usernameDialog) {
+        SocialDialog(onDismiss = { usernameDialog = false }) {
+            SocialTitle("Change username")
+            SocialBody("3–16 letters, numbers or underscores. After saving you cannot change it for 7 days.", size = 12.sp, color = SocialColors.textMuted)
+            SocialTextField(value = newUsername, onValueChange = { newUsername = it.take(16) }, placeholder = "new_username")
+            if (state.nameError != null) {
+                SocialBody(state.nameError ?: "", size = 12.sp, color = SocialColors.danger)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                SocialPrimaryButton(
+                    "Save",
+                    onClick = {
+                        if (profile.changeUsername(newUsername)) usernameDialog = false
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+                SocialGhostButton("Cancel", onClick = { usernameDialog = false }, modifier = Modifier.weight(1f))
+            }
+        }
+    }
+
+    if (disableDialog) {
+        SocialDialog(onDismiss = { disableDialog = false }) {
+            SocialTitle("Disable account?")
+            SocialBody("You will be signed out and your profile will be hidden. Your data stays until you sign in again.")
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                SocialPrimaryButton(
+                    "Disable",
+                    onClick = { disableDialog = false; profile.disableAccount(); onDeleted() },
+                    danger = true,
+                    modifier = Modifier.weight(1f)
+                )
+                SocialGhostButton("Cancel", onClick = { disableDialog = false }, modifier = Modifier.weight(1f))
+            }
+        }
+    }
+
+    if (deleteDialog) {
+        SocialDialog(onDismiss = { deleteDialog = false }) {
+            SocialTitle("Delete account?")
+            SocialBody("This permanently deletes your Aerix profile, friends, requests, messages, posts and uploaded skin or cape data.")
             SocialBody("Your Minecraft purchase and Microsoft or Mojang account are not deleted.", size = 12.sp)
-            SocialBody("Local Minecraft instances on this device are not deleted.", size = 12.sp)
             BasicTextField(
                 value = typed,
                 onValueChange = { typed = it.uppercase().take(6) },
@@ -358,9 +359,9 @@ fun SocialSafetyScreen(onBack: () -> Unit, onDeleteAccount: () -> Unit) {
                 textStyle = TextStyle(color = SocialColors.textPrimary, fontSize = 15.sp),
                 modifier = Modifier
                     .fillMaxWidth()
+                    .heightIn(min = 48.dp)
                     .clip(RoundedCornerShape(SocialDimens.controlRadius))
                     .background(SocialColors.panelSoft)
-                    .border(BorderStroke(1.dp, SocialColors.border), RoundedCornerShape(SocialDimens.controlRadius))
                     .padding(horizontal = 12.dp, vertical = 12.dp),
                 decorationBox = { inner ->
                     Box {
@@ -372,12 +373,103 @@ fun SocialSafetyScreen(onBack: () -> Unit, onDeleteAccount: () -> Unit) {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 SocialPrimaryButton(
                     "Delete account",
-                    onClick = { confirmDelete = false; onDeleteAccount() },
+                    onClick = {
+                        deleteDialog = false
+                        profile.deleteAccount()
+                        onDeleted()
+                    },
                     enabled = typed == "DELETE",
                     danger = true,
                     modifier = Modifier.weight(1f)
                 )
-                SocialGhostButton("Cancel", onClick = { confirmDelete = false }, modifier = Modifier.weight(1f))
+                SocialGhostButton("Cancel", onClick = { deleteDialog = false }, modifier = Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun SocialStageRow(title: String, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = SocialDimens.row)
+            .clip(RoundedCornerShape(SocialDimens.controlRadius))
+            .background(SocialColors.panelSoft)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        SocialBody(title, size = 14.sp, color = SocialColors.textPrimary, modifier = Modifier.weight(1f))
+        Icon(
+            painter = painterResource(R.drawable.aerix_social_ic_chevron),
+            contentDescription = null,
+            tint = SocialColors.textMuted,
+            modifier = Modifier.size(16.dp)
+        )
+    }
+}
+
+/* --------------------------------------------------------- notifications ----- */
+
+@Composable
+fun SocialSettingsNotificationsScreen(viewModel: SocialSettingsViewModel, onBack: () -> Unit) {
+    val state by viewModel.state.collectAsState()
+    val notifications = state.notifications
+
+    SocialPage {
+        Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            SocialPanel(modifier = Modifier.weight(1f).fillMaxSize().verticalScroll(rememberScrollState())) {
+                SocialSectionTitle("Notify me about")
+                SocialToggleRow("Friend requests", notifications.friendRequests, viewModel::setFriendRequestNotifications, iconRes = R.drawable.aerix_social_ic_friends)
+                SocialToggleRow("Private messages", notifications.privateMessages, viewModel::setPrivateMessageNotifications, iconRes = R.drawable.aerix_social_ic_chat)
+                SocialToggleRow("Party invitations", notifications.partyInvites, viewModel::setPartyInviteNotifications, iconRes = R.drawable.aerix_social_ic_party)
+                SocialToggleRow("Server invitations", notifications.serverInvites, viewModel::setServerInviteNotifications, iconRes = R.drawable.aerix_social_ic_instance)
+            }
+            SocialPanel(modifier = Modifier.weight(1f).fillMaxSize().verticalScroll(rememberScrollState())) {
+                SocialSectionTitle("Delivery")
+                SocialToggleRow("In-launcher alerts", notifications.inLauncher, viewModel::setInLauncher)
+                SocialToggleRow("In-game social alerts", notifications.inGame, viewModel::setInGame, subtitle = "Small notices while playing")
+                SocialToggleRow("Message preview", notifications.messagePreview, viewModel::setMessagePreview, subtitle = "Show message text in alerts")
+                SocialToggleRow("Android notifications", notifications.androidNotifications, viewModel::setAndroidNotifications, subtitle = "Permission is controlled by Android")
+                Spacer(Modifier.weight(1f))
+                SocialPrimaryButton("Save changes", onClick = onBack, modifier = Modifier.fillMaxWidth())
+            }
+        }
+    }
+}
+
+/* ------------------------------------------------------------------ safety ----- */
+
+@Composable
+fun SocialSafetyScreen(onBack: () -> Unit, onDeleteAccount: () -> Unit) {
+    var reportOpen by remember { mutableStateOf(false) }
+    var blocked by remember { mutableStateOf(listOf("FrostByte", "EchoFox")) }
+
+    SocialPage {
+        Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            SocialPanel(modifier = Modifier.weight(1.2f).fillMaxSize().verticalScroll(rememberScrollState())) {
+                SocialSectionTitle("Blocked accounts")
+                if (blocked.isEmpty()) {
+                    SocialBody("Nobody is blocked.", size = 12.sp, color = SocialColors.textMuted)
+                } else {
+                    blocked.forEach { name ->
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            SocialBody(name, size = 14.sp, color = SocialColors.textPrimary, modifier = Modifier.weight(1f))
+                            SocialGhostButton("Unblock", onClick = { blocked = blocked - name })
+                        }
+                    }
+                }
+                SocialBody("Blocked accounts cannot message you or send party and server invitations.", size = 11.sp, color = SocialColors.textMuted)
+            }
+            SocialPanel(modifier = Modifier.weight(0.9f).fillMaxSize()) {
+                SocialSectionTitle("Get help")
+                SocialStageRow("Report a concern") { reportOpen = true }
+                SocialStageRow("Social guidelines") { }
+                SocialBody("Muting hides alerts. Blocking stops contact.", size = 11.sp, color = SocialColors.textMuted)
+                Spacer(Modifier.weight(1f))
+                SocialGhostButton("Delete account", onClick = onDeleteAccount, modifier = Modifier.fillMaxWidth())
+                SocialGhostButton("Back", onClick = onBack, modifier = Modifier.fillMaxWidth())
             }
         }
     }
@@ -385,7 +477,6 @@ fun SocialSafetyScreen(onBack: () -> Unit, onDeleteAccount: () -> Unit) {
     if (reportOpen) {
         SocialDialog(onDismiss = { reportOpen = false }) {
             SocialTitle("Report a concern")
-            SocialBody("What is the problem?", size = 13.sp)
             listOf("Harassment", "Spam or scam", "Inappropriate name or skin", "Threats", "Something else").forEach { reason ->
                 Row(
                     modifier = Modifier
@@ -398,8 +489,7 @@ fun SocialSafetyScreen(onBack: () -> Unit, onDeleteAccount: () -> Unit) {
                     SocialBody(reason, size = 14.sp, color = SocialColors.textPrimary)
                 }
             }
-            SocialBody("Reports are reviewed by Aerix moderators. Your report may include recent messages from this chat.", size = 11.sp, color = SocialColors.textMuted)
-            SocialGhostButton("Cancel", onClick = { reportOpen = false }, modifier = Modifier.fillMaxWidth())
+            SocialBody("Reports are reviewed with the account's recent activity.", size = 11.sp, color = SocialColors.textMuted)
         }
     }
 }

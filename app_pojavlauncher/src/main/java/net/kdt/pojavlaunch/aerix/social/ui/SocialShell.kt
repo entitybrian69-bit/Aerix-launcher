@@ -1,9 +1,10 @@
 /*
  * Aerix Launcher Social layer.
  *
- * The second launcher. It replaces the Play dashboard for as long as it is open: its own
- * background, its own 84dp rail, its own top bar and its own screens. The launcher rail,
- * dashboard and play button are not composed while this is on screen.
+ * The second launcher. It replaces the Play dashboard for as long as it is open and now uses
+ * the launcher's own glass theme. The rail holds the four Social entries asked for: add a
+ * friend, activity, customise, profile. Chat lives on the dashboard, so there is no chat
+ * entry and no exit entry: the top-left arrow is the way out.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -24,6 +25,7 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -40,7 +42,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -53,7 +54,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -64,24 +64,32 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import net.kdt.pojavlaunch.R
 import net.kdt.pojavlaunch.aerix.social.SocialGraph
-import net.kdt.pojavlaunch.aerix.social.ui.screens.SocialAppearanceScreen
+import net.kdt.pojavlaunch.aerix.social.ui.screens.SocialActivityScreen
+import net.kdt.pojavlaunch.aerix.social.ui.screens.SocialAddFriendScreen
 import net.kdt.pojavlaunch.aerix.social.ui.screens.SocialAuthScreen
 import net.kdt.pojavlaunch.aerix.social.ui.screens.SocialCapeScreen
+import net.kdt.pojavlaunch.aerix.social.ui.screens.SocialCharacterScreen
 import net.kdt.pojavlaunch.aerix.social.ui.screens.SocialChatScreen
 import net.kdt.pojavlaunch.aerix.social.ui.screens.SocialDashboardScreen
-import net.kdt.pojavlaunch.aerix.social.ui.screens.SocialNotificationsScreen
-import net.kdt.pojavlaunch.aerix.social.ui.screens.SocialPrivacyScreen
+import net.kdt.pojavlaunch.aerix.social.ui.screens.SocialEditProfileScreen
 import net.kdt.pojavlaunch.aerix.social.ui.screens.SocialProfileScreen
 import net.kdt.pojavlaunch.aerix.social.ui.screens.SocialSafetyScreen
+import net.kdt.pojavlaunch.aerix.social.ui.screens.SocialSettingsAccountScreen
+import net.kdt.pojavlaunch.aerix.social.ui.screens.SocialSettingsChatsScreen
+import net.kdt.pojavlaunch.aerix.social.ui.screens.SocialSettingsHubScreen
+import net.kdt.pojavlaunch.aerix.social.ui.screens.SocialSettingsMicScreen
+import net.kdt.pojavlaunch.aerix.social.ui.screens.SocialSettingsNotificationsScreen
+import net.kdt.pojavlaunch.aerix.social.ui.screens.SocialSettingsPrivacyScreen
 import net.kdt.pojavlaunch.aerix.social.ui.screens.SocialSkinScreen
-import net.kdt.pojavlaunch.aerix.social.ui.screens.SocialVoiceScreen
+import net.kdt.pojavlaunch.aerix.social.ui.screens.SocialThemeScreen
+import net.kdt.pojavlaunch.aerix.social.vm.SocialActivityViewModel
+import net.kdt.pojavlaunch.aerix.social.vm.SocialAddFriendViewModel
 import net.kdt.pojavlaunch.aerix.social.vm.SocialChatViewModel
 import net.kdt.pojavlaunch.aerix.social.vm.SocialDashboardViewModel
 import net.kdt.pojavlaunch.aerix.social.vm.SocialProfileViewModel
 import net.kdt.pojavlaunch.aerix.social.vm.SocialRoute
 import net.kdt.pojavlaunch.aerix.social.vm.SocialSettingsViewModel
 import net.kdt.pojavlaunch.aerix.social.vm.SocialShellViewModel
-import net.kdt.pojavlaunch.aerix.social.vm.SocialTab
 
 private val socialFactory = viewModelFactory {
     initializer { SocialShellViewModel() }
@@ -89,6 +97,8 @@ private val socialFactory = viewModelFactory {
     initializer { SocialDashboardViewModel(SocialGraph.repository) }
     initializer { SocialChatViewModel(SocialGraph.repository) }
     initializer { SocialSettingsViewModel(SocialGraph.store) }
+    initializer { SocialAddFriendViewModel(SocialGraph.repository) }
+    initializer { SocialActivityViewModel(SocialGraph.repository) }
 }
 
 /**
@@ -102,14 +112,16 @@ fun SocialShell(
     modifier: Modifier = Modifier
 ) {
     val route by shell.route.collectAsState()
-    val tab by shell.tab.collectAsState()
 
     val profileVm: SocialProfileViewModel = viewModel(factory = socialFactory)
     val dashboardVm: SocialDashboardViewModel = viewModel(factory = socialFactory)
     val chatVm: SocialChatViewModel = viewModel(factory = socialFactory)
     val settingsVm: SocialSettingsViewModel = viewModel(factory = socialFactory)
+    val addFriendVm: SocialAddFriendViewModel = viewModel(factory = socialFactory)
+    val activityVm: SocialActivityViewModel = viewModel(factory = socialFactory)
 
     val profile by profileVm.state.collectAsState()
+    val dashboard by dashboardVm.state.collectAsState()
 
     // Dashboard -> shell: the shell replaces the whole launcher instantly, so it fades in over
     // 240ms from 0.98 scale instead of snapping into place.
@@ -138,24 +150,21 @@ fun SocialShell(
             SocialRail(
                 current = route,
                 onHome = { shell.reset(SocialRoute.DASHBOARD) },
-                onChats = { shell.selectTab(SocialTab.CHATS) },
-                onParty = { shell.selectTab(SocialTab.PARTY) },
-                onProfile = { shell.push(SocialRoute.PROFILE) },
-                onExit = onExitToLauncher
+                onAddFriend = { shell.reset(SocialRoute.ADD_FRIEND) },
+                onActivity = { shell.reset(SocialRoute.ACTIVITY) },
+                onCustomise = { shell.reset(SocialRoute.THEME) },
+                onProfile = { shell.reset(SocialRoute.PROFILE) }
             )
             Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
                 SocialHeader(
                     route = route,
-                    name = profile.name,
                     onBack = { if (!shell.back()) onExitToLauncher() },
-                    onProfile = { shell.push(SocialRoute.PROFILE) },
-                    onSettings = { shell.push(SocialRoute.PRIVACY) }
+                    onSettings = { shell.push(SocialRoute.SETTINGS) }
                 )
                 AnimatedContent(
                     targetState = route,
                     transitionSpec = {
                         if (targetState == SocialRoute.CHAT || initialState == SocialRoute.CHAT) {
-                            // Opening a chat is a lighter move than a full page change.
                             (fadeIn(tween(SocialMotion.CHAT_MS)) + slideInHorizontally(tween(SocialMotion.CHAT_MS)) { chatSlide })
                                 .togetherWith(fadeOut(tween(SocialMotion.CHAT_MS)))
                         } else {
@@ -168,63 +177,121 @@ fun SocialShell(
                     when (target) {
                         SocialRoute.AUTH -> SocialAuthScreen(
                             inProgress = profile.signInInProgress,
-                            // Existing account: straight to the dashboard, the stored profile is kept.
                             onSignInExisting = {
-                                profileVm.signIn()
-                                shell.reset(SocialRoute.DASHBOARD)
+                                profileVm.signIn { shell.reset(SocialRoute.DASHBOARD) }
                             },
-                            // New account: pick a name, skin and cape first.
-                            onCreateAccount = { shell.reset(SocialRoute.APPEARANCE) },
+                            onCreateAccount = {
+                                profileVm.createAccount()
+                                shell.reset(SocialRoute.CHARACTER)
+                            },
                             onNotNow = onExitToLauncher
                         )
-                        SocialRoute.APPEARANCE -> SocialAppearanceScreen(
+                        SocialRoute.CHARACTER -> SocialCharacterScreen(
                             profile = profileVm,
                             name = profile.name,
+                            username = profile.username,
                             skinId = profile.skinId,
                             capeId = profile.capeId,
                             nameError = profile.nameError,
                             onOpenSkin = { shell.push(SocialRoute.SKIN) },
                             onOpenCape = { shell.push(SocialRoute.CAPE) },
+                            onOpenTheme = { shell.push(SocialRoute.THEME) },
                             onFinish = { shell.reset(SocialRoute.DASHBOARD) }
                         )
                         SocialRoute.DASHBOARD -> SocialDashboardScreen(
                             viewModel = dashboardVm,
-                            tab = tab,
-                            onTabSelected = { shell.selectTab(it) },
                             onMessage = { friend ->
                                 chatVm.open(friend)
                                 shell.push(SocialRoute.CHAT)
                             },
-                            onOpenPrivacy = { shell.push(SocialRoute.PRIVACY) },
-                            onOpenSafety = { shell.push(SocialRoute.SAFETY) },
-                            onOpenVoice = { shell.push(SocialRoute.VOICE) }
+                            onAddFriend = { shell.push(SocialRoute.ADD_FRIEND) },
+                            onActivity = { shell.push(SocialRoute.ACTIVITY) },
+                            onOpenParty = { shell.push(SocialRoute.PARTY) }
+                        )
+                        SocialRoute.ADD_FRIEND -> SocialAddFriendScreen(
+                            viewModel = addFriendVm,
+                            onBack = { shell.back() }
+                        )
+                        SocialRoute.ACTIVITY -> SocialActivityScreen(
+                            viewModel = activityVm,
+                            friends = dashboard.friends,
+                            onBack = { shell.back() }
+                        )
+                        SocialRoute.THEME -> SocialThemeScreen(
+                            profile = profileVm,
+                            selected = profile.themeWallpaperId,
+                            onBack = { shell.back() }
                         )
                         SocialRoute.CHAT -> SocialChatScreen(
                             viewModel = chatVm,
                             onBack = { shell.back() },
-                            onVoice = { shell.push(SocialRoute.VOICE) }
+                            onVoice = { shell.push(SocialRoute.PARTY) }
+                        )
+                        SocialRoute.PARTY -> SocialDashboardScreen(
+                            viewModel = dashboardVm,
+                            onMessage = { friend ->
+                                chatVm.open(friend)
+                                shell.push(SocialRoute.CHAT)
+                            },
+                            onAddFriend = { shell.push(SocialRoute.ADD_FRIEND) },
+                            onActivity = { shell.push(SocialRoute.ACTIVITY) },
+                            onOpenParty = { shell.back() },
+                            forcePartyTab = true
                         )
                         SocialRoute.PROFILE -> SocialProfileScreen(
                             profile = profile,
                             onBack = { shell.back() },
-                            onOpenPrivacy = { shell.push(SocialRoute.PRIVACY) },
-                            onOpenNotifications = { shell.push(SocialRoute.NOTIFICATIONS) },
+                            onEdit = { shell.push(SocialRoute.EDIT_PROFILE) },
+                            onOpenSettings = { shell.push(SocialRoute.SETTINGS) },
                             onOpenSafety = { shell.push(SocialRoute.SAFETY) },
-                            onOpenSkin = { shell.push(SocialRoute.SKIN) },
-                            onOpenCape = { shell.push(SocialRoute.CAPE) },
-                            onSignOut = { profileVm.signOut(); shell.reset(SocialRoute.AUTH) }
+                            onSignOut = {
+                                profileVm.signOut()
+                                shell.reset(SocialRoute.AUTH)
+                            }
                         )
-                        SocialRoute.PRIVACY -> SocialPrivacyScreen(
+                        SocialRoute.EDIT_PROFILE -> SocialEditProfileScreen(
+                            profile = profileVm,
+                            state = profile,
+                            onBack = { shell.back() }
+                        )
+                        SocialRoute.SETTINGS -> SocialSettingsHubScreen(
+                            profile = profile,
+                            onBack = { shell.back() },
+                            onOpenPrivacy = { shell.push(SocialRoute.SETTINGS_PRIVACY) },
+                            onOpenMic = { shell.push(SocialRoute.SETTINGS_MIC) },
+                            onOpenChats = { shell.push(SocialRoute.SETTINGS_CHATS) },
+                            onOpenAccount = { shell.push(SocialRoute.SETTINGS_ACCOUNT) },
+                            onOpenNotifications = { shell.push(SocialRoute.SETTINGS_NOTIFICATIONS) }
+                        )
+                        SocialRoute.SETTINGS_PRIVACY -> SocialSettingsPrivacyScreen(
                             viewModel = settingsVm,
                             onBack = { shell.back() }
                         )
-                        SocialRoute.NOTIFICATIONS -> SocialNotificationsScreen(
+                        SocialRoute.SETTINGS_MIC -> SocialSettingsMicScreen(
+                            viewModel = settingsVm,
+                            onBack = { shell.back() }
+                        )
+                        SocialRoute.SETTINGS_CHATS -> SocialSettingsChatsScreen(
+                            viewModel = settingsVm,
+                            onBack = { shell.back() }
+                        )
+                        SocialRoute.SETTINGS_ACCOUNT -> SocialSettingsAccountScreen(
+                            profile = profileVm,
+                            state = profile,
+                            onBack = { shell.back() },
+                            onOpenSafety = { shell.push(SocialRoute.SAFETY) },
+                            onDeleted = { shell.reset(SocialRoute.AUTH) }
+                        )
+                        SocialRoute.SETTINGS_NOTIFICATIONS -> SocialSettingsNotificationsScreen(
                             viewModel = settingsVm,
                             onBack = { shell.back() }
                         )
                         SocialRoute.SAFETY -> SocialSafetyScreen(
                             onBack = { shell.back() },
-                            onDeleteAccount = { shell.reset(SocialRoute.AUTH) }
+                            onDeleteAccount = {
+                                profileVm.deleteAccount()
+                                shell.reset(SocialRoute.AUTH)
+                            }
                         )
                         SocialRoute.SKIN -> SocialSkinScreen(
                             profile = profileVm,
@@ -236,7 +303,6 @@ fun SocialShell(
                             selected = profile.capeId,
                             onBack = { shell.back() }
                         )
-                        SocialRoute.VOICE -> SocialVoiceScreen(onBack = { shell.back() })
                     }
                 }
             }
@@ -245,27 +311,28 @@ fun SocialShell(
 }
 
 @Composable
-private fun SocialHeader(
-    route: SocialRoute,
-    name: String,
-    onBack: () -> Unit,
-    onProfile: () -> Unit,
-    onSettings: () -> Unit
-) {
+private fun SocialHeader(route: SocialRoute, onBack: () -> Unit, onSettings: () -> Unit) {
     val title = when (route) {
         SocialRoute.AUTH -> "Aerix account"
-        SocialRoute.APPEARANCE -> "Create your Aerix profile"
+        SocialRoute.CHARACTER -> "Create your character"
         SocialRoute.DASHBOARD -> "Social"
+        SocialRoute.ADD_FRIEND -> "Add a friend"
+        SocialRoute.ACTIVITY -> "Activity"
+        SocialRoute.THEME -> "Customise"
         SocialRoute.CHAT -> "Chat"
+        SocialRoute.PARTY -> "Party"
         SocialRoute.PROFILE -> "My profile"
-        SocialRoute.PRIVACY -> "Privacy & presence"
-        SocialRoute.NOTIFICATIONS -> "Notifications"
+        SocialRoute.EDIT_PROFILE -> "Edit profile"
+        SocialRoute.SETTINGS -> "Settings"
+        SocialRoute.SETTINGS_PRIVACY -> "Privacy"
+        SocialRoute.SETTINGS_MIC -> "Microphone"
+        SocialRoute.SETTINGS_CHATS -> "Chats"
+        SocialRoute.SETTINGS_ACCOUNT -> "Account settings"
+        SocialRoute.SETTINGS_NOTIFICATIONS -> "Notifications"
         SocialRoute.SAFETY -> "Safety"
         SocialRoute.SKIN -> "Choose skin"
         SocialRoute.CAPE -> "Choose cape"
-        SocialRoute.VOICE -> "Voice chat"
     }
-    var menuOpen by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -273,115 +340,158 @@ private fun SocialHeader(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Surface(
-            modifier = Modifier.size(SocialDimens.touch),
-            shape = CircleShape,
-            color = SocialColors.panelRaised,
-            border = BorderStroke(1.dp, SocialColors.border),
+        SocialIconButton(
+            iconRes = R.drawable.aerix_ic_arrow_back,
+            contentDescription = "Back",
             onClick = onBack
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    painter = painterResource(R.drawable.aerix_ic_arrow_back),
-                    contentDescription = "Back",
-                    tint = SocialColors.textPrimary,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-        }
-        Text(text = title, color = SocialColors.textPrimary, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.weight(1f))
-        if (route == SocialRoute.DASHBOARD || route == SocialRoute.CHAT) {
-            Row(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(SocialDimens.controlRadius))
-                    .clickable(onClick = onProfile)
-                    .padding(horizontal = 8.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                SocialAvatar(avatar = 6, size = 32.dp)
-                Text(text = name.ifBlank { "Nova" }, color = SocialColors.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-            }
-            Surface(
-                modifier = Modifier.size(40.dp),
-                shape = CircleShape,
-                color = SocialColors.panelRaised,
-                border = BorderStroke(1.dp, SocialColors.border),
-                onClick = { menuOpen = true }
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        painter = painterResource(R.drawable.aerix_social_ic_more),
-                        contentDescription = "More",
-                        tint = SocialColors.textPrimary,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-            }
-        }
-    }
-    if (menuOpen) {
-        SocialDialog(onDismiss = { menuOpen = false }) {
-            SocialSectionTitle("Social menu")
-            SocialGhostButton("Privacy & presence", onClick = { menuOpen = false; onSettings() }, modifier = Modifier.fillMaxWidth())
-            SocialGhostButton("My profile", onClick = { menuOpen = false; onProfile() }, modifier = Modifier.fillMaxWidth())
-        }
+        )
+        Text(
+            text = title,
+            color = SocialColors.textPrimary,
+            fontSize = 22.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.weight(1f)
+        )
+        SocialIconButton(
+            iconRes = R.drawable.aerix_ic_settings_filled,
+            contentDescription = "Settings",
+            onClick = onSettings,
+            selected = route == SocialRoute.SETTINGS
+        )
     }
 }
 
+/** Add a friend, Activity, Customise, Profile. No chat entry and no exit entry. */
 @Composable
 private fun SocialRail(
     current: SocialRoute,
     onHome: () -> Unit,
-    onChats: () -> Unit,
-    onParty: () -> Unit,
-    onProfile: () -> Unit,
-    onExit: () -> Unit
+    onAddFriend: () -> Unit,
+    onActivity: () -> Unit,
+    onCustomise: () -> Unit,
+    onProfile: () -> Unit
 ) {
     Column(
         modifier = Modifier
             .width(SocialDimens.railWidth)
             .fillMaxHeight()
-            .background(Color(0xFF171029))
+            .background(SocialColors.panel.copy(alpha = 0.72f))
             .padding(vertical = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Spacer(Modifier.height(4.dp))
-        RailItem(R.drawable.aerix_social_ic_friends, "Friends", current == SocialRoute.DASHBOARD, onHome)
-        RailItem(R.drawable.aerix_social_ic_chat, "Chats", current == SocialRoute.CHAT, onChats)
-        RailItem(R.drawable.aerix_social_ic_party, "Party", current == SocialRoute.VOICE, onParty)
-        RailItem(R.drawable.aerix_social_ic_profile, "Profile", current == SocialRoute.PROFILE, onProfile)
+        RailItem(R.drawable.aerix_ic_home_filled, "Social", current == SocialRoute.DASHBOARD, onHome)
+        RailItem(R.drawable.aerix_social_ic_add_person, "Add friend", current == SocialRoute.ADD_FRIEND, onAddFriend)
+        RailItem(R.drawable.aerix_social_ic_activity, "Activity", current == SocialRoute.ACTIVITY, onActivity)
+        RailItem(R.drawable.aerix_social_ic_theme, "Customise", current == SocialRoute.THEME, onCustomise)
         Spacer(Modifier.weight(1f))
-        RailItem(R.drawable.aerix_social_ic_exit, "Exit", false, onExit)
+        RailItem(R.drawable.aerix_social_ic_profile, "Profile", current == SocialRoute.PROFILE, onProfile)
     }
 }
 
 @Composable
 private fun RailItem(iconRes: Int, label: String, selected: Boolean, onClick: () -> Unit) {
+    val accent = SocialColors.accent
     Box(
         modifier = Modifier
-            .width(64.dp)
-            .height(56.dp)
+            .width(68.dp)
+            .height(60.dp)
             .clip(RoundedCornerShape(16.dp))
-            .background(if (selected) SocialColors.accent else Color.Transparent)
+            .background(if (selected) accent.copy(alpha = 0.85f) else SocialColors.panelSoft.copy(alpha = 0.5f))
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(3.dp)
+        ) {
             Icon(
                 painter = painterResource(iconRes),
                 contentDescription = label,
-                tint = if (selected) Color.White else SocialColors.textMuted,
+                tint = if (selected) SocialColors.onAccent else SocialColors.textMuted,
                 modifier = Modifier.size(20.dp)
             )
             Text(
                 text = label,
-                color = if (selected) Color.White else SocialColors.textMuted,
+                color = if (selected) SocialColors.onAccent else SocialColors.textMuted,
                 fontSize = 9.sp,
-                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                maxLines = 1
             )
         }
     }
+}
+
+/** Small avatar chip used by the top bar of sub-screens. */
+@Composable
+fun SocialAvatarChip(avatar: Int, name: String, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .clip(CircleShape)
+            .background(SocialColors.panelSoft)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        SocialAvatar(avatar = avatar, size = 28.dp)
+        Text(text = name, color = SocialColors.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+    }
+}
+
+@Composable
+fun SocialDivider(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(1.dp)
+            .background(SocialColors.border)
+    )
+}
+
+@Composable
+fun SocialSectionCard(
+    title: String,
+    subtitle: String,
+    iconRes: Int,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(SocialDimens.cardRadius))
+            .background(SocialColors.panelSoft)
+            .border(BorderStroke(1.dp, SocialColors.border), RoundedCornerShape(SocialDimens.cardRadius))
+            .clickable(onClick = onClick)
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .clip(CircleShape)
+                .background(SocialColors.accent.copy(alpha = 0.22f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(painterResource(iconRes), contentDescription = null, tint = SocialColors.accentBright, modifier = Modifier.size(22.dp))
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            SocialBody(title, color = SocialColors.textPrimary, size = 15.sp, weight = FontWeight.SemiBold)
+            SocialBody(subtitle, size = 12.sp, color = SocialColors.textMuted)
+        }
+        Icon(
+            painter = painterResource(R.drawable.aerix_social_ic_chevron),
+            contentDescription = null,
+            tint = SocialColors.textMuted,
+            modifier = Modifier.size(18.dp)
+        )
+    }
+}
+
+/** Convenience spacer used by several screens. */
+@Composable
+fun SocialGap(height: Int = 12) {
+    Spacer(Modifier.height(height.dp))
 }
