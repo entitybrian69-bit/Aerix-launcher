@@ -15,6 +15,7 @@ package net.kdt.pojavlaunch.aerix.social.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -42,6 +43,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -50,7 +52,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -107,11 +111,29 @@ fun SocialShell(
 
     val profile by profileVm.state.collectAsState()
 
+    // Dashboard -> shell: the shell replaces the whole launcher instantly, so it fades in over
+    // 240ms from 0.98 scale instead of snapping into place.
+    var shellShown by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { shellShown = true }
+    val shellProgress by animateFloatAsState(
+        targetValue = if (shellShown) 1f else 0f,
+        animationSpec = tween(SocialMotion.SHELL_MS),
+        label = "socialShell"
+    )
+    val chatSlide = with(LocalDensity.current) { 12.dp.roundToPx() }
+
     BackHandler(enabled = true) {
         if (!shell.back()) onExitToLauncher()
     }
 
-    SocialBackground(modifier = modifier) {
+    SocialBackground(
+        modifier = modifier.graphicsLayer {
+            alpha = shellProgress
+            val scale = 0.98f + 0.02f * shellProgress
+            scaleX = scale
+            scaleY = scale
+        }
+    ) {
         Row(modifier = Modifier.fillMaxSize()) {
             SocialRail(
                 current = route,
@@ -132,8 +154,14 @@ fun SocialShell(
                 AnimatedContent(
                     targetState = route,
                     transitionSpec = {
-                        (fadeIn(tween(SocialMotion.SCREEN_MS)) + slideInHorizontally(tween(SocialMotion.SCREEN_MS)) { it / 12 })
-                            .togetherWith(fadeOut(tween(SocialMotion.SCREEN_MS)) + slideOutHorizontally(tween(SocialMotion.SCREEN_MS)) { -it / 12 })
+                        if (targetState == SocialRoute.CHAT || initialState == SocialRoute.CHAT) {
+                            // Opening a chat is a lighter move than a full page change.
+                            (fadeIn(tween(SocialMotion.CHAT_MS)) + slideInHorizontally(tween(SocialMotion.CHAT_MS)) { chatSlide })
+                                .togetherWith(fadeOut(tween(SocialMotion.CHAT_MS)))
+                        } else {
+                            (fadeIn(tween(SocialMotion.SCREEN_MS)) + slideInHorizontally(tween(SocialMotion.SCREEN_MS)) { it / 12 })
+                                .togetherWith(fadeOut(tween(SocialMotion.SCREEN_MS)) + slideOutHorizontally(tween(SocialMotion.SCREEN_MS)) { -it / 12 })
+                        }
                     },
                     label = "socialRoute"
                 ) { target ->
@@ -317,16 +345,7 @@ private fun SocialRail(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(SocialColors.accent),
-            contentAlignment = Alignment.Center
-        ) {
-            Text("A", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
-        }
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(4.dp))
         RailItem(R.drawable.aerix_social_ic_friends, "Friends", current == SocialRoute.DASHBOARD, onHome)
         RailItem(R.drawable.aerix_social_ic_chat, "Chats", current == SocialRoute.CHAT, onChats)
         RailItem(R.drawable.aerix_social_ic_party, "Party", current == SocialRoute.VOICE, onParty)

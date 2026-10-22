@@ -16,6 +16,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -125,31 +127,33 @@ fun SocialDashboardScreen(
         }
         Spacer(Modifier.height(12.dp))
 
-        when {
-            state.connection == SocialConnection.LOADING && state.friends.isEmpty() -> {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    SocialBody("Loading your friends…", size = 14.sp)
+        Crossfade(targetState = tab, animationSpec = tween(SocialMotion.TAB_MS), label = "socialTab") { activeTab ->
+            when {
+                state.connection == SocialConnection.LOADING && state.friends.isEmpty() -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        SocialBody("Loading your friends…", size = 14.sp)
+                    }
                 }
+                state.connection == SocialConnection.ERROR && state.friends.isEmpty() -> {
+                    SocialErrorState(onRetry = viewModel::refresh)
+                }
+                activeTab == SocialTab.PARTY -> SocialPartyTab(onOpenVoice = onOpenVoice, onJoin = viewModel::createParty, onLeave = viewModel::leaveParty)
+                else -> SocialFriendsTab(
+                    friends = viewModel.visibleFriends,
+                    query = state.query,
+                    onQueryChange = viewModel::onQueryChange,
+                    onMessage = onMessage,
+                    onAddFriend = viewModel::addFriend,
+                    pendingRequests = state.requests.size,
+                    onAccept = viewModel::accept,
+                    onDecline = viewModel::decline,
+                    sentTo = state.addFriendSentTo,
+                    onDismissSent = viewModel::dismissAddFriend,
+                    tab = activeTab,
+                    onOpenPrivacy = onOpenPrivacy,
+                    onOpenSafety = onOpenSafety
+                )
             }
-            state.connection == SocialConnection.ERROR && state.friends.isEmpty() -> {
-                SocialErrorState(onRetry = viewModel::refresh)
-            }
-            tab == SocialTab.PARTY -> SocialPartyTab(onOpenVoice = onOpenVoice, onJoin = viewModel::createParty, onLeave = viewModel::leaveParty)
-            else -> SocialFriendsTab(
-                friends = viewModel.visibleFriends,
-                query = state.query,
-                onQueryChange = viewModel::onQueryChange,
-                onMessage = onMessage,
-                onAddFriend = viewModel::addFriend,
-                pendingRequests = state.requests.size,
-                onAccept = viewModel::accept,
-                onDecline = viewModel::decline,
-                sentTo = state.addFriendSentTo,
-                onDismissSent = viewModel::dismissAddFriend,
-                tab = tab,
-                onOpenPrivacy = onOpenPrivacy,
-                onOpenSafety = onOpenSafety
-            )
         }
     }
 }

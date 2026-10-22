@@ -74,6 +74,7 @@ fun SocialCompactPanel(
     val state by viewModel.state.collectAsState()
     var draft by remember { mutableStateOf("") }
     var blockTarget by remember { mutableStateOf<String?>(null) }
+    var confirmJoin by remember { mutableStateOf(false) }
 
     Box(modifier = modifier.fillMaxSize()) {
         Box(
@@ -238,9 +239,24 @@ fun SocialCompactPanel(
                                 )
                             }
                             SocialBody("Joining will leave your current game session.", size = 12.sp, color = SocialColors.textMuted)
-                            SocialPrimaryButton("Join", onClick = onClose, modifier = Modifier.fillMaxWidth())
+                            SocialPrimaryButton("Join", onClick = { confirmJoin = true }, modifier = Modifier.fillMaxWidth())
                             SocialGhostButton("Message ${invite.fromName}", onClick = { viewModel.show(CompactMode.CHAT) }, modifier = Modifier.fillMaxWidth())
                             SocialGhostButton("Dismiss", onClick = onClose, modifier = Modifier.fillMaxWidth())
+                        }
+                        if (confirmJoin) {
+                            SocialDialog(onDismiss = { confirmJoin = false }) {
+                                SocialTitle("Leave your current game?")
+                                SocialBody("Joining ${invite.fromName}'s server closes your current game session. Unsaved progress in your world may be lost.")
+                                SocialBody("Your own instance is not deleted; you can open it again from the launcher.", size = 12.sp)
+                                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    SocialPrimaryButton(
+                                        "Leave and join",
+                                        onClick = { confirmJoin = false; onClose() },
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    SocialGhostButton("Stay in game", onClick = { confirmJoin = false }, modifier = Modifier.weight(1f))
+                                }
+                            }
                         }
                     }
                 }

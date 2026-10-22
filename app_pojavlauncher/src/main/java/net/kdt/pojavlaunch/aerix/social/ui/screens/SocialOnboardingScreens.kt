@@ -36,6 +36,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -52,6 +56,7 @@ import net.kdt.pojavlaunch.aerix.social.ui.SocialAvatar
 import net.kdt.pojavlaunch.aerix.social.ui.SocialBody
 import net.kdt.pojavlaunch.aerix.social.ui.SocialColors
 import net.kdt.pojavlaunch.aerix.social.ui.SocialDimens
+import net.kdt.pojavlaunch.aerix.social.ui.SocialDialog
 import net.kdt.pojavlaunch.aerix.social.ui.SocialGhostButton
 import net.kdt.pojavlaunch.aerix.social.ui.SocialPage
 import net.kdt.pojavlaunch.aerix.social.ui.SocialPanel
@@ -356,6 +361,11 @@ fun SocialCapeScreen(
 
 @Composable
 fun SocialVoiceScreen(onBack: () -> Unit) {
+    // The mock backend has no real capture: the screen shows the pre-permission explainer and
+    // the "microphone denied" fallback, which is the state Android can leave us in.
+    var promptOpen by remember { mutableStateOf(false) }
+    var denied by remember { mutableStateOf(false) }
+
     SocialPage {
         Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             SocialPanel(modifier = Modifier.weight(1f).fillMaxSize()) {
@@ -364,28 +374,67 @@ fun SocialVoiceScreen(onBack: () -> Unit) {
                         Icon(
                             painter = painterResource(R.drawable.aerix_social_ic_mic_off),
                             contentDescription = null,
-                            tint = SocialColors.accentBright,
+                            tint = if (denied) SocialColors.danger else SocialColors.accentBright,
                             modifier = Modifier.size(72.dp)
                         )
-                        SocialTitle("Talk with your party")
-                        SocialBody("Microphone access is optional", size = 12.sp, color = SocialColors.textMuted)
+                        SocialTitle(if (denied) "Microphone access is off" else "Talk with your party")
+                        SocialBody(
+                            if (denied) "You can still hear your party. Aerix cannot hear you until Android permission is granted."
+                            else "Microphone access is optional",
+                            size = 12.sp,
+                            color = SocialColors.textMuted
+                        )
                     }
                 }
             }
             SocialPanel(modifier = Modifier.weight(1f).fillMaxSize()) {
-                SocialSectionTitle("Before you enable your microphone")
+                SocialSectionTitle(if (denied) "You can still play together" else "Before you enable your microphone")
                 SocialBody("Microphone permission — Android will ask for access after you continue.")
                 SocialBody("You stay in control — Join muted, then use mute or push-to-talk.")
                 SocialBody("Listen without a microphone — You still hear the party without granting access.")
                 Spacer(Modifier.weight(1f))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    SocialPrimaryButton("Continue to permission", onClick = onBack, modifier = Modifier.weight(1f))
-                    SocialGhostButton("Not now", onClick = onBack, modifier = Modifier.weight(1f))
+                    if (denied) {
+                        SocialPrimaryButton("Join muted", onClick = onBack, modifier = Modifier.weight(1f))
+                        SocialGhostButton(
+                            "Open Android settings",
+                            onClick = { denied = false },
+                            modifier = Modifier.weight(1f)
+                        )
+                    } else {
+                        SocialPrimaryButton(
+                            "Continue to permission",
+                            onClick = { promptOpen = true },
+                            modifier = Modifier.weight(1f)
+                        )
+                        SocialGhostButton("Not now", onClick = onBack, modifier = Modifier.weight(1f))
+                    }
                 }
                 SocialBody(
-                    "Android controls permission prompts. An app switch or permission prompt may interrupt gameplay.",
+                    if (denied) "Android controls permission prompts. Open Settings > Apps > Aerix > Permissions to allow the microphone."
+                    else "Android controls permission prompts. An app switch or permission prompt may interrupt gameplay.",
                     size = 11.sp,
                     color = SocialColors.textMuted
+                )
+            }
+        }
+    }
+
+    if (promptOpen) {
+        SocialDialog(onDismiss = { promptOpen = false }) {
+            SocialTitle("Allow Aerix to use your microphone?")
+            SocialBody("Aerix uses the microphone only while you are in a voice party. You can revoke access at any time in Android settings.")
+            SocialBody("You can join muted, or listen without a microphone.", size = 12.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                SocialPrimaryButton(
+                    "Allow",
+                    onClick = { promptOpen = false; onBack() },
+                    modifier = Modifier.weight(1f)
+                )
+                SocialGhostButton(
+                    "Deny",
+                    onClick = { promptOpen = false; denied = true },
+                    modifier = Modifier.weight(1f)
                 )
             }
         }
