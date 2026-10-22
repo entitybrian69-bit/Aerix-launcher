@@ -83,7 +83,17 @@ jobs:
           gradle-version: "8.14.3"
 
       - name: Build debug APK
-        run: ./gradlew :app_pojavlauncher:assembleNoruntimeDebug --console=plain
+        shell: bash
+        run: |
+          set +e
+          ./gradlew :app_pojavlauncher:assembleNoruntimeDebug --console=plain > build.log 2>&1
+          code=$?
+          if [ "$code" -ne 0 ]; then
+            grep -E "^e: |error: |FAILURE: |What went wrong|Caused by" -A2 build.log | sort -u | head -40 |
+              while read -r l; do echo "::error title=gradle::$(printf '%s' "$l" | head -c 500)"; done
+            tail -20 build.log | while read -r l; do echo "::error title=tail::$(printf '%s' "$l" | head -c 500)"; done
+          fi
+          exit "$code"
 
       - name: Check it is really the debug build
         run: |
