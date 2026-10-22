@@ -54,7 +54,7 @@ enum class LinkPlatform(val label: String, val prefix: String) {
 
 data class SocialLink(val platform: LinkPlatform, val value: String) {
     val url: String
-        get() = if (value.startsWith("http://") || value.startsWith("https://")) value else prefix + value
+        get() = if (value.startsWith("http://") || value.startsWith("https://")) value else platform.prefix + value
 }
 
 /** Anything that can travel inside a chat message. */
