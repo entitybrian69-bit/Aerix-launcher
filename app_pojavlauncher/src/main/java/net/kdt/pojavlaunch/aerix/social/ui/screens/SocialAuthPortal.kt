@@ -78,7 +78,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -116,6 +118,7 @@ fun PortalAuthScreen(
 ) {
     val busy = inProgress
     val scope = rememberCoroutineScope()
+    val clipboard = LocalClipboardManager.current
 
     // The flow itself runs in the ViewModel (see SocialProfileViewModel.signInWithGoogle), so
     // leaving the app to pick a Google account cannot cancel it and leave this screen stuck.
@@ -219,11 +222,21 @@ fun PortalAuthScreen(
                             weight = androidx.compose.ui.text.font.FontWeight.SemiBold
                         )
                         SocialBody(googleError, size = 11.sp, color = SocialColors.textPrimary)
-                        SocialBody(
-                            "Details are also in the launcher log (Settings → Logs) under AerixGoogle.",
-                            size = 10.sp,
-                            color = SocialColors.textMuted
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            SocialBody(
+                                "Full trace: launcher Logs, tag AerixGoogle.",
+                                size = 10.sp,
+                                color = SocialColors.textMuted
+                            )
+                            LinkText(
+                                text = "Copy details",
+                                enabled = true,
+                                onClick = { clipboard.setText(AnnotatedString(googleError.orEmpty())) }
+                            )
+                        }
                     }
                 }
 
