@@ -15,6 +15,4 @@
 
     <color name="primary_text">@color/aerix_text_primary</color>
     <color name="secondary_text">@color/aerix_text_secondary</color>
-    <color name="checkbox_text_color">#FFFFFFFF</color>
-    <color name="mineknob_track_tint">#FF569C15</color>
 </resources>
