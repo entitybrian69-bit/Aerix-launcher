@@ -112,6 +112,31 @@ clears it (`markRead()`), so the badge only reflects messages you have not looke
 the overlay you can switch between friends, message them, call them and run the party without
 leaving the game.
 
+## Google sign-in (real)
+
+The first Social screen now runs Android's **Credential Manager** flow. Tapping *Sign in with
+Google* opens the system account sheet; Google returns an ID token, the launcher reads the
+email/name from it, stores the address on the profile and continues to the character step (or
+straight to the dashboard if this device already has a profile). Nothing is typed into the
+launcher and no password reaches it.
+
+**One-time setup (needs your Google account, cannot be done from the repo):**
+
+1. Google Cloud Console → *APIs & Services* → *OAuth consent screen*: create it (External, add
+   your own address as a test user).
+2. *Credentials* → *Create credentials* → *OAuth client ID* → **Web application**.
+3. Copy the client id (`…apps.googleusercontent.com`).
+4. Put it in `gradle.properties` as `aerixGoogleWebClientId=…` (or build with
+   `-PaerixGoogleWebClientId=…`). The value is injected as the `aerix_google_web_client_id`
+   resource; it is not a secret and is safe to keep in the tree.
+
+No SHA-1 fingerprint and no `google-services.json` are needed for this flow, because the client
+is a *Web application* client used as the server client id.
+
+Until the id is present, the auth screen says exactly that ("This build has no Google OAuth
+client id…") — it never fakes a sign-in. The token is used as identity only; a hosted backend
+would verify its signature before trusting it.
+
 ## Real device wiring
 
 Social is no longer a mockup: every control below touches the device.
@@ -150,6 +175,9 @@ drops in by replacing those two objects in `SocialGraph`, with no screen changes
   bio + links (with `@` handles), sign-out keeps the name, delete clears everything.
 - `SocialSettingsViewModelTest` — privacy, profile lock + status, chat permissions, microphone
   settings, notifications.
+- `GoogleAuthTest` — ID-token claims and base64url decoding, malformed tokens rejected, a
+  sign-in stores the Google address and re-signing keeps the chosen name, and failures surface
+  a reason.
 - `SocialPersistenceTest` — a conversation and its real attachment path survive a reopen, read
   ids are remembered, and the whole snapshot round-trips through JSON.
 - `DataStoreSocialStoreTest` — defaults, full profile/settings round-trip including links and the
