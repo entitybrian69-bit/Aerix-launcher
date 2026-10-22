@@ -6,7 +6,7 @@ are not composed at all. **Social now uses the launcher's own glass theme** — 
 same `AerixSurface` tokens, same accent — instead of a separate purple palette.
 
 - Branch: `arena/2f1249a3-aerix-launcher`
-- Code + APK commit: `d1fbb547`
+- Code commit: `0c015fe` (look-and-feel pass), earlier: `d1fbb547`
 - Debug APK: `apk/Aerix-Launcher-debug.apk` — 102,392,169 B,
   sha256 `f8fcceaea93e020f322ebf1524c77393a4333928c3347eca7bd0c657c5a02706`
   (`apk/DEBUG_BUILD.txt`, run `39745699736`, package `net.kdt.pojavlaunch.debug`)
@@ -92,6 +92,25 @@ new state, the UI recomposes.
 ViewModels: `SocialShellViewModel`, `SocialProfileViewModel`, `SocialDashboardViewModel`,
 `SocialAddFriendViewModel`, `SocialChatViewModel`, `SocialActivityViewModel`,
 `SocialSettingsViewModel`, `InGameSocialViewModel`.
+
+## Look and feel (latest pass)
+
+- **Real artwork**: Customise decodes the bundled `assets/wallpapers/*.jpg` thumbnails (the same
+  files the Play dashboard uses), with the theme chip and the "applied" tick on the card.
+- **Brighter**: the tint over the wallpaper dropped from 0x4D–0x8C to 0x14–0x33, and panels are
+  72–82% opaque glass, so the wallpaper reads through everywhere.
+- **Compact top bar**: 20sp title on the left; the exit arrow (dashboard only) and the settings
+  gear sit together in the top-right at 36dp. No tall header pushing content down.
+- **Motion**: buttons, chips, icon buttons and rail tiles spring to 0.94–0.96 on press; rail
+  selection animates colour and lifts the icon; the dashboard tab underline grows and recolours;
+  story rings breathe; wallpaper cards lift slightly when selected.
+
+## In game
+
+The pause-menu **Social** tile shows a red badge with the unread count. Opening the overlay
+clears it (`markRead()`), so the badge only reflects messages you have not looked at yet. Inside
+the overlay you can switch between friends, message them, call them and run the party without
+leaving the game.
 
 ## Motion
 

@@ -6,6 +6,10 @@
  * friend, activity, customise, profile. Chat lives on the dashboard, so there is no chat
  * entry and no exit entry: the top-left arrow is the way out.
  *
+ * The top bar is deliberately compact: a 20sp title, and the only two controls (the exit arrow on
+ * the dashboard, the settings gear everywhere) gathered in the top-right corner at 36dp, so the
+ * content of every screen starts right under it.
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
