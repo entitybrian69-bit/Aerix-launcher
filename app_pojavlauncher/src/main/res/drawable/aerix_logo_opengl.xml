@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- OpenGL mark: the isometric cube of the GL logo. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+    <path
+        android:strokeColor="#FFFFFF" android:strokeWidth="1.4"
+        android:strokeLineJoin="round"
+        android:pathData="M12,2.2 L20.6,7 L20.6,17 L12,21.8 L3.4,17 L3.4,7 Z" />
+    <path
+        android:strokeColor="#FFFFFF" android:strokeWidth="1.2"
+        android:strokeLineJoin="round"
+        android:pathData="M12,11.6 L20.4,7 M12,11.6 L3.6,7 M12,11.6 L12,21.6" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M8.2,9 L12,6.9 L15.8,9 L12,11.1 Z" />
+</vector>

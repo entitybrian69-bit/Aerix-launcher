@@ -221,7 +221,9 @@ public class NewJREUtil {
     }
 
     public enum ExternalRuntime {
-        JRE_8(8, "Internal-8", "components/jre-new"),
+        // There is no Java 8 artifact on the download host: components/jre-new *is* Java 17.
+        // Listing a JRE_8 that fetched that folder installed Java 17 under the name "Internal-8",
+        // which is why the Runtime Manager used to show "Internal 8 / 17.0.20.1".
         JRE_17(17, "Internal-17", "components/jre-new"),
         JRE_21(21, "Internal-21", "components/jre-21"),
         JRE_25(25, "Internal-25", "components/jre-25");

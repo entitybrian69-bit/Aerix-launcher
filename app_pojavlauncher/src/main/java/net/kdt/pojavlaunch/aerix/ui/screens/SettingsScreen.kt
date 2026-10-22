@@ -179,7 +179,9 @@ private data class RendererStackOption(
     val keyMatch: String,
     val title: String,
     val badge: String,
-    val rendererId: String
+    val rendererId: String,
+    /** The stack's own mark, shown beside its name. */
+    @DrawableRes val logoRes: Int
 )
 
 /**
@@ -187,13 +189,41 @@ private data class RendererStackOption(
  * every other tile names a backend renderer directly.
  */
 private fun defaultRendererStackOptions(defaultRendererId: String): List<RendererStackOption> = listOf(
-    RendererStackOption("AUTO", "Auto (Smart Pick)", "RECOMMENDED", defaultRendererId),
-    RendererStackOption("VGPU_FAST", "vgpu - (up to 1.16.5, fast)", "1.16.5 FAST", Renderers.NGGL4ES_RENDERER),
-    RendererStackOption("VGPU_1368", "VGPU 1.3.6\u03B2", "SHADERCONV", Renderers.SFPEW_RENDERER),
-    RendererStackOption("LTW", "LTW (1.17+ Core)", "1.17+", Renderers.LTW_RENDERER),
-    RendererStackOption("Legacy", "LTW Legacy (1.8\u20131.16.5)", "1.8\u20131.16.5", Renderers.GL4ES_RENDERER),
-    RendererStackOption("Zink", "Kopper Zink (Vulkan)", "VULKAN", Renderers.ZINK_RENDERER)
+    RendererStackOption("AUTO", "Auto (Smart Pick)", "RECOMMENDED", defaultRendererId, R.drawable.aerix_logo_auto),
+    RendererStackOption("VGPU_FAST", "vgpu - (up to 1.16.5, fast)", "1.16.5 FAST", Renderers.NGGL4ES_RENDERER, R.drawable.aerix_logo_vgpu),
+    RendererStackOption("VGPU_1368", "VGPU 1.3.6\u03B2", "SHADERCONV", Renderers.SFPEW_RENDERER, R.drawable.aerix_logo_vgpu),
+    RendererStackOption("LTW", "LTW (1.17+ Core)", "1.17+", Renderers.LTW_RENDERER, R.drawable.aerix_logo_bolt),
+    RendererStackOption("Legacy", "LTW Legacy (1.8\u20131.16.5)", "1.8\u20131.16.5", Renderers.GL4ES_RENDERER, R.drawable.aerix_logo_opengl),
+    RendererStackOption("Zink", "Kopper Zink (Vulkan)", "VULKAN", Renderers.ZINK_RENDERER, R.drawable.aerix_logo_vulkan)
 )
+
+/**
+ * The name of an installed runtime, corrected against the Java version inside it.
+ *
+ * A build used to install the Java 17 artifact under the name "Internal-8", so the Runtime
+ * Manager said "Internal 8" over a 17.0.20.1 version string. The volume is the truth: when the
+ * name is one of the built-in "Internal-N" slots and N disagrees with the detected major
+ * version, the detected version wins. Imported runtimes keep the name their author gave them.
+ */
+private fun runtimeLabel(runtime: Runtime): String {
+    val pretty = runtime.name.replace(".tar.xz", "").replace("-", " ")
+    val match = Regex("^Internal[ -](\\d+)$").find(runtime.name.replace(".tar.xz", ""))
+        ?: return pretty
+    val declared = match.groupValues[1].toIntOrNull() ?: return pretty
+    val actual = runtime.javaVersion
+    return if (actual > 0 && actual != declared) "Internal $actual" else "Internal $declared"
+}
+
+/** One renderer's mark, sized to sit on the same baseline as its name. */
+@Composable
+private fun RendererLogo(@DrawableRes logoRes: Int, tint: Color) {
+    Icon(
+        painter = painterResource(logoRes),
+        contentDescription = null,
+        tint = tint,
+        modifier = Modifier.size(20.dp)
+    )
+}
 
 @Composable
 fun SettingsScreen(activity: FragmentActivity, tabKey: String, onTabChanged: (String) -> Unit) {
@@ -365,6 +395,10 @@ private fun RendererTabContent(activity: FragmentActivity) {
                                             unselectedColor = AerixSurface.textSecondary
                                         ),
                                         modifier = Modifier.size(20.dp)
+                                    )
+                                    RendererLogo(
+                                        logoRes = option.logoRes,
+                                        tint = if (isSelected) AerixThemeManager.currentAccent() else Color.White
                                     )
                                     Text(
                                         text = option.title,
@@ -797,6 +831,10 @@ private fun RendererPluginCard(
                 ),
                 modifier = Modifier.size(20.dp)
             )
+            RendererLogo(
+                logoRes = R.drawable.aerix_logo_plugin,
+                tint = if (selected) AerixThemeManager.currentAccent() else Color.White
+            )
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = plugin.displayName,
@@ -1085,7 +1123,7 @@ private fun JavaManageTabContent(activity: FragmentActivity) {
                         )
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = runtime.name.replace(".tar.xz", "").replace("-", " "),
+                                text = runtimeLabel(runtime),
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White

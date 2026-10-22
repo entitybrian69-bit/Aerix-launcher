@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Vulkan mark: the downward chevron used by the Vulkan API. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M1.6,4.4 L12,21.6 L22.4,4.4 L17.2,4.4 L12,13.4 L6.8,4.4 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.55"
+        android:pathData="M9.1,4.4 L12,9.5 L14.9,4.4 Z" />
+</vector>

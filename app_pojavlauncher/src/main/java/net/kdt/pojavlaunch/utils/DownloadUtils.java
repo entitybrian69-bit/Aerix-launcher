@@ -29,6 +29,8 @@ public class DownloadUtils {
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestProperty("User-Agent", USER_AGENT);
             conn.setConnectTimeout(10000);
+            conn.setReadTimeout(30000);
+            conn.setInstanceFollowRedirects(true);
             conn.setDoInput(true);
             conn.connect();
             if (conn.getResponseCode() != HttpURLConnection.HTTP_OK) {
@@ -64,28 +66,92 @@ public class DownloadUtils {
         }
     }
 
+    /**
+     * Downloads [urlInput] into [outputFile], surviving a connection that drops mid-transfer.
+     *
+     * A runtime is tens of megabytes, and a phone connection will often die somewhere in the
+     * middle of that. The old version had no timeout, no retry and no resume, so a single dropped
+     * read ended the whole install and the progress bar simply vanished. Now every attempt:
+     *
+     *  - keeps whatever arrived before, and asks the server to continue from there (HTTP Range),
+     *  - restarts cleanly if the server ignores the range,
+     *  - fails loudly if the body is shorter than the advertised length, which is what a silent
+     *    truncation looks like, so the retry can pick it up,
+     *  - gives up only after [MAX_ATTEMPTS] tries, with the last error as the cause.
+     */
     public static void downloadFileMonitored(String urlInput, File outputFile, @Nullable byte[] buffer,
                                              Tools.DownloaderFeedback monitor) throws IOException {
         FileUtils.ensureParentDirectory(outputFile);
+        if (buffer == null) buffer = new byte[65535];
 
-        HttpURLConnection conn = (HttpURLConnection) new URL(urlInput).openConnection();
-        InputStream readStr = conn.getInputStream();
-        try (FileOutputStream fos = new FileOutputStream(outputFile)) {
-            int current;
-            int overall = 0;
-            int length = conn.getContentLength();
+        IOException lastError = null;
+        for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+            long already = outputFile.isFile() ? outputFile.length() : 0L;
+            HttpURLConnection conn = null;
+            try {
+                conn = (HttpURLConnection) new URL(urlInput).openConnection();
+                conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
+                conn.setReadTimeout(READ_TIMEOUT_MS);
+                conn.setInstanceFollowRedirects(true);
+                conn.setRequestProperty("User-Agent", USER_AGENT);
+                // Without this the server may hand back a gzip stream whose length means nothing.
+                conn.setRequestProperty("Accept-Encoding", "identity");
+                if (already > 0) conn.setRequestProperty("Range", "bytes=" + already + "-");
 
-            if (buffer == null) buffer = new byte[65535];
+                int code = conn.getResponseCode();
+                if (already > 0 && code == HttpURLConnection.HTTP_OK) {
+                    // The server ignored the range, so the bytes we have are not a prefix of this
+                    // response. Start over rather than stitching two different files together.
+                    already = 0;
+                    if (!outputFile.delete() && outputFile.exists()) {
+                        throw new IOException("Could not restart the partial download");
+                    }
+                } else if (code != HttpURLConnection.HTTP_OK && code != 206) {
+                    throw new IOException("Server returned HTTP " + code + " for " + urlInput);
+                }
 
-            while ((current = readStr.read(buffer)) != -1) {
-                overall += current;
-                fos.write(buffer, 0, current);
-                monitor.updateProgress(overall, length);
+                long expected = conn.getContentLengthLong();
+                if (expected > 0) expected += already;
+
+                long overall = already;
+                try (InputStream readStr = conn.getInputStream();
+                     FileOutputStream fos = new FileOutputStream(outputFile, already > 0)) {
+                    int current;
+                    while ((current = readStr.read(buffer)) != -1) {
+                        overall += current;
+                        fos.write(buffer, 0, current);
+                        // max must never be below curr, or the percentage goes backwards.
+                        monitor.updateProgress((int) overall, (int) Math.max(expected, overall));
+                    }
+                }
+
+                if (expected > 0 && overall < expected) {
+                    throw new IOException("Download stopped at " + overall + " of " + expected + " bytes");
+                }
+                return;
+            } catch (IOException e) {
+                lastError = e;
+                Log.w("DownloadUtils", "Attempt " + attempt + "/" + MAX_ATTEMPTS + " failed for "
+                        + urlInput + " (" + e.getMessage() + ")");
+                if (attempt < MAX_ATTEMPTS) {
+                    try {
+                        // Small backoff: a dropped mobile connection needs a moment to come back.
+                        Thread.sleep(1000L * attempt);
+                    } catch (InterruptedException interrupted) {
+                        Thread.currentThread().interrupt();
+                        throw new IOException("Download interrupted", interrupted);
+                    }
+                }
+            } finally {
+                if (conn != null) conn.disconnect();
             }
-            conn.disconnect();
         }
-
+        throw lastError != null ? lastError : new IOException("Download failed: " + urlInput);
     }
+
+    private static final int MAX_ATTEMPTS = 5;
+    private static final int CONNECT_TIMEOUT_MS = 30_000;
+    private static final int READ_TIMEOUT_MS = 45_000;
 
     public static <T> T downloadStringCached(String url, String cacheName, ParseCallback<T> parseCallback) throws IOException, ParseException{
         File cacheDestination = new File(Tools.DIR_CACHE, "string_cache/"+cacheName);

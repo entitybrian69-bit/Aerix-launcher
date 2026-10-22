@@ -46,7 +46,7 @@ object PojavLaunchBridge {
                 Toast.makeText(activity, R.string.downloading_java_runtime_uni, Toast.LENGTH_SHORT).show()
                 PojavApplication.sExecutorService.execute {
                     runCatching {
-                        NewJREUtil.ExternalRuntime.JRE_8.downloadRuntime(appContext.assets)
+                        NewJREUtil.ExternalRuntime.JRE_17.downloadRuntime(appContext.assets)
                         val installed = MultiRTUtils.getRuntimes()
                         if (installed.isNotEmpty() && LauncherPreferences.PREF_DEFAULT_RUNTIME.isNullOrEmpty()) {
                             LauncherPreferences.PREF_DEFAULT_RUNTIME = installed[0].name

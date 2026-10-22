@@ -1,8 +1,6 @@
 name: Aerix debug (testing)
 
 # Builds the APK that all testing happens on and stores it in apk/.
-# The sources are the ones released as v1.3.6, so a debug build and the public
-# release are the same launcher; only the applicationId and signing differ.
 # This workflow only ever builds the "noruntime" debug variant:
 #   applicationId net.kdt.pojavlaunch.debug, signed with app_pojavlauncher/debug.keystore
 # so it installs next to the public launcher and can never be mistaken for, or

@@ -73,7 +73,7 @@ object PojavDeviceBridge {
     suspend fun report(context: Context): DeviceReport = withContext(Dispatchers.IO) {
         val gl = runCatching { GpuUtils.getGlInfo() }.getOrNull()
         val renderers = runCatching { RendererCache.getCompatibleRenderers(context).rendererDisplayNames.toList() }.getOrDefault(emptyList())
-        val current = runCatching {
+        val current = PojavPluginBridge.labelForTag(LauncherPreferences.PREF_RENDERER) ?: runCatching {
             GameRenderer.getKnownRenderer(LauncherPreferences.PREF_RENDERER)?.let { context.getString(it.displayName()) }
         }.getOrNull() ?: LauncherPreferences.PREF_RENDERER
         val soc = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {

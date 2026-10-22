@@ -1,266 +1,58 @@
 name: Aerix release
 
-# Publishes a finished Android CI run as a GitHub release.
-#
-# Both APKs of the run are attached as release assets: the full one, which carries its own Java
-# runtime, and the no-runtime one, which downloads the runtime on demand. Release assets are not
-# part of the git history and may be up to 2 GB, so the 128 MB full APK belongs here rather than
-# in the tree - the old version of this file committed APKs into apk/ and could only ever ship
-# the no-runtime build.
-#
-# Started by hand (Actions -> Aerix release -> Run workflow, which asks for the run id, tag and a
-# note) or by touching this file on a branch that should publish. With RUN_ID and BUILD_SHA left
-# empty it publishes the newest successful Android CI run of the branch that triggered it.
+# Commits the no-runtime debug APK of a finished Android CI run into apk/ on the Aerix branch.
+# The full APK (128 MB) is over GitHub's 100 MB file limit and LFS uploads are refused on forks;
+# the no-runtime APK downloads every Java runtime on demand through NewJREUtil.
+# Runs when this file changes on the Aerix branch; RUN_ID / BUILD_SHA select the CI run.
 on:
-  workflow_dispatch:
-    inputs:
-      run_id:
-        description: "Android CI run id to publish (empty: newest successful run of the branch)"
-        required: false
-        default: ""
-      tag:
-        description: "Release tag (empty: v<version>)"
-        required: false
-        default: ""
-      version:
-        description: "Version the build carries, used in the asset names (empty: VERSION below)"
-        required: false
-        default: ""
-      notes:
-        description: "One line to put at the top of the release notes"
-        required: false
-        default: ""
-      skip_noruntime:
-        description: "Attach only the full APK"
-        required: false
-        type: boolean
-        default: false
   push:
+    branches: [ "arena/5d11b9a3-aerix-launcher" ]
     paths: [ ".github/workflows/aerix-release.yml" ]
 
 permissions:
   contents: write
   actions: read
 
-# The knobs of a push-triggered release, same as the workflow_dispatch inputs above.
-#
-# Note: the token of a workflow cannot create a release here - the API answers "Resource not
-# accessible by integration" even with contents: write - but it can upload the assets of one that
-# exists. Create the release itself (empty) next to the branch, then set RUN_ID / TAG here and push.
 env:
-  RUN_ID: "39404082199"
-  BUILD_SHA: "a7fd04bf744890c0b9034fb5621ecbb8f4651694"
-  TAG: "v1.3.4"
-  # Name of the release: the version the build carries, and the tag it is published under when TAG
-  # is left empty.
-  VERSION: "1.3.4"
-  NOTES: "Aerix Launcher 1.3.4 - Fix CurseForge response parsing and share validated, credential-isolated official/mirror routing across Discover and modpack installation."
-
+  RUN_ID: "38670604839"
+  BUILD_SHA: "822150482e735571b68c163f3743111b500e9273"
 
 jobs:
   publish:
     runs-on: ubuntu-latest
-    env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      DISPATCH_RUN_ID: ${{ github.event.inputs.run_id }}
-      DISPATCH_TAG: ${{ github.event.inputs.tag }}
-      DISPATCH_NOTES: ${{ github.event.inputs.notes }}
-      DISPATCH_VERSION: ${{ github.event.inputs.version }}
-      DISPATCH_SKIP_NORUNTIME: ${{ github.event.inputs.skip_noruntime }}
     steps:
-      # A push to this file with no run chosen only stores the workflow: it must not publish the
-      # newest run it happens to find, which may be an older build with other artifacts.
-      - name: Decide whether this run publishes
-        id: gate
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [ "${GITHUB_EVENT_NAME}" = "push" ] && [ -z "${RUN_ID:-}" ] && [ -z "${BUILD_SHA:-}" ]; then
-            echo "publish=false" >> "$GITHUB_OUTPUT"
-            echo "::notice title=stored::No RUN_ID or BUILD_SHA set, so this push only stores the workflow."
-          else
-            echo "publish=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Checkout the branch that publishes
-        if: steps.gate.outputs.publish == 'true'
+      - name: Checkout Aerix branch
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.ref_name }}
+          ref: arena/5d11b9a3-aerix-launcher
           fetch-depth: 1
 
-      - name: Resolve the CI run to publish
-        if: steps.gate.outputs.publish == 'true'
-        id: run
-        shell: bash
-        run: |
-          set -euo pipefail
-          run_id="${DISPATCH_RUN_ID:-${RUN_ID:-}}"
-          sha="${BUILD_SHA:-}"
-          if [ -z "$run_id" ]; then
-            if [ -n "$sha" ]; then
-              run_id=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow android.yml \
-                --commit "$sha" --status success --limit 1 --json databaseId --jq '.[0].databaseId // ""')
-            else
-              run_id=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow android.yml \
-                --branch "$GITHUB_REF_NAME" --status success --limit 1 --json databaseId --jq '.[0].databaseId // ""')
-            fi
-          fi
-          if [ -z "$run_id" ]; then
-            echo "::error title=no CI run::No finished Android CI run to publish. Give a run id, or wait for CI on $GITHUB_REF_NAME."
-            exit 1
-          fi
-          # The run is the source of truth for the commit: a release always names the build it ships.
-          sha=$(gh run view "$run_id" --repo "$GITHUB_REPOSITORY" --json headSha --jq .headSha)
-          short=${sha:0:7}
-          tag="${DISPATCH_TAG:-${TAG:-}}"
-          version="${DISPATCH_VERSION:-${VERSION:-}}"
-          [ -n "$tag" ] || tag="v$version"
-          {
-            echo "run_id=$run_id"
-            echo "sha=$sha"
-            echo "short=$short"
-            echo "tag=$tag"
-            echo "version=$version"
-            echo "url=https://github.com/$GITHUB_REPOSITORY/actions/runs/$run_id"
-          } >> "$GITHUB_OUTPUT"
-          echo "Publishing run $run_id ($short) as $tag"
-
-      - name: Download the APKs of that run
-        if: steps.gate.outputs.publish == 'true'
+      - name: Download no-runtime APK
         uses: actions/download-artifact@v4
         with:
-          pattern: app-release*
+          name: app-debug-noruntime
           path: out
-          run-id: ${{ steps.run.outputs.run_id }}
+          run-id: ${{ env.RUN_ID }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Collect the APKs
-        if: steps.gate.outputs.publish == 'true'
-        id: apk
+      - name: Commit APKs to apk/
         shell: bash
         run: |
-          set -euo pipefail
-          version="${{ steps.run.outputs.version }}"
-          mkdir -p dist
-          pick() { find "out/$1" -name '*.apk' -print -quit 2>/dev/null || true; }
-          full=$(pick app-release)
-          noruntime=$(pick app-release-noruntime)
-          if [ -z "$full" ]; then
-            echo "::error title=no APK::The run has no app-release artifact."
-            exit 1
-          fi
-          # Check the actual APK metadata before giving it a public versioned filename.
-          python3 - "$full" "$noruntime" "$version" <<'PYAPK'
-          import glob, os, re, subprocess, sys
-          tools = glob.glob(os.path.join(os.environ.get('ANDROID_HOME', '/usr/local/lib/android/sdk'), 'build-tools', '*', 'aapt'))
-          if not tools:
-              raise SystemExit('aapt is required to verify APK metadata before publication')
-          version = sys.argv[3]
-          major, minor, patch = map(int, version.split('.'))
-          expected_code = major * 10000 + minor * 100 + patch
-          for path, suffix in [(sys.argv[1], ''), (sys.argv[2], '-noruntime')]:
-              if not path:
-                  continue
-              output = subprocess.check_output([tools[-1], 'dump', 'badging', path], text=True)
-              package = dict(re.findall(r"(name|versionCode|versionName)='([^']*)'", output.splitlines()[0]))
-              if package.get('versionName') != version + suffix or package.get('versionCode') != str(expected_code):
-                  raise SystemExit(f'APK metadata mismatch: {path}: {package}')
-              print(f'Verified APK metadata: {path}: {package}')
-          PYAPK
-          cp "$full" "dist/Aerix-Launcher-$version.apk"
-          # The same file under a name that never changes, so
-          # /releases/latest/download/Aerix-Launcher.apk is a permanent link to the
-          # newest build: the website's download button uses it and downloads the APK
-          # directly, with no visit to a GitHub page and no JavaScript needed.
-          cp "$full" "dist/Aerix-Launcher.apk"
-          {
-            echo "full=Aerix-Launcher-$version.apk"
-            echo "size=$(du -h "$full" | cut -f1)"
-          } >> "$GITHUB_OUTPUT"
-          assets="dist/Aerix-Launcher-$version.apk dist/Aerix-Launcher.apk"
-          notes_extra=""
-          if [ -n "$noruntime" ] && [ "${DISPATCH_SKIP_NORUNTIME:-}" != "true" ]; then
-            cp "$noruntime" "dist/Aerix-Launcher-$version-noruntime.apk"
-            cp "$noruntime" "dist/Aerix-Launcher-noruntime.apk"
-            assets="$assets dist/Aerix-Launcher-$version-noruntime.apk dist/Aerix-Launcher-noruntime.apk"
-            notes_extra="noruntime"
-          fi
-          (cd dist && sha256sum *.apk > SHA256SUMS)
-          assets="$assets dist/SHA256SUMS"
-          echo "assets=$assets" >> "$GITHUB_OUTPUT"
-          echo "noruntime=$notes_extra" >> "$GITHUB_OUTPUT"
-          ls -la dist
-
-      - name: Write the release notes
-        if: steps.gate.outputs.publish == 'true'
-        shell: bash
-        run: |
-          set -euo pipefail
-          version="${{ steps.run.outputs.version }}"
-          short="${{ steps.run.outputs.short }}"
-          run_url="${{ steps.run.outputs.url }}"
-          {
-            echo "**Aerix Launcher $version** - build \`$short\` - [Android CI run]($run_url)"
-            echo ""
-            if [ -n "${DISPATCH_NOTES:-${NOTES:-}}" ]; then
-              echo "${DISPATCH_NOTES:-${NOTES:-}}"
-              echo ""
-            fi
-            echo "| File | What it is |"
-            echo "| --- | --- |"
-            echo "| \`Aerix-Launcher-$version.apk\` | Everything included, including the Java runtime. Install this one. |"
-            if [ "${{ steps.apk.outputs.noruntime }}" = "noruntime" ]; then
-              echo "| \`Aerix-Launcher-$version-noruntime.apk\` | The same build without the bundled runtime, for a smaller download. |"
-            fi
-            echo ""
-            echo "Permanent link to the newest APK: \`https://github.com/$GITHUB_REPOSITORY/releases/latest/download/Aerix-Launcher.apk\`"
-            echo ""
-            echo "Release build, signed with the release key of this project - not a debug build."
-            echo "Android may ask to allow installing apps from unknown sources the first time."
-            echo ""
-          } > notes.md
-          cat notes.md
-
-      - name: Publish the release
-        if: steps.gate.outputs.publish == 'true'
-        shell: bash
-        run: |
-          # The job log of a failed run is not always reachable by the caller that reads this, so a
-          # failure is folded into an annotation as well.
           report() {
-            msg=$(tail -c 3000 step.log 2>/dev/null | tr '\n' '|' | sed 's/%/%25/g')
-            [ -n "$msg" ] && echo "::error title=publish::$msg" || true
+            msg=$(tail -c 3000 step.log | tr '\n' '|' | sed 's/%/%25/g')
+            echo "::error title=commit-step::$msg"
           }
           exec > >(tee step.log) 2>&1
           trap report ERR
-          set -euo pipefail
-          tag="${{ steps.run.outputs.tag }}"
-          sha="${{ steps.run.outputs.sha }}"
-          assets=(${{ steps.apk.outputs.assets }})
-          echo "tag=$tag sha=$sha assets=${assets[*]}"
-          ls -la "${assets[@]}"
-          if ! gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            # A version tag (v1.0.0) is a real release, so /releases/latest tracks it and the
-            # website's permanent download link keeps resolving. A build tag (aerix-<sha>) stays
-            # a pre-release, which is what it is.
-            case "$tag" in
-              v[0-9]*)
-                gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target "$sha" \
-                  --title "Aerix Launcher $version" --latest --notes-file notes.md ;;
-              *)
-                gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target "$sha" \
-                  --title "Aerix Launcher $tag" --prerelease --notes-file notes.md ;;
-            esac
-          fi
-          gh release upload "$tag" "${assets[@]}" --repo "$GITHUB_REPOSITORY" --clobber
-          gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --notes-file notes.md
-          url=$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json url --jq .url)
-          {
-            echo "## Aerix release $tag"
-            echo ""
-            echo "$url"
-            echo ""
-            cat notes.md
-          } >> "$GITHUB_STEP_SUMMARY"
-          echo "Release: $url"
+          set -e
+          SHORT=${BUILD_SHA:0:7}
+          git rm -q --ignore-unmatch apk/*.apk
+          # git rm drops the directory once its last file is gone; recreate it before copying.
+          mkdir -p apk
+          cp out/app-debug-noruntime.apk "apk/Aerix-Launcher-$SHORT-debug.apk"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apk
+          git commit -m "Build: Aerix APK $SHORT (CI run $RUN_ID) [skip ci]"
+          git push origin HEAD:arena/5d11b9a3-aerix-launcher
+

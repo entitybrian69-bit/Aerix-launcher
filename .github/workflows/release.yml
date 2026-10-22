@@ -1,10 +1,20 @@
 name: Release CI
 
+# Public release build. It is only allowed to run after the owner asks for a
+# release and types the confirmation below. Everything else gets tested on the
+# debug APK built by aerix-debug.yml.
+
 on:
   workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type RELEASE to build the public APK'
+        required: true
+        default: ''
 
 jobs:
   build:
+    if: github.event.inputs.confirm == 'RELEASE'
     runs-on: ubuntu-22.04
     env:
       POJAV_KEYSTORE_PASSWORD: ${{ secrets.POJAV_KEYSTORE_PASSWORD }}
