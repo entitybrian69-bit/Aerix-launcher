@@ -278,7 +278,7 @@ private fun VoicePanel(
     onLeave: () -> Unit,
     onMute: () -> Unit
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.weight(1f)) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
         SocialPanel(modifier = Modifier.fillMaxWidth()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 SocialAvatar(avatar = 6, size = 32.dp)
@@ -307,6 +307,6 @@ private fun VoicePanel(
         }
         SocialGhostButton("Leave party", onClick = onLeave, modifier = Modifier.fillMaxWidth())
         SocialBody("Leaving the party does not leave the game.", size = 11.sp, color = SocialColors.textMuted)
-        Spacer(Modifier.height(SocialDimens.xs))
+        Spacer(Modifier.height(8.dp))
     }
 }

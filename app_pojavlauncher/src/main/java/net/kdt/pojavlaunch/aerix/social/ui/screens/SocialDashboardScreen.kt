@@ -202,7 +202,7 @@ private fun SocialFriendsTab(
                 Column(modifier = Modifier.weight(1.7f).fillMaxHeight()) {
                     SocialSearchRow(query = query, onQueryChange = onQueryChange, onAddFriend = onAddFriend)
                     Spacer(Modifier.height(12.dp))
-                    if (friends.isEmpty()) SocialEmptyState(onAddFriend = onAddFriend)
+                    if (friends.isEmpty()) SocialEmptyState(query = query, onAddFriend = onAddFriend)
                     else FriendList(friends, onMessage)
                 }
                 Column(
@@ -216,7 +216,7 @@ private fun SocialFriendsTab(
         } else {
             Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 SocialSearchRow(query = query, onQueryChange = onQueryChange, onAddFriend = onAddFriend)
-                if (friends.isEmpty()) SocialEmptyState(onAddFriend = onAddFriend) else FriendList(friends, onMessage)
+                if (friends.isEmpty()) SocialEmptyState(query = query, onAddFriend = onAddFriend) else FriendList(friends, onMessage)
             }
         }
     }
@@ -317,7 +317,7 @@ private fun statusLabel(status: UserStatus): String = when (status) {
 }
 
 @Composable
-private fun SocialEmptyState(onAddFriend: () -> Unit) {
+private fun SocialEmptyState(query: String, onAddFriend: (String) -> Unit) {
     SocialPanel(modifier = Modifier.fillMaxWidth().padding(top = 24.dp)) {
         Column(
             modifier = Modifier.fillMaxWidth(),
@@ -332,7 +332,7 @@ private fun SocialEmptyState(onAddFriend: () -> Unit) {
             )
             SocialTitle("Your friends list starts here")
             SocialBody("Add someone by their unique Aerix name to get started.")
-            SocialPrimaryButton("Add friend", onClick = onAddFriend)
+            SocialPrimaryButton("Add friend", onClick = { onAddFriend(query) })
             SocialBody("Accepted friends can send private messages and party invitations.", size = 11.sp, color = SocialColors.textMuted)
         }
     }

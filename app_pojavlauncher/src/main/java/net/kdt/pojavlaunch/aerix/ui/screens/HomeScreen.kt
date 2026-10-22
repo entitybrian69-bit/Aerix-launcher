@@ -94,6 +94,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import net.kdt.pojavlaunch.R
+import net.kdt.pojavlaunch.aerix.social.SocialGraph
+import net.kdt.pojavlaunch.aerix.social.data.UserStatus
+import net.kdt.pojavlaunch.aerix.social.ui.SocialWidgetCard
 import net.kdt.pojavlaunch.aerix.bridge.AerixInstance
 import net.kdt.pojavlaunch.aerix.bridge.PojavAccountBridge
 import net.kdt.pojavlaunch.aerix.bridge.PojavInstanceBridge

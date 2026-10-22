@@ -71,7 +71,7 @@ class MockSocialRepository(
     private val _party = MutableStateFlow(PartyState())
     private val _connection = MutableStateFlow(SocialConnection.OK)
     private val _blocked = MutableStateFlow(listOf(AerixUser("frost", "FrostByte", 4), AerixUser("echo", "EchoFox", 5)))
-    private val _invite = MutableStateFlow(ServerInvite(fromName = "Kai", avatar = 1))
+    private val _invite = MutableStateFlow<ServerInvite?>(ServerInvite(fromName = "Kai", avatar = 1))
     private val _chats = MutableStateFlow(
         mapOf(
             "kai" to listOf(

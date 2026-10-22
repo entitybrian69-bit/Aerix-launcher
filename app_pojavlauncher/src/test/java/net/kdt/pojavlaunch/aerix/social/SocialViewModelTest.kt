@@ -39,15 +39,13 @@ class SocialViewModelTest {
     @get:Rule
     val main = MainDispatcherRule()
 
-    private fun repository(dispatcher: TestDispatcher) = MockSocialRepository(io = dispatcher)
-
     @Test
     fun acceptingARequestMovesTheSenderIntoFriends() = runTest {
         val dispatcher = UnconfinedTestDispatcher(testScheduler)
         val repository = MockSocialRepository(io = dispatcher)
         val viewModel = SocialDashboardViewModel(repository)
 
-        val request = repository.requests.value.first()
+        val request = repository.requests.value.first { it.fromName == "Nova" }
         val friendsBefore = repository.friends.value.size
 
         viewModel.accept(request.id)
