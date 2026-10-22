@@ -115,6 +115,8 @@ fun PortalAuthScreen(
     stage: String?,
     lastEmail: String,
     onStartGoogle: (creatingAccount: Boolean, variant: GoogleSignInVariant) -> Unit,
+    onStartBrowser: () -> Unit,
+    browserReady: Boolean,
     onNotNow: () -> Unit
 ) {
     val busy = inProgress
@@ -282,6 +284,16 @@ fun PortalAuthScreen(
                         onClick = { startGoogle(creating = true) }
                     )
                     LinkText(text = "Not now", enabled = !busy, onClick = onNotNow)
+                }
+
+                // The escape hatch from the Play services sheet: the same Google login, in the
+                // browser. Shown with the other links so it is there before anything fails.
+                if (browserReady) {
+                    LinkText(
+                        text = if (busy) "Waiting for the browser…" else "Sign in in the browser",
+                        enabled = !busy,
+                        onClick = onStartBrowser
+                    )
                 }
                 SocialBody("Privacy · Terms", size = 10.sp, color = SocialColors.textMuted.copy(alpha = 0.8f))
             }

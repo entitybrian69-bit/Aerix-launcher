@@ -94,6 +94,7 @@ import net.kdt.pojavlaunch.aerix.social.vm.SocialActivityViewModel
 import net.kdt.pojavlaunch.aerix.social.vm.SocialAddFriendViewModel
 import net.kdt.pojavlaunch.aerix.social.vm.SocialChatViewModel
 import net.kdt.pojavlaunch.aerix.social.vm.SocialDashboardViewModel
+import net.kdt.pojavlaunch.aerix.social.auth.GoogleBrowserAuth
 import net.kdt.pojavlaunch.aerix.social.vm.SignInOutcome
 import net.kdt.pojavlaunch.aerix.social.vm.SocialProfileViewModel
 import net.kdt.pojavlaunch.aerix.social.vm.SocialRoute
@@ -239,6 +240,8 @@ fun SocialShell(
                                     variant
                                 )
                             },
+                            onStartBrowser = { profileVm.signInWithBrowser(context) },
+                            browserReady = GoogleBrowserAuth.isUsable(profile.googleBrowserClientId),
                             onNotNow = onExitToLauncher
                         )
                         SocialRoute.CHARACTER -> SocialCharacterScreen(

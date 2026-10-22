@@ -71,6 +71,7 @@ import net.kdt.pojavlaunch.aerix.social.ui.SocialTextField
 import net.kdt.pojavlaunch.aerix.social.ui.SocialTitle
 import net.kdt.pojavlaunch.BuildConfig
 import net.kdt.pojavlaunch.aerix.social.auth.GoogleAuth
+import net.kdt.pojavlaunch.aerix.social.auth.GoogleBrowserAuth
 import net.kdt.pojavlaunch.aerix.social.ui.SocialAvatar
 import net.kdt.pojavlaunch.aerix.social.ui.SocialMicTestCard
 import net.kdt.pojavlaunch.aerix.social.ui.SocialToggleRow
@@ -287,6 +288,9 @@ fun SocialSettingsAccountScreen(
     var forgetDialog by remember { mutableStateOf(false) }
     var clientIdDialog by remember { mutableStateOf(false) }
     var clientIdDraft by remember { mutableStateOf(state.googleClientId) }
+    var browserDialog by remember { mutableStateOf(false) }
+    var browserIdDraft by remember { mutableStateOf(state.googleBrowserClientId) }
+    var browserSecretDraft by remember { mutableStateOf(state.googleBrowserSecret) }
     var disableDialog by remember { mutableStateOf(false) }
     var deleteDialog by remember { mutableStateOf(false) }
     var typed by remember { mutableStateOf("") }
@@ -349,6 +353,17 @@ fun SocialSettingsAccountScreen(
                 SocialStageRow("Delete account") { deleteDialog = true }
                 SocialBody("Deleting removes your profile, friends, messages, posts and links permanently.", size = 11.sp, color = SocialColors.textMuted)
                 if (BuildConfig.DEBUG) {
+                    SocialStageRow("Browser sign-in (testing)") { browserDialog = true }
+                    SocialBody(
+                        if (state.googleBrowserClientId.isBlank()) {
+                            "Optional. Signs in through Chrome instead of the Play services sheet, " +
+                                "which works when that sheet refuses this build."
+                        } else {
+                            "Configured · signs in through the browser."
+                        },
+                        size = 11.sp,
+                        color = SocialColors.textMuted
+                    )
                     SocialStageRow("Google client id (testing)") { clientIdDialog = true }
                     SocialBody(
                         if (state.googleClientId.isBlank()) "No testing override · this build uses the baked-in id if it has one."
@@ -404,6 +419,39 @@ fun SocialSettingsAccountScreen(
                     modifier = Modifier.weight(1f)
                 )
                 SocialGhostButton("Cancel", onClick = { forgetDialog = false }, modifier = Modifier.weight(1f))
+            }
+        }
+    }
+
+    if (browserDialog) {
+        SocialDialog(onDismiss = { browserDialog = false }) {
+            SocialTitle("Browser sign-in")
+            SocialBody(
+                "Create an OAuth client of type Desktop app in Google Cloud Console and paste its id " +
+                    "here. A Desktop client needs no redirect URI, no SHA-1 and no secret. If you " +
+                    "would rather reuse the Web client, add ${GoogleBrowserAuth.redirectUri()} " +
+                    "to its Authorised redirect URIs and paste its secret below."
+            )
+            SocialTextField(
+                value = browserIdDraft,
+                onValueChange = { browserIdDraft = it },
+                placeholder = "000000000000-abc.apps.googleusercontent.com"
+            )
+            SocialTextField(
+                value = browserSecretDraft,
+                onValueChange = { browserSecretDraft = it },
+                placeholder = "Client secret (only for a Web client)"
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                SocialPrimaryButton(
+                    "Save",
+                    onClick = {
+                        profile.setBrowserClient(browserIdDraft, browserSecretDraft)
+                        browserDialog = false
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+                SocialGhostButton("Cancel", onClick = { browserDialog = false }, modifier = Modifier.weight(1f))
             }
         }
     }

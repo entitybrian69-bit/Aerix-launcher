@@ -217,6 +217,14 @@ data class SocialPersisted(
      * built without `aerixGoogleWebClientId`. Ignored on release builds.
      */
     val googleClientId: String = "",
+    /**
+     * Debug-build override for the browser (loopback) sign-in client, used when the Play
+     * services sheet refuses this build. Either a "Desktop app" client or the same Web client
+     * with the loopback redirect registered.
+     */
+    val googleBrowserClientId: String = "",
+    /** Only needed when [googleBrowserClientId] is a Web application client. */
+    val googleBrowserSecret: String = "",
     val name: String = "",
     val username: String = "",
     val usernameChangedAt: Long = 0L,

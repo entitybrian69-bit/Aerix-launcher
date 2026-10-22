@@ -84,6 +84,8 @@ fun SocialAuthScreen(
     stage: String?,
     lastEmail: String,
     onStartGoogle: (creatingAccount: Boolean, variant: GoogleSignInVariant) -> Unit,
+    onStartBrowser: () -> Unit,
+    browserReady: Boolean,
     onNotNow: () -> Unit
 ) {
     PortalAuthScreen(
@@ -92,6 +94,8 @@ fun SocialAuthScreen(
         stage = stage,
         lastEmail = lastEmail,
         onStartGoogle = onStartGoogle,
+        onStartBrowser = onStartBrowser,
+        browserReady = browserReady,
         onNotNow = onNotNow
     )
 }

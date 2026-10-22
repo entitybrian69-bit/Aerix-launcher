@@ -26,6 +26,7 @@ import net.kdt.pojavlaunch.aerix.social.data.ActivityPost
 import net.kdt.pojavlaunch.aerix.social.auth.GoogleAccount
 import net.kdt.pojavlaunch.aerix.social.auth.GoogleAuth
 import net.kdt.pojavlaunch.aerix.social.auth.GoogleAuthResult
+import net.kdt.pojavlaunch.aerix.social.auth.GoogleBrowserAuth
 import net.kdt.pojavlaunch.aerix.social.auth.GoogleSignInVariant
 import net.kdt.pojavlaunch.aerix.social.data.AerixUser
 import net.kdt.pojavlaunch.aerix.social.data.AttachmentKind
@@ -131,6 +132,10 @@ data class ProfileUiState(
     val googleError: String? = null,
     /** Debug-only OAuth client id typed into Settings. */
     val googleClientId: String = "",
+    /** Debug-only client for the browser sign-in fallback, typed into Settings. */
+    val googleBrowserClientId: String = "",
+    /** Secret for that client, only needed when it is a Web application client. */
+    val googleBrowserSecret: String = "",
     /** Human readable stage of the Google flow, shown on the portal instead of a dead button. */
     val googleStage: String? = null,
     /** Set once after a successful sign-in so the shell can route, then consumed. */
@@ -168,6 +173,8 @@ class SocialProfileViewModel(
                         signedIn = persisted.signedIn,
                         email = persisted.email,
                         googleClientId = persisted.googleClientId,
+                        googleBrowserClientId = persisted.googleBrowserClientId,
+                        googleBrowserSecret = persisted.googleBrowserSecret,
                         name = persisted.name,
                         username = persisted.username.ifBlank { persisted.name },
                         usernameChangedAt = persisted.usernameChangedAt,
@@ -211,6 +218,8 @@ class SocialProfileViewModel(
                             signedIn = true,
                             email = account.email,
                             googleClientId = persisted.googleClientId,
+                            googleBrowserClientId = persisted.googleBrowserClientId,
+                            googleBrowserSecret = persisted.googleBrowserSecret,
                             name = fallbackName,
                             username = fallbackUsername,
                             privacy = persisted.privacy,
@@ -327,6 +336,89 @@ class SocialProfileViewModel(
                 }
             }
         }
+
+    /**
+     * Browser sign-in: the same Google login, through the system browser instead of the Play
+     * services sheet. Works when the sheet refuses the app (unregistered signing key, missing
+     * Android OAuth client, old Play services) because it never asks Play services anything.
+     */
+    fun signInWithBrowser(context: android.content.Context, creatingAccount: Boolean = false) =
+        viewModelScope.launch {
+            val clientId = _state.value.googleBrowserClientId.ifBlank {
+                GoogleAuth.resolveClientId(context, _state.value.googleClientId)
+            }
+            if (!GoogleBrowserAuth.isUsable(clientId)) {
+                _state.update {
+                    it.copy(
+                        googleError = "Browser sign-in has no client id yet. Add one in Settings → " +
+                            "Account → Browser sign-in (testing)."
+                    )
+                }
+                return@launch
+            }
+            _state.update {
+                it.copy(
+                    signInInProgress = true,
+                    googleError = null,
+                    googleStage = "Waiting for the browser…",
+                    signInOutcome = null,
+                    forceCharacterStep = creatingAccount
+                )
+            }
+            val result = try {
+                kotlinx.coroutines.withTimeoutOrNull(GoogleBrowserAuth.TIMEOUT_MS + 30_000) {
+                    GoogleBrowserAuth.signIn(
+                        context = context,
+                        clientId = clientId,
+                        clientSecret = _state.value.googleBrowserSecret
+                    )
+                } ?: GoogleAuthResult.Failed(
+                    "The browser never came back to the launcher. Complete the Google page, then " +
+                        "try again."
+                )
+            } catch (error: Throwable) {
+                GoogleAuthResult.Failed(error.message ?: "Browser sign-in failed.")
+            }
+            when (result) {
+                is GoogleAuthResult.Success -> {
+                    _state.update { it.copy(googleStage = "Signing you in…") }
+                    signInWithGoogle(result.account)
+                }
+                is GoogleAuthResult.Cancelled -> _state.update {
+                    it.copy(
+                        signInInProgress = false,
+                        googleStage = null,
+                        googleError = "Sign-in was cancelled in the browser."
+                    )
+                }
+                GoogleAuthResult.NotConfigured -> _state.update {
+                    it.copy(
+                        signInInProgress = false,
+                        googleStage = null,
+                        googleError = "This build has no Google OAuth client id."
+                    )
+                }
+                is GoogleAuthResult.Failed -> _state.update {
+                    it.copy(signInInProgress = false, googleStage = null, googleError = result.message)
+                }
+            }
+        }
+
+    /** Saves the browser sign-in client. Debug only: the rows live behind [BuildConfig.DEBUG]. */
+    fun setBrowserClient(clientId: String, secret: String) {
+        val cleanId = clientId.trim()
+        val cleanSecret = secret.trim()
+        viewModelScope.launch {
+            withContext(io) {
+                store.update { it.copy(googleBrowserClientId = cleanId, googleBrowserSecret = cleanSecret) }
+            }
+            _state.update { it.copy(googleBrowserClientId = cleanId, googleBrowserSecret = cleanSecret) }
+        }
+    }
+
+    /** Whether the browser fallback is ready to be offered on the portal. */
+    fun browserSignInReady(): Boolean =
+        GoogleBrowserAuth.isUsable(_state.value.googleBrowserClientId)
 
     /** The shell consumes the outcome once so a later sign-out cannot replay the navigation. */
     fun consumeSignInOutcome() {
@@ -512,6 +604,8 @@ class SocialProfileViewModel(
         signedIn = _state.value.signedIn,
         email = _state.value.email,
         googleClientId = _state.value.googleClientId,
+        googleBrowserClientId = _state.value.googleBrowserClientId,
+        googleBrowserSecret = _state.value.googleBrowserSecret,
         name = _state.value.name,
         username = _state.value.username,
         usernameChangedAt = _state.value.usernameChangedAt,

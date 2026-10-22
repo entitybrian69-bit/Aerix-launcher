@@ -39,6 +39,8 @@ class DataStoreSocialStore(private val store: DataStore<Preferences>) : SocialSt
             prefs[Keys.SIGNED_IN] = next.signedIn
             prefs[Keys.EMAIL] = next.email
             prefs[Keys.GOOGLE_CLIENT_ID] = next.googleClientId
+            prefs[Keys.GOOGLE_BROWSER_CLIENT_ID] = next.googleBrowserClientId
+            prefs[Keys.GOOGLE_BROWSER_SECRET] = next.googleBrowserSecret
             prefs[Keys.NAME] = next.name
             prefs[Keys.USERNAME] = next.username
             prefs[Keys.USERNAME_CHANGED_AT] = next.usernameChangedAt
@@ -89,6 +91,8 @@ class DataStoreSocialStore(private val store: DataStore<Preferences>) : SocialSt
         signedIn = prefs[Keys.SIGNED_IN] ?: false,
         email = prefs[Keys.EMAIL].orEmpty(),
         googleClientId = prefs[Keys.GOOGLE_CLIENT_ID].orEmpty(),
+        googleBrowserClientId = prefs[Keys.GOOGLE_BROWSER_CLIENT_ID].orEmpty(),
+        googleBrowserSecret = prefs[Keys.GOOGLE_BROWSER_SECRET].orEmpty(),
         name = prefs[Keys.NAME].orEmpty(),
         username = prefs[Keys.USERNAME].orEmpty(),
         usernameChangedAt = prefs[Keys.USERNAME_CHANGED_AT] ?: 0L,
@@ -156,6 +160,8 @@ class DataStoreSocialStore(private val store: DataStore<Preferences>) : SocialSt
         val SIGNED_IN = booleanPreferencesKey("social_signed_in")
         val EMAIL = stringPreferencesKey("social_email")
         val GOOGLE_CLIENT_ID = stringPreferencesKey("social_google_client_id")
+        val GOOGLE_BROWSER_CLIENT_ID = stringPreferencesKey("social_google_browser_client_id")
+        val GOOGLE_BROWSER_SECRET = stringPreferencesKey("social_google_browser_secret")
         val NAME = stringPreferencesKey("social_name")
         val USERNAME = stringPreferencesKey("social_username")
         val USERNAME_CHANGED_AT = longPreferencesKey("social_username_changed_at")
