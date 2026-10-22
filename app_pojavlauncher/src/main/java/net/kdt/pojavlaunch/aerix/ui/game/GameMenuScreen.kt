@@ -209,6 +209,7 @@ fun GameMenuScreen(
                     versionLine = versionLine,
                     onCloseRequest = onCloseRequest,
                     onOpenDownloads = { page = GameMenuPage.DOWNLOADS },
+                    socialUnread = socialUnread,
                     onOpenSocial = {
                         socialOpen = true
                         // Opening the overlay is what "checking" means: the badge clears.
@@ -247,7 +248,8 @@ private fun GameMenuMainPage(
     versionLine: String,
     onCloseRequest: () -> Unit,
     onOpenDownloads: () -> Unit,
-    onOpenSocial: () -> Unit
+    onOpenSocial: () -> Unit,
+    socialUnread: Int = 0
 ) {
     BoxWithConstraints(
         modifier = Modifier.fillMaxSize(),
