@@ -43,7 +43,8 @@ data class GoogleAccount(
 
 sealed class GoogleAuthResult {
     data class Success(val account: GoogleAccount) : GoogleAuthResult()
-    data object Cancelled : GoogleAuthResult()
+    /** Dismissed — or refused for a reason Play services reports as a cancellation. */
+    data class Cancelled(val detail: String = "") : GoogleAuthResult()
     data object NotConfigured : GoogleAuthResult()
     data class Failed(val message: String) : GoogleAuthResult()
 }
@@ -107,8 +108,11 @@ object GoogleAuth {
                     GoogleAuthResult.Failed("Google returned a credential this launcher cannot read.")
                 }
             } catch (cancelled: GetCredentialCancellationException) {
-                Log.i(TAG, "Sign-in cancelled", cancelled)
-                GoogleAuthResult.Cancelled
+                // Play services reports a misconfigured OAuth client the same way it reports a
+                // dismissed sheet, so the message is kept: it often says "[16] Account reauth
+                // failed" or "activity is cancelled by the user".
+                Log.i(TAG, "Sign-in cancelled / refused", cancelled)
+                GoogleAuthResult.Cancelled(cancelled.message.orEmpty().trim())
             } catch (none: NoCredentialException) {
                 Log.w(TAG, "No credential available", none)
                 GoogleAuthResult.Failed(
@@ -153,6 +157,38 @@ object GoogleAuth {
             else -> "Check that this Gmail is listed under Audience → Test users in Google Cloud."
         }
         return "$raw · $hint"
+    }
+
+    /**
+     * The certificate this APK is signed with, which is what Google matches against the Android
+     * OAuth client's SHA-1. Without a matching Android client the account sheet opens, the
+     * player picks an account and the sheet closes with a cancellation instead of a token.
+     */
+    fun signingSha1(context: Context): String = signingDigest(context, "SHA-1")
+
+    fun signingSha256(context: Context): String = signingDigest(context, "SHA-256")
+
+    private fun signingDigest(context: Context, algorithm: String): String = try {
+        val pm = context.packageManager
+        val pkg = context.packageName
+        val signature = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+            pm.getPackageInfo(pkg, android.content.pm.PackageManager.GET_SIGNING_CERTIFICATES)
+                .signingInfo
+                ?.apkContentsSigners
+                ?.firstOrNull()
+        } else {
+            @Suppress("DEPRECATION")
+            pm.getPackageInfo(pkg, android.content.pm.PackageManager.GET_SIGNATURES)
+                .signatures
+                ?.firstOrNull()
+        }
+        if (signature == null) return ""
+        val digest = java.security.MessageDigest.getInstance(algorithm)
+            .digest(signature.toByteArray())
+        digest.joinToString(":") { String.format("%02X", it) }
+    } catch (error: Throwable) {
+        Log.w(TAG, "Could not read the signing certificate", error)
+        ""
     }
 
     /**

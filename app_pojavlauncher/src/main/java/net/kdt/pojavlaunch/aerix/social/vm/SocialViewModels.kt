@@ -287,14 +287,22 @@ class SocialProfileViewModel(
                     _state.update { it.copy(googleStage = "Signing you in…") }
                     signInWithGoogle(result.account)
                 }
-                GoogleAuthResult.Cancelled -> _state.update {
+                is GoogleAuthResult.Cancelled -> _state.update {
                     // Not an error, but never silence either: an interrupted sheet used to look
-                    // exactly like a dead button.
+                    // exactly like a dead button. A sheet that closes on *every* attempt is not
+                    // the player cancelling — it is Play services refusing the app, and the fix
+                    // is the signing key registration named in Settings → Account.
                     it.copy(
                         signInInProgress = false,
                         googleStage = null,
-                        googleError = "Google closed before the account was confirmed. Tap again and " +
-                            "pick the account, then allow the sign-in."
+                        googleError = buildString {
+                            append("Google closed before the account was confirmed.")
+                            append(" If this happens every time, this build's signing key is not ")
+                            append("registered as an Android OAuth client in the same project as ")
+                            append("the Web client — see Settings → Account → Sign-in diagnostics.")
+                            val detail = result.detail
+                            if (detail.isNotBlank()) append(" · ").append(detail)
+                        }
                     )
                 }
                 GoogleAuthResult.NotConfigured -> _state.update {

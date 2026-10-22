@@ -33,11 +33,13 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.setValue
@@ -46,6 +48,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -289,6 +292,8 @@ fun SocialSettingsAccountScreen(
     var typed by remember { mutableStateOf("") }
     var newUsername by remember { mutableStateOf(state.username) }
     val canChange = state.canChangeUsername()
+    val sha1 = remember { GoogleAuth.signingSha1(context) }
+    val sha256 = remember { GoogleAuth.signingSha256(context) }
 
     SocialPage {
         Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -348,6 +353,28 @@ fun SocialSettingsAccountScreen(
                     SocialBody(
                         if (state.googleClientId.isBlank()) "No testing override · this build uses the baked-in id if it has one."
                         else "Testing override in use.",
+                        size = 11.sp,
+                        color = SocialColors.textMuted
+                    )
+                }
+                // What Google actually checks, right where the failing sign-in points: the
+                // package and the certificate fingerprint, plus the id this build asks with.
+                if (BuildConfig.DEBUG) {
+                    SocialSectionTitle("Sign-in diagnostics")
+                    SocialBody(
+                        "Google only signs you in when an Android OAuth client in the same Cloud " +
+                            "project carries this exact package name and SHA-1.",
+                        size = 11.sp,
+                        color = SocialColors.textMuted
+                    )
+                    DiagnosticRow("Package", context.packageName)
+                    DiagnosticRow("SHA-1", sha1)
+                    DiagnosticRow("SHA-256", sha256)
+                    DiagnosticRow("Web client id", GoogleAuth.resolveClientId(context, state.googleClientId))
+                    SocialBody(
+                        "Create it in Google Cloud Console → Credentials → Create credentials → " +
+                            "OAuth client ID → Android. Add the SHA-1 of every key that signs a " +
+                            "build you install.",
                         size = 11.sp,
                         color = SocialColors.textMuted
                     )
@@ -488,6 +515,50 @@ fun SocialSettingsAccountScreen(
 }
 
 @Composable
+/** A read-only fact the player can copy into Google Cloud Console. */
+@Composable
+private fun DiagnosticRow(label: String, value: String) {
+    val clipboard = LocalClipboardManager.current
+    var copied by remember { mutableStateOf(false) }
+    LaunchedEffect(value, copied) {
+        if (copied) {
+            kotlinx.coroutines.delay(1600)
+            copied = false
+        }
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(SocialDimens.controlRadius))
+            .background(SocialColors.panelSoft)
+            .clickable {
+                if (value.isNotBlank()) {
+                    clipboard.setText(AnnotatedString(value))
+                    copied = true
+                }
+            }
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            SocialBody(label, size = 11.sp, color = SocialColors.textMuted, maxLines = 1)
+            SocialBody(
+                value.ifBlank { "unavailable" },
+                size = 12.sp,
+                color = SocialColors.textPrimary,
+                maxLines = 1
+            )
+        }
+        Text(
+            text = if (copied) "Copied" else "Copy",
+            color = if (copied) SocialColors.accent else SocialColors.textSecondary,
+            fontSize = 11.sp,
+            maxLines = 1
+        )
+    }
+}
+
 private fun SocialStageRow(title: String, onClick: () -> Unit) {
     Row(
         modifier = Modifier
