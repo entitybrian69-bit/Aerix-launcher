@@ -96,7 +96,7 @@ object GoogleAuth {
             } catch (none: NoCredentialException) {
                 GoogleAuthResult.Failed("No Google account is set up on this device.")
             } catch (error: GetCredentialException) {
-                GoogleAuthResult.Failed(error.errorMessage ?: "Google sign-in failed.")
+                GoogleAuthResult.Failed(error.errorMessage?.toString() ?: "Google sign-in failed.")
             } catch (error: Throwable) {
                 GoogleAuthResult.Failed(error.message ?: "Google sign-in failed.")
             }
