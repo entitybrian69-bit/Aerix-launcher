@@ -17,7 +17,7 @@ jobs:
       - name: Pull the failed Android CI log and surface the real error
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          FAILED_RUN: "39710251735"
+          FAILED_RUN: "39710759563"
         run: |
           set -u
           gh run view "$FAILED_RUN" -R "${{ github.repository }}" --log-failed > fail.log 2>&1 || true
