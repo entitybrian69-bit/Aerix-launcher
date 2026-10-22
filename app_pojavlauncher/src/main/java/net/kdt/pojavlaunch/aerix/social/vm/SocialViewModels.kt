@@ -14,6 +14,7 @@ package net.kdt.pojavlaunch.aerix.social.vm
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -102,7 +103,8 @@ data class ProfileUiState(
 )
 
 class SocialProfileViewModel(
-    private val store: SocialStore
+    private val store: SocialStore,
+    private val io: CoroutineDispatcher = Dispatchers.IO
 ) : ViewModel() {
     private val _state = MutableStateFlow(ProfileUiState())
     val state: StateFlow<ProfileUiState> = _state.asStateFlow()
@@ -124,12 +126,12 @@ class SocialProfileViewModel(
 
     fun signIn() = viewModelScope.launch {
         _state.update { it.copy(signInInProgress = true) }
-        withContext(Dispatchers.IO) { store.update { it.copy(signedIn = true) } }
+        withContext(io) { store.update { it.copy(signedIn = true) } }
         _state.update { it.copy(signInInProgress = false) }
     }
 
     fun signOut() = viewModelScope.launch {
-        withContext(Dispatchers.IO) { store.update { it.copy(signedIn = false) } }
+        withContext(io) { store.update { it.copy(signedIn = false) } }
     }
 
     fun onNameChange(value: String) {
@@ -137,11 +139,11 @@ class SocialProfileViewModel(
     }
 
     fun selectSkin(id: String) = viewModelScope.launch {
-        withContext(Dispatchers.IO) { store.update { it.copy(skinId = id) } }
+        withContext(io) { store.update { it.copy(skinId = id) } }
     }
 
     fun selectCape(id: String) = viewModelScope.launch {
-        withContext(Dispatchers.IO) { store.update { it.copy(capeId = id) } }
+        withContext(io) { store.update { it.copy(capeId = id) } }
     }
 
     /** Validates and persists the appearance. Returns true when the caller may move on. */
@@ -153,7 +155,7 @@ class SocialProfileViewModel(
             return false
         }
         viewModelScope.launch {
-            withContext(Dispatchers.IO) {
+            withContext(io) {
                 store.update { it.copy(name = name, signedIn = true) }
             }
             _state.update { it.copy(saved = true, nameError = null, name = name) }
@@ -290,7 +292,10 @@ data class SettingsUiState(
     val notifications: NotificationSettings = NotificationSettings()
 )
 
-class SocialSettingsViewModel(private val store: SocialStore) : ViewModel() {
+class SocialSettingsViewModel(
+    private val store: SocialStore,
+    private val io: CoroutineDispatcher = Dispatchers.IO
+) : ViewModel() {
     private val _state = MutableStateFlow(SettingsUiState())
     val state: StateFlow<SettingsUiState> = _state.asStateFlow()
 
@@ -319,11 +324,11 @@ class SocialSettingsViewModel(private val store: SocialStore) : ViewModel() {
     fun setAndroidNotifications(value: Boolean) = persistNotifications { it.copy(androidNotifications = value) }
 
     private fun persistPrivacy(transform: (PrivacySettings) -> PrivacySettings) = viewModelScope.launch {
-        withContext(Dispatchers.IO) { store.update { it.copy(privacy = transform(it.privacy)) } }
+        withContext(io) { store.update { it.copy(privacy = transform(it.privacy)) } }
     }
 
     private fun persistNotifications(transform: (NotificationSettings) -> NotificationSettings) = viewModelScope.launch {
-        withContext(Dispatchers.IO) { store.update { it.copy(notifications = transform(it.notifications)) } }
+        withContext(io) { store.update { it.copy(notifications = transform(it.notifications)) } }
     }
 }
 

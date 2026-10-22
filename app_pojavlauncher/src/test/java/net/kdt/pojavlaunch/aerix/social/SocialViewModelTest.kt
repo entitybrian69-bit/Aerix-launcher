@@ -124,7 +124,7 @@ class SocialProfileViewModelTest {
     @Test
     fun shortNamesAreRejectedBeforeAnythingIsWritten() = runTest {
         val store = InMemorySocialStore()
-        val viewModel = SocialProfileViewModel(store)
+        val viewModel = SocialProfileViewModel(store, UnconfinedTestDispatcher(testScheduler))
         advanceUntilIdle()
 
         viewModel.onNameChange("ab")
@@ -136,7 +136,7 @@ class SocialProfileViewModelTest {
     @Test
     fun validNameIsPersistedAndSignsTheUserIn() = runTest {
         val store = InMemorySocialStore()
-        val viewModel = SocialProfileViewModel(store)
+        val viewModel = SocialProfileViewModel(store, UnconfinedTestDispatcher(testScheduler))
         advanceUntilIdle()
 
         var finished = false
@@ -153,7 +153,7 @@ class SocialProfileViewModelTest {
     @Test
     fun signingOutKeepsTheProfileName() = runTest {
         val store = InMemorySocialStore()
-        val viewModel = SocialProfileViewModel(store)
+        val viewModel = SocialProfileViewModel(store, UnconfinedTestDispatcher(testScheduler))
         advanceUntilIdle()
 
         viewModel.signIn()
@@ -179,7 +179,7 @@ class SocialSettingsViewModelTest {
     @Test
     fun privacyToggleIsPersisted() = runTest {
         val store = InMemorySocialStore()
-        val viewModel = SocialSettingsViewModel(store)
+        val viewModel = SocialSettingsViewModel(store, UnconfinedTestDispatcher(testScheduler))
         advanceUntilIdle()
 
         viewModel.setOnlineStatus(false)
@@ -191,7 +191,7 @@ class SocialSettingsViewModelTest {
     @Test
     fun notificationTogglesAndDropdownsArePersisted() = runTest {
         val store = InMemorySocialStore()
-        val viewModel = SocialSettingsViewModel(store)
+        val viewModel = SocialSettingsViewModel(store, UnconfinedTestDispatcher(testScheduler))
         advanceUntilIdle()
 
         viewModel.setMessagePreview(true)
