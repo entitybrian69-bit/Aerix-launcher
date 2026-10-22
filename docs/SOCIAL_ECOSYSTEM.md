@@ -112,6 +112,27 @@ clears it (`markRead()`), so the badge only reflects messages you have not looke
 the overlay you can switch between friends, message them, call them and run the party without
 leaving the game.
 
+## Entry screen: the portal
+
+The first Social screen is the chosen concept, built as live Compose (no bitmap, no video):
+
+- **Portal** — a breathing mint portal with two counter-rotating light arcs, a glass interior,
+  orbiting highlight, and ground light pools on the surface it stands on.
+- **Player** — a blocky silhouette standing at the portal's edge, bobbing and shifting weight;
+  on touch its rim light flares and a light gradient reaches its face.
+- **Air** — aurora ribbons drift across the top, 26 dust motes rise and twinkle.
+- **Pill** — one wide "Continue with Google" with the real Google mark, a spring press (0.96),
+  a specular band that glides across the glass, and a mint glow underneath.
+- **Touch** — every press spawns ripple rings at the exact finger position, fires two light arcs
+  from the pill into the portal, pulls the motes faster, speeds the portal spin and brightens
+  the player. Ripples and arcs fade over ~1.4s, so the screen keeps answering after release.
+- **Account chip** — top right, shows the address this device last signed in with.
+- **Links** — "Create an account" and "Not now" are quiet text links that underline/brighten on
+  press; the small print is Privacy · Terms.
+
+Sign-in and character setup are **full-bleed**: the rail and header are hidden while onboarding,
+so the portal owns the whole screen and "Not now" is the way back to the launcher.
+
 ## Google sign-in (real)
 
 The first Social screen now runs Android's **Credential Manager** flow. Tapping *Sign in with
