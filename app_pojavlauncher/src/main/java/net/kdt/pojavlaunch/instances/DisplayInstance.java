@@ -8,6 +8,9 @@ public class DisplayInstance {
     public String versionId;
     public String icon;
 
+    /** Stable directory identity, independent of whichever profile is currently selected. */
+    public String getInstanceId() { return mInstanceRoot.getName(); }
+
     protected void sanitize() {
         sanitizeIcon();
     }

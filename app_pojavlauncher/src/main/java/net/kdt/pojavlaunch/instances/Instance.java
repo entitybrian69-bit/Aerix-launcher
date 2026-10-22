@@ -36,6 +36,9 @@ public class Instance extends DisplayInstance {
     protected void sanitize() {
         super.sanitize();
         sanitizeArgs();
+        if (net.kdt.pojavlaunch.aerix.bridge.RetiredRendererCleanup.isRetiredTag(renderer)) {
+            renderer = null; // Inherit the remaining global renderer; preserve all other instance data.
+        }
     }
 
     private void sanitizeArgs() {
@@ -87,7 +90,8 @@ public class Instance extends DisplayInstance {
     }
 
     public String getLaunchRenderer() {
-        if(Tools.isValidString(renderer)) return renderer;
+        if(Tools.isValidString(renderer) &&
+                !net.kdt.pojavlaunch.aerix.bridge.RetiredRendererCleanup.isRetiredTag(renderer)) return renderer;
         return LauncherPreferences.PREF_RENDERER;
     }
 

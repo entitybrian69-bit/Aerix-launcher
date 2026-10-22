@@ -1,22 +1,13 @@
 /*
  * Aerix Launcher UI layer for PojavLauncher.
- * Generic renderer plugin discovery and launch adapter, ported from mirai-launcher- (Zalith Launcher 2 fork):
+ * Renderer plugin discovery and launch adapter, ported from mirai-launcher- (Zalith Launcher 2 fork):
  *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/game/plugin/PluginLoader.kt
  *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/game/plugin/renderer/RendererPlugin.kt
  *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/game/plugin/renderer/RendererPluginManager.kt
- * Discovers every installed renderer plugin APK. A plugin opts in with a boolean meta-data key inside its
- * <application> element; any of these markers is accepted:
- *   fclPlugin            - Fold Craft Launcher renderer plugins
- *   zalithRendererPlugin - Zalith Launcher renderer plugins
- *   pojavRendererPlugin  - PojavLauncher-style renderer plugins
- *   aerixPlugin          - Aerix-native renderer plugins
- *   emesisPlugin         - Emesis renderer plugins (the com.emesis package space counts as an implicit marker)
- * A plugin declares meta-data "renderer" as "<rendererId>:<glLibrary>:<eglLibrary>", optionally
- * "des" (display name), "minMCVer", "maxMCVer" and "pojavEnv" (KEY=VALUE pairs, ':'-separated;
- * POJAV_RENDERER overrides the id, DLOPEN lists extra comma-separated libraries, LIB_MESA_NAME /
- * MESA_LIBRARY values are resolved against the plugin's native directory).
- * Emesis-style plugins may omit "renderer"; then rendererId "emesis" and libemesis.so are assumed.
- * Each plugin is registered in PojavLauncher's RendererCache as an external RenderSpec (tag
+ * Discovers every installed renderer plugin APK. A host opts in with one of these meta-data markers:
+ *   fclPlugin, fclPlugin_V2 (Fold Craft Launcher), zalithRendererPlugin (Zalith Launcher 2),
+ *   pojavRendererPlugin, aerixPlugin, emesisPlugin (the com.emesis package space counts implicitly)
+ * and registers each one in PojavLauncher's RendererCache as an external RenderSpec (tag
  * "plugin:<packageName>") without modifying Pojav's backend classes. When a plugin renderer is
  * selected, applyLaunchOverride() replaces the instance's GameRenderer spec at launch time so
  * GameRenderer.setupEnvironment() and GameRenderer.maybeSetupRenderer() use the plugin's native
@@ -40,6 +31,9 @@
 package net.kdt.pojavlaunch.aerix.bridge
 
 import android.annotation.SuppressLint
+import android.app.ActivityManager
+import android.os.Build
+import android.util.Log
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ApplicationInfo
@@ -47,6 +41,7 @@ import android.content.pm.PackageManager
 import android.os.Bundle
 import git.artdeell.mojoexec.MojoExec
 import net.kdt.pojavlaunch.R
+import net.kdt.pojavlaunch.Logger
 import net.kdt.pojavlaunch.game.renderer.GameRenderer
 import net.kdt.pojavlaunch.game.renderer.RenderSpec
 import net.kdt.pojavlaunch.game.renderer.RendererCache
@@ -56,7 +51,6 @@ class AerixRendererPlugin(
     val packageName: String,
     val appName: String,
     val appVersion: String,
-    val marker: String,
     val rendererId: String,
     val displayName: String,
     val summary: String,
@@ -66,13 +60,21 @@ class AerixRendererPlugin(
     val eglName: String,
     val nativeLibDir: String,
     val env: Map<String, String>,
-    val dlopen: List<String>
+    val dlopen: List<String>,
+    val metadataVersion: Int = 1,
+    val useNamespaceBypass: Boolean = true
 ) : RenderSpec {
     val pluginTag: String = "$TAG_PREFIX$packageName"
-    private val loadedLibraries = HashSet<String>()
 
-    override fun compatibleDevice(context: Context): Boolean =
-        File(nativeLibDir).isDirectory && libraryAvailable(eglName)
+    override fun compatibleDevice(context: Context): Boolean {
+        if (!File(nativeLibDir).isDirectory) return false
+        if (metadataVersion < 2) return true
+        val gles = context.getSystemService(ActivityManager::class.java)?.deviceConfigurationInfo?.reqGlEsVersion ?: 0
+        val abi = (if (android.os.Process.is64Bit()) Build.SUPPORTED_64_BIT_ABIS else Build.SUPPORTED_32_BIT_ABIS).firstOrNull() ?: return false
+        return Build.VERSION.SDK_INT >= 26 && gles >= 0x30000 &&
+            RendererPluginV2.matchesElfAbi(File(glName), abi) &&
+            (eglName == "libEGL.so" || eglName == glName || RendererPluginV2.matchesElfAbi(File(eglName), abi))
+    }
 
     override fun name(): String = displayName
 
@@ -87,46 +89,42 @@ class AerixRendererPlugin(
     override fun setupEnvironment(context: Context, envMap: MutableMap<String, String>) {
         envMap.putAll(env)
         envMap["POJAV_RENDERER"] = rendererId
-        if (glName.isNotEmpty()) envMap["LIBGL_NAME"] = glName
-    }
-
-    override fun setupRenderer(): Boolean {
-        loadPluginLibraries()
-        val vulkan = usesVulkan()
-        if (vulkan) runCatching { MojoExec.preloadVulkan() }
-        return MojoExec.prepareEgl(resolveLibrary(eglName), true, !vulkan, glesVersion())
-    }
-
-    /** Absolute path of a library the plugin declared, relative names resolve inside its native dir. */
-    fun resolveLibrary(name: String): String = when {
-        name.isEmpty() -> name
-        name.startsWith("/") -> name
-        else -> "$nativeLibDir/$name"
-    }
-
-    private fun libraryAvailable(name: String): Boolean {
-        if (name.isEmpty()) return false
-        if (File(resolveLibrary(name)).exists()) return true
-        return !name.startsWith("/") && !name.contains('/')
-    }
-
-    private fun usesVulkan(): Boolean =
-        env.containsKey("MESA_LOADER_DRIVER_OVERRIDE") ||
-            rendererId.contains("zink", ignoreCase = true) ||
-            rendererId.contains("vulkan", ignoreCase = true) ||
-            rendererId.contains("freedreno", ignoreCase = true) ||
-            rendererId.contains("turnip", ignoreCase = true)
-
-    private fun glesVersion(): Int =
-        if (rendererId.contains("gles2", ignoreCase = true) ||
-            rendererId.contains("opengles2", ignoreCase = true)) 2 else 3
-
-    private fun loadPluginLibraries() {
-        for (name in dlopen) {
-            val path = resolveLibrary(name)
-            if (!File(path).exists() || !loadedLibraries.add(path)) continue
-            runCatching { System.load(path) }
+        if (metadataVersion >= 2) envMap["SDL_EGL_LIBRARY"] = eglName
+        if (glName.isNotEmpty()) {
+            envMap["LIBGL_NAME"] = glName
         }
+    }
+
+    /** Values passed directly to MojoExec; inspecting this plan never loads native code. */
+    internal data class EglLaunchPlan(val library: String, val namespaceBypass: Boolean, val gles: Boolean, val major: Int)
+
+    internal fun eglLaunchPlan(): EglLaunchPlan {
+        val target = when {
+            eglName.startsWith("/") -> eglName
+            File(nativeLibDir, eglName).exists() -> File(nativeLibDir, eglName).absolutePath
+            else -> eglName
+        }
+        return EglLaunchPlan(target, useNamespaceBypass, !RendererPluginV2.usesDesktopGl(rendererId, env), 3)
+    }
+
+    override fun setupRenderer(): Boolean = try {
+        val initialize = {
+            if (RendererPluginV2.usesVulkan(rendererId, env)) MojoExec.preloadVulkan()
+            val plan = eglLaunchPlan()
+            Logger.appendToLog("Renderer native load: tag=$pluginTag bundle=$appVersion " +
+                "egl=${plan.library} namespaceBypass=${plan.namespaceBypass} gles=${plan.gles} major=${plan.major}")
+            val loaded = MojoExec.prepareEgl(plan.library, plan.namespaceBypass, plan.gles, plan.major)
+            // prepareEgl only dlopens the provider. EGL context creation happens later in GLFW/SDL.
+            Logger.appendToLog("Renderer native provider loaded=$loaded tag=$pluginTag; EGL context/gameplay not yet verified")
+            loaded
+        }
+        initialize()
+    } catch (error: Exception) {
+        Logger.appendToLog("Renderer initialization failed: tag=$pluginTag ${error.javaClass.simpleName}: ${error.message}")
+        Log.e("AerixRendererPlugin", "Renderer initialization failed", error); false
+    } catch (error: LinkageError) {
+        Logger.appendToLog("Renderer native linkage failed: tag=$pluginTag ${error.javaClass.simpleName}: ${error.message}")
+        Log.e("AerixRendererPlugin", "Renderer native linkage failed", error); false
     }
 
     companion object {
@@ -137,11 +135,13 @@ class AerixRendererPlugin(
 object PojavPluginBridge {
     private const val PACKAGE_FLAGS = PackageManager.GET_META_DATA or PackageManager.GET_SHARED_LIBRARY_FILES
     private const val EMESIS_PACKAGE_PREFIX = "com.emesis"
-    private const val EMESIS_DEFAULT_LIBRARY = "libemesis.so"
+    private const val EMESIS_RENDERER_ID = "emesis"
+    private const val EMESIS_LIBRARY = "libemesis.so"
 
-    /** Boolean meta-data keys that mark an APK as a renderer plugin, checked in this order. */
+    /** Meta-data keys that mark an APK as a renderer plugin, checked in this order. */
     private val PLUGIN_MARKERS = listOf(
         "fclPlugin",
+        "fclPlugin_V2",
         "zalithRendererPlugin",
         "pojavRendererPlugin",
         "aerixPlugin",
@@ -155,45 +155,49 @@ object PojavPluginBridge {
     @JvmOverloads
     @SuppressLint("QueryPermissionsNeeded")
     fun loadPlugins(context: Context, force: Boolean = false): List<AerixRendererPlugin> {
-        if (!force && plugins.isNotEmpty()) {
+        if (plugins.isNotEmpty() && !force) {
             injectIntoRendererCache(context, plugins)
             return plugins
         }
-        val appContext = context.applicationContext ?: context
-        val pm = appContext.packageManager
-        val ownPackage = appContext.packageName
-        val discovered = LinkedHashMap<String, AerixRendererPlugin>()
+        val pm = context.packageManager
+        val discovered = ArrayList<AerixRendererPlugin>()
+        RetiredRendererCleanup.clean(context)
+        val seen = hashSetOf<String>()
+
         runCatching {
-            for (info in candidatePackages(pm)) {
-                if (info.packageName == ownPackage) continue
-                val plugin = parsePlugin(pm, info) ?: continue
-                if (!discovered.containsKey(plugin.packageName)) {
-                    discovered[plugin.packageName] = plugin
-                }
+            val activities = pm.queryIntentActivities(Intent(Intent.ACTION_MAIN), PACKAGE_FLAGS)
+            for (resolve in activities) {
+                val appInfo = resolve.activityInfo?.applicationInfo ?: continue
+                if (!seen.add(appInfo.packageName)) continue
+                parsePlugin(context, pm, appInfo)?.let { discovered.add(it) }
             }
         }
-        plugins = discovered.values.sortedBy { it.displayName.lowercase() }
-        injectIntoRendererCache(appContext, plugins)
+        runCatching {
+            val packages = pm.getInstalledApplications(PACKAGE_FLAGS)
+            for (appInfo in packages) {
+                if (!seen.add(appInfo.packageName)) continue
+                parsePlugin(context, pm, appInfo)?.let { discovered.add(it) }
+            }
+        }
+
+        plugins = discovered.sortedBy { it.displayName.lowercase() }
+        injectIntoRendererCache(context, plugins)
         return plugins
     }
 
-    /** Rescans installed packages and rebuilds the renderer cache. */
+    /** Rescans installed packages and rebuilds the renderer list, used when a plugin APK changes. */
     @JvmStatic
     fun refreshPlugins(context: Context) {
         runCatching { RendererCache.releaseRendererCache() }
-        loadPlugins(context, true)
+        loadPlugins(context.applicationContext ?: context, force = true)
     }
+
+    /** Display name for a renderer tag, including the "plugin:" tags. */
+    fun labelForTag(tag: String?): String? = findByTag(tag)?.displayName
 
     fun findByTag(tag: String?): AerixRendererPlugin? {
         if (tag == null || !tag.startsWith(AerixRendererPlugin.TAG_PREFIX)) return null
         return plugins.firstOrNull { it.pluginTag == tag }
-    }
-
-    /** Display name for a renderer tag, including the "plugin:" tags. */
-    fun labelForTag(tag: String?): String? {
-        if (tag == null) return null
-        findByTag(tag)?.let { return it.displayName }
-        return null
     }
 
     /**
@@ -203,49 +207,74 @@ object PojavPluginBridge {
     @JvmStatic
     fun applyLaunchOverride(context: Context, gameRenderer: GameRenderer, rendererTag: String?) {
         if (rendererTag == null || !rendererTag.startsWith(AerixRendererPlugin.TAG_PREFIX)) return
-        if (plugins.isEmpty()) loadPlugins(context)
-        val plugin = findByTag(rendererTag) ?: return
-        gameRenderer.setCurrentRenderer(plugin)
-    }
-
-    @SuppressLint("QueryPermissionsNeeded")
-    private fun candidatePackages(pm: PackageManager): List<ApplicationInfo> {
-        val packages = ArrayList<ApplicationInfo>()
-        runCatching {
-            pm.queryIntentActivities(Intent(Intent.ACTION_MAIN), PACKAGE_FLAGS).forEach { resolve ->
-                resolve.activityInfo?.applicationInfo?.let { packages.add(it) }
-            }
+        if (plugins.isEmpty()) loadPlugins(context, force = true)
+        val plugin = findByTag(rendererTag)
+        if (plugin == null || !plugin.compatibleDevice(context)) {
+            Log.w("AerixRendererPlugin", "Selected renderer unavailable; keeping built-in fallback before environment setup")
+            android.widget.Toast.makeText(context, "Selected renderer unavailable; using built-in renderer", android.widget.Toast.LENGTH_LONG).show()
+            return
         }
-        runCatching { packages.addAll(pm.getInstalledApplications(PACKAGE_FLAGS)) }
-        return packages
+        gameRenderer.setCurrentRenderer(plugin)
     }
 
     /** First meta-data marker declaring the package a renderer plugin, or the implicit Emesis one. */
     private fun pluginMarker(meta: Bundle, packageName: String): String? {
         for (key in PLUGIN_MARKERS) {
+            if (key == "fclPlugin_V2") {
+                if (meta.containsKey(key)) return key
+                continue
+            }
             if (meta.getBoolean(key, false)) return key
         }
         return if (packageName.startsWith(EMESIS_PACKAGE_PREFIX)) "emesisPlugin" else null
     }
 
-    private fun parsePlugin(pm: PackageManager, info: ApplicationInfo): AerixRendererPlugin? = runCatching {
-        if (info.flags and ApplicationInfo.FLAG_SYSTEM != 0) return null
+    private fun parsePlugin(
+        context: Context,
+        pm: PackageManager,
+        info: ApplicationInfo
+    ): AerixRendererPlugin? = runCatching {
+        if (info.flags and ApplicationInfo.FLAG_SYSTEM != 0 || RetiredRendererCleanup.isRetiredPackage(info.packageName)) return null
         val meta = info.metaData ?: return null
         val marker = pluginMarker(meta, info.packageName) ?: return null
         val emesisStyle = marker == "emesisPlugin" || marker == "aerixPlugin"
+        if (meta.containsKey("fclPlugin_V2")) {
+            val plugin = runCatching {
+                val metadata = when (val value = meta.get("fclPlugin_V2")) {
+                    is Int -> pm.getResourcesForApplication(info).getString(value)
+                    is String -> value
+                    else -> error("Invalid V2 config resource")
+                }
+                val nativeDir = requireNotNull(info.nativeLibraryDir)
+                val config = RendererPluginV2.parse(metadata, File(nativeDir))
+                AerixRendererPlugin(
+                    packageName = info.packageName, appName = info.loadLabel(pm).toString(),
+                    appVersion = pm.getPackageInfo(info.packageName, 0).versionName.orEmpty(),
+                    rendererId = config.id,
+                    displayName = config.name,
+                    summary = "External V2 renderer plugin",
+                    minMCVer = config.minVersion, maxMCVer = config.maxVersion,
+                    glName = config.gl, eglName = config.egl, nativeLibDir = nativeDir,
+                    env = config.env,
+                    dlopen = emptyList(), metadataVersion = 2
+                ).also { require(it.compatibleDevice(context)) { "Plugin requires Android 8+, GLES 3 and matching native libraries" } }
+            }.onFailure { Log.w("AerixRendererPlugin", "Cannot load V2 renderer ${info.packageName}: ${it.message}") }.getOrNull()
+            if (plugin != null) return plugin
+            // A malformed/unsupported V2 config may still supply valid legacy metadata.
+        }
 
         val parts = meta.getString("renderer")?.split(":") ?: emptyList()
         if (!emesisStyle && parts.size < 3) return null
-
+        val des = meta.getString("des") ?: if (emesisStyle) "Emesis" else info.loadLabel(pm).toString()
+        val pojavEnv = meta.getString("pojavEnv") ?: ""
         val nativeDir = info.nativeLibraryDir ?: return null
         val appName = info.loadLabel(pm).toString()
         val appVersion = runCatching { pm.getPackageInfo(info.packageName, 0).versionName ?: "" }.getOrDefault("")
-        val des = meta.getString("des") ?: if (emesisStyle) "Emesis" else appName
 
-        var rendererId = if (parts.size >= 3) parts[0] else "emesis"
+        var rendererId = if (parts.size >= 3) parts[0] else EMESIS_RENDERER_ID
         val env = LinkedHashMap<String, String>()
         val dlopen = ArrayList<String>()
-        (meta.getString("pojavEnv") ?: "").split(":").forEach { pair ->
+        pojavEnv.split(":").forEach { pair ->
             val eq = pair.indexOf('=')
             if (eq > 0) {
                 val key = pair.substring(0, eq)
@@ -259,21 +288,20 @@ object PojavPluginBridge {
             }
         }
 
-        val glName = if (parts.size >= 3) parts[1] else EMESIS_DEFAULT_LIBRARY
-        val eglRaw = if (parts.size >= 3) parts[2] else EMESIS_DEFAULT_LIBRARY
-        if (parts.size < 3 && EMESIS_DEFAULT_LIBRARY !in dlopen) dlopen.add(EMESIS_DEFAULT_LIBRARY)
+        val glName = if (parts.size >= 3) parts[1] else EMESIS_LIBRARY
+        val eglRaw = if (parts.size >= 3) parts[2] else EMESIS_LIBRARY
+        if (parts.size < 3 && EMESIS_LIBRARY !in dlopen) dlopen.add(EMESIS_LIBRARY)
         val eglName = if (eglRaw.startsWith("/")) "$nativeDir$eglRaw" else eglRaw
 
         AerixRendererPlugin(
             packageName = info.packageName,
             appName = appName,
             appVersion = appVersion,
-            marker = marker,
             rendererId = rendererId,
-            displayName = if (des.contains(appName)) des else "$des ($appName)",
-            summary = "Plugin: $appName $appVersion".trim(),
-            minMCVer = meta.text("minMCVer"),
-            maxMCVer = meta.text("maxMCVer"),
+            displayName = "$des ($appName)",
+            summary = "Plugin: $appName",
+            minMCVer = meta.versionString("minMCVer"),
+            maxMCVer = meta.versionString("maxMCVer"),
             glName = glName,
             eglName = eglName,
             nativeLibDir = nativeDir,
@@ -282,14 +310,14 @@ object PojavPluginBridge {
         )
     }.getOrNull()
 
-    private fun Bundle.text(key: String): String? {
+    private fun Bundle.versionString(key: String): String? {
         val raw = get(key) ?: return null
         return raw.toString().takeIf { it.isNotBlank() }
     }
 
     /**
      * Appends discovered plugin renderers into Pojav's cached RendererCache so every renderer list
-     * (Aerix screens, instance editor, classic preference screens) sees them.
+     * (Settings, Instance Editor, Pojav's own preference screen) sees them.
      */
     private fun injectIntoRendererCache(context: Context, list: List<AerixRendererPlugin>) {
         if (list.isEmpty()) return

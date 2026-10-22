@@ -55,6 +55,9 @@ import net.kdt.pojavlaunch.utils.KeycodeUtils;
 import net.kdt.pojavlaunch.Logger;
 import net.kdt.pojavlaunch.Tools;
 import net.kdt.pojavlaunch.authenticator.accounts.Accounts;
+import net.kdt.pojavlaunch.aerix.bridge.AerixPreferences;
+import net.kdt.pojavlaunch.aerix.ui.game.GameMenuCallbacks;
+import net.kdt.pojavlaunch.aerix.ui.game.GameMenuOverlayView;
 import net.kdt.pojavlaunch.customcontrols.ControlButtonMenuListener;
 import net.kdt.pojavlaunch.customcontrols.ControlData;
 import net.kdt.pojavlaunch.customcontrols.ControlDrawerData;
@@ -87,6 +90,9 @@ import java.util.Objects;
 import net.kdt.pojavlaunch.R;
 
 public class GameActivity extends BaseActivity implements ControlButtonMenuListener, EditorExitable, ServiceConnection {
+    private net.kdt.pojavlaunch.recording.RecorderController mRecorder;
+    /** Request code of the legacy storage permission asked for by the in game downloader. */
+    private static final int REQUEST_STORAGE_PERMISSION = 0x41E1;
     public static final String INTENT_LAUNCH_VERSION = "intent_version";
     public static final String INTENT_LAUNCH_CLASSPATH = "intent_classpath";
 
@@ -97,6 +103,8 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     private DrawerLayout drawerLayout;
     private ListView navDrawer;
     private View mDrawerPullButton;
+    private FpsView mFpsView;
+    private GameMenuOverlayView mGameMenuOverlay;
     private GyroControl mGyroControl = null;
     private ControlLayout mControlLayout;
     private HotbarView mHotbarView;
@@ -120,6 +128,12 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        // Explicit process policy before Minecraft creates its native audio tracks.
+        // Per-track/backend restrictions and OEM privacy controls can still disallow capture.
+        if (android.os.Build.VERSION.SDK_INT >= 29) {
+            android.media.AudioManager audioManager = getSystemService(android.media.AudioManager.class);
+            if (audioManager != null) audioManager.setAllowedCapturePolicy(android.media.AudioAttributes.ALLOW_CAPTURE_BY_ALL);
+        }
         instance = Instances.loadSelectedInstance();
         account = Accounts.getCurrent();
         if(instance == null) {
@@ -230,6 +244,48 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         mControlLayout.setMenuListener(this);
 
         mDrawerPullButton.setOnClickListener(v -> onClickedMenu());
+        mRecorder = new net.kdt.pojavlaunch.recording.RecorderController(this);
+        mGameMenuOverlay.setCallbacks(new GameMenuCallbacks() {
+            @Override public void onScreenRecorder() {
+                hideGameMenu();
+                mRecorder.show();
+            }
+
+            @Override
+            public void onResumeGame() {
+                hideGameMenu();
+            }
+
+            @Override
+            public void onForceCloseGame() {
+                dialogForceClose(GameActivity.this);
+            }
+
+            @Override
+            public void onLogOutput() {
+                openLogOutput();
+            }
+
+            @Override
+            public void onSendCustomKey() {
+                dialogSendCustomKey();
+            }
+
+            @Override
+            public void onQuickSettings() {
+                openQuickSettings();
+            }
+
+            @Override
+            public void onCustomControls() {
+                openCustomControls();
+            }
+
+            @Override
+            public void onRequestStoragePermission() {
+                requestStorageAccess();
+            }
+        });
         drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED);
         launcherGLView.mCursorView.setCursorScale(LauncherPreferences.PREF_MOUSESCALE);
         weakCursor = new WeakReference<>(launcherGLView.mCursorView);
@@ -325,6 +381,8 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         loggerView = findViewById(R.id.mainLoggerView);
         touchCharInput = findViewById(R.id.mainTouchCharInput);
         mDrawerPullButton = findViewById(R.id.drawer_button);
+        mFpsView = findViewById(R.id.main_fps_view);
+        mGameMenuOverlay = findViewById(R.id.game_menu_overlay);
         mHotbarView = findViewById(R.id.hotbar_view);
         mLoadingScreen = findViewById(R.id.main_loading_screen);
     }
@@ -335,11 +393,21 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         ContextExecutor.setActivity(this);
         if(PREF_ENABLE_GYRO) mGyroControl.enable();
         PLATFORM.setHovered(true);
+        // The readout is only shown once the game itself is on screen.
+        if(mLoadingScreen == null) updateFpsViewVisibility();
+    }
+
+    /** Show the frame rate readout only when the player asked for it. */
+    private void updateFpsViewVisibility() {
+        if (mFpsView == null) return;
+        mFpsView.setVisibility(LauncherPreferences.PREF_SHOW_FPS ? View.VISIBLE : View.GONE);
     }
 
     @Override
     protected void onPause() {
+        if (touchCharInput != null) touchCharInput.setKeyboardState(false);
         ContextExecutor.clearActivity();
+        hideGameMenu();
         mGyroControl.disable();
         // Avoid going through the JNI each time.
         if (Platform.isGrabbing()){
@@ -360,12 +428,14 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
 
     @Override
     protected void onStop() {
+        if (mRecorder != null) mRecorder.onGameStopped();
         PLATFORM.setVisible(false);
         super.onStop();
     }
 
     @Override
     protected void onDestroy() {
+        if (mRecorder != null) mRecorder.destroy();
         super.onDestroy();
         ContextExecutor.clearActivity();
     }
@@ -396,8 +466,15 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     }
 
     @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (mRecorder != null) mRecorder.onRequestPermissionsResult(requestCode, grantResults);
+    }
+
+    @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (mRecorder != null && mRecorder.onActivityResult(requestCode, resultCode, data)) return;
 
         if (requestCode == 1 && resultCode == Activity.RESULT_OK) {
             // Reload PREF_DEFAULTCTRL_PATH
@@ -441,6 +518,7 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     boolean isInEditor;
     private void openCustomControls() {
         if(ingameControlsEditorListener == null || ingameControlsEditorArrayAdapter == null) return;
+        hideGameMenu();
 
         mControlLayout.setModifiable(true);
         navDrawer.setAdapter(ingameControlsEditorArrayAdapter);
@@ -450,10 +528,12 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     }
 
     private void openLogOutput() {
+        hideGameMenu();
         loggerView.setVisibility(View.VISIBLE);
     }
 
     private void openQuickSettings() {
+        hideGameMenu();
         if(mQuickSettingSideDialog == null) {
             mQuickSettingSideDialog = new QuickSettingSideDialog(this, mControlLayout) {
                 @Override
@@ -504,6 +584,21 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
+        // The menu is on top of the game and takes the back button: it returns from the
+        // downloader to the entries first, and closes the menu when it is already there.
+        if (mGameMenuOverlay != null && mGameMenuOverlay.isMenuShown()) {
+            int keyCode = event.getKeyCode();
+            if (keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN
+                    || keyCode == KeyEvent.KEYCODE_VOLUME_MUTE) {
+                return super.dispatchKeyEvent(event);
+            }
+            if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_ESCAPE) {
+                if (event.getAction() == KeyEvent.ACTION_UP) mGameMenuOverlay.handleBackPress();
+                return true;
+            }
+            // Everything else belongs to the menu, not to the game behind it.
+            return true;
+        }
         if(isInEditor) {
             if(event.getKeyCode() == KeyEvent.KEYCODE_BACK) {
                 if(event.getAction() == KeyEvent.ACTION_DOWN) mControlLayout.askToExit(this);
@@ -537,6 +632,7 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
 
     public void hideLoadingScreen(){
         if(mLoadingScreen == null) return;
+        updateFpsViewVisibility();
         ((TextView) mLoadingScreen.findViewById(R.id.main_loading_screen_text)).setText(getString(R.string.loading_screen_booted, PLATFORM.backendName()));
         mLoadingScreen.animate()
                 .alpha(0f)
@@ -550,8 +646,45 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
 
     @Override
     public void onClickedMenu() {
-        drawerLayout.openDrawer(navDrawer);
-        navDrawer.requestLayout();
+        if (isInEditor) {
+            // While the controls are being edited the drawer holds the properties of the button
+            // that was picked, which is what the menu button opens there.
+            drawerLayout.openDrawer(navDrawer);
+            navDrawer.requestLayout();
+            return;
+        }
+        if (mGameMenuOverlay != null && mGameMenuOverlay.isMenuShown()) {
+            hideGameMenu();
+            return;
+        }
+        showGameMenu();
+    }
+
+    /** Open the full screen in game menu. */
+    private void showGameMenu() {
+        if (mGameMenuOverlay == null) return;
+        drawerLayout.closeDrawers();
+        mGameMenuOverlay.showMenu();
+    }
+
+    private void hideGameMenu() {
+        if (mGameMenuOverlay == null) return;
+        mGameMenuOverlay.hideMenu();
+    }
+
+    /**
+     * The instance folders belong to the app, so the downloader writes without asking for
+     * anything. On the older versions a custom folder on the shared storage still needs the
+     * legacy permission, which is what this asks for; on the newer ones the launcher can only
+     * report that the folder is not writable.
+     */
+    private void requestStorageAccess() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            requestPermissions(new String[]{android.Manifest.permission.WRITE_EXTERNAL_STORAGE},
+                    REQUEST_STORAGE_PERMISSION);
+        } else {
+            Toast.makeText(this, R.string.aerix_ingame_download_storage_error, Toast.LENGTH_LONG).show();
+        }
     }
 
     @Override

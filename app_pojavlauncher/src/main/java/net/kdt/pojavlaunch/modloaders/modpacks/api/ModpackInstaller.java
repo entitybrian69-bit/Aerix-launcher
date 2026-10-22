@@ -8,6 +8,7 @@ import net.kdt.pojavlaunch.R;
 
 import net.kdt.pojavlaunch.Tools;
 import net.kdt.pojavlaunch.instances.InstanceInstaller;
+import net.kdt.pojavlaunch.instances.InstanceRefreshEvents;
 import net.kdt.pojavlaunch.instances.Instances;
 import net.kdt.pojavlaunch.instances.Instance;
 import net.kdt.pojavlaunch.lifecycle.ContextExecutor;
@@ -52,6 +53,8 @@ public class ModpackInstaller {
                 instance.installer.start();
             }
             else ContextExecutor.executeActivity(activity -> Toast.makeText(activity, R.string.modpack_install_toast_success, Toast.LENGTH_SHORT).show());
+            // Refresh only after installation (or GUI-installer handoff) succeeded.
+            InstanceRefreshEvents.notifyChanged();
         } catch (IOException e) {
             Instances.removeInstance(instance);
             throw e;

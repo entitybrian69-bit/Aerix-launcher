@@ -20,6 +20,15 @@ static def getDateSeconds() {
     }
 }
 
+// One version source: the APK, About page and updater all read this same value.
+def aerixVersion = new Properties()
+rootProject.file('version.properties').withInputStream { aerixVersion.load(it) }
+def AERIX_VERSION_NAME = aerixVersion.getProperty('versionName')
+if (!(AERIX_VERSION_NAME ==~ /\d+\.\d+\.\d+/)) throw new GradleException('versionName must be major.minor.patch')
+def versionParts = AERIX_VERSION_NAME.split('\\.').collect { it.toInteger() }
+if (versionParts[1] >= 100 || versionParts[2] >= 100) throw new GradleException('Minor/patch must be below 100')
+def AERIX_VERSION_CODE = versionParts[0] * 10000 + versionParts[1] * 100 + versionParts[2]
+
 def getVersionName = {
     def currentBranch = grgit.branch.current()
     def latestCommit = grgit.log(maxCommits: 1)
@@ -35,10 +44,10 @@ def getVersionName = {
 
 def getCFApiKey = {
     String key = System.getenv("CURSEFORGE_API_KEY")
-    if(key != null) return key
+    if(key != null && !key.trim().isEmpty()) return key.trim()
     File curseforgeKeyFile = new File("./curseforge_key.txt")
     if(curseforgeKeyFile.canRead() && curseforgeKeyFile.isFile()) {
-        return curseforgeKeyFile.text
+        return curseforgeKeyFile.text.trim()
     }
     logger.warn('BUILD: You have no CurseForge key, the curseforge api will get disabled !')
     return "DUMMY"
@@ -73,6 +82,17 @@ android {
             keyAlias "android_github_release"
             keyPassword System.getenv("POJAV_KEYSTORE_PASSWORD")
         }
+        // The key the published Aerix builds are signed with. It travels with the project next to
+        // the other keystores, so a build never depends on a secret this repository may not have;
+        // AERIX_KEYSTORE_PASSWORD overrides the password in the environment for anyone who keeps
+        // the key out of the tree.
+        aerixRelease {
+            storeFile file("aerix_release.p12")
+            storeType "PKCS12"
+            storePassword System.getenv("AERIX_KEYSTORE_PASSWORD") ?: "aerix-release"
+            keyAlias "aerix"
+            keyPassword System.getenv("AERIX_KEYSTORE_PASSWORD") ?: "aerix-release"
+        }
         googlePlayBuild {
             storeFile file("pojav_gplay.jks")
             storePassword System.getenv("POJAV_GPLAY_KEYSTORE_PASSWORD")
@@ -93,12 +113,16 @@ android {
         }
     }
 
+    testOptions {
+        unitTests.includeAndroidResources = true
+    }
+
     defaultConfig {
         applicationId "net.kdt.pojavlaunch"
         minSdkVersion 23
         targetSdkVersion 36
-        versionCode getDateSeconds()
-        versionName getVersionName()
+        versionCode AERIX_VERSION_CODE
+        versionName AERIX_VERSION_NAME
         multiDexEnabled false //important
         resValue 'string', 'curseforge_api_key', getCFApiKey()
         resValue 'string', 'group_id', 'net.kdt'
@@ -125,7 +149,7 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             signingConfig signingConfigs.customDebug
             resValue "string", "app_name", "Aerix Launcher (Debug)"
-            resValue "string", "app_short_name", "PojavLauncher (Debug)"
+            resValue "string", "app_short_name", "Aerix Launcher (Debug)"
             resValue "string", "aerix_app_label", "Aerix Launcher (Debug)"
             resValue 'string', 'application_package', 'net.kdt.pojavlaunch.debug'
             resValue 'string', 'storageProviderAuthorities', 'net.kdt.pojavlaunch.scoped.gamefolder.debug'
@@ -145,9 +169,9 @@ android {
             // Don't set to true or java.awt will be a.a or something similar.
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-            signingConfig signingConfigs.customRelease
+            signingConfig signingConfigs.aerixRelease
             resValue "string", "app_name", "Aerix Launcher"
-            resValue "string", "app_short_name", "PojavLauncher"
+            resValue "string", "app_short_name", "Aerix Launcher"
             resValue "string", "aerix_app_label", "Aerix Launcher"
             resValue 'string', 'application_package', 'net.kdt.pojavlaunch'
             resValue 'string', 'storageProviderAuthorities', 'net.kdt.pojavlaunch.scoped.gamefolder'
@@ -162,7 +186,7 @@ android {
             signingConfig signingConfigs.customDebug // WIP, changeme
             applicationIdSuffix '.pub'
             resValue "string", "app_name", "Aerix Launcher (Nightly)"
-            resValue "string", "app_short_name", "PojavLauncher (Nightly)"
+            resValue "string", "app_short_name", "Aerix Launcher (Nightly)"
             resValue "string", "aerix_app_label", "Aerix Launcher (Nightly)"
             resValue 'string', 'application_package', 'net.kdt.pojavlaunch.pub'
             resValue 'string', 'storageProviderAuthorities', 'net.kdt.pojavlaunch.pub.scoped.gamefolder'
@@ -342,6 +366,8 @@ afterEvaluate {
 }
 
 dependencies {
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.robolectric:robolectric:4.14.1'
     implementation 'androidx.documentfile:documentfile:1.1.0'
     implementation platform('androidx.compose:compose-bom:2026.06.01')
     implementation 'androidx.compose.ui:ui'

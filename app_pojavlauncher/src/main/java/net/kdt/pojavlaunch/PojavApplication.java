@@ -108,8 +108,8 @@ public class PojavApplication extends MGApplication {
 	}
 
 	/**
-	 * Scans for renderer plugin APKs in the background so every renderer list already contains them,
-	 * then rescans whenever a plugin APK is installed, replaced or removed.
+	 * Scans for renderer plugin APKs off the main thread so every renderer list already contains
+	 * them, then rescans when a plugin APK is installed, replaced or removed.
 	 */
 	private void initRendererPlugins() {
 		try {

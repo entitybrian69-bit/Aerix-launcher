@@ -80,6 +80,7 @@ enum class LauncherSection {
     HOME,
     LIBRARY,
     DISCOVER,
+    OTHER_RELEASES,
     DOWNLOADS,
     CONTENT,
     FILES,
@@ -115,7 +116,9 @@ fun AerixNavigationRail(
             modifier = Modifier
                 .width(if (expandedRail) AerixMetrics.expandedNavigationRailWidth else AerixMetrics.navigationRailWidth)
                 .fillMaxHeight()
-                .padding(horizontal = AerixSpacing.xs, vertical = AerixSpacing.smPlus)
+                // The pill sits against the left edge - only the end side keeps a gap, so the
+                // pages own the rest of the width.
+                .padding(start = 2.dp, end = AerixSpacing.xs, top = AerixSpacing.smPlus, bottom = AerixSpacing.smPlus)
                 .liquidGlass(shape = CircleShape, tint = AerixSurface.glassTint, strength = 0.94f, elevation = AerixMetrics.glassRailElevation),
             shape = CircleShape,
             color = Color.Transparent,
@@ -174,6 +177,8 @@ fun AerixNavigationRail(
                     librarySelected(selectedSection), activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.LIBRARY) }
                 RailIconItem(R.drawable.aerix_ic_public, stringResource(R.string.aerix_nav_discover),
                     discoverSelected(selectedSection), activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.DISCOVER) }
+                RailIconItem(R.drawable.aerix_ic_rocket_launch_filled, "Our other new releases",
+                    selectedSection == LauncherSection.OTHER_RELEASES, activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.OTHER_RELEASES) }
                 RailIconItem(R.drawable.aerix_ic_format_paint_outlined, stringResource(R.string.aerix_nav_wallpapers),
                     wallpapersSelected(selectedSection), activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.WALLPAPERS) }
 

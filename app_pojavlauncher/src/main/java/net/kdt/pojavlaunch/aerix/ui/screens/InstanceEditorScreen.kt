@@ -30,16 +30,19 @@
 
 package net.kdt.pojavlaunch.aerix.ui.screens
 
+import net.kdt.pojavlaunch.aerix.bridge.rememberControlLayoutCatalog
 import android.text.format.DateFormat
 import android.text.format.Formatter
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -51,9 +54,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.Checkbox
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
+import net.kdt.pojavlaunch.aerix.bridge.ContentListPolicy
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -108,7 +116,6 @@ import androidx.fragment.app.FragmentActivity
 import kotlinx.coroutines.launch
 import net.kdt.pojavlaunch.R
 import net.kdt.pojavlaunch.Tools
-import net.kdt.pojavlaunch.aerix.bridge.AerixDownloadRequest
 import net.kdt.pojavlaunch.aerix.bridge.AerixIconCropper
 import net.kdt.pojavlaunch.aerix.bridge.AerixInstance
 import net.kdt.pojavlaunch.aerix.bridge.AerixInstanceDraft
@@ -117,7 +124,10 @@ import net.kdt.pojavlaunch.aerix.bridge.ContentEntry
 import net.kdt.pojavlaunch.aerix.bridge.ContentKind
 import net.kdt.pojavlaunch.aerix.bridge.PojavContentBridge
 import net.kdt.pojavlaunch.aerix.bridge.PojavInstaller
+import net.kdt.pojavlaunch.aerix.bridge.LoaderKind
+import net.kdt.pojavlaunch.aerix.bridge.LoaderVersion
 import net.kdt.pojavlaunch.aerix.bridge.PojavInstanceBridge
+import net.kdt.pojavlaunch.aerix.bridge.PojavLoaderBridge
 import net.kdt.pojavlaunch.aerix.bridge.PojavInstanceEditorBridge
 import net.kdt.pojavlaunch.aerix.bridge.PojavLaunchBridge
 import net.kdt.pojavlaunch.aerix.bridge.PojavNavigator
@@ -149,6 +159,7 @@ import net.kdt.pojavlaunch.aerix.theme.AerixSpacing
 import net.kdt.pojavlaunch.aerix.theme.AerixSurface
 import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
 import net.kdt.pojavlaunch.aerix.ui.AerixNav
+import net.kdt.pojavlaunch.aerix.ui.LauncherSection
 import net.kdt.pojavlaunch.profiles.VersionSelectorDialog
 import net.kdt.pojavlaunch.instances.Instance
 import net.kdt.pojavlaunch.prefs.LauncherPreferences
@@ -182,6 +193,7 @@ private val mcVerRegex = Regex("""(\d+\.\d+(?:\.\d+)?)""")
 
 @Composable
 fun InstanceEditorScreen(activity: FragmentActivity, onClose: () -> Unit) {
+    val contentPaneStates = rememberSaveableStateHolder()
     LaunchedEffect(Unit) {
         if (PojavInstanceEditorBridge.draft == null) {
             PojavInstanceEditorBridge.open(activity)
@@ -240,7 +252,9 @@ fun InstanceEditorScreen(activity: FragmentActivity, onClose: () -> Unit) {
         )
     }
 
-    // Two-pane layout from Mirai VersionSettingsScreen.kt (Screenshot 2)
+    // Two-pane layout from Mirai VersionSettingsScreen.kt (Screenshot 2). The loader page needs
+    // the width - two version lists side by side - so the sidebar gives it up while that page is
+    // open instead of squeezing the lists.
     Row(
         modifier = Modifier
             .fillMaxSize()
@@ -250,7 +264,7 @@ fun InstanceEditorScreen(activity: FragmentActivity, onClose: () -> Unit) {
         // Left sidebar: Back button + InstanceSidebarCard + 2-column InstanceNavGrid
         Column(
             modifier = Modifier
-                .width(264.dp)
+                .width(if (activeTab == "loader") 226.dp else 264.dp)
                 .fillMaxHeight(),
             verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
         ) {
@@ -329,11 +343,11 @@ fun InstanceEditorScreen(activity: FragmentActivity, onClose: () -> Unit) {
                 border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft)
             ) {
                 when (activeTab) {
-                    "mods" -> InstanceModsPane(activity = activity)
-                    "packs" -> InstanceContentPane(activity = activity, kind = ContentKind.RESOURCE_PACKS, assetType = AssetType.RESOURCE_PACK)
-                    "shaders" -> InstanceContentPane(activity = activity, kind = ContentKind.SHADER_PACKS, assetType = AssetType.SHADER_PACK)
-                    "worlds" -> InstanceContentPane(activity = activity, kind = ContentKind.SAVES, assetType = AssetType.WORLD)
-                    "shots" -> InstanceContentPane(activity = activity, kind = ContentKind.SCREENSHOTS, assetType = null)
+                    "mods" -> contentPaneStates.SaveableStateProvider("${PojavInstanceBridge.selected?.source}:mods") { InstanceModsPane(activity = activity) }
+                    "packs" -> contentPaneStates.SaveableStateProvider("${PojavInstanceBridge.selected?.source}:packs") { InstanceContentPane(activity = activity, kind = ContentKind.RESOURCE_PACKS, assetType = AssetType.RESOURCE_PACK) }
+                    "shaders" -> contentPaneStates.SaveableStateProvider("${PojavInstanceBridge.selected?.source}:shaders") { InstanceContentPane(activity = activity, kind = ContentKind.SHADER_PACKS, assetType = AssetType.SHADER_PACK) }
+                    "worlds" -> contentPaneStates.SaveableStateProvider("${PojavInstanceBridge.selected?.source}:worlds") { InstanceContentPane(activity = activity, kind = ContentKind.SAVES, assetType = AssetType.WORLD) }
+                    "shots" -> contentPaneStates.SaveableStateProvider("${PojavInstanceBridge.selected?.source}:shots") { InstanceContentPane(activity = activity, kind = ContentKind.SCREENSHOTS, assetType = null) }
                     "overview" -> InstanceOverviewPane(
                         activity = activity,
                         draft = draft,
@@ -562,6 +576,9 @@ private fun InstanceModsPane(activity: FragmentActivity) {
     val scope = rememberCoroutineScope()
     val accent = AerixThemeManager.currentAccent()
 
+    val listState = rememberLazyListState()
+    val selection = remember { ContentSelectionState() }
+
     var entries by remember { mutableStateOf<List<ContentEntry>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var revision by remember { mutableIntStateOf(0) }
@@ -602,6 +619,8 @@ private fun InstanceModsPane(activity: FragmentActivity) {
             matchesName && matchesState
         }
     }
+
+    val rowKeys = remember(entries) { ContentListPolicy.rowKeys(entries) }
 
     val enabledCount = remember(entries) { entries.count { it.enabled } }
     val disabledCount = remember(entries) { entries.count { !it.enabled } }
@@ -740,6 +759,7 @@ private fun InstanceModsPane(activity: FragmentActivity) {
             // Refresh button
             IconButton(
                 onClick = { revision++ },
+                enabled = !selection.busy && !loading,
                 modifier = Modifier.size(36.dp)
             ) {
                 Icon(
@@ -798,32 +818,41 @@ private fun InstanceModsPane(activity: FragmentActivity) {
             }
         }
 
+        ContentSelectionControls(ContentKind.MODS, entries, filtered, selection, loading) { revision++ }
         when {
-            loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            loading && entries.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = accent)
             }
             filtered.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 QuietEmptyState(R.drawable.aerix_ic_extension_outlined, stringResource(R.string.aerix_content_empty))
             }
             else -> LazyColumn(
+                state = listState,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(horizontal = AerixSpacing.md, vertical = AerixSpacing.xs),
                 verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
             ) {
-                items(filtered, key = { it.file.absolutePath }) { entry ->
+                items(filtered, key = { rowKeys.getValue(it.file.absolutePath) }) { entry ->
                     ModItemCard(
                         entry = entry,
+                        selecting = selection.selecting,
+                        selected = entry.file.absolutePath in selection.selected,
+                        busy = selection.busy || loading,
+                        onSelect = { selection.toggle(entry) },
                         onToggle = { enabled ->
-                            scope.launch {
-                                PojavContentBridge.setEnabled(entry, enabled)
-                                revision++
+                            if (!selection.busy && !loading) scope.launch {
+                                selection.busy = true
+                                try {
+                                    val ok = try { PojavContentBridge.setEnabled(entry, enabled) }
+                                    catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                                    catch (_: Exception) { false }
+                                    if (!ok) Toast.makeText(context, failedText, Toast.LENGTH_SHORT).show()
+                                    revision++
+                                } finally { selection.busy = false }
                             }
                         },
                         onDelete = {
-                            scope.launch {
-                                PojavContentBridge.delete(entry)
-                                revision++
-                            }
+                            if (!selection.busy && !loading) selection.pendingDelete = listOf(entry)
                         }
                     )
                 }
@@ -840,6 +869,10 @@ private fun InstanceModsPane(activity: FragmentActivity) {
 @Composable
 private fun ModItemCard(
     entry: ContentEntry,
+    selecting: Boolean,
+    selected: Boolean,
+    busy: Boolean,
+    onSelect: () -> Unit,
     onToggle: (Boolean) -> Unit,
     onDelete: () -> Unit
 ) {
@@ -847,7 +880,7 @@ private fun ModItemCard(
     var showMenu by remember { mutableStateOf(false) }
 
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().then(if (selecting) Modifier.clickable(enabled = !busy, onClick = onSelect) else Modifier),
         shape = RoundedCornerShape(AerixRadii.card),
         color = AerixSurface.panel,
         border = BorderStroke(AerixSpacing.hairline, AerixSurface.border)
@@ -857,6 +890,7 @@ private fun ModItemCard(
             horizontalArrangement = Arrangement.spacedBy(AerixSpacing.md),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            if (selecting) Checkbox(checked = selected, onCheckedChange = { onSelect() }, enabled = !busy)
             AerixImageWell(
                 image = entry.icon,
                 fallback = R.drawable.aerix_ic_extension_outlined,
@@ -906,13 +940,14 @@ private fun ModItemCard(
                 )
             }
 
-            Row(
+            if (!selecting) Row(
                 horizontalArrangement = Arrangement.spacedBy(AerixSpacing.sm),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Switch(
                     modifier = Modifier.scale(0.75f),
                     checked = entry.enabled,
+                    enabled = !busy,
                     onCheckedChange = onToggle,
                     colors = SwitchDefaults.colors(
                         checkedThumbColor = AerixSurface.onAction,
@@ -926,6 +961,7 @@ private fun ModItemCard(
                 Box {
                     IconButton(
                         modifier = Modifier.size(32.dp),
+                        enabled = !busy,
                         onClick = { showMenu = true }
                     ) {
                         Icon(
@@ -974,6 +1010,9 @@ private fun InstanceContentPane(
     val scope = rememberCoroutineScope()
     val accent = AerixThemeManager.currentAccent()
 
+    val listState = rememberLazyListState()
+    val selection = remember(kind) { ContentSelectionState() }
+
     var entries by remember(kind) { mutableStateOf<List<ContentEntry>>(emptyList()) }
     var loading by remember(kind) { mutableStateOf(true) }
     var revision by remember { mutableIntStateOf(0) }
@@ -1003,6 +1042,7 @@ private fun InstanceContentPane(
         entries.filter { query.isBlank() || it.displayTitle.contains(query, ignoreCase = true) || it.name.contains(query, ignoreCase = true) }
     }
 
+    val rowKeys = remember(entries) { ContentListPolicy.rowKeys(entries) }
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
             modifier = Modifier
@@ -1054,6 +1094,7 @@ private fun InstanceContentPane(
 
             IconButton(
                 onClick = { revision++ },
+                enabled = !selection.busy && !loading,
                 modifier = Modifier.size(36.dp)
             ) {
                 Icon(
@@ -1098,26 +1139,30 @@ private fun InstanceContentPane(
             }
         }
 
+        ContentSelectionControls(kind, entries, shown, selection, loading) { revision++ }
         when {
-            loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            loading && entries.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = accent)
             }
             shown.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 QuietEmptyState(kind.iconRes, stringResource(R.string.aerix_content_empty))
             }
             else -> LazyColumn(
+                state = listState,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(horizontal = AerixSpacing.md, vertical = AerixSpacing.xs),
                 verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
             ) {
-                items(shown, key = { it.file.absolutePath }) { entry ->
+                items(shown, key = { rowKeys.getValue(it.file.absolutePath) }) { entry ->
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(AerixRadii.card),
                         color = AerixSurface.panel,
                         border = BorderStroke(AerixSpacing.hairline, AerixSurface.border),
+                        enabled = !selection.busy && !loading,
                         onClick = {
-                            if (kind == ContentKind.SCREENSHOTS) {
+                            if (selection.selecting) selection.toggle(entry)
+                            else if (kind == ContentKind.SCREENSHOTS) {
                                 Tools.openPath(context, entry.file, true)
                             }
                         }
@@ -1127,6 +1172,8 @@ private fun InstanceContentPane(
                             horizontalArrangement = Arrangement.spacedBy(AerixSpacing.md),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
+                            if (selection.selecting) Checkbox(checked = entry.file.absolutePath in selection.selected,
+                                onCheckedChange = { selection.toggle(entry) }, enabled = !selection.busy && !loading)
                             AerixImageWell(
                                 image = entry.icon,
                                 fallback = kind.iconRes,
@@ -1150,13 +1197,9 @@ private fun InstanceContentPane(
                                     maxLines = 1
                                 )
                             }
-                            IconButton(
-                                onClick = {
-                                    scope.launch {
-                                        PojavContentBridge.delete(entry)
-                                        revision++
-                                    }
-                                }
+                            if (!selection.selecting) IconButton(
+                                enabled = !selection.busy && !loading,
+                                onClick = { selection.pendingDelete = listOf(entry) }
                             ) {
                                 Icon(
                                     painter = painterResource(R.drawable.aerix_ic_delete_outlined),
@@ -1225,16 +1268,12 @@ private fun InstanceSettingsPane(
         }
     }
 
-    var controlRefreshTick by remember { mutableIntStateOf(0) }
-    val controlEntries = remember(controlRefreshTick) {
-        val dir = File(Tools.CTRLMAP_PATH)
-        val files = dir.listFiles { f -> f.isFile && f.name.endsWith(".json", ignoreCase = true) }
-            ?.sortedBy { it.name.lowercase() }
-            .orEmpty()
+    val controlCatalog = rememberControlLayoutCatalog(activity)
+    val controlEntries = remember(controlCatalog.files) {
         buildList {
             add("" to "Follow Global")
-            files.forEach { file ->
-                add(file.name to file.name.removeSuffix(".json"))
+            controlCatalog.files.forEach { file ->
+                add(file.name to file.nameWithoutExtension)
             }
         }
     }
@@ -1407,7 +1446,7 @@ private fun InstanceSettingsPane(
                 getItemText = { it.second },
                 getItemId = { it.first },
                 trailingIcon = {
-                    IconButton(onClick = { controlRefreshTick++ }) {
+                    IconButton(onClick = { controlCatalog.refresh() }) {
                         Icon(
                             painter = painterResource(R.drawable.aerix_ic_refresh),
                             contentDescription = "Refresh Controls",
@@ -1680,69 +1719,521 @@ private fun OverviewTile(title: String, value: String, modifier: Modifier = Modi
 
 @Composable
 private fun InstanceLoaderPane(activity: FragmentActivity, draft: AerixInstanceDraft) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val accent = AerixThemeManager.currentAccent()
     val vanilla = stringResource(R.string.aerix_home_vanilla)
-    val currentLoader = loaderLabel(draft.versionId, vanilla)
-    val installers = listOf(
-        Triple("Fabric", R.drawable.ic_fabric, PojavInstaller.FABRIC),
-        Triple("NeoForge", R.drawable.ic_neoforge, PojavInstaller.NEOFORGE),
-        Triple("Forge", R.drawable.ic_forge, PojavInstaller.FORGE),
-        Triple("Quilt", R.drawable.ic_quilt, PojavInstaller.QUILT),
-        Triple("OptiFine", R.drawable.aerix_loader_optifine, PojavInstaller.OPTIFINE),
-        Triple("Legacy Fabric", R.drawable.aerix_loader_legacy_fabric, PojavInstaller.LEGACY_FABRIC)
-    )
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(AerixSpacing.mdPlus)
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus)
-    ) {
-        Text(
-            text = "Install or Update Modloader",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.ExtraBold,
-            color = Color.White
-        )
-        Text(
-            text = "Current version: ${draft.versionId} ($currentLoader)",
-            style = MaterialTheme.typography.labelMedium,
-            color = AerixSurface.textSecondary
-        )
+    var kind by remember { mutableStateOf(LoaderKind.FABRIC) }
+    var mcVersions by remember { mutableStateOf<List<LoaderVersion>>(emptyList()) }
+    var builds by remember { mutableStateOf<List<LoaderVersion>>(emptyList()) }
+    var mcVersion by remember { mutableStateOf<String?>(null) }
+    var instanceMcVersion by remember { mutableStateOf<String?>(null) }
+    var build by remember { mutableStateOf<LoaderVersion?>(null) }
+    var metaLoading by remember { mutableStateOf(true) }
+    var metaFailed by remember { mutableStateOf(false) }
+    var stableOnly by remember { mutableStateOf(true) }
+    var mcQuery by remember { mutableStateOf("") }
+    var buildQuery by remember { mutableStateOf("") }
+    var installing by remember { mutableStateOf(false) }
+    var installError by remember { mutableStateOf<String?>(null) }
+    var reload by remember { mutableIntStateOf(0) }
 
-        installers.chunked(2).forEach { row ->
+    // The version of the instance the screen was opened on, picked by default. Nothing in here is
+    // allowed to throw: a failing source is an empty list and the retry row, never a crash.
+    LaunchedEffect(kind, reload, draft.versionId) {
+        metaLoading = true
+        metaFailed = false
+        val versions = runCatching { PojavLoaderBridge.gameVersions(kind) }.getOrDefault(emptyList())
+        mcVersions = versions
+        if (versions.isEmpty()) {
+            metaFailed = true
+            builds = emptyList()
+        } else {
+            // A loader without a single stable build would leave both benches empty under the
+            // switch; dropping the filter opens them instead.
+            if (stableOnly && versions.none { it.stable }) stableOnly = false
+            instanceMcVersion = PojavLoaderBridge.minecraftVersion(draft.versionId, versions)
+            mcVersion = instanceMcVersion
+            if (mcVersion == null) { builds = emptyList(); build = null }
+        }
+        metaLoading = false
+    }
+
+    LaunchedEffect(kind, mcVersion, reload) {
+        val version = mcVersion ?: return@LaunchedEffect
+        metaLoading = true
+        val found = runCatching { PojavLoaderBridge.builds(kind, version) }.getOrDefault(emptyList())
+        if (stableOnly && found.none { it.stable }) stableOnly = false
+        builds = found
+        build = found.firstOrNull { !stableOnly || it.stable }
+        metaLoading = false
+    }
+
+    val visibleMcVersions = remember(mcVersions, stableOnly, mcQuery) {
+        mcVersions.filter { (!stableOnly || it.stable) && it.value.contains(mcQuery, true) }
+    }
+    val visibleBuilds = remember(builds, stableOnly, buildQuery) {
+        builds.filter { (!stableOnly || it.stable) && it.label.contains(buildQuery, true) }
+    }
+
+    Column(modifier = Modifier.fillMaxSize().padding(AerixSpacing.smPlus)) {
+        // One line of heading, with what the instance currently runs on the other side, so the
+        // lists below get the height instead of the chrome.
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = stringResource(R.string.aerix_loader_title),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.ExtraBold,
+                color = Color.White
+            )
+            Spacer(Modifier.width(AerixSpacing.sm))
+            Text(
+                text = stringResource(
+                    R.string.aerix_loader_subtitle,
+                    draft.name.ifEmpty { draft.versionId },
+                    loaderLabel(draft.versionId, vanilla)
+                ),
+                color = AerixSurface.textSecondary,
+                fontSize = 10.5.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        Spacer(Modifier.height(AerixSpacing.xs))
+
+        // The loaders, as chips: the logo carries the recognition, the title the rest.
+        Row(
+            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(AerixSpacing.xs)
+        ) {
+            LoaderKind.entries.forEach { entry ->
+                val selected = entry == kind
+                val shape = RoundedCornerShape(AerixRadii.control)
+                Row(
+                    modifier = Modifier
+                        .clip(shape)
+                        .background(if (selected) accent.copy(alpha = 0.18f) else AerixSurface.panelRaised)
+                        .border(
+                            BorderStroke(
+                                AerixSpacing.hairline,
+                                if (selected) accent.copy(alpha = 0.7f) else AerixSurface.borderSoft
+                            ),
+                            shape
+                        )
+                        .clickable(enabled = !installing, role = Role.Button) {
+                            if (entry.installsHere) {
+                                kind = entry
+                                build = null
+                                installError = null
+                            } else {
+                                PojavNavigator.openInstaller(activity, entry.installer!!, draft.instance.instanceId)
+                            }
+                        }
+                        .padding(horizontal = AerixSpacing.sm, vertical = AerixSpacing.xsPlus),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        painter = painterResource(entry.iconRes),
+                        contentDescription = null,
+                        tint = Color.Unspecified,
+                        modifier = Modifier.size(17.dp)
+                    )
+                    Spacer(Modifier.width(AerixSpacing.xs))
+                    Text(
+                        text = entry.title,
+                        color = if (selected) accent else AerixSurface.textPrimary,
+                        fontSize = 11.5.sp,
+                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                        maxLines = 1
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(AerixSpacing.smCompact))
+
+        if (metaFailed) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = stringResource(R.string.aerix_loader_failed),
+                    color = AerixSurface.warning,
+                    fontSize = 11.5.sp,
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(Modifier.width(AerixSpacing.sm))
+                AerixGhostButton(
+                    text = stringResource(R.string.aerix_loader_retry),
+                    iconRes = R.drawable.aerix_ic_refresh,
+                    onClick = { reload++ }
+                )
+            }
+            return@Column
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth().weight(1f),
+            horizontalArrangement = Arrangement.spacedBy(AerixSpacing.smCompact)
+        ) {
+            VersionBench(
+                title = stringResource(R.string.aerix_loader_bench_minecraft),
+                rows = visibleMcVersions,
+                selected = mcVersion,
+                onSelect = { picked -> mcVersion = picked; build = null },
+                accent = accent,
+                loading = metaLoading && mcVersions.isEmpty(),
+                query = mcQuery,
+                onQueryChange = { mcQuery = it },
+                modifier = Modifier.weight(1f)
+            )
+            VersionBench(
+                title = stringResource(R.string.aerix_loader_bench_build, kind.title),
+                rows = visibleBuilds,
+                selected = build?.value,
+                onSelect = { picked -> build = visibleBuilds.firstOrNull { it.value == picked } },
+                accent = accent,
+                loading = metaLoading && builds.isEmpty(),
+                query = buildQuery,
+                onQueryChange = { buildQuery = it },
+                toggleLabel = stringResource(R.string.aerix_loader_stable_only),
+                toggleChecked = stableOnly,
+                onToggleChange = { checked ->
+                    stableOnly = checked
+                    // A build the switch is about to hide is replaced by the newest one that stays
+                    // visible, so the button never points at something off screen.
+                    if (checked && build?.stable == false) {
+                        build = builds.firstOrNull { it.stable }
+                    }
+                },
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        Spacer(Modifier.height(AerixSpacing.smCompact))
+
+        // What the button is about to do, spelled out: loader, version, and where it lands.
+        val picked = build
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(AerixRadii.control),
+            color = AerixSurface.panelRaised,
+            border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft)
+        ) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
+                modifier = Modifier.padding(
+                    horizontal = AerixSpacing.smPlus,
+                    vertical = AerixSpacing.smCompact
+                ),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                row.forEach { (label, iconRes, installer) ->
-                    Surface(
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(AerixRadii.cardSmall),
-                        color = AerixSurface.panelRaised,
-                        border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft),
-                        onClick = { PojavNavigator.openInstaller(activity, installer) }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = if (picked == null) {
+                            stringResource(R.string.aerix_loader_pick_a_build)
+                        } else {
+                            "${kind.title} ${picked.label}"
+                        },
+                        color = AerixSurface.textPrimary,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = installError ?: stringResource(
+                            R.string.aerix_loader_install_detail,
+                            mcVersion ?: "?",
+                            draft.name.ifBlank { draft.versionId }
+                        ),
+                        color = if (installError != null) AerixSurface.danger else AerixSurface.textSecondary,
+                        fontSize = 10.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                Spacer(Modifier.width(AerixSpacing.sm))
+                Surface(
+                    shape = RoundedCornerShape(AerixRadii.compact),
+                    color = if (picked == null || installing) accent.copy(alpha = 0.35f) else accent,
+                    contentColor = AerixSurface.onAccent,
+                    onClick = {
+                        val selectedVersion = mcVersion
+                        if (picked == null || selectedVersion == null || installing) return@Surface
+                        val targetId = draft.instance.instanceId
+                        val selectedKind = kind
+                        val startInstall: () -> Unit = {
+                            installing = true
+                            installError = null
+                            scope.launch {
+                                val result = runCatching {
+                                    PojavLoaderBridge.install(targetId, selectedKind, selectedVersion, picked)
+                                }
+                                installing = false
+                                result.onSuccess { versionId ->
+                                    PojavInstanceBridge.reload()
+                                    Toast.makeText(
+                                        context,
+                                        if (selectedKind.forgeLike != null) context.getString(R.string.aerix_loader_finish_installer)
+                                        else context.getString(R.string.aerix_loader_installed, versionId),
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                    PojavInstanceEditorBridge.close()
+                                    AerixNav.finishTo(LauncherSection.LIBRARY)
+                                }.onFailure { error ->
+                                    installError = error.message
+                                        ?: context.getString(R.string.aerix_loader_install_failed)
+                                }
+                            }
+                        }
+                        if (selectedVersion != instanceMcVersion) {
+                            android.app.AlertDialog.Builder(context)
+                                .setTitle(R.string.aerix_loader_change_game_title)
+                                .setMessage(R.string.aerix_loader_change_game_warning)
+                                .setNegativeButton(android.R.string.cancel, null)
+                                .setPositiveButton(android.R.string.ok) { _, _ -> startInstall() }
+                                .show()
+                        } else startInstall()
+                    }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(
+                            horizontal = AerixSpacing.md,
+                            vertical = AerixSpacing.smCompact
+                        ),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            modifier = Modifier.padding(AerixSpacing.md),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus)
-                        ) {
-                            Icon(
-                                painter = painterResource(iconRes),
-                                contentDescription = null,
-                                tint = Color.Unspecified,
-                                modifier = Modifier.size(28.dp)
+                        if (installing) {
+                            CircularProgressIndicator(
+                                color = AerixSurface.onAccent,
+                                strokeWidth = 2.dp,
+                                modifier = Modifier.size(14.dp)
                             )
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(label, fontWeight = FontWeight.Bold, color = Color.White, fontSize = 14.sp)
-                                Text("Install / update $label", color = AerixSurface.textSecondary, fontSize = 11.sp)
+                        } else {
+                            Icon(
+                                painter = painterResource(R.drawable.aerix_ic_download),
+                                contentDescription = null,
+                                modifier = Modifier.size(15.dp)
+                            )
+                        }
+                        Spacer(Modifier.width(AerixSpacing.xs))
+                        Text(
+                            text = stringResource(
+                                if (installing) R.string.aerix_loader_installing else R.string.aerix_loader_install
+                            ),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * One bench of the loader screen: a titled card holding a scrollable list of versions, a search
+ * field and an optional switch. Everything is sized for a phone on its side, so the list - the part
+ * the player came for - gets most of the card: a row is 32dp and the head of the card is one line.
+ */
+@Composable
+private fun VersionBench(
+    title: String,
+    rows: List<LoaderVersion>,
+    selected: String?,
+    onSelect: (String) -> Unit,
+    accent: Color,
+    loading: Boolean,
+    query: String,
+    onQueryChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    toggleLabel: String? = null,
+    toggleChecked: Boolean = false,
+    onToggleChange: ((Boolean) -> Unit)? = null
+) {
+    Surface(
+        modifier = modifier.fillMaxHeight(),
+        shape = RoundedCornerShape(AerixRadii.cardSmall),
+        color = AerixSurface.panel.copy(alpha = 0.72f),
+        border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft)
+    ) {
+        Column(modifier = Modifier.fillMaxSize().padding(AerixSpacing.xsPlus)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = title,
+                    color = AerixSurface.textPrimary,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                if (toggleLabel != null && onToggleChange != null) {
+                    Text(
+                        text = toggleLabel,
+                        color = AerixSurface.textSecondary,
+                        fontSize = 9.5.sp,
+                        maxLines = 1
+                    )
+                    Spacer(Modifier.width(AerixSpacing.xs))
+                    MiniToggle(checked = toggleChecked, accent = accent, onChange = onToggleChange)
+                }
+            }
+            Spacer(Modifier.height(AerixSpacing.xs))
+            SearchRow(query = query, onQueryChange = onQueryChange, accent = accent)
+            Spacer(Modifier.height(AerixSpacing.xs))
+            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                when {
+                    loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(
+                            color = accent,
+                            strokeWidth = 2.dp,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    rows.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(
+                            text = stringResource(R.string.aerix_loader_nothing_here),
+                            color = AerixSurface.textMuted,
+                            fontSize = 11.sp
+                        )
+                    }
+                    else -> LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.spacedBy(AerixSpacing.xxs)
+                    ) {
+                        items(rows, key = { it.value }) { row ->
+                            val isSelected = row.value == selected
+                            val shape = RoundedCornerShape(AerixRadii.compact)
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(32.dp)
+                                    .clip(shape)
+                                    .background(
+                                        if (isSelected) accent.copy(alpha = 0.16f)
+                                        else Color.White.copy(alpha = 0.04f)
+                                    )
+                                    .border(
+                                        BorderStroke(
+                                            AerixSpacing.hairline,
+                                            if (isSelected) accent.copy(alpha = 0.55f) else Color.Transparent
+                                        ),
+                                        shape
+                                    )
+                                    .clickable(role = Role.RadioButton) { onSelect(row.value) }
+                                    .padding(horizontal = AerixSpacing.sm),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // A drawn dot instead of a RadioButton: the stock one is 48dp of
+                                // touch target for a 14dp circle, which cost three rows per screen.
+                                Box(
+                                    modifier = Modifier
+                                        .size(14.dp)
+                                        .clip(CircleShape)
+                                        .border(
+                                            BorderStroke(
+                                                1.5.dp,
+                                                if (isSelected) accent else AerixSurface.textMuted
+                                            ),
+                                            CircleShape
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (isSelected) {
+                                        Box(
+                                            Modifier
+                                                .size(6.dp)
+                                                .clip(CircleShape)
+                                                .background(accent)
+                                        )
+                                    }
+                                }
+                                Spacer(Modifier.width(AerixSpacing.smCompact))
+                                Text(
+                                    text = row.label,
+                                    color = if (isSelected) accent else AerixSurface.textPrimary,
+                                    fontSize = 12.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                if (!row.stable) {
+                                    Text(
+                                        text = stringResource(R.string.aerix_loader_unstable),
+                                        color = AerixSurface.warning,
+                                        fontSize = 9.sp
+                                    )
+                                }
                             }
                         }
                     }
                 }
             }
         }
+    }
+}
+
+/** Compact on/off pill for the bench headers: a 28x16 track with a dot that slides across. */
+@Composable
+private fun MiniToggle(checked: Boolean, accent: Color, onChange: ((Boolean) -> Unit)?) {
+    val offset by animateFloatAsState(if (checked) 1f else 0f, label = "miniToggle")
+    Box(
+        modifier = Modifier
+            .size(width = 30.dp, height = 16.dp)
+            .clip(CircleShape)
+            .background(if (checked) accent else Color.White.copy(alpha = 0.16f))
+            .border(
+                BorderStroke(AerixSpacing.hairline, if (checked) accent else AerixSurface.borderSoft),
+                CircleShape
+            )
+            .clickable(enabled = onChange != null, role = Role.Switch) { onChange?.invoke(!checked) },
+        contentAlignment = Alignment.CenterStart
+    ) {
+        Box(
+            modifier = Modifier
+                .padding(start = 2.dp)
+                .offset(x = (offset * 14).dp)
+                .size(12.dp)
+                .clip(CircleShape)
+                .background(if (checked) AerixSurface.onAccent else AerixSurface.textSecondary)
+        )
+    }
+}
+
+@Composable
+private fun SearchRow(query: String, onQueryChange: (String) -> Unit, accent: Color) {
+    val shape = RoundedCornerShape(AerixRadii.compact)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(26.dp)
+            .clip(shape)
+            .background(Color.White.copy(alpha = 0.05f))
+            .border(AerixSpacing.hairline, AerixSurface.borderSoft, shape)
+            .padding(horizontal = AerixSpacing.smCompact),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            painter = painterResource(R.drawable.aerix_ic_search),
+            contentDescription = null,
+            tint = AerixSurface.textMuted,
+            modifier = Modifier.size(12.dp)
+        )
+        Spacer(Modifier.width(AerixSpacing.xs))
+        BasicTextField(
+            value = query,
+            onValueChange = onQueryChange,
+            singleLine = true,
+            textStyle = MaterialTheme.typography.bodyMedium.copy(
+                color = AerixSurface.textPrimary,
+                fontSize = 11.sp
+            ),
+            cursorBrush = SolidColor(accent),
+            modifier = Modifier.weight(1f)
+        )
     }
 }
 

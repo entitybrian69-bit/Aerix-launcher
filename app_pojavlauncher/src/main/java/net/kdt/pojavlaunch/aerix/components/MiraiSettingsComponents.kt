@@ -114,7 +114,7 @@ import net.kdt.pojavlaunch.aerix.theme.AerixRadii
 import net.kdt.pojavlaunch.aerix.theme.AerixSpacing
 import net.kdt.pojavlaunch.aerix.theme.AerixSurface
 import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
-import net.kdt.pojavlaunch.game.renderer.def.Renderers
+import net.kdt.pojavlaunch.game.renderer.RendererCache
 import net.kdt.pojavlaunch.prefs.LauncherPreferences
 import kotlin.math.roundToInt
 
@@ -1121,9 +1121,12 @@ fun <E> MiraiEnumSettingsCard(
 }
 
 /**
- * Built-in renderer metadata ported from mirai-launcher- (Renderers.kt)
- * matching Photos 1, 2, and 5 (Krypton Wrapper, MobileGlues, GL4ES, vgpu - (up to 1.16.5, fast),
- * VGPU 1.3.6β, LTW Legacy, LTW (Large Thin Wrapper), Kopper Zink, VirGLRenderer, Freedreno (Adreno)).
+ * A renderer the launcher can run.
+ *
+ * The entries are built from the launcher's own renderer list, so every option maps to a
+ * backend implemented in net.kdt.pojavlaunch.game.renderer and is only offered when the
+ * current device supports it. The name of each renderer is the one the launcher itself
+ * uses, the supported Minecraft versions included.
  */
 data class MiraiRendererEntry(
     val uniqueId: String,
@@ -1137,6 +1140,11 @@ data class MiraiRendererEntry(
 private const val PREF_MIRAI_GLOBAL_RENDERER_ID = "aerix_mirai_global_renderer_id"
 private const val PREF_MIRAI_INSTANCE_RENDERER_PREFIX = "aerix_mirai_instance_renderer_"
 
+/**
+ * Every renderer the launcher implements, plus the external renderer plugins that are installed.
+ *
+ * @param includeFollowGlobal add the "Follow Global" entry used by the per instance list
+ */
 fun miraiRendererEntries(context: Context, includeFollowGlobal: Boolean): List<MiraiRendererEntry> {
     val list = ArrayList<MiraiRendererEntry>()
     if (includeFollowGlobal) {
@@ -1148,78 +1156,20 @@ fun miraiRendererEntries(context: Context, includeFollowGlobal: Boolean): List<M
             )
         )
     }
-    list.addAll(
-        listOf(
+    val plugins = runCatching { PojavPluginBridge.loadPlugins(context) }.getOrDefault(emptyList())
+    val pluginTags = plugins.map { it.pluginTag }.toSet()
+    val cache = RendererCache.getCompatibleRenderers(context)
+    cache.rendererIds.forEachIndexed { index, rendererId ->
+        if (rendererId in pluginTags) return@forEachIndexed
+        list.add(
             MiraiRendererEntry(
-                uniqueId = "opengles3",
-                displayName = "Krypton Wrapper",
-                backendRendererId = Renderers.NGGL4ES_RENDERER,
-                minVer = "1.17",
-                maxVer = "26.2"
-            ),
-            MiraiRendererEntry(
-                uniqueId = "opengles3_mobileglues",
-                displayName = "MobileGlues",
-                backendRendererId = Renderers.MOBILEGLUES_RENDERER,
-                minVer = "1.17",
-                maxVer = "26.3"
-            ),
-            MiraiRendererEntry(
-                uniqueId = "opengles2",
-                displayName = "GL4ES",
-                backendRendererId = Renderers.GL4ES_RENDERER,
-                maxVer = "1.16.5"
-            ),
-            MiraiRendererEntry(
-                uniqueId = "opengles2_vgpu",
-                displayName = "vgpu - (up to 1.16.5, fast)",
-                backendRendererId = Renderers.SFPEW_RENDERER,
-                summary = "( Performative and balance for version above 1.16.5)",
-                maxVer = "1.16.5"
-            ),
-            MiraiRendererEntry(
-                uniqueId = "opengles2_vgpu_1",
-                displayName = "VGPU 1.3.6\u03B2",
-                backendRendererId = Renderers.SFPEW_RENDERER,
-                summary = "(Compat with all version and very reliable)",
-                maxVer = "1.16.5"
-            ),
-            MiraiRendererEntry(
-                uniqueId = "opengles2_ltwlegacy",
-                displayName = "LTW Legacy",
-                backendRendererId = Renderers.GL4ES_RENDERER,
-                summary = "OpenGL 1.x/2.1 translation layer for Minecraft 1.8 - 1.16.5, built from source.",
-                minVer = "1.8",
-                maxVer = "1.16.5"
-            ),
-            MiraiRendererEntry(
-                uniqueId = "opengles3_ltw",
-                displayName = "LTW (Large Thin Wrapper)",
-                backendRendererId = Renderers.LTW_RENDERER,
-                summary = "Incomplete OpenGL 3.2 core wrapper on OpenGL ES 3; game, mod, and device compatibility varies.",
-                minVer = "1.17"
-            ),
-            MiraiRendererEntry(
-                uniqueId = "opengles3_desktopgl_zink_kopper",
-                displayName = "Kopper Zink",
-                backendRendererId = Renderers.ZINK_RENDERER,
-                maxVer = "26.2"
-            ),
-            MiraiRendererEntry(
-                uniqueId = "gallium_virgl",
-                displayName = "VirGLRenderer",
-                backendRendererId = Renderers.LEGACYZINK_RENDERER,
-                maxVer = "26.2"
-            ),
-            MiraiRendererEntry(
-                uniqueId = "gallium_freedreno",
-                displayName = "Freedreno (Adreno)",
-                backendRendererId = Renderers.FREEDRENO_RENDERER,
-                maxVer = "26.2"
+                uniqueId = rendererId,
+                displayName = cache.rendererDisplayNames.getOrElse(index) { rendererId },
+                backendRendererId = rendererId
             )
         )
-    )
-    runCatching { PojavPluginBridge.loadPlugins(context) }.getOrDefault(emptyList()).forEach { plugin ->
+    }
+    plugins.forEach { plugin ->
         if (list.none { it.uniqueId == plugin.pluginTag }) {
             list.add(
                 MiraiRendererEntry(
@@ -1244,11 +1194,12 @@ fun getMiraiGlobalRendererId(context: Context): String {
     }
     val backend = LauncherPreferences.PREF_RENDERER
     return entries.firstOrNull { it.backendRendererId == backend }?.uniqueId
-        ?: entries.first().uniqueId
+        ?: entries.firstOrNull()?.uniqueId
+        ?: backend
 }
 
 fun setMiraiGlobalRenderer(entry: MiraiRendererEntry) {
-    val backend = entry.backendRendererId ?: Renderers.NGGL4ES_RENDERER
+    val backend = entry.backendRendererId ?: LauncherPreferences.PREF_RENDERER
     LauncherPreferences.PREF_RENDERER = backend
     LauncherPreferences.DEFAULT_PREF.edit()
         .putString("renderer", backend)

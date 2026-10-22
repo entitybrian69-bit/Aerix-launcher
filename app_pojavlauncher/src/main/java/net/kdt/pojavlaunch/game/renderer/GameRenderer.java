@@ -46,6 +46,7 @@ import git.artdeell.mojoexec.MojoExec;
 public class GameRenderer {
     private final static String TAG = "Renderer";
     private final static String FALLBACK_RENDERER = GL4ES_RENDERER;
+    private static volatile boolean pluginInitializationFailed;
     private RenderSpec currentRenderer;
     private Map<String, String> environment = new HashMap<>();
 
@@ -152,10 +153,18 @@ public class GameRenderer {
      * @return whether the renderer setup was successful
      */
     public boolean maybeSetupRenderer() {
+        if (pluginInitializationFailed) {
+            Log.e(TAG, "A plugin failed native initialization in this process; restart the game process before retrying");
+            return false;
+        }
         setRendererLibraryPath(Tools.NATIVE_LIB_DIR, currentRenderer.librarySearchPath());
         if (!currentRenderer.setupRenderer()) {
+            if (currentRenderer instanceof net.kdt.pojavlaunch.aerix.bridge.AerixRendererPlugin) {
+                pluginInitializationFailed = true;
+                Log.e(TAG, "Plugin renderer initialization failed; aborting this launch before starting the JVM");
+                return false;
+            }
             Log.e(TAG, "Failed to setup renderer " + currentRenderer.name() + ", falling back to " + FALLBACK_RENDERER);
-            // Hopefully (yes, it's going to be fun if it returns null for the fallback renderer. Shouldn't happen though)
             return getKnownRenderer(FALLBACK_RENDERER).setupRenderer();
         }
         return true;

@@ -151,8 +151,8 @@ object AerixRadii {
 object AerixMetrics {
     val pillTabHeight: Dp = 38.dp
     val pageHeaderHeight: Dp = 44.dp
-    val navigationRailWidth: Dp = 68.dp
-    val expandedNavigationRailWidth: Dp = 78.dp
+    val navigationRailWidth: Dp = 62.dp
+    val expandedNavigationRailWidth: Dp = 72.dp
     val glassSurfaceElevation: Dp = 1.dp
     val glassFloatingElevation: Dp = 3.dp
     val glassRailElevation: Dp = 2.dp

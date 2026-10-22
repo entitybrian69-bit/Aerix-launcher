@@ -33,6 +33,7 @@
 
 package net.kdt.pojavlaunch.aerix.ui.screens
 
+import net.kdt.pojavlaunch.BuildConfig
 import android.content.Intent
 import android.content.res.Configuration
 import android.net.Uri
@@ -48,6 +49,9 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.ui.semantics.Role
+import net.kdt.pojavlaunch.aerix.bridge.rememberControlLayoutCatalog
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -103,7 +107,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.fragment.app.FragmentActivity
 import net.kdt.pojavlaunch.Architecture
-import net.kdt.pojavlaunch.BuildConfig
 import net.kdt.pojavlaunch.ImportControlActivity
 import net.kdt.pojavlaunch.NewJREUtil
 import net.kdt.pojavlaunch.PojavApplication
@@ -167,7 +170,7 @@ private val settingTabItems = listOf(
     SettingTabItem(AerixNav.TAB_WALLPAPERS, R.drawable.aerix_ic_format_paint_outlined, "Wallpapers"),
     SettingTabItem(AerixNav.TAB_LAUNCHER, R.drawable.aerix_ic_setting_launcher, "Launcher"),
     SettingTabItem(AerixNav.TAB_CONTROLS, R.drawable.aerix_ic_videogame_asset_outlined, "Controls"),
-    SettingTabItem(AerixNav.TAB_CONTROL_MANAGER, R.drawable.aerix_ic_videogame_asset_outlined, "Controls"),
+    SettingTabItem(AerixNav.TAB_CONTROL_MANAGER, R.drawable.aerix_ic_dashboard_outlined, "Layouts"),
     SettingTabItem(AerixNav.TAB_GAMEPAD, R.drawable.aerix_ic_sports_esports_outlined, "Gamepad"),
     SettingTabItem(AerixNav.TAB_ABOUT, R.drawable.aerix_ic_info_outlined, "About")
 )
@@ -179,14 +182,17 @@ private data class RendererStackOption(
     val rendererId: String
 )
 
-private val rendererStackOptions = listOf(
-    RendererStackOption("AUTO", "Auto (Smart Pick)", "RECOMMENDED", Renderers.LTW_RENDERER),
+/**
+ * Tiles of the renderer grid. "AUTO" stands for the renderer the launcher uses by default,
+ * every other tile names a backend renderer directly.
+ */
+private fun defaultRendererStackOptions(defaultRendererId: String): List<RendererStackOption> = listOf(
+    RendererStackOption("AUTO", "Auto (Smart Pick)", "RECOMMENDED", defaultRendererId),
     RendererStackOption("VGPU_FAST", "vgpu - (up to 1.16.5, fast)", "1.16.5 FAST", Renderers.NGGL4ES_RENDERER),
     RendererStackOption("VGPU_1368", "VGPU 1.3.6\u03B2", "SHADERCONV", Renderers.SFPEW_RENDERER),
     RendererStackOption("LTW", "LTW (1.17+ Core)", "1.17+", Renderers.LTW_RENDERER),
     RendererStackOption("Legacy", "LTW Legacy (1.8\u20131.16.5)", "1.8\u20131.16.5", Renderers.GL4ES_RENDERER),
-    RendererStackOption("Zink", "Kopper Zink (Vulkan)", "VULKAN", Renderers.ZINK_RENDERER),
-    RendererStackOption("MOBILEGLUES", "MobileGlues (1.17+)", "MODERN", Renderers.MOBILEGLUES_RENDERER)
+    RendererStackOption("Zink", "Kopper Zink (Vulkan)", "VULKAN", Renderers.ZINK_RENDERER)
 )
 
 @Composable
@@ -249,13 +255,19 @@ fun SettingsScreen(activity: FragmentActivity, tabKey: String, onTabChanged: (St
 
 @Composable
 private fun RendererTabContent(activity: FragmentActivity) {
+    var showUpdateDialog by remember { mutableStateOf(false) }
+    if (showUpdateDialog) LauncherUpdateDialog(activity) { showUpdateDialog = false }
+
     val revision = PojavSettingsBridge.revision
     val compatible = remember(revision) { PojavSettingsBridge.renderers(activity) }
     val plugins = remember(revision) { PojavPluginBridge.loadPlugins(activity) }
     val currentRenderer = remember(revision) { LauncherPreferences.PREF_RENDERER ?: Renderers.GL4ES_RENDERER }
+    // Renderer the launcher falls back to while nothing was picked in the settings.
+    val defaultRendererId = remember(revision) { LauncherPreferences.defaultRendererId(activity) }
+    val rendererStackOptions = remember(revision) { defaultRendererStackOptions(defaultRendererId) }
     val rendererEntries = remember(revision) { miraiRendererEntries(activity, includeFollowGlobal = false) }
     var currentMiraiRendererId by remember(revision) { mutableStateOf(getMiraiGlobalRendererId(activity)) }
-    var autoSelected by remember { mutableStateOf(false) }
+    var autoSelected by remember(revision) { mutableStateOf(currentRenderer == defaultRendererId) }
     var globalVulkanDriver by remember(revision) {
         mutableStateOf(
             LauncherPreferences.DEFAULT_PREF.getString("aerix_global_vulkan_driver", "default driver")
@@ -498,6 +510,7 @@ private fun RendererTabContent(activity: FragmentActivity) {
             }
         }
 
+
         // 3. Compact Footer Updater Card (Mirai RendererSettingsScreen lines 428-469)
         item {
             Surface(
@@ -514,7 +527,7 @@ private fun RendererTabContent(activity: FragmentActivity) {
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = "Aerix Launcher v1.6 \u2022 Built by entitybrian",
+                        text = "Aerix Launcher v${BuildConfig.VERSION_NAME} \u2022 Built by entitybrian",
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.SemiBold,
                         color = AerixSurface.textPrimary
@@ -522,7 +535,7 @@ private fun RendererTabContent(activity: FragmentActivity) {
 
                     Button(
                         onClick = {
-                            PojavNavigator.openUrl(activity, "https://github.com/entitybrian69-bit/Aerix-launcher/releases")
+                            showUpdateDialog = true
                         },
                         shape = RoundedCornerShape(AerixRadii.card),
                         colors = ButtonDefaults.buttonColors(
@@ -543,7 +556,8 @@ private fun RendererTabContent(activity: FragmentActivity) {
 
         // 4. Detailed Renderer, Vulkan Driver, Graphics API, Resolution & Fullscreen SettingsCardColumn (Mirai RendererSettingsScreen — Photos 1 & 2)
         item {
-            val showMgSettings = currentRenderer == Renderers.MOBILEGLUES_RENDERER || currentMiraiRendererId == "opengles3_mobileglues"
+            val showMgSettings = currentRenderer == Renderers.MOBILEGLUES_RENDERER ||
+                currentMiraiRendererId == Renderers.MOBILEGLUES_RENDERER
             val vulkanDrivers = remember {
                 listOf(
                     "default driver" to "default driver",
@@ -571,7 +585,7 @@ private fun RendererTabContent(activity: FragmentActivity) {
                     position = CardPosition.Top,
                     items = rendererEntries,
                     currentId = currentMiraiRendererId,
-                    defaultId = rendererEntries.firstOrNull()?.uniqueId ?: "opengles3",
+                    defaultId = rendererEntries.firstOrNull()?.uniqueId ?: defaultRendererId,
                     title = "Global Renderer",
                     summary = "Define the global renderer used by the game",
                     getItemText = { it.displayName },
@@ -1412,6 +1426,20 @@ private fun LauncherTabContent(activity: FragmentActivity) {
                 )
             }
         }
+
+        // Group 5: the Aetherium mod. It is a recommendation, so it lives here with the rest of
+        // the launcher settings instead of over the home screen.
+        item {
+            SettingsCardColumn(modifier = Modifier.fillMaxWidth()) {
+                MiraiActionSettingsCard(
+                    position = CardPosition.Single,
+                    title = stringResource(R.string.aerix_settings_aetherium),
+                    summary = stringResource(R.string.aerix_settings_aetherium_sub),
+                    value = stringResource(R.string.aerix_settings_aetherium_tag),
+                    onClick = { AerixNav.navigate(LauncherSection.DISCOVER) }
+                )
+            }
+        }
     }
 }
 
@@ -1592,16 +1620,9 @@ private fun ControlsTabContent(activity: FragmentActivity) {
 
 @Composable
 private fun ControlManagerTabContent(activity: FragmentActivity) {
-    var refreshTick by remember { mutableIntStateOf(0) }
-    val ctrlDir = remember { File(Tools.CTRLMAP_PATH).also { it.mkdirs() } }
-    val files = remember(refreshTick) {
-        ctrlDir.listFiles { f -> f.isFile && f.name.endsWith(".json", ignoreCase = true) }
-            ?.sortedBy { it.name.lowercase() }
-            ?: emptyList()
-    }
-    val defaultPath = remember(refreshTick, PojavSettingsBridge.revision) {
-        LauncherPreferences.PREF_DEFAULTCTRL_PATH ?: Tools.CTRLDEF_FILE
-    }
+    val catalog = rememberControlLayoutCatalog(activity)
+    val files = catalog.files
+    val defaultPath = catalog.selectedPath
 
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
@@ -1642,7 +1663,7 @@ private fun ControlManagerTabContent(activity: FragmentActivity) {
                 AerixGhostButton(
                     text = "",
                     iconRes = R.drawable.aerix_ic_refresh,
-                    onClick = { refreshTick++ }
+                    onClick = { catalog.refresh() }
                 )
                 AerixGhostButton(
                     text = "Import",
@@ -1664,9 +1685,13 @@ private fun ControlManagerTabContent(activity: FragmentActivity) {
         ) {
             items(files.size, key = { files[it].absolutePath }) { index ->
                 val file = files[index]
-                val isDefault = file.absolutePath == defaultPath || defaultPath.endsWith("/${file.name}")
+                val isDefault = file.absolutePath == defaultPath
                 Surface(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().selectable(
+                        selected = isDefault,
+                        role = Role.RadioButton,
+                        onClick = { catalog.select(file) }
+                    ),
                     shape = RoundedCornerShape(AerixRadii.card),
                     color = AerixSurface.panel,
                     border = BorderStroke(
@@ -1704,15 +1729,11 @@ private fun ControlManagerTabContent(activity: FragmentActivity) {
                             text = if (isDefault) "Default" else "Set default",
                             iconRes = if (isDefault) R.drawable.aerix_ic_check else null,
                             onClick = {
-                                LauncherPreferences.PREF_DEFAULTCTRL_PATH = file.absolutePath
-                                PojavSettingsBridge.writeString(activity, "defaultCtrl", file.absolutePath)
-                                refreshTick++
+                                catalog.select(file)
                             }
                         )
                         IconButton(onClick = {
-                            LauncherPreferences.PREF_DEFAULTCTRL_PATH = file.absolutePath
-                            PojavSettingsBridge.writeString(activity, "defaultCtrl", file.absolutePath)
-                            PojavNavigator.openCustomControls(activity)
+                            if (catalog.select(file)) PojavNavigator.openCustomControls(activity)
                         }) {
                             Icon(
                                 painter = painterResource(R.drawable.aerix_ic_edit_outlined),
@@ -1722,8 +1743,7 @@ private fun ControlManagerTabContent(activity: FragmentActivity) {
                         }
                         if (file.name != "default.json") {
                             IconButton(onClick = {
-                                file.delete()
-                                refreshTick++
+                                catalog.delete(file)
                             }) {
                                 Icon(
                                     painter = painterResource(R.drawable.aerix_ic_delete_outlined),
@@ -1801,6 +1821,9 @@ private fun GamepadTabContent(activity: FragmentActivity) {
 
 @Composable
 private fun AboutInfoTabContent(activity: FragmentActivity) {
+    var showUpdateDialog by remember { mutableStateOf(false) }
+    if (showUpdateDialog) LauncherUpdateDialog(activity) { showUpdateDialog = false }
+
     val accent = AerixThemeManager.currentAccent()
 
     LazyColumn(
@@ -1828,10 +1851,10 @@ private fun AboutInfoTabContent(activity: FragmentActivity) {
                         iconRes = R.drawable.ic_aerix_mark,
                         iconTint = Color.Unspecified,
                         title = "Aerix Launcher",
-                        subtitle = "Launcher Version: 1.6",
+                        subtitle = "Launcher Version: ${BuildConfig.VERSION_NAME}",
                         actions = {
                             AboutPillButton("Check for Updates", accent) {
-                                PojavNavigator.openUrl(activity, "https://github.com/entitybrian69-bit/Aerix-launcher/releases")
+                                showUpdateDialog = true
                             }
                             AboutPillButton("Project Link", accent) {
                                 PojavNavigator.openUrl(activity, "https://github.com/entitybrian69-bit/Aerix-launcher")
@@ -1857,134 +1880,6 @@ private fun AboutInfoTabContent(activity: FragmentActivity) {
             }
         }
 
-        // Card 2: Acknowledgements (Screenshot 5 bottom card)
-        item {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(AerixRadii.hero),
-                color = AerixSurface.panel,
-                border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = AerixSpacing.mdPlus),
-                    verticalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus)
-                ) {
-                    Text(
-                        text = "Acknowledgements",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        modifier = Modifier.padding(horizontal = AerixSpacing.lg)
-                    )
-                    HorizontalDivider(color = AerixSurface.borderSoft)
-
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = AerixSpacing.mdPlus),
-                        verticalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus)
-                    ) {
-                        AboutRowCard(
-                            iconRes = R.drawable.aerix_img_avatar_bangbang93,
-                            iconTint = Color.Unspecified,
-                            title = "bangbang93",
-                            subtitle = "Aerix uses the BMCL API mirror source",
-                            actions = {
-                                AboutPillButton("Sponsorship Support", accent) {
-                                    PojavNavigator.openUrl(activity, "https://afdian.com/a/bangbang93")
-                                }
-                            }
-                        )
-                        AboutRowCard(
-                            iconRes = R.drawable.aerix_img_launcher_fcl,
-                            iconTint = Color.Unspecified,
-                            title = "Fold Craft Launcher",
-                            subtitle = "Aerix incorporates code from FCL and references parts of its implementation",
-                            actions = {
-                                AboutPillButton("Project Link", accent) {
-                                    PojavNavigator.openUrl(activity, "https://github.com/FCL-Team/FoldCraftLauncher")
-                                }
-                            }
-                        )
-                        AboutRowCard(
-                            iconRes = R.drawable.aerix_img_launcher_hmcl,
-                            iconTint = Color.Unspecified,
-                            title = "Hello Minecraft! Launcher",
-                            subtitle = "Aerix incorporates code from HMCL and references parts of its implementation",
-                            actions = {
-                                AboutPillButton("Project Link", accent) {
-                                    PojavNavigator.openUrl(activity, "https://github.com/HMCL-dev/HMCL")
-                                }
-                            }
-                        )
-                        AboutRowCard(
-                            iconRes = R.drawable.aerix_img_platform_mcmod,
-                            iconTint = Color.Unspecified,
-                            title = "MCMod (mcmod.cn)",
-                            subtitle = "Aerix uses Simplified Chinese translations of mods and modpacks from MCMod",
-                            actions = {
-                                AboutPillButton("Open", accent) {
-                                    PojavNavigator.openUrl(activity, "https://www.mcmod.cn/")
-                                }
-                            }
-                        )
-                        AboutRowCard(
-                            iconRes = R.drawable.aerix_img_avatar_mcim,
-                            iconTint = Color.Unspecified,
-                            title = "mcmod-info-mirror",
-                            subtitle = "Aerix uses the MCIM mirror source",
-                            actions = {
-                                AboutPillButton("Sponsorship Support", accent) {
-                                    PojavNavigator.openUrl(activity, "https://afdian.com/a/vels")
-                                }
-                            }
-                        )
-                        AboutRowCard(
-                            iconRes = R.drawable.aerix_img_launcher_pcl2,
-                            iconTint = Color.Unspecified,
-                            title = "Plain Craft Launcher 2",
-                            subtitle = "Aerix references parts of the implementation from PCL2",
-                            actions = {}
-                        )
-                        AboutRowCard(
-                            iconRes = R.drawable.aerix_img_launcher_pojav,
-                            iconTint = Color.Unspecified,
-                            title = "PojavLauncher",
-                            subtitle = "Aerix uses the launch backend from PojavLauncher / MojoLauncher",
-                            actions = {
-                                AboutPillButton("Project Link", accent) {
-                                    PojavNavigator.openUrl(activity, "https://github.com/PojavLauncherTeam/PojavLauncher")
-                                }
-                            }
-                        )
-                        AboutRowCard(
-                            iconRes = R.drawable.aerix_ic_github,
-                            iconTint = Color.White,
-                            title = "GitHub Community",
-                            subtitle = "All issue reporters and contributors from the GitHub community",
-                            actions = {
-                                AboutPillButton("Contributors", accent) {
-                                    PojavNavigator.openUrl(activity, "https://github.com/entitybrian69-bit/Aerix-launcher/graphs/contributors")
-                                }
-                            }
-                        )
-                        AboutRowCard(
-                            iconRes = R.drawable.aerix_img_platform_weblate,
-                            iconTint = Color.Unspecified,
-                            title = "Weblate Community",
-                            subtitle = "All translators who participated in community language localization",
-                            actions = {
-                                AboutPillButton("Weblate", accent) {
-                                    PojavNavigator.openUrl(activity, "https://hosted.weblate.org/projects/zalithlauncher2")
-                                }
-                            }
-                        )
-                    }
-                }
-            }
-        }
     }
 }
 
