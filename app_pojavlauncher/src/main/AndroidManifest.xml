@@ -17,6 +17,13 @@
     <uses-permission
         android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
+    <!-- Renderer plugins are ordinary APKs installed by the user. Android 11+ hides them from
+         getInstalledApplications unless this permission is present, so plugin discovery depends on it.
+         Aerix ships APKs directly from GitHub Releases, where the Play package-visibility policy
+         does not apply. -->
+    <uses-permission
+        android:name="android.permission.QUERY_ALL_PACKAGES"
+        tools:ignore="QueryAllPackagesPermission" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
@@ -161,5 +168,11 @@
         <package android:name="net.kdt.pojavlaunch"/>
         <package android:name="net.kdt.pojavlaunch.debug"/>
         <package android:name="net.kdt.pojavlaunch.pub"/>
+        <!-- Fallback visibility for plugin APKs that ship a launcher activity, used when the
+             package visibility permission above is not granted. -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
     </queries>
 </manifest>
