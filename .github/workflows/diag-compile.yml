@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - '.github/workflows/diag-compile.yml'
+      - 'app_pojavlauncher/src/main/**'
   workflow_dispatch:
 
 permissions:
