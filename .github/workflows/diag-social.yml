@@ -1,0 +1,44 @@
+name: diag social
+
+on:
+  push:
+    paths:
+      - 'app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/social/**'
+      - 'app_pojavlauncher/src/test/java/net/kdt/pojavlaunch/aerix/social/**'
+      - '.github/workflows/diag-social.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Compile and run Social unit tests
+        shell: bash
+        run: |
+          set +e
+          ./gradlew :app_pojavlauncher:compileNoruntimeDebugKotlin :app_pojavlauncher:testNoruntimeDebugUnitTest --console=plain > k.log 2>&1
+          code=$?
+          echo "gradle exit=$code"
+          grep -E "^e: |error: |FAILURE: |What went wrong|Caused by|Unresolved reference" k.log | sort -u | head -40 |
+            while read -r l; do echo "::error title=gradle::$(printf '%s' "$l" | head -c 500)"; done
+          if [ "$code" != "0" ]; then
+            tail -30 k.log | while read -r l; do echo "::notice title=tail::$(printf '%s' "$l" | head -c 500)"; done
+          fi
+          grep -E "tests? completed|BUILD SUCCESSFUL|BUILD FAILED" k.log | tail -5 |
+            while read -r l; do echo "::notice title=result::$(printf '%s' "$l" | head -c 300)"; done
+          exit "$code"

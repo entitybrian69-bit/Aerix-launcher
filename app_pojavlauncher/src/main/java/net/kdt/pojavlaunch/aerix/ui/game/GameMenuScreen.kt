@@ -57,6 +57,14 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
+import net.kdt.pojavlaunch.aerix.social.SocialGraph
+import net.kdt.pojavlaunch.aerix.social.ui.SocialColors
+import net.kdt.pojavlaunch.aerix.social.ui.ingame.SocialCompactPanel
+import net.kdt.pojavlaunch.aerix.social.vm.CompactMode
+import net.kdt.pojavlaunch.aerix.social.vm.InGameSocialViewModel
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -151,6 +159,13 @@ fun GameMenuScreen(
     val account = remember { PojavAccountBridge.current }
     var page by remember { mutableStateOf(GameMenuPage.MAIN) }
     var shown by remember { mutableStateOf(false) }
+    var socialOpen by remember { mutableStateOf(false) }
+    val socialFactory = remember {
+        viewModelFactory {
+            initializer { InGameSocialViewModel(SocialGraph.repository, SocialGraph.store) }
+        }
+    }
+    val socialViewModel: InGameSocialViewModel = viewModel(factory = socialFactory)
 
     LaunchedEffect(revision) {
         page = GameMenuPage.MAIN
@@ -189,7 +204,11 @@ fun GameMenuScreen(
                     account = account,
                     versionLine = versionLine,
                     onCloseRequest = onCloseRequest,
-                    onOpenDownloads = { page = GameMenuPage.DOWNLOADS }
+                    onOpenDownloads = { page = GameMenuPage.DOWNLOADS },
+                    onOpenSocial = {
+                        socialOpen = true
+                        socialViewModel.show(CompactMode.CHAT)
+                    }
                 )
                 GameMenuPage.DOWNLOADS -> Box(
                     modifier = Modifier
@@ -205,6 +224,12 @@ fun GameMenuScreen(
                 }
             }
         }
+        if (socialOpen) {
+            SocialCompactPanel(
+                viewModel = socialViewModel,
+                onClose = { socialOpen = false }
+            )
+        }
     }
 }
 
@@ -215,7 +240,8 @@ private fun GameMenuMainPage(
     account: AerixAccount?,
     versionLine: String,
     onCloseRequest: () -> Unit,
-    onOpenDownloads: () -> Unit
+    onOpenDownloads: () -> Unit,
+    onOpenSocial: () -> Unit
 ) {
     BoxWithConstraints(
         modifier = Modifier.fillMaxSize(),
@@ -297,13 +323,25 @@ private fun GameMenuMainPage(
             }
 
             Spacer(Modifier.height(if (compact) AerixSpacing.smPlus else AerixSpacing.md))
-            MenuTile(
-                label = if (net.kdt.pojavlaunch.recording.RecordingState.isActive()) "Stop recording" else "Screen recorder",
-                iconRes = R.drawable.aerix_ic_record,
-                color = palette.tiles[0], compact = compact,
-                onClick = { onCloseRequest(); callbacks.onScreenRecorder() },
-                modifier = Modifier.fillMaxWidth().height(if (compact) 48.dp else 60.dp)
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus)
+            ) {
+                MenuTile(
+                    label = if (net.kdt.pojavlaunch.recording.RecordingState.isActive()) "Stop recording" else "Screen recorder",
+                    iconRes = R.drawable.aerix_ic_record,
+                    color = palette.tiles[0], compact = compact,
+                    onClick = { onCloseRequest(); callbacks.onScreenRecorder() },
+                    modifier = Modifier.weight(1f).height(if (compact) 48.dp else 60.dp)
+                )
+                MenuTile(
+                    label = "Social",
+                    iconRes = R.drawable.aerix_social_ic_friends,
+                    color = SocialColors.accent, compact = compact,
+                    onClick = onOpenSocial,
+                    modifier = Modifier.weight(1f).height(if (compact) 48.dp else 60.dp)
+                )
+            }
             Spacer(Modifier.height(AerixSpacing.sm))
             ResumeButton(
                 color = palette.resume,

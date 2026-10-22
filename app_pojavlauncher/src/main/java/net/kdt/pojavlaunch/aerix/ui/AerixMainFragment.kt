@@ -62,6 +62,7 @@ class AerixMainFragment : Fragment() {
     override fun onAttach(context: Context) {
         super.onAttach(context)
         AerixPreferences.init(context)
+        net.kdt.pojavlaunch.aerix.social.SocialGraph.init(context)
         val retentionDays = AerixPreferences.logRetentionDays
         Thread({ runCatching { PojavFileBridge.pruneOldLogs(retentionDays) } }, "AerixLogPrune").start()
         PojavTaskBridge.attach()

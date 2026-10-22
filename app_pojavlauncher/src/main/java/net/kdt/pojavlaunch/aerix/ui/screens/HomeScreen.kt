@@ -63,6 +63,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -145,11 +147,16 @@ private class HomeActions(
     val downloads: () -> Unit,
     val fileManager: () -> Unit,
     val logs: () -> Unit,
-    val accounts: () -> Unit
+    val accounts: () -> Unit,
+    val social: () -> Unit
 )
 
 @Composable
-fun HomeScreen(activity: FragmentActivity, navigate: (LauncherSection) -> Unit) {
+fun HomeScreen(
+    activity: FragmentActivity,
+    navigate: (LauncherSection) -> Unit,
+    onOpenSocial: () -> Unit = {}
+) {
     val instances = PojavInstanceBridge.instances
     val selected = PojavInstanceBridge.selected
     val taskCount = PojavTaskBridge.taskCount
@@ -182,7 +189,8 @@ fun HomeScreen(activity: FragmentActivity, navigate: (LauncherSection) -> Unit) 
         downloads = { navigate(LauncherSection.DISCOVER) },
         fileManager = { navigate(LauncherSection.FILES) },
         logs = { navigate(LauncherSection.LOGS) },
-        accounts = { navigate(LauncherSection.ACCOUNTS) }
+        accounts = { navigate(LauncherSection.ACCOUNTS) },
+        social = onOpenSocial
     )
 
     // Mirai LauncherScreen: content dashboard on the left (weight 7.4f) and the docked 3D skin
@@ -507,7 +515,13 @@ private fun WideHomeDashboard(
             horizontalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus)
         ) {
             RecentWorldsPanel(recent, selected, accent, actions, Modifier.weight(1.7f).fillMaxHeight(), lazy = true)
-            QuickToolsPanel(accent, actions, Modifier.weight(0.72f).fillMaxHeight(), scrollable = true)
+            Column(
+                modifier = Modifier.weight(1.05f).fillMaxHeight(),
+                verticalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus)
+            ) {
+                QuickToolsPanel(accent, actions, Modifier.weight(1f).fillMaxWidth(), scrollable = true)
+                SocialWidgetRow(actions = actions, modifier = Modifier.height(84.dp))
+            }
         }
     }
 }
@@ -527,6 +541,9 @@ private fun CompactHomeDashboard(
         verticalArrangement = Arrangement.spacedBy(AerixSpacing.md)
     ) {
         item { LiquidHomeHero(selected, count, accent, actions, Modifier.fillMaxWidth().height(312.dp)) }
+        item {
+            SocialWidgetRow(actions = actions)
+        }
         item {
             Column(verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm)) {
                 HomeSectionLabel(stringResource(R.string.aerix_home_your_space), null)
@@ -1003,4 +1020,22 @@ private fun HomeToolAction(label: String, iconRes: Int, accent: Color, onClick: 
         }
         Text(text = label, color = AerixSurface.textPrimary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
+}
+
+/** Reads the Social state so the widget shows whoever is signed in right now. */
+@Composable
+private fun SocialWidgetRow(actions: HomeActions, modifier: Modifier = Modifier) {
+    val friends by SocialGraph.repository.friends.collectAsState()
+    val requests by SocialGraph.repository.requests.collectAsState()
+    var signedIn by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        SocialGraph.store.data.collect { signedIn = it.signedIn && it.name.isNotBlank() }
+    }
+    SocialWidgetCard(
+        onOpen = actions.social,
+        signedIn = signedIn,
+        friendsOnline = friends.count { it.status != UserStatus.OFFLINE },
+        pendingRequests = requests.size,
+        modifier = modifier
+    )
 }

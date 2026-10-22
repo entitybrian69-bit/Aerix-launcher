@@ -46,6 +46,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.lifecycle.viewmodel.compose.viewModel
+import net.kdt.pojavlaunch.aerix.social.SocialGraph
+import net.kdt.pojavlaunch.aerix.social.ui.SocialShell
+import net.kdt.pojavlaunch.aerix.social.vm.SocialShellViewModel
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -84,6 +94,20 @@ import net.kdt.pojavlaunch.aerix.ui.screens.WallpapersScreen
 fun AerixLauncherScreen(activity: FragmentActivity) {
     AerixNav.init()
     net.kdt.pojavlaunch.aerix.ui.screens.LauncherUpdateNoticeHost(activity)
+
+    // The Social shell is a second launcher. While it is open nothing of the Play dashboard is
+    // composed: no rail, no play button, no dashboard.
+    val socialShell: SocialShellViewModel = viewModel()
+    val socialOpen by socialShell.isOpen.collectAsState()
+    var socialSignedIn by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        SocialGraph.store.data.collect { socialSignedIn = it.signedIn && it.name.isNotBlank() }
+    }
+    if (socialOpen) {
+        SocialShell(shell = socialShell, onExitToLauncher = { socialShell.close() })
+        return
+    }
+
     val section = AerixNav.section
     val navigate: (LauncherSection) -> Unit = { target ->
         when (target) {
@@ -135,7 +159,11 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
                     ) { target ->
                         when (target) {
                             LauncherSection.OTHER_RELEASES -> net.kdt.pojavlaunch.aerix.ui.screens.OtherReleasesScreen(activity, navigate)
-                            LauncherSection.HOME -> HomeScreen(activity, navigate)
+                            LauncherSection.HOME -> HomeScreen(
+                                activity = activity,
+                                navigate = navigate,
+                                onOpenSocial = { socialShell.open(socialSignedIn) }
+                            )
                             LauncherSection.LIBRARY -> LibraryScreen(activity)
                             LauncherSection.DISCOVER, LauncherSection.DOWNLOADS -> DiscoverScreen(activity, navigate)
                             LauncherSection.FILES -> FileManagerScreen(activity)
