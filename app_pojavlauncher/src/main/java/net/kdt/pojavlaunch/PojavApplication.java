@@ -2,8 +2,10 @@ package net.kdt.pojavlaunch;
 
 import static android.content.Intent.FLAG_ACTIVITY_NEW_TASK;
 
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.os.Build;
@@ -100,6 +102,38 @@ public class PojavApplication extends MGApplication {
 			ferrorIntent.putExtra("throwable", throwable);
 			ferrorIntent.setFlags(FLAG_ACTIVITY_NEW_TASK);
 			startActivity(ferrorIntent);
+		}
+
+		// Renderer plugin support: scan for installed renderer plugin APKs early so every renderer
+		// list (Aerix screens, instance editor, classic preference screens) already contains them,
+		// then refresh the registry whenever a plugin APK is installed, replaced or removed.
+		try {
+			sExecutorService.execute(() -> {
+				try {
+					net.kdt.pojavlaunch.aerix.bridge.PojavPluginBridge.INSTANCE.loadPlugins(this);
+				} catch (Throwable pluginScanError) {
+					Log.w("PojavApplication", "Renderer plugin scan failed", pluginScanError);
+				}
+			});
+			IntentFilter pluginPackageFilter = new IntentFilter();
+			pluginPackageFilter.addAction(Intent.ACTION_PACKAGE_ADDED);
+			pluginPackageFilter.addAction(Intent.ACTION_PACKAGE_REMOVED);
+			pluginPackageFilter.addAction(Intent.ACTION_PACKAGE_REPLACED);
+			pluginPackageFilter.addDataScheme("package");
+			BroadcastReceiver pluginPackageReceiver = new BroadcastReceiver() {
+				@Override
+				public void onReceive(Context context, Intent intent) {
+					sExecutorService.execute(() ->
+							net.kdt.pojavlaunch.aerix.bridge.PojavPluginBridge.refreshPlugins(context));
+				}
+			};
+			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+				registerReceiver(pluginPackageReceiver, pluginPackageFilter, Context.RECEIVER_NOT_EXPORTED);
+			} else {
+				registerReceiver(pluginPackageReceiver, pluginPackageFilter);
+			}
+		} catch (Throwable pluginInitError) {
+			Log.w("PojavApplication", "Renderer plugin support failed to initialize", pluginInitError);
 		}
 	}
 

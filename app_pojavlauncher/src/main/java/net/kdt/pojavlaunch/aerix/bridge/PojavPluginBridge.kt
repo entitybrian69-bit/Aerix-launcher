@@ -1,11 +1,22 @@
 /*
  * Aerix Launcher UI layer for PojavLauncher.
- * Renderer plugin discovery and launch adapter, ported from mirai-launcher- (Zalith Launcher 2 fork):
+ * Generic renderer plugin discovery and launch adapter, ported from mirai-launcher- (Zalith Launcher 2 fork):
  *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/game/plugin/PluginLoader.kt
  *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/game/plugin/renderer/RendererPlugin.kt
  *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/game/plugin/renderer/RendererPluginManager.kt
- * Discovers installed FCL / Zalith renderer plugin APKs (meta-data fclPlugin or zalithRendererPlugin)
- * and registers each one in PojavLauncher's RendererCache as an external RenderSpec (tag
+ * Discovers every installed renderer plugin APK. A host APK opts in with a boolean meta-data key in its
+ * <application> element; any of these markers is accepted:
+ *   fclPlugin            - Fold Craft Launcher renderer plugins
+ *   zalithRendererPlugin - Zalith Launcher renderer plugins
+ *   pojavRendererPlugin  - Pojav-style renderer plugins
+ *   aerixPlugin          - Aerix-native renderer plugins
+ *   emesisPlugin         - Emesis renderer plugins (com.emesis package space is accepted as an implicit marker)
+ * Plugin APKs should also declare meta-data "renderer" as "<rendererId>:<glLibrary>:<eglLibrary>",
+ * optionally "des" (display name), "minMCVer", "maxMCVer" and "pojavEnv" (KEY=VALUE pairs, ':'-separated;
+ * POJAV_RENDERER overrides the id, DLOPEN lists extra comma-separated libraries, LIB_MESA_NAME /
+ * MESA_LIBRARY values are resolved against the plugin's native directory).
+ * Emesis-style plugins may omit "renderer", in which case rendererId "emesis" and libemesis.so are assumed.
+ * Each plugin is registered in PojavLauncher's RendererCache as an external RenderSpec (tag
  * "plugin:<packageName>") without modifying Pojav's backend classes. When a plugin renderer is
  * selected, applyLaunchOverride() replaces the instance's GameRenderer spec at launch time so
  * GameRenderer.setupEnvironment() and GameRenderer.maybeSetupRenderer() use the plugin's native
@@ -100,6 +111,17 @@ class AerixRendererPlugin(
 
 object PojavPluginBridge {
     private const val PACKAGE_FLAGS = PackageManager.GET_META_DATA or PackageManager.GET_SHARED_LIBRARY_FILES
+    private const val EMESIS_PACKAGE_PREFIX = "com.emesis"
+    private const val EMESIS_DEFAULT_LIBRARY = "libemesis.so"
+
+    /** Meta-data keys an APK can use to declare itself a renderer plugin. */
+    private val PLUGIN_METADATA_KEYS = listOf(
+        "fclPlugin",
+        "zalithRendererPlugin",
+        "pojavRendererPlugin",
+        "aerixPlugin",
+        "emesisPlugin"
+    )
 
     var plugins: List<AerixRendererPlugin> = emptyList()
         private set
@@ -152,27 +174,46 @@ object PojavPluginBridge {
         gameRenderer.setCurrentRenderer(plugin)
     }
 
+    /** First meta-data marker declaring the package a renderer plugin, or an implicit Emesis marker. */
+    private fun pluginMarker(meta: Bundle, packageName: String): String? {
+        for (key in PLUGIN_METADATA_KEYS) {
+            if (meta.getBoolean(key, false)) return key
+        }
+        return if (packageName.startsWith(EMESIS_PACKAGE_PREFIX)) "emesisPlugin" else null
+    }
+
+    @JvmStatic
+    fun refreshPlugins(context: Context) {
+        runCatching { RendererCache.releaseRendererCache() }
+        loadPlugins(context, true)
+    }
+
     private fun parsePlugin(
         context: Context,
         pm: PackageManager,
         info: ApplicationInfo
     ): AerixRendererPlugin? = runCatching {
         if (info.flags and ApplicationInfo.FLAG_SYSTEM != 0) return null
-        val meta = info.metaData ?: return null
-        val isFcl = meta.getBoolean("fclPlugin", false)
-        val isZalith = meta.getBoolean("zalithRendererPlugin", false)
-        if (!isFcl && !isZalith) return null
+        val meta = info.metaData ?: Bundle.EMPTY
+        val marker = pluginMarker(meta, info.packageName) ?: return null
+        val isEmesis = marker == "emesisPlugin" || marker == "aerixPlugin"
 
-        val rendererRaw = meta.getString("renderer") ?: return null
-        val parts = rendererRaw.split(":")
-        if (parts.size < 3) return null
-        val des = meta.getString("des") ?: info.loadLabel(pm).toString()
+        val rendererRaw = meta.getString("renderer")
+        val parts = rendererRaw?.split(":") ?: emptyList()
+        if (!isEmesis && parts.size < 3) return null
+
+        val des = meta.getString("des")
+            ?: if (isEmesis) "Emesis" else info.loadLabel(pm).toString()
         val pojavEnv = meta.getString("pojavEnv") ?: ""
         val nativeDir = info.nativeLibraryDir ?: return null
         val appName = info.loadLabel(pm).toString()
         val appVersion = runCatching { pm.getPackageInfo(info.packageName, 0).versionName ?: "" }.getOrDefault("")
 
-        var rendererId = parts[0]
+        var rendererId = when {
+            parts.size >= 3 -> parts[0]
+            isEmesis -> "emesis"
+            else -> return null
+        }
         val env = LinkedHashMap<String, String>()
         val dlopen = ArrayList<String>()
         pojavEnv.split(":").forEach { pair ->
@@ -189,7 +230,19 @@ object PojavPluginBridge {
             }
         }
 
-        val eglRaw = parts[2]
+        val glName = when {
+            parts.size >= 3 -> parts[1]
+            isEmesis -> EMESIS_DEFAULT_LIBRARY
+            else -> return null
+        }
+        val eglRaw = when {
+            parts.size >= 3 -> parts[2]
+            isEmesis -> EMESIS_DEFAULT_LIBRARY
+            else -> return null
+        }
+        if (isEmesis && parts.size < 3 && EMESIS_DEFAULT_LIBRARY !in dlopen) {
+            dlopen.add(EMESIS_DEFAULT_LIBRARY)
+        }
         val eglName = if (eglRaw.startsWith("/")) "$nativeDir$eglRaw" else eglRaw
 
         AerixRendererPlugin(
@@ -201,7 +254,7 @@ object PojavPluginBridge {
             summary = "Plugin: $appName",
             minMCVer = meta.versionString("minMCVer"),
             maxMCVer = meta.versionString("maxMCVer"),
-            glName = parts[1],
+            glName = glName,
             eglName = eglName,
             nativeLibDir = nativeDir,
             env = env,
