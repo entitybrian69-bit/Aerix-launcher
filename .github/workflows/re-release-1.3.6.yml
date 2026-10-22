@@ -26,11 +26,15 @@ jobs:
     steps:
       - name: Fetch APKs from Android CI run 39609549340, verify sha256, release as v1.3.6
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
           set -u
           repo="${{ github.repository }}"
           mkdir -p art out
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error title=no-token::GH_PAT secret is missing or misnamed"
+            exit 1
+          fi
 
           echo "== List artifacts of run $SRC_RUN"
           gh api "repos/$repo/actions/runs/$SRC_RUN/artifacts?per_page=50" < /dev/null \
