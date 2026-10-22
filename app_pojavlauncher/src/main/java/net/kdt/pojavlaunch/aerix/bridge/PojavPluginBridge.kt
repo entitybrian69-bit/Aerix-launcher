@@ -126,6 +126,7 @@ object PojavPluginBridge {
     var plugins: List<AerixRendererPlugin> = emptyList()
         private set
 
+    @JvmOverloads
     @SuppressLint("QueryPermissionsNeeded")
     fun loadPlugins(context: Context, force: Boolean = false): List<AerixRendererPlugin> {
         if (plugins.isNotEmpty() && !force) {
