@@ -308,4 +308,5 @@
     <string name="aerix_home_no_instance">No instance selected</string>
     <string name="aerix_download_error">Unable to reach the platform</string>
     <string name="aerix_curseforge_needs_key">CurseForge needs an API key. Open Settings → CurseForge API key, paste a key from console.curseforge.com, then retry.</string>
-    <string name="aerix_library_refresh">Refresh</string></resources>
+    <string name="aerix_library_refresh">Refresh</string>    <string name="aerix_plugin_renderer_fallback">External plugin renderer</string>
+</resources>
