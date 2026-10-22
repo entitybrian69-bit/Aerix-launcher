@@ -444,9 +444,16 @@ fun SocialSettingsNotificationsScreen(viewModel: SocialSettingsViewModel, onBack
 /* ------------------------------------------------------------------ safety ----- */
 
 @Composable
-fun SocialSafetyScreen(onBack: () -> Unit, onDeleteAccount: () -> Unit) {
+fun SocialSafetyScreen(
+    viewModel: SocialSettingsViewModel,
+    onBack: () -> Unit,
+    onDeleteAccount: () -> Unit
+) {
+    val state by viewModel.state.collectAsState()
+    // Real blocked accounts, read from the repository that owns them.
+    val blocked = state.blocked
     var reportOpen by remember { mutableStateOf(false) }
-    var blocked by remember { mutableStateOf(listOf("FrostByte", "EchoFox")) }
+    var reportTarget by remember { mutableStateOf(blocked.firstOrNull()?.id) }
 
     SocialPage {
         Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -455,10 +462,11 @@ fun SocialSafetyScreen(onBack: () -> Unit, onDeleteAccount: () -> Unit) {
                 if (blocked.isEmpty()) {
                     SocialBody("Nobody is blocked.", size = 12.sp, color = SocialColors.textMuted)
                 } else {
-                    blocked.forEach { name ->
+                    blocked.forEach { user ->
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            SocialBody(name, size = 14.sp, color = SocialColors.textPrimary, modifier = Modifier.weight(1f))
-                            SocialGhostButton("Unblock", onClick = { blocked = blocked - name })
+                            SocialAvatar(avatar = user.avatar, size = 32.dp)
+                            SocialBody(user.name, size = 14.sp, color = SocialColors.textPrimary, modifier = Modifier.weight(1f), maxLines = 1)
+                            SocialGhostButton("Unblock", onClick = { viewModel.unblock(user.id) })
                         }
                     }
                 }
@@ -479,19 +487,29 @@ fun SocialSafetyScreen(onBack: () -> Unit, onDeleteAccount: () -> Unit) {
     if (reportOpen) {
         SocialDialog(onDismiss = { reportOpen = false }) {
             SocialTitle("Report a concern")
+            SocialBody(
+                reportTarget?.let { id -> "About ${blocked.firstOrNull { it.id == id }?.name ?: id}" }
+                    ?: "Pick the account in the friends list first, then report it from their profile.",
+                size = 12.sp,
+                color = SocialColors.textMuted
+            )
             listOf("Harassment", "Spam or scam", "Inappropriate name or skin", "Threats", "Something else").forEach { reason ->
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
                         .background(SocialColors.panelSoft)
-                        .clickable { reportOpen = false }
+                        .clickable {
+                            val target = reportTarget
+                            if (target != null) viewModel.report(target, reason)
+                            reportOpen = false
+                        }
                         .padding(horizontal = 12.dp, vertical = 12.dp)
                 ) {
                     SocialBody(reason, size = 14.sp, color = SocialColors.textPrimary)
                 }
             }
-            SocialBody("Reports are reviewed with the account's recent activity.", size = 11.sp, color = SocialColors.textMuted)
+            SocialBody("Reports are recorded with the account's recent activity.", size = 11.sp, color = SocialColors.textMuted)
         }
     }
 }

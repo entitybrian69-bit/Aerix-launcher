@@ -322,7 +322,20 @@ fun SocialCompactPanel(
                 SocialBody("$blockTarget will not be able to message you, invite you to parties, or send server invitations. You will stop seeing each other as friends.")
                 SocialBody("You can unblock $blockTarget later in Launcher Social settings.", size = 11.sp, color = SocialColors.textMuted)
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    SocialPrimaryButton("Block", onClick = { blockTarget = null; onClose() }, danger = true, modifier = Modifier.weight(1f))
+                    SocialPrimaryButton(
+                        "Block",
+                        onClick = {
+                            // Real block: the account leaves the friends list and is written to disk.
+                            state.invite?.let { invite ->
+                                state.friends.firstOrNull { it.name.equals(invite.fromName, true) }
+                                    ?.let { friend -> viewModel.block(friend.id) }
+                            }
+                            blockTarget = null
+                            onClose()
+                        },
+                        danger = true,
+                        modifier = Modifier.weight(1f)
+                    )
                     SocialGhostButton("Cancel", onClick = { blockTarget = null }, modifier = Modifier.weight(1f))
                 }
             }

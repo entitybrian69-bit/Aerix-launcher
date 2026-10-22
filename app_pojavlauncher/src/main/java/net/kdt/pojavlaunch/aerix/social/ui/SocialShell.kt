@@ -111,7 +111,7 @@ private val socialFactory = viewModelFactory {
     initializer { SocialProfileViewModel(SocialGraph.store) }
     initializer { SocialDashboardViewModel(SocialGraph.repository) }
     initializer { SocialChatViewModel(SocialGraph.repository) }
-    initializer { SocialSettingsViewModel(SocialGraph.store) }
+    initializer { SocialSettingsViewModel(SocialGraph.store, repository = SocialGraph.repository) }
     initializer { SocialAddFriendViewModel(SocialGraph.repository) }
     initializer { SocialActivityViewModel(SocialGraph.repository) }
 }
@@ -315,6 +315,7 @@ fun SocialShell(
                             onBack = { shell.back() }
                         )
                         SocialRoute.SAFETY -> SocialSafetyScreen(
+                            viewModel = settingsVm,
                             onBack = { shell.back() },
                             onDeleteAccount = {
                                 profileVm.deleteAccount()

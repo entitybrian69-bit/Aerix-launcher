@@ -602,27 +602,47 @@ data class SettingsUiState(
     val privacy: PrivacySettings = PrivacySettings(),
     val notifications: NotificationSettings = NotificationSettings(),
     val chat: ChatSettings = ChatSettings(),
-    val mic: MicSettings = MicSettings()
+    val mic: MicSettings = MicSettings(),
+    /** The accounts actually blocked on this device. */
+    val blocked: List<AerixUser> = emptyList()
 )
 
 class SocialSettingsViewModel(
     private val store: SocialStore,
-    private val io: CoroutineDispatcher = Dispatchers.IO
+    private val io: CoroutineDispatcher = Dispatchers.IO,
+    /** Optional so the settings-only unit tests keep constructing this with a store alone. */
+    private val repository: SocialRepository? = null
 ) : ViewModel() {
     private val _state = MutableStateFlow(SettingsUiState())
     val state: StateFlow<SettingsUiState> = _state.asStateFlow()
 
     init {
-        viewModelScope.launch {
-            store.data.collect { persisted ->
-                _state.value = SettingsUiState(
-                    privacy = persisted.privacy,
-                    notifications = persisted.notifications,
-                    chat = persisted.chat,
-                    mic = persisted.mic
-                )
+        repository?.let { repo ->
+            viewModelScope.launch {
+                repo.blocked.collect { blocked -> _state.update { it.copy(blocked = blocked) } }
             }
         }
+        viewModelScope.launch {
+            store.data.collect { persisted ->
+                _state.update { current ->
+                    // copy(): the blocked list comes from the repository, not from preferences.
+                    current.copy(
+                        privacy = persisted.privacy,
+                        notifications = persisted.notifications,
+                        chat = persisted.chat,
+                        mic = persisted.mic
+                    )
+                }
+            }
+        }
+    }
+
+    /** Unblocks for real: the repository drops the account from the blocked list on disk. */
+    fun unblock(userId: String) = viewModelScope.launch { repository?.unblock(userId) }
+
+    /** Records the report against the account. */
+    fun report(userId: String, reason: String) = viewModelScope.launch {
+        repository?.report(userId, reason)
     }
 
     /* privacy -- */
@@ -760,6 +780,9 @@ class InGameSocialViewModel(
         // Persisted so a restart does not bring the badge back for messages already read.
         repository.markSeen(incoming.map { it.id })
     }
+
+    /** Blocks the account for real, from the in-game overlay. */
+    fun block(userId: String) = viewModelScope.launch { repository.block(userId) }
 
     fun startCall() = viewModelScope.launch {
         repository.startGroupCall()

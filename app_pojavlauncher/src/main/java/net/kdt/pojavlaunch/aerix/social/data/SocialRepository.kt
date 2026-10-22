@@ -74,6 +74,9 @@ interface SocialRepository {
     suspend fun toggleFollow(userId: String)
 
     suspend fun block(userId: String)
+
+    /** Puts a blocked account back in the directory; nothing else is restored. */
+    suspend fun unblock(userId: String)
     suspend fun report(userId: String, reason: String)
     suspend fun expireInvite()
 
@@ -402,6 +405,14 @@ class LocalSocialRepository(
             _blocked.update { list -> if (list.any { it.id == userId }) list else list + user }
             persist()
         }
+    }
+
+    override suspend fun unblock(userId: String) = withContext(io) {
+        val user = _blocked.value.firstOrNull { it.id == userId } ?: return@withContext
+        _blocked.update { list -> list.filterNot { it.id == userId } }
+        // Back in the directory so the player can search for them again, not back as a friend.
+        directory.update { users -> if (users.any { it.id == userId }) users else users + user }
+        persist()
     }
 
     override suspend fun report(userId: String, reason: String) = withContext(io) {
