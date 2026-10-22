@@ -30,6 +30,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -195,7 +197,8 @@ fun HomeV2(
 
 @Composable
 private fun Modifier.verticalScrollCompat(): Modifier =
-    androidx.compose.foundation.verticalScroll(androidx.compose.foundation.rememberScrollState())
+    verticalScroll(rememberScrollState())
+
 
 /* -------------------------------------------------------------------- hero ----- */
 
