@@ -367,6 +367,8 @@ afterEvaluate {
 
 dependencies {
     testImplementation 'junit:junit:4.13.2'
+    // Real org.json on the unit-test classpath: the Android stub only throws "not mocked".
+    testImplementation 'org.json:json:20240303'
     testImplementation 'org.robolectric:robolectric:4.14.1'
     implementation 'androidx.documentfile:documentfile:1.1.0'
     implementation platform('androidx.compose:compose-bom:2026.06.01')
