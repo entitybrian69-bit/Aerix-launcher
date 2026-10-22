@@ -17,9 +17,12 @@ A plugin APK declares itself with a boolean `<meta-data>` entry inside the
 | `pojavRendererPlugin` | PojavLauncher-style renderer plugins |
 | `aerixPlugin` | Aerix-native renderer plugins |
 | `emesisPlugin` | Emesis renderer plugins |
+| `fclPlugin_V2` | FCL renderer plugins using the V2 JSON config |
 
 Packages inside the `com.emesis` space are treated as `emesisPlugin` even when
-the marker is missing. A plugin that sets no marker at all is ignored, so
+the marker is missing. V2 plugins declare their config through `fclPlugin_V2`
+(a string or a string resource) and Aerix validates their ELF ABI and GLES level
+before listing them. A plugin that sets no marker at all is ignored, so
 unrelated apps never show up in the renderer list.
 
 ## Metadata a plugin provides

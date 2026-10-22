@@ -11,6 +11,7 @@ asks for a release and confirms it.
 | Checksum | `apk/Aerix-Launcher-debug.apk.sha256` |
 | Build info | `apk/DEBUG_BUILD.txt` (commit, workflow run, build time) |
 | CI artifact | Actions run of **Aerix debug (testing)**, artifact `aerix-debug-apk` |
+| Source | the `v1.3.6` release commit (`ba3e4c2`) restored into this branch |
 | Variant | `noruntimeDebug` |
 | applicationId | `net.kdt.pojavlaunch.debug` |
 | Label | Aerix Launcher (Debug) |
@@ -51,7 +52,13 @@ Public APKs are **not** stored in this repository. `Aerix-Launcher.apk` is
 around 118 MB, which is above GitHub's 100 MB per-file limit, so release builds
 live as assets on the GitHub Releases page and nowhere else.
 
-Current public release: **v1.3.6**
+Current public release: **v1.3.6**, tag target `ba3e4c2`.
+
+The sources in this branch are that release tree. The `v3_openjdk` tip this
+branch was originally cut from was missing 45 Aerix source files (for example
+`DiscoverScreen.kt` was a 44-line stub instead of 1,915 lines), so anything built
+from it was not the code users run. The restore commit brings the release tree
+back, and the debug APK is now built from it.
 
 | Asset | Size | SHA-256 |
 |---|---|---|
