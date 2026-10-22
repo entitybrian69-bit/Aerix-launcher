@@ -112,6 +112,25 @@ clears it (`markRead()`), so the badge only reflects messages you have not looke
 the overlay you can switch between friends, message them, call them and run the party without
 leaving the game.
 
+## Real device wiring
+
+Social is no longer a mockup: every control below touches the device.
+
+| Feature | What actually happens |
+| --- | --- |
+| Image / GIF / file / music | The chip opens the system document picker for its mime type; the file is copied into `filesDir/social_media/<uuid>.<ext>`, its real name, size and mime type are read, and the message keeps that path. |
+| Image preview | Thumbnails are decoded from the copied file at ≤720px, off the main thread. |
+| Music | `SocialAudioPlayer` plays the picked track with a real `MediaPlayer`; the bubble button becomes Play/Pause and stops when the chat closes. |
+| Microphone | `SocialMic` opens an `AudioRecord` and publishes the input amplitude; the settings test card and the party / in-game voice rooms draw that level. Android asks for `RECORD_AUDIO` the first time. |
+| Notifications | Every incoming message posts a real notification on the `aerix_social` channel, respecting the in-app switches, the preview setting and the Android 13 `POST_NOTIFICATIONS` permission (asked once when Social opens). |
+| Instance share | The picker lists the real `PojavInstanceBridge.instances`; the receiving bubble selects the instance if this device has it and says so plainly when it does not. |
+| Persistence | Friends, requests, chats (including attachment paths), posts, blocked list, party and read ids are written to a dedicated DataStore file (`aerix_social_content`); the seed directory only fills a fresh install. |
+| Read state | `markSeen()` writes read message ids to disk, so the in-game red badge stays cleared after a restart. |
+
+**Backend seam.** Screens and ViewModels only know `SocialRepository` (interface) and
+`SocialContentStore`. `LocalSocialRepository` is the on-device implementation; a hosted backend
+drops in by replacing those two objects in `SocialGraph`, with no screen changes.
+
 ## Motion
 
 | Transition | Spec |
@@ -122,7 +141,7 @@ leaving the game.
 | Chat open | 180ms fade + 12dp slide |
 | Dialogs | 160ms fade + 0.96 → 1.0 |
 
-## Tests (265 in the module, 20 new)
+## Tests (269 in the module, 24 new)
 
 - `SocialViewModelTest` — accept/decline, online-offline split, send + reactions, instance
   attachment download → ready, music toggle, Gmail search + request, username-only search,
@@ -131,5 +150,7 @@ leaving the game.
   bio + links (with `@` handles), sign-out keeps the name, delete clears everything.
 - `SocialSettingsViewModelTest` — privacy, profile lock + status, chat permissions, microphone
   settings, notifications.
+- `SocialPersistenceTest` — a conversation and its real attachment path survive a reopen, read
+  ids are remembered, and the whole snapshot round-trips through JSON.
 - `DataStoreSocialStoreTest` — defaults, full profile/settings round-trip including links and the
   username timestamp, and merge-instead-of-reset on a second write.

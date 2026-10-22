@@ -98,6 +98,13 @@ import net.kdt.pojavlaunch.aerix.social.vm.SocialProfileViewModel
 import net.kdt.pojavlaunch.aerix.social.vm.SocialRoute
 import net.kdt.pojavlaunch.aerix.social.vm.SocialSettingsViewModel
 import net.kdt.pojavlaunch.aerix.social.vm.SocialShellViewModel
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 
 private val socialFactory = viewModelFactory {
     initializer { SocialShellViewModel() }
@@ -128,6 +135,7 @@ fun SocialShell(
     val addFriendVm: SocialAddFriendViewModel = viewModel(factory = socialFactory)
     val activityVm: SocialActivityViewModel = viewModel(factory = socialFactory)
 
+    val context = LocalContext.current
     val profile by profileVm.state.collectAsState()
     val dashboard by dashboardVm.state.collectAsState()
 
@@ -135,6 +143,18 @@ fun SocialShell(
     // 240ms from 0.98 scale instead of snapping into place.
     var shellShown by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { shellShown = true }
+
+    // Android 13+ needs an explicit yes before Social can post message alerts. Asking once here
+    // keeps the permission prompt out of a conversation.
+    val notifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
+    LaunchedEffect(Unit) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            notifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
     val shellProgress by animateFloatAsState(
         targetValue = if (shellShown) 1f else 0f,
         animationSpec = tween(SocialMotion.SHELL_MS),
