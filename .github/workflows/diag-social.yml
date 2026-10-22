@@ -41,4 +41,12 @@ jobs:
           fi
           grep -E "tests? completed|BUILD SUCCESSFUL|BUILD FAILED" k.log | tail -5 |
             while read -r l; do echo "::notice title=result::$(printf '%s' "$l" | head -c 300)"; done
+          python3 - <<'PYEOF'
+          import glob, xml.etree.ElementTree as ET
+          for f in glob.glob('app_pojavlauncher/build/test-results/**/*.xml', recursive=True):
+              for tc in ET.parse(f).getroot().iter('testcase'):
+                  for bad in list(tc.iter('failure')) + list(tc.iter('error')):
+                      msg = (bad.get('message') or bad.text or '').strip().replace('\n', ' ')[:400]
+                      print(f"::error title={tc.get('classname')}.{tc.get('name')}::{msg}")
+          PYEOF
           exit "$code"

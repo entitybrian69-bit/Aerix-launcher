@@ -253,8 +253,15 @@ class SocialChatViewModel(private val repository: SocialRepository) : ViewModel(
 
     fun open(friend: AerixUser) = viewModelScope.launch {
         repository.ensureChat(friend.id)
+        // Seed the existing history immediately: the chats flow only emits on the next change,
+        // so without this a chat with history would open empty.
         _state.update {
-            it.copy(friendId = friend.id, friendName = friend.name, friendAvatar = friend.avatar)
+            it.copy(
+                friendId = friend.id,
+                friendName = friend.name,
+                friendAvatar = friend.avatar,
+                messages = repository.chats.value[friend.id].orEmpty()
+            )
         }
     }
 
