@@ -288,7 +288,14 @@ class SocialProfileViewModel(
                     signInWithGoogle(result.account)
                 }
                 GoogleAuthResult.Cancelled -> _state.update {
-                    it.copy(signInInProgress = false, googleStage = null)
+                    // Not an error, but never silence either: an interrupted sheet used to look
+                    // exactly like a dead button.
+                    it.copy(
+                        signInInProgress = false,
+                        googleStage = null,
+                        googleError = "Google closed before the account was confirmed. Tap again and " +
+                            "pick the account, then allow the sign-in."
+                    )
                 }
                 GoogleAuthResult.NotConfigured -> _state.update {
                     it.copy(
