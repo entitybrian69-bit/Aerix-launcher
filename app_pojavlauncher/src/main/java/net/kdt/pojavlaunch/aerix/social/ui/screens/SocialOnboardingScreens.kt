@@ -73,8 +73,8 @@ import kotlinx.coroutines.launch
 import net.kdt.pojavlaunch.aerix.social.vm.SocialProfileViewModel
 
 /**
- * Google account step. Both buttons run the real Credential Manager flow: Android shows the
- * Google accounts on the phone and hands back an ID token. There is no fake account list.
+ * Google account step. The real screen lives in [PortalAuthScreen]: portal, player, one wide
+ * pill, and the Credential Manager flow behind it. This keeps the shell's call site stable.
  */
 @Composable
 fun SocialAuthScreen(
@@ -86,127 +86,15 @@ fun SocialAuthScreen(
     onGoogleError: (String) -> Unit,
     onNotNow: () -> Unit
 ) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var launching by remember { mutableStateOf(false) }
-    var notConfigured by remember { mutableStateOf(false) }
-
-    fun startGoogle(creating: Boolean) {
-        if (launching || inProgress) return
-        launching = true
-        scope.launch {
-            val result = GoogleAuth.signIn(context, clientIdOverride)
-            launching = false
-            when (result) {
-                is GoogleAuthResult.Success -> onGoogleAccount(result.account, creating)
-                GoogleAuthResult.Cancelled -> Unit
-                GoogleAuthResult.NotConfigured -> notConfigured = true
-                is GoogleAuthResult.Failed -> onGoogleError(result.message)
-            }
-        }
-    }
-
-    val busy = inProgress || launching
-
-    SocialPage {
-        Column(
-            modifier = Modifier.weight(1f).fillMaxWidth(),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Column(
-                modifier = Modifier.widthIn(max = 560.dp).fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(18.dp)
-            ) {
-                SocialTitle("Your friends, together.", modifier = Modifier.fillMaxWidth())
-                SocialBody("Friends, messages, parties and voice in one place.", size = 14.sp)
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    listOf(1, 2, 3, 4).forEach { index ->
-                        SocialAvatar(avatar = index, size = 52.dp)
-                    }
-                }
-
-                SocialPanel(modifier = Modifier.fillMaxWidth()) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(44.dp)
-                                .clip(CircleShape)
-                                .background(SocialColors.panelSoft),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                painter = painterResource(R.drawable.aerix_social_ic_google),
-                                contentDescription = null,
-                                tint = SocialColors.accentBright,
-                                modifier = Modifier.size(22.dp)
-                            )
-                        }
-                        Column(modifier = Modifier.weight(1f)) {
-                            SocialBody("Aerix account", size = 15.sp, color = SocialColors.textPrimary, weight = FontWeight.SemiBold)
-                            SocialBody(
-                                if (lastEmail.isNotBlank()) "Last account · $lastEmail"
-                                else "Sign in with Google to continue",
-                                size = 12.sp,
-                                color = SocialColors.textMuted,
-                                maxLines = 1
-                            )
-                        }
-                    }
-                    SocialPrimaryButton(
-                        text = if (busy) "Waiting for Google…" else "Sign in with Google",
-                        onClick = { startGoogle(creating = false) },
-                        enabled = !busy,
-                        iconRes = R.drawable.aerix_social_ic_google,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    SocialGhostButton(
-                        text = "Create a new account",
-                        onClick = { startGoogle(creating = true) },
-                        enabled = !busy,
-                        iconRes = R.drawable.aerix_social_ic_add_person,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    if (notConfigured) {
-                        SocialBody(
-                            "This build has no Google OAuth client id, so Android cannot open the " +
-                                "account sheet. Add aerixGoogleWebClientId in gradle.properties and rebuild " +
-                                "(debug builds can also paste it in Settings → Account).",
-                            size = 12.sp,
-                            color = SocialColors.danger
-                        )
-                    }
-                    if (googleError != null) {
-                        SocialBody(googleError, size = 12.sp, color = SocialColors.danger)
-                    }
-                    SocialBody(
-                        "New here? Signing in with Google takes one step further: choose a name, a " +
-                            "username, a skin and an optional theme.",
-                        size = 12.sp,
-                        color = SocialColors.textMuted
-                    )
-                    SocialBody(
-                        "Aerix accounts are separate from your Minecraft account. Google sign-in " +
-                            "opens a secure system screen; your password never touches the launcher.",
-                        size = 12.sp,
-                        color = SocialColors.textMuted
-                    )
-                }
-
-                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    SocialGhostButton(text = "Not now", onClick = onNotNow)
-                }
-            }
-        }
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-            SocialBody("Privacy", size = 12.sp, color = SocialColors.textSecondary)
-            Spacer(Modifier.width(16.dp))
-            SocialBody("Terms", size = 12.sp, color = SocialColors.textSecondary)
-        }
-    }
+    PortalAuthScreen(
+        inProgress = inProgress,
+        googleError = googleError,
+        lastEmail = lastEmail,
+        clientIdOverride = clientIdOverride,
+        onGoogleAccount = onGoogleAccount,
+        onGoogleError = onGoogleError,
+        onNotNow = onNotNow
+    )
 }
 
 /** Name, username, skin, cape and the optional theme — all changeable later. */

@@ -175,21 +175,28 @@ fun SocialShell(
             scaleY = scale
         }
     ) {
+        // Sign-in and character setup are full-bleed: no rail, no header, so the portal scene
+        // owns the whole screen. "Not now" is the way back out.
+        val onboarding = route == SocialRoute.AUTH || route == SocialRoute.CHARACTER
         Row(modifier = Modifier.fillMaxSize()) {
-            SocialRail(
-                current = route,
-                onHome = { shell.reset(SocialRoute.DASHBOARD) },
-                onAddFriend = { shell.reset(SocialRoute.ADD_FRIEND) },
-                onActivity = { shell.reset(SocialRoute.ACTIVITY) },
-                onCustomise = { shell.reset(SocialRoute.THEME) },
-                onProfile = { shell.reset(SocialRoute.PROFILE) }
-            )
-            Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                SocialHeader(
-                    route = route,
-                    onBack = { if (!shell.back()) onExitToLauncher() },
-                    onSettings = { shell.push(SocialRoute.SETTINGS) }
+            if (!onboarding) {
+                SocialRail(
+                    current = route,
+                    onHome = { shell.reset(SocialRoute.DASHBOARD) },
+                    onAddFriend = { shell.reset(SocialRoute.ADD_FRIEND) },
+                    onActivity = { shell.reset(SocialRoute.ACTIVITY) },
+                    onCustomise = { shell.reset(SocialRoute.THEME) },
+                    onProfile = { shell.reset(SocialRoute.PROFILE) }
                 )
+            }
+            Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                if (!onboarding) {
+                    SocialHeader(
+                        route = route,
+                        onBack = { if (!shell.back()) onExitToLauncher() },
+                        onSettings = { shell.push(SocialRoute.SETTINGS) }
+                    )
+                }
                 AnimatedContent(
                     targetState = route,
                     transitionSpec = {
