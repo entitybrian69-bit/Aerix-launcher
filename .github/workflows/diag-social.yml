@@ -6,6 +6,7 @@ on:
       - 'app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/**'
       - 'app_pojavlauncher/src/test/java/net/kdt/pojavlaunch/aerix/**'
       - 'app_pojavlauncher/src/main/res/drawable/**'
+      - 'app_pojavlauncher/build.gradle'
       - '.github/workflows/diag-social.yml'
   workflow_dispatch:
 
