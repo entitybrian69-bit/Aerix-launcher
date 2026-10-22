@@ -115,6 +115,7 @@ fun PortalAuthScreen(
     onNotNow: () -> Unit
 ) {
     val busy = inProgress
+    val scope = rememberCoroutineScope()
 
     // The flow itself runs in the ViewModel (see SocialProfileViewModel.signInWithGoogle), so
     // leaving the app to pick a Google account cannot cancel it and leave this screen stuck.
