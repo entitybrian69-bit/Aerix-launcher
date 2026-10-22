@@ -663,7 +663,11 @@ data class InGameSocialUiState(
     val party: PartyState = PartyState(),
     val invite: ServerInvite? = null,
     val messages: List<ChatMessage> = emptyList(),
-    val signedIn: Boolean = false
+    val signedIn: Boolean = false,
+    val friends: List<AerixUser> = emptyList(),
+    val activeFriendId: String = "kai",
+    val activeFriendName: String = "Kai",
+    val unread: Int = 0
 )
 
 /** Shares the same repository as the launcher shell, so chat and party stay in sync. */
@@ -674,6 +678,9 @@ class InGameSocialViewModel(
     private val _state = MutableStateFlow(InGameSocialUiState())
     val state: StateFlow<InGameSocialUiState> = _state.asStateFlow()
 
+    /** Ids of every incoming message the player has already seen in the overlay. */
+    private val seen = mutableSetOf<String>()
+
     init {
         viewModelScope.launch {
             repository.party.collect { party -> _state.update { it.copy(party = party) } }
@@ -682,13 +689,44 @@ class InGameSocialViewModel(
             repository.invite.collect { invite -> _state.update { it.copy(invite = invite) } }
         }
         viewModelScope.launch {
+            repository.friends.collect { friends -> _state.update { it.copy(friends = friends) } }
+        }
+        viewModelScope.launch {
             repository.chats.collect { chats ->
-                _state.update { it.copy(messages = chats["kai"].orEmpty()) }
+                val active = _state.value.activeFriendId
+                val messages = chats[active].orEmpty()
+                // Anything from someone else that has not been opened yet is a notification.
+                val unread = messages.count { !it.mine && it.id !in seen }
+                _state.update { it.copy(messages = messages, unread = unread) }
             }
         }
         viewModelScope.launch {
             store.data.collect { persisted -> _state.update { it.copy(signedIn = persisted.signedIn) } }
         }
+    }
+
+    /** Switches the overlay to another conversation and marks it as read. */
+    fun selectFriend(friend: AerixUser) = viewModelScope.launch {
+        repository.ensureChat(friend.id)
+        markRead()
+        _state.update {
+            it.copy(
+                activeFriendId = friend.id,
+                activeFriendName = friend.name,
+                messages = repository.chats.value[friend.id].orEmpty()
+            )
+        }
+    }
+
+    /** Called when the overlay is opened or read: the red badge disappears. */
+    fun markRead() {
+        repository.chats.value.values.flatten().filterNot { it.mine }.forEach { seen += it.id }
+        _state.update { it.copy(unread = 0) }
+    }
+
+    fun startCall() = viewModelScope.launch {
+        repository.startGroupCall()
+        _state.update { it.copy(mode = CompactMode.VOICE) }
     }
 
     fun show(mode: CompactMode) {
@@ -705,8 +743,10 @@ class InGameSocialViewModel(
     fun startGroupCall() = viewModelScope.launch { repository.startGroupCall() }
 
     fun send(text: String) = viewModelScope.launch {
-        repository.ensureChat("kai")
-        repository.sendMessage("kai", text)
+        val friendId = _state.value.activeFriendId
+        repository.ensureChat(friendId)
+        repository.sendMessage(friendId, text)
+        markRead()
     }
 
     fun expireInvite() = viewModelScope.launch { repository.expireInvite() }

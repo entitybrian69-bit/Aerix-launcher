@@ -133,6 +133,38 @@ fun SocialCompactPanel(
                     }
                 }
                 CompactMode.CHAT -> {
+                    // Every friend is reachable without leaving the game: tap to switch, call
+                    // them, or just keep typing while the game keeps running behind the panel.
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            state.friends.take(5).forEach { friend ->
+                                Box(
+                                    modifier = Modifier
+                                        .clip(CircleShape)
+                                        .background(
+                                            if (friend.id == state.activeFriendId) SocialColors.accent.copy(alpha = 0.35f)
+                                            else Color.Transparent
+                                        )
+                                        .clickable { viewModel.selectFriend(friend) }
+                                        .padding(3.dp)
+                                ) {
+                                    SocialAvatar(
+                                        avatar = friend.avatar,
+                                        size = 30.dp,
+                                        story = friend.hasStory
+                                    )
+                                }
+                            }
+                        }
+                        SocialGhostButton("Call", onClick = viewModel::startCall, modifier = Modifier)
+                    }
                     Column(modifier = Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
                         state.messages.forEach { message ->
                             Column(

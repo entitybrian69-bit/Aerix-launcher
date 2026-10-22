@@ -14,13 +14,19 @@
 package net.kdt.pojavlaunch.aerix.social.ui
 
 import androidx.annotation.DrawableRes
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -44,7 +50,6 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -126,8 +131,9 @@ fun SocialBackground(modifier: Modifier = Modifier, content: @Composable () -> U
             modifier = Modifier
                 .fillMaxSize()
                 .background(
+                    // Only enough tint to keep text readable; the wallpaper must stay visible.
                     Brush.verticalGradient(
-                        listOf(Color(0x4D04101A), Color(0x73060F16), Color(0x8C04101A))
+                        listOf(Color(0x1404101A), Color(0x26060F16), Color(0x3304101A))
                     )
                 )
         ) {
@@ -145,7 +151,11 @@ fun SocialPanel(
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(SocialDimens.cardRadius))
-            .background(Brush.verticalGradient(listOf(SocialColors.panelRaised, SocialColors.panel)))
+            .background(
+                Brush.verticalGradient(
+                    listOf(SocialColors.panelRaised.copy(alpha = 0.82f), SocialColors.panel.copy(alpha = 0.72f))
+                )
+            )
             .border(BorderStroke(1.dp, SocialColors.border), RoundedCornerShape(SocialDimens.cardRadius))
             .padding(padding),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -208,9 +218,16 @@ fun SocialAvatar(
     modifier: Modifier = Modifier,
     story: Boolean = false
 ) {
+    // The story ring breathes slowly so a new story catches the eye without being noisy.
+    val ringPulse by animateFloatAsState(
+        targetValue = if (story) 1f else 0.85f,
+        animationSpec = tween(900),
+        label = "storyRing"
+    )
     Box(
         modifier = modifier
             .size(size)
+            .graphicsLayer { alpha = if (story) ringPulse else 1f }
             .clip(CircleShape)
             .background(if (story) SocialColors.storyRing else Color.Transparent)
             .padding(if (story) 2.dp else 0.dp),
@@ -225,6 +242,18 @@ fun SocialAvatar(
                 .background(SocialColors.panelRaised)
         )
     }
+}
+
+/** Shared press feedback: every tappable Social control springs down a little. */
+@Composable
+fun rememberPressScale(interaction: MutableInteractionSource): Float {
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.94f else 1f,
+        animationSpec = spring(dampingRatio = 0.42f, stiffness = Spring.StiffnessMediumLow),
+        label = "socialPress"
+    )
+    return scale
 }
 
 @Composable
@@ -242,32 +271,43 @@ fun SocialPrimaryButton(
         danger -> SocialColors.danger
         else -> accent
     }
-    Surface(
-        modifier = modifier.heightIn(min = SocialDimens.touch),
-        shape = RoundedCornerShape(SocialDimens.controlRadius),
-        color = fill,
-        contentColor = if (danger) Color.White else SocialColors.onAccent,
-        enabled = enabled,
-        onClick = onClick
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            if (iconRes != null) {
-                Icon(painter = painterResource(iconRes), contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-            }
-            Text(
-                text = text,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                softWrap = false
+    val interaction = remember { MutableInteractionSource() }
+    val scale = rememberPressScale(interaction)
+    val shape = RoundedCornerShape(SocialDimens.controlRadius)
+    Row(
+        modifier = modifier
+            .heightIn(min = SocialDimens.touch)
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .clip(shape)
+            .background(fill)
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                enabled = enabled,
+                onClick = onClick
             )
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (iconRes != null) {
+            Icon(
+                painter = painterResource(iconRes),
+                contentDescription = null,
+                tint = if (danger) Color.White else SocialColors.onAccent,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(Modifier.width(8.dp))
         }
+        Text(
+            text = text,
+            color = if (danger) Color.White else SocialColors.onAccent,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            softWrap = false
+        )
     }
 }
 
@@ -279,33 +319,44 @@ fun SocialGhostButton(
     enabled: Boolean = true,
     @DrawableRes iconRes: Int? = null
 ) {
-    Surface(
-        modifier = modifier.heightIn(min = SocialDimens.touch),
-        shape = RoundedCornerShape(SocialDimens.controlRadius),
-        color = SocialColors.panelSoft,
-        contentColor = SocialColors.textPrimary,
-        border = BorderStroke(1.dp, SocialColors.border),
-        enabled = enabled,
-        onClick = onClick
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            if (iconRes != null) {
-                Icon(painter = painterResource(iconRes), contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-            }
-            Text(
-                text = text,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                softWrap = false
+    val interaction = remember { MutableInteractionSource() }
+    val scale = rememberPressScale(interaction)
+    val shape = RoundedCornerShape(SocialDimens.controlRadius)
+    Row(
+        modifier = modifier
+            .heightIn(min = SocialDimens.touch)
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .clip(shape)
+            .background(SocialColors.panelSoft.copy(alpha = if (enabled) 0.85f else 0.4f))
+            .border(BorderStroke(1.dp, SocialColors.border), shape)
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                enabled = enabled,
+                onClick = onClick
             )
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (iconRes != null) {
+            Icon(
+                painter = painterResource(iconRes),
+                contentDescription = null,
+                tint = SocialColors.textPrimary,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(Modifier.width(8.dp))
         }
+        Text(
+            text = text,
+            color = SocialColors.textPrimary,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            softWrap = false
+        )
     }
 }
 
@@ -316,39 +367,67 @@ fun SocialIconButton(
     contentDescription: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    selected: Boolean = false
+    selected: Boolean = false,
+    size: Dp = SocialDimens.touch,
+    iconSize: Dp = 20.dp
 ) {
-    Surface(
-        modifier = modifier.size(SocialDimens.touch),
-        shape = CircleShape,
-        color = if (selected) SocialColors.accent else SocialColors.panelSoft,
-        contentColor = if (selected) SocialColors.onAccent else SocialColors.textPrimary,
-        border = BorderStroke(1.dp, SocialColors.border),
-        onClick = onClick
+    val interaction = remember { MutableInteractionSource() }
+    val scale = rememberPressScale(interaction)
+    val background by animateColorAsState(
+        targetValue = if (selected) SocialColors.accent else SocialColors.panelSoft.copy(alpha = 0.85f),
+        animationSpec = tween(180),
+        label = "iconButtonBackground"
+    )
+    Box(
+        modifier = modifier
+            .size(size)
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .clip(CircleShape)
+            .background(background)
+            .border(BorderStroke(1.dp, SocialColors.border), CircleShape)
+            .clickable(interactionSource = interaction, indication = null, onClick = onClick),
+        contentAlignment = Alignment.Center
     ) {
-        Box(contentAlignment = Alignment.Center) {
-            Icon(
-                painter = painterResource(iconRes),
-                contentDescription = contentDescription,
-                modifier = Modifier.size(20.dp)
-            )
-        }
+        Icon(
+            painter = painterResource(iconRes),
+            contentDescription = contentDescription,
+            tint = if (selected) SocialColors.onAccent else SocialColors.textPrimary,
+            modifier = Modifier.size(iconSize)
+        )
     }
 }
 
 @Composable
 fun SocialChip(text: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Surface(
-        modifier = modifier.heightIn(min = 40.dp),
-        shape = CircleShape,
-        color = if (selected) SocialColors.accent.copy(alpha = 0.28f) else SocialColors.panelSoft,
-        contentColor = if (selected) SocialColors.textPrimary else SocialColors.textSecondary,
-        border = BorderStroke(1.dp, if (selected) SocialColors.accent else SocialColors.border),
-        onClick = onClick
+    val interaction = remember { MutableInteractionSource() }
+    val scale = rememberPressScale(interaction)
+    val background by animateColorAsState(
+        targetValue = if (selected) SocialColors.accent.copy(alpha = 0.3f) else SocialColors.panelSoft.copy(alpha = 0.8f),
+        animationSpec = tween(180),
+        label = "chipBackground"
+    )
+    val borderColor by animateColorAsState(
+        targetValue = if (selected) SocialColors.accent else SocialColors.border,
+        animationSpec = tween(180),
+        label = "chipBorder"
+    )
+    Box(
+        modifier = modifier
+            .heightIn(min = 40.dp)
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .clip(CircleShape)
+            .background(background)
+            .border(BorderStroke(1.dp, borderColor), CircleShape)
+            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center
     ) {
-        Box(modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp), contentAlignment = Alignment.Center) {
-            Text(text = text, fontSize = 13.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
-        }
+        Text(
+            text = text,
+            color = if (selected) SocialColors.textPrimary else SocialColors.textSecondary,
+            fontSize = 13.sp,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
+        )
     }
 }
 
@@ -639,7 +718,11 @@ fun SocialDialog(onDismiss: () -> Unit, content: @Composable ColumnScope.() -> U
                 }
                 .padding(horizontal = 24.dp)
                 .clip(RoundedCornerShape(22.dp))
-                .background(Brush.verticalGradient(listOf(SocialColors.panelRaised, SocialColors.panel)))
+                .background(
+                Brush.verticalGradient(
+                    listOf(SocialColors.panelRaised.copy(alpha = 0.82f), SocialColors.panel.copy(alpha = 0.72f))
+                )
+            )
                 .border(BorderStroke(1.dp, SocialColors.borderStrong), RoundedCornerShape(22.dp))
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),

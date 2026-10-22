@@ -13,6 +13,10 @@
 package net.kdt.pojavlaunch.aerix.social.ui.screens
 
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -96,6 +100,22 @@ fun SocialDashboardScreen(
         Row(horizontalArrangement = Arrangement.spacedBy(22.dp), verticalAlignment = Alignment.CenterVertically) {
             SocialTab.entries.forEach { entry ->
                 val selected = entry == tab
+                // Colour and underline animate instead of snapping, so switching tabs feels alive.
+                val labelColor by animateColorAsState(
+                    targetValue = if (selected) SocialColors.textPrimary else SocialColors.textMuted,
+                    animationSpec = tween(SocialMotion.TAB_MS),
+                    label = "tabLabel"
+                )
+                val underlineWidth by animateDpAsState(
+                    targetValue = if (selected) 22.dp else 0.dp,
+                    animationSpec = spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessLow),
+                    label = "tabUnderline"
+                )
+                val underlineColor by animateColorAsState(
+                    targetValue = if (selected) SocialColors.accent else androidx.compose.ui.graphics.Color.Transparent,
+                    animationSpec = tween(SocialMotion.TAB_MS),
+                    label = "tabUnderlineColor"
+                )
                 Column(
                     modifier = Modifier
                         .clip(RoundedCornerShape(10.dp))
@@ -109,16 +129,16 @@ fun SocialDashboardScreen(
                             SocialTab.CHATS -> "Chats"
                             SocialTab.PARTY -> "Party"
                         },
-                        color = if (selected) SocialColors.textPrimary else SocialColors.textMuted,
+                        color = labelColor,
                         fontSize = 15.sp,
                         fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
                     )
                     Spacer(Modifier.height(4.dp))
                     Box(
                         modifier = Modifier
-                            .width(22.dp)
+                            .width(underlineWidth)
                             .height(2.dp)
-                            .background(if (selected) SocialColors.accent else androidx.compose.ui.graphics.Color.Transparent)
+                            .background(underlineColor)
                     )
                 }
             }

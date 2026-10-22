@@ -16,7 +16,10 @@ package net.kdt.pojavlaunch.aerix.social.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -27,6 +30,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -333,30 +337,40 @@ private fun SocialHeader(route: SocialRoute, onBack: () -> Unit, onSettings: () 
         SocialRoute.SKIN -> "Choose skin"
         SocialRoute.CAPE -> "Choose cape"
     }
+    // Compact bar: no big leading arrow, no tall padding. The content starts right under it,
+    // and the only controls are small and gathered in the top-right corner next to Settings.
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = SocialDimens.pagePaddingH, vertical = 12.dp),
+            .padding(horizontal = SocialDimens.pagePaddingH, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        SocialIconButton(
-            iconRes = R.drawable.aerix_ic_arrow_back,
-            contentDescription = "Back",
-            onClick = onBack
-        )
         Text(
             text = title,
             color = SocialColors.textPrimary,
-            fontSize = 22.sp,
+            fontSize = 20.sp,
             fontWeight = FontWeight.Bold,
+            maxLines = 1,
             modifier = Modifier.weight(1f)
         )
+        // Only the dashboard keeps the exit arrow, and it sits next to the gear, at 36dp.
+        if (route == SocialRoute.DASHBOARD) {
+            SocialIconButton(
+                iconRes = R.drawable.aerix_ic_arrow_back,
+                contentDescription = "Back to launcher",
+                onClick = onBack,
+                size = 36.dp,
+                iconSize = 17.dp
+            )
+        }
         SocialIconButton(
             iconRes = R.drawable.aerix_ic_settings_filled,
             contentDescription = "Settings",
             onClick = onSettings,
-            selected = route == SocialRoute.SETTINGS
+            selected = route == SocialRoute.SETTINGS,
+            size = 36.dp,
+            iconSize = 18.dp
         )
     }
 }
@@ -392,13 +406,35 @@ private fun SocialRail(
 @Composable
 private fun RailItem(iconRes: Int, label: String, selected: Boolean, onClick: () -> Unit) {
     val accent = SocialColors.accent
+    val interaction = remember { MutableInteractionSource() }
+    val press = rememberPressScale(interaction)
+    // Selection springs: the tile grows a touch, the icon lifts, the colours cross-fade.
+    val selection by animateFloatAsState(
+        targetValue = if (selected) 1f else 0f,
+        animationSpec = spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMediumLow),
+        label = "railSelection"
+    )
+    val background by animateColorAsState(
+        targetValue = if (selected) accent.copy(alpha = 0.85f) else SocialColors.panelSoft.copy(alpha = 0.55f),
+        animationSpec = tween(220),
+        label = "railBackground"
+    )
+    val contentColor by animateColorAsState(
+        targetValue = if (selected) SocialColors.onAccent else SocialColors.textMuted,
+        animationSpec = tween(220),
+        label = "railContent"
+    )
     Box(
         modifier = Modifier
             .width(68.dp)
             .height(60.dp)
+            .graphicsLayer {
+                scaleX = press * (1f + 0.04f * selection)
+                scaleY = press * (1f + 0.04f * selection)
+            }
             .clip(RoundedCornerShape(16.dp))
-            .background(if (selected) accent.copy(alpha = 0.85f) else SocialColors.panelSoft.copy(alpha = 0.5f))
-            .clickable(onClick = onClick),
+            .background(background)
+            .clickable(interactionSource = interaction, indication = null, onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -408,12 +444,14 @@ private fun RailItem(iconRes: Int, label: String, selected: Boolean, onClick: ()
             Icon(
                 painter = painterResource(iconRes),
                 contentDescription = label,
-                tint = if (selected) SocialColors.onAccent else SocialColors.textMuted,
-                modifier = Modifier.size(20.dp)
+                tint = contentColor,
+                modifier = Modifier
+                    .size(20.dp)
+                    .graphicsLayer { translationY = -3f * selection }
             )
             Text(
                 text = label,
-                color = if (selected) SocialColors.onAccent else SocialColors.textMuted,
+                color = contentColor,
                 fontSize = 9.sp,
                 fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                 maxLines = 1
