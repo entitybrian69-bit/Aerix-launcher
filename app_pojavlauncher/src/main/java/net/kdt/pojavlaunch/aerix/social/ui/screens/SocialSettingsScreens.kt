@@ -63,6 +63,7 @@ import net.kdt.pojavlaunch.aerix.social.ui.SocialSectionTitle
 import net.kdt.pojavlaunch.aerix.social.ui.SocialSliderRow
 import net.kdt.pojavlaunch.aerix.social.ui.SocialTextField
 import net.kdt.pojavlaunch.aerix.social.ui.SocialTitle
+import net.kdt.pojavlaunch.aerix.social.ui.SocialAvatar
 import net.kdt.pojavlaunch.aerix.social.ui.SocialMicTestCard
 import net.kdt.pojavlaunch.aerix.social.ui.SocialToggleRow
 import net.kdt.pojavlaunch.aerix.social.vm.ProfileUiState
