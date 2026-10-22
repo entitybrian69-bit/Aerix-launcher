@@ -12,6 +12,8 @@ permissions:
 
 env:
   TARGET_SHA: a75fdfeb6c22ebf0c772c0a4f83ab53c103e4ad81d8105789deb0df9ebc232f3
+  SRC_RUN: "39609549340"
+  SRC_SHA: ea48bde5ebd4fd4103dce5e20af2612a753cadcc
   NEW_TAG: v1.3.6
   NEW_VERSION: "1.3.6"
 
@@ -20,53 +22,81 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Reassemble uploaded APK, verify sha256, release as v1.3.6
+      - name: Fetch APKs from Android CI run 39609549340, verify sha256, release as v1.3.6
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -u
           repo="${{ github.repository }}"
-          mkdir -p out
+          mkdir -p art out
 
-          if ! ls incoming/*.part* >/dev/null 2>&1; then
-            echo "::notice title=skipping::no APK chunks in incoming/ yet - nothing to do"
-            exit 0
+          echo "== List artifacts of run $SRC_RUN"
+          gh api "repos/$repo/actions/runs/$SRC_RUN/artifacts?per_page=50" < /dev/null \
+            --jq '.artifacts[] | select(.expired == false) | "\(.id)\t\(.name)"' | sort -u > arts.tsv
+          cat arts.tsv
+
+          dl_art() { # id name
+            mkdir -p "art/$2"
+            gh api "repos/$repo/actions/artifacts/$1/zip" < /dev/null > "art/$2/z.zip"
+            unzip -o -q "art/$2/z.zip" -d "art/$2"
+            rm -f "art/$2/z.zip"
+          }
+
+          echo "== Recorded checksums from CI"
+          sha_art_id=$(awk -F'\t' '$2=="apk-sha256"{print $1; exit}' arts.tsv)
+          if [ -n "$sha_art_id" ]; then
+            dl_art "$sha_art_id" "apk-sha256"
+            cisha=$(find art/apk-sha256 -type f -exec cat {} + | tr '\n' ';')
+            echo "$cisha"
+            echo "::notice title=ci-sha256::$cisha"
           fi
 
-          echo "== Reassemble chunks"
-          ls -la incoming/
-          apktmp=/tmp/Aerix-Launcher-$NEW_VERSION.apk
-          cat $(ls -v incoming/*.part*) > "$apktmp"
+          echo "== Download both APK artifacts"
+          full_id=$(awk -F'\t' '$2=="app-release"{print $1; exit}' arts.tsv)
+          nort_id=$(awk -F'\t' '$2=="app-release-noruntime"{print $1; exit}' arts.tsv)
+          [ -n "$full_id" ] && dl_art "$full_id" "app-release"
+          [ -n "$nort_id" ] && dl_art "$nort_id" "app-release-noruntime"
 
-          echo "== Verify sha256"
-          sha=$(sha256sum "$apktmp" | awk '{print $1}')
-          echo "$sha  $apktmp"
-          echo "::notice title=sha::reassembled apk = $sha ($(stat -c%s "$apktmp") bytes)"
-          if [ "$sha" != "$TARGET_SHA" ]; then
-            echo "::error title=sha-mismatch::uploaded apk is $sha but you asked for $TARGET_SHA - refusing to publish wrong bytes"
+          sha_full=""; sha_nort=""
+          [ -n "$full_id" ] && sha_full=$(find art/app-release -name '*.apk' -type f -exec sha256sum {} + | awk '{print $1}')
+          [ -n "$nort_id" ] && sha_nort=$(find art/app-release-noruntime -name '*.apk' -type f -exec sha256sum {} + | awk '{print $1}')
+          echo "::notice title=sha::app-release = $sha_full"
+          echo "::notice title=sha::app-release-noruntime = $sha_nort"
+
+          if [ "$sha_full" != "$TARGET_SHA" ] && [ "$sha_nort" != "$TARGET_SHA" ]; then
+            echo "::error title=no-match::neither artifact of run $SRC_RUN matches $TARGET_SHA (full=$sha_full noruntime=$sha_nort)"
             exit 1
           fi
+          echo "::notice title=MATCH::$TARGET_SHA verified against run $SRC_RUN"
 
-          echo "== Match confirmed. Prepare assets"
-          cp "$apktmp" "out/Aerix-Launcher-$NEW_VERSION.apk"
-          cp "$apktmp" "out/Aerix-Launcher.apk"
+          echo "== Assemble v1.3.6 assets"
           : > SHA256SUMS
+          [ -n "$full_id" ] && cp "$(find art/app-release -name '*.apk' -type f | head -1)" "out/Aerix-Launcher-$NEW_VERSION.apk" \
+            && echo "$sha_full  Aerix-Launcher-$NEW_VERSION.apk" >> SHA256SUMS
+          [ -n "$nort_id" ] && cp "$(find art/app-release-noruntime -name '*.apk' -type f | head -1)" "out/Aerix-Launcher-$NEW_VERSION-noruntime.apk" \
+            && echo "$sha_nort  Aerix-Launcher-$NEW_VERSION-noruntime.apk" >> SHA256SUMS
           for f in out/*.apk; do
-            echo "$(sha256sum "$f" | awk '{print $1}')  $(basename "$f")" >> SHA256SUMS
+            b=$(basename "$f")
+            unv=$(printf '%s' "$b" | sed "s/-$NEW_VERSION//")
+            cp "$f" "out/$unv"
+            grep "  $b\$" SHA256SUMS | sed "s/  $b\$/  $unv/" >> SHA256SUMS
           done
+          sort -u SHA256SUMS -o SHA256SUMS
           cat SHA256SUMS
 
           notes=$(mktemp)
           {
-            echo "Release of the exact binary identified by"
+            echo "Re-release of the exact binary identified by"
             echo "\`sha256:$TARGET_SHA\` as version $NEW_VERSION."
+            echo ""
+            echo "Source: Android CI run [$SRC_RUN](https://github.com/$repo/actions/runs/$SRC_RUN)"
+            echo "(build 349), built from commit \`$SRC_SHA\`. Its original release page no"
+            echo "longer exists; the verified CI artifacts are republished here."
             echo ""
             echo "Checksums for every attachment are in \`SHA256SUMS\`."
           } > "$notes"
 
-          gh release create "$NEW_TAG" --repo "$repo" \
+          gh release create "$NEW_TAG" --repo "$repo" --target "$SRC_SHA" \
             --title "Aerix Launcher $NEW_VERSION" --notes-file "$notes" --latest \
             out/*.apk SHA256SUMS < /dev/null
-          echo "::notice title=done::$NEW_TAG published"
+          echo "::notice title=done::$NEW_TAG published from CI run $SRC_RUN"
