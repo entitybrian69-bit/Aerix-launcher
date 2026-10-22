@@ -343,7 +343,7 @@ fun LiveWaveform(
     bars: Int = 28,
     color: Color = Glass.accentStatic
 ) {
-    val clockValue by rememberInfiniteTransition(label = "wave").animateFloat(
+    val clock = rememberInfiniteTransition(label = "wave").animateFloat(
         initialValue = 0f,
         targetValue = 6.2831855f,
         animationSpec = infiniteRepeatable(tween(1800, easing = LinearEasing)),
@@ -352,7 +352,7 @@ fun LiveWaveform(
     Canvas(modifier = modifier) {
         val barWidth = size.width / (bars * 1.6f)
         repeat(bars) { index ->
-            val phase = clockValue + index * 0.45f
+            val phase = clock + index * 0.45f
             val wobble = 0.35f + 0.65f * (0.5f + 0.5f * sin(phase))
             val height = size.height * (0.15f + 0.85f * wobble * (0.35f + 0.65f * level.coerceIn(0f, 1f)))
             val x = index * barWidth * 1.6f
