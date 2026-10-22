@@ -294,7 +294,9 @@ private fun RendererTabContent(activity: FragmentActivity) {
 
     val revision = PojavSettingsBridge.revision
     val compatible = remember(revision) { PojavSettingsBridge.renderers(activity) }
-    val plugins = remember(revision) { PojavPluginBridge.loadPlugins(activity) }
+    // Always rescans: a plugin installed while the launcher was running has to appear without a
+    // restart, which is exactly when someone opens this tab.
+    val plugins = remember(revision) { PojavPluginBridge.loadPlugins(activity, force = true) }
     val currentRenderer = remember(revision) { LauncherPreferences.PREF_RENDERER ?: Renderers.GL4ES_RENDERER }
     // Renderer the launcher falls back to while nothing was picked in the settings.
     val defaultRendererId = remember(revision) { LauncherPreferences.defaultRendererId(activity) }
