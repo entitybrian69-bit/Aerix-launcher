@@ -1,0 +1,132 @@
+name: Aerix debug (testing)
+
+# Builds the APK that all testing happens on and stores it in apk/.
+# This workflow only ever builds the "noruntime" debug variant:
+#   applicationId net.kdt.pojavlaunch.debug, signed with app_pojavlauncher/debug.keystore
+# so it installs next to the public launcher and can never be mistaken for, or
+# overwrite, a release APK. Public releases are built by release.yml / nightly.yml,
+# which only run after a typed confirmation.
+
+on:
+  push:
+    branches: [ "arena/2f1249a3-aerix-launcher" ]
+    paths:
+      - "app_pojavlauncher/src/**"
+      - "app_pojavlauncher/*.gradle"
+      - "app_pojavlauncher/proguard-rules.pro"
+      - "app_pojavlauncher/libs/**"
+      - "forge_installer/**"
+      - "glfw/**"
+      - "sdl/**"
+      - "mojoexec/**"
+      - "*.gradle"
+      - "gradle/**"
+      - "gradle.properties"
+      - "settings.gradle"
+      - ".github/workflows/aerix-debug.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: aerix-debug
+  cancel-in-progress: true
+
+env:
+  APK_NAME: Aerix-Launcher-debug.apk
+  APK_PATH: app_pojavlauncher/build/outputs/apk/noruntime/debug/app_pojavlauncher-noruntime-debug.apk
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      CURSEFORGE_API_KEY: ${{ secrets.CURSEFORGE_API_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Get LTW
+        uses: dawidd6/action-download-artifact@v6
+        continue-on-error: true
+        with:
+          repo: MojoLauncher/LTW
+          workflow: android.yml
+          workflow_conclusion: success
+          name: output-aar
+          path: app_pojavlauncher/libs
+
+      - name: Get Mesa
+        uses: dawidd6/action-download-artifact@v6
+        continue-on-error: true
+        with:
+          github_token: ${{ secrets.MESA_ACTIONS }}
+          repo: MojoLauncher/mesa-unified2
+          workflow: android.yml
+          workflow_conclusion: success
+          branch: mojo/26.2
+          name: mesa-aar
+          path: app_pojavlauncher/libs
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.14.3"
+
+      - name: Build debug APK
+        run: ./gradlew :app_pojavlauncher:assembleNoruntimeDebug --console=plain
+
+      - name: Check it is really the debug build
+        run: |
+          set -e
+          test -f "$APK_PATH"
+          python3 -c "
+          import sys
+          data = open('$APK_PATH', 'rb').read()
+          wanted = 'net.kdt.pojavlaunch.debug'.encode('utf-16-le')
+          sys.exit(0 if wanted in data else 1)
+          "
+          echo "applicationId net.kdt.pojavlaunch.debug confirmed"
+          keytool -printcert -jarfile "$APK_PATH" | head -6
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: aerix-debug-apk
+          path: ${{ env.APK_PATH }}
+          retention-days: 30
+
+      - name: Store the debug APK in apk/
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          set -e
+          SHORT=${GITHUB_SHA:0:7}
+          git rm -q --ignore-unmatch 'apk/*.apk'
+          git rm -q --ignore-unmatch 'apk/*.sha256'
+          mkdir -p apk
+          cp "$APK_PATH" "apk/$APK_NAME"
+          ( cd apk && sha256sum "$APK_NAME" > "$APK_NAME.sha256" )
+          {
+            echo "kind: debug (testing only)"
+            echo "name: $APK_NAME"
+            echo "commit: $GITHUB_SHA"
+            echo "run: $GITHUB_RUN_ID"
+            echo "built: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+            echo "note: not a public release; the release APKs live in GitHub Releases"
+          } > apk/DEBUG_BUILD.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apk
+          git commit -m "Build: Aerix debug APK $SHORT (run $GITHUB_RUN_ID)"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+          echo "::notice title=debug-apk::apk/$APK_NAME from $SHORT"
