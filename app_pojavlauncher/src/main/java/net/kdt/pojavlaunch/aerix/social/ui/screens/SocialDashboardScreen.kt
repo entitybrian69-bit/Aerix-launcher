@@ -66,6 +66,7 @@ import net.kdt.pojavlaunch.aerix.social.ui.SocialBody
 import net.kdt.pojavlaunch.aerix.social.ui.SocialColors
 import net.kdt.pojavlaunch.aerix.social.ui.SocialDimens
 import net.kdt.pojavlaunch.aerix.social.ui.SocialGhostButton
+import net.kdt.pojavlaunch.aerix.social.ui.SocialMotion
 import net.kdt.pojavlaunch.aerix.social.ui.SocialPanel
 import net.kdt.pojavlaunch.aerix.social.ui.SocialPrimaryButton
 import net.kdt.pojavlaunch.aerix.social.ui.SocialSectionTitle
