@@ -11,9 +11,11 @@ permissions:
   contents: write
 
 env:
-  TARGET_SHA: a75fdfeb6c22ebf0c772c0a4f83ab53c103e4ad81d8105789deb0df9ebc232f3
-  SRC_RUN: "39609549340"
-  SRC_SHA: ea48bde5ebd4fd4103dce5e20af2612a753cadcc
+  # sha256 of the raw APK inside run 39413488311's app-release artifact
+  # (the a75fdfeb... digest on the Actions page covers the artifact zip wrapper)
+  TARGET_SHA: e3afc03e19d35b7dc32385af04e596866799485dd64bf833731790f8f400f069
+  SRC_RUN: "39413488311"
+  SRC_SHA: ba3e4c230a81275dfda296a121172a3752f9a913
   NEW_TAG: v1.3.6
   NEW_VERSION: "1.3.6"
 
@@ -86,12 +88,10 @@ jobs:
 
           notes=$(mktemp)
           {
-            echo "Re-release of the exact binary identified by"
-            echo "\`sha256:$TARGET_SHA\` as version $NEW_VERSION."
+            echo "Re-release of Android CI run [$SRC_RUN](https://github.com/$repo/actions/runs/$SRC_RUN)"
+            echo "(\`app-release\` artifact, built from commit \`$SRC_SHA\`) as version $NEW_VERSION."
             echo ""
-            echo "Source: Android CI run [$SRC_RUN](https://github.com/$repo/actions/runs/$SRC_RUN)"
-            echo "(build 349), built from commit \`$SRC_SHA\`. Its original release page no"
-            echo "longer exists; the verified CI artifacts are republished here."
+            echo "Full APK: \`sha256:$TARGET_SHA\`."
             echo ""
             echo "Checksums for every attachment are in \`SHA256SUMS\`."
           } > "$notes"
