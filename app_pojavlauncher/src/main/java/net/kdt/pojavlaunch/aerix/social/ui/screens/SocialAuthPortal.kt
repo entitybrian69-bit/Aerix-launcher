@@ -19,6 +19,7 @@
 package net.kdt.pojavlaunch.aerix.social.ui.screens
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
@@ -95,7 +96,7 @@ import kotlin.math.min
 import kotlin.math.sin
 
 /** One touch, spreading: [anim] runs 0..1 and the drawing fades as it grows. */
-private class PortalRipple(val origin: Offset, val anim: Animatable<Float>)
+private class PortalRipple(val origin: Offset, val anim: Animatable<Float, AnimationVector1D>)
 
 /** A drifting mote of light in the air around the portal. */
 private class Mote(val x: Float, val y: Float, val radius: Float, val speed: Float, val phase: Float)
