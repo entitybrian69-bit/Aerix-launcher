@@ -28,6 +28,7 @@ import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.credentials.exceptions.GetCredentialException
 import androidx.credentials.exceptions.NoCredentialException
+import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import kotlinx.coroutines.Dispatchers
@@ -50,6 +51,21 @@ sealed class GoogleAuthResult {
 }
 
 private const val TAG = "AerixGoogle"
+
+/**
+ * The two Google pickers Android can show. They go through different Play services code paths
+ * and one of them can be refused while the other works, so a refused sheet is worth retrying
+ * with the other before blaming the account.
+ */
+enum class GoogleSignInVariant {
+    /** The dedicated "Sign in with Google" bottom sheet. */
+    SHEET,
+
+    /** The classic account picker backed by GoogleIdOption. */
+    PICKER;
+
+    val other: GoogleSignInVariant get() = if (this == SHEET) PICKER else SHEET
+}
 
 object GoogleAuth {
 
@@ -78,15 +94,27 @@ object GoogleAuth {
      * Opens the system account sheet. Suspends until the player picks an account, cancels, or
      * the device has no Google account at all.
      */
-    suspend fun signIn(context: Context, clientIdOverride: String = ""): GoogleAuthResult {
+    suspend fun signIn(
+        context: Context,
+        clientIdOverride: String = "",
+        variant: GoogleSignInVariant = GoogleSignInVariant.SHEET
+    ): GoogleAuthResult {
         val clientId = resolveClientId(context, clientIdOverride)
         if (!isUsable(clientId)) return GoogleAuthResult.NotConfigured
         val activity = context.findActivity()
             ?: return GoogleAuthResult.Failed("Google sign-in needs the launcher window.")
+        val option = when (variant) {
+            GoogleSignInVariant.SHEET -> GetSignInWithGoogleOption.Builder(clientId).build()
+            // filterByAuthorizedAccounts = false: offer every account on the device, not just
+            // ones that already used this app.
+            GoogleSignInVariant.PICKER -> GetGoogleIdOption.Builder()
+                .setServerClientId(clientId)
+                .setFilterByAuthorizedAccounts(false)
+                .setAutoSelectEnabled(false)
+                .build()
+        }
         val request = GetCredentialRequest.Builder()
-            .addCredentialOption(
-                GetSignInWithGoogleOption.Builder(clientId).build()
-            )
+            .addCredentialOption(option)
             .build()
         return withContext(Dispatchers.Main) {
             try {

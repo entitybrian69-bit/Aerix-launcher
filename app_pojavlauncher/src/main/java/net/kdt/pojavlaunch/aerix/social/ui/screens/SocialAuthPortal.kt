@@ -91,6 +91,7 @@ import net.kdt.pojavlaunch.R
 import net.kdt.pojavlaunch.aerix.social.auth.GoogleAccount
 import net.kdt.pojavlaunch.aerix.social.auth.GoogleAuth
 import net.kdt.pojavlaunch.aerix.social.auth.GoogleAuthResult
+import net.kdt.pojavlaunch.aerix.social.auth.GoogleSignInVariant
 import net.kdt.pojavlaunch.aerix.social.ui.SocialBody
 import net.kdt.pojavlaunch.aerix.social.ui.SocialColors
 import net.kdt.pojavlaunch.aerix.social.ui.SocialDimens
@@ -113,7 +114,7 @@ fun PortalAuthScreen(
     googleError: String?,
     stage: String?,
     lastEmail: String,
-    onStartGoogle: (creatingAccount: Boolean) -> Unit,
+    onStartGoogle: (creatingAccount: Boolean, variant: GoogleSignInVariant) -> Unit,
     onNotNow: () -> Unit
 ) {
     val busy = inProgress
@@ -122,9 +123,9 @@ fun PortalAuthScreen(
 
     // The flow itself runs in the ViewModel (see SocialProfileViewModel.signInWithGoogle), so
     // leaving the app to pick a Google account cannot cancel it and leave this screen stuck.
-    fun startGoogle(creating: Boolean) {
+    fun startGoogle(creating: Boolean, variant: GoogleSignInVariant = GoogleSignInVariant.SHEET) {
         if (busy) return
-        onStartGoogle(creating)
+        onStartGoogle(creating, variant)
     }
 
     // Touch feedback state, shared by every animated layer of the scene.
@@ -222,14 +223,23 @@ fun PortalAuthScreen(
                             weight = androidx.compose.ui.text.font.FontWeight.SemiBold
                         )
                         SocialBody(googleError, size = 11.sp, color = SocialColors.textPrimary)
+                        SocialBody(
+                            "Full trace: launcher Logs, tag AerixGoogle.",
+                            size = 10.sp,
+                            color = SocialColors.textMuted
+                        )
+                        // Two escapes from a refused sheet: the other Play services picker, or
+                        // the exact text to paste back to me.
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            horizontalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
-                            SocialBody(
-                                "Full trace: launcher Logs, tag AerixGoogle.",
-                                size = 10.sp,
-                                color = SocialColors.textMuted
+                            LinkText(
+                                text = "Try other picker",
+                                enabled = !busy,
+                                onClick = {
+                                    startGoogle(creating = false, variant = GoogleSignInVariant.PICKER)
+                                }
                             )
                             LinkText(
                                 text = "Copy details",

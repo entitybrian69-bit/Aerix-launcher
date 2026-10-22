@@ -229,10 +229,15 @@ fun SocialShell(
                             googleError = profile.googleError,
                             stage = profile.googleStage,
                             lastEmail = profile.email,
-                            onStartGoogle = { creating ->
+                            onStartGoogle = { creating, variant ->
                                 // Holds the ViewModel, so the result survives the trip to the
                                 // Google account sheet and back.
-                                profileVm.signInWithGoogle(context, profile.googleClientId, creating)
+                                profileVm.signInWithGoogle(
+                                    context,
+                                    profile.googleClientId,
+                                    creating,
+                                    variant
+                                )
                             },
                             onNotNow = onExitToLauncher
                         )

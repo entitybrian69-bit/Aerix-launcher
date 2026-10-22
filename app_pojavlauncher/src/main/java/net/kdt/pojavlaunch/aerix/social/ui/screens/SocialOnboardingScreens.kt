@@ -54,6 +54,7 @@ import net.kdt.pojavlaunch.R
 import net.kdt.pojavlaunch.aerix.social.auth.GoogleAccount
 import net.kdt.pojavlaunch.aerix.social.auth.GoogleAuth
 import net.kdt.pojavlaunch.aerix.social.auth.GoogleAuthResult
+import net.kdt.pojavlaunch.aerix.social.auth.GoogleSignInVariant
 import net.kdt.pojavlaunch.aerix.social.data.SocialWardrobe
 import net.kdt.pojavlaunch.aerix.social.data.WardrobeItem
 import net.kdt.pojavlaunch.aerix.social.ui.SocialAvatar
@@ -82,7 +83,7 @@ fun SocialAuthScreen(
     googleError: String?,
     stage: String?,
     lastEmail: String,
-    onStartGoogle: (creatingAccount: Boolean) -> Unit,
+    onStartGoogle: (creatingAccount: Boolean, variant: GoogleSignInVariant) -> Unit,
     onNotNow: () -> Unit
 ) {
     PortalAuthScreen(

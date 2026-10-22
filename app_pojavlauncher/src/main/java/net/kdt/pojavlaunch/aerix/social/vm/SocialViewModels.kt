@@ -26,6 +26,7 @@ import net.kdt.pojavlaunch.aerix.social.data.ActivityPost
 import net.kdt.pojavlaunch.aerix.social.auth.GoogleAccount
 import net.kdt.pojavlaunch.aerix.social.auth.GoogleAuth
 import net.kdt.pojavlaunch.aerix.social.auth.GoogleAuthResult
+import net.kdt.pojavlaunch.aerix.social.auth.GoogleSignInVariant
 import net.kdt.pojavlaunch.aerix.social.data.AerixUser
 import net.kdt.pojavlaunch.aerix.social.data.AttachmentKind
 import net.kdt.pojavlaunch.aerix.social.data.ChatAttachment
@@ -136,6 +137,8 @@ data class ProfileUiState(
     val signInOutcome: SignInOutcome? = null,
     /** True when the player pressed "Create a new account", so the character step always runs. */
     val forceCharacterStep: Boolean = false,
+    /** Which picker the last attempt used, so the retry can use the other one. */
+    val lastSignInVariant: GoogleSignInVariant = GoogleSignInVariant.SHEET,
     val saved: Boolean = false
 ) {
     fun canChangeUsername(now: Long = System.currentTimeMillis()): Boolean =
@@ -261,7 +264,8 @@ class SocialProfileViewModel(
     fun signInWithGoogle(
         context: android.content.Context,
         clientIdOverride: String = "",
-        creatingAccount: Boolean = false
+        creatingAccount: Boolean = false,
+        variant: GoogleSignInVariant = GoogleSignInVariant.SHEET
     ) = viewModelScope.launch {
             _state.update {
                 it.copy(
@@ -269,12 +273,13 @@ class SocialProfileViewModel(
                     googleError = null,
                     googleStage = "Opening Google…",
                     signInOutcome = null,
-                    forceCharacterStep = creatingAccount
+                    forceCharacterStep = creatingAccount,
+                    lastSignInVariant = variant
                 )
             }
             val result = try {
                 kotlinx.coroutines.withTimeoutOrNull(GOOGLE_TIMEOUT_MS) {
-                    GoogleAuth.signIn(context, clientIdOverride)
+                    GoogleAuth.signIn(context, clientIdOverride, variant)
                 } ?: GoogleAuthResult.Failed(
                     "Google did not answer within ${GOOGLE_TIMEOUT_MS / 1000} seconds. " +
                         "Check that Play Services is signed in, then try again."
@@ -298,6 +303,8 @@ class SocialProfileViewModel(
                         googleError = buildString {
                             append("Google closed before the account was confirmed.")
                             append(" Closing the sheet yourself is fine — tap again.")
+                            append(" If Google refused it, the same tap through the other ")
+                            append("picker often goes through: use the link below.")
                             append(" If it closes every single time, Play services is refusing this ")
                             append("app, which is a Google Cloud setting, not a launcher bug:")
                             append(" add an Android OAuth client with this build's package and ")
