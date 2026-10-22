@@ -108,6 +108,7 @@ import androidx.fragment.app.FragmentActivity
 import kotlinx.coroutines.launch
 import net.kdt.pojavlaunch.R
 import net.kdt.pojavlaunch.Tools
+import net.kdt.pojavlaunch.aerix.bridge.AerixDownloadRequest
 import net.kdt.pojavlaunch.aerix.bridge.AerixIconCropper
 import net.kdt.pojavlaunch.aerix.bridge.AerixInstance
 import net.kdt.pojavlaunch.aerix.bridge.AerixInstanceDraft
