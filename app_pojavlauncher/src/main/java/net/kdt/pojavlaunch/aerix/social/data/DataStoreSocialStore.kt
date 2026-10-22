@@ -37,6 +37,7 @@ class DataStoreSocialStore(private val store: DataStore<Preferences>) : SocialSt
         store.edit { prefs ->
             val next = transform(read(prefs))
             prefs[Keys.SIGNED_IN] = next.signedIn
+            prefs[Keys.EMAIL] = next.email
             prefs[Keys.NAME] = next.name
             prefs[Keys.USERNAME] = next.username
             prefs[Keys.USERNAME_CHANGED_AT] = next.usernameChangedAt
@@ -85,6 +86,7 @@ class DataStoreSocialStore(private val store: DataStore<Preferences>) : SocialSt
 
     private fun read(prefs: Preferences): SocialPersisted = SocialPersisted(
         signedIn = prefs[Keys.SIGNED_IN] ?: false,
+        email = prefs[Keys.EMAIL].orEmpty(),
         name = prefs[Keys.NAME].orEmpty(),
         username = prefs[Keys.USERNAME].orEmpty(),
         usernameChangedAt = prefs[Keys.USERNAME_CHANGED_AT] ?: 0L,
@@ -150,6 +152,7 @@ class DataStoreSocialStore(private val store: DataStore<Preferences>) : SocialSt
 
     private object Keys {
         val SIGNED_IN = booleanPreferencesKey("social_signed_in")
+        val EMAIL = stringPreferencesKey("social_email")
         val NAME = stringPreferencesKey("social_name")
         val USERNAME = stringPreferencesKey("social_username")
         val USERNAME_CHANGED_AT = longPreferencesKey("social_username_changed_at")

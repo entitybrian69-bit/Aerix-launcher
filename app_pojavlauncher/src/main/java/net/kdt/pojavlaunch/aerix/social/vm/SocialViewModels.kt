@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import net.kdt.pojavlaunch.aerix.social.data.ActivityPost
+import net.kdt.pojavlaunch.aerix.social.auth.GoogleAccount
 import net.kdt.pojavlaunch.aerix.social.data.AerixUser
 import net.kdt.pojavlaunch.aerix.social.data.AttachmentKind
 import net.kdt.pojavlaunch.aerix.social.data.ChatAttachment
@@ -110,6 +111,8 @@ class SocialShellViewModel : ViewModel() {
 
 data class ProfileUiState(
     val signedIn: Boolean = false,
+    /** The Google account this profile belongs to, once a real sign-in happened. */
+    val email: String = "",
     val name: String = "",
     val username: String = "",
     val usernameChangedAt: Long = 0L,
@@ -121,6 +124,8 @@ data class ProfileUiState(
     val themeWallpaperId: String = "",
     val nameError: String? = null,
     val signInInProgress: Boolean = false,
+    /** Why the last Google sign-in did not go through, shown on the auth screen. */
+    val googleError: String? = null,
     val saved: Boolean = false
 ) {
     fun canChangeUsername(now: Long = System.currentTimeMillis()): Boolean =
@@ -143,6 +148,7 @@ class SocialProfileViewModel(
                 _state.update {
                     it.copy(
                         signedIn = persisted.signedIn,
+                        email = persisted.email,
                         name = persisted.name,
                         username = persisted.username.ifBlank { persisted.name },
                         usernameChangedAt = persisted.usernameChangedAt,
@@ -156,6 +162,49 @@ class SocialProfileViewModel(
                 }
             }
         }
+    }
+
+    /**
+     * Real Google sign-in. Stores the account's email and, when this device has no profile yet,
+     * seeds the name from Google before the character screen refines it.
+     * [onDone] receives true when there was already a profile, so the shell can go straight to
+     * the dashboard instead of the character step.
+     */
+    fun signInWithGoogle(account: GoogleAccount, onDone: (existingProfile: Boolean) -> Unit = {}) =
+        viewModelScope.launch {
+            _state.update { it.copy(signInInProgress = true, googleError = null) }
+            val existing = _state.value.name.isNotBlank()
+            val fallbackName = account.displayName.ifBlank { account.email.substringBefore('@') }.take(16)
+            withContext(io) {
+                store.update { persisted ->
+                    persisted.copy(
+                        signedIn = true,
+                        email = account.email,
+                        name = persisted.name.ifBlank { fallbackName },
+                        username = persisted.username.ifBlank {
+                            (persisted.name.ifBlank { fallbackName }).filter { it.isLetterOrDigit() }.take(16)
+                        }
+                    )
+                }
+            }
+            _state.update {
+                it.copy(
+                    signedIn = true,
+                    email = account.email,
+                    name = it.name.ifBlank { fallbackName },
+                    signInInProgress = false
+                )
+            }
+            onDone(existing)
+        }
+
+    /** A sign-in that failed for a reason worth showing (no account, not configured, …). */
+    fun onGoogleSignInFailed(message: String) {
+        _state.update { it.copy(signInInProgress = false, googleError = message) }
+    }
+
+    fun clearGoogleError() {
+        _state.update { it.copy(googleError = null) }
     }
 
     /**
@@ -298,6 +347,7 @@ class SocialProfileViewModel(
 
     fun snapshot(): SocialPersisted = SocialPersisted(
         signedIn = _state.value.signedIn,
+        email = _state.value.email,
         name = _state.value.name,
         username = _state.value.username,
         usernameChangedAt = _state.value.usernameChangedAt,

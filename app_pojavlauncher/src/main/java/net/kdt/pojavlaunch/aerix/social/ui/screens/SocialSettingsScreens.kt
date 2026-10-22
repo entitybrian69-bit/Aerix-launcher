@@ -302,7 +302,20 @@ fun SocialSettingsAccountScreen(
             }
             SocialPanel(modifier = Modifier.weight(1f).fillMaxSize().verticalScroll(rememberScrollState())) {
                 SocialSectionTitle("Account")
-                SocialBody("Signed in with Google · ${state.name.ifBlank { "Aerix member" }}", size = 12.sp, color = SocialColors.textMuted)
+                // The real address Google returned, or a plain statement when there is none.
+                SocialBody(
+                    if (state.email.isNotBlank()) state.email
+                    else "Local profile · no Google account linked",
+                    size = 13.sp,
+                    color = SocialColors.textPrimary,
+                    maxLines = 1
+                )
+                SocialBody(
+                    if (state.email.isNotBlank()) "Signed in with Google · ${state.name.ifBlank { "Aerix member" }}"
+                    else "Signed in · ${state.name.ifBlank { "Aerix member" }}",
+                    size = 12.sp,
+                    color = SocialColors.textMuted
+                )
                 SocialStageRow("Disable account") { disableDialog = true }
                 SocialBody("Disabling signs you out everywhere and hides your profile. Nothing is deleted.", size = 11.sp, color = SocialColors.textMuted)
                 SocialStageRow("Delete account") { deleteDialog = true }

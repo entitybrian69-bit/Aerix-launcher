@@ -205,13 +205,18 @@ fun SocialShell(
                     when (target) {
                         SocialRoute.AUTH -> SocialAuthScreen(
                             inProgress = profile.signInInProgress,
-                            onSignInExisting = {
-                                profileVm.signIn { shell.reset(SocialRoute.DASHBOARD) }
+                            googleError = profile.googleError,
+                            onGoogleAccount = { account, creating ->
+                                profileVm.signInWithGoogle(account) { existingProfile ->
+                                    // A brand new account still picks its character; an account
+                                    // this device already knows goes straight to the dashboard.
+                                    shell.reset(
+                                        if (existingProfile && !creating) SocialRoute.DASHBOARD
+                                        else SocialRoute.CHARACTER
+                                    )
+                                }
                             },
-                            onCreateAccount = {
-                                profileVm.createAccount()
-                                shell.reset(SocialRoute.CHARACTER)
-                            },
+                            onGoogleError = { message -> profileVm.onGoogleSignInFailed(message) },
                             onNotNow = onExitToLauncher
                         )
                         SocialRoute.CHARACTER -> SocialCharacterScreen(

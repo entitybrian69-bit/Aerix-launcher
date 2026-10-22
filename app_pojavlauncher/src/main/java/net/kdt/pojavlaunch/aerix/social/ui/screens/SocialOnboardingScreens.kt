@@ -40,15 +40,20 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import net.kdt.pojavlaunch.R
+import net.kdt.pojavlaunch.aerix.social.auth.GoogleAccount
+import net.kdt.pojavlaunch.aerix.social.auth.GoogleAuth
+import net.kdt.pojavlaunch.aerix.social.auth.GoogleAuthResult
 import net.kdt.pojavlaunch.aerix.social.data.SocialWardrobe
 import net.kdt.pojavlaunch.aerix.social.data.WardrobeItem
 import net.kdt.pojavlaunch.aerix.social.ui.SocialAvatar
@@ -64,20 +69,42 @@ import net.kdt.pojavlaunch.aerix.social.ui.SocialSectionTitle
 import net.kdt.pojavlaunch.aerix.social.ui.SocialTextField
 import net.kdt.pojavlaunch.aerix.social.ui.SocialTitle
 import net.kdt.pojavlaunch.aerix.social.ui.socialAvatarRes
+import kotlinx.coroutines.launch
 import net.kdt.pojavlaunch.aerix.social.vm.SocialProfileViewModel
 
 /**
- * Google account step. Two clear paths: sign in with an existing account, or create a new
- * one (which continues to the character screen).
+ * Google account step. Both buttons run the real Credential Manager flow: Android shows the
+ * Google accounts on the phone and hands back an ID token. There is no fake account list.
  */
 @Composable
 fun SocialAuthScreen(
     inProgress: Boolean,
-    onSignInExisting: () -> Unit,
-    onCreateAccount: () -> Unit,
+    googleError: String?,
+    onGoogleAccount: (GoogleAccount, creatingAccount: Boolean) -> Unit,
+    onGoogleError: (String) -> Unit,
     onNotNow: () -> Unit
 ) {
-    var chooserOpen by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var launching by remember { mutableStateOf(false) }
+    var notConfigured by remember { mutableStateOf(false) }
+
+    fun startGoogle(creating: Boolean) {
+        if (launching || inProgress) return
+        launching = true
+        scope.launch {
+            val result = GoogleAuth.signIn(context)
+            launching = false
+            when (result) {
+                is GoogleAuthResult.Success -> onGoogleAccount(result.account, creating)
+                GoogleAuthResult.Cancelled -> Unit
+                GoogleAuthResult.NotConfigured -> notConfigured = true
+                is GoogleAuthResult.Failed -> onGoogleError(result.message)
+            }
+        }
+    }
+
+    val busy = inProgress || launching
 
     SocialPage {
         Column(
@@ -122,26 +149,39 @@ fun SocialAuthScreen(
                         }
                     }
                     SocialPrimaryButton(
-                        text = if (inProgress) "Connecting…" else "Sign in with Google",
-                        onClick = { chooserOpen = true },
-                        enabled = !inProgress,
+                        text = if (busy) "Waiting for Google…" else "Sign in with Google",
+                        onClick = { startGoogle(creating = false) },
+                        enabled = !busy,
                         iconRes = R.drawable.aerix_social_ic_google,
                         modifier = Modifier.fillMaxWidth()
                     )
                     SocialGhostButton(
                         text = "Create a new account",
-                        onClick = onCreateAccount,
-                        enabled = !inProgress,
+                        onClick = { startGoogle(creating = true) },
+                        enabled = !busy,
                         iconRes = R.drawable.aerix_social_ic_add_person,
                         modifier = Modifier.fillMaxWidth()
                     )
+                    if (notConfigured) {
+                        SocialBody(
+                            "This build has no Google OAuth client id, so Android cannot open the " +
+                                "account sheet. Add aerixGoogleWebClientId in gradle.properties and rebuild.",
+                            size = 12.sp,
+                            color = SocialColors.danger
+                        )
+                    }
+                    if (googleError != null) {
+                        SocialBody(googleError, size = 12.sp, color = SocialColors.danger)
+                    }
                     SocialBody(
-                        "New here? Creating an account takes one step: choose a name, a username, a skin and an optional theme.",
+                        "New here? Signing in with Google takes one step further: choose a name, a " +
+                            "username, a skin and an optional theme.",
                         size = 12.sp,
                         color = SocialColors.textMuted
                     )
                     SocialBody(
-                        "Aerix accounts are separate from your Minecraft account. Google sign-in opens a secure system screen.",
+                        "Aerix accounts are separate from your Minecraft account. Google sign-in " +
+                            "opens a secure system screen; your password never touches the launcher.",
                         size = 12.sp,
                         color = SocialColors.textMuted
                     )
@@ -156,49 +196,6 @@ fun SocialAuthScreen(
             SocialBody("Privacy", size = 12.sp, color = SocialColors.textSecondary)
             Spacer(Modifier.width(16.dp))
             SocialBody("Terms", size = 12.sp, color = SocialColors.textSecondary)
-        }
-    }
-
-    if (chooserOpen) {
-        SocialDialog(onDismiss = { chooserOpen = false }) {
-            SocialTitle("Choose an account")
-            SocialBody("to continue to Aerix", size = 13.sp)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = SocialDimens.row)
-                    .clip(RoundedCornerShape(SocialDimens.controlRadius))
-                    .background(SocialColors.panelSoft)
-                    .clickable {
-                        chooserOpen = false
-                        onSignInExisting()
-                    }
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                SocialAvatar(avatar = 6, size = 36.dp)
-                Column(modifier = Modifier.weight(1f)) {
-                    SocialBody("Nova", size = 14.sp, color = SocialColors.textPrimary, weight = FontWeight.Medium)
-                    SocialBody("nova@gmail.com", size = 12.sp, color = SocialColors.textMuted)
-                }
-                Icon(
-                    painter = painterResource(R.drawable.aerix_social_ic_chevron),
-                    contentDescription = null,
-                    tint = SocialColors.textMuted,
-                    modifier = Modifier.size(16.dp)
-                )
-            }
-            SocialGhostButton(
-                text = "Use another account",
-                onClick = {
-                    chooserOpen = false
-                    onCreateAccount()
-                },
-                modifier = Modifier.fillMaxWidth()
-            )
-            SocialGhostButton(text = "Cancel", onClick = { chooserOpen = false }, modifier = Modifier.fillMaxWidth())
-            SocialBody("Aerix only receives your name and profile picture from Google.", size = 11.sp, color = SocialColors.textMuted)
         }
     }
 }

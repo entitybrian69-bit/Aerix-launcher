@@ -210,6 +210,8 @@ data class MicSettings(
 /** Everything the launcher writes to DataStore. */
 data class SocialPersisted(
     val signedIn: Boolean = false,
+    /** The Google account this profile was signed in with; blank for a local-only profile. */
+    val email: String = "",
     val name: String = "",
     val username: String = "",
     val usernameChangedAt: Long = 0L,
