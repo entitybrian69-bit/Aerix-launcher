@@ -168,27 +168,32 @@ object GoogleAuth {
 
     fun signingSha256(context: Context): String = signingDigest(context, "SHA-256")
 
-    private fun signingDigest(context: Context, algorithm: String): String = try {
-        val pm = context.packageManager
-        val pkg = context.packageName
-        val signature = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
-            pm.getPackageInfo(pkg, android.content.pm.PackageManager.GET_SIGNING_CERTIFICATES)
-                .signingInfo
-                ?.apkContentsSigners
-                ?.firstOrNull()
-        } else {
-            @Suppress("DEPRECATION")
-            pm.getPackageInfo(pkg, android.content.pm.PackageManager.GET_SIGNATURES)
-                .signatures
-                ?.firstOrNull()
+    private fun signingDigest(context: Context, algorithm: String): String {
+        return try {
+            val pm = context.packageManager
+            val pkg = context.packageName
+            val signature = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                pm.getPackageInfo(pkg, android.content.pm.PackageManager.GET_SIGNING_CERTIFICATES)
+                    .signingInfo
+                    ?.apkContentsSigners
+                    ?.firstOrNull()
+            } else {
+                @Suppress("DEPRECATION")
+                pm.getPackageInfo(pkg, android.content.pm.PackageManager.GET_SIGNATURES)
+                    .signatures
+                    ?.firstOrNull()
+            }
+            if (signature == null) {
+                ""
+            } else {
+                val digest = java.security.MessageDigest.getInstance(algorithm)
+                    .digest(signature.toByteArray())
+                digest.joinToString(":") { String.format("%02X", it) }
+            }
+        } catch (error: Throwable) {
+            Log.w(TAG, "Could not read the signing certificate", error)
+            ""
         }
-        if (signature == null) return ""
-        val digest = java.security.MessageDigest.getInstance(algorithm)
-            .digest(signature.toByteArray())
-        digest.joinToString(":") { String.format("%02X", it) }
-    } catch (error: Throwable) {
-        Log.w(TAG, "Could not read the signing certificate", error)
-        ""
     }
 
     /**

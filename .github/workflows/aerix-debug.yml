@@ -133,9 +133,9 @@ jobs:
             echo "run: $GITHUB_RUN_ID"
             echo "built: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
             # The fingerprint Google matches against the Android OAuth client for this package.
-            echo "package: net.kdt.pojavlaunch.debug"
-            echo "sha1: $(keytool -printcert -jarfile "$APK_PATH" | grep -m1 'SHA1:' | sed 's/.*SHA1: //')"
-            echo "sha256: $(keytool -printcert -jarfile "$APK_PATH" | grep -m1 'SHA256:' | sed 's/.*SHA256: //')"
+            echo 'package: net.kdt.pojavlaunch.debug'
+            echo "sha1: $(keytool -printcert -jarfile '$APK_PATH' | grep -m1 'SHA1:' | sed 's/.*SHA1: //')"
+            echo "sha256: $(keytool -printcert -jarfile '$APK_PATH' | grep -m1 'SHA256:' | sed 's/.*SHA256: //')"
             echo "note: not a public release; the release APKs live in GitHub Releases"
           } > apk/DEBUG_BUILD.txt
           git config user.name "github-actions[bot]"

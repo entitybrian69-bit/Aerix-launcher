@@ -514,7 +514,6 @@ fun SocialSettingsAccountScreen(
     }
 }
 
-@Composable
 /** A read-only fact the player can copy into Google Cloud Console. */
 @Composable
 private fun DiagnosticRow(label: String, value: String) {
@@ -559,6 +558,7 @@ private fun DiagnosticRow(label: String, value: String) {
     }
 }
 
+@Composable
 private fun SocialStageRow(title: String, onClick: () -> Unit) {
     Row(
         modifier = Modifier
