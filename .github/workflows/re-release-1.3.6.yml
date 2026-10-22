@@ -103,3 +103,5 @@ jobs:
             exit 1
           }
           echo "::notice title=done::$NEW_TAG published from CI run $SRC_RUN"
+
+# permissions unblocked, re-triggering publish
