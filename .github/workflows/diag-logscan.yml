@@ -23,7 +23,8 @@ jobs:
           gh run view "$FAILED_RUN" -R "${{ github.repository }}" --log-failed > fail.log 2>&1 || true
           echo "log lines: $(wc -l < fail.log)"
           grep -oE "error: resource [a-z]+/[A-Za-z0-9_]+ \(aka [^)]+\) not found" fail.log | sort -u > hits.txt || true
-          grep -nE "^e: |FAILED|Execution failed|Caused by|What went wrong|Unresolved reference|duplicate" fail.log | head -40 >> hits.txt || true
+          awk '/\* What went wrong:/{f=1} f&&c<25{print; c++}' fail.log >> hits.txt || true
+          grep -nE "^e: |FAILED|Caused by|Unresolved reference|duplicate|Error:" fail.log | head -40 >> hits.txt || true
           if [ -s hits.txt ]; then
             while read -r l; do echo "::error title=gradle::$(printf '%s' "$l" | head -c 600)"; done < hits.txt
           else
