@@ -620,6 +620,16 @@ class SocialProfileViewModel(
 
     /** Deletes the profile and everything this device stored for it. */
     fun deleteAccount() = viewModelScope.launch {
+        // When this profile belongs to an Aerix account, mark the account itself as deleted
+        // rather than erasing the credential: the same username can then be signed back in and
+        // restored by the person who knows the password. Google-linked profiles have no local
+        // credential, so there is nothing to mark.
+        val accountEmail = _state.value.email
+        if (accountEmail.isNotBlank()) {
+            withContext(io) {
+                accounts.find(accountEmail)?.let { accounts.softDelete(it.id) }
+            }
+        }
         repository?.clearAll()
         withContext(io) { store.update { SocialPersisted() } }
         _state.update {

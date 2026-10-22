@@ -351,7 +351,12 @@ fun SocialSettingsAccountScreen(
                 SocialStageRow("Disable account") { disableDialog = true }
                 SocialBody("Disabling signs you out everywhere and hides your profile. Nothing is deleted.", size = 11.sp, color = SocialColors.textMuted)
                 SocialStageRow("Delete account") { deleteDialog = true }
-                SocialBody("Deleting removes your profile, friends, messages, posts and links permanently.", size = 11.sp, color = SocialColors.textMuted)
+                SocialBody(
+                    "Deleting clears your profile and this device's Social data. If you signed in " +
+                        "with an Aerix account, signing in again with its password restores it.",
+                    size = 11.sp,
+                    color = SocialColors.textMuted
+                )
                 if (BuildConfig.DEBUG) {
                     SocialStageRow("Browser sign-in (testing)") { browserDialog = true }
                     SocialBody(
