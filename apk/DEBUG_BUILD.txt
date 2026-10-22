@@ -1,9 +1,8 @@
 kind: debug (testing only)
 name: Aerix-Launcher-debug.apk
-commit: da0c5aa8ed95e21565c5d3515ce879cef782a85b
-run: 39782174411
-built: 2026-10-22T12:57:27Z
+commit: 35ac83d01872b1c66ebe72fdfad026fa74cde030
+run: 39783204326
+built: 2026-10-22T13:06:02Z
 package: net.kdt.pojavlaunch.debug
-sha1: 
-sha256: 
+sha1: 17:D6:F8:A1:A3:8E:B2:EF:B7:B2:C7:A7:75:99:9C:F4:0D:46:84:10
 note: not a public release; the release APKs live in GitHub Releases
