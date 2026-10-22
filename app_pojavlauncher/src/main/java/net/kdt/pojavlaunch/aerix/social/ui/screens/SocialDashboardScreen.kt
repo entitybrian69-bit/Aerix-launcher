@@ -97,9 +97,6 @@ import net.kdt.pojavlaunch.aerix.social.ui.SocialMicMeter
 import net.kdt.pojavlaunch.aerix.social.ui.SocialTextField
 import net.kdt.pojavlaunch.aerix.social.ui.SocialTitle
 import net.kdt.pojavlaunch.aerix.social.vm.SocialChatViewModel
-import net.kdt.pojavlaunch.aerix.ui.glass.GlassSurface
-import net.kdt.pojavlaunch.aerix.ui.glass.Presence
-import net.kdt.pojavlaunch.aerix.ui.glass.PresenceDot
 import net.kdt.pojavlaunch.aerix.social.vm.SocialDashboardViewModel
 import net.kdt.pojavlaunch.aerix.social.vm.SocialTab
 
@@ -291,40 +288,31 @@ private fun NoFriendsState(onAddFriend: () -> Unit, onActivity: () -> Unit) {
 
 @Composable
 private fun FriendRow(friend: AerixUser, onMessage: (AerixUser) -> Unit) {
-    // v2 language: the row itself is the button. It springs under the finger, ripples at the
-    // touch point and lives with a pulsing presence dot.
-    GlassSurface(
-        modifier = Modifier.fillMaxWidth().heightIn(min = SocialDimens.row),
-        shape = RoundedCornerShape(SocialDimens.controlRadius),
-        tint = SocialColors.panelSoft,
-        onClick = { onMessage(friend) },
-        contentPadding = 10.dp
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = SocialDimens.row)
+            .clip(RoundedCornerShape(SocialDimens.controlRadius))
+            .background(SocialColors.panelSoft)
+            .border(BorderStroke(1.dp, SocialColors.border), RoundedCornerShape(SocialDimens.controlRadius))
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        androidx.compose.foundation.layout.Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            SocialAvatar(avatar = friend.avatar, size = 40.dp, story = friend.hasStory)
-            Column(modifier = Modifier.weight(1f)) {
-                androidx.compose.foundation.layout.Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    SocialBody(friend.name, color = SocialColors.textPrimary, size = 14.sp, weight = FontWeight.SemiBold)
-                    PresenceDot(
-                        state = when (friend.status) {
-                            UserStatus.ONLINE -> Presence.ONLINE
-                            UserStatus.PLAYING -> Presence.ONLINE
-                            UserStatus.IN_VOICE -> Presence.PARTY
-                            UserStatus.OFFLINE -> Presence.OFFLINE
-                        }
-                    )
-                }
-                SocialBody(friend.activity ?: statusLabel(friend.status), size = 12.sp, color = SocialColors.textMuted, maxLines = 1)
+        SocialAvatar(avatar = friend.avatar, size = 40.dp, story = friend.hasStory)
+        Column(modifier = Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                SocialBody(friend.name, color = SocialColors.textPrimary, size = 14.sp, weight = FontWeight.SemiBold)
+                Box(
+                    modifier = Modifier
+                        .size(7.dp)
+                        .clip(CircleShape)
+                        .background(if (friend.status == UserStatus.OFFLINE) SocialColors.textMuted else SocialColors.online)
+                )
             }
-            SocialGhostButton("Message", onClick = { onMessage(friend) })
+            SocialBody(friend.activity ?: statusLabel(friend.status), size = 12.sp, color = SocialColors.textMuted, maxLines = 1)
         }
+        SocialGhostButton("Message", onClick = { onMessage(friend) })
     }
 }
 
