@@ -167,6 +167,19 @@ fun SocialShell(
         if (!shell.back()) onExitToLauncher()
     }
 
+    // Navigation happens from state, not from a callback: whatever path the Google flow takes,
+    // the moment a profile is signed in the shell leaves the auth screen. A returning account
+    // goes to the dashboard; a new or switched one goes through the character step.
+    LaunchedEffect(profile.signedIn, profile.signInOutcome, route) {
+        val outcome = profile.signInOutcome ?: return@LaunchedEffect
+        if (route != SocialRoute.AUTH) return@LaunchedEffect
+        shell.reset(
+            if (outcome == SignInOutcome.RETURNING && !profile.forceCharacterStep) SocialRoute.DASHBOARD
+            else SocialRoute.CHARACTER
+        )
+        profileVm.consumeSignInOutcome()
+    }
+
     SocialBackground(
         modifier = modifier.graphicsLayer {
             alpha = shellProgress
@@ -214,20 +227,13 @@ fun SocialShell(
                         SocialRoute.AUTH -> SocialAuthScreen(
                             inProgress = profile.signInInProgress,
                             googleError = profile.googleError,
+                            stage = profile.googleStage,
                             lastEmail = profile.email,
-                            clientIdOverride = profile.googleClientId,
-                            onGoogleAccount = { account, creating ->
-                                profileVm.signInWithGoogle(account) { outcome ->
-                                    // Returning account: straight to the dashboard. New or
-                                    // switched account: the character step, because the profile
-                                    // now belongs to someone else.
-                                    shell.reset(
-                                        if (outcome == SignInOutcome.RETURNING && !creating) SocialRoute.DASHBOARD
-                                        else SocialRoute.CHARACTER
-                                    )
-                                }
+                            onStartGoogle = { creating ->
+                                // Holds the ViewModel, so the result survives the trip to the
+                                // Google account sheet and back.
+                                profileVm.signInWithGoogle(context, profile.googleClientId, creating)
                             },
-                            onGoogleError = { message -> profileVm.onGoogleSignInFailed(message) },
                             onNotNow = onExitToLauncher
                         )
                         SocialRoute.CHARACTER -> SocialCharacterScreen(

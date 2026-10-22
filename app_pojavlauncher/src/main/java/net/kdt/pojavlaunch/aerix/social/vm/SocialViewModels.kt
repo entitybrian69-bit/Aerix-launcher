@@ -24,6 +24,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import net.kdt.pojavlaunch.aerix.social.data.ActivityPost
 import net.kdt.pojavlaunch.aerix.social.auth.GoogleAccount
+import net.kdt.pojavlaunch.aerix.social.auth.GoogleAuth
+import net.kdt.pojavlaunch.aerix.social.auth.GoogleAuthResult
 import net.kdt.pojavlaunch.aerix.social.data.AerixUser
 import net.kdt.pojavlaunch.aerix.social.data.AttachmentKind
 import net.kdt.pojavlaunch.aerix.social.data.ChatAttachment
@@ -128,6 +130,12 @@ data class ProfileUiState(
     val googleError: String? = null,
     /** Debug-only OAuth client id typed into Settings. */
     val googleClientId: String = "",
+    /** Human readable stage of the Google flow, shown on the portal instead of a dead button. */
+    val googleStage: String? = null,
+    /** Set once after a successful sign-in so the shell can route, then consumed. */
+    val signInOutcome: SignInOutcome? = null,
+    /** True when the player pressed "Create a new account", so the character step always runs. */
+    val forceCharacterStep: Boolean = false,
     val saved: Boolean = false
 ) {
     fun canChangeUsername(now: Long = System.currentTimeMillis()): Boolean =
@@ -182,7 +190,7 @@ class SocialProfileViewModel(
      */
     fun signInWithGoogle(account: GoogleAccount, onDone: (SignInOutcome) -> Unit = {}) =
         viewModelScope.launch {
-            _state.update { it.copy(signInInProgress = true, googleError = null) }
+            _state.update { it.copy(signInInProgress = true, googleError = null, googleStage = "Saving your profile…") }
             val previousEmail = _state.value.email
             val hasProfile = _state.value.name.isNotBlank()
             val switched = previousEmail.isNotBlank() &&
@@ -238,8 +246,67 @@ class SocialProfileViewModel(
                 hasProfile -> SignInOutcome.RETURNING
                 else -> SignInOutcome.NEW_ACCOUNT
             }
+            _state.update { it.copy(googleStage = null, signInOutcome = outcome) }
             onDone(outcome)
         }
+
+    /**
+     * Runs the whole Google flow from the ViewModel, not from a composable.
+     *
+     * The account sheet takes the app out of the foreground, so a coroutine owned by the screen
+     * can be cancelled while the player is picking an account — which looks exactly like "I
+     * tapped my account and nothing happened". A ViewModel outlives that, so the result always
+     * lands somewhere, and the screen navigates from state instead of a callback.
+     */
+    fun signInWithGoogle(
+        context: android.content.Context,
+        clientIdOverride: String = "",
+        creatingAccount: Boolean = false
+    ) = viewModelScope.launch {
+            _state.update {
+                it.copy(
+                    signInInProgress = true,
+                    googleError = null,
+                    googleStage = "Opening Google…",
+                    signInOutcome = null,
+                    forceCharacterStep = creatingAccount
+                )
+            }
+            val result = try {
+                kotlinx.coroutines.withTimeoutOrNull(GOOGLE_TIMEOUT_MS) {
+                    GoogleAuth.signIn(context, clientIdOverride)
+                } ?: GoogleAuthResult.Failed(
+                    "Google did not answer within ${GOOGLE_TIMEOUT_MS / 1000} seconds. " +
+                        "Check that Play Services is signed in, then try again."
+                )
+            } catch (error: Throwable) {
+                GoogleAuthResult.Failed(error.message ?: "Google sign-in failed.")
+            }
+            when (result) {
+                is GoogleAuthResult.Success -> {
+                    _state.update { it.copy(googleStage = "Signing you in…") }
+                    signInWithGoogle(result.account)
+                }
+                GoogleAuthResult.Cancelled -> _state.update {
+                    it.copy(signInInProgress = false, googleStage = null)
+                }
+                GoogleAuthResult.NotConfigured -> _state.update {
+                    it.copy(
+                        signInInProgress = false,
+                        googleStage = null,
+                        googleError = "This build has no Google OAuth client id."
+                    )
+                }
+                is GoogleAuthResult.Failed -> _state.update {
+                    it.copy(signInInProgress = false, googleStage = null, googleError = result.message)
+                }
+            }
+        }
+
+    /** The shell consumes the outcome once so a later sign-out cannot replay the navigation. */
+    fun consumeSignInOutcome() {
+        _state.update { it.copy(signInOutcome = null, forceCharacterStep = false) }
+    }
 
     /** A sign-in that failed for a reason worth showing (no account, not configured, …). */
     fun onGoogleSignInFailed(message: String) {
@@ -410,6 +477,10 @@ class SocialProfileViewModel(
             _state.update { it.copy(username = value.trim(), usernameChangedAt = now, nameError = null) }
         }
         return true
+    }
+
+    private companion object {
+        const val GOOGLE_TIMEOUT_MS = 90_000L
     }
 
     fun snapshot(): SocialPersisted = SocialPersisted(

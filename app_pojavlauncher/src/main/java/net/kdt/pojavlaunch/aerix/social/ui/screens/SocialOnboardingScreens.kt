@@ -80,19 +80,17 @@ import net.kdt.pojavlaunch.aerix.social.vm.SocialProfileViewModel
 fun SocialAuthScreen(
     inProgress: Boolean,
     googleError: String?,
+    stage: String?,
     lastEmail: String,
-    clientIdOverride: String,
-    onGoogleAccount: (GoogleAccount, creatingAccount: Boolean) -> Unit,
-    onGoogleError: (String) -> Unit,
+    onStartGoogle: (creatingAccount: Boolean) -> Unit,
     onNotNow: () -> Unit
 ) {
     PortalAuthScreen(
         inProgress = inProgress,
         googleError = googleError,
+        stage = stage,
         lastEmail = lastEmail,
-        clientIdOverride = clientIdOverride,
-        onGoogleAccount = onGoogleAccount,
-        onGoogleError = onGoogleError,
+        onStartGoogle = onStartGoogle,
         onNotNow = onNotNow
     )
 }

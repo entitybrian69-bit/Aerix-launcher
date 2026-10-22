@@ -109,30 +109,18 @@ private class Mote(val x: Float, val y: Float, val radius: Float, val speed: Flo
 fun PortalAuthScreen(
     inProgress: Boolean,
     googleError: String?,
+    stage: String?,
     lastEmail: String,
-    clientIdOverride: String,
-    onGoogleAccount: (GoogleAccount, creatingAccount: Boolean) -> Unit,
-    onGoogleError: (String) -> Unit,
+    onStartGoogle: (creatingAccount: Boolean) -> Unit,
     onNotNow: () -> Unit
 ) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var launching by remember { mutableStateOf(false) }
-    var notConfigured by remember { mutableStateOf(false) }
-    val busy = inProgress || launching
+    val busy = inProgress
 
+    // The flow itself runs in the ViewModel (see SocialProfileViewModel.signInWithGoogle), so
+    // leaving the app to pick a Google account cannot cancel it and leave this screen stuck.
     fun startGoogle(creating: Boolean) {
         if (busy) return
-        launching = true
-        scope.launch {
-            when (val result = GoogleAuth.signIn(context, clientIdOverride)) {
-                is GoogleAuthResult.Success -> onGoogleAccount(result.account, creating)
-                GoogleAuthResult.Cancelled -> Unit
-                GoogleAuthResult.NotConfigured -> notConfigured = true
-                is GoogleAuthResult.Failed -> onGoogleError(result.message)
-            }
-            launching = false
-        }
+        onStartGoogle(creating)
     }
 
     // Touch feedback state, shared by every animated layer of the scene.
@@ -209,31 +197,41 @@ fun PortalAuthScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                if (notConfigured || googleError != null) {
+                // Where the flow is right now: opening the sheet, signing in, or what failed.
+                if (busy && !stage.isNullOrBlank()) {
+                    StatusPill(text = stage, accent = true)
+                }
+                if (!busy && googleError != null) {
                     Column(
                         modifier = Modifier
-                            .widthIn(max = 420.dp)
+                            .widthIn(max = 460.dp)
                             .clip(RoundedCornerShape(SocialDimens.controlRadius))
-                            .background(Color(0x66121F2B))
-                            .border(1.dp, SocialColors.danger.copy(alpha = 0.5f), RoundedCornerShape(SocialDimens.controlRadius))
-                            .padding(horizontal = 14.dp, vertical = 8.dp)
+                            .background(Color(0xCC2A1218))
+                            .border(1.dp, SocialColors.danger.copy(alpha = 0.8f), RoundedCornerShape(SocialDimens.controlRadius))
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         SocialBody(
-                            if (notConfigured) {
-                                "This build has no Google OAuth client id, so Android cannot open the " +
-                                    "account sheet. Add aerixGoogleWebClientId and rebuild, or paste it in " +
-                                    "Settings → Account on a debug build."
-                            } else {
-                                googleError.orEmpty()
-                            },
-                            size = 11.sp,
-                            color = SocialColors.danger
+                            "Google sign-in did not finish",
+                            size = 12.sp,
+                            color = SocialColors.danger,
+                            weight = androidx.compose.ui.text.font.FontWeight.SemiBold
+                        )
+                        SocialBody(googleError, size = 11.sp, color = SocialColors.textPrimary)
+                        SocialBody(
+                            "Details are also in the launcher log (Settings → Logs) under AerixGoogle.",
+                            size = 10.sp,
+                            color = SocialColors.textMuted
                         )
                     }
                 }
 
                 PortalGoogleButton(
-                    text = if (busy) "Waiting for Google…" else "Continue with Google",
+                    text = when {
+                        busy && !stage.isNullOrBlank() -> stage
+                        busy -> "Waiting for Google…"
+                        else -> "Continue with Google"
+                    },
                     enabled = !busy,
                     accent = accent,
                     onTap = { startGoogle(creating = false) },
@@ -776,4 +774,30 @@ private fun LinkText(text: String, enabled: Boolean, onClick: () -> Unit) {
             }
             .padding(horizontal = 4.dp, vertical = 6.dp)
     )
+}
+
+/** Small pill that says what the flow is doing, so the button is never silently dead. */
+@Composable
+private fun StatusPill(text: String, accent: Boolean) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (accent) SocialColors.accent.copy(alpha = 0.16f) else SocialColors.panelSoft)
+            .border(
+                1.dp,
+                if (accent) SocialColors.accent.copy(alpha = 0.6f) else SocialColors.border,
+                RoundedCornerShape(12.dp)
+            )
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(6.dp)
+                .clip(CircleShape)
+                .background(if (accent) SocialColors.accent else SocialColors.textMuted)
+        )
+        SocialBody(text, size = 11.sp, color = if (accent) SocialColors.accent else SocialColors.textSecondary)
+    }
 }

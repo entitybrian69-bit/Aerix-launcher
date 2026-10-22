@@ -20,6 +20,7 @@ package net.kdt.pojavlaunch.aerix.social.auth
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import android.util.Log
 import androidx.credentials.ClearCredentialStateRequest
 import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
@@ -46,6 +47,8 @@ sealed class GoogleAuthResult {
     data object NotConfigured : GoogleAuthResult()
     data class Failed(val message: String) : GoogleAuthResult()
 }
+
+private const val TAG = "AerixGoogle"
 
 object GoogleAuth {
 
@@ -104,15 +107,52 @@ object GoogleAuth {
                     GoogleAuthResult.Failed("Google returned a credential this launcher cannot read.")
                 }
             } catch (cancelled: GetCredentialCancellationException) {
+                Log.i(TAG, "Sign-in cancelled", cancelled)
                 GoogleAuthResult.Cancelled
             } catch (none: NoCredentialException) {
-                GoogleAuthResult.Failed("No Google account is set up on this device.")
+                Log.w(TAG, "No credential available", none)
+                GoogleAuthResult.Failed(
+                    "No Google account is set up on this device. Add one in Android Settings → " +
+                        "Passwords & accounts, then try again."
+                )
             } catch (error: GetCredentialException) {
-                GoogleAuthResult.Failed(error.errorMessage?.toString() ?: "Google sign-in failed.")
+                GoogleAuthResult.Failed(explain(error, "GetCredentialException"))
             } catch (error: Throwable) {
-                GoogleAuthResult.Failed(error.message ?: "Google sign-in failed.")
+                GoogleAuthResult.Failed(explain(error, error.javaClass.simpleName))
             }
         }
+    }
+
+    /**
+     * Turns a platform exception into something a player (and I) can act on: the raw text plus
+     * the one fix that usually applies.
+     */
+    private fun explain(error: Throwable, kind: String): String {
+        Log.e(TAG, "Google sign-in failed ($kind)", error)
+        val raw = buildString {
+            append(kind)
+            error.message?.let { append(": ").append(it) }
+            // ApiException carries the Google error code, which is the useful part.
+            val code = runCatching {
+                error.javaClass.getMethod("getStatusCode").invoke(error)
+            }.getOrNull()
+            if (code != null) append(" (code ").append(code).append(')')
+        }
+        val haystack = (error.message.orEmpty() + " " + error.cause?.message.orEmpty()).lowercase()
+        val hint = when {
+            haystack.contains("10") && haystack.contains("developer") ||
+                haystack.contains("developer_error") || haystack.contains(": 10") ->
+                "Google rejected this app's signing key. Add an Android OAuth client for package " +
+                    "net.kdt.pojavlaunch.debug with this build's SHA-1, in the same project."
+            haystack.contains("28444") || haystack.contains("api is not enabled") ->
+                "Enable the Google Identity API for this project in Google Cloud."
+            haystack.contains("7") && haystack.contains("network") ->
+                "The network dropped during sign-in. Try again on a stable connection."
+            haystack.contains("origin") ->
+                "This OAuth client has an origin restriction that excludes the app."
+            else -> "Check that this Gmail is listed under Audience → Test users in Google Cloud."
+        }
+        return "$raw · $hint"
     }
 
     /**
