@@ -348,10 +348,14 @@ private fun PartyCard(joined: Boolean, onJoin: () -> Unit, onOpenVoice: () -> Un
     SocialPanel(modifier = Modifier.fillMaxWidth()) {
         SocialSectionTitle("Your party")
         SocialBody(if (joined) "Connected" else "Not connected", size = 12.sp, color = SocialColors.textMuted)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            SocialPrimaryButton(if (joined) "Open" else "Create party", onClick = if (joined) onOpenVoice else onJoin, modifier = Modifier.weight(1f))
-            SocialGhostButton("Voice", onClick = onOpenVoice, modifier = Modifier.weight(1f))
-        }
+        // Stacked instead of side by side: the party card lives in the narrow side column, where
+        // two weighted buttons squeeze the label until it breaks mid-word.
+        SocialPrimaryButton(
+            text = if (joined) "Open party" else "Create party",
+            onClick = if (joined) onOpenVoice else onJoin,
+            modifier = Modifier.fillMaxWidth()
+        )
+        SocialGhostButton("Voice", onClick = onOpenVoice, modifier = Modifier.fillMaxWidth())
     }
 }
 

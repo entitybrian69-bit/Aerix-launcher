@@ -27,7 +27,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -69,46 +71,82 @@ import net.kdt.pojavlaunch.aerix.social.vm.SocialProfileViewModel
 @Composable
 fun SocialAuthScreen(
     inProgress: Boolean,
-    onSignIn: () -> Unit,
+    onSignInExisting: () -> Unit,
+    onCreateAccount: () -> Unit,
     onNotNow: () -> Unit
 ) {
+    var chooserOpen by remember { mutableStateOf(false) }
+
     SocialPage {
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
-            SocialTitle("Your friends, together.", modifier = Modifier.fillMaxWidth())
-            Spacer(Modifier.height(6.dp))
-            SocialBody("Friends, messages and voice in one place.", size = 14.sp)
-            Spacer(Modifier.height(24.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                listOf(1, 2, 3, 4).forEach { index ->
-                    SocialAvatar(avatar = index, size = 52.dp)
+        Column(
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Column(
+                modifier = Modifier.widthIn(max = 560.dp).fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(18.dp)
+            ) {
+                SocialTitle("Your friends, together.", modifier = Modifier.fillMaxWidth())
+                SocialBody("Friends, messages and voice in one place.", size = 14.sp)
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    listOf(1, 2, 3, 4).forEach { index ->
+                        SocialAvatar(avatar = index, size = 52.dp)
+                    }
                 }
-            }
-            Spacer(Modifier.height(28.dp))
-            SocialPanel(modifier = Modifier.fillMaxWidth()) {
-                SocialTitle("Connect with Aerix")
-                SocialBody("Friends, messages and voice in one place.", size = 13.sp)
-                SocialPrimaryButton(
-                    text = if (inProgress) "Connecting…" else "Continue with Google",
-                    onClick = onSignIn,
-                    enabled = !inProgress,
-                    iconRes = R.drawable.aerix_social_ic_google,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                SocialGhostButton(
-                    text = "Not now",
-                    onClick = onNotNow,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                SocialBody(
-                    "Aerix accounts are separate from your Minecraft account.",
-                    size = 12.sp,
-                    color = SocialColors.textMuted
-                )
-                SocialBody(
-                    "Google sign-in opens a secure system screen.",
-                    size = 12.sp,
-                    color = SocialColors.textMuted
-                )
+
+                SocialPanel(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(44.dp)
+                                .clip(CircleShape)
+                                .background(SocialColors.panelSoft),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.aerix_social_ic_google),
+                                contentDescription = null,
+                                tint = SocialColors.accentBright,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            SocialBody("Aerix account", size = 15.sp, color = SocialColors.textPrimary, weight = FontWeight.SemiBold)
+                            SocialBody("Use your Google account to sign in", size = 12.sp, color = SocialColors.textMuted)
+                        }
+                    }
+                    SocialPrimaryButton(
+                        text = if (inProgress) "Connecting…" else "Sign in with Google",
+                        onClick = { chooserOpen = true },
+                        enabled = !inProgress,
+                        iconRes = R.drawable.aerix_social_ic_google,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    SocialGhostButton(
+                        text = "Create a new account",
+                        onClick = onCreateAccount,
+                        enabled = !inProgress,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    SocialBody(
+                        "New to Aerix? Creating an account takes one step: choose a name and an optional skin and cape.",
+                        size = 12.sp,
+                        color = SocialColors.textMuted
+                    )
+                    SocialBody(
+                        "Aerix accounts are separate from your Minecraft account. Google sign-in opens a secure system screen.",
+                        size = 12.sp,
+                        color = SocialColors.textMuted
+                    )
+                }
+
+                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    SocialGhostButton(text = "Not now", onClick = onNotNow)
+                }
             }
         }
         Row(
@@ -118,6 +156,57 @@ fun SocialAuthScreen(
             SocialBody("Privacy", size = 12.sp, color = SocialColors.textSecondary)
             Spacer(Modifier.width(16.dp))
             SocialBody("Terms", size = 12.sp, color = SocialColors.textSecondary)
+        }
+    }
+
+    if (chooserOpen) {
+        SocialDialog(onDismiss = { chooserOpen = false }) {
+            SocialTitle("Choose an account")
+            SocialBody("to continue to Aerix", size = 13.sp)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = SocialDimens.row)
+                    .clip(RoundedCornerShape(SocialDimens.controlRadius))
+                    .background(SocialColors.panelSoft)
+                    .clickable {
+                        chooserOpen = false
+                        onSignInExisting()
+                    }
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                SocialAvatar(avatar = 6, size = 36.dp)
+                Column(modifier = Modifier.weight(1f)) {
+                    SocialBody("Nova", size = 14.sp, color = SocialColors.textPrimary, weight = FontWeight.Medium)
+                    SocialBody("nova@gmail.com", size = 12.sp, color = SocialColors.textMuted)
+                }
+                Icon(
+                    painter = painterResource(R.drawable.aerix_social_ic_chevron),
+                    contentDescription = null,
+                    tint = SocialColors.textMuted,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+            SocialGhostButton(
+                text = "Use another account",
+                onClick = {
+                    chooserOpen = false
+                    onCreateAccount()
+                },
+                modifier = Modifier.fillMaxWidth()
+            )
+            SocialGhostButton(
+                text = "Cancel",
+                onClick = { chooserOpen = false },
+                modifier = Modifier.fillMaxWidth()
+            )
+            SocialBody(
+                "Aerix only receives your name and profile picture from Google.",
+                size = 11.sp,
+                color = SocialColors.textMuted
+            )
         }
     }
 }

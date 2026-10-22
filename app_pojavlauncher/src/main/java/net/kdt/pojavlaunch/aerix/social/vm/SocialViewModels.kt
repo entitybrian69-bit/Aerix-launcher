@@ -124,9 +124,16 @@ class SocialProfileViewModel(
         }
     }
 
-    fun signIn() = viewModelScope.launch {
+    /**
+     * Existing account: the stored profile is kept, so the player lands straight on the
+     * dashboard. A blank name (first sign-in on a fresh install) falls back to the account
+     * display name instead of asking for the appearance setup again.
+     */
+    fun signIn(accountName: String = "Nova") = viewModelScope.launch {
         _state.update { it.copy(signInInProgress = true) }
-        withContext(io) { store.update { it.copy(signedIn = true) } }
+        withContext(io) {
+            store.update { it.copy(signedIn = true, name = it.name.ifBlank { accountName }) }
+        }
         _state.update { it.copy(signInInProgress = false) }
     }
 

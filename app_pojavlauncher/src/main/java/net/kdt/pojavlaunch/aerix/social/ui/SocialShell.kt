@@ -168,10 +168,13 @@ fun SocialShell(
                     when (target) {
                         SocialRoute.AUTH -> SocialAuthScreen(
                             inProgress = profile.signInInProgress,
-                            onSignIn = {
+                            // Existing account: straight to the dashboard, the stored profile is kept.
+                            onSignInExisting = {
                                 profileVm.signIn()
-                                shell.push(SocialRoute.APPEARANCE)
+                                shell.reset(SocialRoute.DASHBOARD)
                             },
+                            // New account: pick a name, skin and cape first.
+                            onCreateAccount = { shell.reset(SocialRoute.APPEARANCE) },
                             onNotNow = onExitToLauncher
                         )
                         SocialRoute.APPEARANCE -> SocialAppearanceScreen(

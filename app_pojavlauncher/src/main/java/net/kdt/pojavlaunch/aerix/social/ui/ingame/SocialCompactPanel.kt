@@ -262,11 +262,15 @@ fun SocialCompactPanel(
                 }
             }
 
-            SocialGhostButton(
-                text = "Block ${state.invite?.fromName ?: "player"}",
-                onClick = { blockTarget = state.invite?.fromName ?: "Kai" },
-                modifier = Modifier.fillMaxWidth()
-            )
+            // Nothing to block while signed out: the account-level actions only exist once the
+            // player has an Aerix profile.
+            if (state.mode != CompactMode.AUTH_REQUIRED) {
+                SocialGhostButton(
+                    text = "Block ${state.invite?.fromName ?: "player"}",
+                    onClick = { blockTarget = state.invite?.fromName ?: "Kai" },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
         }
     }
 
