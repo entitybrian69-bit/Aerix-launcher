@@ -214,7 +214,7 @@ private fun runtimeLabel(runtime: Runtime): String {
     return if (actual > 0 && actual != declared) "Internal $actual" else "Internal $declared"
 }
 
-/** One renderer's mark, sized to sit on the same baseline as its name. */
+/** One renderer's mark (Vulkan, OpenGL, vGPU, LTW, plugin), sized to sit beside its name. */
 @Composable
 private fun RendererLogo(@DrawableRes logoRes: Int, tint: Color) {
     Icon(
