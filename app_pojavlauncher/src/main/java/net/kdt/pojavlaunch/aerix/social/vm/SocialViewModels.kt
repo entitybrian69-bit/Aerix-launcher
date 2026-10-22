@@ -228,7 +228,9 @@ class SocialProfileViewModel(
     }
 
     fun addLink(platform: LinkPlatform, value: String) {
-        val handle = value.trim().removePrefix("@")
+        // Keep the @ for platforms that show it, drop it only when the prefix already has one.
+        val raw = value.trim()
+        val handle = if (platform.prefix.endsWith("@")) raw.removePrefix("@") else raw
         if (handle.isBlank()) return
         viewModelScope.launch {
             withContext(io) {
@@ -259,8 +261,7 @@ class SocialProfileViewModel(
                     it.copy(
                         name = name,
                         username = username,
-                        signedIn = true,
-                        usernameChangedAt = if (it.username.isBlank()) System.currentTimeMillis() else it.usernameChangedAt
+                        signedIn = true
                     )
                 }
             }

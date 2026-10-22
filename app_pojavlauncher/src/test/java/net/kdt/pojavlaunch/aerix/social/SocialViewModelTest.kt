@@ -179,7 +179,7 @@ class SocialViewModelTest {
         val viewModel = SocialAddFriendViewModel(repository)
 
         viewModel.setByEmail(true)
-        viewModel.onQueryChange("alex@gmail.com")
+        viewModel.onQueryChange("nova@gmail.com")
         viewModel.search()
         advanceUntilIdle()
 
@@ -213,7 +213,7 @@ class SocialViewModelTest {
         val viewModel = SocialActivityViewModel(repository)
         advanceUntilIdle()
 
-        val post = viewModel.state.value.posts.first()
+        val post = viewModel.state.value.posts.first { !it.following }
         viewModel.toggleLike(post.id)
         advanceUntilIdle()
         assertTrue(viewModel.state.value.posts.first { it.id == post.id }.liked)
@@ -312,17 +312,21 @@ class SocialProfileViewModelTest {
         viewModel.onUsernameChange("nova_one")
         viewModel.saveCharacter()
         advanceUntilIdle()
-        val firstChange = store.snapshot().usernameChangedAt
-        assertTrue(firstChange > 0L)
+        // Setting the username while creating the character does not start the cooldown.
+        assertEquals(0L, store.snapshot().usernameChangedAt)
 
-        // A second change right away is rejected and the stored username stays.
+        // The first rename is allowed and starts the week.
         assertTrue(viewModel.changeUsername("nova_two"))
         advanceUntilIdle()
+        assertTrue(store.snapshot().usernameChangedAt > 0L)
+        assertEquals("nova_two", store.snapshot().username)
+
+        // A second rename right away is rejected and the stored username stays.
         assertFalse(viewModel.changeUsername("nova_three"))
         assertEquals("nova_two", store.snapshot().username)
         assertNotNull(viewModel.state.value.nameError)
 
-        // A week later it is allowed again.
+        // Once the week is over it is allowed again.
         val later = SocialPersisted(
             usernameChangedAt = System.currentTimeMillis() - SocialPersisted.USERNAME_COOLDOWN_MS - 1000
         )
