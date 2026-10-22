@@ -2,113 +2,115 @@
 
 A second launcher inside Aerix, opened from a Play-dashboard widget. Not a section of the
 existing rail: while Social is open the Play dashboard, the Play button and the launcher rail
-are not composed at all.
+are not composed at all. **Social now uses the launcher's own glass theme** — same wallpaper,
+same `AerixSurface` tokens, same accent — instead of a separate purple palette.
 
 - Branch: `arena/2f1249a3-aerix-launcher`
-- Code commit: `d81d8fa1c48ab72ddc716f72033c8e4ad0e4e44a`
-- Debug APK commit: `b417dc9dc` (`apk/Aerix-Launcher-debug.apk`, 102,205,734 B,
-  sha256 `2a3aed53cda88abbfab93f9817bbf141f946ea6a426c97e7777fb5300b72f602`)
-- CI runs: `diag social` 39730501429 (success), `Android CI` 39730501451 (success),
-  `Aerix debug (testing)` 39730501582 (success, built the APK above)
+- Code + APK commit: `d1fbb547`
+- Debug APK: `apk/Aerix-Launcher-debug.apk` — 102,392,169 B,
+  sha256 `f8fcceaea93e020f322ebf1524c77393a4333928c3347eca7bd0c657c5a02706`
+  (`apk/DEBUG_BUILD.txt`, run `39745699736`, package `net.kdt.pojavlaunch.debug`)
+- CI: `diag social` **39745699604** (compile + 265 unit tests, success),
+  `Android CI` 39745699649 (success), `Aerix debug (testing)` **39745699736** (success)
+
+## First-run flow
+
+1. **Google account** (`SocialAuthScreen`): *Sign in with Google* (account chooser → straight to
+   the dashboard, stored profile kept) or *Create a new account*.
+2. **Character screen** (`SocialCharacterScreen`): display name, username, skin, cape and an
+   optional theme. Nothing here starts the username cooldown — that starts on the first rename.
+3. **Dashboard** (`SocialDashboardScreen`): empty state reads "You have no friends yet" with an
+   **Add friends** button; once friends exist it lists who is **online** and **offline** and each
+   row has **Message**.
+
+## Rail (84dp)
+
+`Social` (dashboard) · `Add friend` · `Activity` · `Customise` · `Profile`.
+
+No chat entry (chat lives on the dashboard) and **no exit entry** — the top-left arrow leaves
+Social, as in the launcher. The gear in the top-right opens Settings.
+
+## Screens
+
+| Screen | File |
+| --- | --- |
+| Google sign-in / sign-up, account chooser | `ui/screens/SocialOnboardingScreens.kt` |
+| Character setup, skin picker, cape picker | `ui/screens/SocialOnboardingScreens.kt` |
+| Dashboard (friends online/offline, chats, party) | `ui/screens/SocialDashboardScreen.kt` |
+| Chat: images, GIFs, files of any size, links, instances, music | `ui/screens/SocialDashboardScreen.kt` |
+| Add a friend (username **or** Gmail search, Add button) | `ui/screens/SocialAddFriendScreen.kt` |
+| Activity: posts, videos, text, 24h stories, likes/comments/follow | `ui/screens/SocialActivityScreen.kt` |
+| Profile (bio, counters, platform links) and Edit profile | `ui/screens/SocialProfileScreens.kt` |
+| Customise: the same 25 launcher wallpapers + themes | `ui/screens/SocialThemeScreen.kt` |
+| Settings hub, Privacy, Microphone, Chats, Account, Notifications, Safety | `ui/screens/SocialSettingsScreens.kt` |
+| In-game compact panel (chat / voice / invite / sign-in required) | `ui/ingame/SocialCompactPanel.kt` |
+| Play-dashboard widget | `ui/SocialWidgetCard.kt` |
+
+## Feature notes
+
+- **Add friend**: search by Aerix username or by the Gmail on the account (`SocialAddFriendViewModel`
+  → `repository.search(query, byEmail)`). Results exclude existing friends and show **Add**.
+  Only after the other side accepts can chat, calls, files and parties happen.
+- **Attachments** (`AttachmentKind`): IMAGE, GIF, FILE (any size), LINK, INSTANCE, MUSIC.
+  A shared instance renders a **Download and select** button: `installSharedInstance` moves the
+  share from `IDLE` → `DOWNLOADING` → `READY`, i.e. it downloads and auto-selects the instance.
+  A music message has a **Play in chat** toggle so it keeps playing while you type or talk.
+- **Party**: any number of friends (minimum three is explained in the UI), renameable, with a
+  logo and a **group call**; everything sendable in a chat is sendable in the party.
+- **Activity**: photos, videos, text posts and stories. A story puts a **crimson ring** on the
+  avatar and expires after 24 hours. Tapping a profile shows the picture, the
+  likes/followers/following/posts counters, and every platform link (YouTube, Instagram,
+  Discord, X, TikTok, Twitch, website) with its own icon that opens the destination.
+- **Profile**: account logo (6 avatars), display name, bio and links.
+- **Username**: one change per week (`SocialPersisted.USERNAME_COOLDOWN_MS`), with the remaining
+  time shown in Settings → Account.
+
+## Settings (gear, top right)
+
+| Section | Contents |
+| --- | --- |
+| Privacy | status text, profile lock, online status, activity sharing, server details, who can send requests / messages / party invites |
+| Microphone (mic icon in the middle) | join muted, push-to-talk, voice activity, noise suppression, echo cancellation, input and output volume |
+| Chats | who may message you: strangers / friends / close friends / party; media auto-download, read receipts, keep media |
+| Account settings | username (weekly lock), disable account, delete account (typed `DELETE`), blocked accounts and reporting |
 
 ## Architecture
 
 ```
-Appearance / name / skin / cape + privacy + notifications
-        │
-   SocialStore (interface)
-        ├── DataStoreSocialStore   Preferences DataStore, file "aerix_social"   (production)
-        └── InMemorySocialStore    JVM tests
+SocialStore (interface) ── DataStoreSocialStore (Preferences "aerix_social")
+                        └─ InMemorySocialStore (JVM tests)
 
-Friends / requests / chats / party / invite / connection
-        │
-   SocialRepository (interface)
-        └── MockSocialRepository   in-memory, every mutation is suspend + delay, runs on io
+SocialRepository (interface) ── MockSocialRepository (in-memory, suspend + delay on an io dispatcher)
 
-   SocialGraph  ── one repository + one store for the whole process (launcher shell and
-                   the in-game overlay observe the same StateFlows)
+SocialGraph: one store + one repository for the whole process (shell and in-game overlay)
 ```
 
-Unidirectional flow: Compose collects `StateFlow<...UiState>`, sends events to a ViewModel,
-the ViewModel calls a suspend repository/store function inside `viewModelScope` on
-`Dispatchers.IO`, the repository emits new state, the UI recomposes.
+Compose collects `StateFlow<...UiState>`, sends events to a ViewModel, the ViewModel calls a
+suspend repository/store function in `viewModelScope` on `Dispatchers.IO`, the repository emits
+new state, the UI recomposes.
 
-| ViewModel | State | Writes |
-| --- | --- | --- |
-| `SocialShellViewModel` | `isOpen`, `route`, `tab`, back stack | navigation only |
-| `SocialProfileViewModel` | `ProfileUiState` | DataStore: sign-in flag, name, skin, cape |
-| `SocialDashboardViewModel` | `DashboardUiState` | accept / decline / add friend / party |
-| `SocialChatViewModel` | `ChatUiState` | send message, toggle reaction |
-| `SocialSettingsViewModel` | `SettingsUiState` | DataStore: 6 privacy + 8 notification fields |
-| `InGameSocialViewModel` | `InGameSocialUiState` | shared repository: party, invite, chat |
-
-Models: `AerixUser`, `ChatMessage` (reactions map + `myReaction`), `FriendRequest`,
-`PartyState`, `PartyMember`, `ServerInvite`, `PrivacySettings`, `NotificationSettings`,
-`SocialPersisted`.
-
-## Sheet → screen map (27 items)
-
-| # | Sheet | Implementation |
-| --- | --- | --- |
-| 1 | Play dashboard widget | `social/ui/SocialWidgetCard.kt` + `SocialWidgetRow` in `ui/screens/HomeScreen.kt` |
-| 2 | Social sign-in (Google) | `SocialAuthScreen` — `social/ui/screens/SocialOnboardingScreens.kt` |
-| 3 | Appearance: name / skin / cape | `SocialAppearanceScreen` — same file |
-| 4 | Dashboard | `SocialDashboardScreen` — `social/ui/screens/SocialDashboardScreen.kt` |
-| 5 | Privacy & presence | `SocialPrivacyScreen` — `social/ui/screens/SocialSettingsScreens.kt` |
-| 6 | Cape picker | `SocialCapeScreen` — onboarding file |
-| 7 | Skin picker | `SocialSkinScreen` — onboarding file |
-| 8 | Safety | `SocialSafetyScreen` — settings file |
-| 9 | Notifications | `SocialNotificationsScreen` — settings file |
-| 10 | Compact panel: chat | `SocialCompactPanel` `CompactMode.CHAT` |
-| 11 | Compact panel: voice | `CompactMode.VOICE` → `VoicePanel` |
-| 12 | Compact panel: sign-in required | `CompactMode.AUTH_REQUIRED` |
-| 13 | Compact panel: expired invite | `CompactMode.INVITE` + `ServerInviteState.EXPIRED` |
-| 14 | Compact panel: reconnecting | `VoicePanel(reconnecting = true)` |
-| 15 | Friend request sent | dashboard `addFriendSentTo` dialog |
-| 16 | Active invite with Join | `CompactMode.INVITE` + `matchesInstance` copy + `Join` |
-| 17 | Voice: pre-permission | `SocialVoiceScreen` (default state) |
-| 18 | Voice: microphone denied | `SocialVoiceScreen` (`denied = true` after Deny) |
-| 19 | Dashboard error state | `SocialErrorState` (retry) |
-| 20 | Dashboard empty state | `SocialEmptyState` (add by name) |
-| 21 | Profile | `SocialProfileScreen` |
-| 22 | Sign-out dialog | `SocialProfileScreen` + `confirmSignOut` |
-| 23 | Delete account (type `DELETE`) | `SocialSafetyScreen` + `confirmDelete` |
-| 24 | Block dialog | `SocialCompactPanel` + `blockTarget` |
-| 25 | Leave-game dialog | `SocialCompactPanel` + `confirmJoin` |
-| 26 | In-game settings overlay | `ui/game/GameMenuScreen.kt`: Social `MenuTile` + `SocialCompactPanel` host |
-| 27 | Chat with reactions | `SocialChatScreen` + `ChatBubble` (👍 ❤️ 😂) |
-
-## Design rules honoured
-
-- Fixed palette in `social/ui/SocialUi.kt`: accent `#8B5CF6`, bright `#A78BFA`, background
-  `#140F26` → `#1B1436`. `AerixSurface` is never referenced inside `aerix/social`.
-- No Aerix logo inside Social (back arrow in the top bar, no brand tile in the rail).
-- No Minecraft heads in launcher Social UI: `aerix_social_avatar_1..6.xml` generic vectors.
-  MC heads are only used by the in-game overlay / 3D skin preview elsewhere.
-- 20/16dp page padding, ≥48dp touch targets, ≥60dp list rows, 22/16/14sp type scale.
-- Rail is 84dp with Friends / Chats / Party / Profile + Exit.
+ViewModels: `SocialShellViewModel`, `SocialProfileViewModel`, `SocialDashboardViewModel`,
+`SocialAddFriendViewModel`, `SocialChatViewModel`, `SocialActivityViewModel`,
+`SocialSettingsViewModel`, `InGameSocialViewModel`.
 
 ## Motion
 
 | Transition | Spec |
 | --- | --- |
-| Dashboard → shell | 240ms fade in, scale 0.98 → 1.0 (`SocialShell`) |
-| Screen → screen | 200ms fade + 1/12 width slide (`AnimatedContent`) |
-| Rail selection | immediate |
+| Launcher → shell | 240ms fade + 0.98 → 1.0 scale |
+| Screen → screen | 200ms fade + 1/12 width slide |
 | Tabs | 120ms `Crossfade` |
 | Chat open | 180ms fade + 12dp slide |
-| Dialogs | 160ms fade + 0.96 → 1.0 scale |
+| Dialogs | 160ms fade + 0.96 → 1.0 |
 
-## Tests
+## Tests (265 in the module, 20 new)
 
-12 new JVM tests, run in CI together with the module's 251 tests:
-
-- `SocialViewModelTest` — accept moves a sender into friends, decline only removes the
-  request, send appends + clears the draft, reaction toggles on and off, name validation
-  rejects < 3 characters, a valid name persists and signs in, sign-out keeps the name,
-  privacy toggle persists, notification + dropdown values persist.
-- `DataStoreSocialStoreTest` — defaults match the mockups, profile and settings round-trip
-  through a real Preferences DataStore file, a second update merges instead of resetting.
-
-`./gradlew :app_pojavlauncher:compileNoruntimeDebugKotlin :app_pojavlauncher:testNoruntimeDebugUnitTest`
-is green in run 39730501429.
+- `SocialViewModelTest` — accept/decline, online-offline split, send + reactions, instance
+  attachment download → ready, music toggle, Gmail search + request, username-only search,
+  like/follow/comment, publishing a post, party create/rename/group call.
+- `SocialProfileViewModelTest` — validation, character save, the one-week username lock,
+  bio + links (with `@` handles), sign-out keeps the name, delete clears everything.
+- `SocialSettingsViewModelTest` — privacy, profile lock + status, chat permissions, microphone
+  settings, notifications.
+- `DataStoreSocialStoreTest` — defaults, full profile/settings round-trip including links and the
+  username timestamp, and merge-instead-of-reset on a second write.
