@@ -64,8 +64,12 @@ data class ChatAttachment(
     val kind: AttachmentKind,
     val title: String,
     val subtitle: String = "",
+    /** Instance id, URL or track id depending on [kind]. */
     val payload: String = "",
-    val sizeLabel: String = ""
+    val sizeLabel: String = "",
+    /** File copied into the app's own storage, for media that really lives on this device. */
+    val localPath: String? = null,
+    val mimeType: String? = null
 )
 
 data class ChatMessage(

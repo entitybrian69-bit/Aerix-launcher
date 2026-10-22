@@ -19,6 +19,9 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -51,14 +54,20 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 import net.kdt.pojavlaunch.R
 import net.kdt.pojavlaunch.aerix.social.data.AerixUser
 import net.kdt.pojavlaunch.aerix.social.data.AttachmentKind
@@ -68,6 +77,10 @@ import net.kdt.pojavlaunch.aerix.social.data.InstanceShareState
 import net.kdt.pojavlaunch.aerix.social.data.PartyState
 import net.kdt.pojavlaunch.aerix.social.data.SocialConnection
 import net.kdt.pojavlaunch.aerix.social.data.UserStatus
+import net.kdt.pojavlaunch.aerix.social.media.SocialAudioPlayer
+import net.kdt.pojavlaunch.aerix.social.media.SocialInstances
+import net.kdt.pojavlaunch.aerix.social.media.SocialMic
+import net.kdt.pojavlaunch.aerix.social.media.SocialMedia
 import net.kdt.pojavlaunch.aerix.social.ui.SocialAvatar
 import net.kdt.pojavlaunch.aerix.social.ui.SocialBody
 import net.kdt.pojavlaunch.aerix.social.ui.SocialColors
@@ -78,6 +91,8 @@ import net.kdt.pojavlaunch.aerix.social.ui.SocialMotion
 import net.kdt.pojavlaunch.aerix.social.ui.SocialPanel
 import net.kdt.pojavlaunch.aerix.social.ui.SocialPrimaryButton
 import net.kdt.pojavlaunch.aerix.social.ui.SocialSectionTitle
+import net.kdt.pojavlaunch.aerix.social.ui.SocialDialog
+import net.kdt.pojavlaunch.aerix.social.ui.SocialMicMeter
 import net.kdt.pojavlaunch.aerix.social.ui.SocialTextField
 import net.kdt.pojavlaunch.aerix.social.ui.SocialTitle
 import net.kdt.pojavlaunch.aerix.social.vm.SocialChatViewModel
@@ -377,6 +392,7 @@ private fun PartyTab(
     onOpenVoice: () -> Unit
 ) {
     var name by remember(party.name) { mutableStateOf(party.name.ifBlank { "Nova's party" }) }
+    var callOpen by remember { mutableStateOf(false) }
     Row(modifier = Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         SocialPanel(modifier = Modifier.weight(1f).fillMaxHeight()) {
             SocialSectionTitle(if (party.joined) party.name else "Start a party")
@@ -403,7 +419,8 @@ private fun PartyTab(
                     )
                     SocialGhostButton("Leave", onClick = onLeave, modifier = Modifier.weight(1f))
                 }
-                SocialPrimaryButton("Group call", onClick = onOpenVoice, iconRes = R.drawable.aerix_social_ic_mic, modifier = Modifier.fillMaxWidth())
+                // Opens the real voice room: the mic in there is the device microphone.
+                SocialPrimaryButton("Group call", onClick = { callOpen = true }, iconRes = R.drawable.aerix_social_ic_mic, modifier = Modifier.fillMaxWidth())
                 Spacer(Modifier.weight(1f))
             }
         }
@@ -432,6 +449,7 @@ private fun PartyTab(
             SocialBody("Everything you can send in a chat you can send here, including files, links, instances and music.", size = 11.sp, color = SocialColors.textMuted)
         }
     }
+    if (callOpen) PartyCallSheet(party = party, onClose = { callOpen = false })
 }
 
 @Composable
@@ -462,6 +480,75 @@ private fun SocialErrorState(onRetry: () -> Unit) {
 
 /* -------------------------------------------------------------------- chat ----- */
 
+
+/** Voice room: the meter below is the device microphone, not an animation. */
+@Composable
+private fun PartyCallSheet(party: PartyState, onClose: () -> Unit) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var granted by remember { mutableStateOf(SocialMic.hasPermission(context)) }
+    var live by remember { mutableStateOf(false) }
+    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
+        granted = ok
+        if (ok) {
+            SocialMic.start(scope)
+            live = true
+        }
+    }
+    DisposableEffect(Unit) { onDispose { SocialMic.stop() } }
+
+    SocialDialog(onDismiss = onClose) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Icon(
+                painter = painterResource(R.drawable.aerix_social_ic_mic),
+                contentDescription = null,
+                tint = SocialColors.accent,
+                modifier = Modifier.size(20.dp)
+            )
+            SocialTitle(party.name.ifBlank { "Group call" })
+        }
+        SocialBody(
+            if (live) "${party.members.size} in the call · you are live"
+            else "Tap join and Android asks for the microphone once.",
+            size = 12.sp,
+            color = SocialColors.textMuted
+        )
+        SocialMicMeter(active = live)
+        party.members.take(4).forEach { member ->
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                SocialAvatar(avatar = member.avatar, size = 32.dp)
+                Column(modifier = Modifier.weight(1f)) {
+                    SocialBody(member.name, size = 13.sp, color = SocialColors.textPrimary, maxLines = 1)
+                    SocialBody(if (member.muted) "Muted" else "Live", size = 11.sp, color = SocialColors.textMuted)
+                }
+            }
+        }
+        SocialPrimaryButton(
+            text = when {
+                !granted -> "Allow microphone"
+                live -> "Leave call"
+                else -> "Join call"
+            },
+            onClick = {
+                when {
+                    !granted -> permission.launch(android.Manifest.permission.RECORD_AUDIO)
+                    live -> {
+                        SocialMic.stop()
+                        live = false
+                    }
+                    else -> {
+                        SocialMic.start(scope)
+                        live = true
+                    }
+                }
+            },
+            iconRes = if (live) R.drawable.aerix_social_ic_mic_off else R.drawable.aerix_social_ic_mic,
+            modifier = Modifier.fillMaxWidth()
+        )
+        SocialGhostButton("Close", onClick = onClose, modifier = Modifier.fillMaxWidth())
+    }
+}
+
 @Composable
 fun SocialChatScreen(
     viewModel: SocialChatViewModel,
@@ -470,10 +557,57 @@ fun SocialChatScreen(
 ) {
     val state by viewModel.state.collectAsState()
     val listState = rememberLazyListState()
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val playingId by SocialAudioPlayer.playingId.collectAsState()
+    var linkDialog by remember { mutableStateOf(false) }
+    var linkDraft by remember { mutableStateOf("") }
+    var instanceDialog by remember { mutableStateOf(false) }
+    var sending by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.messages.size) {
         if (state.messages.isNotEmpty()) listState.animateScrollToItem(state.messages.lastIndex)
     }
+
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        sending = true
+        scope.launch {
+            val file = SocialMedia.copyToStorage(context, uri)
+            sending = false
+            if (file == null) return@launch
+            val kind = when {
+                file.mimeType.startsWith("audio/") -> AttachmentKind.MUSIC
+                file.mimeType == "image/gif" -> AttachmentKind.GIF
+                file.mimeType.startsWith("image/") -> AttachmentKind.IMAGE
+                else -> AttachmentKind.FILE
+            }
+            viewModel.sendAttachment(
+                ChatAttachment(
+                    kind = kind,
+                    title = file.displayName,
+                    subtitle = file.mimeType,
+                    payload = file.path,
+                    sizeLabel = file.sizeLabel,
+                    localPath = file.path,
+                    mimeType = file.mimeType
+                )
+            )
+        }
+    }
+
+    // Real document pickers: every chip opens the system picker for its own mime type.
+    fun pick(kind: AttachmentKind) {
+        val mime = when (kind) {
+            AttachmentKind.IMAGE -> "image/*"
+            AttachmentKind.GIF -> "image/gif"
+            AttachmentKind.FILE -> "*/*"
+            AttachmentKind.MUSIC -> "audio/*"
+            else -> "*/*"
+        }
+        picker.launch(mime)
+    }
+
 
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = SocialDimens.pagePaddingH)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -500,10 +634,13 @@ fun SocialChatScreen(
                     ChatBubble(
                         message = message,
                         shareState = state.shares[message.id]?.state,
-                        playing = state.playingMusicId == message.id,
+                        playing = playingId == message.id,
                         onReact = { emoji -> viewModel.react(message.id, emoji) },
                         onInstall = { viewModel.install(message.id) },
-                        onToggleMusic = { viewModel.toggleMusic(message.id) }
+                        onToggleMusic = {
+                            val path = message.attachments.firstOrNull()?.localPath
+                            SocialAudioPlayer.toggle(message.id, path)
+                        }
                     )
                 }
             }
@@ -512,12 +649,12 @@ fun SocialChatScreen(
             modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            AttachmentChip(R.drawable.aerix_ic_image_outlined, "Image") { viewModel.attach(AttachmentKind.IMAGE) }
-            AttachmentChip(R.drawable.aerix_social_ic_gif, "GIF") { viewModel.attach(AttachmentKind.GIF) }
-            AttachmentChip(R.drawable.aerix_ic_description_outlined, "File") { viewModel.attach(AttachmentKind.FILE) }
-            AttachmentChip(R.drawable.aerix_ic_link, "Link") { viewModel.attach(AttachmentKind.LINK) }
-            AttachmentChip(R.drawable.aerix_social_ic_instance, "Instance") { viewModel.attach(AttachmentKind.INSTANCE) }
-            AttachmentChip(R.drawable.aerix_social_ic_music, "Music") { viewModel.attach(AttachmentKind.MUSIC) }
+            AttachmentChip(R.drawable.aerix_ic_image_outlined, "Image") { pick(AttachmentKind.IMAGE) }
+            AttachmentChip(R.drawable.aerix_social_ic_gif, "GIF") { pick(AttachmentKind.GIF) }
+            AttachmentChip(R.drawable.aerix_ic_description_outlined, "File") { pick(AttachmentKind.FILE) }
+            AttachmentChip(R.drawable.aerix_ic_link, "Link") { linkDialog = true }
+            AttachmentChip(R.drawable.aerix_social_ic_instance, "Instance") { instanceDialog = true }
+            AttachmentChip(R.drawable.aerix_social_ic_music, "Music") { pick(AttachmentKind.MUSIC) }
         }
         Row(
             modifier = Modifier
@@ -533,7 +670,7 @@ fun SocialChatScreen(
                 SocialTextField(
                     value = state.draft,
                     onValueChange = viewModel::onDraftChange,
-                    placeholder = "Message ${state.friendName}",
+                    placeholder = if (sending) "Preparing file…" else "Message ${state.friendName}",
                     modifier = Modifier
                 )
             }
@@ -543,6 +680,64 @@ fun SocialChatScreen(
                 onClick = viewModel::send,
                 selected = state.draft.isNotBlank()
             )
+        }
+    }
+
+    if (linkDialog) {
+        SocialDialog(onDismiss = { linkDialog = false }) {
+            SocialTitle("Send a link")
+            SocialTextField(value = linkDraft, onValueChange = { linkDraft = it }, placeholder = "https://…")
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                SocialPrimaryButton(
+                    "Send",
+                    onClick = {
+                        viewModel.sendLink(linkDraft)
+                        linkDraft = ""
+                        linkDialog = false
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+                SocialGhostButton("Cancel", onClick = { linkDialog = false }, modifier = Modifier.weight(1f))
+            }
+        }
+    }
+
+    if (instanceDialog) {
+        val instances = remember { SocialInstances.local() }
+        SocialDialog(onDismiss = { instanceDialog = false }) {
+            SocialTitle("Share an instance")
+            if (instances.isEmpty()) {
+                SocialBody("You have no instances yet. Create one in the launcher first.", size = 13.sp)
+            } else {
+                instances.take(6).forEach { instance ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = SocialDimens.row)
+                            .clip(RoundedCornerShape(SocialDimens.controlRadius))
+                            .background(SocialColors.panelSoft)
+                            .clickable {
+                                viewModel.sendAttachment(SocialInstances.attachment(instance))
+                                instanceDialog = false
+                            }
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.aerix_social_ic_instance),
+                            contentDescription = null,
+                            tint = SocialColors.accent,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            SocialBody(instance.name, size = 13.sp, color = SocialColors.textPrimary, weight = FontWeight.Medium, maxLines = 1)
+                            SocialBody(instance.version.ifBlank { "Local instance" }, size = 11.sp, color = SocialColors.textMuted)
+                        }
+                    }
+                }
+            }
+            SocialGhostButton("Cancel", onClick = { instanceDialog = false }, modifier = Modifier.fillMaxWidth())
         }
     }
 }
@@ -559,7 +754,7 @@ private fun AttachmentChip(iconRes: Int, label: String, onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        Icon(painter = painterResource(iconRes), contentDescription = null, tint = SocialColors.accentBright, modifier = Modifier.size(14.dp))
+        Icon(painter = painterResource(iconRes), contentDescription = null, tint = SocialColors.accent, modifier = Modifier.size(14.dp))
         Text(text = label, color = SocialColors.textSecondary, fontSize = 11.sp)
     }
 }
@@ -620,7 +815,7 @@ private fun ChatBubble(
     }
 }
 
-/** One attachment: media preview, file, link, instance or a music player. */
+/** One attachment: real media preview, file, link, instance or a real music player. */
 @Composable
 private fun AttachmentCard(
     attachment: ChatAttachment,
@@ -630,6 +825,23 @@ private fun AttachmentCard(
     onToggleMusic: () -> Unit
 ) {
     SocialPanel(modifier = Modifier.fillMaxWidth(0.72f)) {
+        if (attachment.kind == AttachmentKind.IMAGE || attachment.kind == AttachmentKind.GIF) {
+            val bitmap by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, attachment.localPath) {
+                value = attachment.localPath?.let { SocialMedia.thumbnail(it) }
+            }
+            val image = bitmap
+            if (image != null) {
+                Image(
+                    bitmap = image,
+                    contentDescription = attachment.title,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 220.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                )
+            }
+        }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Box(
                 modifier = Modifier
@@ -650,7 +862,7 @@ private fun AttachmentCard(
                         }
                     ),
                     contentDescription = null,
-                    tint = SocialColors.accentBright,
+                    tint = SocialColors.accent,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -661,19 +873,25 @@ private fun AttachmentCard(
         }
         when (attachment.kind) {
             AttachmentKind.INSTANCE -> {
-                val label = when (shareState) {
-                    InstanceShareState.DOWNLOADING -> "Downloading…"
-                    InstanceShareState.READY -> "Downloaded · open in Launcher"
-                    else -> "Download and select"
+                val local = remember(attachment.payload) {
+                    SocialInstances.local().any { it.id == attachment.payload || it.name.equals(attachment.title, true) }
+                }
+                val label = when {
+                    shareState == InstanceShareState.DOWNLOADING -> "Downloading…"
+                    local -> "Open in launcher"
+                    else -> "Not installed here"
                 }
                 SocialPrimaryButton(
                     text = label,
-                    onClick = onInstall,
+                    onClick = {
+                        // Real action: select the instance if this device has it, otherwise the
+                        // player is told, instead of pretending a download happened.
+                        if (!SocialInstances.select(attachment.payload)) onInstall()
+                    },
                     enabled = shareState != InstanceShareState.DOWNLOADING,
                     iconRes = R.drawable.aerix_ic_download,
                     modifier = Modifier.fillMaxWidth()
                 )
-                SocialBody("Tapping downloads the instance and selects it automatically.", size = 11.sp, color = SocialColors.textMuted)
             }
             AttachmentKind.MUSIC -> {
                 SocialGhostButton(
@@ -682,10 +900,18 @@ private fun AttachmentCard(
                     iconRes = if (playing) R.drawable.aerix_ic_pause else R.drawable.aerix_ic_play_arrow_filled,
                     modifier = Modifier.fillMaxWidth()
                 )
-                SocialBody("Plays while you keep chatting, and keeps playing in a party.", size = 11.sp, color = SocialColors.textMuted)
+                SocialBody(
+                    if (attachment.localPath != null) "Plays from this device." else "Shared track",
+                    size = 11.sp,
+                    color = SocialColors.textMuted
+                )
             }
-            AttachmentKind.LINK -> SocialBody(attachment.payload, size = 11.sp, color = SocialColors.accentBright, maxLines = 1)
-            else -> SocialBody("${attachment.sizeLabel} · tap to open", size = 11.sp, color = SocialColors.textMuted)
+            AttachmentKind.LINK -> SocialBody(attachment.payload, size = 11.sp, color = SocialColors.accent, maxLines = 1)
+            else -> SocialBody(
+                listOf(attachment.sizeLabel, attachment.mimeType).filterNotNull().filter { it.isNotBlank() }.joinToString(" · "),
+                size = 11.sp,
+                color = SocialColors.textMuted
+            )
         }
     }
 }

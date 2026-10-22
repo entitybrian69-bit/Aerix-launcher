@@ -467,18 +467,45 @@ class SocialChatViewModel(private val repository: SocialRepository) : ViewModel(
         viewModelScope.launch { repository.sendMessage(id, text) }
     }
 
-    /** Sends a demo attachment of [kind]; the payload mirrors what a real upload would carry. */
-    fun attach(kind: AttachmentKind) {
+    /** Sends an attachment that really exists on this device (or a shared instance). */
+    fun sendAttachment(attachment: ChatAttachment) {
         val id = _state.value.friendId ?: return
-        val attachment = when (kind) {
-            AttachmentKind.IMAGE -> ChatAttachment(kind, "screenshot.png", "1440 × 900", "screenshot.png", "2.4 MB")
-            AttachmentKind.GIF -> ChatAttachment(kind, "creeper.gif", "Animated", "creeper.gif", "1.1 MB")
-            AttachmentKind.FILE -> ChatAttachment(kind, "modpack-notes.pdf", "Any file, any size", "modpack-notes.pdf", "8.7 MB")
-            AttachmentKind.LINK -> ChatAttachment(kind, "Aerix Launcher", "github.com/entitybrian69-bit/Aerix-launcher", "https://github.com/entitybrian69-bit/Aerix-launcher")
-            AttachmentKind.INSTANCE -> ChatAttachment(kind, "Remarkably Optimized", "Fabric 0.16.10 • 1.21.1", "remarkably-optimized", "412 MB")
-            AttachmentKind.MUSIC -> ChatAttachment(kind, "Aurora", "Shared track · 3:12", "aurora.mp3", "6.2 MB")
-        }
         viewModelScope.launch { repository.sendMessage(id, "", attachment) }
+    }
+
+    /**
+     * Sends an attachment of [kind] without a picker. The chat screen now always feeds real
+     * device files, so this stays for tests and for anything that builds a message by hand.
+     */
+    fun attach(kind: AttachmentKind) {
+        val attachment = when (kind) {
+            AttachmentKind.INSTANCE -> ChatAttachment(
+                kind = kind,
+                title = "Vanilla 1.21",
+                subtitle = "1.21.4",
+                payload = "vanilla-1.21"
+            )
+            AttachmentKind.MUSIC -> ChatAttachment(kind = kind, title = "Aurora Drift", subtitle = "Nova", payload = "aurora-drift")
+            AttachmentKind.IMAGE -> ChatAttachment(kind = kind, title = "screenshot.png", subtitle = "image/png")
+            AttachmentKind.GIF -> ChatAttachment(kind = kind, title = "creeper.gif", subtitle = "image/gif")
+            AttachmentKind.FILE -> ChatAttachment(kind = kind, title = "mods.zip", subtitle = "application/zip")
+            AttachmentKind.LINK -> ChatAttachment(kind = kind, title = "aerix.launcher", payload = "https://aerix.example")
+        }
+        sendAttachment(attachment)
+    }
+
+    /** Sends a link typed by the player. */
+    fun sendLink(url: String) {
+        val clean = url.trim()
+        if (clean.isBlank()) return
+        sendAttachment(
+            ChatAttachment(
+                kind = AttachmentKind.LINK,
+                title = clean.substringAfter("://").take(48),
+                subtitle = clean,
+                payload = clean
+            )
+        )
     }
 
     fun install(messageId: String) = viewModelScope.launch {
@@ -683,6 +710,13 @@ class InGameSocialViewModel(
 
     init {
         viewModelScope.launch {
+            // Read state comes back from disk, so a restart does not resurrect the badge.
+            seen += runCatching { repository.seenMessages() }.getOrDefault(emptySet())
+            val active = _state.value.activeFriendId
+            val messages = repository.chats.value[active].orEmpty()
+            _state.update { it.copy(unread = messages.count { m -> !m.mine && m.id !in seen }) }
+        }
+        viewModelScope.launch {
             repository.party.collect { party -> _state.update { it.copy(party = party) } }
         }
         viewModelScope.launch {
@@ -719,9 +753,12 @@ class InGameSocialViewModel(
     }
 
     /** Called when the overlay is opened or read: the red badge disappears. */
-    fun markRead() {
-        repository.chats.value.values.flatten().filterNot { it.mine }.forEach { seen += it.id }
+    fun markRead() = viewModelScope.launch {
+        val incoming = repository.chats.value.values.flatten().filterNot { it.mine }
+        incoming.forEach { seen += it.id }
         _state.update { it.copy(unread = 0) }
+        // Persisted so a restart does not bring the badge back for messages already read.
+        repository.markSeen(incoming.map { it.id })
     }
 
     fun startCall() = viewModelScope.launch {

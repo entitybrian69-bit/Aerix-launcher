@@ -35,14 +35,21 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import android.Manifest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
@@ -51,6 +58,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import net.kdt.pojavlaunch.R
+import net.kdt.pojavlaunch.aerix.social.media.SocialMic
+import net.kdt.pojavlaunch.aerix.social.ui.SocialMicMeter
 import net.kdt.pojavlaunch.aerix.social.data.ServerInviteState
 import net.kdt.pojavlaunch.aerix.social.ui.SocialAvatar
 import net.kdt.pojavlaunch.aerix.social.ui.SocialBody
@@ -330,6 +339,18 @@ private fun VoicePanel(
     onLeave: () -> Unit,
     onMute: () -> Unit
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var granted by remember { mutableStateOf(SocialMic.hasPermission(context)) }
+    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
+        granted = ok
+    }
+    // The in-game call uses the device microphone: starting and stopping follows join/mute.
+    LaunchedEffect(joined, muted, granted) {
+        if (joined && !muted && granted) SocialMic.start(scope) else SocialMic.stop()
+    }
+    DisposableEffect(Unit) { onDispose { SocialMic.stop() } }
+
     Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
         SocialPanel(modifier = Modifier.fillMaxWidth()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -346,15 +367,25 @@ private fun VoicePanel(
             }
             if (muted) {
                 SocialBody("Microphone access is off", size = 12.sp, color = SocialColors.textSecondary)
+            } else if (joined) {
+                SocialMicMeter(active = granted)
             }
         }
         if (!joined) {
             SocialPrimaryButton("Join party", onClick = onJoin, modifier = Modifier.fillMaxWidth())
         } else {
             SocialPrimaryButton("Hold to talk", onClick = onMute, modifier = Modifier.fillMaxWidth())
+            if (!granted) {
+                SocialGhostButton(
+                    "Allow microphone",
+                    onClick = { permission.launch(Manifest.permission.RECORD_AUDIO) },
+                    modifier = Modifier.fillMaxWidth(),
+                    iconRes = R.drawable.aerix_social_ic_mic
+                )
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 SocialGhostButton("Mute", onClick = onMute, modifier = Modifier.weight(1f), iconRes = R.drawable.aerix_social_ic_mic_off)
-                SocialGhostButton("Audio settings", onClick = {}, modifier = Modifier.weight(1f))
+                SocialGhostButton("Audio settings", onClick = onMute, modifier = Modifier.weight(1f))
             }
         }
         SocialGhostButton("Leave party", onClick = onLeave, modifier = Modifier.fillMaxWidth())

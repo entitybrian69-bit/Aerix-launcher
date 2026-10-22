@@ -63,6 +63,7 @@ import net.kdt.pojavlaunch.aerix.social.ui.SocialSectionTitle
 import net.kdt.pojavlaunch.aerix.social.ui.SocialSliderRow
 import net.kdt.pojavlaunch.aerix.social.ui.SocialTextField
 import net.kdt.pojavlaunch.aerix.social.ui.SocialTitle
+import net.kdt.pojavlaunch.aerix.social.ui.SocialMicTestCard
 import net.kdt.pojavlaunch.aerix.social.ui.SocialToggleRow
 import net.kdt.pojavlaunch.aerix.social.vm.ProfileUiState
 import net.kdt.pojavlaunch.aerix.social.vm.SocialProfileViewModel
@@ -216,6 +217,7 @@ fun SocialSettingsMicScreen(viewModel: SocialSettingsViewModel, onBack: () -> Un
                 }
             }
             SocialPanel(modifier = Modifier.weight(1.2f).fillMaxSize().verticalScroll(rememberScrollState())) {
+                SocialMicTestCard()
                 SocialSectionTitle("What the microphone does")
                 SocialToggleRow("Join muted", mic.muteOnJoin, viewModel::setMuteOnJoin, subtitle = "You unmute when you want to talk")
                 SocialToggleRow("Push to talk", mic.pushToTalk, viewModel::setPushToTalk, subtitle = "Hold the talk button instead of an open mic")
