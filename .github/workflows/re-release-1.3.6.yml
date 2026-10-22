@@ -98,5 +98,8 @@ jobs:
 
           gh release create "$NEW_TAG" --repo "$repo" --target "$SRC_SHA" \
             --title "Aerix Launcher $NEW_VERSION" --notes-file "$notes" --latest \
-            out/*.apk SHA256SUMS < /dev/null
+            out/*.apk SHA256SUMS 2>gh_err.txt || {
+            echo "::error title=release-create-failed::$(head -c 2000 gh_err.txt)"
+            exit 1
+          }
           echo "::notice title=done::$NEW_TAG published from CI run $SRC_RUN"
