@@ -225,6 +225,14 @@ data class SocialPersisted(
     val googleBrowserClientId: String = "",
     /** Only needed when [googleBrowserClientId] is a Web application client. */
     val googleBrowserSecret: String = "",
+    /** Supabase project URL for Aerix accounts on a server; blank means this device only. */
+    val aerixServerUrl: String = "",
+    /** The project's public anon key. Safe to store: row-level security protects the data. */
+    val aerixAnonKey: String = "",
+    /** Session for the signed-in server account, so a delete can be attributed to its owner. */
+    val aerixUserId: String = "",
+    val aerixAccessToken: String = "",
+    val aerixRefreshToken: String = "",
     val name: String = "",
     val username: String = "",
     val usernameChangedAt: Long = 0L,

@@ -41,6 +41,11 @@ class DataStoreSocialStore(private val store: DataStore<Preferences>) : SocialSt
             prefs[Keys.GOOGLE_CLIENT_ID] = next.googleClientId
             prefs[Keys.GOOGLE_BROWSER_CLIENT_ID] = next.googleBrowserClientId
             prefs[Keys.GOOGLE_BROWSER_SECRET] = next.googleBrowserSecret
+            prefs[Keys.AERIX_SERVER_URL] = next.aerixServerUrl
+            prefs[Keys.AERIX_ANON_KEY] = next.aerixAnonKey
+            prefs[Keys.AERIX_USER_ID] = next.aerixUserId
+            prefs[Keys.AERIX_ACCESS_TOKEN] = next.aerixAccessToken
+            prefs[Keys.AERIX_REFRESH_TOKEN] = next.aerixRefreshToken
             prefs[Keys.NAME] = next.name
             prefs[Keys.USERNAME] = next.username
             prefs[Keys.USERNAME_CHANGED_AT] = next.usernameChangedAt
@@ -93,6 +98,11 @@ class DataStoreSocialStore(private val store: DataStore<Preferences>) : SocialSt
         googleClientId = prefs[Keys.GOOGLE_CLIENT_ID].orEmpty(),
         googleBrowserClientId = prefs[Keys.GOOGLE_BROWSER_CLIENT_ID].orEmpty(),
         googleBrowserSecret = prefs[Keys.GOOGLE_BROWSER_SECRET].orEmpty(),
+        aerixServerUrl = prefs[Keys.AERIX_SERVER_URL].orEmpty(),
+        aerixAnonKey = prefs[Keys.AERIX_ANON_KEY].orEmpty(),
+        aerixUserId = prefs[Keys.AERIX_USER_ID].orEmpty(),
+        aerixAccessToken = prefs[Keys.AERIX_ACCESS_TOKEN].orEmpty(),
+        aerixRefreshToken = prefs[Keys.AERIX_REFRESH_TOKEN].orEmpty(),
         name = prefs[Keys.NAME].orEmpty(),
         username = prefs[Keys.USERNAME].orEmpty(),
         usernameChangedAt = prefs[Keys.USERNAME_CHANGED_AT] ?: 0L,
@@ -162,6 +172,11 @@ class DataStoreSocialStore(private val store: DataStore<Preferences>) : SocialSt
         val GOOGLE_CLIENT_ID = stringPreferencesKey("social_google_client_id")
         val GOOGLE_BROWSER_CLIENT_ID = stringPreferencesKey("social_google_browser_client_id")
         val GOOGLE_BROWSER_SECRET = stringPreferencesKey("social_google_browser_secret")
+        val AERIX_SERVER_URL = stringPreferencesKey("social_aerix_server_url")
+        val AERIX_ANON_KEY = stringPreferencesKey("social_aerix_anon_key")
+        val AERIX_USER_ID = stringPreferencesKey("social_aerix_user_id")
+        val AERIX_ACCESS_TOKEN = stringPreferencesKey("social_aerix_access_token")
+        val AERIX_REFRESH_TOKEN = stringPreferencesKey("social_aerix_refresh_token")
         val NAME = stringPreferencesKey("social_name")
         val USERNAME = stringPreferencesKey("social_username")
         val USERNAME_CHANGED_AT = longPreferencesKey("social_username_changed_at")

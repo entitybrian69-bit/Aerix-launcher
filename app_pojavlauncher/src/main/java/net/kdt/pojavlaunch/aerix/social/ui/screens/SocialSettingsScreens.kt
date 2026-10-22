@@ -288,6 +288,9 @@ fun SocialSettingsAccountScreen(
     var forgetDialog by remember { mutableStateOf(false) }
     var clientIdDialog by remember { mutableStateOf(false) }
     var clientIdDraft by remember { mutableStateOf(state.googleClientId) }
+    var serverDialog by remember { mutableStateOf(false) }
+    var serverUrlDraft by remember { mutableStateOf(state.aerixServerUrl) }
+    var serverKeyDraft by remember { mutableStateOf(state.aerixAnonKey) }
     var browserDialog by remember { mutableStateOf(false) }
     var browserIdDraft by remember { mutableStateOf(state.googleBrowserClientId) }
     var browserSecretDraft by remember { mutableStateOf(state.googleBrowserSecret) }
@@ -358,6 +361,17 @@ fun SocialSettingsAccountScreen(
                     color = SocialColors.textMuted
                 )
                 if (BuildConfig.DEBUG) {
+                    SocialStageRow("Aerix server (testing)") { serverDialog = true }
+                    SocialBody(
+                        if (state.aerixServerUrl.isBlank()) {
+                            "Optional. Paste a Supabase project URL and anon key to make accounts " +
+                                "work on any device and survive a reinstall."
+                        } else {
+                            "Connected · accounts live on ${state.aerixServerUrl}."
+                        },
+                        size = 11.sp,
+                        color = SocialColors.textMuted
+                    )
                     SocialStageRow("Browser sign-in (testing)") { browserDialog = true }
                     SocialBody(
                         if (state.googleBrowserClientId.isBlank()) {
@@ -424,6 +438,38 @@ fun SocialSettingsAccountScreen(
                     modifier = Modifier.weight(1f)
                 )
                 SocialGhostButton("Cancel", onClick = { forgetDialog = false }, modifier = Modifier.weight(1f))
+            }
+        }
+    }
+
+    if (serverDialog) {
+        SocialDialog(onDismiss = { serverDialog = false }) {
+            SocialTitle("Aerix server")
+            SocialBody(
+                "Create a free Supabase project, run the SQL from docs/supabase/aerix_accounts.sql, " +
+                    "then paste Project URL and the anon public key here. The anon key is meant to " +
+                    "be public: the database rules protect the data."
+            )
+            SocialTextField(
+                value = serverUrlDraft,
+                onValueChange = { serverUrlDraft = it },
+                placeholder = "https://abcdefgh.supabase.co"
+            )
+            SocialTextField(
+                value = serverKeyDraft,
+                onValueChange = { serverKeyDraft = it },
+                placeholder = "anon public key"
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                SocialPrimaryButton(
+                    "Save",
+                    onClick = {
+                        profile.setAerixServer(serverUrlDraft, serverKeyDraft)
+                        serverDialog = false
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+                SocialGhostButton("Cancel", onClick = { serverDialog = false }, modifier = Modifier.weight(1f))
             }
         }
     }

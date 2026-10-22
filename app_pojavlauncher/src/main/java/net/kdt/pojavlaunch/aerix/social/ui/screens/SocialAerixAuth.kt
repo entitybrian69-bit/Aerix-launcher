@@ -64,7 +64,9 @@ data class AerixAuthUi(
     val busy: Boolean = false,
     val error: String? = null,
     val notice: String? = null,
-    val restoreUsername: String? = null
+    val restoreUsername: String? = null,
+    /** True when accounts live on a server, so sign-in is by email and works on any device. */
+    val remote: Boolean = false
 )
 
 private enum class AerixMode { SIGN_IN, SIGN_UP }
@@ -114,7 +116,11 @@ fun AerixAuthPanel(
                 overflow = TextOverflow.Ellipsis
             )
             SocialBody(
-                "Your name, your account, on your device. No Google, nothing to configure.",
+                if (ui.remote) {
+                    "Your Aerix account. Sign in here on any device, with the same password."
+                } else {
+                    "Your name, your account, on your device. No Google, nothing to configure."
+                },
                 size = 12.sp,
                 color = SocialColors.textMuted
             )
@@ -154,11 +160,11 @@ fun AerixAuthPanel(
             // --- fields
             when (mode) {
                 AerixMode.SIGN_IN -> {
-                    AerixField("Username or email") {
+                    AerixField(if (ui.remote) "Email" else "Username or email") {
                         SocialTextField(
                             value = identifier,
                             onValueChange = { identifier = it },
-                            placeholder = "yourname",
+                            placeholder = if (ui.remote) "you@example.com" else "yourname",
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text)
                         )
                     }
@@ -313,7 +319,12 @@ fun AerixAuthPanel(
                 )
             }
             SocialBody(
-                "The password is never stored: a random salt and a PBKDF2 hash are, on this device only.",
+                if (ui.remote) {
+                    "The password goes only to your Aerix server, never to Google."
+                } else {
+                    "The password is never stored: a random salt and a PBKDF2 hash are, on this " +
+                        "device only."
+                },
                 size = 10.sp,
                 color = SocialColors.textMuted.copy(alpha = 0.85f)
             )

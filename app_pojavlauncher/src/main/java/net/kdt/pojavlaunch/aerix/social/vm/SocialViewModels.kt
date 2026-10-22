@@ -28,6 +28,8 @@ import net.kdt.pojavlaunch.aerix.social.auth.GoogleAuth
 import net.kdt.pojavlaunch.aerix.social.auth.GoogleAuthResult
 import net.kdt.pojavlaunch.aerix.social.auth.AerixAccount
 import net.kdt.pojavlaunch.aerix.social.auth.AerixCredentials
+import net.kdt.pojavlaunch.aerix.social.auth.AerixRemoteAccounts
+import net.kdt.pojavlaunch.aerix.social.auth.RemoteAerixAccount
 import net.kdt.pojavlaunch.aerix.social.auth.GoogleBrowserAuth
 import net.kdt.pojavlaunch.aerix.social.auth.GoogleSignInVariant
 import net.kdt.pojavlaunch.aerix.social.data.AerixUser
@@ -153,6 +155,13 @@ data class ProfileUiState(
     val aerixError: String? = null,
     val aerixNotice: String? = null,
     val aerixRestoreUsername: String? = null,
+    /** Server config for Aerix accounts; blank means this device only. */
+    val aerixServerUrl: String = "",
+    val aerixAnonKey: String = "",
+    /** Remembered while a deleted server account waits for its restore. */
+    val aerixPendingEmail: String = "",
+    val aerixPendingUserId: String = "",
+    val aerixPendingToken: String = "",
     val saved: Boolean = false
 ) {
     fun canChangeUsername(now: Long = System.currentTimeMillis()): Boolean =
@@ -186,6 +195,8 @@ class SocialProfileViewModel(
                         googleClientId = persisted.googleClientId,
                         googleBrowserClientId = persisted.googleBrowserClientId,
                         googleBrowserSecret = persisted.googleBrowserSecret,
+                        aerixServerUrl = persisted.aerixServerUrl,
+                        aerixAnonKey = persisted.aerixAnonKey,
                         name = persisted.name,
                         username = persisted.username.ifBlank { persisted.name },
                         usernameChangedAt = persisted.usernameChangedAt,
@@ -231,6 +242,9 @@ class SocialProfileViewModel(
                             googleClientId = persisted.googleClientId,
                             googleBrowserClientId = persisted.googleBrowserClientId,
                             googleBrowserSecret = persisted.googleBrowserSecret,
+                            aerixServerUrl = persisted.aerixServerUrl,
+                            aerixAnonKey = persisted.aerixAnonKey,
+                            // No session for the previous account survives a switch.
                             name = fallbackName,
                             username = fallbackUsername,
                             privacy = persisted.privacy,
@@ -439,11 +453,14 @@ class SocialProfileViewModel(
     // ------------------------------------------------------------------ Aerix accounts
 
     /**
-     * Creates an Aerix account and signs into it. The password never leaves the device: it is
-     * salted and stretched with PBKDF2 and only the hash is written down.
+     * Creates an Aerix account and signs into it.
+     *
+     * With a server configured the account is created there, so it follows the person to any
+     * device; without one it is created on this device only.
      */
     fun aerixSignUp(username: String, email: String, password: String) = viewModelScope.launch {
-        _state.update { it.copy(aerixBusy = true, aerixError = null, aerixNotice = null, aerixRestoreUsername = null) }
+        clearAerixMessages()
+        _state.update { it.copy(aerixBusy = true) }
         val problem = AerixCredentials.usernameProblem(username)
             ?: AerixCredentials.emailProblem(email)
             ?: AerixCredentials.passwordProblem(password)
@@ -451,6 +468,29 @@ class SocialProfileViewModel(
             _state.update { it.copy(aerixBusy = false, aerixError = problem) }
             return@launch
         }
+
+        val remote = remoteAccounts()
+        if (remote != null) {
+            val attempt = runCatching {
+                withContext(io) { remote.signUp(username, email, password) }
+            }
+            attempt.onSuccess { account ->
+                persistSession(account)
+                _state.update {
+                    it.copy(aerixBusy = false, aerixNotice = "Account created. Welcome, ${account.username}.")
+                }
+                signInWithAccount(account)
+            }.onFailure { error ->
+                _state.update {
+                    it.copy(
+                        aerixBusy = false,
+                        aerixError = error.message ?: "The server could not create the account."
+                    )
+                }
+            }
+            return@launch
+        }
+
         val account = AerixCredentials.create(username, email, password)
         val taken = withContext(io) { !accounts.insert(account) }
         if (taken) {
@@ -472,20 +512,63 @@ class SocialProfileViewModel(
     }
 
     /**
-     * Signs into an existing Aerix account. A soft-deleted account is *not* signed in silently:
-     * the correct password unlocks an explicit restore, so a deleted account can come back
-     * without the person having to guess what happened to it.
+     * Signs into an existing Aerix account. A deleted account is *not* signed in silently: the
+     * correct password unlocks an explicit restore, so a deleted account can come back without
+     * the person having to guess what happened to it.
      */
     fun aerixSignIn(identifier: String, password: String) = viewModelScope.launch {
-        _state.update { it.copy(aerixBusy = true, aerixError = null, aerixNotice = null, aerixRestoreUsername = null) }
+        clearAerixMessages()
+        _state.update { it.copy(aerixBusy = true) }
         if (identifier.isBlank()) {
-            _state.update { it.copy(aerixBusy = false, aerixError = "Enter your username or email") }
+            _state.update { it.copy(aerixBusy = false, aerixError = "Enter your email") }
             return@launch
         }
         if (password.isEmpty()) {
             _state.update { it.copy(aerixBusy = false, aerixError = "Enter your password") }
             return@launch
         }
+
+        val remote = remoteAccounts()
+        if (remote != null) {
+            if (!identifier.contains('@')) {
+                _state.update {
+                    it.copy(
+                        aerixBusy = false,
+                        aerixError = "Server accounts sign in with their email address."
+                    )
+                }
+                return@launch
+            }
+            val attempt = runCatching {
+                withContext(io) { remote.signIn(identifier, password) }
+            }
+            attempt.onSuccess { account ->
+                if (account.deletedAt != null) {
+                    _state.update {
+                        it.copy(
+                            aerixBusy = false,
+                            aerixRestoreUsername = account.username,
+                            aerixPendingEmail = account.email,
+                            aerixPendingUserId = account.userId,
+                            aerixPendingToken = account.accessToken,
+                            aerixNotice = "${account.username} was deleted on " +
+                                "${formatDeletedAt(account.deletedAt)}. The password is right, so it " +
+                                "can be restored with everything in it."
+                        )
+                    }
+                    return@launch
+                }
+                persistSession(account)
+                _state.update { it.copy(aerixBusy = false) }
+                signInWithAccount(account)
+            }.onFailure { error ->
+                _state.update {
+                    it.copy(aerixBusy = false, aerixError = error.message ?: "Sign-in failed.")
+                }
+            }
+            return@launch
+        }
+
         val account = withContext(io) { accounts.find(identifier) }
         if (account == null) {
             _state.update {
@@ -517,9 +600,39 @@ class SocialProfileViewModel(
         signInWithAccount(account)
     }
 
-    /** Brings a soft-deleted account back and signs into it. */
+    /** Brings a deleted account back and signs into it. */
     fun aerixRestore(username: String, password: String) = viewModelScope.launch {
         _state.update { it.copy(aerixBusy = true, aerixError = null) }
+
+        val remote = remoteAccounts()
+        val pendingToken = _state.value.aerixPendingToken
+        val pendingId = _state.value.aerixPendingUserId
+        val pendingEmail = _state.value.aerixPendingEmail
+        if (remote != null && pendingToken.isNotBlank() && pendingId.isNotBlank()) {
+            val attempt = runCatching {
+                withContext(io) {
+                    remote.restore(pendingToken, pendingId)
+                    remote.signIn(pendingEmail, password)
+                }
+            }
+            attempt.onSuccess { account ->
+                persistSession(account)
+                _state.update {
+                    it.copy(
+                        aerixBusy = false,
+                        aerixRestoreUsername = null,
+                        aerixNotice = "Welcome back. ${account.username} is restored."
+                    )
+                }
+                signInWithAccount(account)
+            }.onFailure { error ->
+                _state.update {
+                    it.copy(aerixBusy = false, aerixError = error.message ?: "Restore failed.")
+                }
+            }
+            return@launch
+        }
+
         val account = withContext(io) { accounts.find(username) }
         if (account == null || !AerixCredentials.verify(account, password)) {
             _state.update {
@@ -538,12 +651,75 @@ class SocialProfileViewModel(
         signInWithAccount(account)
     }
 
+    /** Stores the server URL and public key, then clears anything that belonged to a session. */
+    fun setAerixServer(url: String, anonKey: String) {
+        val cleanUrl = url.trim().trimEnd('/')
+        val cleanKey = anonKey.trim()
+        viewModelScope.launch {
+            withContext(io) {
+                store.update {
+                    it.copy(
+                        aerixServerUrl = cleanUrl,
+                        aerixAnonKey = cleanKey,
+                        aerixUserId = "",
+                        aerixAccessToken = "",
+                        aerixRefreshToken = ""
+                    )
+                }
+            }
+            _state.update {
+                it.copy(
+                    aerixServerUrl = cleanUrl,
+                    aerixAnonKey = cleanKey,
+                    aerixPendingEmail = "",
+                    aerixPendingUserId = "",
+                    aerixPendingToken = ""
+                )
+            }
+        }
+    }
+
+    /** The server client, or null when this install has no project configured. */
+    private fun remoteAccounts(): AerixRemoteAccounts? {
+        val url = _state.value.aerixServerUrl
+        val key = _state.value.aerixAnonKey
+        if (url.isBlank() || key.isBlank()) return null
+        return AerixRemoteAccounts(url, key).takeIf { it.isConfigured() }
+    }
+
+    private suspend fun persistSession(account: RemoteAerixAccount) {
+        withContext(io) {
+            store.update {
+                it.copy(
+                    aerixUserId = account.userId,
+                    aerixAccessToken = account.accessToken,
+                    aerixRefreshToken = account.refreshToken
+                )
+            }
+        }
+        _state.update {
+            it.copy(
+                aerixPendingEmail = "",
+                aerixPendingUserId = "",
+                aerixPendingToken = ""
+            )
+        }
+    }
+
     /** Signs in as an Aerix account, reusing the same profile path as Google. */
     private fun signInWithAccount(account: AerixAccount) {
+        signInWithAccount(account.email, account.username)
+    }
+
+    private fun signInWithAccount(account: RemoteAerixAccount) {
+        signInWithAccount(account.email, account.username)
+    }
+
+    private fun signInWithAccount(email: String, username: String) {
         signInWithGoogle(
             GoogleAccount(
-                email = account.email,
-                displayName = account.username,
+                email = email,
+                displayName = username,
                 // No Google token: this account is ours, so there is nothing to verify remotely.
                 idToken = ""
             )
@@ -551,7 +727,9 @@ class SocialProfileViewModel(
     }
 
     fun clearAerixMessages() {
-        _state.update { it.copy(aerixError = null, aerixNotice = null, aerixRestoreUsername = null) }
+        _state.update {
+            it.copy(aerixError = null, aerixNotice = null, aerixRestoreUsername = null)
+        }
     }
 
     private fun formatDeletedAt(at: Long): String = runCatching {
@@ -624,14 +802,42 @@ class SocialProfileViewModel(
         // rather than erasing the credential: the same username can then be signed back in and
         // restored by the person who knows the password. Google-linked profiles have no local
         // credential, so there is nothing to mark.
+        val snapshot = withContext(io) { store.snapshot() }
         val accountEmail = _state.value.email
         if (accountEmail.isNotBlank()) {
             withContext(io) {
                 accounts.find(accountEmail)?.let { accounts.softDelete(it.id) }
             }
         }
+        // Server account: the row is marked deleted too, so the restore works from any device.
+        val remote = remoteAccounts()
+        if (remote != null && snapshot.aerixUserId.isNotBlank() && snapshot.aerixAccessToken.isNotBlank()) {
+            runCatching {
+                withContext(io) { remote.softDelete(snapshot.aerixAccessToken, snapshot.aerixUserId) }
+            }.onFailure { error ->
+                // Deleting locally must still succeed, but say what the server did not do.
+                _state.update { it.copy(googleError = null) }
+                android.util.Log.w("AerixAccounts", "Server delete failed: ${error.message}")
+            }
+        }
         repository?.clearAll()
-        withContext(io) { store.update { SocialPersisted() } }
+        withContext(io) {
+            store.update { previous ->
+                // Clear the account and its session, keep preferences and the server config.
+                SocialPersisted(
+                    googleClientId = previous.googleClientId,
+                    googleBrowserClientId = previous.googleBrowserClientId,
+                    googleBrowserSecret = previous.googleBrowserSecret,
+                    aerixServerUrl = previous.aerixServerUrl,
+                    aerixAnonKey = previous.aerixAnonKey,
+                    themeWallpaperId = previous.themeWallpaperId,
+                    privacy = previous.privacy,
+                    notifications = previous.notifications,
+                    chat = previous.chat,
+                    mic = previous.mic
+                )
+            }
+        }
         _state.update {
             it.copy(signedIn = false, email = "", name = "", username = "", bio = "", links = emptyList())
         }

@@ -253,7 +253,9 @@ fun SocialShell(
                                 busy = profile.aerixBusy,
                                 error = profile.aerixError,
                                 notice = profile.aerixNotice,
-                                restoreUsername = profile.aerixRestoreUsername
+                                restoreUsername = profile.aerixRestoreUsername,
+                                remote = profile.aerixServerUrl.isNotBlank() &&
+                                    profile.aerixAnonKey.isNotBlank()
                             ),
                             onAerixSignIn = { identifier, password ->
                                 profileVm.clearAerixMessages()
