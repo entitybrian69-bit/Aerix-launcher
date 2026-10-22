@@ -63,6 +63,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -906,7 +907,16 @@ private fun AttachmentCard(
                     color = SocialColors.textMuted
                 )
             }
-            AttachmentKind.LINK -> SocialBody(attachment.payload, size = 11.sp, color = SocialColors.accent, maxLines = 1)
+            AttachmentKind.LINK -> {
+                val uriHandler = LocalUriHandler.current
+                SocialBody(attachment.payload, size = 11.sp, color = SocialColors.accent, maxLines = 1)
+                SocialGhostButton(
+                    text = "Open link",
+                    onClick = { runCatching { uriHandler.openUri(attachment.payload) } },
+                    iconRes = R.drawable.aerix_ic_link,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
             else -> SocialBody(
                 listOf(attachment.sizeLabel, attachment.mimeType).filterNotNull().filter { it.isNotBlank() }.joinToString(" · "),
                 size = 11.sp,

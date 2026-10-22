@@ -16,6 +16,8 @@ import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
+import android.app.PendingIntent
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.app.NotificationCompat
@@ -46,6 +48,18 @@ object SocialNotifications {
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
             PackageManager.PERMISSION_GRANTED
 
+    /** Tapping the alert brings the launcher (and its Social badge) to the front. */
+    private fun openLauncher(context: Context): PendingIntent? {
+        val intent = context.packageManager.getLaunchIntentForPackage(context.packageName) ?: return null
+        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        return PendingIntent.getActivity(
+            context,
+            0,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+    }
+
     /** Posts a message alert unless the player turned that category off. */
     fun notifyMessage(
         context: Context,
@@ -63,6 +77,7 @@ object SocialNotifications {
             .setContentText(body)
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setContentIntent(openLauncher(context))
             .build()
         runCatching { NotificationManagerCompat.from(context).notify(nextId++, notification) }
     }
