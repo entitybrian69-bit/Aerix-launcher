@@ -110,7 +110,8 @@ public class DownloadUtils {
                     throw new IOException("Server returned HTTP " + code + " for " + urlInput);
                 }
 
-                long expected = conn.getContentLengthLong();
+                // getContentLengthLong is API 24+; getContentLength is enough for a runtime.
+                long expected = conn.getContentLength();
                 if (expected > 0) expected += already;
 
                 long overall = already;
