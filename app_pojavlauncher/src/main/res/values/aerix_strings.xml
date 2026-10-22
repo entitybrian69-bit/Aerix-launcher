@@ -286,11 +286,11 @@
     <string name="aerix_wallpaper_header">%1$d Minecraft HD Wallpapers &amp; Dynamic Themes</string>
     <string name="aerix_wallpaper_solid_dark">Solid Dark</string>
     <string name="cancel">Cancel</string>
-    <string name="aerix_festivals_april_fools">April Fools' Day</string>
+    <string name="aerix_festivals_april_fools">"April Fools' Day"</string>
     <string name="aerix_festivals_christmas">Christmas</string>
     <string name="aerix_festivals_halloween">Halloween</string>
     <string name="aerix_festivals_new_year">New Year</string>
-    <string name="aerix_festivals_valentines">Valentine's Day</string>
+    <string name="aerix_festivals_valentines">"Valentine's Day"</string>
     <string name="aerix_nav_accounts">Accounts</string>
     <string name="aerix_nav_discover">Discover</string>
     <string name="aerix_nav_home">Home</string>
