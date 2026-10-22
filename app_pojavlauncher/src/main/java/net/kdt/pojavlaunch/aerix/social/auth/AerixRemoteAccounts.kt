@@ -60,7 +60,7 @@ class AerixRemoteAccounts(baseUrl: String, private val anonKey: String) {
      */
     fun usernameTaken(username: String): Boolean = try {
         val body = JSONObject().put("candidate", username).toString()
-        val response = post("$root/rest/v1/rpc/aerix_username_taken", body, token = null)
+        val response = request("POST", "$root/rest/v1/rpc/aerix_username_taken", body, token = null)
         response.trim() == "true"
     } catch (error: Throwable) {
         Log.w(TAG, "username check skipped", error)
