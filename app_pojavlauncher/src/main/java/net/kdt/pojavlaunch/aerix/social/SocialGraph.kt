@@ -17,6 +17,9 @@ import net.kdt.pojavlaunch.aerix.social.data.DataStoreSocialContentStore
 import net.kdt.pojavlaunch.aerix.social.data.DataStoreSocialStore
 import net.kdt.pojavlaunch.aerix.social.data.InMemorySocialStore
 import net.kdt.pojavlaunch.aerix.social.data.LocalSocialRepository
+import net.kdt.pojavlaunch.aerix.social.data.AerixAccountsStore
+import net.kdt.pojavlaunch.aerix.social.data.DataStoreAerixAccountsStore
+import net.kdt.pojavlaunch.aerix.social.data.InMemoryAerixAccountsStore
 import net.kdt.pojavlaunch.aerix.social.data.SocialRepository
 import net.kdt.pojavlaunch.aerix.social.data.SocialStore
 import net.kdt.pojavlaunch.aerix.social.notify.SocialNotifications
@@ -49,6 +52,13 @@ object SocialGraph {
         )
     }
 
+    @Volatile
+    private var accountsInstance: AerixAccountsStore? = null
+
+    /** The Aerix account book: local credentials, never sent anywhere. */
+    val accounts: AerixAccountsStore
+        get() = accountsInstance ?: InMemoryAerixAccountsStore().also { accountsInstance = it }
+
     val store: SocialStore
         get() = storeInstance ?: InMemorySocialStore().also { storeInstance = it }
 
@@ -57,6 +67,9 @@ object SocialGraph {
         appContext = application
         if (storeInstance == null) {
             storeInstance = DataStoreSocialStore(application)
+        }
+        if (accountsInstance == null) {
+            accountsInstance = DataStoreAerixAccountsStore(application)
         }
         SocialNotifications.ensureChannel(application)
     }

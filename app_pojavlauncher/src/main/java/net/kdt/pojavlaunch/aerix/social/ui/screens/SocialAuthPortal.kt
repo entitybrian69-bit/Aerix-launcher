@@ -34,6 +34,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -117,9 +118,26 @@ fun PortalAuthScreen(
     onStartGoogle: (creatingAccount: Boolean, variant: GoogleSignInVariant) -> Unit,
     onStartBrowser: () -> Unit,
     browserReady: Boolean,
+    aerix: AerixAuthUi,
+    onAerixSignIn: (String, String) -> Unit,
+    onAerixSignUp: (String, String, String) -> Unit,
+    onAerixRestore: (String, String) -> Unit,
     onNotNow: () -> Unit
 ) {
     val busy = inProgress
+    // The Aerix account form replaces the portal scene rather than sitting on top of it: two
+    // sign-in surfaces at once would be a decision, not a choice.
+    var showAerix by remember { mutableStateOf(false) }
+    if (showAerix) {
+        AerixAuthPanel(
+            ui = aerix,
+            onSignIn = onAerixSignIn,
+            onSignUp = onAerixSignUp,
+            onRestore = onAerixRestore,
+            onUseGoogle = { showAerix = false }
+        )
+        return
+    }
     val scope = rememberCoroutineScope()
     val clipboard = LocalClipboardManager.current
 
@@ -272,6 +290,28 @@ fun PortalAuthScreen(
                             pillCenter = pillTopLeft + Offset(coords.size.width / 2f, coords.size.height / 2f)
                         }
                 )
+
+                // Second, equal way in: an Aerix account, which needs no Google at all.
+                Box(
+                    modifier = Modifier
+                        .widthIn(max = 420.dp)
+                        .fillMaxWidth(0.62f)
+                        .heightIn(min = 42.dp)
+                        .clip(RoundedCornerShape(SocialDimens.controlRadius))
+                        .background(Color(0x4D121F2B))
+                        .border(1.dp, SocialColors.borderStrong, RoundedCornerShape(SocialDimens.controlRadius))
+                        .clickable { showAerix = true },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Use an Aerix account",
+                        color = SocialColors.textPrimary,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
 
                 Row(
                     modifier = Modifier.padding(top = 2.dp),

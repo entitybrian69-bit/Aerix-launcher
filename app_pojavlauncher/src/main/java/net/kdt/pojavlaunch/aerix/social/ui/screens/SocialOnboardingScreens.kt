@@ -86,6 +86,10 @@ fun SocialAuthScreen(
     onStartGoogle: (creatingAccount: Boolean, variant: GoogleSignInVariant) -> Unit,
     onStartBrowser: () -> Unit,
     browserReady: Boolean,
+    aerix: AerixAuthUi,
+    onAerixSignIn: (String, String) -> Unit,
+    onAerixSignUp: (String, String, String) -> Unit,
+    onAerixRestore: (String, String) -> Unit,
     onNotNow: () -> Unit
 ) {
     PortalAuthScreen(
@@ -96,6 +100,10 @@ fun SocialAuthScreen(
         onStartGoogle = onStartGoogle,
         onStartBrowser = onStartBrowser,
         browserReady = browserReady,
+        aerix = aerix,
+        onAerixSignIn = onAerixSignIn,
+        onAerixSignUp = onAerixSignUp,
+        onAerixRestore = onAerixRestore,
         onNotNow = onNotNow
     )
 }

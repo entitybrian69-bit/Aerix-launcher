@@ -26,6 +26,8 @@ import net.kdt.pojavlaunch.aerix.social.data.ActivityPost
 import net.kdt.pojavlaunch.aerix.social.auth.GoogleAccount
 import net.kdt.pojavlaunch.aerix.social.auth.GoogleAuth
 import net.kdt.pojavlaunch.aerix.social.auth.GoogleAuthResult
+import net.kdt.pojavlaunch.aerix.social.auth.AerixAccount
+import net.kdt.pojavlaunch.aerix.social.auth.AerixCredentials
 import net.kdt.pojavlaunch.aerix.social.auth.GoogleBrowserAuth
 import net.kdt.pojavlaunch.aerix.social.auth.GoogleSignInVariant
 import net.kdt.pojavlaunch.aerix.social.data.AerixUser
@@ -46,6 +48,8 @@ import net.kdt.pojavlaunch.aerix.social.data.SocialConnection
 import net.kdt.pojavlaunch.aerix.social.data.SocialLink
 import net.kdt.pojavlaunch.aerix.social.data.SocialPersisted
 import net.kdt.pojavlaunch.aerix.social.data.SocialRepository
+import net.kdt.pojavlaunch.aerix.social.data.AerixAccountsStore
+import net.kdt.pojavlaunch.aerix.social.data.InMemoryAerixAccountsStore
 import net.kdt.pojavlaunch.aerix.social.data.SocialStore
 import net.kdt.pojavlaunch.aerix.social.data.UserSearchResult
 import net.kdt.pojavlaunch.aerix.social.data.formatCooldown
@@ -144,6 +148,11 @@ data class ProfileUiState(
     val forceCharacterStep: Boolean = false,
     /** Which picker the last attempt used, so the retry can use the other one. */
     val lastSignInVariant: GoogleSignInVariant = GoogleSignInVariant.SHEET,
+    /** Aerix-account form state: busy, the last complaint, a note, and a pending restore. */
+    val aerixBusy: Boolean = false,
+    val aerixError: String? = null,
+    val aerixNotice: String? = null,
+    val aerixRestoreUsername: String? = null,
     val saved: Boolean = false
 ) {
     fun canChangeUsername(now: Long = System.currentTimeMillis()): Boolean =
@@ -160,7 +169,9 @@ class SocialProfileViewModel(
     private val store: SocialStore,
     private val io: CoroutineDispatcher = Dispatchers.IO,
     /** Cleared when a different Google account signs in, so chats never leak between accounts. */
-    private val repository: SocialRepository? = null
+    private val repository: SocialRepository? = null,
+    /** The Aerix account book. Memory-only when nothing supplies a persistent one. */
+    private val accounts: AerixAccountsStore = InMemoryAerixAccountsStore()
 ) : ViewModel() {
     private val _state = MutableStateFlow(ProfileUiState())
     val state: StateFlow<ProfileUiState> = _state.asStateFlow()
@@ -424,6 +435,128 @@ class SocialProfileViewModel(
     fun consumeSignInOutcome() {
         _state.update { it.copy(signInOutcome = null, forceCharacterStep = false) }
     }
+
+    // ------------------------------------------------------------------ Aerix accounts
+
+    /**
+     * Creates an Aerix account and signs into it. The password never leaves the device: it is
+     * salted and stretched with PBKDF2 and only the hash is written down.
+     */
+    fun aerixSignUp(username: String, email: String, password: String) = viewModelScope.launch {
+        _state.update { it.copy(aerixBusy = true, aerixError = null, aerixNotice = null, aerixRestoreUsername = null) }
+        val problem = AerixCredentials.usernameProblem(username)
+            ?: AerixCredentials.emailProblem(email)
+            ?: AerixCredentials.passwordProblem(password)
+        if (problem != null) {
+            _state.update { it.copy(aerixBusy = false, aerixError = problem) }
+            return@launch
+        }
+        val account = AerixCredentials.create(username, email, password)
+        val taken = withContext(io) { !accounts.insert(account) }
+        if (taken) {
+            val existing = withContext(io) { accounts.find(username) ?: accounts.find(email) }
+            _state.update {
+                it.copy(
+                    aerixBusy = false,
+                    aerixError = if (existing?.username?.equals(username.trim(), true) == true) {
+                        "That username is taken. Try another one."
+                    } else {
+                        "That email already has an account. Sign in instead."
+                    }
+                )
+            }
+            return@launch
+        }
+        _state.update { it.copy(aerixBusy = false, aerixNotice = "Account created. Welcome, ${account.username}.") }
+        signInWithAccount(account)
+    }
+
+    /**
+     * Signs into an existing Aerix account. A soft-deleted account is *not* signed in silently:
+     * the correct password unlocks an explicit restore, so a deleted account can come back
+     * without the person having to guess what happened to it.
+     */
+    fun aerixSignIn(identifier: String, password: String) = viewModelScope.launch {
+        _state.update { it.copy(aerixBusy = true, aerixError = null, aerixNotice = null, aerixRestoreUsername = null) }
+        if (identifier.isBlank()) {
+            _state.update { it.copy(aerixBusy = false, aerixError = "Enter your username or email") }
+            return@launch
+        }
+        if (password.isEmpty()) {
+            _state.update { it.copy(aerixBusy = false, aerixError = "Enter your password") }
+            return@launch
+        }
+        val account = withContext(io) { accounts.find(identifier) }
+        if (account == null) {
+            _state.update {
+                it.copy(
+                    aerixBusy = false,
+                    aerixError = "No Aerix account called \"${identifier.trim()}\" on this device. " +
+                        "Create one, or sign in with Google."
+                )
+            }
+            return@launch
+        }
+        val correct = withContext(io) { AerixCredentials.verify(account, password) }
+        if (!correct) {
+            _state.update { it.copy(aerixBusy = false, aerixError = "That password doesn't match this account.") }
+            return@launch
+        }
+        if (account.isDeleted) {
+            _state.update {
+                it.copy(
+                    aerixBusy = false,
+                    aerixRestoreUsername = account.username,
+                    aerixNotice = "${account.username} was deleted on ${formatDeletedAt(account.deletedAt)}. " +
+                        "The password is right, so it can be restored with everything in it."
+                )
+            }
+            return@launch
+        }
+        _state.update { it.copy(aerixBusy = false) }
+        signInWithAccount(account)
+    }
+
+    /** Brings a soft-deleted account back and signs into it. */
+    fun aerixRestore(username: String, password: String) = viewModelScope.launch {
+        _state.update { it.copy(aerixBusy = true, aerixError = null) }
+        val account = withContext(io) { accounts.find(username) }
+        if (account == null || !AerixCredentials.verify(account, password)) {
+            _state.update {
+                it.copy(aerixBusy = false, aerixError = "That account could not be restored. Sign in first.")
+            }
+            return@launch
+        }
+        withContext(io) { accounts.restore(account.id) }
+        _state.update {
+            it.copy(
+                aerixBusy = false,
+                aerixRestoreUsername = null,
+                aerixNotice = "Welcome back. ${account.username} is restored."
+            )
+        }
+        signInWithAccount(account)
+    }
+
+    /** Signs in as an Aerix account, reusing the same profile path as Google. */
+    private fun signInWithAccount(account: AerixAccount) {
+        signInWithGoogle(
+            GoogleAccount(
+                email = account.email,
+                displayName = account.username,
+                // No Google token: this account is ours, so there is nothing to verify remotely.
+                idToken = ""
+            )
+        )
+    }
+
+    fun clearAerixMessages() {
+        _state.update { it.copy(aerixError = null, aerixNotice = null, aerixRestoreUsername = null) }
+    }
+
+    private fun formatDeletedAt(at: Long): String = runCatching {
+        java.text.SimpleDateFormat("d MMM yyyy", java.util.Locale.getDefault()).format(java.util.Date(at))
+    }.getOrDefault("earlier")
 
     /** A sign-in that failed for a reason worth showing (no account, not configured, …). */
     fun onGoogleSignInFailed(message: String) {

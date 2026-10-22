@@ -95,6 +95,7 @@ import net.kdt.pojavlaunch.aerix.social.vm.SocialAddFriendViewModel
 import net.kdt.pojavlaunch.aerix.social.vm.SocialChatViewModel
 import net.kdt.pojavlaunch.aerix.social.vm.SocialDashboardViewModel
 import net.kdt.pojavlaunch.aerix.social.auth.GoogleBrowserAuth
+import net.kdt.pojavlaunch.aerix.social.ui.screens.AerixAuthUi
 import net.kdt.pojavlaunch.aerix.social.vm.SignInOutcome
 import net.kdt.pojavlaunch.aerix.social.vm.SocialProfileViewModel
 import net.kdt.pojavlaunch.aerix.social.vm.SocialRoute
@@ -110,7 +111,13 @@ import androidx.core.content.ContextCompat
 
 private val socialFactory = viewModelFactory {
     initializer { SocialShellViewModel() }
-    initializer { SocialProfileViewModel(SocialGraph.store, repository = SocialGraph.repository) }
+    initializer {
+        SocialProfileViewModel(
+            SocialGraph.store,
+            repository = SocialGraph.repository,
+            accounts = SocialGraph.accounts
+        )
+    }
     initializer { SocialDashboardViewModel(SocialGraph.repository) }
     initializer { SocialChatViewModel(SocialGraph.repository) }
     initializer { SocialSettingsViewModel(SocialGraph.store, repository = SocialGraph.repository) }
@@ -242,6 +249,21 @@ fun SocialShell(
                             },
                             onStartBrowser = { profileVm.signInWithBrowser(context) },
                             browserReady = GoogleBrowserAuth.isUsable(profile.googleBrowserClientId),
+                            aerix = AerixAuthUi(
+                                busy = profile.aerixBusy,
+                                error = profile.aerixError,
+                                notice = profile.aerixNotice,
+                                restoreUsername = profile.aerixRestoreUsername
+                            ),
+                            onAerixSignIn = { identifier, password ->
+                                profileVm.clearAerixMessages()
+                                profileVm.aerixSignIn(identifier, password)
+                            },
+                            onAerixSignUp = { username, email, password ->
+                                profileVm.clearAerixMessages()
+                                profileVm.aerixSignUp(username, email, password)
+                            },
+                            onAerixRestore = { username, password -> profileVm.aerixRestore(username, password) },
                             onNotNow = onExitToLauncher
                         )
                         SocialRoute.CHARACTER -> SocialCharacterScreen(
