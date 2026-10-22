@@ -1,0 +1,30 @@
+name: diag logscan
+
+on:
+  push:
+    paths:
+      - '.github/workflows/diag-logscan.yml'
+  workflow_dispatch:
+
+permissions:
+  actions: read
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Pull the failed Android CI log and surface the real error
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FAILED_RUN: "39708669986"
+        run: |
+          set -u
+          gh run view "$FAILED_RUN" --log-failed > fail.log 2>&1 || true
+          echo "log lines: $(wc -l < fail.log)"
+          grep -nE "^e: |error:|FAILED|Execution failed|Caused by|What went wrong|Unresolved reference|duplicate" fail.log | head -40 > hits.txt || true
+          if [ -s hits.txt ]; then
+            while read -r l; do echo "::error title=gradle::$(printf '%s' "$l" | head -c 600)"; done < hits.txt
+          else
+            tail -25 fail.log | while read -r l; do echo "::notice title=tail::$(printf '%s' "$l" | head -c 600)"; done
+          fi
