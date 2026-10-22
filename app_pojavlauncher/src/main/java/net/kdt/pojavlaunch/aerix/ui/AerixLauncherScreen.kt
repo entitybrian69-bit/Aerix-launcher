@@ -159,7 +159,7 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
                     ) { target ->
                         when (target) {
                             LauncherSection.OTHER_RELEASES -> net.kdt.pojavlaunch.aerix.ui.screens.OtherReleasesScreen(activity, navigate)
-                            LauncherSection.HOME -> HomeScreen(
+                            LauncherSection.HOME -> net.kdt.pojavlaunch.aerix.ui.v2.HomeV2(
                                 activity = activity,
                                 navigate = navigate,
                                 onOpenSocial = { socialShell.open(socialSignedIn) }
