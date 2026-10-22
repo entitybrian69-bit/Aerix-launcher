@@ -212,6 +212,11 @@ data class SocialPersisted(
     val signedIn: Boolean = false,
     /** The Google account this profile was signed in with; blank for a local-only profile. */
     val email: String = "",
+    /**
+     * Debug-build override for the Google OAuth client id, typed in Settings when the APK was
+     * built without `aerixGoogleWebClientId`. Ignored on release builds.
+     */
+    val googleClientId: String = "",
     val name: String = "",
     val username: String = "",
     val usernameChangedAt: Long = 0L,

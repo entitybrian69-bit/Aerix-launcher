@@ -20,6 +20,8 @@ import kotlinx.coroutines.test.runTest
 import net.kdt.pojavlaunch.aerix.social.auth.GoogleAccount
 import net.kdt.pojavlaunch.aerix.social.auth.GoogleIdToken
 import net.kdt.pojavlaunch.aerix.social.data.InMemorySocialStore
+import net.kdt.pojavlaunch.aerix.social.data.LocalSocialRepository
+import net.kdt.pojavlaunch.aerix.social.vm.SignInOutcome
 import net.kdt.pojavlaunch.aerix.social.vm.SocialProfileViewModel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -72,14 +74,14 @@ class GoogleAuthTest {
         val dispatcher = UnconfinedTestDispatcher(testScheduler)
         val store = InMemorySocialStore()
         val viewModel = SocialProfileViewModel(store, dispatcher)
-        var existingProfile = true
+        var outcome = SignInOutcome.RETURNING
 
         viewModel.signInWithGoogle(
             GoogleAccount(email = "nova@gmail.com", displayName = "Nova", idToken = "token")
-        ) { existingProfile = it }
+        ) { outcome = it }
         advanceUntilIdle()
 
-        assertFalse("a first sign-in is not an existing profile", existingProfile)
+        assertEquals(SignInOutcome.NEW_ACCOUNT, outcome)
         assertTrue(viewModel.state.value.signedIn)
         assertEquals("nova@gmail.com", viewModel.state.value.email)
         assertEquals("Nova", viewModel.state.value.name)
@@ -95,7 +97,7 @@ class GoogleAuthTest {
         val dispatcher = UnconfinedTestDispatcher(testScheduler)
         val store = InMemorySocialStore()
         val viewModel = SocialProfileViewModel(store, dispatcher)
-        var existingProfile = false
+        var outcome = SignInOutcome.NEW_ACCOUNT
 
         viewModel.signInWithGoogle(
             GoogleAccount(email = "nova@gmail.com", displayName = "Nova", idToken = "token")
@@ -107,11 +109,96 @@ class GoogleAuthTest {
 
         viewModel.signInWithGoogle(
             GoogleAccount(email = "nova@gmail.com", displayName = "Nova", idToken = "token")
-        ) { existingProfile = it }
+        ) { outcome = it }
         advanceUntilIdle()
 
-        assertTrue("the profile already existed", existingProfile)
+        assertEquals(SignInOutcome.RETURNING, outcome)
         assertEquals("Kai", viewModel.state.value.name)
+    }
+
+    @Test
+    fun signingInWithADifferentGoogleAccountStartsFresh() = runTest {
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
+        val store = InMemorySocialStore()
+        val repository = LocalSocialRepository(io = dispatcher)
+        val viewModel = SocialProfileViewModel(store, dispatcher, repository)
+        advanceUntilIdle()
+
+        viewModel.signInWithGoogle(
+            GoogleAccount(email = "nova@gmail.com", displayName = "Nova", idToken = "token")
+        )
+        advanceUntilIdle()
+        viewModel.onNameChange("Kai")
+        viewModel.saveCharacter()
+        advanceUntilIdle()
+        assertTrue(repository.friends.value.isNotEmpty())
+
+        var outcome = SignInOutcome.RETURNING
+        viewModel.signInWithGoogle(
+            GoogleAccount(email = "luna@gmail.com", displayName = "Luna", idToken = "token")
+        ) { outcome = it }
+        advanceUntilIdle()
+
+        assertEquals(SignInOutcome.SWITCHED_ACCOUNT, outcome)
+        assertEquals("luna@gmail.com", viewModel.state.value.email)
+        assertEquals("Luna", viewModel.state.value.name)
+        // The previous account's friends and chats must not follow the new one in.
+        assertTrue(repository.friends.value.isEmpty())
+        assertTrue(repository.chats.value.isEmpty())
+    }
+
+    @Test
+    fun signingOutKeepsTheAddressButMarksTheProfileSignedOut() = runTest {
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
+        val store = InMemorySocialStore()
+        val viewModel = SocialProfileViewModel(store, dispatcher)
+
+        viewModel.signInWithGoogle(
+            GoogleAccount(email = "nova@gmail.com", displayName = "Nova", idToken = "token")
+        )
+        advanceUntilIdle()
+
+        viewModel.signOut()
+        advanceUntilIdle()
+        assertFalse(viewModel.state.value.signedIn)
+        assertEquals("nova@gmail.com", viewModel.state.value.email)
+
+        var outcome = SignInOutcome.NEW_ACCOUNT
+        viewModel.signInWithGoogle(
+            GoogleAccount(email = "nova@gmail.com", displayName = "Nova", idToken = "token")
+        ) { outcome = it }
+        advanceUntilIdle()
+        assertEquals(SignInOutcome.RETURNING, outcome)
+    }
+
+    @Test
+    fun forgettingTheAccountRemovesTheGoogleLink() = runTest {
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
+        val store = InMemorySocialStore()
+        val viewModel = SocialProfileViewModel(store, dispatcher)
+
+        viewModel.signInWithGoogle(
+            GoogleAccount(email = "nova@gmail.com", displayName = "Nova", idToken = "token")
+        )
+        advanceUntilIdle()
+
+        viewModel.forgetGoogleAccount()
+        advanceUntilIdle()
+        assertEquals("", viewModel.state.value.email)
+        assertFalse(store.snapshot().signedIn)
+    }
+
+    @Test
+    fun theTestingClientIdIsRemembered() = runTest {
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
+        val store = InMemorySocialStore()
+        val viewModel = SocialProfileViewModel(store, dispatcher)
+
+        viewModel.setGoogleClientId("  123-abc.apps.googleusercontent.com ")
+        advanceUntilIdle()
+
+        assertEquals("123-abc.apps.googleusercontent.com", viewModel.state.value.googleClientId)
+        assertEquals("123-abc.apps.googleusercontent.com", store.snapshot().googleClientId)
     }
 
     @Test

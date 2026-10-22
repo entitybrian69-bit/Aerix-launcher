@@ -37,6 +37,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -63,6 +66,8 @@ import net.kdt.pojavlaunch.aerix.social.ui.SocialSectionTitle
 import net.kdt.pojavlaunch.aerix.social.ui.SocialSliderRow
 import net.kdt.pojavlaunch.aerix.social.ui.SocialTextField
 import net.kdt.pojavlaunch.aerix.social.ui.SocialTitle
+import net.kdt.pojavlaunch.BuildConfig
+import net.kdt.pojavlaunch.aerix.social.auth.GoogleAuth
 import net.kdt.pojavlaunch.aerix.social.ui.SocialAvatar
 import net.kdt.pojavlaunch.aerix.social.ui.SocialMicTestCard
 import net.kdt.pojavlaunch.aerix.social.ui.SocialToggleRow
@@ -270,9 +275,15 @@ fun SocialSettingsAccountScreen(
     state: ProfileUiState,
     onBack: () -> Unit,
     onOpenSafety: () -> Unit,
-    onDeleted: () -> Unit
+    onDeleted: () -> Unit,
+    onSignedOut: () -> Unit = {}
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var usernameDialog by remember { mutableStateOf(false) }
+    var forgetDialog by remember { mutableStateOf(false) }
+    var clientIdDialog by remember { mutableStateOf(false) }
+    var clientIdDraft by remember { mutableStateOf(state.googleClientId) }
     var disableDialog by remember { mutableStateOf(false) }
     var deleteDialog by remember { mutableStateOf(false) }
     var typed by remember { mutableStateOf("") }
@@ -316,12 +327,79 @@ fun SocialSettingsAccountScreen(
                     size = 12.sp,
                     color = SocialColors.textMuted
                 )
+                // Real sign-out: Google's credential state for this app is cleared, and the
+                // profile stays on the device so the same account can come back to it.
+                SocialStageRow("Sign out") {
+                    scope.launch {
+                        GoogleAuth.signOut(context)
+                        profile.signOut()
+                        onSignedOut()
+                    }
+                }
+                SocialBody("Signing out keeps your profile on this device. It is hidden until the same Google account signs in again.", size = 11.sp, color = SocialColors.textMuted)
+                SocialStageRow("Use a different Google account") { forgetDialog = true }
+                SocialBody("Forgetting the link means the next account starts with its own character and its own chats.", size = 11.sp, color = SocialColors.textMuted)
                 SocialStageRow("Disable account") { disableDialog = true }
                 SocialBody("Disabling signs you out everywhere and hides your profile. Nothing is deleted.", size = 11.sp, color = SocialColors.textMuted)
                 SocialStageRow("Delete account") { deleteDialog = true }
                 SocialBody("Deleting removes your profile, friends, messages, posts and links permanently.", size = 11.sp, color = SocialColors.textMuted)
+                if (BuildConfig.DEBUG) {
+                    SocialStageRow("Google client id (testing)") { clientIdDialog = true }
+                    SocialBody(
+                        if (state.googleClientId.isBlank()) "No testing override · this build uses the baked-in id if it has one."
+                        else "Testing override in use.",
+                        size = 11.sp,
+                        color = SocialColors.textMuted
+                    )
+                }
                 Spacer(Modifier.weight(1f))
                 SocialGhostButton("Done", onClick = onBack, modifier = Modifier.fillMaxWidth())
+            }
+        }
+    }
+
+    if (forgetDialog) {
+        SocialDialog(onDismiss = { forgetDialog = false }) {
+            SocialTitle("Use a different account?")
+            SocialBody("This removes ${state.email.ifBlank { "the current Google account" }} from this device. Your profile and chats stay until another account signs in, then they start fresh.")
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                SocialPrimaryButton(
+                    "Forget account",
+                    onClick = {
+                        scope.launch {
+                            GoogleAuth.signOut(context)
+                            profile.forgetGoogleAccount()
+                            forgetDialog = false
+                            onSignedOut()
+                        }
+                    },
+                    danger = true,
+                    modifier = Modifier.weight(1f)
+                )
+                SocialGhostButton("Cancel", onClick = { forgetDialog = false }, modifier = Modifier.weight(1f))
+            }
+        }
+    }
+
+    if (clientIdDialog) {
+        SocialDialog(onDismiss = { clientIdDialog = false }) {
+            SocialTitle("Google client id")
+            SocialBody("Testing only. Paste the OAuth *Web application* client id from Google Cloud Console; it is used when the APK was built without one.")
+            SocialTextField(
+                value = clientIdDraft,
+                onValueChange = { clientIdDraft = it },
+                placeholder = "000000000000-abc.apps.googleusercontent.com"
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                SocialPrimaryButton(
+                    "Save",
+                    onClick = {
+                        profile.setGoogleClientId(clientIdDraft)
+                        clientIdDialog = false
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+                SocialGhostButton("Cancel", onClick = { clientIdDialog = false }, modifier = Modifier.weight(1f))
             }
         }
     }
@@ -391,8 +469,13 @@ fun SocialSettingsAccountScreen(
                     "Delete account",
                     onClick = {
                         deleteDialog = false
-                        profile.deleteAccount()
-                        onDeleted()
+                        scope.launch {
+                            // Deleting also revokes the Google link, so the account sheet asks
+                            // again instead of handing back the deleted profile.
+                            GoogleAuth.signOut(context)
+                            profile.deleteAccount()
+                            onDeleted()
+                        }
                     },
                     enabled = typed == "DELETE",
                     danger = true,

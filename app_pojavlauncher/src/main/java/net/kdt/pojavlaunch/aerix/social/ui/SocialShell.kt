@@ -94,6 +94,7 @@ import net.kdt.pojavlaunch.aerix.social.vm.SocialActivityViewModel
 import net.kdt.pojavlaunch.aerix.social.vm.SocialAddFriendViewModel
 import net.kdt.pojavlaunch.aerix.social.vm.SocialChatViewModel
 import net.kdt.pojavlaunch.aerix.social.vm.SocialDashboardViewModel
+import net.kdt.pojavlaunch.aerix.social.vm.SignInOutcome
 import net.kdt.pojavlaunch.aerix.social.vm.SocialProfileViewModel
 import net.kdt.pojavlaunch.aerix.social.vm.SocialRoute
 import net.kdt.pojavlaunch.aerix.social.vm.SocialSettingsViewModel
@@ -108,7 +109,7 @@ import androidx.core.content.ContextCompat
 
 private val socialFactory = viewModelFactory {
     initializer { SocialShellViewModel() }
-    initializer { SocialProfileViewModel(SocialGraph.store) }
+    initializer { SocialProfileViewModel(SocialGraph.store, repository = SocialGraph.repository) }
     initializer { SocialDashboardViewModel(SocialGraph.repository) }
     initializer { SocialChatViewModel(SocialGraph.repository) }
     initializer { SocialSettingsViewModel(SocialGraph.store, repository = SocialGraph.repository) }
@@ -206,12 +207,15 @@ fun SocialShell(
                         SocialRoute.AUTH -> SocialAuthScreen(
                             inProgress = profile.signInInProgress,
                             googleError = profile.googleError,
+                            lastEmail = profile.email,
+                            clientIdOverride = profile.googleClientId,
                             onGoogleAccount = { account, creating ->
-                                profileVm.signInWithGoogle(account) { existingProfile ->
-                                    // A brand new account still picks its character; an account
-                                    // this device already knows goes straight to the dashboard.
+                                profileVm.signInWithGoogle(account) { outcome ->
+                                    // Returning account: straight to the dashboard. New or
+                                    // switched account: the character step, because the profile
+                                    // now belongs to someone else.
                                     shell.reset(
-                                        if (existingProfile && !creating) SocialRoute.DASHBOARD
+                                        if (outcome == SignInOutcome.RETURNING && !creating) SocialRoute.DASHBOARD
                                         else SocialRoute.CHARACTER
                                     )
                                 }
@@ -313,7 +317,8 @@ fun SocialShell(
                             state = profile,
                             onBack = { shell.back() },
                             onOpenSafety = { shell.push(SocialRoute.SAFETY) },
-                            onDeleted = { shell.reset(SocialRoute.AUTH) }
+                            onDeleted = { shell.reset(SocialRoute.AUTH) },
+                            onSignedOut = { shell.reset(SocialRoute.AUTH) }
                         )
                         SocialRoute.SETTINGS_NOTIFICATIONS -> SocialSettingsNotificationsScreen(
                             viewModel = settingsVm,

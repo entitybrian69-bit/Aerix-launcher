@@ -126,6 +126,8 @@ data class ProfileUiState(
     val signInInProgress: Boolean = false,
     /** Why the last Google sign-in did not go through, shown on the auth screen. */
     val googleError: String? = null,
+    /** Debug-only OAuth client id typed into Settings. */
+    val googleClientId: String = "",
     val saved: Boolean = false
 ) {
     fun canChangeUsername(now: Long = System.currentTimeMillis()): Boolean =
@@ -135,9 +137,14 @@ data class ProfileUiState(
         (usernameChangedAt + SocialPersisted.USERNAME_COOLDOWN_MS - now).coerceAtLeast(0L)
 }
 
+/** What a successful Google sign-in means for the screens: dashboard or character step. */
+enum class SignInOutcome { RETURNING, NEW_ACCOUNT, SWITCHED_ACCOUNT }
+
 class SocialProfileViewModel(
     private val store: SocialStore,
-    private val io: CoroutineDispatcher = Dispatchers.IO
+    private val io: CoroutineDispatcher = Dispatchers.IO,
+    /** Cleared when a different Google account signs in, so chats never leak between accounts. */
+    private val repository: SocialRepository? = null
 ) : ViewModel() {
     private val _state = MutableStateFlow(ProfileUiState())
     val state: StateFlow<ProfileUiState> = _state.asStateFlow()
@@ -149,6 +156,7 @@ class SocialProfileViewModel(
                     it.copy(
                         signedIn = persisted.signedIn,
                         email = persisted.email,
+                        googleClientId = persisted.googleClientId,
                         name = persisted.name,
                         username = persisted.username.ifBlank { persisted.name },
                         usernameChangedAt = persisted.usernameChangedAt,
@@ -167,35 +175,70 @@ class SocialProfileViewModel(
     /**
      * Real Google sign-in. Stores the account's email and, when this device has no profile yet,
      * seeds the name from Google before the character screen refines it.
-     * [onDone] receives true when there was already a profile, so the shell can go straight to
-     * the dashboard instead of the character step.
+     *
+     * Signing in with a *different* Google address than the one on file starts that account
+     * fresh: the profile and the locally stored Social content are cleared, because they belong
+     * to the previous account.
      */
-    fun signInWithGoogle(account: GoogleAccount, onDone: (existingProfile: Boolean) -> Unit = {}) =
+    fun signInWithGoogle(account: GoogleAccount, onDone: (SignInOutcome) -> Unit = {}) =
         viewModelScope.launch {
             _state.update { it.copy(signInInProgress = true, googleError = null) }
-            val existing = _state.value.name.isNotBlank()
+            val previousEmail = _state.value.email
+            val hasProfile = _state.value.name.isNotBlank()
+            val switched = previousEmail.isNotBlank() &&
+                !previousEmail.equals(account.email, ignoreCase = true)
             val fallbackName = account.displayName.ifBlank { account.email.substringBefore('@') }.take(16)
+            val fallbackUsername = fallbackName.filter { it.isLetterOrDigit() }.take(16)
+
+            if (switched) repository?.clearAll()
+
             withContext(io) {
                 store.update { persisted ->
-                    persisted.copy(
-                        signedIn = true,
-                        email = account.email,
-                        name = persisted.name.ifBlank { fallbackName },
-                        username = persisted.username.ifBlank {
-                            (persisted.name.ifBlank { fallbackName }).filter { it.isLetterOrDigit() }.take(16)
-                        }
-                    )
+                    if (switched) {
+                        // Different person: keep app-level preferences, drop the account's data.
+                        SocialPersisted(
+                            signedIn = true,
+                            email = account.email,
+                            googleClientId = persisted.googleClientId,
+                            name = fallbackName,
+                            username = fallbackUsername,
+                            privacy = persisted.privacy,
+                            notifications = persisted.notifications,
+                            chat = persisted.chat,
+                            mic = persisted.mic
+                        )
+                    } else {
+                        persisted.copy(
+                            signedIn = true,
+                            email = account.email,
+                            name = persisted.name.ifBlank { fallbackName },
+                            username = persisted.username.ifBlank {
+                                (persisted.name.ifBlank { fallbackName }).filter { it.isLetterOrDigit() }.take(16)
+                            }
+                        )
+                    }
                 }
             }
             _state.update {
                 it.copy(
                     signedIn = true,
                     email = account.email,
-                    name = it.name.ifBlank { fallbackName },
+                    // A switched account starts from the Google name; its character step follows.
+                    name = if (switched) fallbackName else it.name.ifBlank { fallbackName },
+                    username = if (switched) fallbackUsername else it.username.ifBlank { fallbackUsername },
+                    skinId = if (switched) "skin_1" else it.skinId,
+                    capeId = if (switched) "cape_none" else it.capeId,
+                    bio = if (switched) "" else it.bio,
+                    links = if (switched) emptyList() else it.links,
                     signInInProgress = false
                 )
             }
-            onDone(existing)
+            val outcome = when {
+                switched -> SignInOutcome.SWITCHED_ACCOUNT
+                hasProfile -> SignInOutcome.RETURNING
+                else -> SignInOutcome.NEW_ACCOUNT
+            }
+            onDone(outcome)
         }
 
     /** A sign-in that failed for a reason worth showing (no account, not configured, …). */
@@ -205,6 +248,29 @@ class SocialProfileViewModel(
 
     fun clearGoogleError() {
         _state.update { it.copy(googleError = null) }
+    }
+
+    /**
+     * Real sign-out. The Google session for this app is cleared by the caller
+     * ([net.kdt.pojavlaunch.aerix.social.auth.GoogleAuth.signOut]); the address stays on file so
+     * the same account is recognised (and not wiped) when it comes back.
+     */
+    fun signOut() = viewModelScope.launch {
+        withContext(io) { store.update { it.copy(signedIn = false) } }
+        _state.update { it.copy(signedIn = false, googleError = null) }
+    }
+
+    /** Removes the Google link entirely, so the next account is treated as a new person. */
+    fun forgetGoogleAccount() = viewModelScope.launch {
+        withContext(io) { store.update { it.copy(signedIn = false, email = "") } }
+        _state.update { it.copy(signedIn = false, email = "") }
+    }
+
+    /** Debug-build testing hook: the OAuth client id to use when the APK was built without one. */
+    fun setGoogleClientId(value: String) = viewModelScope.launch {
+        val clean = value.trim()
+        withContext(io) { store.update { it.copy(googleClientId = clean) } }
+        _state.update { it.copy(googleClientId = clean) }
     }
 
     /**
@@ -231,16 +297,17 @@ class SocialProfileViewModel(
         withContext(io) { store.update { it.copy(signedIn = true) } }
     }
 
-    fun signOut() = viewModelScope.launch {
-        withContext(io) { store.update { it.copy(signedIn = false) } }
-    }
-
     fun disableAccount() = viewModelScope.launch {
         withContext(io) { store.update { it.copy(signedIn = false) } }
     }
 
+    /** Deletes the profile and everything this device stored for it. */
     fun deleteAccount() = viewModelScope.launch {
+        repository?.clearAll()
         withContext(io) { store.update { SocialPersisted() } }
+        _state.update {
+            it.copy(signedIn = false, email = "", name = "", username = "", bio = "", links = emptyList())
+        }
     }
 
     fun onNameChange(value: String) {
@@ -348,6 +415,7 @@ class SocialProfileViewModel(
     fun snapshot(): SocialPersisted = SocialPersisted(
         signedIn = _state.value.signedIn,
         email = _state.value.email,
+        googleClientId = _state.value.googleClientId,
         name = _state.value.name,
         username = _state.value.username,
         usernameChangedAt = _state.value.usernameChangedAt,

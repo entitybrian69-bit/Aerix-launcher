@@ -80,6 +80,8 @@ import net.kdt.pojavlaunch.aerix.social.vm.SocialProfileViewModel
 fun SocialAuthScreen(
     inProgress: Boolean,
     googleError: String?,
+    lastEmail: String,
+    clientIdOverride: String,
     onGoogleAccount: (GoogleAccount, creatingAccount: Boolean) -> Unit,
     onGoogleError: (String) -> Unit,
     onNotNow: () -> Unit
@@ -93,7 +95,7 @@ fun SocialAuthScreen(
         if (launching || inProgress) return
         launching = true
         scope.launch {
-            val result = GoogleAuth.signIn(context)
+            val result = GoogleAuth.signIn(context, clientIdOverride)
             launching = false
             when (result) {
                 is GoogleAuthResult.Success -> onGoogleAccount(result.account, creating)
@@ -145,7 +147,13 @@ fun SocialAuthScreen(
                         }
                         Column(modifier = Modifier.weight(1f)) {
                             SocialBody("Aerix account", size = 15.sp, color = SocialColors.textPrimary, weight = FontWeight.SemiBold)
-                            SocialBody("Sign in with Google to continue", size = 12.sp, color = SocialColors.textMuted)
+                            SocialBody(
+                                if (lastEmail.isNotBlank()) "Last account · $lastEmail"
+                                else "Sign in with Google to continue",
+                                size = 12.sp,
+                                color = SocialColors.textMuted,
+                                maxLines = 1
+                            )
                         }
                     }
                     SocialPrimaryButton(
@@ -165,7 +173,8 @@ fun SocialAuthScreen(
                     if (notConfigured) {
                         SocialBody(
                             "This build has no Google OAuth client id, so Android cannot open the " +
-                                "account sheet. Add aerixGoogleWebClientId in gradle.properties and rebuild.",
+                                "account sheet. Add aerixGoogleWebClientId in gradle.properties and rebuild " +
+                                "(debug builds can also paste it in Settings → Account).",
                             size = 12.sp,
                             color = SocialColors.danger
                         )

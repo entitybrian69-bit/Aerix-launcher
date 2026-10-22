@@ -85,6 +85,10 @@ interface SocialRepository {
 
     /** Everything already read on this device. */
     suspend fun seenMessages(): Set<String>
+
+    /** Wipes this device's Social content (friends, chats, feed) — used when the signed-in
+     *  Google account changes, so one person's messages never appear under another's profile. */
+    suspend fun clearAll()
 }
 
 /** Everything written to [SocialContentStore] for one snapshot. */
@@ -433,6 +437,19 @@ class LocalSocialRepository(
     }
 
     override suspend fun seenMessages(): Set<String> = seenIds
+
+    override suspend fun clearAll() = withContext(io) {
+        _friends.value = emptyList()
+        _requests.value = emptyList()
+        _chats.value = emptyMap()
+        _posts.value = emptyList()
+        _blocked.value = emptyList()
+        _party.value = PartyState()
+        _shares.value = emptyMap()
+        seenIds = emptySet()
+        persist()
+        Unit
+    }
 
     private fun now(): String {
         val calendar = java.util.Calendar.getInstance()

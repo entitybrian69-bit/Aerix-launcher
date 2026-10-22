@@ -20,6 +20,7 @@ package net.kdt.pojavlaunch.aerix.social.auth
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import androidx.credentials.ClearCredentialStateRequest
 import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
@@ -54,22 +55,33 @@ object GoogleAuth {
     fun clientId(context: Context): String =
         runCatching { context.getString(R.string.aerix_google_web_client_id) }.getOrDefault("").trim()
 
-    fun isConfigured(context: Context): Boolean {
-        val id = clientId(context)
-        return id.isNotBlank() && id != PLACEHOLDER && id.endsWith(".apps.googleusercontent.com")
+    /**
+     * Build value first, then the testing override typed into Settings on a debug build, so a
+     * test APK can sign in without a rebuild.
+     */
+    fun resolveClientId(context: Context, override: String = ""): String {
+        val fromBuild = clientId(context)
+        if (isUsable(fromBuild)) return fromBuild
+        return override.trim()
     }
+
+    fun isConfigured(context: Context): Boolean = isUsable(clientId(context))
+
+    fun isUsable(id: String): Boolean =
+        id.isNotBlank() && id != PLACEHOLDER && id.endsWith(".apps.googleusercontent.com")
 
     /**
      * Opens the system account sheet. Suspends until the player picks an account, cancels, or
      * the device has no Google account at all.
      */
-    suspend fun signIn(context: Context): GoogleAuthResult {
-        if (!isConfigured(context)) return GoogleAuthResult.NotConfigured
+    suspend fun signIn(context: Context, clientIdOverride: String = ""): GoogleAuthResult {
+        val clientId = resolveClientId(context, clientIdOverride)
+        if (!isUsable(clientId)) return GoogleAuthResult.NotConfigured
         val activity = context.findActivity()
             ?: return GoogleAuthResult.Failed("Google sign-in needs the launcher window.")
         val request = GetCredentialRequest.Builder()
             .addCredentialOption(
-                GetSignInWithGoogleOption.Builder(clientId(activity)).build()
+                GetSignInWithGoogleOption.Builder(clientId).build()
             )
             .build()
         return withContext(Dispatchers.Main) {
@@ -99,6 +111,19 @@ object GoogleAuth {
                 GoogleAuthResult.Failed(error.errorMessage?.toString() ?: "Google sign-in failed.")
             } catch (error: Throwable) {
                 GoogleAuthResult.Failed(error.message ?: "Google sign-in failed.")
+            }
+        }
+    }
+
+    /**
+     * Real sign-out: clears the credential state Google shares with this app, so the next
+     * sign-in asks again instead of silently reusing the last account.
+     */
+    suspend fun signOut(context: Context) {
+        val activity = context.findActivity() ?: return
+        withContext(Dispatchers.Main) {
+            runCatching {
+                CredentialManager.create(activity).clearCredentialState(ClearCredentialStateRequest())
             }
         }
     }
