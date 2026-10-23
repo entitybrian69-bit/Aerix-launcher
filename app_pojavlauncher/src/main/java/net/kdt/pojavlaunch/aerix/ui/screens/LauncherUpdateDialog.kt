@@ -26,6 +26,7 @@ import net.kdt.pojavlaunch.R
 import net.kdt.pojavlaunch.aerix.bridge.*
 import net.kdt.pojavlaunch.aerix.theme.AerixSurface
 import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
+import kotlinx.coroutines.delay
 import java.util.Locale
 
 @Composable
@@ -44,6 +45,24 @@ internal fun LauncherUpdateDialog(activity: FragmentActivity, automatic: Boolean
     val progress by animateFloatAsState(
         targetValue = (updater.received.toFloat() / (release?.asset?.size ?: 1)).coerceIn(0f, 1f), label = "update-download"
     )
+    // Download rate, sampled twice a second from the byte count the download reports.
+    var speedMb by remember { mutableFloatStateOf(0f) }
+    val downloading = phase == LauncherUpdatePhase.DOWNLOADING
+    LaunchedEffect(downloading) {
+        speedMb = 0f
+        if (!downloading) return@LaunchedEffect
+        var lastBytes = updater.received
+        var lastAt = System.nanoTime()
+        while (true) {
+            delay(500)
+            val now = System.nanoTime()
+            val bytes = updater.received
+            val elapsed = (now - lastAt) / 1_000_000_000.0
+            if (elapsed > 0.0) speedMb = ((bytes - lastBytes) / 1048576.0 / elapsed).toFloat()
+            lastBytes = bytes
+            lastAt = now
+        }
+    }
     LaunchedEffect(Unit) { updater.permissionReturned(activity); if (!automatic) updater.check() }
     DisposableEffect(activity, automatic) {
         LauncherUpdateNotices.opened(automatic)
@@ -90,7 +109,26 @@ internal fun LauncherUpdateDialog(activity: FragmentActivity, automatic: Boolean
                             LinearProgressIndicator(Modifier.fillMaxWidth(), color = accent)
                             Text("Looking for the latest stable release…")
                         }
-                        LauncherUpdatePhase.CURRENT -> Text("No newer published release is available for this version.")
+                        LauncherUpdatePhase.CURRENT -> {
+                            Text("No newer published release is available for this version.")
+                            if (BuildConfig.DEBUG && release != null) {
+                                Text(
+                                    "Debug build: measure how fast this release downloads, using the same code path an update uses.",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                                TextButton(
+                                    onClick = { updater.measureDownloadSpeed(activity) },
+                                    enabled = !updater.speedTestRunning
+                                ) {
+                                    Text(if (updater.speedTestRunning) "Measuring…" else "Test download speed", color = accent)
+                                }
+                                if (updater.speedTestRunning) {
+                                    Text("${megabytes(updater.received)} MB downloaded")
+                                } else if (updater.speedTestResult.isNotBlank()) {
+                                    Text(updater.speedTestResult, color = accent, fontWeight = FontWeight.SemiBold)
+                                }
+                            }
+                        }
                         LauncherUpdatePhase.AVAILABLE -> {
                             Text("${release?.tag} · ${megabytes(release?.asset?.size ?: 0)} MB", color = accent,
                                 style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
@@ -100,7 +138,10 @@ internal fun LauncherUpdateDialog(activity: FragmentActivity, automatic: Boolean
                         LauncherUpdatePhase.DOWNLOADING -> {
                             Text("${(progress * 100).toInt()}%", color = accent, style = MaterialTheme.typography.headlineSmall)
                             LinearProgressIndicator(progress = { progress }, Modifier.fillMaxWidth().height(6.dp), color = accent)
-                            Text("${megabytes(updater.received)} / ${megabytes(release?.asset?.size ?: 0)} MB")
+                            Text(
+                                "${megabytes(updater.received)} / ${megabytes(release?.asset?.size ?: 0)} MB" +
+                                    if (speedMb > 0.05f) " \u00B7 ${String.format(Locale.US, "%.1f", speedMb)} MB/s" else ""
+                            )
                             Text("You can close this window. The download will keep running.", style = MaterialTheme.typography.bodySmall)
                         }
                         LauncherUpdatePhase.READY -> {

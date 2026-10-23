@@ -12,10 +12,8 @@ import androidx.core.content.FileProvider
 import kotlinx.coroutines.*
 import net.kdt.pojavlaunch.BuildConfig
 import java.io.File
-import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
-import java.security.MessageDigest
 
 internal enum class LauncherUpdatePhase { CHECKING, CURRENT, AVAILABLE, DOWNLOADING, READY, ERROR }
 
@@ -24,12 +22,18 @@ internal object LauncherUpdater {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var job: Job? = null
     @Volatile private var connection: HttpURLConnection? = null
+    /** The connections of the download in progress, so cancelling closes every one of them. */
+    @Volatile private var downloadConnections: DownloadConnections? = null
     var phase by mutableStateOf(LauncherUpdatePhase.CHECKING); private set
     var release by mutableStateOf<LauncherRelease?>(null); private set
     var received by mutableLongStateOf(0L); private set
     var error by mutableStateOf(""); private set
     var awaitingPermission by mutableStateOf(false); private set
     var installing by mutableStateOf(false); private set
+    /** Result of the last download speed test, for the debug build only. */
+    var speedTestResult by mutableStateOf(""); private set
+    var speedTestRunning by mutableStateOf(false); private set
+    private var speedTestJob: Job? = null
     private var apk: File? = null
 
     fun check() {
@@ -72,40 +76,28 @@ internal object LauncherUpdater {
         val update = release ?: return
         val app = context.applicationContext
         phase = LauncherUpdatePhase.DOWNLOADING; error = ""; received = 0
+        val connections = DownloadConnections()
+        downloadConnections = connections
         job = scope.launch {
             val directory = File(app.cacheDir, "updates")
             val target = File(directory, update.asset.name)
-            val partial = File(directory, update.asset.name + ".part")
             try {
-                if (!directory.exists() && !directory.mkdirs()) throw IOException("Cannot create update cache")
-                val digest = MessageDigest.getInstance("SHA-256")
-                val response = open(update.asset.url)
-                try {
-                    require(response.responseCode == 200) { "Download returned HTTP ${response.responseCode}" }
-                    response.inputStream.use { input -> partial.outputStream().use { output ->
-                        val buffer = ByteArray(64 * 1024)
-                        var bytes = 0L
-                        var lastReport = 0L
-                        while (true) {
-                            currentCoroutineContext().ensureActive()
-                            val count = input.read(buffer)
-                            if (count == -1) break
-                            bytes += count
-                            require(bytes <= update.asset.size && bytes <= LauncherUpdatePolicy.MAX_APK_BYTES) { "Update download size does not match the release" }
-                            output.write(buffer, 0, count); digest.update(buffer, 0, count)
-                            val now = System.nanoTime()
-                            if (now - lastReport > 100_000_000) {
-                                withContext(Dispatchers.Main) { received = bytes }
-                                lastReport = now
-                            }
-                        }
-                        require(bytes == update.asset.size) { "The update download is incomplete. Please retry." }
-                        withContext(Dispatchers.Main) { received = bytes }
-                    } }
-                } finally { response.disconnect(); connection = null }
-                val hash = digest.digest().joinToString("") { "%02x".format(it.toInt() and 255) }
-                require(update.asset.sha256 == null || hash == update.asset.sha256) { "Update checksum verification failed" }
-                require(partial.renameTo(target)) { "Cannot save downloaded update" }
+                require(directory.isDirectory || directory.mkdirs()) { "Cannot create the update cache" }
+                // Six connections instead of one: a single stream on a phone's link spends most of
+                // its time waiting, which is what made a hundred-megabyte update crawl. The parts
+                // land straight in the file and the checksum is verified once it is whole.
+                val result = FastDownload.download(
+                    url = update.asset.url,
+                    target = target,
+                    expectedSize = update.asset.size,
+                    userAgent = "AerixLauncher/${BuildConfig.VERSION_NAME}",
+                    connections = connections,
+                    onProgress = { bytes -> received = bytes }
+                )
+                withContext(Dispatchers.Main) { received = result.bytes }
+                require(update.asset.sha256 == null || result.sha256 == update.asset.sha256) {
+                    "Update checksum verification failed"
+                }
                 validate(app, target, update)
                 withContext(Dispatchers.Main) { apk = target; phase = LauncherUpdatePhase.READY }
             } catch (e: Exception) {
@@ -113,13 +105,64 @@ internal object LauncherUpdater {
                 if (e is CancellationException || !currentCoroutineContext().isActive) {
                     withContext(NonCancellable + Dispatchers.Main) { phase = LauncherUpdatePhase.AVAILABLE; received = 0 }
                 } else fail(e)
-            } finally { partial.delete() }
+            } finally {
+                downloadConnections = null
+            }
+        }
+    }
+    /**
+     * Downloads the published APK with the same code path an update uses, then reports how fast it
+     * arrived. Debug builds only: it exists so the download speed can be measured on a device
+     * without waiting for a newer release, and it never installs anything.
+     */
+    fun measureDownloadSpeed(context: Context) {
+        if (speedTestRunning) return
+        val update = release ?: return
+        val app = context.applicationContext
+        speedTestRunning = true
+        speedTestResult = "Measuring…"
+        speedTestJob = scope.launch {
+            val directory = File(app.cacheDir, "updates")
+            val target = File(directory, "speedtest.apk")
+            val connections = DownloadConnections()
+            try {
+                require(directory.isDirectory || directory.mkdirs()) { "Cannot create the update cache" }
+                val started = System.nanoTime()
+                val result = FastDownload.download(
+                    url = update.asset.url,
+                    target = target,
+                    expectedSize = update.asset.size,
+                    userAgent = "AerixLauncher/${BuildConfig.VERSION_NAME}",
+                    connections = connections,
+                    onProgress = { bytes -> received = bytes }
+                )
+                val seconds = (System.nanoTime() - started) / 1_000_000_000.0
+                val megabytes = result.bytes / 1048576.0
+                val rate = if (seconds > 0) megabytes / seconds else 0.0
+                withContext(Dispatchers.Main) {
+                    speedTestResult = "%.0f MB in %.1f s · %.1f MB/s".format(megabytes, seconds, rate)
+                    received = 0
+                }
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                withContext(Dispatchers.Main) { speedTestResult = e.message ?: "The test download failed" }
+            } finally {
+                runCatching { target.delete() }
+                runCatching { connections.disconnectAll() }
+                withContext(NonCancellable + Dispatchers.Main) { speedTestRunning = false; received = 0 }
+            }
         }
     }
     fun cancelDownload() {
         job?.cancel()
         val active = connection
-        scope.launch { runCatching { active?.disconnect() } }
+        val parts = downloadConnections
+        scope.launch {
+            runCatching { active?.disconnect() }
+            // Closes every part's connection, not just the one the last request used, so a
+            // cancelled download stops pushing bytes into the cache immediately.
+            runCatching { parts?.disconnectAll() }
+        }
     }
     private fun open(url: String): HttpURLConnection {
         return (URL(url).openConnection() as HttpURLConnection).apply {
