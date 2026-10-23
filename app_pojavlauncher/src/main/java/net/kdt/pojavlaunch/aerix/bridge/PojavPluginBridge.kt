@@ -312,6 +312,35 @@ object PojavPluginBridge {
         loadPlugins(context.applicationContext ?: context, force = true)
     }
 
+    /**
+     * One line per renderer plugin this launcher knows by name, for the Renderer tab: whether the
+     * package was found, selectable, or why it was not. A plugin APK that is installed but cannot
+     * be seen by the launcher looks exactly like one that was never installed, so the difference is
+     * stated instead of left to guesswork.
+     */
+    @JvmStatic
+    fun pluginDiagnostics(context: Context): List<String> {
+        runCatching { loadPlugins(context) }
+        return diagnostics().also { lines ->
+            runCatching { lines.forEach { Logger.appendToLog("Renderer plugin status: $it") } }
+        }
+    }
+
+    private fun diagnostics(): List<String> {
+        return KNOWN_PLUGIN_PACKAGES.map { packageName ->
+            val label = AerixRendererBrands.nameFor(packageName) ?: packageName
+            val found = plugins.firstOrNull { it.packageName == packageName }
+            if (found != null) {
+                "$label: ready"
+            } else {
+                val reason = lastScanNotes.firstOrNull { it.startsWith(packageName) }
+                    ?.substringAfter(':', "not detected")
+                    ?: "not installed, or not visible to the launcher"
+                "$label: $reason"
+            }
+        }
+    }
+
     /** Display name for a renderer tag, including the "plugin:" tags. */
     fun labelForTag(tag: String?): String? = findByTag(tag)?.displayName
 
@@ -387,8 +416,8 @@ object PojavPluginBridge {
      * Android version fills [ApplicationInfo.nativeLibraryDir] for it, so fall back to the
      * conventional per-ABI directory before giving up on the plugin.
      */
-    private fun nativeLibraryDirOf(info: ApplicationInfo): String? {
-        info.nativeLibraryDir?.let { if (File(it).isDirectory) return it }
+    private fun nativeLibraryDirOf(context: Context, info: ApplicationInfo): String? {
+        info.nativeLibraryDir?.let { dir -> if (File(dir).isDirectory) return dir }
         // The device ABI, which is also the one the plugin's libraries must match. This used to
         // read ApplicationInfo.primaryCpuAbi, a field that is not part of the public SDK stubs.
         val abi = (if (android.os.Process.is64Bit()) Build.SUPPORTED_64_BIT_ABIS
@@ -403,7 +432,39 @@ object PojavPluginBridge {
         // Shared, read-only library directory used when the ABI matches the launcher itself.
         val appLibrary = File(info.sourceDir).parentFile?.let { File(it, "lib/$abi") }
         if (appLibrary != null && appLibrary.isDirectory) return appLibrary.absolutePath
-        return null
+        // Nothing was unpacked for this package. An APK can keep its libraries compressed inside
+        // itself (`extractNativeLibs="false"`), in which case Android never creates a library
+        // directory. Unpack them ourselves, per ABI, into our private storage.
+        return extractLibrariesFromApk(context, info, abi)
+    }
+
+    /** Unpacks `lib/<abi>/*.so` of a plugin APK that does not have its libraries extracted. */
+    private fun extractLibrariesFromApk(context: Context, info: ApplicationInfo, abi: String): String? {
+        val target = File(context.noBackupFilesDir, "renderer-libs/${info.packageName}")
+        val stamp = File(target, ".stamp")
+        val expected = "${info.sourceDir}|$abi"
+        if (stamp.isFile && runCatching { stamp.readText() }.getOrNull() == expected) {
+            if (target.listFiles()?.any { it.name.endsWith(".so") } == true) return target.absolutePath
+        }
+        return runCatching {
+            java.util.zip.ZipFile(File(info.sourceDir)).use { zip ->
+                val prefix = "lib/$abi/"
+                val entries = zip.entries().asSequence()
+                    .filter { it.name.startsWith(prefix) && it.name.endsWith(".so") && !it.isDirectory }
+                    .toList()
+                if (entries.isEmpty()) return@use null
+                if (target.exists() && !target.deleteRecursively()) return@use null
+                if (!target.mkdirs() && !target.isDirectory) return@use null
+                for (entry in entries) {
+                    val name = entry.name.substringAfterLast('/')
+                    zip.getInputStream(entry).use { input ->
+                        File(target, name).outputStream().use { output -> input.copyTo(output) }
+                    }
+                }
+                stamp.writeText(expected)
+                target.absolutePath
+            }
+        }.getOrNull()
     }
 
     private fun parsePlugin(
@@ -413,7 +474,12 @@ object PojavPluginBridge {
     ): AerixRendererPlugin? = runCatching {
         if (info.flags and ApplicationInfo.FLAG_SYSTEM != 0 || RetiredRendererCleanup.isRetiredPackage(info.packageName)) return null
         val meta = info.metaData ?: return null
-        val marker = markerForMeta(meta, info.packageName) ?: return null
+        val marker = markerForMeta(meta, info.packageName) ?: run {
+            if (meta.containsKey("renderer")) {
+                note("${info.packageName}: declares a renderer but no plugin marker")
+            }
+            return null
+        }
         val emesisStyle = marker == "emesisPlugin" || marker == "aerixPlugin"
         if (meta.containsKey("fclPlugin_V2")) {
             val plugin = runCatching {
@@ -422,7 +488,7 @@ object PojavPluginBridge {
                     is String -> value
                     else -> error("Invalid V2 config resource")
                 }
-                val nativeDir = requireNotNull(nativeLibraryDirOf(info)) { "No native library directory" }
+                val nativeDir = requireNotNull(nativeLibraryDirOf(context, info)) { "No native library directory" }
                 val config = RendererPluginV2.parse(metadata, File(nativeDir))
                 AerixRendererPlugin(
                     packageName = info.packageName, appName = info.loadLabel(pm).toString(),
@@ -448,7 +514,7 @@ object PojavPluginBridge {
         }
         val des = meta.getString("des") ?: if (emesisStyle) "Emesis" else info.loadLabel(pm).toString()
         val pojavEnv = meta.getString("pojavEnv") ?: meta.getString("boatEnv") ?: ""
-        val nativeDir = nativeLibraryDirOf(info) ?: run {
+        val nativeDir = nativeLibraryDirOf(context, info) ?: run {
             note("${info.packageName}: no extracted native libraries for this ABI")
             return null
         }
@@ -484,7 +550,8 @@ object PojavPluginBridge {
             appVersion = appVersion,
             rendererId = rendererId,
             // A known plugin is shown under its own name; anything else keeps "<des> (<app>)".
-            displayName = brand?.name ?: "$des ($appName)",
+            displayName = brand?.name ?: if (des.contains(appName, ignoreCase = true) ||
+                appName.contains(des, ignoreCase = true)) des else "$des ($appName)",
             summary = brand?.description ?: "Plugin: $appName",
             minMCVer = meta.versionString("minMCVer"),
             maxMCVer = meta.versionString("maxMCVer"),

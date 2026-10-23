@@ -660,6 +660,20 @@ private fun RendererTabContent(activity: FragmentActivity) {
                 )
             }
 
+            // State of the renderer plugin APKs, right above the list that is missing them: an
+            // installed plugin that Android does not expose and one that was never installed look
+            // identical from here otherwise.
+            val pluginDiagnostics = remember(revision) { PojavPluginBridge.pluginDiagnostics(activity) }
+            Text(
+                text = "Renderer plugins: " + pluginDiagnostics.joinToString("  \u00B7  "),
+                style = MaterialTheme.typography.labelSmall,
+                color = if (pluginDiagnostics.any { !it.endsWith(": ready") }) {
+                    Color(0xFFFFC46B)
+                } else {
+                    AerixSurface.textSecondary
+                }
+            )
+
             SettingsCardColumn(modifier = Modifier.fillMaxWidth()) {
                 MiraiListSettingsCard(
                     position = CardPosition.Top,
