@@ -198,7 +198,7 @@ private fun defaultRendererStackOptions(defaultRendererId: String): List<Rendere
     RendererStackOption("LTW", "LTW (1.17+ Core)", "1.17+", Renderers.LTW_RENDERER, R.drawable.aerix_logo_opengl),
     RendererStackOption("Legacy", "LTW Legacy (1.8\u20131.16.5)", "1.8\u20131.16.5", Renderers.GL4ES_RENDERER, R.drawable.aerix_logo_opengl),
     RendererStackOption("Zink", "Kopper Zink (Vulkan)", "VULKAN", Renderers.ZINK_RENDERER, R.drawable.aerix_logo_vulkan),
-    RendererStackOption("PROTON", "Proton (PowerVR)", "POWERVR", Renderers.PROTON_RENDERER, R.drawable.aerix_logo_proton, brandedLogo = true)
+    RendererStackOption("PROTON", "Proton (PowerVR)", "32-BIT ONLY", Renderers.PROTON_RENDERER, R.drawable.aerix_logo_proton, brandedLogo = true)
 )
 
 /**
@@ -413,7 +413,14 @@ private fun RendererTabContent(activity: FragmentActivity) {
                     }
                 }
 
-                rendererStackOptions.chunked(2).forEach { rowOptions ->
+                // Proton ships for 32-bit ARM only, so its tile is not offered on a device that
+                // cannot run it - it would select a library that is not there. Every other tile is
+                // shown as before.
+                val offeredOptions = rendererStackOptions.filter { option ->
+                    option.rendererId != Renderers.PROTON_RENDERER ||
+                        compatible.any { it.first == option.rendererId }
+                }
+                offeredOptions.chunked(2).forEach { rowOptions ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(AerixSpacing.sm)

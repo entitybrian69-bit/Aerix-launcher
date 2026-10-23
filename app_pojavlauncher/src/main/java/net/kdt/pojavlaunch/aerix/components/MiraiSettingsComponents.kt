@@ -109,6 +109,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import net.kdt.pojavlaunch.R
 import net.kdt.pojavlaunch.aerix.bridge.PojavPluginBridge
+import net.kdt.pojavlaunch.game.renderer.def.Renderers
 import net.kdt.pojavlaunch.aerix.theme.AerixMetrics
 import net.kdt.pojavlaunch.aerix.theme.AerixRadii
 import net.kdt.pojavlaunch.aerix.theme.AerixSpacing
@@ -1165,7 +1166,9 @@ fun miraiRendererEntries(context: Context, includeFollowGlobal: Boolean): List<M
             MiraiRendererEntry(
                 uniqueId = rendererId,
                 displayName = cache.rendererDisplayNames.getOrElse(index) { rendererId },
-                backendRendererId = rendererId
+                backendRendererId = rendererId,
+                // A renderer with a device restriction says so here, next to its name.
+                summary = if (rendererId == Renderers.PROTON_RENDERER) "32-bit devices only" else null
             )
         )
     }

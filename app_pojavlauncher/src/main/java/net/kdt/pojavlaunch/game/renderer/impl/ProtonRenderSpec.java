@@ -14,22 +14,27 @@ import java.util.Map;
 import git.artdeell.mojoexec.MojoExec;
 
 /**
- * Proton renderer, bundled with the launcher.
+ * Proton renderer, bundled with the launcher for 32-bit devices.
  *
  * A desktop-GL-over-GLES translator that runs on top of the system EGL implementation, built from
  * the Large Thin Wrapper and Krypton Wrapper sources. It packages only OpenGL entry points (no EGL
  * symbols at all), so the EGL context - and therefore window creation - is the system one, and the
  * renderer library is what LWJGL binds OpenGL to. The plugin APK of the same renderer hands the
  * host exactly the same pair: {@code libEGL.so} as the EGL provider and its own library as GL.
+ *
+ * Only the 32-bit ARM build of the renderer is packaged, so the entry is offered on 32-bit devices
+ * and hidden everywhere else instead of pointing at a library that is not there.
  */
 public class ProtonRenderSpec implements RenderSpec {
-    /** The renderer, packaged per ABI in jniLibs. */
+    /** The renderer, packaged for 32-bit ARM in jniLibs. */
     public static final String LIBRARY = "libpowervr.so";
     /** ES version the wrapper is asked for; it exposes desktop GL 3.1+ on top of it. */
     private static final int GLES_MAJOR = 3;
 
     @Override
     public boolean compatibleDevice(Context context) {
+        // Only the 32-bit ARM build is packaged, so a 64-bit process has nothing to load.
+        if (android.os.Process.is64Bit()) return false;
         return new File(Tools.NATIVE_LIB_DIR, LIBRARY).isFile();
     }
 
