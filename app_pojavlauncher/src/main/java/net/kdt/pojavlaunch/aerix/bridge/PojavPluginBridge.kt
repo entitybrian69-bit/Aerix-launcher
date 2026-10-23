@@ -435,7 +435,7 @@ object PojavPluginBridge {
         return extractLibrariesFromApk(context, info, abi)
     }
 
-    /** Unpacks `lib/<abi>/*.so` of a plugin APK that does not have its libraries extracted. */
+    /** Unpacks the libraries of `lib/<abi>` of a plugin APK that keeps them compressed. */
     private fun extractLibrariesFromApk(context: Context, info: ApplicationInfo, abi: String): String? {
         val target = File(context.noBackupFilesDir, "renderer-libs/" + info.packageName)
         val stamp = File(target, ".stamp")
