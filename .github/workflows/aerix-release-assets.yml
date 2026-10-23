@@ -1,0 +1,47 @@
+name: Release assets (1.4.0)
+
+# One-off: adds the unversioned copies (Aerix-Launcher.apk, Aerix-Launcher-noruntime.apk) that the
+# website's releases/latest/download buttons point at to the v1.4.0 release, and refreshes
+# SHA256SUMS to cover every attached file. The APKs are the ones already built by the release run,
+# downloaded by run id, so nothing is rebuilt and no byte is changed.
+
+on:
+  push:
+    branches: [ "arena/2f1249a3-aerix-launcher" ]
+    paths: [ ".github/workflows/aerix-release-assets.yml" ]
+
+permissions:
+  contents: write
+
+env:
+  RUN_ID: "39911021049"
+  TAG: "v1.4.0"
+  VERSION: "1.4.0"
+
+jobs:
+  attach:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download the release APKs
+        uses: actions/download-artifact@v4
+        with:
+          name: app-release-full
+          path: dist
+          run-id: ${{ env.RUN_ID }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Add the unversioned copies
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          ls -l dist
+          cp "dist/Aerix-Launcher-$VERSION.apk" dist/Aerix-Launcher.apk
+          cp "dist/Aerix-Launcher-$VERSION-noruntime.apk" dist/Aerix-Launcher-noruntime.apk
+          ( cd dist && sha256sum Aerix-Launcher-*.apk Aerix-Launcher.apk > SHA256SUMS && cat SHA256SUMS )
+          gh release upload "$TAG" \
+            "dist/Aerix-Launcher.apk" "dist/Aerix-Launcher-noruntime.apk" "dist/SHA256SUMS" \
+            --repo "$GITHUB_REPOSITORY" --clobber
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets \
+            -q '.assets[] | "\(.name) \(.size)"'

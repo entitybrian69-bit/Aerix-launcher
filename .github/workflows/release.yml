@@ -168,12 +168,17 @@ jobs:
             echo "::error title=release-exists::v$VERSION is already published"
             exit 1
           fi
+          # The website's download buttons point at the unversioned names under
+          # releases/latest/download, so the same bytes go up under both names.
+          cp "dist/Aerix-Launcher-$VERSION.apk" dist/Aerix-Launcher.apk
+          cp "dist/Aerix-Launcher-$VERSION-noruntime.apk" dist/Aerix-Launcher-noruntime.apk
+          ( cd dist && sha256sum Aerix-Launcher-*.apk Aerix-Launcher.apk > SHA256SUMS && cat SHA256SUMS )
           TITLE=$(head -1 "$NOTES" | sed 's/^# //')
           gh release create "v$VERSION" \
             --title "$TITLE" \
             --notes-file "$NOTES" \
             --target "$GITHUB_SHA" \
             --latest \
-            dist/Aerix-Launcher-*.apk dist/SHA256SUMS
+            dist/Aerix-Launcher-*.apk dist/Aerix-Launcher.apk dist/SHA256SUMS
           gh release view "v$VERSION" --json tagName,name,url,assets \
             -q '.tagName, .name, .url, (.assets[] | "\(.name) \(.size) \(.digest // "-")")'
