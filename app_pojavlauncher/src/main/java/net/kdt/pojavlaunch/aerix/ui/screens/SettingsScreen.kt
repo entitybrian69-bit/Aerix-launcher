@@ -372,7 +372,8 @@ private fun RendererTabContent(activity: FragmentActivity) {
                     text = if (plugins.isEmpty()) {
                         "No renderer plugin APK detected. Install the plugin APK, then reopen this tab."
                     } else {
-                        "Renderer plugins: " + plugins.joinToString(" \u00B7 ") { it.displayName }
+                        "Renderer plugins (" + plugins.size + "): " +
+                            plugins.joinToString(" \u00B7 ") { it.displayName }
                     },
                     style = MaterialTheme.typography.labelSmall,
                     color = AerixSurface.textSecondary,

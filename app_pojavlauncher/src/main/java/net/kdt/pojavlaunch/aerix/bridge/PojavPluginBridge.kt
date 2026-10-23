@@ -208,6 +208,19 @@ object PojavPluginBridge {
     private const val EMESIS_RENDERER_ID = "emesis"
     private const val EMESIS_LIBRARY = "libemesis.so"
 
+    /**
+     * Renderer plugins the launcher ships with, probed by name on every scan.
+     *
+     * Enumerating installed applications is not guaranteed to return a package that has no code and
+     * no activity (the PowerVR plugin is exactly that: hasCode="false", no component at all), and
+     * some devices filter such packages out of the list. Asking for the package by name is covered
+     * by the <queries> entries in the manifest and returns it anyway.
+     */
+    private val KNOWN_PLUGIN_PACKAGES = listOf(
+        "com.entitybrian.emesis",
+        "np.proton.renderer.powervr"
+    )
+
     /** Meta-data keys that mark an APK as a renderer plugin, checked in this order. */
     private val PLUGIN_MARKERS = listOf(
         "fclPlugin",
@@ -263,6 +276,22 @@ object PojavPluginBridge {
                 if (!seen.add(appInfo.packageName)) continue
                 parsePlugin(context, pm, appInfo)?.let { discovered.add(it) }
             }
+        }
+        // Ask for the plugins this launcher knows by name. A code-less plugin APK without any
+        // component is the case application enumeration drops on some Android versions, and a
+        // silent miss looks exactly like "the plugin is not installed".
+        for (packageName in KNOWN_PLUGIN_PACKAGES) {
+            if (!seen.add(packageName)) continue
+            val appInfo = try {
+                pm.getApplicationInfo(packageName, PACKAGE_FLAGS)
+            } catch (error: PackageManager.NameNotFoundException) {
+                note("$packageName: not installed (or not visible to the launcher)")
+                null
+            } catch (error: Exception) {
+                note("$packageName: ${error.javaClass.simpleName}: ${error.message}")
+                null
+            }
+            if (appInfo != null) parsePlugin(context, pm, appInfo)?.let { discovered.add(it) }
         }
 
         plugins = discovered.sortedBy { it.displayName.lowercase() }
