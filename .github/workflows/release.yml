@@ -4,6 +4,11 @@ name: Release CI
 # release and types the confirmation below. Everything else gets tested on the
 # debug APK built by aerix-debug.yml.
 #
+# A marked push has to touch this file to be seen at all, so each release cuts a
+# one line note here recording what it shipped.
+#
+# Last cut: v1.4.1 - the Emesis renderer bundled as a built-in option.
+#
 # The job only produces artifacts. Publishing them is a separate, deliberate
 # step: the assets are named after version.properties (Aerix-Launcher-<version>.apk
 # and Aerix-Launcher-<version>-noruntime.apk) because the in-app updater looks
