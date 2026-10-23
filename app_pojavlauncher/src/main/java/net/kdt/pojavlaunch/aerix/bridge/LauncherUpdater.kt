@@ -36,6 +36,12 @@ internal object LauncherUpdater {
     /** Bytes read by the speed test so far, so its progress is visible while it samples. */
     var speedTestReceived by mutableLongStateOf(0L); private set
     private var speedTestJob: Job? = null
+    /** Whole-file test: the real update path, so the number it prints is the update's number. */
+    var fullTestRunning by mutableStateOf(false); private set
+    var fullTestResult by mutableStateOf(""); private set
+    var fullTestReceived by mutableLongStateOf(0L); private set
+    var fullTestSize by mutableLongStateOf(0L); private set
+    private var fullTestJob: Job? = null
     private var apk: File? = null
 
     fun check() {
@@ -189,6 +195,60 @@ internal object LauncherUpdater {
                 withContext(NonCancellable + Dispatchers.Main) { speedTestRunning = false }
             }
         }
+    }
+
+    /**
+     * Downloads the whole published APK through the exact code path an update takes - same pool,
+     * same adaptive growth, same checksum - then throws the file away and reports the average
+     * rate. Debug builds only. This is the honest answer to "will my next update be fast?".
+     */
+    fun measureFullDownload(context: Context) {
+        if (fullTestRunning) return
+        val update = release ?: return
+        val app = context.applicationContext
+        fullTestRunning = true
+        fullTestResult = ""
+        fullTestReceived = 0
+        fullTestSize = update.asset.size
+        fullTestJob = scope.launch {
+            val directory = File(app.cacheDir, "updates")
+            val target = File(directory, "speedtest-full.apk")
+            val connections = DownloadConnections()
+            try {
+                require(directory.isDirectory || directory.mkdirs()) { "Cannot create the update cache" }
+                val started = System.nanoTime()
+                val result = FastDownload.download(
+                    url = update.asset.url,
+                    target = target,
+                    expectedSize = update.asset.size,
+                    userAgent = "AerixLauncher/${BuildConfig.VERSION_NAME}",
+                    connections = connections,
+                    onProgress = { bytes -> fullTestReceived = bytes }
+                )
+                val seconds = (System.nanoTime() - started) / 1_000_000_000.0
+                val megabytes = result.bytes / 1048576.0
+                val rate = if (seconds > 0) megabytes / seconds else 0.0
+                withContext(Dispatchers.Main) {
+                    fullTestResult = "%.1f MB in %.1f s · average %.2f MB/s".format(megabytes, seconds, rate)
+                    fullTestReceived = 0
+                }
+            } catch (e: Exception) {
+                if (e is CancellationException) {
+                    withContext(NonCancellable + Dispatchers.Main) { fullTestResult = "Test cancelled."; fullTestReceived = 0 }
+                } else {
+                    withContext(Dispatchers.Main) { fullTestResult = e.message ?: "The test download failed"; fullTestReceived = 0 }
+                }
+            } finally {
+                runCatching { connections.disconnectAll() }
+                runCatching { target.delete() }
+                withContext(NonCancellable + Dispatchers.Main) { fullTestRunning = false }
+            }
+        }
+    }
+
+    /** Stops a running whole-file test. */
+    fun cancelFullTest() {
+        fullTestJob?.cancel()
     }
 
     /** Stops a running speed test, leaving its result on screen. */

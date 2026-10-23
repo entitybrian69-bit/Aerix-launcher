@@ -138,6 +138,33 @@ internal fun LauncherUpdateDialog(activity: FragmentActivity, automatic: Boolean
                                 if (updater.speedTestResult.isNotBlank()) {
                                     Text(updater.speedTestResult, color = accent, fontWeight = FontWeight.SemiBold)
                                 }
+                                // The whole file, through the updater's own path: the number this
+                                // prints is exactly what the next update would average.
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    TextButton(
+                                        onClick = { updater.measureFullDownload(activity) },
+                                        enabled = !updater.fullTestRunning
+                                    ) {
+                                        Text(if (updater.fullTestRunning) "Downloading the whole APK…" else "Full download test", color = accent)
+                                    }
+                                    if (updater.fullTestRunning) {
+                                        TextButton(onClick = { updater.cancelFullTest() }) {
+                                            Text("Stop", color = AerixSurface.danger)
+                                        }
+                                    }
+                                }
+                                if (updater.fullTestRunning) {
+                                    val size = updater.fullTestSize.coerceAtLeast(1L)
+                                    val done = (updater.fullTestReceived.toFloat() / size).coerceIn(0f, 1f)
+                                    LinearProgressIndicator(progress = { done }, Modifier.fillMaxWidth().height(6.dp), color = accent)
+                                    Text(
+                                        "${megabytes(updater.fullTestReceived)} / ${megabytes(updater.fullTestSize)} MB",
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                }
+                                if (updater.fullTestResult.isNotBlank()) {
+                                    Text(updater.fullTestResult, color = accent, fontWeight = FontWeight.SemiBold)
+                                }
                             }
                         }
                         LauncherUpdatePhase.AVAILABLE -> {
