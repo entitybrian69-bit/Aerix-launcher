@@ -182,7 +182,9 @@ private data class RendererStackOption(
     val badge: String,
     val rendererId: String,
     /** The stack's own mark, shown beside its name. */
-    @DrawableRes val logoRes: Int
+    @DrawableRes val logoRes: Int,
+    /** Artwork of the renderer itself: shown with its own colours instead of tinted. */
+    val brandedLogo: Boolean = false
 )
 
 /**
@@ -195,7 +197,8 @@ private fun defaultRendererStackOptions(defaultRendererId: String): List<Rendere
     RendererStackOption("VGPU_1368", "VGPU 1.3.6\u03B2", "SHADERCONV", Renderers.SFPEW_RENDERER, R.drawable.aerix_logo_opengl),
     RendererStackOption("LTW", "LTW (1.17+ Core)", "1.17+", Renderers.LTW_RENDERER, R.drawable.aerix_logo_opengl),
     RendererStackOption("Legacy", "LTW Legacy (1.8\u20131.16.5)", "1.8\u20131.16.5", Renderers.GL4ES_RENDERER, R.drawable.aerix_logo_opengl),
-    RendererStackOption("Zink", "Kopper Zink (Vulkan)", "VULKAN", Renderers.ZINK_RENDERER, R.drawable.aerix_logo_vulkan)
+    RendererStackOption("Zink", "Kopper Zink (Vulkan)", "VULKAN", Renderers.ZINK_RENDERER, R.drawable.aerix_logo_vulkan),
+    RendererStackOption("PROTON", "Proton (PowerVR)", "POWERVR", Renderers.PROTON_RENDERER, R.drawable.aerix_logo_proton, brandedLogo = true)
 )
 
 /**
@@ -463,10 +466,14 @@ private fun RendererTabContent(activity: FragmentActivity) {
                                         ),
                                         modifier = Modifier.size(20.dp)
                                     )
-                                    RendererLogo(
-                                        logoRes = option.logoRes,
-                                        tint = if (isSelected) AerixThemeManager.currentAccent() else Color.White
-                                    )
+                                    if (option.brandedLogo) {
+                                        BrandedRendererLogo(logoRes = option.logoRes)
+                                    } else {
+                                        RendererLogo(
+                                            logoRes = option.logoRes,
+                                            tint = if (isSelected) AerixThemeManager.currentAccent() else Color.White
+                                        )
+                                    }
                                     Text(
                                         text = option.title,
                                         style = MaterialTheme.typography.labelLarge,
