@@ -143,6 +143,12 @@ android {
 
     buildTypes {
         debug {
+            // The testing APK is installed on ARM phones, and the renderer libs it now carries no
+            // longer fit the 100 MiB a repository file may have when all four ABIs are inside it.
+            // Only the two ARM ABIs are packaged here; release builds stay universal.
+            ndk {
+                abiFilters "arm64-v8a", "armeabi-v7a"
+            }
             applicationIdSuffix '.debug'
             minifyEnabled false
             shrinkResources false

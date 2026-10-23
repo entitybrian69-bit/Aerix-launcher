@@ -198,7 +198,8 @@ private fun defaultRendererStackOptions(defaultRendererId: String): List<Rendere
     RendererStackOption("LTW", "LTW (1.17+ Core)", "1.17+", Renderers.LTW_RENDERER, R.drawable.aerix_logo_opengl),
     RendererStackOption("Legacy", "LTW Legacy (1.8\u20131.16.5)", "1.8\u20131.16.5", Renderers.GL4ES_RENDERER, R.drawable.aerix_logo_opengl),
     RendererStackOption("Zink", "Kopper Zink (Vulkan)", "VULKAN", Renderers.ZINK_RENDERER, R.drawable.aerix_logo_vulkan),
-    RendererStackOption("PROTON", "Proton (PowerVR)", "32-BIT ONLY", Renderers.PROTON_RENDERER, R.drawable.aerix_logo_proton, brandedLogo = true)
+    RendererStackOption("PROTON", "Proton (PowerVR)", "32-BIT ONLY", Renderers.PROTON_RENDERER, R.drawable.aerix_logo_proton, brandedLogo = true),
+    RendererStackOption("EMESIS", "Emesis Renderer", "ALL VERSIONS", Renderers.EMESIS_RENDERER, R.drawable.aerix_logo_emesis, brandedLogo = true)
 )
 
 /**
@@ -416,14 +417,17 @@ private fun RendererTabContent(activity: FragmentActivity) {
                 }
 
                 // Only the choices this launcher actually stands behind are shown as tiles: Auto
-                // and the bundled Proton renderer. Proton is offered only where it can run, since
-                // only its 32-bit build is packaged. Every other renderer stays available in the
+                // and the two bundled renderers, Emesis and Proton. Each is offered only where it
+                // can run - Proton ships a 32-bit ARM build, Emesis ships every ABI, so a stripped
+                // build simply does not list it. Every other renderer stays available in the
                 // Global Renderer list and in the instance editor below.
                 val hasProton = compatible.any { it.first == Renderers.PROTON_RENDERER }
+                val hasEmesis = compatible.any { it.first == Renderers.EMESIS_RENDERER }
                 val offeredOptions = rendererStackOptions.filter { option ->
                     when {
                         option.keyMatch == "AUTO" -> true
                         option.rendererId == Renderers.PROTON_RENDERER -> hasProton
+                        option.rendererId == Renderers.EMESIS_RENDERER -> hasEmesis
                         else -> false
                     }
                 }
