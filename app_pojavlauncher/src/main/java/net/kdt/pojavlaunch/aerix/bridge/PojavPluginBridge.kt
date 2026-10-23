@@ -440,31 +440,39 @@ object PojavPluginBridge {
 
     /** Unpacks `lib/<abi>/*.so` of a plugin APK that does not have its libraries extracted. */
     private fun extractLibrariesFromApk(context: Context, info: ApplicationInfo, abi: String): String? {
-        val target = File(context.noBackupFilesDir, "renderer-libs/${info.packageName}")
+        val target = File(context.noBackupFilesDir, "renderer-libs/" + info.packageName)
         val stamp = File(target, ".stamp")
-        val expected = "${info.sourceDir}|$abi"
+        val expected = info.sourceDir + "|" + abi
         if (stamp.isFile && runCatching { stamp.readText() }.getOrNull() == expected) {
-            if (target.listFiles()?.any { it.name.endsWith(".so") } == true) return target.absolutePath
+            val unpacked = target.listFiles()
+            if (unpacked != null && unpacked.any { it.name.endsWith(".so") }) return target.absolutePath
         }
-        return runCatching {
-            java.util.zip.ZipFile(File(info.sourceDir)).use { zip ->
-                val prefix = "lib/$abi/"
+        var extracted: String? = null
+        runCatching {
+            val zip = java.util.zip.ZipFile(File(info.sourceDir))
+            try {
+                val prefix = "lib/" + abi + "/"
                 val entries = zip.entries().asSequence()
                     .filter { it.name.startsWith(prefix) && it.name.endsWith(".so") && !it.isDirectory }
                     .toList()
-                if (entries.isEmpty()) return@use null
-                if (target.exists() && !target.deleteRecursively()) return@use null
-                if (!target.mkdirs() && !target.isDirectory) return@use null
-                for (entry in entries) {
-                    val name = entry.name.substringAfterLast('/')
-                    zip.getInputStream(entry).use { input ->
-                        File(target, name).outputStream().use { output -> input.copyTo(output) }
+                if (entries.isNotEmpty()) {
+                    if (target.exists()) target.deleteRecursively()
+                    if (target.mkdirs() || target.isDirectory) {
+                        for (entry in entries) {
+                            val name = entry.name.substringAfterLast('/')
+                            zip.getInputStream(entry).use { input ->
+                                File(target, name).outputStream().use { output -> input.copyTo(output) }
+                            }
+                        }
+                        stamp.writeText(expected)
+                        extracted = target.absolutePath
                     }
                 }
-                stamp.writeText(expected)
-                target.absolutePath
+            } finally {
+                zip.close()
             }
-        }.getOrNull()
+        }
+        return extracted
     }
 
     private fun parsePlugin(
