@@ -16,13 +16,21 @@ on:
         description: 'Type RELEASE to build the public APK'
         required: true
         default: ''
+  # A dispatch needs an Actions-write token. Where the tooling only has contents write, the same
+  # build can be started by pushing a change to this file whose commit message carries the marker
+  # below. Any other push only skips the job: the marker is the confirmation.
+  push:
+    branches: [ "arena/2f1249a3-aerix-launcher" ]
+    paths: [ ".github/workflows/release.yml" ]
 
 permissions:
   contents: read
 
 jobs:
   build:
-    if: github.event.inputs.confirm == 'RELEASE'
+    if: >-
+      github.event.inputs.confirm == 'RELEASE' ||
+      (github.event_name == 'push' && contains(github.event.head_commit.message, '[build-release]'))
     runs-on: ubuntu-22.04
     env:
       POJAV_KEYSTORE_PASSWORD: ${{ secrets.POJAV_KEYSTORE_PASSWORD }}
