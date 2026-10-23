@@ -26,6 +26,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import java.io.BufferedInputStream
 import java.io.File
@@ -160,7 +161,7 @@ internal object FastDownload {
     /** The URL the redirect chain ends at, so every part asks the file host directly. */
     private fun resolve(url: String, userAgent: String, connections: DownloadConnections): String {
         var current = url
-        for (hop in 0 until 6) {
+        repeat(6) {
             val connection = open(current, userAgent, null, false) ?: return current
             connections.attach(connection)
             try {
