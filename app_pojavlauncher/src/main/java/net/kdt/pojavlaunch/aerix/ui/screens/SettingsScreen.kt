@@ -240,11 +240,13 @@ private fun RendererLogo(@DrawableRes logoRes: Int, tint: Color, wide: Boolean =
  */
 @Composable
 private fun BrandedRendererLogo(@DrawableRes logoRes: Int) {
+    // A wordmark is wide and short: fill the width of the slot instead of fitting it in a square,
+    // which would leave a few pixels of text beside the name.
     Icon(
         painter = painterResource(logoRes),
         contentDescription = null,
         tint = Color.Unspecified,
-        modifier = Modifier.size(width = 40.dp, height = 26.dp)
+        modifier = Modifier.size(width = 46.dp, height = 22.dp)
     )
 }
 
@@ -413,12 +415,17 @@ private fun RendererTabContent(activity: FragmentActivity) {
                     }
                 }
 
-                // Proton ships for 32-bit ARM only, so its tile is not offered on a device that
-                // cannot run it - it would select a library that is not there. Every other tile is
-                // shown as before.
+                // Only the choices this launcher actually stands behind are shown as tiles: Auto
+                // and the bundled Proton renderer. Proton is offered only where it can run, since
+                // only its 32-bit build is packaged. Every other renderer stays available in the
+                // Global Renderer list and in the instance editor below.
+                val hasProton = compatible.any { it.first == Renderers.PROTON_RENDERER }
                 val offeredOptions = rendererStackOptions.filter { option ->
-                    option.rendererId != Renderers.PROTON_RENDERER ||
-                        compatible.any { it.first == option.rendererId }
+                    when {
+                        option.keyMatch == "AUTO" -> true
+                        option.rendererId == Renderers.PROTON_RENDERER -> hasProton
+                        else -> false
+                    }
                 }
                 offeredOptions.chunked(2).forEach { rowOptions ->
                     Row(
@@ -427,8 +434,8 @@ private fun RendererTabContent(activity: FragmentActivity) {
                     ) {
                         rowOptions.forEach { option ->
                             val isSelected = when (option.keyMatch) {
-                                "AUTO" -> autoSelected
-                                else -> !autoSelected && currentRenderer == option.rendererId
+                                "AUTO" -> autoSelected || currentRenderer == option.rendererId
+                                else -> currentRenderer == option.rendererId
                             }
                             val selectOption = {
                                 autoSelected = option.keyMatch == "AUTO"
