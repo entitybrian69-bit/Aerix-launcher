@@ -161,6 +161,16 @@ class AerixRendererPlugin(
         val initialize = {
             if (RendererPluginV2.usesVulkan(rendererId, env)) MojoExec.preloadVulkan()
             val plan = eglLaunchPlan()
+            // Load the plugin's own OpenGL library into the process first, the way the launchers
+            // these plugins were written for do: it registers the library under its soname, so the
+            // plugin's internal bare-name lookups resolve and LWJGL binds GL to an already loaded
+            // library instead of a second copy. A plugin that cannot be preloaded this way is not
+            // fatal here; the loader below still runs.
+            packagedLibrary(glName)?.let { gl ->
+                val preloaded = runCatching { System.load(gl) }
+                Logger.appendToLog("Renderer preload: $gl ok=${preloaded.isSuccess}" +
+                    (preloaded.exceptionOrNull()?.let { " (${it.javaClass.simpleName}: ${it.message})" } ?: ""))
+            }
             // MojoExec builds one linker namespace per process out of this path and keeps it, so
             // the plugin directory has to be in it before the first attempt.
             GameRenderer.setRendererLibraryPath(Tools.NATIVE_LIB_DIR, nativeLibDir)
