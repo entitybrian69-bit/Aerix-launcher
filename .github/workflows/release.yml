@@ -126,3 +126,54 @@ jobs:
           name: app-release-checksums
           path: out/SHA256SUMS
           if-no-files-found: error
+
+  # Publishes the release the build job produced. Kept apart from the build so a failure here never
+  # leaves a half-built APK on the Releases page: the assets only go up once both files exist.
+  publish:
+    needs: build
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 1
+
+      - name: Download the APKs
+        uses: actions/download-artifact@v4
+        with:
+          name: app-release-full
+          path: dist
+
+      - name: Download the checksums
+        uses: actions/download-artifact@v4
+        with:
+          name: app-release-checksums
+          path: dist
+
+      - name: Publish the GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          VERSION=$(sed -n 's/^versionName=//p' version.properties | tr -d '[:space:]')
+          NOTES="docs/releases/v$VERSION.md"
+          test -n "$VERSION"
+          test -f "$NOTES"
+          ls -l dist
+          # The tag is the version; the in-app updater only accepts a stable release whose tag and
+          # asset names match it, so a release that already exists is reported, never overwritten.
+          if gh release view "v$VERSION" > /dev/null 2>&1; then
+            echo "::error title=release-exists::v$VERSION is already published"
+            exit 1
+          fi
+          TITLE=$(head -1 "$NOTES" | sed 's/^# //')
+          gh release create "v$VERSION" \
+            --title "$TITLE" \
+            --notes-file "$NOTES" \
+            --target "$GITHUB_SHA" \
+            --latest \
+            dist/Aerix-Launcher-*.apk dist/SHA256SUMS
+          gh release view "v$VERSION" --json tagName,name,url,assets \
+            -q '.tagName, .name, .url, (.assets[] | "\(.name) \(.size) \(.digest // "-")")'
