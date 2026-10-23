@@ -7,7 +7,7 @@ name: Release CI
 # A marked push has to touch this file to be seen at all, so each release cuts a
 # one line note here recording what it shipped.
 #
-# Last cut: v1.4.1 - the Emesis renderer bundled as a built-in option.
+# Last cut: v1.4.2 - update downloads over a pool of sixteen connections.
 #
 # The job only produces artifacts. Publishing them is a separate, deliberate
 # step: the assets are named after version.properties (Aerix-Launcher-<version>.apk
