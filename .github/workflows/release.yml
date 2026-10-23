@@ -3,6 +3,11 @@ name: Release CI
 # Public release build. It is only allowed to run after the owner asks for a
 # release and types the confirmation below. Everything else gets tested on the
 # debug APK built by aerix-debug.yml.
+#
+# The job only produces artifacts. Publishing them is a separate, deliberate
+# step: the assets are named after version.properties (Aerix-Launcher-<version>.apk
+# and Aerix-Launcher-<version>-noruntime.apk) because the in-app updater looks
+# for exactly those names on the release of that tag.
 
 on:
   workflow_dispatch:
@@ -11,6 +16,9 @@ on:
         description: 'Type RELEASE to build the public APK'
         required: true
         default: ''
+
+permissions:
+  contents: read
 
 jobs:
   build:
@@ -36,7 +44,7 @@ jobs:
           path: app_pojavlauncher/libs
 
       - name: Get Mesa
-        uses: dawidd6/action-download-artifact@v6  
+        uses: dawidd6/action-download-artifact@v6
         continue-on-error: true
         with:
           github_token: ${{ secrets.MESA_ACTIONS }}
@@ -51,11 +59,11 @@ jobs:
         with:
           gradle-version: "8.14.3"
 
-      - name: Set up JDK 17
+      - name: Set up JDK 21
         uses: actions/setup-java@v3
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '21'
 
       - name: Create out directory
         run: mkdir out
@@ -66,8 +74,47 @@ jobs:
           gradle :app_pojavlauncher:assembleFullRelease
           mv app_pojavlauncher/build/outputs/apk/full/release/app_pojavlauncher-full-release.apk out/app-release.apk
 
-      - name: Upload Release APK
+      - name: Build no-runtime Release .apk
+        run: |
+          # The same build without an embedded Java runtime: it downloads the runtime it needs,
+          # and it is the APK the -noruntime edition of the launcher updates itself with.
+          gradle :app_pojavlauncher:assembleNoruntimeRelease
+          mv app_pojavlauncher/build/outputs/apk/noruntime/release/app_pojavlauncher-noruntime-release.apk out/app-release-noruntime.apk
+
+      - name: Name the assets after the version
+        run: |
+          set -e
+          VERSION=$(sed -n 's/^versionName=//p' version.properties | tr -d '[:space:]')
+          test -n "$VERSION"
+          mv out/app-release.apk "out/Aerix-Launcher-$VERSION.apk"
+          mv out/app-release-noruntime.apk "out/Aerix-Launcher-$VERSION-noruntime.apk"
+          cd out
+          sha256sum Aerix-Launcher-*.apk > SHA256SUMS
+          cat SHA256SUMS
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Check the package and version inside the APKs
+        run: |
+          set -e
+          SDK="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          # build-tools carry aapt2; the runner image already has one.
+          AAPT2=$(ls "$SDK"/build-tools/*/aapt2 2>/dev/null | tail -1 || true)
+          test -n "$AAPT2"
+          for apk in out/Aerix-Launcher-*.apk; do
+            echo "== $apk"
+            "$AAPT2" dump badging "$apk" | grep -E "^package:|^application-label:"
+          done
+
+      - name: Upload full APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-release
-          path: out/app-release.apk
+          name: app-release-full
+          path: out/Aerix-Launcher-*.apk
+          if-no-files-found: error
+
+      - name: Upload checksums
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-checksums
+          path: out/SHA256SUMS
+          if-no-files-found: error
