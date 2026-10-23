@@ -27,6 +27,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.BufferedInputStream
 import java.io.File
 import java.io.IOException
@@ -95,6 +96,10 @@ internal object FastDownload {
     private const val PER_CONNECTION_FLOOR = 700_000.0
     private const val BUFFER_BYTES = 256 * 1024
     private const val MAX_ATTEMPTS = 5
+    private const val SAMPLE_READ_TIMEOUT_MS = 8_000
+
+    /** A download that takes no bytes at all for this long is reported instead of waited on. */
+    private const val STALL_TIMEOUT_MS = 45_000L
     private const val REPORT_INTERVAL_NS = 100_000_000L
 
     /** The range size used for a file of [size]. */
@@ -157,32 +162,55 @@ internal object FastDownload {
 
     /**
      * How many bytes per second one connection ([parallel] = 1) or a pool of them reaches, measured
-     * on a small slice of the file. Used by the debug speed test to show which side is the limit.
+     * on a slice of the file. Used by the debug speed test to show which side is the limit.
+     *
+     * It is capped by [timeoutMs] and reads with a short timeout, retrying twice at most: a shaped
+     * or throttled connection must produce a number in seconds, never leave the screen waiting.
+     * Returns null when nothing could be read inside the cap.
      */
     suspend fun measureRate(
         url: String,
         userAgent: String,
         connections: DownloadConnections,
         parallel: Int,
-        sampleBytes: Long = 6L * 1024 * 1024
-    ): Double = withContext(Dispatchers.IO) {
-        val direct = resolve(url, userAgent, connections)
-        val total = probe(direct, userAgent, connections) ?: return@withContext 0.0
-        val lanes = max(1, parallel)
-        val perLane = max(1L, min(sampleBytes / lanes, total))
-        val started = System.nanoTime()
-        val written = AtomicLong(0L)
-        coroutineScope {
-            repeat(lanes) { lane ->
-                launch(Dispatchers.IO) {
-                    val start = min(total - 1, lane * (total / lanes))
-                    val end = min(total - 1, start + perLane - 1)
-                    if (start <= end) readRange(direct, start, end, userAgent, connections, null, written, null)
+        sampleBytes: Long = 4L * 1024 * 1024,
+        timeoutMs: Long = 20_000,
+        onBytes: (Long) -> Unit = {}
+    ): Double? = withTimeoutOrNull(timeoutMs) {
+        withContext(Dispatchers.IO) {
+            val direct = resolve(url, userAgent, connections)
+            val total = probe(direct, userAgent, connections) ?: return@withContext null
+            val lanes = max(1, parallel)
+            val perLane = max(1L, min(sampleBytes / lanes, total))
+            val started = System.nanoTime()
+            val written = AtomicLong(0L)
+            val reporter = ProgressReporter(written) { bytes -> onBytes(bytes) }
+            coroutineScope {
+                repeat(lanes) { lane ->
+                    launch(Dispatchers.IO) {
+                        val start = min(total - 1, lane * (total / lanes))
+                        val end = min(total - 1, start + perLane - 1)
+                        if (start <= end) {
+                            // A sample is throwaway: two attempts and a short read timeout are
+                            // enough to learn the speed, and a dead lane must not hold the rest.
+                            try {
+                                readRange(
+                                    direct, start, end, userAgent, connections, null, written, reporter,
+                                    attempts = 2, readTimeoutMs = SAMPLE_READ_TIMEOUT_MS
+                                )
+                            } catch (e: CancellationException) {
+                                throw e
+                            } catch (e: Exception) {
+                                // One dead lane must not cancel the sample the others are producing.
+                            }
+                        }
+                    }
                 }
             }
+            if (written.get() <= 0L) return@withContext null
+            val seconds = (System.nanoTime() - started) / 1_000_000_000.0
+            if (seconds <= 0.0) null else written.get() / seconds
         }
-        val seconds = (System.nanoTime() - started) / 1_000_000_000.0
-        if (seconds <= 0.0) 0.0 else written.get() / seconds
     }
 
     /** The URL the redirect chain ends at, so every chunk asks the file host directly. */
@@ -270,10 +298,19 @@ internal object FastDownload {
                 launch {
                     var lastBytes = 0L
                     var lastAt = System.nanoTime()
-                    while (isActive && next.get() < ranges) {
+                    var lastProgressAt = lastAt
+                    // Ends when every range has been taken and every byte has landed; the scope
+                    // would otherwise wait for a watcher that never stops watching.
+                    while (isActive && (next.get() < ranges || written.get() < size)) {
                         delay(1_000)
                         val now = System.nanoTime()
                         val bytes = written.get()
+                        if (bytes > lastBytes) lastProgressAt = now
+                        // Waiting forever looks exactly like a frozen app: say so instead, and let
+                        // the caller offer a retry.
+                        else if (now - lastProgressAt > STALL_TIMEOUT_MS * 1_000_000) {
+                            throw IOException("The update stalled with no data for 45 seconds. Please retry.")
+                        }
                         val seconds = (now - lastAt) / 1_000_000_000.0
                         val lanes = spawned.get().coerceAtLeast(1)
                         val perConnection = if (seconds > 0) (bytes - lastBytes) / seconds / lanes else 0.0
@@ -306,14 +343,16 @@ internal object FastDownload {
         connections: DownloadConnections,
         target: File?,
         written: AtomicLong,
-        reporter: ProgressReporter?
+        reporter: ProgressReporter?,
+        attempts: Int = MAX_ATTEMPTS,
+        readTimeoutMs: Int = 30_000
     ) {
         var position = start
         var attempt = 0
         val buffer = ByteArray(BUFFER_BYTES)
         while (position <= endInclusive) {
             currentCoroutineContext().ensureActive()
-            val connection = open(url, userAgent, "bytes=$position-$endInclusive", true)
+            val connection = open(url, userAgent, "bytes=$position-$endInclusive", true, readTimeoutMs)
                 ?: throw IOException("Cannot open the update download")
             connections.attach(connection)
             try {
@@ -337,14 +376,14 @@ internal object FastDownload {
                 }
                 if (position <= endInclusive) {
                     attempt++
-                    if (attempt >= MAX_ATTEMPTS) throw IOException("The update connection kept closing early")
+                    if (attempt >= attempts) throw IOException("The update connection kept closing early")
                     delay(250L * attempt)
                 }
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
                 if (!currentCoroutineContext().isActive) throw e
                 attempt++
-                if (attempt >= MAX_ATTEMPTS) throw e
+                if (attempt >= attempts) throw e
                 delay(250L * attempt)
             } finally {
                 connections.detach(connection)
@@ -366,6 +405,9 @@ internal object FastDownload {
         var position = from
         BufferedInputStream(connection.inputStream, BUFFER_BYTES).use { input ->
             while (position <= endInclusive) {
+                // Stopping here is what lets a timed out sample or a cancelled download walk away
+                // from a connection that is still dribbling bytes.
+                if (Thread.currentThread().isInterrupted) break
                 val count = input.read(buffer)
                 if (count == -1) break
                 require(position + count - 1 <= endInclusive) {
@@ -442,11 +484,12 @@ internal object FastDownload {
         url: String,
         userAgent: String,
         range: String?,
-        followRedirects: Boolean
+        followRedirects: Boolean,
+        readTimeoutMs: Int = 30_000
     ): HttpURLConnection? = runCatching {
         (URL(url).openConnection() as HttpURLConnection).apply {
             connectTimeout = 15_000
-            readTimeout = 30_000
+            readTimeout = readTimeoutMs
             instanceFollowRedirects = followRedirects
             useCaches = false
             // The update is a zip that is already compressed: do not let anything re-encode it.

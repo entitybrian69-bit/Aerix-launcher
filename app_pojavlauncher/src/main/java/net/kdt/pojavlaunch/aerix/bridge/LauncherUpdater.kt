@@ -33,6 +33,8 @@ internal object LauncherUpdater {
     /** Result of the last download speed test, for the debug build only. */
     var speedTestResult by mutableStateOf(""); private set
     var speedTestRunning by mutableStateOf(false); private set
+    /** Bytes read by the speed test so far, so its progress is visible while it samples. */
+    var speedTestReceived by mutableLongStateOf(0L); private set
     private var speedTestJob: Job? = null
     private var apk: File? = null
 
@@ -112,48 +114,88 @@ internal object LauncherUpdater {
     }
     /**
      * Measures how fast this release downloads: once over a single connection, then over the whole
-     * pool the updater uses. Debug builds only. It reads a slice of the published APK and installs
-     * nothing, so it answers "is my link slow, or was the download slow?" in a few seconds.
+     * pool the updater uses. Debug builds only. It reads a few megabytes of the published APK and
+     * installs nothing, so it answers "is my link slow, or was the download slow?" in seconds.
+     *
+     * Every phase is capped, so the dialog always ends with a number or a plain reason - it can
+     * never sit on "Measuring" while a shaped connection dribbles.
      */
     fun measureDownloadSpeed(context: Context) {
         if (speedTestRunning) return
         val update = release ?: return
         speedTestRunning = true
-        speedTestResult = "Measuring…"
+        speedTestResult = ""
+        speedTestReceived = 0
         speedTestJob = scope.launch {
+            val userAgent = "AerixLauncher/${BuildConfig.VERSION_NAME}"
+            val active = DownloadConnections()
             try {
-                val userAgent = "AerixLauncher/${BuildConfig.VERSION_NAME}"
                 val single = FastDownload.measureRate(
                     url = update.asset.url,
                     userAgent = userAgent,
-                    connections = DownloadConnections(),
+                    connections = active,
                     parallel = 1,
-                    sampleBytes = 6L * 1024 * 1024
-                )
+                    sampleBytes = 3L * 1024 * 1024,
+                    timeoutMs = 25_000
+                ) { bytes -> speedTestReceived = bytes }
                 withContext(Dispatchers.Main) {
-                    speedTestResult = "1 connection: %.1f MB/s · measuring %d connections…"
-                        .format(single / 1048576.0, FastDownload.MAX_CONNECTIONS)
+                    speedTestResult = if (single == null) {
+                        "1 connection: no data came back in 25 s."
+                    } else {
+                        "1 connection: %.2f MB/s".format(single / 1048576.0)
+                    }
+                    speedTestReceived = 0
                 }
                 val pooled = FastDownload.measureRate(
                     url = update.asset.url,
                     userAgent = userAgent,
-                    connections = DownloadConnections(),
+                    connections = active,
                     parallel = FastDownload.MAX_CONNECTIONS,
-                    sampleBytes = 32L * 1024 * 1024
-                )
-                val gain = if (single > 0) pooled / single else 0.0
+                    sampleBytes = 12L * 1024 * 1024,
+                    timeoutMs = 30_000
+                ) { bytes -> speedTestReceived = bytes }
                 withContext(Dispatchers.Main) {
-                    speedTestResult = "1 connection: %.1f MB/s\n%d connections: %.1f MB/s (%.1f× faster)"
-                        .format(single / 1048576.0, FastDownload.MAX_CONNECTIONS, pooled / 1048576.0, gain)
+                    val firstLine = if (single == null) "1 connection: no data in 25 s"
+                    else "1 connection: %.2f MB/s".format(single / 1048576.0)
+                    speedTestResult = if (pooled == null) {
+                        firstLine + "\n%d connections: no data in 30 s".format(FastDownload.MAX_CONNECTIONS)
+                    } else if (single != null && single > 0) {
+                        "%s\n%d connections: %.2f MB/s (%.1f× faster)".format(
+                            firstLine, FastDownload.MAX_CONNECTIONS,
+                            pooled / 1048576.0, pooled / single
+                        )
+                    } else {
+                        "%s\n%d connections: %.2f MB/s".format(
+                            firstLine, FastDownload.MAX_CONNECTIONS, pooled / 1048576.0
+                        )
+                    }
+                    speedTestReceived = 0
                 }
             } catch (e: Exception) {
-                if (e is CancellationException) throw e
-                withContext(Dispatchers.Main) { speedTestResult = e.message ?: "The test download failed" }
+                if (e is CancellationException) {
+                    withContext(NonCancellable + Dispatchers.Main) {
+                        speedTestResult = "Speed test cancelled."
+                        speedTestReceived = 0
+                    }
+                } else {
+                    withContext(Dispatchers.Main) {
+                        speedTestResult = e.message ?: "The speed test failed"
+                        speedTestReceived = 0
+                    }
+                }
             } finally {
+                // Close whatever is still open, so a capped phase cannot leave a lane reading.
+                runCatching { active.disconnectAll() }
                 withContext(NonCancellable + Dispatchers.Main) { speedTestRunning = false }
             }
         }
     }
+
+    /** Stops a running speed test, leaving its result on screen. */
+    fun cancelSpeedTest() {
+        speedTestJob?.cancel()
+    }
+
     fun cancelDownload() {
         job?.cancel()
         val active = connection

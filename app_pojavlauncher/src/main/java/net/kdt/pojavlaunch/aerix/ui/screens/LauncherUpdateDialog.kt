@@ -113,18 +113,29 @@ internal fun LauncherUpdateDialog(activity: FragmentActivity, automatic: Boolean
                             Text("No newer published release is available for this version.")
                             if (BuildConfig.DEBUG && release != null) {
                                 Text(
-                                    "Debug build: measure how fast this release downloads, using the same code path an update uses.",
+                                    "Debug build: measure how fast this release downloads, one connection against the full pool.",
                                     style = MaterialTheme.typography.bodySmall
                                 )
-                                TextButton(
-                                    onClick = { updater.measureDownloadSpeed(activity) },
-                                    enabled = !updater.speedTestRunning
-                                ) {
-                                    Text(if (updater.speedTestRunning) "Measuring…" else "Test download speed", color = accent)
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    TextButton(
+                                        onClick = { updater.measureDownloadSpeed(activity) },
+                                        enabled = !updater.speedTestRunning
+                                    ) {
+                                        Text(if (updater.speedTestRunning) "Measuring…" else "Test download speed", color = accent)
+                                    }
+                                    if (updater.speedTestRunning) {
+                                        TextButton(onClick = { updater.cancelSpeedTest() }) {
+                                            Text("Stop", color = AerixSurface.danger)
+                                        }
+                                    }
                                 }
                                 if (updater.speedTestRunning) {
-                                    Text("Sampling a slice of the published release…", style = MaterialTheme.typography.bodySmall)
-                                } else if (updater.speedTestResult.isNotBlank()) {
+                                    Text(
+                                        "${megabytes(updater.speedTestReceived)} MB sampled…",
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                }
+                                if (updater.speedTestResult.isNotBlank()) {
                                     Text(updater.speedTestResult, color = accent, fontWeight = FontWeight.SemiBold)
                                 }
                             }
