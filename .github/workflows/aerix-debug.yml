@@ -137,7 +137,25 @@ jobs:
           } > apk/DEBUG_BUILD.txt
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          SIZE=$(stat -c %s "$APK_PATH")
+          # GitHub refuses files over 100 MiB. Say so instead of failing the whole build; the
+          # artifact above still carries the APK.
+          if [ "$SIZE" -gt 104857600 ]; then
+            echo "::warning title=debug-apk-too-large::APK is $SIZE bytes, over the 100 MiB repository limit; only the workflow artifact has it"
+            exit 0
+          fi
           git add apk
           git commit -m "Build: Aerix debug APK $SHORT (run $GITHUB_RUN_ID)"
-          git push origin "HEAD:${GITHUB_REF_NAME}"
+          # Another run may have stored its APK meanwhile; integrate and retry instead of failing
+          # the build over a push race.
+          stored=0
+          for attempt in 1 2 3; do
+            if git push origin "HEAD:${GITHUB_REF_NAME}"; then stored=1; break; fi
+            git pull --rebase --autostash origin "${GITHUB_REF_NAME}" || true
+            sleep 10
+          done
+          if [ "$stored" -ne 1 ]; then
+            echo "::warning title=debug-apk-not-stored::could not push apk/$APK_NAME after three attempts"
+            exit 0
+          fi
           echo "::notice title=debug-apk::apk/$APK_NAME from $SHORT"
