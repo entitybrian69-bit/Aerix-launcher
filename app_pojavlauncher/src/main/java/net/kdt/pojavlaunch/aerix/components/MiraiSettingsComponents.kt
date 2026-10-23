@@ -1167,8 +1167,13 @@ fun miraiRendererEntries(context: Context, includeFollowGlobal: Boolean): List<M
                 uniqueId = rendererId,
                 displayName = cache.rendererDisplayNames.getOrElse(index) { rendererId },
                 backendRendererId = rendererId,
-                // A renderer with a device restriction says so here, next to its name.
-                summary = if (rendererId == Renderers.PROTON_RENDERER) "32-bit devices only" else null
+                // A renderer with a device restriction says so here, next to its name; a bundled
+                // renderer also describes what it is.
+                summary = when (rendererId) {
+                    Renderers.PROTON_RENDERER -> "32-bit devices only"
+                    Renderers.EMESIS_RENDERER -> context.getString(R.string.mcl_setting_renderer_emesis_description)
+                    else -> null
+                }
             )
         )
     }

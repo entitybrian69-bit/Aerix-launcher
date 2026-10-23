@@ -42,6 +42,7 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.DrawableRes
+import androidx.annotation.StringRes
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
@@ -184,7 +185,9 @@ private data class RendererStackOption(
     /** The stack's own mark, shown beside its name. */
     @DrawableRes val logoRes: Int,
     /** Artwork of the renderer itself: shown with its own colours instead of tinted. */
-    val brandedLogo: Boolean = false
+    val brandedLogo: Boolean = false,
+    /** What the renderer is, shown under the grid while this tile is the chosen one. */
+    @StringRes val descriptionRes: Int = 0
 )
 
 /**
@@ -199,7 +202,7 @@ private fun defaultRendererStackOptions(defaultRendererId: String): List<Rendere
     RendererStackOption("Legacy", "LTW Legacy (1.8\u20131.16.5)", "1.8\u20131.16.5", Renderers.GL4ES_RENDERER, R.drawable.aerix_logo_opengl),
     RendererStackOption("Zink", "Kopper Zink (Vulkan)", "VULKAN", Renderers.ZINK_RENDERER, R.drawable.aerix_logo_vulkan),
     RendererStackOption("PROTON", "Proton (PowerVR)", "32-BIT ONLY", Renderers.PROTON_RENDERER, R.drawable.aerix_logo_proton, brandedLogo = true),
-    RendererStackOption("EMESIS", "Emesis Renderer", "ALL VERSIONS", Renderers.EMESIS_RENDERER, R.drawable.aerix_logo_emesis, brandedLogo = true)
+    RendererStackOption("EMESIS", "Emesis Renderer", "ALL VERSIONS", Renderers.EMESIS_RENDERER, R.drawable.aerix_logo_emesis, brandedLogo = true, descriptionRes = R.string.mcl_setting_renderer_emesis_description)
 )
 
 /**
@@ -511,6 +514,18 @@ private fun RendererTabContent(activity: FragmentActivity) {
                     }
                 }
 
+                // What the chosen renderer is, right under the grid: a renderer that ships with the
+                // launcher says what it is for, the way the lists name their entries.
+                val describedOption = offeredOptions.firstOrNull {
+                    it.descriptionRes != 0 && !autoSelected && it.rendererId == currentRenderer
+                }
+                if (describedOption != null) {
+                    Text(
+                        text = stringResource(describedOption.descriptionRes),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = AerixSurface.textSecondary
+                    )
+                }
             }
         }
 
