@@ -474,7 +474,8 @@ object PojavPluginBridge {
     ): AerixRendererPlugin? = runCatching {
         if (info.flags and ApplicationInfo.FLAG_SYSTEM != 0 || RetiredRendererCleanup.isRetiredPackage(info.packageName)) return null
         val meta = info.metaData ?: return null
-        val marker = markerForMeta(meta, info.packageName) ?: run {
+        val marker = markerForMeta(meta, info.packageName)
+        if (marker == null) {
             if (meta.containsKey("renderer")) {
                 note("${info.packageName}: declares a renderer but no plugin marker")
             }
