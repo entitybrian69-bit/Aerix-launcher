@@ -1125,7 +1125,9 @@ private fun AssetDetailContent(
         }
         map.entries.map { (key, list) ->
             val (gv, ldr) = key
-            val adapted = (target.mcVersion == null || gv == target.mcVersion) &&
+            // Adapted means "this build is for the instance being played". With no instance there
+            // is nothing to be adapted to: marking every group would mark none of them.
+            val adapted = target.mcVersion != null && gv.equals(target.mcVersion, ignoreCase = true) &&
                 (target.loader == null || ldr == null || ldr.equals(target.loader, ignoreCase = true))
             VersionGroup(gv, ldr, adapted, list)
         }.sortedWith(compareByDescending<VersionGroup> { it.isAdapted })
@@ -1161,11 +1163,12 @@ private fun AssetDetailContent(
                 plan = InstallPlan(file = file, loading = true)
                 scope.launch {
                     val targets = PojavAssetBridge.targets()
-                    // What to resolve for: the instance this file is headed into, then whatever the
-                    // launcher is sitting on. With no instance at all there is nothing to match, and
-                    // the dialog says so rather than naming a version nobody has: the file's own
-                    // version list is not evidence of anything installed here.
-                    val anchor = targets.firstOrNull { it.detected } ?: targets.firstOrNull()
+                    // What to resolve for: the instance the dialog is about to tick, i.e. the one
+                    // the file fits, else the one being played. With no instance at all there is
+                    // nothing to match, and the dialog says so rather than naming a version nobody
+                    // has: the file's own version list is not evidence of anything installed here.
+                    val anchor = defaultInstallTarget(file, project.type, targets)
+                        ?: targets.firstOrNull { it.detected }
                     val mcVersion = anchor?.mcVersion ?: target.mcVersion
                     val loader = anchor?.loader ?: target.loader
                     val dependencies = PojavAssetBridge.planDependencies(
@@ -1180,12 +1183,7 @@ private fun AssetDetailContent(
                         file = file,
                         loading = false,
                         targets = targets,
-                        dependencies = dependencies,
-                        detected = if (mcVersion != null || loader != null) {
-                            InstanceTarget(mcVersion, loader)
-                        } else {
-                            null
-                        }
+                        dependencies = dependencies
                     )
                 }
             }
@@ -1335,7 +1333,6 @@ private fun AssetDetailContent(
             type = project.type,
             targets = current.targets,
             dependencies = current.dependencies,
-            detected = current.detected,
             loading = current.loading,
             onDismiss = { plan = null },
             onInstall = { targetList, dependencyList ->
@@ -1360,8 +1357,7 @@ private class InstallPlan(
     val file: AssetFile,
     val loading: Boolean = false,
     val targets: List<AssetTarget> = emptyList(),
-    val dependencies: List<ResolvedDependency> = emptyList(),
-    val detected: InstanceTarget? = null
+    val dependencies: List<ResolvedDependency> = emptyList()
 )
 
 @Composable

@@ -87,7 +87,6 @@ import net.kdt.pojavlaunch.aerix.bridge.AssetFile
 import net.kdt.pojavlaunch.aerix.bridge.AssetTarget
 import net.kdt.pojavlaunch.aerix.bridge.instanceRenderKey
 import net.kdt.pojavlaunch.aerix.bridge.AssetType
-import net.kdt.pojavlaunch.aerix.bridge.InstanceTarget
 import net.kdt.pojavlaunch.aerix.bridge.ResolvedDependency
 import net.kdt.pojavlaunch.aerix.components.AerixGhostButton
 import net.kdt.pojavlaunch.aerix.components.AerixImageWell
@@ -111,7 +110,6 @@ internal fun AssetInstallDialog(
     type: AssetType,
     targets: List<AssetTarget>,
     dependencies: List<ResolvedDependency>,
-    detected: InstanceTarget?,
     loading: Boolean,
     onDismiss: () -> Unit,
     onInstall: (List<AssetTarget>, List<ResolvedDependency>) -> Unit
@@ -123,11 +121,13 @@ internal fun AssetInstallDialog(
             dependencies.forEach { put(it.project.id + it.project.platform, it.required) }
         }
     }
-    val targetTicks = remember(targets) {
+    // The one instance this file belongs in: the one being played when the file fits it, otherwise
+    // the closest match. The rest stay unticked, so a download can never land in a world that
+    // cannot load it without the player saying so.
+    val autoTarget = remember(targets, file, type) { defaultInstallTarget(file, type, targets) }
+    val targetTicks = remember(targets, file, type) {
         mutableStateMapOf<String, Boolean>().apply {
-            // Every instance is ticked to begin with: installing into several at once is the point
-            // of the picker, and unticking is one tap.
-            targets.forEach { put(it.instanceId, true) }
+            targets.forEach { put(it.instanceId, it.instanceId == autoTarget?.instanceId) }
         }
     }
 
@@ -211,9 +211,10 @@ internal fun AssetInstallDialog(
                             TargetPane(
                                 loading = loading,
                                 targets = targets,
-                                fileVersions = file.gameVersions,
+                                file = file,
+                                loadersMatter = loaderMatters(type),
                                 ticks = targetTicks,
-                                detected = detected,
+                                autoTarget = autoTarget,
                                 ticksChanged = { key, checked -> targetTicks[key] = checked },
                                 accent = accent,
                                 listMaxHeight = paneMaxHeight,
@@ -240,9 +241,10 @@ internal fun AssetInstallDialog(
                             TargetPane(
                                 loading = loading,
                                 targets = targets,
-                                fileVersions = file.gameVersions,
+                                file = file,
+                                loadersMatter = loaderMatters(type),
                                 ticks = targetTicks,
-                                detected = detected,
+                                autoTarget = autoTarget,
                                 ticksChanged = { key, checked -> targetTicks[key] = checked },
                                 accent = accent,
                                 listMaxHeight = if (tight) 150.dp else 190.dp,
@@ -441,15 +443,20 @@ private fun DependencyChip(required: Boolean, accent: Color) {
     }
 }
 
-/** Right pane of the dialog: the instances to install into, several at once. */
+/**
+ * Right pane of the dialog: the instances to install into, several at once. The pane opens with the
+ * one instance the file belongs in ticked, and says which one and why at the top.
+ */
 @Composable
 private fun TargetPane(
     loading: Boolean,
     targets: List<AssetTarget>,
-    /** Versions the file itself covers: an instance outside them gets a warning, not a blocked tick. */
-    fileVersions: List<String>,
+    /** The file being installed: what it was built for is what the rows are checked against. */
+    file: AssetFile,
+    loadersMatter: Boolean,
     ticks: MutableMap<String, Boolean>,
-    detected: InstanceTarget?,
+    /** The instance ticked on open, or null when the file fits none of them. */
+    autoTarget: AssetTarget?,
     ticksChanged: (String, Boolean) -> Unit,
     accent: Color,
     listMaxHeight: Dp,
@@ -457,15 +464,16 @@ private fun TargetPane(
 ) {
     Column(modifier = modifier) {
         PaneTitle(text = stringResource(R.string.aerix_install_targets), accent = accent)
-        val detectedLabel = detected?.let { target ->
+        val autoLabel = autoTarget?.let { target ->
             listOfNotNull(
-                target.mcVersion,
+                target.name.takeIf { it.isNotBlank() },
+                target.mcVersion ?: target.versionId.takeIf { it.isNotBlank() },
                 target.loader?.replaceFirstChar { it.uppercase() }
             ).joinToString(" · ")
         }
-        if (!detectedLabel.isNullOrBlank()) {
+        if (!autoLabel.isNullOrBlank()) {
             Text(
-                text = stringResource(R.string.aerix_install_targets_detected, detectedLabel),
+                text = stringResource(R.string.aerix_install_targets_detected, autoLabel),
                 color = AerixSurface.textMuted,
                 fontSize = 10.sp,
                 modifier = Modifier.padding(horizontal = AerixSpacing.xs, vertical = 1.dp)
@@ -525,13 +533,23 @@ private fun TargetPane(
             itemsIndexed(targets, key = { index, target -> instanceRenderKey(index, target.instanceId) }) { _, target ->
                 TargetRow(
                     target = target,
-                    mismatch = target.mcVersion != null && fileVersions.isNotEmpty() &&
-                        fileVersions.none { it.equals(target.mcVersion, ignoreCase = true) },
+                    check = checkTarget(file, target, loadersMatter),
                     checked = ticks[target.instanceId] == true,
                     accent = accent,
                     onCheckedChange = { checked -> ticksChanged(target.instanceId, checked) }
                 )
             }
+        }
+        if (targets.none { ticks[it.instanceId] == true }) {
+            Text(
+                text = stringResource(
+                    if (autoTarget == null) R.string.aerix_install_targets_no_match
+                    else R.string.aerix_install_targets_none_ticked
+                ),
+                color = AerixSurface.warning,
+                fontSize = 10.sp,
+                modifier = Modifier.padding(horizontal = AerixSpacing.xs, vertical = AerixSpacing.xxs)
+            )
         }
     }
 }
@@ -539,8 +557,8 @@ private fun TargetPane(
 @Composable
 private fun TargetRow(
     target: AssetTarget,
-    /** True when the file has no build for the instance's Minecraft version. */
-    mismatch: Boolean,
+    /** What the file asks for against this instance: the badges, and whether it fits at all. */
+    check: TargetCheck,
     checked: Boolean,
     accent: Color,
     onCheckedChange: (Boolean) -> Unit
@@ -586,16 +604,25 @@ private fun TargetRow(
                     overflow = TextOverflow.Ellipsis
                 )
             }
-            if (target.detected || mismatch) {
+            // What is wrong with the row, named after what the file needs rather than after the
+            // instance: "not for 1.12.2" read as if the file were for 1.12.2.
+            check.wantedVersion?.let { wanted ->
                 Spacer(modifier = Modifier.width(AerixSpacing.xs))
-                if (mismatch) {
-                    TargetBadge(
-                        text = stringResource(R.string.aerix_install_target_mismatch, target.mcVersion.orEmpty()),
-                        tint = AerixSurface.warning
-                    )
-                } else {
-                    TargetBadge(text = stringResource(R.string.aerix_install_target_detected), tint = accent)
-                }
+                TargetBadge(
+                    text = stringResource(R.string.aerix_install_target_needs_version, wanted),
+                    tint = AerixSurface.warning
+                )
+            }
+            check.wantedLoader?.let { wanted ->
+                Spacer(modifier = Modifier.width(AerixSpacing.xs))
+                TargetBadge(
+                    text = stringResource(R.string.aerix_install_target_needs_loader, wanted),
+                    tint = AerixSurface.warning
+                )
+            }
+            if (target.detected && check.fits) {
+                Spacer(modifier = Modifier.width(AerixSpacing.xs))
+                TargetBadge(text = stringResource(R.string.aerix_install_target_detected), tint = accent)
             }
         }
     }

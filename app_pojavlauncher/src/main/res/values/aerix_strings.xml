@@ -533,7 +533,10 @@
     <string name="aerix_install_targets_loading">Loading install destinations…</string>
     <string name="aerix_install_targets_none">No instance to install into yet. Create one first, then come back.</string>
     <string name="aerix_install_target_detected">Detected</string>
-    <string name="aerix_install_target_mismatch">not for %1$s</string>
+    <string name="aerix_install_target_needs_version">needs %1$s</string>
+    <string name="aerix_install_target_needs_loader">%1$s only</string>
+    <string name="aerix_install_targets_no_match">Nothing here is built for this file. Tick an instance to install anyway.</string>
+    <string name="aerix_install_targets_none_ticked">Tick the instance to install into.</string>
     <string name="aerix_install_select_all">Select all</string>
     <string name="aerix_install_deselect_all">Clear</string>
     <string name="aerix_install_confirm">Install</string>
