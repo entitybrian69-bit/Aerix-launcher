@@ -111,45 +111,46 @@ internal object LauncherUpdater {
         }
     }
     /**
-     * Downloads the published APK with the same code path an update uses, then reports how fast it
-     * arrived. Debug builds only: it exists so the download speed can be measured on a device
-     * without waiting for a newer release, and it never installs anything.
+     * Measures how fast this release downloads: once over a single connection, then over the whole
+     * pool the updater uses. Debug builds only. It reads a slice of the published APK and installs
+     * nothing, so it answers "is my link slow, or was the download slow?" in a few seconds.
      */
     fun measureDownloadSpeed(context: Context) {
         if (speedTestRunning) return
         val update = release ?: return
-        val app = context.applicationContext
         speedTestRunning = true
         speedTestResult = "Measuring…"
         speedTestJob = scope.launch {
-            val directory = File(app.cacheDir, "updates")
-            val target = File(directory, "speedtest.apk")
-            val connections = DownloadConnections()
             try {
-                require(directory.isDirectory || directory.mkdirs()) { "Cannot create the update cache" }
-                val started = System.nanoTime()
-                val result = FastDownload.download(
+                val userAgent = "AerixLauncher/${BuildConfig.VERSION_NAME}"
+                val single = FastDownload.measureRate(
                     url = update.asset.url,
-                    target = target,
-                    expectedSize = update.asset.size,
-                    userAgent = "AerixLauncher/${BuildConfig.VERSION_NAME}",
-                    connections = connections,
-                    onProgress = { bytes -> received = bytes }
+                    userAgent = userAgent,
+                    connections = DownloadConnections(),
+                    parallel = 1,
+                    sampleBytes = 6L * 1024 * 1024
                 )
-                val seconds = (System.nanoTime() - started) / 1_000_000_000.0
-                val megabytes = result.bytes / 1048576.0
-                val rate = if (seconds > 0) megabytes / seconds else 0.0
                 withContext(Dispatchers.Main) {
-                    speedTestResult = "%.0f MB in %.1f s · %.1f MB/s".format(megabytes, seconds, rate)
-                    received = 0
+                    speedTestResult = "1 connection: %.1f MB/s · measuring %d connections…"
+                        .format(single / 1048576.0, FastDownload.MAX_CONNECTIONS)
+                }
+                val pooled = FastDownload.measureRate(
+                    url = update.asset.url,
+                    userAgent = userAgent,
+                    connections = DownloadConnections(),
+                    parallel = FastDownload.MAX_CONNECTIONS,
+                    sampleBytes = 32L * 1024 * 1024
+                )
+                val gain = if (single > 0) pooled / single else 0.0
+                withContext(Dispatchers.Main) {
+                    speedTestResult = "1 connection: %.1f MB/s\n%d connections: %.1f MB/s (%.1f× faster)"
+                        .format(single / 1048576.0, FastDownload.MAX_CONNECTIONS, pooled / 1048576.0, gain)
                 }
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
                 withContext(Dispatchers.Main) { speedTestResult = e.message ?: "The test download failed" }
             } finally {
-                runCatching { target.delete() }
-                runCatching { connections.disconnectAll() }
-                withContext(NonCancellable + Dispatchers.Main) { speedTestRunning = false; received = 0 }
+                withContext(NonCancellable + Dispatchers.Main) { speedTestRunning = false }
             }
         }
     }

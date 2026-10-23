@@ -1,6 +1,6 @@
 /*
  * Aerix Launcher bridge for PojavLauncher.
- * Fast file download: several HTTP range requests at once, each writing its own slice of the file.
+ * Fast file download: a queue of byte ranges handed to many connections at once.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,13 +20,12 @@ package net.kdt.pojavlaunch.aerix.bridge
 
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.BufferedInputStream
 import java.io.File
@@ -36,7 +35,9 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
 import java.util.Collections
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
+import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.min
 
@@ -68,56 +69,51 @@ internal class DownloadConnections {
 internal class DownloadResult(val bytes: Long, val sha256: String)
 
 /**
- * Downloads one file over several connections at once.
+ * Downloads one file over many connections at once.
  *
- * A single stream spends most of its life waiting: the phone's link stalls, the CDN shapes a
- * single connection, one retransmission holds up everything behind it. GitHub serves release
- * assets with byte ranges, so the file is cut into equal parts and each part is fetched on its
- * own connection. Every part writes straight into its own offset of the file, so nothing is held
- * in memory and the file is whole the moment the last part lands. A part that drops resumes from
- * the byte it reached instead of starting over.
+ * A single stream to GitHub's file host is shaped to roughly one megabyte a second no matter how
+ * fast the phone's link is, and one stalled connection stops everything behind it. So the file is
+ * cut into fixed size chunks held in a queue, and a pool of connections pulls chunks off that
+ * queue: whoever finishes first takes the next one, and the pool grows while the measured speed per
+ * connection is still low. Nothing is buffered in memory - each chunk is written straight into its
+ * own offset of the file - and a chunk that drops resumes from the byte it reached.
  *
  * A server that ignores range requests still works: the download falls back to a single stream.
  */
 internal object FastDownload {
-    /** Connections used at once. */
-    const val MAX_CONNECTIONS = 6
+    /** Connections a download may grow to. */
+    const val MAX_CONNECTIONS = 16
 
-    /** Files smaller than this are not worth splitting. */
-    const val MIN_PART_BYTES = 4L * 1024 * 1024
+    /** Connections a large download starts with, before the speed is known. */
+    const val INITIAL_CONNECTIONS = 6
 
+    /** Range size. Big enough that connection setup is noise, small enough to keep the queue busy. */
+    const val MAX_CHUNK_BYTES = 8L * 1024 * 1024
+    const val MIN_CHUNK_BYTES = 2L * 1024 * 1024
+
+    /** Below this per-connection speed, another connection is worth opening. */
+    private const val PER_CONNECTION_FLOOR = 700_000.0
     private const val BUFFER_BYTES = 256 * 1024
-    private const val MAX_ATTEMPTS = 4
+    private const val MAX_ATTEMPTS = 5
     private const val REPORT_INTERVAL_NS = 100_000_000L
 
-    /** One byte range of the file, inclusive at both ends. */
-    internal class Part(val index: Int, val start: Long, val endInclusive: Long) {
-        val length: Long get() = endInclusive - start + 1
+    /** The range size used for a file of [size]. */
+    fun chunkBytesFor(size: Long): Long =
+        (size / (MAX_CONNECTIONS * 2L)).coerceIn(MIN_CHUNK_BYTES, MAX_CHUNK_BYTES)
+
+    /** How many ranges a file of [size] is cut into. */
+    fun chunkCount(size: Long): Int {
+        require(size > 0) { "Nothing to download" }
+        val chunk = chunkBytesFor(size)
+        return ceil(size.toDouble() / chunk).toInt()
     }
 
-    /**
-     * Cuts [size] into equal parts. A small file stays whole and the count never goes past
-     * [maxConnections], so a 130 MB APK is fetched over six connections and a 2 MB file over one.
-     */
-    fun plan(
-        size: Long,
-        maxConnections: Int = MAX_CONNECTIONS,
-        minPartBytes: Long = MIN_PART_BYTES
-    ): List<Part> {
-        require(size > 0) { "Nothing to download" }
-        val floor = max(1L, minPartBytes)
-        val count = min(max(1, maxConnections).toLong(), max(1L, size / floor)).toInt()
-        val base = size / count
-        val remainder = size % count
-        var start = 0L
-        val parts = ArrayList<Part>(count)
-        for (index in 0 until count) {
-            val length = base + if (index < remainder) 1L else 0L
-            parts.add(Part(index, start, start + length - 1))
-            start += length
-        }
-        return parts
-    }
+    /** First byte of range [index]. */
+    fun chunkStart(size: Long, index: Int): Long = index * chunkBytesFor(size)
+
+    /** Last byte of range [index], inclusive. */
+    fun chunkEnd(size: Long, index: Int): Long =
+        min(size - 1, chunkStart(size, index) + chunkBytesFor(size) - 1)
 
     /**
      * Downloads [url] into [target] and returns its checksum.
@@ -132,6 +128,7 @@ internal object FastDownload {
         expectedSize: Long,
         userAgent: String,
         connections: DownloadConnections,
+        maxConnections: Int = MAX_CONNECTIONS,
         onProgress: (Long) -> Unit
     ): DownloadResult = withContext(Dispatchers.IO) {
         require(expectedSize > 0 && expectedSize <= LauncherUpdatePolicy.MAX_APK_BYTES) {
@@ -144,11 +141,11 @@ internal object FastDownload {
         target.delete()
 
         // Follow GitHub's redirect down to the file host first. A request that is redirected can
-        // lose its Range header on the way, and then every part would come back as the whole file.
+        // lose its Range header on the way, and then every chunk would come back as the whole file.
         val direct = resolve(url, userAgent, connections)
         val total = probe(direct, userAgent, connections)
         val written = if (total != null && total == expectedSize) {
-            downloadParts(direct, target, expectedSize, userAgent, connections, onProgress)
+            downloadChunks(direct, target, expectedSize, userAgent, connections, maxConnections, onProgress)
         } else {
             downloadSingle(direct, target, expectedSize, userAgent, connections, onProgress)
         }
@@ -158,7 +155,37 @@ internal object FastDownload {
         DownloadResult(written, sha256(target))
     }
 
-    /** The URL the redirect chain ends at, so every part asks the file host directly. */
+    /**
+     * How many bytes per second one connection ([parallel] = 1) or a pool of them reaches, measured
+     * on a small slice of the file. Used by the debug speed test to show which side is the limit.
+     */
+    suspend fun measureRate(
+        url: String,
+        userAgent: String,
+        connections: DownloadConnections,
+        parallel: Int,
+        sampleBytes: Long = 6L * 1024 * 1024
+    ): Double = withContext(Dispatchers.IO) {
+        val direct = resolve(url, userAgent, connections)
+        val total = probe(direct, userAgent, connections) ?: return@withContext 0.0
+        val lanes = max(1, parallel)
+        val perLane = max(1L, min(sampleBytes / lanes, total))
+        val started = System.nanoTime()
+        val written = AtomicLong(0L)
+        coroutineScope {
+            repeat(lanes) { lane ->
+                launch(Dispatchers.IO) {
+                    val start = min(total - 1, lane * (total / lanes))
+                    val end = min(total - 1, start + perLane - 1)
+                    if (start <= end) readRange(direct, start, end, userAgent, connections, null, written, null)
+                }
+            }
+        }
+        val seconds = (System.nanoTime() - started) / 1_000_000_000.0
+        if (seconds <= 0.0) 0.0 else written.get() / seconds
+    }
+
+    /** The URL the redirect chain ends at, so every chunk asks the file host directly. */
     private fun resolve(url: String, userAgent: String, connections: DownloadConnections): String {
         var current = url
         repeat(6) {
@@ -205,26 +232,61 @@ internal object FastDownload {
         return total.toLongOrNull()
     }
 
-    private suspend fun downloadParts(
+    private suspend fun downloadChunks(
         url: String,
         target: File,
         size: Long,
         userAgent: String,
         connections: DownloadConnections,
+        maxConnections: Int,
         onProgress: (Long) -> Unit
     ): Long {
-        val parts = plan(size)
+        val ranges = chunkCount(size)
+        val next = AtomicInteger(0)
         val written = AtomicLong(0L)
         val reporter = ProgressReporter(written, onProgress)
+        val spawned = AtomicInteger(0)
+        val ceiling = max(1, maxConnections)
         RandomAccessFile(target, "rw").use { it.setLength(size) }
         try {
             coroutineScope {
-                val jobs = parts.map { part ->
-                    async(Dispatchers.IO) {
-                        fetchPart(url, target, part, userAgent, connections, written, reporter)
+                val spawn = {
+                    if (spawned.getAndIncrement() < ceiling) {
+                        launch(Dispatchers.IO) {
+                            while (true) {
+                                currentCoroutineContext().ensureActive()
+                                val index = next.getAndIncrement()
+                                if (index >= ranges) break
+                                readRange(
+                                    url, chunkStart(size, index), chunkEnd(size, index),
+                                    userAgent, connections, target, written, reporter
+                                )
+                            }
+                        }
                     }
                 }
-                jobs.awaitAll()
+                // Start with a small pool, then let the watcher decide whether more helps.
+                repeat(min(INITIAL_CONNECTIONS, ceiling)) { spawn() }
+                launch {
+                    var lastBytes = 0L
+                    var lastAt = System.nanoTime()
+                    while (isActive && next.get() < ranges) {
+                        delay(1_000)
+                        val now = System.nanoTime()
+                        val bytes = written.get()
+                        val seconds = (now - lastAt) / 1_000_000_000.0
+                        val lanes = spawned.get().coerceAtLeast(1)
+                        val perConnection = if (seconds > 0) (bytes - lastBytes) / seconds / lanes else 0.0
+                        lastBytes = bytes
+                        lastAt = now
+                        // A shaped connection plateaus well below the floor; add lanes until the
+                        // per-connection speed rises, and stop at the ceiling either way.
+                        if (perConnection < PER_CONNECTION_FLOOR && spawned.get() < ceiling) {
+                            spawn()
+                            if (perConnection < PER_CONNECTION_FLOOR / 2 && spawned.get() < ceiling) spawn()
+                        }
+                    }
+                }
             }
         } finally {
             reporter.flush()
@@ -232,55 +294,48 @@ internal object FastDownload {
         return written.get()
     }
 
-    /** One part, retried from wherever it stopped rather than from the beginning. */
-    private suspend fun fetchPart(
+    /**
+     * Reads one byte range into its place in the file, resuming from wherever it stopped rather
+     * than from the beginning. [reporter] may be null, for speed sampling.
+     */
+    private suspend fun readRange(
         url: String,
-        target: File,
-        part: Part,
+        start: Long,
+        endInclusive: Long,
         userAgent: String,
         connections: DownloadConnections,
+        target: File?,
         written: AtomicLong,
-        reporter: ProgressReporter
+        reporter: ProgressReporter?
     ) {
-        var position = part.start
+        var position = start
         var attempt = 0
         val buffer = ByteArray(BUFFER_BYTES)
-        while (position <= part.endInclusive) {
+        while (position <= endInclusive) {
             currentCoroutineContext().ensureActive()
-            val connection = open(url, userAgent, "bytes=$position-${part.endInclusive}", true)
+            val connection = open(url, userAgent, "bytes=$position-$endInclusive", true)
                 ?: throw IOException("Cannot open the update download")
             connections.attach(connection)
             try {
                 if (connection.responseCode != HttpURLConnection.HTTP_PARTIAL) {
                     throw IOException("The server refused a range request (HTTP ${connection.responseCode})")
                 }
-                // Writing at the wrong offset would corrupt the file, so the answer has to be the
-                // range that was asked for, not a part of it that starts somewhere else.
-                val answeredStart = connection.getHeaderField("Content-Range")
-                    ?.substringAfter(' ', "")
-                    ?.substringBefore('-')
-                    ?.toLongOrNull()
+                // Writing at the wrong offset would corrupt the file, so the answer has to begin
+                // exactly where the request asked.
+                val answeredStart = contentRangeStart(connection.getHeaderField("Content-Range"))
                 if (answeredStart != null && answeredStart != position) {
                     throw IOException("The server answered a different byte range than was asked for")
                 }
-                // Every part writes at its own offset, so two parts can never touch the same byte.
-                RandomAccessFile(target, "rw").use { file ->
-                    file.seek(position)
-                    BufferedInputStream(connection.inputStream, BUFFER_BYTES).use { input ->
-                        while (position <= part.endInclusive) {
-                            currentCoroutineContext().ensureActive()
-                            val count = input.read(buffer)
-                            if (count == -1) break
-                            require(position + count - 1 <= part.endInclusive) {
-                                "The server sent more bytes than were asked for"
-                            }
-                            file.write(buffer, 0, count)
-                            position += count
-                            reporter.add(count.toLong())
-                        }
+                if (target != null) {
+                    RandomAccessFile(target, "rw").use { file ->
+                        file.seek(position)
+                        position = copyRange(connection, file, position, endInclusive, buffer, written, reporter)
                     }
+                } else {
+                    // Sampling: read and discard, only the byte count matters.
+                    position = copyRange(connection, null, position, endInclusive, buffer, written, reporter)
                 }
-                if (position <= part.endInclusive) {
+                if (position <= endInclusive) {
                     attempt++
                     if (attempt >= MAX_ATTEMPTS) throw IOException("The update connection kept closing early")
                     delay(250L * attempt)
@@ -296,7 +351,33 @@ internal object FastDownload {
                 runCatching { connection.disconnect() }
             }
         }
-        require(position == part.endInclusive + 1) { "A part of the update is incomplete" }
+        require(position == endInclusive + 1) { "A part of the update is incomplete" }
+    }
+
+    private fun copyRange(
+        connection: HttpURLConnection,
+        file: RandomAccessFile?,
+        from: Long,
+        endInclusive: Long,
+        buffer: ByteArray,
+        written: AtomicLong,
+        reporter: ProgressReporter?
+    ): Long {
+        var position = from
+        BufferedInputStream(connection.inputStream, BUFFER_BYTES).use { input ->
+            while (position <= endInclusive) {
+                val count = input.read(buffer)
+                if (count == -1) break
+                require(position + count - 1 <= endInclusive) {
+                    "The server sent more bytes than were asked for"
+                }
+                file?.write(buffer, 0, count)
+                position += count
+                written.addAndGet(count.toLong())
+                reporter?.add(count.toLong())
+            }
+        }
+        return position
     }
 
     /** One connection, for servers that ignore range requests. */
@@ -326,6 +407,7 @@ internal object FastDownload {
                         if (count == -1) break
                         require(written.get() + count <= size) { "Update download size does not match the release" }
                         output.write(buffer, 0, count)
+                        written.addAndGet(count.toLong())
                         reporter.add(count.toLong())
                     }
                 }
@@ -336,6 +418,11 @@ internal object FastDownload {
             runCatching { connection.disconnect() }
         }
         return written.get()
+    }
+
+    private fun contentRangeStart(header: String?): Long? {
+        if (header == null) return null
+        return header.substringAfter(' ', "").substringBefore('-').trim().toLongOrNull()
     }
 
     private fun sha256(file: File): String {
@@ -382,7 +469,7 @@ internal class ProgressReporter(
     private val lastReport = AtomicLong(0L)
 
     fun add(count: Long) {
-        val total = written.addAndGet(count)
+        val total = written.get()
         val now = System.nanoTime()
         val previous = lastReport.get()
         if (now - previous > 100_000_000L && lastReport.compareAndSet(previous, now)) {

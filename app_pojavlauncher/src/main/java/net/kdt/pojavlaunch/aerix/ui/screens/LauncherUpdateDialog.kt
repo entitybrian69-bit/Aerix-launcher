@@ -123,7 +123,7 @@ internal fun LauncherUpdateDialog(activity: FragmentActivity, automatic: Boolean
                                     Text(if (updater.speedTestRunning) "Measuring…" else "Test download speed", color = accent)
                                 }
                                 if (updater.speedTestRunning) {
-                                    Text("${megabytes(updater.received)} MB downloaded")
+                                    Text("Sampling a slice of the published release…", style = MaterialTheme.typography.bodySmall)
                                 } else if (updater.speedTestResult.isNotBlank()) {
                                     Text(updater.speedTestResult, color = accent, fontWeight = FontWeight.SemiBold)
                                 }

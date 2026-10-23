@@ -13,26 +13,23 @@ import java.security.MessageDigest
 import kotlin.concurrent.thread
 
 class FastDownloadTest {
-    @Test fun partsCoverTheFileWithoutGapsOrOverlap() {
-        val size = 131_090_806L
-        val parts = FastDownload.plan(size)
-        assertEquals(FastDownload.MAX_CONNECTIONS, parts.size)
-        assertEquals(0L, parts.first().start)
-        assertEquals(size - 1, parts.last().endInclusive)
-        parts.zipWithNext().forEach { (a, b) -> assertEquals(a.endInclusive + 1, b.start) }
-        assertEquals(size, parts.sumOf { it.length })
+    @Test fun chunksCoverTheFileWithoutGapsOrOverlap() {
+        for (size in longArrayOf(131_090_806L, 400_000_000L, 9_000_000L, 2_500_000L)) {
+            val count = FastDownload.chunkCount(size)
+            assertEquals(0L, FastDownload.chunkStart(size, 0))
+            assertEquals(size - 1, FastDownload.chunkEnd(size, count - 1))
+            for (index in 0 until count - 1) {
+                assertEquals(FastDownload.chunkEnd(size, index) + 1, FastDownload.chunkStart(size, index + 1))
+            }
+            assertEquals(size, (0 until count).sumOf { FastDownload.chunkEnd(size, it) - FastDownload.chunkStart(size, it) + 1 })
+            // Enough ranges that every connection keeps busy, but no more than is worth setting up.
+            assertTrue(count >= FastDownload.MAX_CONNECTIONS)
+        }
     }
 
-    @Test fun smallFilesAreNotSplit() {
-        assertEquals(1, FastDownload.plan(1024L).size)
-        assertEquals(1, FastDownload.plan(FastDownload.MIN_PART_BYTES).size)
-        assertEquals(2, FastDownload.plan(FastDownload.MIN_PART_BYTES * 2).size)
-    }
-
-    @Test fun partCountIsCappedForHugeFiles() {
-        val parts = FastDownload.plan(1_000_000_000L, maxConnections = 64)
-        assertEquals(FastDownload.MAX_CONNECTIONS, parts.size)
-        assertEquals(1_000_000_000L, parts.sumOf { it.length })
+    @Test fun chunkSizeStaysInsideItsBounds() {
+        assertEquals(FastDownload.MIN_CHUNK_BYTES, FastDownload.chunkBytesFor(1_000_000L))
+        assertEquals(FastDownload.MAX_CHUNK_BYTES, FastDownload.chunkBytesFor(4_000_000_000L))
     }
 
     @Test fun contentRangeTotalIsParsed() {
