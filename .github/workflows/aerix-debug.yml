@@ -22,6 +22,7 @@ on:
       - "*.gradle"
       - "gradle/**"
       - "gradle.properties"
+      - "version.properties"
       - "settings.gradle"
       - ".github/workflows/aerix-debug.yml"
   workflow_dispatch:
