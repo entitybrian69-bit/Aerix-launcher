@@ -441,8 +441,21 @@ private fun RendererTabContent(activity: FragmentActivity) {
                     }
                 }
 
-                // Installed FCL / Zalith renderer plugin APKs discovered by PojavPluginBridge
+                // Installed FCL / Zalith renderer plugin APKs discovered by PojavPluginBridge.
+                // The status line is always shown: it is the difference between "the plugin APK is
+                // not installed / not visible" and "the plugin is here and the list below is it".
                 val skippedPlugins = remember(revision) { PojavPluginBridge.lastScanNotes }
+                Text(
+                    text = if (plugins.isEmpty()) {
+                        "No renderer plugin APK detected. Install the plugin APK, then reopen this tab."
+                    } else {
+                        "Renderer plugins: " + plugins.joinToString(" \u00B7 ") { it.displayName }
+                    },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = AerixSurface.textSecondary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
                 if (skippedPlugins.isNotEmpty()) {
                     Text(
                         text = "Skipped plugin APK: " + skippedPlugins.joinToString("; "),

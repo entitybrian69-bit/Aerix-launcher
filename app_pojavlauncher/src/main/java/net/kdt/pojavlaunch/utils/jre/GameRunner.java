@@ -336,9 +336,6 @@ public class GameRunner {
         // A renderer plugin may ship its own OpenGL library; built-in renderers keep the shim.
         RenderSpec activeRenderer = gameRenderer.getCurrentRenderer();
         javaArgList.add("-Dorg.lwjgl.opengl.libname=" + activeRenderer.glLibraryPath());
-        if (activeRenderer.eglLibraryPath() != null) {
-            javaArgList.add("-Dorg.lwjgl.egl.libname=" + activeRenderer.eglLibraryPath());
-        }
         javaArgList.add("-Dorg.lwjgl.freetype.libname="+ Tools.NATIVE_LIB_DIR+"/libfreetype.so");
         // Renderer plugins that pick a compatibility core by game version read this property
         // (Emesis does), so state the version instead of letting them guess from the classpath.

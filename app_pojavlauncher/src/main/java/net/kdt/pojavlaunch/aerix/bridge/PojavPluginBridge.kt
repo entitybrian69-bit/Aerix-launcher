@@ -68,71 +68,26 @@ class AerixRendererPlugin(
     val pluginTag: String = "$TAG_PREFIX$packageName"
 
     /**
-     * Directory the native libraries are loaded from.
-     *
-     * A plugin APK lives in another application's directory. Android's linker only hands a process
-     * its own native libraries, so the plugin's `.so` files are copied into our private storage
-     * once per plugin version and loaded from there; that directory is always readable by us and
-     * is the directory the plugin's own libraries are searched in as well.
+     * Absolute path of a library shipped by the plugin, or null when the plugin does not package
+     * it. A plugin APK with `extractNativeLibs="true"` (both known plugins) has its libraries
+     * unpacked into [nativeLibDir], which is exactly where the proven plugin hosts load them from.
      */
-    @Volatile
-    private var preparedLibDir: String? = null
-
-    private fun libraryDir(): String = preparedLibDir ?: nativeLibDir
-
-    /** Absolute path of a library from the plugin, resolved against [libraryDir]. */
-    private fun libraryIn(dir: String, name: String): String? {
+    private fun packagedLibrary(name: String): String? {
         if (name.isEmpty()) return null
         if (name.startsWith("/")) return name.takeIf { File(it).isFile }
-        return File(dir, name).takeIf { it.isFile }?.absolutePath
-    }
-
-    /**
-     * Copies this plugin's libraries for the device ABI into private storage. Safe to call from
-     * any thread and any number of times; the copy is skipped when the plugin did not change.
-     */
-    @Synchronized
-    fun installLibraries(context: Context): String? {
-        preparedLibDir?.let { if (File(it).isDirectory) return it }
-        val source = File(nativeLibDir)
-        if (!source.isDirectory) return null
-        val target = File(context.noBackupFilesDir, "renderer-plugins/$packageName")
-        val stampFile = File(target, ".stamp")
-        val stamp = "$appVersion|${source.absolutePath}"
-        if (stampFile.isFile && runCatching { stampFile.readText() }.getOrNull() == stamp) {
-            preparedLibDir = target.absolutePath
-            return preparedLibDir
-        }
-        val copied = runCatching {
-            if (target.exists() && !target.deleteRecursively()) return null
-            if (!target.mkdirs() && !target.isDirectory) return null
-            var count = 0
-            source.listFiles()?.forEach { file ->
-                if (file.isFile && file.name.endsWith(".so")) {
-                    file.copyTo(File(target, file.name), overwrite = true)
-                    count++
-                }
-            }
-            if (count > 0) stampFile.writeText(stamp)
-            count
-        }.getOrDefault(0)
-        if (copied <= 0) {
-            Logger.appendToLog("Renderer plugin $packageName: could not copy native libraries, using them in place")
-            return null
-        }
-        preparedLibDir = target.absolutePath
-        return preparedLibDir
+        return File(nativeLibDir, name).takeIf { it.isFile }?.absolutePath
     }
 
     override fun compatibleDevice(context: Context): Boolean {
-        if (!File(libraryDir()).isDirectory) return false
+        if (!File(nativeLibDir).isDirectory) return false
         if (metadataVersion < 2) return true
         val gles = context.getSystemService(ActivityManager::class.java)?.deviceConfigurationInfo?.reqGlEsVersion ?: 0
         val abi = (if (android.os.Process.is64Bit()) Build.SUPPORTED_64_BIT_ABIS else Build.SUPPORTED_32_BIT_ABIS).firstOrNull() ?: return false
+        val gl = packagedLibrary(glName) ?: return false
         return Build.VERSION.SDK_INT >= 26 && gles >= 0x30000 &&
-            RendererPluginV2.matchesElfAbi(File(libraryIn(libraryDir(), glName) ?: glName), abi) &&
+            RendererPluginV2.matchesElfAbi(File(gl), abi) &&
             (eglName == "libEGL.so" || eglName == glName ||
-                RendererPluginV2.matchesElfAbi(File(libraryIn(libraryDir(), eglName) ?: eglName), abi))
+                packagedLibrary(eglName)?.let { RendererPluginV2.matchesElfAbi(File(it), abi) } == true)
     }
 
     override fun name(): String = displayName
@@ -143,47 +98,22 @@ class AerixRendererPlugin(
 
     override fun library(): String = eglName
 
-    /**
-     * Both the private copy and the plugin's own directory. The plugin resolves its own libraries
-     * by bare file name, and MojoExec builds one linker namespace out of this string on first use,
-     * so everything the plugin may ask for has to be in here from the start.
-     */
-    override fun librarySearchPath(): String {
-        val privateDir = preparedLibDir
-        return if (privateDir == null || privateDir == nativeLibDir) nativeLibDir
-        else "$privateDir:$nativeLibDir"
-    }
-
-    /** Absolute path of a packaged library, or null when the plugin ships it in the APK only. */
-    private fun packagedLibrary(name: String): String? =
-        libraryIn(preparedLibDir ?: nativeLibDir, name) ?: libraryIn(nativeLibDir, name)
+    override fun librarySearchPath(): String = nativeLibDir
 
     /**
-     * The OpenGL library of this plugin for LWJGL.
-     *
-     * A plugin whose EGL wrapper and OpenGL implementation are the same file is already handed to
-     * LWJGL through MojoExec, so it keeps the shim name. When they are different files (PowerVR
-     * ships `libpowervr.so` next to the system EGL) LWJGL must bind OpenGL to the plugin library
-     * itself, otherwise every GL entry point resolves against the EGL library and the game dies on
-     * the first GL call.
+     * OpenGL library handed to LWJGL. The launchers these plugins were written for pass the
+     * plugin's own OpenGL library by absolute path; the shim name every built-in renderer uses
+     * only resolves to the EGL library, which is the wrong library whenever a plugin ships its
+     * OpenGL implementation separately (PowerVR: `libpowervr.so` next to the system `libEGL.so`).
      */
-    override fun glLibraryPath(): String {
-        val gl = packagedLibrary(glName) ?: return "libGLMojo.so"
-        val egl = packagedLibrary(eglName) ?: return gl
-        val sameFile = runCatching { File(egl).canonicalPath == File(gl).canonicalPath }.getOrDefault(false)
-        return if (sameFile) "libGLMojo.so" else gl
-    }
-
-    /** LWJGL's own EGL loader, pointed at the plugin EGL implementation when it ships one. */
-    override fun eglLibraryPath(): String? = packagedLibrary(eglName)
+    override fun glLibraryPath(): String = packagedLibrary(glName) ?: "libGLMojo.so"
 
     override fun setupEnvironment(context: Context, envMap: MutableMap<String, String>) {
         envMap.putAll(env)
         envMap["POJAV_RENDERER"] = rendererId
-        // How a plugin's EGL provider is handed to the runtime, following the contract the plugin
-        // was written against: POJAVEXEC_EGL carries the name exactly as the plugin declares it
-        // (a bare name is resolved through the plugin's own library directory), while SDL asks for
-        // a real file and therefore gets the resolved path.
+        // POJAVEXEC_EGL carries the name as the plugin declares it (a bare name is resolved
+        // against the plugin's library directory by the loader), while SDL asks for a real file
+        // and gets the resolved path when the plugin ships one.
         envMap["POJAVEXEC_EGL"] = eglName
         packagedLibrary(eglName)?.let { envMap["SDL_EGL_LIBRARY"] = it }
         packagedLibrary(glName)?.let { envMap["SDL_OPENGL_LIBRARY"] = it }
@@ -192,42 +122,60 @@ class AerixRendererPlugin(
     /** Values passed directly to MojoExec; inspecting this plan never loads native code. */
     internal data class EglLaunchPlan(val library: String, val namespaceBypass: Boolean, val gles: Boolean, val major: Int)
 
+    /**
+     * Does this plugin bring its own EGL implementation?
+     *
+     * A plugin that ships its own EGL presents a desktop OpenGL context to the game and translates
+     * it underneath (Emesis: "OpenGL 3.2+ Core over OpenGL ES 3.x"). Asking such an EGL for an
+     * OpenGL **ES** context, which is what a forced-GLES launch does, is not what it implements.
+     * A plugin that only ships a GL wrapper next to the system `libEGL.so` (PowerVR) does expect an
+     * ES context, so it keeps the forced-GLES launch with the ES version it declares.
+     */
+    internal fun shipsOwnEgl(): Boolean {
+        val packaged = packagedLibrary(eglName) ?: return false
+        return !eglName.substringAfterLast('/').equals("libEGL.so", true) && File(packaged).isFile
+    }
+
+    /** ES major version the plugin asks for, 3 when it does not say. */
+    internal fun glesMajor(): Int =
+        env["LIBGL_ES"]?.trim()?.toIntOrNull()?.takeIf { it == 2 || it == 3 } ?: 3
+
     internal fun eglLaunchPlan(): EglLaunchPlan {
         val target = packagedLibrary(eglName) ?: eglName
-        return EglLaunchPlan(target, useNamespaceBypass, !RendererPluginV2.usesDesktopGl(rendererId, env), 3)
+        val desktop = shipsOwnEgl() || RendererPluginV2.usesDesktopGl(rendererId, env)
+        return EglLaunchPlan(target, useNamespaceBypass, !desktop, if (desktop) 0 else glesMajor())
     }
 
     /**
-     * Every way this plugin's EGL provider can be loaded, in order, as (directory, useNamespace).
+     * How the plugin's EGL provider is loaded, in order, as (library, useNamespace).
      *
-     * A plugin's libraries are preloaded through a linker namespace built from the plugin's own
-     * library directory, because those libraries are searched by their bare file names from inside
-     * the plugin (Emesis loads `libemesis_modern.so` this way). A plain `dlopen` only sees the
-     * system paths, so it is the last resort and never the plugin's only chance to load. V2
-     * metadata states the mode it needs, so that mode keeps its place at the front.
+     * A plugin is written against a host that exposes its library directory to the linker: Emesis
+     * resolves its own directory with dladdr and loads its cores from there, and a bare library
+     * name in a plugin manifest (PowerVR's `libEGL.so` is the system one) has to keep resolving
+     * against system paths. The namespaced load is therefore tried first - it covers the plugin
+     * directory while still inheriting the system search path - with a plain load as the last
+     * resort, so a device where the namespace cannot be created behaves as it did before.
      */
-    private fun loadAttempts(): List<Pair<String, Boolean>> {
-        val directories = listOfNotNull(preparedLibDir, nativeLibDir).distinct()
-        val namespaced = directories.map { it to true }
-        val plain = directories.map { it to false }
-        return if (metadataVersion >= 2 && !useNamespaceBypass) plain + namespaced
-        else namespaced + plain
+    private fun loadAttempts(plan: EglLaunchPlan): List<Pair<String, Boolean>> {
+        val plainFirst = metadataVersion >= 2 && !useNamespaceBypass
+        return if (plainFirst) listOf(plan.library to false, plan.library to true)
+        else listOf(plan.library to true, plan.library to false)
     }
 
     override fun setupRenderer(): Boolean = try {
         val initialize = {
             if (RendererPluginV2.usesVulkan(rendererId, env)) MojoExec.preloadVulkan()
-            val gles = !RendererPluginV2.usesDesktopGl(rendererId, env)
+            val plan = eglLaunchPlan()
             // MojoExec builds one linker namespace per process out of this path and keeps it, so
-            // every directory the plugin may load from has to be in it before the first attempt.
-            GameRenderer.setRendererLibraryPath(Tools.NATIVE_LIB_DIR, librarySearchPath())
+            // the plugin directory has to be in it before the first attempt.
+            GameRenderer.setRendererLibraryPath(Tools.NATIVE_LIB_DIR, nativeLibDir)
+            Logger.appendToLog("Renderer plan: tag=$pluginTag egl=${plan.library} ownEgl=${shipsOwnEgl()} " +
+                "gles=${plan.gles} major=${plan.major} namespaceBypass=${plan.namespaceBypass}")
             var loaded = false
-            for ((directory, bypass) in loadAttempts()) {
-                val library = libraryIn(directory, eglName) ?: continue
-                loaded = MojoExec.prepareEgl(library, bypass, gles, 3)
-                Logger.appendToLog("Renderer native load: tag=$pluginTag egl=$library gles=$gles " +
-                    "directory=${if (directory == nativeLibDir) "plugin" else "private"} " +
-                    "namespaceBypass=$bypass loaded=$loaded")
+            for ((library, bypass) in loadAttempts(plan)) {
+                loaded = MojoExec.prepareEgl(library, bypass, plan.gles, plan.major)
+                Logger.appendToLog("Renderer native load: tag=$pluginTag egl=$library gles=${plan.gles} " +
+                    "major=${plan.major} namespaceBypass=$bypass loaded=$loaded")
                 if (loaded) break
             }
             // prepareEgl only dlopens the provider. EGL context creation happens later in GLFW/SDL.
@@ -351,8 +299,6 @@ object PojavPluginBridge {
                 Log.w("AerixRendererPlugin", "Selected renderer plugin is not installed; keeping built-in renderer")
                 return
             }
-            // Copy the plugin's libraries into our own storage before anything tries to load them.
-            plugin.installLibraries(context)
             if (!plugin.compatibleDevice(context)) {
                 Log.w("AerixRendererPlugin", "Selected renderer unavailable; keeping built-in fallback before environment setup")
                 android.widget.Toast.makeText(context, "Selected renderer unavailable; using built-in renderer", android.widget.Toast.LENGTH_LONG).show()

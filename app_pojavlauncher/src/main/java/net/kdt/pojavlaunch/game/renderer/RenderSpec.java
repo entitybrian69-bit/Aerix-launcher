@@ -65,15 +65,6 @@ public interface RenderSpec {
         return "libGLMojo.so";
     }
 
-    /**
-     * Library handed to LWJGL for EGL (`-Dorg.lwjgl.egl.libname`), or null to keep LWJGL's default.
-     * Only renderers that bring their own EGL implementation need to answer.
-     *
-     * @return absolute path, or null
-     */
-    default String eglLibraryPath() {
-        return null;
-    }
 
     /**
      * Prepare renderer usage in the game. Sets up environment and some other things
