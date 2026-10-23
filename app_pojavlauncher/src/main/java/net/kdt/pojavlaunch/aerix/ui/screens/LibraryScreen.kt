@@ -98,6 +98,7 @@ import net.kdt.pojavlaunch.R
 import net.kdt.pojavlaunch.aerix.bridge.AerixInstance
 import net.kdt.pojavlaunch.aerix.bridge.instanceRenderKey
 import net.kdt.pojavlaunch.aerix.bridge.AerixPreferences
+import net.kdt.pojavlaunch.aerix.bridge.GameDownloadTarget
 import net.kdt.pojavlaunch.aerix.bridge.ModpackExportFormat
 import net.kdt.pojavlaunch.aerix.bridge.PojavInstanceBridge
 import net.kdt.pojavlaunch.aerix.bridge.PojavLaunchBridge
@@ -128,22 +129,17 @@ private enum class LibrarySortMode(val label: String) {
     VERSION("Sort: Game Version")
 }
 
-private val mcVerPattern = Regex("""(\d+\.\d+(?:\.\d+)?)""")
-
+/**
+ * The version of the game an instance runs. In "fabric-loader-0.16.10-1.16.5" the first number is
+ * the loader's version and only the second is Minecraft's, so it is picked by shape rather than by
+ * being first: [GameDownloadTarget.minecraftVersionIn].
+ */
 private fun extractGameVersion(versionId: String): String =
-    mcVerPattern.find(versionId)?.value ?: versionId.ifBlank { "Latest" }
+    GameDownloadTarget.minecraftVersionIn(versionId) ?: versionId.ifBlank { "Latest" }
 
-private fun extractLoaderSummary(versionId: String, vanilla: String): String {
-    val loader = loaderLabel(versionId, vanilla)
-    if (loader == vanilla) return vanilla
-    val id = versionId.lowercase()
-    val ver = when {
-        id.contains("fabric-loader-") -> versionId.substringAfter("fabric-loader-").substringBefore('-')
-        id.contains("quilt-loader-") -> versionId.substringAfter("quilt-loader-").substringBefore('-')
-        else -> ""
-    }
-    return if (ver.isNotBlank()) "$loader $ver" else loader
-}
+/** The loader alone ("Fabric"); the game's version is always shown beside it. */
+private fun extractLoaderSummary(versionId: String, vanilla: String): String =
+    loaderLabel(versionId, vanilla)
 
 @Composable
 fun LibraryScreen(activity: FragmentActivity) {

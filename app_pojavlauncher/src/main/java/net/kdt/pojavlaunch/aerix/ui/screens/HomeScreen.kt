@@ -93,6 +93,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import net.kdt.pojavlaunch.R
 import net.kdt.pojavlaunch.aerix.bridge.AerixInstance
+import net.kdt.pojavlaunch.aerix.bridge.GameDownloadTarget
 import net.kdt.pojavlaunch.aerix.bridge.PojavAccountBridge
 import net.kdt.pojavlaunch.aerix.bridge.PojavInstanceBridge
 import net.kdt.pojavlaunch.aerix.bridge.PojavLaunchBridge
@@ -126,7 +127,17 @@ private const val DOLL_FLING_FRICTION = 5f
 private const val DOLL_FLING_MIN_VELOCITY = 60f
 private const val DOLL_FLING_STOP_VELOCITY = 20f
 
-private val mcVersionRegex = Regex("""(\d+\.\d+(?:\.\d+)?)""")
+/**
+ * "Fabric 1.16.5" - the loader and the version of the game it runs, never the loader's own
+ * version. A loader id ("fabric-loader-0.16.10-1.16.5") carries both numbers, and the first one is
+ * the loader's, so the Minecraft version has to be picked by shape: see
+ * [GameDownloadTarget.minecraftVersionIn].
+ */
+private fun instanceVersionLabel(versionId: String, vanilla: String): String {
+    val mcVersion = GameDownloadTarget.minecraftVersionIn(versionId) ?: versionId
+    val loader = loaderLabel(versionId, vanilla)
+    return if (loader == vanilla) mcVersion else "$loader $mcVersion"
+}
 
 private class HomeActions(
     val play: () -> Unit,
@@ -241,12 +252,14 @@ private fun ActionMenuCard(
     var dollFlingJob by remember(account?.username) { mutableStateOf<Job?>(null) }
     var showInstanceMenu by remember { mutableStateOf(false) }
 
+    // The loader and the version of the game: "Fabric 1.16.5". The loader's own version
+    // ("0.16.10") is not what the player picked and does not belong on the card.
     val versionSubtitle = remember(selected, vanilla) {
-        if (selected == null) "Select Instance"
-        else {
-            val loader = loaderLabel(selected.versionId, vanilla)
-            val mcVer = mcVersionRegex.find(selected.versionId)?.value ?: selected.versionId
-            if (loader == vanilla) "Minecraft $mcVer" else "$loader $mcVer"
+        when {
+            selected == null -> "Select Instance"
+            loaderLabel(selected.versionId, vanilla) == vanilla ->
+                "Minecraft ${GameDownloadTarget.minecraftVersionIn(selected.versionId) ?: selected.versionId}"
+            else -> instanceVersionLabel(selected.versionId, vanilla)
         }
     }
 
@@ -750,7 +763,10 @@ private fun ActiveWorldPanel(selected: AerixInstance?, accent: Color, actions: H
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        text = selected?.let { "${loaderLabel(it.versionId, vanilla)}  ·  ${stringResource(R.string.aerix_home_minecraft, it.versionId)}" }
+                        text = selected?.let {
+                            val mcVersion = GameDownloadTarget.minecraftVersionIn(it.versionId) ?: it.versionId
+                            "${loaderLabel(it.versionId, vanilla)}  ·  ${stringResource(R.string.aerix_home_minecraft, mcVersion)}"
+                        }
                             ?: stringResource(R.string.aerix_home_create_first),
                         color = AerixSurface.textSecondary,
                         fontSize = 11.sp,
@@ -926,7 +942,7 @@ private fun RecentWorldRow(instance: AerixInstance, isSelected: Boolean, accent:
         Column(modifier = Modifier.weight(1f)) {
             Text(text = instance.name, color = AerixSurface.textPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
-                text = "${loaderLabel(instance.versionId, vanilla)} · ${instance.versionId}",
+                text = instanceVersionLabel(instance.versionId, vanilla),
                 color = AerixSurface.textSecondary,
                 fontSize = 10.sp,
                 maxLines = 1,
