@@ -114,7 +114,7 @@ object AerixContribution {
         ),
         ContributionMember(
             id = "fire-playz",
-            name = "Fire Playz",
+            name = "Fire playz",
             role = "Co-owner",
             title = "Social and online manager",
             roleColor = coOwnerBlue,
