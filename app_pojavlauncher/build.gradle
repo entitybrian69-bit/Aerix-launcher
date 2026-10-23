@@ -143,6 +143,11 @@ android {
 
     buildTypes {
         debug {
+            // The testing APK is installed on ARM phones, and the universal build no longer fits
+            // the 100 MiB the repository accepts for a stored file. Release builds stay universal.
+            ndk {
+                abiFilters "arm64-v8a", "armeabi-v7a"
+            }
             applicationIdSuffix '.debug'
             minifyEnabled false
             shrinkResources false
