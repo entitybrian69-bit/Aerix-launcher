@@ -661,17 +661,13 @@ private fun RendererTabContent(activity: FragmentActivity) {
             }
 
             // State of the renderer plugin APKs, right above the list that is missing them: an
-            // installed plugin that Android does not expose and one that was never installed look
+            // installed plugin Android does not expose and one that was never installed look
             // identical from here otherwise.
-            val pluginDiagnostics = remember(revision) { PojavPluginBridge.pluginDiagnostics(activity) }
+            val pluginStatus = remember(revision) { PojavPluginBridge.pluginStatus(activity) }
             Text(
-                text = "Renderer plugins: " + pluginDiagnostics.joinToString("  \u00B7  "),
+                text = "Renderer plugins: $pluginStatus",
                 style = MaterialTheme.typography.labelSmall,
-                color = if (pluginDiagnostics.any { !it.endsWith(": ready") }) {
-                    Color(0xFFFFC46B)
-                } else {
-                    AerixSurface.textSecondary
-                }
+                color = if (pluginStatus == "all detected") AerixSurface.textSecondary else Color(0xFFFFC46B)
             )
 
             SettingsCardColumn(modifier = Modifier.fillMaxWidth()) {

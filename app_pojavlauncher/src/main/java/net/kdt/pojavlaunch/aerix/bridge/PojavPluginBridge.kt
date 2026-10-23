@@ -313,32 +313,29 @@ object PojavPluginBridge {
     }
 
     /**
-     * One line per renderer plugin this launcher knows by name, for the Renderer tab: whether the
-     * package was found, selectable, or why it was not. A plugin APK that is installed but cannot
-     * be seen by the launcher looks exactly like one that was never installed, so the difference is
-     * stated instead of left to guesswork.
+     * Whether the renderer plugins this launcher knows by name were found, for the Renderer tab
+     * and the launcher log. A plugin APK that is installed but cannot be seen by the launcher looks
+     * exactly like one that was never installed, so the difference is stated.
      */
     @JvmStatic
-    fun pluginDiagnostics(context: Context): List<String> {
+    fun pluginStatus(context: Context): String {
         runCatching { loadPlugins(context) }
-        return diagnostics().also { lines ->
-            runCatching { lines.forEach { Logger.appendToLog("Renderer plugin status: $it") } }
-        }
-    }
-
-    private fun diagnostics(): List<String> {
-        return KNOWN_PLUGIN_PACKAGES.map { packageName ->
-            val label = AerixRendererBrands.nameFor(packageName) ?: packageName
-            val found = plugins.firstOrNull { it.packageName == packageName }
-            if (found != null) {
-                "$label: ready"
-            } else {
-                val reason = lastScanNotes.firstOrNull { it.startsWith(packageName) }
-                    ?.substringAfter(':', "not detected")
-                    ?: "not installed, or not visible to the launcher"
-                "$label: $reason"
+        val missing = ArrayList<String>()
+        for (known in KNOWN_PLUGIN_PACKAGES) {
+            var found = false
+            for (plugin in plugins) {
+                if (plugin.packageName == known) found = true
+            }
+            if (!found) {
+                val label = AerixRendererBrands.nameFor(known)
+                missing.add(if (label == null) known else label)
             }
         }
+        val status = if (missing.isEmpty()) "all detected"
+            else "not detected: " + missing.joinToString(", ")
+        Logger.appendToLog("Renderer plugin status: $status")
+        for (note in scanNotes) Logger.appendToLog("Renderer plugin note: $note")
+        return status
     }
 
     /** Display name for a renderer tag, including the "plugin:" tags. */
