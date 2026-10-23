@@ -12,8 +12,10 @@ import androidx.core.content.FileProvider
 import kotlinx.coroutines.*
 import net.kdt.pojavlaunch.BuildConfig
 import java.io.File
+import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
+import java.security.MessageDigest
 
 internal enum class LauncherUpdatePhase { CHECKING, CURRENT, AVAILABLE, DOWNLOADING, READY, ERROR }
 
@@ -22,8 +24,6 @@ internal object LauncherUpdater {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var job: Job? = null
     @Volatile private var connection: HttpURLConnection? = null
-    /** The connections of the download in progress, so cancelling can close all of them. */
-    @Volatile private var downloadConnections: DownloadConnections? = null
     var phase by mutableStateOf(LauncherUpdatePhase.CHECKING); private set
     var release by mutableStateOf<LauncherRelease?>(null); private set
     var received by mutableLongStateOf(0L); private set
@@ -72,27 +72,40 @@ internal object LauncherUpdater {
         val update = release ?: return
         val app = context.applicationContext
         phase = LauncherUpdatePhase.DOWNLOADING; error = ""; received = 0
-        val connections = DownloadConnections()
-        downloadConnections = connections
         job = scope.launch {
             val directory = File(app.cacheDir, "updates")
             val target = File(directory, update.asset.name)
+            val partial = File(directory, update.asset.name + ".part")
             try {
-                // Six connections instead of one: a single stream on a phone's link spends most of
-                // its time waiting, and a hundred-megabyte APK took minutes this way. The parts are
-                // written straight into the file and the checksum is verified once it is complete.
-                val result = FastDownload.download(
-                    url = update.asset.url,
-                    target = target,
-                    expectedSize = update.asset.size,
-                    userAgent = "AerixLauncher/${BuildConfig.VERSION_NAME}",
-                    connections = connections,
-                    onProgress = { bytes -> received = bytes }
-                )
-                withContext(Dispatchers.Main) { received = result.bytes }
-                require(update.asset.sha256 == null || result.sha256 == update.asset.sha256) {
-                    "Update checksum verification failed"
-                }
+                if (!directory.exists() && !directory.mkdirs()) throw IOException("Cannot create update cache")
+                val digest = MessageDigest.getInstance("SHA-256")
+                val response = open(update.asset.url)
+                try {
+                    require(response.responseCode == 200) { "Download returned HTTP ${response.responseCode}" }
+                    response.inputStream.use { input -> partial.outputStream().use { output ->
+                        val buffer = ByteArray(64 * 1024)
+                        var bytes = 0L
+                        var lastReport = 0L
+                        while (true) {
+                            currentCoroutineContext().ensureActive()
+                            val count = input.read(buffer)
+                            if (count == -1) break
+                            bytes += count
+                            require(bytes <= update.asset.size && bytes <= LauncherUpdatePolicy.MAX_APK_BYTES) { "Update download size does not match the release" }
+                            output.write(buffer, 0, count); digest.update(buffer, 0, count)
+                            val now = System.nanoTime()
+                            if (now - lastReport > 100_000_000) {
+                                withContext(Dispatchers.Main) { received = bytes }
+                                lastReport = now
+                            }
+                        }
+                        require(bytes == update.asset.size) { "The update download is incomplete. Please retry." }
+                        withContext(Dispatchers.Main) { received = bytes }
+                    } }
+                } finally { response.disconnect(); connection = null }
+                val hash = digest.digest().joinToString("") { "%02x".format(it.toInt() and 255) }
+                require(update.asset.sha256 == null || hash == update.asset.sha256) { "Update checksum verification failed" }
+                require(partial.renameTo(target)) { "Cannot save downloaded update" }
                 validate(app, target, update)
                 withContext(Dispatchers.Main) { apk = target; phase = LauncherUpdatePhase.READY }
             } catch (e: Exception) {
@@ -100,20 +113,13 @@ internal object LauncherUpdater {
                 if (e is CancellationException || !currentCoroutineContext().isActive) {
                     withContext(NonCancellable + Dispatchers.Main) { phase = LauncherUpdatePhase.AVAILABLE; received = 0 }
                 } else fail(e)
-            } finally {
-                downloadConnections = null
-            }
+            } finally { partial.delete() }
         }
     }
     fun cancelDownload() {
         job?.cancel()
         val active = connection
-        val parts = downloadConnections
-        scope.launch {
-            runCatching { active?.disconnect() }
-            // Closes every part's connection, not just the one the last request used.
-            runCatching { parts?.disconnectAll() }
-        }
+        scope.launch { runCatching { active?.disconnect() } }
     }
     private fun open(url: String): HttpURLConnection {
         return (URL(url).openConnection() as HttpURLConnection).apply {
