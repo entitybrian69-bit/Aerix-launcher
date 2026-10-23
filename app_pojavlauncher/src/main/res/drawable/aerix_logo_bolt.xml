@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- Speed mark, used for the LTW stacks (built for throughput). -->
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="24dp" android:height="24dp"
-    android:viewportWidth="24" android:viewportHeight="24">
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M13.6,1.8 L4.2,14.2 L10.8,14.2 L9.4,22.2 L20.4,8.6 L13.2,8.6 Z" />
-</vector>

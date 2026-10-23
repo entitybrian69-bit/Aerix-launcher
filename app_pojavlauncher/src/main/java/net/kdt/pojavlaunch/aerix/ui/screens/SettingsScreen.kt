@@ -191,9 +191,9 @@ private data class RendererStackOption(
  */
 private fun defaultRendererStackOptions(defaultRendererId: String): List<RendererStackOption> = listOf(
     RendererStackOption("AUTO", "Auto (Smart Pick)", "RECOMMENDED", defaultRendererId, R.drawable.aerix_logo_auto),
-    RendererStackOption("VGPU_FAST", "vgpu - (up to 1.16.5, fast)", "1.16.5 FAST", Renderers.NGGL4ES_RENDERER, R.drawable.aerix_logo_vgpu),
-    RendererStackOption("VGPU_1368", "VGPU 1.3.6\u03B2", "SHADERCONV", Renderers.SFPEW_RENDERER, R.drawable.aerix_logo_vgpu),
-    RendererStackOption("LTW", "LTW (1.17+ Core)", "1.17+", Renderers.LTW_RENDERER, R.drawable.aerix_logo_bolt),
+    RendererStackOption("VGPU_FAST", "vgpu - (up to 1.16.5, fast)", "1.16.5 FAST", Renderers.NGGL4ES_RENDERER, R.drawable.aerix_logo_opengl),
+    RendererStackOption("VGPU_1368", "VGPU 1.3.6\u03B2", "SHADERCONV", Renderers.SFPEW_RENDERER, R.drawable.aerix_logo_opengl),
+    RendererStackOption("LTW", "LTW (1.17+ Core)", "1.17+", Renderers.LTW_RENDERER, R.drawable.aerix_logo_opengl),
     RendererStackOption("Legacy", "LTW Legacy (1.8\u20131.16.5)", "1.8\u20131.16.5", Renderers.GL4ES_RENDERER, R.drawable.aerix_logo_opengl),
     RendererStackOption("Zink", "Kopper Zink (Vulkan)", "VULKAN", Renderers.ZINK_RENDERER, R.drawable.aerix_logo_vulkan)
 )
@@ -212,7 +212,9 @@ private fun runtimeLabel(runtime: Runtime): String {
         ?: return pretty
     val declared = match.groupValues[1].toIntOrNull() ?: return pretty
     val actual = runtime.javaVersion
-    return if (actual > 0 && actual != declared) "Internal $actual" else "Internal $declared"
+    // The volume is the truth: a slot that holds a different Java than its name claims is shown
+    // under the version it really contains, and every slot reads "Java N".
+    return "Java " + if (actual > 0 && actual != declared) actual else declared
 }
 
 /**
@@ -225,7 +227,21 @@ private fun RendererLogo(@DrawableRes logoRes: Int, tint: Color, wide: Boolean =
         painter = painterResource(logoRes),
         contentDescription = null,
         tint = tint,
-        modifier = if (wide) Modifier.size(width = 38.dp, height = 20.dp) else Modifier.size(20.dp)
+        modifier = if (wide) Modifier.size(width = 40.dp, height = 26.dp) else Modifier.size(20.dp)
+    )
+}
+
+/**
+ * A renderer's own artwork, shown exactly as its author drew it. Brand images (the Emesis mark,
+ * the PowerVR wordmark) carry their own colours, so they are never tinted or recoloured.
+ */
+@Composable
+private fun BrandedRendererLogo(@DrawableRes logoRes: Int) {
+    Icon(
+        painter = painterResource(logoRes),
+        contentDescription = null,
+        tint = Color.Unspecified,
+        modifier = Modifier.size(width = 40.dp, height = 26.dp)
     )
 }
 
@@ -426,6 +442,16 @@ private fun RendererTabContent(activity: FragmentActivity) {
                 }
 
                 // Installed FCL / Zalith renderer plugin APKs discovered by PojavPluginBridge
+                val skippedPlugins = remember(revision) { PojavPluginBridge.lastScanNotes }
+                if (skippedPlugins.isNotEmpty()) {
+                    Text(
+                        text = "Skipped plugin APK: " + skippedPlugins.joinToString("; "),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = AerixSurface.textSecondary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
                 if (plugins.isNotEmpty()) {
                     plugins.chunked(2).forEach { rowPlugins ->
                         Row(
@@ -838,11 +864,16 @@ private fun RendererPluginCard(
                 modifier = Modifier.size(20.dp)
             )
             // The plugin's own mark when the launcher knows it, a puzzle piece otherwise.
-            RendererLogo(
-                logoRes = AerixRendererBrands.logoFor(plugin.packageName) ?: R.drawable.aerix_logo_plugin,
-                tint = if (selected) AerixThemeManager.currentAccent() else Color.White,
-                wide = true
-            )
+            val brandLogo = AerixRendererBrands.logoFor(plugin.packageName)
+            if (brandLogo != null) {
+                BrandedRendererLogo(logoRes = brandLogo)
+            } else {
+                RendererLogo(
+                    logoRes = R.drawable.aerix_logo_plugin,
+                    tint = if (selected) AerixThemeManager.currentAccent() else Color.White,
+                    wide = true
+                )
+            }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = plugin.displayName,
@@ -1205,7 +1236,7 @@ private fun JavaManageTabContent(activity: FragmentActivity) {
                         )
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = ext.name.replace(".tar.xz", "").replace("-", " "),
+                                text = ext.getLabel(),
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White

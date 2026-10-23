@@ -184,6 +184,10 @@
         <package android:name="net.kdt.pojavlaunch"/>
         <package android:name="net.kdt.pojavlaunch.debug"/>
         <package android:name="net.kdt.pojavlaunch.pub"/>
+        <!-- The renderer plugins this launcher brands. Listed explicitly so they stay visible
+             even on devices that withhold QUERY_ALL_PACKAGES. -->
+        <package android:name="com.entitybrian.emesis"/>
+        <package android:name="np.proton.renderer.powervr"/>
         <!-- Fallback visibility for plugin APKs that ship a launcher activity, used when the
              package visibility permission above is not granted. -->
         <intent>

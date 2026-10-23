@@ -86,12 +86,32 @@ class AerixRendererPlugin(
 
     override fun librarySearchPath(): String = nativeLibDir
 
+    /** Absolute path of a packaged library, or null when the plugin ships it in the APK only. */
+    private fun packagedLibrary(name: String): String? {
+        if (name.isEmpty()) return null
+        if (name.startsWith("/")) return name.takeIf { File(it).isFile }
+        val file = File(nativeLibDir, name)
+        return file.takeIf { it.isFile }?.absolutePath
+    }
+
     override fun setupEnvironment(context: Context, envMap: MutableMap<String, String>) {
         envMap.putAll(env)
         envMap["POJAV_RENDERER"] = rendererId
-        if (metadataVersion >= 2) envMap["SDL_EGL_LIBRARY"] = eglName
-        if (glName.isNotEmpty()) {
-            envMap["LIBGL_NAME"] = glName
+        // How a plugin's EGL provider is handed to the runtime. A legacy plugin (Emesis,
+        // PowerVR) ships only a file name and expects the host to resolve it against its own
+        // native directory, exactly like the plugin's tested host does.
+        val eglPath = packagedLibrary(eglName)
+        if (eglPath != null) {
+            // Both names are used by the loaders below us: the exec bridge takes the path, SDL
+            // takes the path too, and a bare name would send it back to the system EGL.
+            envMap["POJAVEXEC_EGL"] = eglPath
+            envMap["SDL_EGL_LIBRARY"] = eglPath
+        }
+        packagedLibrary(glName)?.let { envMap["SDL_OPENGL_LIBRARY"] = it }
+        // LIBGL_NAME points the desktop-GL bridge at a library, so it has to be a real path.
+        // Legacy metadata only carries a bare file name; a V2 config already resolved it.
+        if (metadataVersion >= 2 && !env.containsKey("LIBGL_NAME")) {
+            packagedLibrary(glName)?.let { envMap["LIBGL_NAME"] = it }
         }
     }
 
@@ -99,23 +119,37 @@ class AerixRendererPlugin(
     internal data class EglLaunchPlan(val library: String, val namespaceBypass: Boolean, val gles: Boolean, val major: Int)
 
     internal fun eglLaunchPlan(): EglLaunchPlan {
-        val target = when {
-            eglName.startsWith("/") -> eglName
-            File(nativeLibDir, eglName).exists() -> File(nativeLibDir, eglName).absolutePath
-            else -> eglName
-        }
+        val target = packagedLibrary(eglName) ?: eglName
         return EglLaunchPlan(target, useNamespaceBypass, !RendererPluginV2.usesDesktopGl(rendererId, env), 3)
     }
+
+    /**
+     * How many ways to load the EGL provider, in order.
+     *
+     * A legacy plugin is written against the loader of the launcher it was tested in, which tries a
+     * plain `dlopen` first and only falls back to a private linker namespace when the plain load
+     * fails. Doing it the other way round puts the plugin's EGL in an isolated namespace where the
+     * game's own GL bridge cannot see the symbols it exports, which is a segfault, not an error.
+     * V2 metadata states what it needs, so it keeps its configured mode first.
+     */
+    private fun bypassAttempts(): List<Boolean> =
+        if (metadataVersion >= 2) listOf(useNamespaceBypass, !useNamespaceBypass)
+        else listOf(false, true)
 
     override fun setupRenderer(): Boolean = try {
         val initialize = {
             if (RendererPluginV2.usesVulkan(rendererId, env)) MojoExec.preloadVulkan()
             val plan = eglLaunchPlan()
             Logger.appendToLog("Renderer native load: tag=$pluginTag bundle=$appVersion " +
-                "egl=${plan.library} namespaceBypass=${plan.namespaceBypass} gles=${plan.gles} major=${plan.major}")
-            val loaded = MojoExec.prepareEgl(plan.library, plan.namespaceBypass, plan.gles, plan.major)
+                "egl=${plan.library} gles=${plan.gles} major=${plan.major}")
+            var loaded = false
+            for (bypass in bypassAttempts()) {
+                loaded = MojoExec.prepareEgl(plan.library, bypass, plan.gles, plan.major)
+                Logger.appendToLog("Renderer native provider loaded=$loaded tag=$pluginTag namespaceBypass=$bypass")
+                if (loaded) break
+            }
             // prepareEgl only dlopens the provider. EGL context creation happens later in GLFW/SDL.
-            Logger.appendToLog("Renderer native provider loaded=$loaded tag=$pluginTag; EGL context/gameplay not yet verified")
+            Logger.appendToLog("Renderer native setup finished loaded=$loaded tag=$pluginTag; EGL context/gameplay not yet verified")
             loaded
         }
         initialize()
@@ -153,6 +187,18 @@ object PojavPluginBridge {
     var plugins: List<AerixRendererPlugin> = emptyList()
         private set
 
+    /**
+     * Why plugin-looking packages were skipped during the last scan. Written to the launcher log
+     * and kept here so a bug report can say what the plugin scanner saw.
+     */
+    var lastScanNotes: List<String> = emptyList()
+        private set
+    private val scanNotes = ArrayList<String>()
+
+    private fun note(message: String) {
+        scanNotes.add(message)
+    }
+
     @JvmStatic
     @JvmOverloads
     @SuppressLint("QueryPermissionsNeeded")
@@ -165,6 +211,7 @@ object PojavPluginBridge {
         val discovered = ArrayList<AerixRendererPlugin>()
         RetiredRendererCleanup.clean(context)
         val seen = hashSetOf<String>()
+        scanNotes.clear()
 
         runCatching {
             val activities = pm.queryIntentActivities(Intent(Intent.ACTION_MAIN), PACKAGE_FLAGS)
@@ -183,6 +230,12 @@ object PojavPluginBridge {
         }
 
         plugins = discovered.sortedBy { it.displayName.lowercase() }
+        lastScanNotes = scanNotes.toList()
+        runCatching {
+            Logger.appendToLog("Renderer plugins: " + if (plugins.isEmpty()) "none" else
+                plugins.joinToString { "${it.packageName} -> ${it.rendererId} (${it.displayName})" })
+            scanNotes.forEach { Logger.appendToLog("Renderer plugin skipped: $it") }
+        }
         injectIntoRendererCache(context, plugins)
         return plugins
     }
@@ -219,16 +272,62 @@ object PojavPluginBridge {
         gameRenderer.setCurrentRenderer(plugin)
     }
 
+    /**
+     * A meta-data flag, whatever type the plugin author's build tool wrote it as.
+     * `android:value="true"` becomes a boolean, but a plugin that builds its manifest by hand can
+     * leave the string "true" there; [Bundle.getBoolean] silently reports false for that.
+     */
+    private fun metaFlag(meta: Bundle, key: String): Boolean {
+        val raw = runCatching { meta.get(key) }.getOrNull() ?: return false
+        return when (raw) {
+            is Boolean -> raw
+            is Int -> raw != 0
+            is String -> raw.trim().equals("true", true) || raw.trim() == "1"
+            else -> false
+        }
+    }
+
     /** First meta-data marker declaring the package a renderer plugin, or the implicit Emesis one. */
-    private fun pluginMarker(meta: Bundle, packageName: String): String? {
+    internal fun markerForMeta(meta: Bundle, packageName: String): String? {
         for (key in PLUGIN_MARKERS) {
             if (key == "fclPlugin_V2") {
                 if (meta.containsKey(key)) return key
                 continue
             }
-            if (meta.getBoolean(key, false)) return key
+            if (metaFlag(meta, key)) return key
         }
-        return if (packageName.startsWith(EMESIS_PACKAGE_PREFIX)) "emesisPlugin" else null
+        if (packageName.startsWith(EMESIS_PACKAGE_PREFIX)) return "emesisPlugin"
+        // Some renderer APKs (PowerVR builds among them) only publish the renderer contract
+        // itself. If all three legacy keys are present the package is a renderer plugin, whether
+        // or not its author used one of the marker names above.
+        val declaresRenderer = meta.getString("renderer") != null &&
+            (meta.getString("pojavEnv") != null || meta.getString("boatEnv") != null)
+        return if (declaresRenderer) "rendererMetadata" else null
+    }
+
+    /**
+     * Where the plugin's native libraries were extracted. A plugin APK without code
+     * (`hasCode="false"`, which PowerVR builds use) still gets its libs unpacked, but not every
+     * Android version fills [ApplicationInfo.nativeLibraryDir] for it, so fall back to the
+     * conventional per-ABI directory before giving up on the plugin.
+     */
+    private fun nativeLibraryDirOf(info: ApplicationInfo): String? {
+        info.nativeLibraryDir?.let { if (File(it).isDirectory) return it }
+        val abi = info.primaryCpuAbi ?: run {
+            val abis = if (android.os.Process.is64Bit()) Build.SUPPORTED_64_BIT_ABIS else Build.SUPPORTED_32_BIT_ABIS
+            abis.firstOrNull()
+        } ?: return null
+        if (Build.VERSION.SDK_INT >= 24) {
+            val dataDir = runCatching { info.dataDir }.getOrNull()
+            if (!dataDir.isNullOrEmpty()) {
+                val unpacked = File(dataDir, "lib/$abi")
+                if (unpacked.isDirectory) return unpacked.absolutePath
+            }
+        }
+        // Shared, read-only library directory used when the ABI matches the launcher itself.
+        val appLibrary = File(info.sourceDir).parentFile?.let { File(it, "lib/$abi") }
+        if (appLibrary != null && appLibrary.isDirectory) return appLibrary.absolutePath
+        return null
     }
 
     private fun parsePlugin(
@@ -238,7 +337,7 @@ object PojavPluginBridge {
     ): AerixRendererPlugin? = runCatching {
         if (info.flags and ApplicationInfo.FLAG_SYSTEM != 0 || RetiredRendererCleanup.isRetiredPackage(info.packageName)) return null
         val meta = info.metaData ?: return null
-        val marker = pluginMarker(meta, info.packageName) ?: return null
+        val marker = markerForMeta(meta, info.packageName) ?: return null
         val emesisStyle = marker == "emesisPlugin" || marker == "aerixPlugin"
         if (meta.containsKey("fclPlugin_V2")) {
             val plugin = runCatching {
@@ -247,7 +346,7 @@ object PojavPluginBridge {
                     is String -> value
                     else -> error("Invalid V2 config resource")
                 }
-                val nativeDir = requireNotNull(info.nativeLibraryDir)
+                val nativeDir = requireNotNull(nativeLibraryDirOf(info)) { "No native library directory" }
                 val config = RendererPluginV2.parse(metadata, File(nativeDir))
                 AerixRendererPlugin(
                     packageName = info.packageName, appName = info.loadLabel(pm).toString(),
@@ -266,15 +365,21 @@ object PojavPluginBridge {
             // A malformed/unsupported V2 config may still supply valid legacy metadata.
         }
 
-        val parts = meta.getString("renderer")?.split(":") ?: emptyList()
-        if (!emesisStyle && parts.size < 3) return null
+        val parts = (meta.getString("renderer") ?: "").split(":").filter { it.isNotBlank() }
+        if (!emesisStyle && parts.isEmpty()) {
+            note("${info.packageName}: no renderer string")
+            return null
+        }
         val des = meta.getString("des") ?: if (emesisStyle) "Emesis" else info.loadLabel(pm).toString()
-        val pojavEnv = meta.getString("pojavEnv") ?: ""
-        val nativeDir = info.nativeLibraryDir ?: return null
+        val pojavEnv = meta.getString("pojavEnv") ?: meta.getString("boatEnv") ?: ""
+        val nativeDir = nativeLibraryDirOf(info) ?: run {
+            note("${info.packageName}: no extracted native libraries for this ABI")
+            return null
+        }
         val appName = info.loadLabel(pm).toString()
         val appVersion = runCatching { pm.getPackageInfo(info.packageName, 0).versionName ?: "" }.getOrDefault("")
 
-        var rendererId = if (parts.size >= 3) parts[0] else EMESIS_RENDERER_ID
+        var rendererId = parts.firstOrNull() ?: EMESIS_RENDERER_ID
         val env = LinkedHashMap<String, String>()
         val dlopen = ArrayList<String>()
         pojavEnv.split(":").forEach { pair ->
@@ -291,9 +396,9 @@ object PojavPluginBridge {
             }
         }
 
-        val glName = if (parts.size >= 3) parts[1] else EMESIS_LIBRARY
-        val eglRaw = if (parts.size >= 3) parts[2] else EMESIS_LIBRARY
-        if (parts.size < 3 && EMESIS_LIBRARY !in dlopen) dlopen.add(EMESIS_LIBRARY)
+        val glName = parts.getOrNull(1) ?: if (emesisStyle) EMESIS_LIBRARY else parts.first()
+        val eglRaw = parts.getOrNull(2) ?: glName
+        if (parts.size < 3 && emesisStyle && EMESIS_LIBRARY !in dlopen) dlopen.add(EMESIS_LIBRARY)
         val eglName = if (eglRaw.startsWith("/")) "$nativeDir$eglRaw" else eglRaw
 
         val brand = AerixRendererBrands.forPackage(info.packageName)

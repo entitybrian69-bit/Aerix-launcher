@@ -153,19 +153,26 @@ public class GameRenderer {
      * @return whether the renderer setup was successful
      */
     public boolean maybeSetupRenderer() {
-        if (pluginInitializationFailed) {
-            Log.e(TAG, "A plugin failed native initialization in this process; restart the game process before retrying");
-            return false;
+        if (pluginInitializationFailed && currentRenderer instanceof net.kdt.pojavlaunch.aerix.bridge.AerixRendererPlugin) {
+            // The plugin already failed once in this process; do not load it a second time.
+            Log.e(TAG, "A plugin failed native initialization in this process; using " + FALLBACK_RENDERER);
+            currentRenderer = getKnownRenderer(FALLBACK_RENDERER);
         }
         setRendererLibraryPath(Tools.NATIVE_LIB_DIR, currentRenderer.librarySearchPath());
         if (!currentRenderer.setupRenderer()) {
             if (currentRenderer instanceof net.kdt.pojavlaunch.aerix.bridge.AerixRendererPlugin) {
+                // A plugin whose provider will not load must not take the whole launch with it:
+                // remember it (so it is not retried in this process) and start the game on the
+                // built-in renderer, exactly like any other renderer that fails to set up.
                 pluginInitializationFailed = true;
-                Log.e(TAG, "Plugin renderer initialization failed; aborting this launch before starting the JVM");
-                return false;
+                Log.e(TAG, "Plugin renderer initialization failed; falling back to " + FALLBACK_RENDERER);
+                Logger.appendToLog("Renderer plugin failed to initialise; launched on " + FALLBACK_RENDERER);
+            } else {
+                Log.e(TAG, "Failed to setup renderer " + currentRenderer.name() + ", falling back to " + FALLBACK_RENDERER);
             }
-            Log.e(TAG, "Failed to setup renderer " + currentRenderer.name() + ", falling back to " + FALLBACK_RENDERER);
-            return getKnownRenderer(FALLBACK_RENDERER).setupRenderer();
+            currentRenderer = getKnownRenderer(FALLBACK_RENDERER);
+            setRendererLibraryPath(Tools.NATIVE_LIB_DIR, currentRenderer.librarySearchPath());
+            return currentRenderer.setupRenderer();
         }
         return true;
     }
