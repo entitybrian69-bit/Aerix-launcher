@@ -4,6 +4,8 @@ name: Release CI
 # release and types the confirmation below. Everything else gets tested on the
 # debug APK built by aerix-debug.yml.
 #
+# 1.4.1: the build job is unchanged; this file is touched so the marked push starts it.
+#
 # The job only produces artifacts. Publishing them is a separate, deliberate
 # step: the assets are named after version.properties (Aerix-Launcher-<version>.apk
 # and Aerix-Launcher-<version>-noruntime.apk) because the in-app updater looks
