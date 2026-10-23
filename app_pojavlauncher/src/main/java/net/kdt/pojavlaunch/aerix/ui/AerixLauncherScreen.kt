@@ -66,6 +66,9 @@ import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
 import net.kdt.pojavlaunch.aerix.ui.screens.AboutScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.AccountsScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.AddAccountScreen
+import net.kdt.pojavlaunch.aerix.ui.screens.AerixContribution
+import net.kdt.pojavlaunch.aerix.ui.screens.ContributionDetailScreen
+import net.kdt.pojavlaunch.aerix.ui.screens.ContributionScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.CreateInstanceScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.DiscoverScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.FileManagerScreen
@@ -99,6 +102,11 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
             LauncherSection.ABOUT -> {
                 AerixNav.settingsTab = AerixNav.TAB_ABOUT
                 AerixNav.navigate(LauncherSection.SETTINGS)
+            }
+            // Opening the rail entry always lands on the team list, never on someone's page.
+            LauncherSection.CONTRIBUTION -> {
+                AerixContribution.openedId = null
+                AerixNav.navigate(LauncherSection.CONTRIBUTION)
             }
             LauncherSection.DOWNLOADS -> AerixNav.navigate(LauncherSection.DISCOVER)
             LauncherSection.CONTENT -> AerixNav.navigate(LauncherSection.INSTANCE_EDITOR)
@@ -146,6 +154,18 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
                                 tabKey = AerixNav.settingsTab,
                                 onTabChanged = { AerixNav.settingsTab = it }
                             )
+                            LauncherSection.CONTRIBUTION -> ContributionScreen(onOpen = { member ->
+                                AerixContribution.openedId = member.id
+                                AerixNav.navigate(LauncherSection.CONTRIBUTION_DETAIL)
+                            })
+                            LauncherSection.CONTRIBUTION_DETAIL -> {
+                                val member = AerixContribution.byId(AerixContribution.openedId)
+                                if (member == null) {
+                                    ContributionScreen(onOpen = { opened -> AerixContribution.openedId = opened.id })
+                                } else {
+                                    ContributionDetailScreen(member = member, onBack = { AerixNav.back() })
+                                }
+                            }
                             LauncherSection.ACCOUNTS -> AccountsScreen(activity)
                             LauncherSection.ABOUT -> AboutScreen(activity)
                             LauncherSection.CREATE_INSTANCE -> CreateInstanceScreen(activity) {

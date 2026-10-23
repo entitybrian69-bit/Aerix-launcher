@@ -87,13 +87,17 @@ enum class LauncherSection {
     WALLPAPERS,
     LOGS,
     SETTINGS,
+    /** The team page, between Settings and the account entry. */
+    CONTRIBUTION,
     ACCOUNTS,
     ABOUT,
     /** Pages opened on top of a section (Mirai "Create New Instance", instance settings, account sign-in). */
     CREATE_INSTANCE,
     INSTANCE_EDITOR,
     ADD_ACCOUNT,
-    OFFLINE_ACCOUNT
+    OFFLINE_ACCOUNT,
+    /** One team member's page, opened from Contribution. */
+    CONTRIBUTION_DETAIL
 }
 
 @Composable
@@ -186,6 +190,10 @@ fun AerixNavigationRail(
 
                 RailIconItem(R.drawable.aerix_ic_settings_filled, stringResource(R.string.aerix_nav_settings),
                     settingsSelected(selectedSection), activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.SETTINGS) }
+
+                RailIconItem(R.drawable.aerix_ic_group_outlined, stringResource(R.string.aerix_nav_contribution),
+                    selectedSection == LauncherSection.CONTRIBUTION || selectedSection == LauncherSection.CONTRIBUTION_DETAIL,
+                    activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.CONTRIBUTION) }
 
                 AccountAvatarRailButton(
                     account = account,
