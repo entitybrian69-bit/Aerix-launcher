@@ -365,6 +365,50 @@ private fun RendererTabContent(activity: FragmentActivity) {
                     color = Color.White
                 )
 
+                // Installed renderer plugin APKs come first: they are renderer backends like the
+                // tiles below, and a freshly installed plugin has to be obvious without scrolling.
+                val skippedPlugins = remember(revision) { PojavPluginBridge.lastScanNotes }
+                Text(
+                    text = if (plugins.isEmpty()) {
+                        "No renderer plugin APK detected. Install the plugin APK, then reopen this tab."
+                    } else {
+                        "Renderer plugins: " + plugins.joinToString(" \u00B7 ") { it.displayName }
+                    },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = AerixSurface.textSecondary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (skippedPlugins.isNotEmpty()) {
+                    Text(
+                        text = "Skipped plugin APK: " + skippedPlugins.joinToString("; "),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = AerixSurface.textSecondary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (plugins.isNotEmpty()) {
+                    plugins.chunked(2).forEach { rowPlugins ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
+                        ) {
+                            rowPlugins.forEach { plugin ->
+                                RendererPluginCard(
+                                    plugin = plugin,
+                                    selected = !autoSelected && currentRenderer == plugin.pluginTag,
+                                    onSelect = {
+                                        autoSelected = false
+                                        PojavSettingsBridge.writeString(activity, "renderer", plugin.pluginTag)
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
+                    }
+                }
+
                 rendererStackOptions.chunked(2).forEach { rowOptions ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -441,50 +485,6 @@ private fun RendererTabContent(activity: FragmentActivity) {
                     }
                 }
 
-                // Installed FCL / Zalith renderer plugin APKs discovered by PojavPluginBridge.
-                // The status line is always shown: it is the difference between "the plugin APK is
-                // not installed / not visible" and "the plugin is here and the list below is it".
-                val skippedPlugins = remember(revision) { PojavPluginBridge.lastScanNotes }
-                Text(
-                    text = if (plugins.isEmpty()) {
-                        "No renderer plugin APK detected. Install the plugin APK, then reopen this tab."
-                    } else {
-                        "Renderer plugins: " + plugins.joinToString(" \u00B7 ") { it.displayName }
-                    },
-                    style = MaterialTheme.typography.labelSmall,
-                    color = AerixSurface.textSecondary,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-                if (skippedPlugins.isNotEmpty()) {
-                    Text(
-                        text = "Skipped plugin APK: " + skippedPlugins.joinToString("; "),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = AerixSurface.textSecondary,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-                if (plugins.isNotEmpty()) {
-                    plugins.chunked(2).forEach { rowPlugins ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
-                        ) {
-                            rowPlugins.forEach { plugin ->
-                                RendererPluginCard(
-                                    plugin = plugin,
-                                    selected = !autoSelected && currentRenderer == plugin.pluginTag,
-                                    onSelect = {
-                                        autoSelected = false
-                                        PojavSettingsBridge.writeString(activity, "renderer", plugin.pluginTag)
-                                    },
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
-                        }
-                    }
-                }
             }
         }
 

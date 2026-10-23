@@ -341,6 +341,18 @@ public class GameRunner {
         // (Emesis does), so state the version instead of letting them guess from the classpath.
         if (versionId != null && !versionId.isEmpty()) {
             javaArgList.add("-Dpojav.mc.version=" + versionId);
+            if (activeRenderer instanceof net.kdt.pojavlaunch.aerix.bridge.AerixRendererPlugin) {
+                // The same value as an environment variable: a plugin reads /proc/self/cmdline for
+                // the -D form, and that file holds the application's command line, not the JVM
+                // arguments of an in-process VM. Without it the plugin cannot tell which core to
+                // use and falls back to its own default.
+                try {
+                    android.system.Os.setenv("pojav.mc.version", versionId, true);
+                    android.system.Os.setenv("emesis.mc.version", versionId, true);
+                } catch (android.system.ErrnoException error) {
+                    Log.w("GameRunner", "Could not state the game version to the renderer", error);
+                }
+            }
         }
 
         activity.runOnUiThread(() -> Toast.makeText(activity, activity.getString(R.string.autoram_info_msg,LauncherPreferences.PREF_RAM_ALLOCATION), Toast.LENGTH_SHORT).show());

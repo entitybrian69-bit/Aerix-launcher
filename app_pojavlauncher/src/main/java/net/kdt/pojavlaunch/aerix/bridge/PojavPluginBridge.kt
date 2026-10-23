@@ -122,27 +122,22 @@ class AerixRendererPlugin(
     /** Values passed directly to MojoExec; inspecting this plan never loads native code. */
     internal data class EglLaunchPlan(val library: String, val namespaceBypass: Boolean, val gles: Boolean, val major: Int)
 
-    /**
-     * Does this plugin bring its own EGL implementation?
-     *
-     * A plugin that ships its own EGL presents a desktop OpenGL context to the game and translates
-     * it underneath (Emesis: "OpenGL 3.2+ Core over OpenGL ES 3.x"). Asking such an EGL for an
-     * OpenGL **ES** context, which is what a forced-GLES launch does, is not what it implements.
-     * A plugin that only ships a GL wrapper next to the system `libEGL.so` (PowerVR) does expect an
-     * ES context, so it keeps the forced-GLES launch with the ES version it declares.
-     */
-    internal fun shipsOwnEgl(): Boolean {
-        val packaged = packagedLibrary(eglName) ?: return false
-        return !eglName.substringAfterLast('/').equals("libEGL.so", true) && File(packaged).isFile
-    }
-
     /** ES major version the plugin asks for, 3 when it does not say. */
     internal fun glesMajor(): Int =
         env["LIBGL_ES"]?.trim()?.toIntOrNull()?.takeIf { it == 2 || it == 3 } ?: 3
 
+    /**
+     * How MojoExec should prepare the plugin's EGL.
+     *
+     * A renderer plugin is a desktop-GL-over-GLES translator: it is asked for an OpenGL **ES**
+     * context and exposes the desktop GL API on top of it (Emesis: "OpenGL 3.2+ Core over OpenGL
+     * ES 3.x", GL4ES and LTW work the same way). Asking it for a desktop context instead makes
+     * GLFW fail with "EGL: Failed to find support for OpenGL", because such an EGL only publishes
+     * ES configs. Only plugins that declare a Mesa/Vulkan backend really provide desktop GL.
+     */
     internal fun eglLaunchPlan(): EglLaunchPlan {
         val target = packagedLibrary(eglName) ?: eglName
-        val desktop = shipsOwnEgl() || RendererPluginV2.usesDesktopGl(rendererId, env)
+        val desktop = RendererPluginV2.usesDesktopGl(rendererId, env)
         return EglLaunchPlan(target, useNamespaceBypass, !desktop, if (desktop) 0 else glesMajor())
     }
 
@@ -169,8 +164,9 @@ class AerixRendererPlugin(
             // MojoExec builds one linker namespace per process out of this path and keeps it, so
             // the plugin directory has to be in it before the first attempt.
             GameRenderer.setRendererLibraryPath(Tools.NATIVE_LIB_DIR, nativeLibDir)
-            Logger.appendToLog("Renderer plan: tag=$pluginTag egl=${plan.library} ownEgl=${shipsOwnEgl()} " +
-                "gles=${plan.gles} major=${plan.major} namespaceBypass=${plan.namespaceBypass}")
+            Logger.appendToLog("Renderer plan: tag=$pluginTag egl=${plan.library} eglDeclared=$eglName " +
+                "gl=${glLibraryPath()} gles=${plan.gles} major=${plan.major} " +
+                "namespaceBypass=${plan.namespaceBypass}")
             var loaded = false
             for ((library, bypass) in loadAttempts(plan)) {
                 loaded = MojoExec.prepareEgl(library, bypass, plan.gles, plan.major)
