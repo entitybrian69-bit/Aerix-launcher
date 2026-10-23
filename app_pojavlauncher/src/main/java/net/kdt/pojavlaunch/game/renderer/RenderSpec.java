@@ -53,6 +53,29 @@ public interface RenderSpec {
     }
 
     /**
+     * Library handed to LWJGL for OpenGL (`-Dorg.lwjgl.opengl.libname`).
+     *
+     * Built-in renderers are all loaded into the process by MojoExec, so an external plugin that
+     * ships its own OpenGL implementation has to say so; the default keeps the shim name every
+     * built-in renderer relies on.
+     *
+     * @return library name or absolute path
+     */
+    default String glLibraryPath() {
+        return "libGLMojo.so";
+    }
+
+    /**
+     * Library handed to LWJGL for EGL (`-Dorg.lwjgl.egl.libname`), or null to keep LWJGL's default.
+     * Only renderers that bring their own EGL implementation need to answer.
+     *
+     * @return absolute path, or null
+     */
+    default String eglLibraryPath() {
+        return null;
+    }
+
+    /**
      * Prepare renderer usage in the game. Sets up environment and some other things
      *
      * @param context application context

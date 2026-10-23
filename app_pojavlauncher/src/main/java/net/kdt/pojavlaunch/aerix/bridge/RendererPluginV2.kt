@@ -96,7 +96,10 @@ internal object RendererPluginV2 {
                 }
             }
         }
-        require(env["POJAV_RENDERER"] == null || env["POJAV_RENDERER"] == id)
+        // A plugin may declare its own POJAV_RENDERER (the launcher-facing tag) inside its
+        // environment; it does not have to be the same string as the config id, and a mismatch is
+        // not a reason to reject a plugin that is otherwise valid. The launcher overwrites this
+        // variable with the selected renderer id before launch anyway.
         return RendererPluginConfig(name, id, gl, egl, env, root.optional("minMCVer"), root.optional("maxMCVer"))
     }
     private fun JsonObject.optional(key: String): String? = get(key)?.takeUnless { it.isJsonNull }?.asString

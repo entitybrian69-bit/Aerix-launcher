@@ -63,7 +63,10 @@ public class RendererCache {
      * Destroy compatible renderers cache
      */
     public static void releaseRendererCache() {
-        sCompatibleRenderers.rendererIds.clear();
+        RendererCache cache = sCompatibleRenderers;
         sCompatibleRenderers = null;
+        // Nothing built the list yet: a plugin was installed or removed before the renderer list
+        // was ever shown, which used to throw a NullPointerException here.
+        if (cache != null) cache.rendererIds.clear();
     }
 }

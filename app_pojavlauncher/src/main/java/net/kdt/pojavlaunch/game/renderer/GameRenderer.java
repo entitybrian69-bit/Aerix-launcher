@@ -110,7 +110,14 @@ public class GameRenderer {
         currentRenderer.setupEnvironment(context, environment);
         for(Map.Entry<String, String> e : environment.entrySet()) {
             Logger.appendToLog("Added renderer env: " + e.getKey() + '=' + e.getValue());
-            Os.setenv(e.getKey(), e.getValue(), true);
+            try {
+                Os.setenv(e.getKey(), e.getValue(), true);
+            } catch (ErrnoException error) {
+                // A renderer (a plugin among them) may contribute a variable the kernel rejects.
+                // Losing one variable is not a reason to take the whole launch down.
+                Log.w(TAG, "Could not export " + e.getKey(), error);
+                Logger.appendToLog("Could not export renderer env " + e.getKey() + ": " + error.getMessage());
+            }
         }
         environment.clear();
         environment = null;
