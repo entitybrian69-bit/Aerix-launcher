@@ -32,7 +32,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
-import androidx.compose.ui.graphics.toArgb
 import androidx.core.view.ViewCompat
 import androidx.core.view.setPadding
 import androidx.activity.OnBackPressedDispatcherOwner
@@ -48,10 +47,10 @@ import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.findViewTreeSavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import net.kdt.pojavlaunch.R
+import net.kdt.pojavlaunch.aerix.bridge.AerixColorTheme
 import net.kdt.pojavlaunch.aerix.bridge.AerixPreferences
 import net.kdt.pojavlaunch.aerix.components.AerixBackground
 import net.kdt.pojavlaunch.aerix.theme.AerixLauncherTheme
-import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
 
 /**
  * Puts the launcher's wallpaper behind the loading screen, and lets the player switch it on or off
@@ -71,6 +70,8 @@ import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
  * wallpaper, and any video decoding with it, is gone before the Mojang logo is on screen.
  */
 object AerixLoadingWallpaper {
+    private const val AERIX_BLUE = 0xFF63C6F2.toInt()
+
     private var enabled by mutableStateOf(false)
     private var composeView: ComposeView? = null
     private var toggle: TextView? = null
@@ -154,8 +155,7 @@ object AerixLoadingWallpaper {
         // Opaque black with nothing behind it, or see-through so the wallpaper shows.
         screen.setBackgroundColor(if (enabled) 0x00000000 else 0xFF000000.toInt())
         composeView?.visibility = if (enabled) View.VISIBLE else View.GONE
-        val accent = runCatching { AerixThemeManager.currentAccent().toArgb() }.getOrNull()
-        toggle?.let { styleToggle(it, enabled, accent) }
+        toggle?.let { styleToggle(it, enabled, accentColor()) }
     }
 
     private fun buildToggle(context: Context): TextView = TextView(context).apply {
@@ -169,9 +169,16 @@ object AerixLoadingWallpaper {
         elevation = dp(context, 6).toFloat()
     }
 
-    private fun styleToggle(button: TextView, on: Boolean, accent: Int?) {
-        // The launcher's accent when it can be read, otherwise the Aerix blue.
-        val accentColor = accent ?: 0xFF63C6F2.toInt()
+    /** The accent the launcher is using, read from the preferences rather than the theme. */
+    private fun accentColor(): Int = runCatching {
+        if (AerixPreferences.colorTheme == AerixColorTheme.CUSTOM) {
+            AerixPreferences.customColor
+        } else {
+            AERIX_BLUE
+        }
+    }.getOrDefault(AERIX_BLUE)
+
+    private fun styleToggle(button: TextView, on: Boolean, accentColor: Int) {
         val shape = GradientDrawable().apply {
             cornerRadius = dp(button.context, 20).toFloat()
             setColor(if (on) accentColor else 0xE6141B24.toInt())
