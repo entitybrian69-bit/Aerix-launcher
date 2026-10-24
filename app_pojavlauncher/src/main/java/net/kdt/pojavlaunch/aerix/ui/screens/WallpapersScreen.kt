@@ -136,7 +136,7 @@ fun WallpapersScreen(modifier: Modifier = Modifier) {
     // and a rememberSaveable slot could come back initialised to Wallpapers - the page would jump
     // out from under the tap.
     WallpaperSection.initialise(selectedId)
-    var showAnimations by remember { WallpaperSection.showAnimations }
+    var showAnimations by remember { mutableStateOf(WallpaperSection.showAnimations) }
     val selectedPreset = remember(selectedId) { AerixThemeManager.wallpapers.firstOrNull { it.id == selectedId } }
     val selectedAnimation = remember(selectedId) { AerixAnimations.firstOrNull { it.id == selectedId } }
     val opacitySetting = AerixPreferences.backgroundOpacity
@@ -372,7 +372,7 @@ fun WallpapersScreen(modifier: Modifier = Modifier) {
                     onClick = {
                         showAnimations = animations
                         WallpaperSection.showAnimations = animations
-                        if (!animations) gridState.scrollToItem(0)
+                        if (!animations) scope.launch { gridState.scrollToItem(0) }
                     }
                 ) {
                     Text(
