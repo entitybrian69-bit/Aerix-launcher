@@ -127,7 +127,9 @@ private fun VideoSurface(
         player = media
         var surface: Surface? = null
 
-        fun cropToFill() = cropTransform(textureView, videoAspect)
+        fun cropToFill() {
+            cropTransform(textureView, videoAspect)
+        }
 
         val attach = {
             runCatching {
@@ -143,8 +145,13 @@ private fun VideoSurface(
         }
 
         textureView.surfaceTextureListener = object : TextureView.SurfaceTextureListener {
-            override fun onSurfaceTextureAvailable(st: SurfaceTexture, w: Int, h: Int) = attach()
-            override fun onSurfaceTextureSizeChanged(st: SurfaceTexture, w: Int, h: Int) = cropToFill()
+            override fun onSurfaceTextureAvailable(st: SurfaceTexture, w: Int, h: Int) {
+                attach()
+            }
+
+            override fun onSurfaceTextureSizeChanged(st: SurfaceTexture, w: Int, h: Int) {
+                cropToFill()
+            }
             override fun onSurfaceTextureDestroyed(st: SurfaceTexture) = true
             override fun onSurfaceTextureUpdated(st: SurfaceTexture) = Unit
         }
