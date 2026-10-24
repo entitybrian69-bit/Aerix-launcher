@@ -117,6 +117,12 @@ android {
         unitTests.includeAndroidResources = true
     }
 
+    // Video wallpapers play straight from the APK, so they must not be compressed: a compressed
+    // resource cannot be opened as a file descriptor, which is what the player needs.
+    androidResources {
+        noCompress 'webm', 'mp4'
+    }
+
     defaultConfig {
         applicationId "net.kdt.pojavlaunch"
         minSdkVersion 23

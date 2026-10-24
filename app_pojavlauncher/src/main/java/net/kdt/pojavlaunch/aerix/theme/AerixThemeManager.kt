@@ -52,6 +52,8 @@ object AerixThemeManager {
     const val WALLPAPER_CUSTOM = "custom"
     /** Imported wallpapers are addressed as `clip:<file name>`, so several can coexist. */
     const val WALLPAPER_CLIP_PREFIX = "clip:"
+    /** Footage that ships with the launcher, addressed as `clipasset:<id>`. */
+    const val WALLPAPER_CLIP_ASSET_PREFIX = "clipasset:"
     private const val CLIP_DIR = "aerix_clips"
     private const val CUSTOM_WALLPAPER_FILE = "aerix_custom_wallpaper"
 
@@ -107,6 +109,20 @@ object AerixThemeManager {
     }
 
     fun clipId(file: File): String = WALLPAPER_CLIP_PREFIX + file.name
+
+    fun isBundledClipId(id: String): Boolean = id.startsWith(WALLPAPER_CLIP_ASSET_PREFIX)
+
+    fun bundledClipId(clip: net.kdt.pojavlaunch.aerix.components.BundledClip): String =
+        WALLPAPER_CLIP_ASSET_PREFIX + clip.id
+
+    /** Applies footage that ships with the launcher. Its own palette becomes the accent. */
+    fun applyBundledClip(clip: net.kdt.pojavlaunch.aerix.components.BundledClip) {
+        AerixPreferences.saveSelectedWallpaper(bundledClipId(clip))
+        AerixPreferences.saveCustomColor(clip.accent.toArgb())
+        AerixPreferences.saveThemeId(THEME_CUSTOM)
+        if (AerixPreferences.wallpaperOpacity >= 95) AerixPreferences.saveWallpaperOpacity(72)
+        wallpaperRevision++
+    }
 
     @Composable
     fun currentAccent(): Color = if (AerixPreferences.colorTheme == AerixColorTheme.CUSTOM) {

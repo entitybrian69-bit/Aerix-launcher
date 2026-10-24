@@ -76,6 +76,7 @@
     <string name="aerix_wallpaper_video_button">Add animation</string>
     <string name="aerix_wallpaper_video_active">Your clip is playing</string>
     <string name="aerix_clip_badge">CLIP</string>
+    <string name="aerix_clip_real">REAL</string>
     <string name="aerix_clip_kind">Real footage · loops</string>
     <string name="aerix_wallpaper_blur">Blur %1$d dp</string>
     <string name="aerix_wallpaper_motion_on">Motion on</string>

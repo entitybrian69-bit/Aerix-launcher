@@ -105,6 +105,16 @@ fun AerixBackground(modifier: Modifier = Modifier, content: @Composable BoxScope
     val motion = ThemeMotion.rememberEnabled()
     val animation = animationById(id)
     Box(modifier.fillMaxSize().background(AerixSurface.canvas)) {
+        // Footage that ships with the launcher: played straight from the APK, no bitmap involved.
+        if (AerixThemeManager.isBundledClipId(id)) {
+            val clip = bundledClipById(id.removePrefix(AerixThemeManager.WALLPAPER_CLIP_ASSET_PREFIX))
+            if (clip != null) {
+                RawVideoWallpaper(resId = clip.rawRes, motion = motion, modifier = Modifier.fillMaxSize())
+                Box(Modifier.fillMaxSize().background(AerixThemeManager.screenScrim()))
+                content()
+                return@Box
+            }
+        }
         // An imported wallpaper is played, not drawn: a clip or an animated image the user brought.
         if (AerixThemeManager.isClipId(id)) {
             val file = AerixThemeManager.clipFile(context, id)

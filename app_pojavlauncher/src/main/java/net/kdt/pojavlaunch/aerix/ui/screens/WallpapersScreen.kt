@@ -97,6 +97,10 @@ import net.kdt.pojavlaunch.aerix.components.AerixAnimations
 import net.kdt.pojavlaunch.aerix.components.paintScenePreview
 import net.kdt.pojavlaunch.aerix.components.rememberClipThumbnail
 import net.kdt.pojavlaunch.aerix.components.MEDIA_WALLPAPER_MIME
+import net.kdt.pojavlaunch.aerix.components.BundledClip
+import net.kdt.pojavlaunch.aerix.components.BundledClips
+import net.kdt.pojavlaunch.aerix.components.BUNDLED_CLIPS_CREDIT
+import net.kdt.pojavlaunch.aerix.components.rememberRawClipThumbnail
 import net.kdt.pojavlaunch.aerix.components.AerixAnimation
 import net.kdt.pojavlaunch.aerix.components.isAnimationId
 
@@ -388,6 +392,15 @@ fun WallpapersScreen(modifier: Modifier = Modifier) {
             }
         }
 
+        if (showAnimations) {
+            Text(
+                text = BUNDLED_CLIPS_CREDIT,
+                color = AerixSurface.textSecondary,
+                fontSize = 9.sp,
+                maxLines = 1
+            )
+        }
+
         LazyVerticalGrid(
             columns = GridCells.Fixed(3),
             modifier = Modifier
@@ -398,6 +411,14 @@ fun WallpapersScreen(modifier: Modifier = Modifier) {
             verticalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus)
         ) {
             if (showAnimations) {
+                // Real recorded footage first: it is what the section is for.
+                items(items = BundledClips, key = { it.id }) { clip ->
+                    BundledClipCard(
+                        clip = clip,
+                        isSelected = selectedId == AerixThemeManager.bundledClipId(clip),
+                        onClick = { AerixThemeManager.applyBundledClip(clip) }
+                    )
+                }
                 items(items = clips, key = { "clip:" + it.absolutePath }) { clip ->
                     ClipCard(
                         file = clip,
@@ -491,6 +512,80 @@ private fun AnimationCard(animation: AerixAnimation, isSelected: Boolean, onClic
                 )
                 Text(
                     text = animation.biome,
+                    color = AerixSurface.textSecondary,
+                    fontSize = 9.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Footage that ships with the launcher: a recorded Minecraft scene, previewed with a real frame
+ * from the clip rather than a gradient.
+ */
+@Composable
+private fun BundledClipCard(clip: BundledClip, isSelected: Boolean, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(AerixRadii.control)
+    val thumbnail = rememberRawClipThumbnail(clip.rawRes)
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .clickable(onClick = onClick),
+        shape = shape,
+        color = AerixSurface.panelRaised,
+        border = BorderStroke(
+            width = if (isSelected) 2.dp else AerixSpacing.hairline,
+            color = if (isSelected) clip.accent else AerixSurface.panelRaised
+        )
+    ) {
+        Column {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(16f / 9f)
+                    .background(AerixSurface.panelTrack)
+            ) {
+                if (thumbnail != null) {
+                    Image(
+                        bitmap = thumbnail,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                }
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(AerixSpacing.xsPlus),
+                    shape = RoundedCornerShape(AerixRadii.compact),
+                    color = AerixSurface.canvas.copy(alpha = 0.62f)
+                ) {
+                    Text(
+                        text = stringResource(R.string.aerix_clip_real),
+                        color = clip.accent,
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = 0.8.sp,
+                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                    )
+                }
+            }
+            Column(modifier = Modifier.padding(AerixSpacing.xsPlus)) {
+                Text(
+                    text = clip.title,
+                    color = AerixSurface.textPrimary,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = clip.subtitle,
                     color = AerixSurface.textSecondary,
                     fontSize = 9.sp,
                     maxLines = 1,
