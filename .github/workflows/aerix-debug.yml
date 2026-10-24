@@ -36,8 +36,12 @@ concurrency:
   cancel-in-progress: true
 
 env:
+  # The APK a 64-bit phone installs, and the one for 32-bit devices. Both are built from the same
+  # source; each carries only the native libraries its own CPU needs, which is most of the saving.
   APK_NAME: Aerix-Launcher-debug.apk
-  APK_PATH: app_pojavlauncher/build/outputs/apk/noruntime/debug/app_pojavlauncher-noruntime-debug.apk
+  APK_PATH: app_pojavlauncher/build/outputs/apk/noruntime/debug/app_pojavlauncher-noruntime-arm64-v8a-debug.apk
+  APK_V7A_NAME: Aerix-Launcher-debug-v7a.apk
+  APK_V7A_PATH: app_pojavlauncher/build/outputs/apk/noruntime/debug/app_pojavlauncher-noruntime-armeabi-v7a-debug.apk
 
 jobs:
   build:
@@ -87,7 +91,7 @@ jobs:
         shell: bash
         run: |
           set +e
-          ./gradlew :app_pojavlauncher:assembleNoruntimeDebug --console=plain > build.log 2>&1
+          ./gradlew :app_pojavlauncher:assembleNoruntimeDebug -PabiSplits --console=plain > build.log 2>&1
           code=$?
           if [ "$code" -ne 0 ]; then
             grep -E "^e: |error: |FAILURE: |What went wrong|Caused by" -A2 build.log | sort -u | head -40 |
@@ -100,6 +104,7 @@ jobs:
         run: |
           set -e
           test -f "$APK_PATH"
+          test -f "$APK_V7A_PATH"
           python3 -c "
           import sys
           data = open('$APK_PATH', 'rb').read()
@@ -113,7 +118,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: aerix-debug-apk
-          path: ${{ env.APK_PATH }}
+          path: |
+            ${{ env.APK_PATH }}
+            ${{ env.APK_V7A_PATH }}
           retention-days: 30
 
       - name: Store the debug APK in apk/
@@ -126,10 +133,13 @@ jobs:
           git rm -q --ignore-unmatch 'apk/*.sha256'
           mkdir -p apk
           cp "$APK_PATH" "apk/$APK_NAME"
+          cp "$APK_V7A_PATH" "apk/$APK_V7A_NAME"
           ( cd apk && sha256sum "$APK_NAME" > "$APK_NAME.sha256" )
+          ( cd apk && sha256sum "$APK_V7A_NAME" > "$APK_V7A_NAME.sha256" )
           {
             echo "kind: debug (testing only)"
-            echo "name: $APK_NAME"
+            echo "name: $APK_NAME (arm64, most phones)"
+            echo "name32: $APK_V7A_NAME (32-bit devices)"
             echo "commit: $GITHUB_SHA"
             echo "run: $GITHUB_RUN_ID"
             echo "built: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
@@ -138,7 +148,7 @@ jobs:
           } > apk/DEBUG_BUILD.txt
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          SIZE=$(stat -c %s "$APK_PATH")
+          SIZE=$(($(stat -c %s "$APK_PATH") + $(stat -c %s "$APK_V7A_PATH")))
           # GitHub refuses files over 100 MiB. Say so instead of failing the whole build; the
           # artifact above still carries the APK.
           if [ "$SIZE" -gt 104857600 ]; then
