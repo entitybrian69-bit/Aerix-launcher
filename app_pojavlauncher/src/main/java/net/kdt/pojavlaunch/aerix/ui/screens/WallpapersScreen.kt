@@ -99,7 +99,6 @@ import net.kdt.pojavlaunch.aerix.components.rememberClipThumbnail
 import net.kdt.pojavlaunch.aerix.components.MEDIA_WALLPAPER_MIME
 import net.kdt.pojavlaunch.aerix.components.BundledClip
 import net.kdt.pojavlaunch.aerix.components.BundledClips
-import net.kdt.pojavlaunch.aerix.components.BUNDLED_CLIPS_CREDIT
 import net.kdt.pojavlaunch.aerix.components.rememberRawClipThumbnail
 import net.kdt.pojavlaunch.aerix.components.AerixAnimation
 import net.kdt.pojavlaunch.aerix.components.isAnimationId
@@ -323,7 +322,8 @@ fun WallpapersScreen(modifier: Modifier = Modifier) {
         // Both live on this page; the buttons switch which one is showing.
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
+            horizontalArrangement = Arrangement.spacedBy(AerixSpacing.sm),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             listOf(
                 stringResource(R.string.aerix_wallpaper_tab_wallpaper) to false,
@@ -348,57 +348,34 @@ fun WallpapersScreen(modifier: Modifier = Modifier) {
                     )
                 }
             }
-        }
-
-        // Real footage, brought by the user: the launcher ships no video, so this is the way to
-        // have an actual animated Minecraft clip behind the interface instead of a drawn scene.
-        if (showAnimations) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
+            // Adding your own clip sits with the section buttons, so nothing pushes the grid down.
+            Surface(
+                shape = RoundedCornerShape(AerixRadii.compact),
+                color = if (showAnimations) activeAccent else AerixSurface.panel,
+                contentColor = if (showAnimations) AerixSurface.onAccent else AerixSurface.textPrimary,
+                border = BorderStroke(
+                    AerixSpacing.hairline,
+                    if (showAnimations) activeAccent else AerixSurface.borderSoft
+                ),
+                onClick = { clipPicker.launch(MEDIA_WALLPAPER_MIME) }
             ) {
-                Surface(
-                    shape = RoundedCornerShape(AerixRadii.compact),
-                    color = activeAccent,
-                    contentColor = AerixSurface.onAccent,
-                    onClick = { clipPicker.launch(MEDIA_WALLPAPER_MIME) }
+                Row(
+                    modifier = Modifier.padding(horizontal = AerixSpacing.md, vertical = AerixSpacing.xsPlus),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(AerixSpacing.xs)
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = AerixSpacing.md, vertical = AerixSpacing.xsPlus),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(AerixSpacing.xs)
-                    ) {
-                        Icon(
-                            painter = painterResource(R.drawable.aerix_ic_add),
-                            contentDescription = null,
-                            modifier = Modifier.size(13.dp)
-                        )
-                        Text(
-                            text = stringResource(R.string.aerix_wallpaper_video_button),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.ExtraBold
-                        )
-                    }
-                }
-                if (AerixThemeManager.isClipId(selectedId)) {
+                    Icon(
+                        painter = painterResource(R.drawable.aerix_ic_add),
+                        contentDescription = null,
+                        modifier = Modifier.size(12.dp)
+                    )
                     Text(
-                        text = stringResource(R.string.aerix_wallpaper_video_active),
-                        color = activeAccent,
-                        fontSize = 10.sp,
+                        text = stringResource(R.string.aerix_wallpaper_video_button),
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
             }
-        }
-
-        if (showAnimations) {
-            Text(
-                text = BUNDLED_CLIPS_CREDIT,
-                color = AerixSurface.textSecondary,
-                fontSize = 9.sp,
-                maxLines = 1
-            )
         }
 
         LazyVerticalGrid(
