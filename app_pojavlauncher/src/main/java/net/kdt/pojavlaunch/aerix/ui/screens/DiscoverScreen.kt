@@ -1660,7 +1660,7 @@ private fun VersionGroupCard(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(AerixRadii.control))
-                                .background(AerixSurface.panelRaised.copy(alpha = 0.55f))
+                                .background(AerixSurface.panelRaised.copy(alpha = 0.28f))
                                 .clickable(enabled = installingFile == null && file.url != null) {
                                     onInstallFile(file)
                                 }

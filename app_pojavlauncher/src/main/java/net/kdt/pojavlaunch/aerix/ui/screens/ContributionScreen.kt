@@ -364,7 +364,7 @@ fun ContributionDetailScreen(member: ContributionMember, onBack: () -> Unit) {
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(AerixRadii.cardSmall))
-                            .background(AerixSurface.panel.copy(alpha = 0.75f))
+                            .background(AerixSurface.panel.copy(alpha = 0.38f))
                             .border(
                                 AerixSpacing.hairline,
                                 AerixSurface.borderSoft,

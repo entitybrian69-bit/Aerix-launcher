@@ -30,10 +30,10 @@ import androidx.compose.ui.unit.dp
 
 object AerixSurface {
     val canvas = Color(0xFF07131D)
-    val panel = Color(0x9D172B3A)
-    val panelRaised = Color(0xB0223B4E)
-    val panelTrack = Color(0x68344F63)
-    val panelGlassTint = Color(0x7D22445A)
+    val panel = Color(0x4F172B3A)
+    val panelRaised = Color(0x5C223B4E)
+    val panelTrack = Color(0x40344F63)
+    val panelGlassTint = Color(0x3D22445A)
     val border = Color(0x78E6FAFF)
     val borderSoft = Color(0x48E6FAFF)
     val borderHighlight = Color(0xE0E6FCFF)

@@ -267,7 +267,10 @@ fun SettingsScreen(activity: FragmentActivity, tabKey: String, onTabChanged: (St
             .padding(horizontal = AerixSpacing.md, vertical = AerixSpacing.sm),
         verticalArrangement = Arrangement.spacedBy(AerixSpacing.md)
     ) {
-        AerixPillTabRow(modifier = Modifier.fillMaxWidth()) {
+        // The Wallpapers page is reached from its own rail entry and is a full page of its own:
+        // it carries no settings tab strip, and the rail's settings entry returns to Renderer, so
+        // nothing is unreachable. This is what lifts the page's own controls to the top.
+        if (activeKey != AerixNav.TAB_WALLPAPERS) AerixPillTabRow(modifier = Modifier.fillMaxWidth()) {
             settingTabItems.forEach { item ->
                 val selected = activeKey == item.key
                 AerixPillTab(
@@ -2056,7 +2059,7 @@ private fun AboutRowCard(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(AerixRadii.card),
-        color = AerixSurface.panelRaised.copy(alpha = 0.72f),
+        color = AerixSurface.panelRaised.copy(alpha = 0.36f),
         border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft)
     ) {
         Row(

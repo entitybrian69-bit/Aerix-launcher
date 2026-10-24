@@ -789,7 +789,7 @@ private fun InstanceListRow(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = shape,
-        color = if (selected) AerixSurface.panelRaised else AerixSurface.panel.copy(alpha = 0.62f),
+        color = if (selected) AerixSurface.panelRaised else AerixSurface.panel.copy(alpha = 0.31f),
         border = BorderStroke(
             if (selected) 1.5.dp else AerixSpacing.hairline,
             if (selected) accent.copy(alpha = 0.86f) else AerixSurface.borderSoft
@@ -933,7 +933,7 @@ private fun LandscapeInstanceListItem(
                 elevation = AerixMetrics.glassSubtleElevation
             ),
         shape = shape,
-        color = if (selected) AerixSurface.panelRaised else AerixSurface.panel.copy(alpha = 0.82f),
+        color = if (selected) AerixSurface.panelRaised else AerixSurface.panel.copy(alpha = 0.41f),
         border = BorderStroke(
             if (selected) 1.5.dp else AerixSpacing.hairline,
             if (selected) accent.copy(alpha = 0.86f) else AerixSurface.borderSoft

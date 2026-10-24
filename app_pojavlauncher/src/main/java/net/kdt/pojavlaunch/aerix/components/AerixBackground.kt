@@ -23,7 +23,6 @@ package net.kdt.pojavlaunch.aerix.components
 import android.content.Context
 import android.graphics.BitmapFactory
 import android.os.Build
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -40,7 +39,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -111,15 +109,16 @@ fun AerixBackground(modifier: Modifier = Modifier, content: @Composable BoxScope
             // blur sits outside it and therefore applies to every wallpaper, including custom ones.
             val imageModifier = Modifier
                 .fillMaxSize()
-                .wallpaperDrift(motion)
                 .let { if (renderBlur) it.blur(blurDp.dp) else it }
-            Image(
-                bitmap = bitmap,
-                contentDescription = null,
-                modifier = imageModifier,
-                contentScale = ContentScale.Crop
-            )
+            // The picture is drawn as moving strips rather than a still image, so the wallpaper
+            // itself is what moves - not only what floats over it.
+            AnimatedWallpaper(bitmap = bitmap, motion = motion, modifier = imageModifier)
             if (motion) {
+                WallpaperLightLayer(
+                    accent = AerixThemeManager.currentAccent(),
+                    effect = wallpaperEffectFor(id),
+                    modifier = Modifier.fillMaxSize()
+                )
                 WallpaperParticleLayer(
                     effect = wallpaperEffectFor(id),
                     accent = AerixThemeManager.currentAccent(),

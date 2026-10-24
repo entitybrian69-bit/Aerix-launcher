@@ -648,7 +648,7 @@ private fun InstanceModsPane(activity: FragmentActivity) {
                     .weight(1f)
                     .height(36.dp)
                     .clip(RoundedCornerShape(AerixRadii.pill))
-                    .background(AerixSurface.panelRaised.copy(alpha = 0.72f))
+                    .background(AerixSurface.panelRaised.copy(alpha = 0.36f))
                     .border(AerixSpacing.hairline, AerixSurface.borderSoft, RoundedCornerShape(AerixRadii.pill))
                     .padding(horizontal = AerixSpacing.md),
                 verticalAlignment = Alignment.CenterVertically
@@ -1056,7 +1056,7 @@ private fun InstanceContentPane(
                     .weight(1f)
                     .height(36.dp)
                     .clip(RoundedCornerShape(AerixRadii.pill))
-                    .background(AerixSurface.panelRaised.copy(alpha = 0.72f))
+                    .background(AerixSurface.panelRaised.copy(alpha = 0.36f))
                     .border(AerixSpacing.hairline, AerixSurface.borderSoft, RoundedCornerShape(AerixRadii.pill))
                     .padding(horizontal = AerixSpacing.md),
                 verticalAlignment = Alignment.CenterVertically
@@ -2055,7 +2055,7 @@ private fun VersionBench(
     Surface(
         modifier = modifier.fillMaxHeight(),
         shape = RoundedCornerShape(AerixRadii.cardSmall),
-        color = AerixSurface.panel.copy(alpha = 0.72f),
+        color = AerixSurface.panel.copy(alpha = 0.36f),
         border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft)
     ) {
         Column(modifier = Modifier.fillMaxSize().padding(AerixSpacing.xsPlus)) {

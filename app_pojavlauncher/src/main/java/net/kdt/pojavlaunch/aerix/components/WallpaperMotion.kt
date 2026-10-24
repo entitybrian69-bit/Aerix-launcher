@@ -1,7 +1,7 @@
 /*
  * Aerix Launcher UI layer for PojavLauncher.
- * Wallpaper motion: a slow drift that every wallpaper gets, plus a particle layer chosen from the
- * biome the wallpaper shows.
+ * Wallpaper motion: the picture itself moves, light sweeps across it, and a particle layer chosen
+ * from the biome the wallpaper shows drifts over the top.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -32,12 +32,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import kotlin.math.abs
 import kotlin.math.cos
+import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sin
 import kotlin.random.Random
@@ -81,43 +85,200 @@ fun wallpaperEffectFor(id: String): WallpaperEffect = when (id) {
     else -> WallpaperEffect.MOTES
 }
 
+/** How wide the picture breathes, in multiples of the screen. */
+private const val ZOOM_MIN = 1.10f
+private const val ZOOM_MAX = 1.22f
+
 /**
- * A slow zoom and pan that makes a still photo feel alive.
+ * The wallpaper itself, moving.
  *
- * The animation value is read inside the `graphicsLayer` block, so each frame only re-draws the
- * layer - the composable never recomposes, which is what keeps this free on a mid-range phone.
- * The image is grown by the same amount it moves, so no edge is ever exposed.
+ * A still photo cannot have its trees sway, but it can be made to *feel* like it is breathing: the
+ * picture is drawn as many narrow strips, each nudged on its own by a slow wave. That produces a
+ * per-region shimmer over the entire frame - water, haze, drifting air - instead of one flat pan,
+ * and it works on every Android version because it is plain drawing, not a shader.
+ *
+ * On top of that the whole image slowly breathes and pans, so the composition moves as a whole
+ * while its parts move against each other.
  */
 @Composable
-fun Modifier.wallpaperDrift(enabled: Boolean): Modifier {
-    if (!enabled) return this
-    val transition = rememberInfiniteTransition(label = "wallpaperDrift")
-    val drift by transition.animateFloat(
+fun AnimatedWallpaper(bitmap: ImageBitmap, motion: Boolean, modifier: Modifier = Modifier) {
+    val transition = rememberInfiniteTransition(label = "wallpaperMotion")
+    val time by transition.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 26_000, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
+            animation = tween(durationMillis = 28_000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
         ),
-        label = "wallpaperDriftValue"
+        label = "wallpaperTime"
     )
-    return graphicsLayer {
-        val t = drift
-        val zoom = 1.06f + 0.05f * t
-        scaleX = zoom
-        scaleY = zoom
-        // A couple of percent of travel either way: enough to be visible, never enough to be
-        // distracting, and always covered by the zoom above.
-        translationX = size.width * (t - 0.5f) * 0.05f
-        translationY = size.height * (0.5f - t) * 0.035f
+    Canvas(modifier) {
+        val t = time
+        val imageW = bitmap.width
+        val imageH = bitmap.height
+        if (imageW <= 0 || imageH <= 0 || size.width <= 0f || size.height <= 0f) return@Canvas
+
+        // Cover the screen, then add the breathing zoom on top so no edge is ever exposed.
+        val zoom = if (motion) ZOOM_MIN + (ZOOM_MAX - ZOOM_MIN) * (0.5f + 0.5f * sin((t * 2f * PI_F).toFloat())) else 1f
+        val cover = max(size.width / imageW, size.height / imageH) * zoom
+        val drawW = imageW * cover
+        val drawH = imageH * cover
+        // A slow pan, kept inside the zoom margin.
+        val panX = if (motion) (drawW - size.width) * 0.5f * (0.5f + 0.5f * sin((t * 2f * PI_F + 1.7f).toFloat())) else (drawW - size.width) * 0.5f
+        val panY = if (motion) (drawH - size.height) * 0.5f * (0.5f + 0.5f * sin((t * 2f * PI_F * 0.7f + 0.4f).toFloat())) else (drawH - size.height) * 0.5f
+        val left = -panX
+        val top = -panY
+
+        if (!motion) {
+            drawCropped(bitmap, left, top, drawW, drawH, 0f, 0f, 0f)
+            return@Canvas
+        }
+
+        // Strip warp: each column gets its own offset, so the whole frame shimmers.
+        val strips = STRIP_COUNT
+        val amplitude = size.width * 0.010f
+        val drift = size.height * 0.006f
+        for (index in 0 until strips) {
+            // Overlap by a pixel: a seam between strips would be visible on a bright wallpaper.
+            val x0 = size.width * index / strips
+            val x1 = size.width * (index + 1) / strips + 1f
+            val phase = index * 0.42f
+            val wave = sin((t * 2f * PI_F).toFloat() + phase) * amplitude +
+                sin((t * 4f * PI_F).toFloat() + phase * 1.7f) * amplitude * 0.45f
+            val bob = cos((t * 2f * PI_F * 0.8f).toFloat() + phase * 0.6f) * drift
+            drawCropped(bitmap, left, top, drawW, drawH, x0 + wave, x1 + wave, bob)
+        }
     }
+}
+
+/** 2π as a constant so the trigonometric phases stay readable. */
+private const val PI_F = 3.1415927f
+
+/** Draws the columns between [x0] and [x1], sampled from the matching part of the picture. */
+private fun DrawScope.drawCropped(
+    bitmap: ImageBitmap,
+    left: Float,
+    top: Float,
+    drawW: Float,
+    drawH: Float,
+    x0: Float,
+    x1: Float,
+    yOffset: Float
+) {
+    val imageW = bitmap.width
+    val imageH = bitmap.height
+    if (drawW <= 0f || drawH <= 0f) return
+    // With no column given, the whole picture is one strip.
+    val fromX = if (x0 == 0f && x1 == 0f) 0f else x0
+    val toX = if (x0 == 0f && x1 == 0f) size.width else x1
+
+    val srcLeft = ((fromX - left) / drawW * imageW).coerceIn(0f, imageW.toFloat())
+    val srcRight = ((toX - left) / drawW * imageW).coerceIn(0f, imageW.toFloat())
+    val srcWidth = (srcRight - srcLeft)
+    if (srcWidth < 0.5f) return
+
+    val dstX = fromX.toInt()
+    val dstY = (top + yOffset).toInt()
+    drawImageRect(
+        image = bitmap,
+        srcOffset = IntOffset(srcLeft.toInt(), 0),
+        srcSize = IntSize(srcWidth.toInt().coerceAtLeast(1), imageH),
+        dstOffset = IntOffset(dstX, dstY),
+        dstSize = IntSize((toX - fromX).toInt().coerceAtLeast(1), drawH.toInt().coerceAtLeast(1))
+    )
+}
+
+/** Columns used by the strip warp. More is smoother, and 44 is invisible to the eye on a phone. */
+private const val STRIP_COUNT = 44
+
+/**
+ * Light moving across the whole picture: two sun washes that drift, a band of haze that crosses the
+ * frame, and the theme accent breathing underneath. This is what makes the parts of a wallpaper
+ * that have no particles still feel lit and moving.
+ */
+@Composable
+fun WallpaperLightLayer(accent: Color, effect: WallpaperEffect, modifier: Modifier = Modifier) {
+    val transition = rememberInfiniteTransition(label = "wallpaperLight")
+    val time by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 22_000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "wallpaperLightTime"
+    )
+    Canvas(modifier) {
+        val t = time
+        val w = size.width
+        val h = size.height
+        val diagonal = max(w, h)
+
+        // Two warm washes drifting in opposite corners: the light source appears to move.
+        val sunX = w * (0.72f + 0.18f * sin((t * 2f * PI_F).toFloat()))
+        val sunY = h * (0.20f + 0.10f * cos((t * 2f * PI_F).toFloat()))
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(Color(0xFFFFF0C9).copy(alpha = 0.20f), Color.Transparent),
+                center = Offset(sunX, sunY),
+                radius = diagonal * 0.60f
+            ),
+            radius = diagonal * 0.60f,
+            center = Offset(sunX, sunY)
+        )
+        val coolX = w * (0.18f + 0.14f * cos((t * 2f * PI_F * 0.8f + 2.1f).toFloat()))
+        val coolY = h * (0.78f + 0.08f * sin((t * 2f * PI_F * 0.8f).toFloat()))
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(AerixGlassBlue.copy(alpha = 0.16f), Color.Transparent),
+                center = Offset(coolX, coolY),
+                radius = diagonal * 0.55f
+            ),
+            radius = diagonal * 0.55f,
+            center = Offset(coolX, coolY)
+        )
+
+        // A band of light that crosses the frame and comes back, like sun through a moving canopy.
+        val bandX = w * (-0.4f + 1.8f * frac(t * 2f))
+        drawRect(
+            brush = Brush.linearGradient(
+                colors = listOf(Color.Transparent, Color.White.copy(alpha = 0.055f), Color.Transparent),
+                start = Offset(bandX, 0f),
+                end = Offset(bandX + w * 0.55f, h)
+            )
+        )
+
+        // The theme accent breathing under everything, so the wallpaper belongs to the theme.
+        val breath = 0.05f + 0.035f * sin((t * 2f * PI_F * 2f).toFloat())
+        drawRect(color = accent.copy(alpha = breath))
+
+        // Warm shimmer for fire, cold sparkle for snow and stars, so each biome lights differently.
+        val tint = when (effect) {
+            WallpaperEffect.EMBERS -> Color(0xFFFF8A3D).copy(alpha = 0.06f + 0.03f * sin((t * 2f * PI_F * 3f).toFloat()))
+            WallpaperEffect.SNOW -> Color(0xFFCFE9FF).copy(alpha = 0.05f)
+            WallpaperEffect.STARS -> Color(0xFFB7A9FF).copy(alpha = 0.05f)
+            WallpaperEffect.BUBBLES -> Color(0xFF9FE8FF).copy(alpha = 0.05f)
+            WallpaperEffect.PETALS -> Color(0xFFFFC7E1).copy(alpha = 0.05f)
+            WallpaperEffect.FIREFLIES -> Color(0xFFCBFF8F).copy(alpha = 0.045f)
+            WallpaperEffect.MOTES, WallpaperEffect.NONE -> Color.Transparent
+        }
+        if (tint.alpha > 0f) drawRect(color = tint)
+    }
+}
+
+/** Mirrors AerixSurface.glassBlue without pulling the theme object into a draw scope. */
+private val AerixGlassBlue = Color(0xFF91E9FF)
+
+private fun frac(value: Float): Float {
+    val v = value % 1f
+    return if (v < 0f) v + 1f else v
 }
 
 /**
  * The particle layer for [effect], drawn over the wallpaper and under the scrim.
  *
  * Every particle is a pure function of the shared time value, and the time is read inside the draw
- * block, so a frame costs a few dozen circles and no recomposition at all.
+ * block, so a frame costs a few dozen shapes and no recomposition at all.
  */
 @Composable
 fun WallpaperParticleLayer(effect: WallpaperEffect, accent: Color, modifier: Modifier = Modifier) {
@@ -158,13 +319,13 @@ private class Particle(
 private fun buildParticles(effect: WallpaperEffect): List<Particle> {
     val count = when (effect) {
         WallpaperEffect.NONE -> 0
-        WallpaperEffect.PETALS -> 34
-        WallpaperEffect.EMBERS -> 42
-        WallpaperEffect.SNOW -> 52
-        WallpaperEffect.STARS -> 58
-        WallpaperEffect.FIREFLIES -> 22
-        WallpaperEffect.BUBBLES -> 22
-        WallpaperEffect.MOTES -> 32
+        WallpaperEffect.PETALS -> 48
+        WallpaperEffect.EMBERS -> 58
+        WallpaperEffect.SNOW -> 72
+        WallpaperEffect.STARS -> 80
+        WallpaperEffect.FIREFLIES -> 34
+        WallpaperEffect.BUBBLES -> 30
+        WallpaperEffect.MOTES -> 52
     }
     // Fixed seed per effect: the same wallpaper always has the same pattern, so it never
     // reshuffles when you navigate away and back.

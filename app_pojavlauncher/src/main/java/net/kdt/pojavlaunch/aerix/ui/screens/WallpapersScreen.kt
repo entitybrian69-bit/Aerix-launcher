@@ -124,7 +124,7 @@ fun WallpapersScreen(modifier: Modifier = Modifier) {
                     elevation = AerixMetrics.glassFloatingElevation
                 ),
             shape = RoundedCornerShape(AerixRadii.cardSmall),
-            color = AerixSurface.panelRaised.copy(alpha = 0.66f),
+            color = AerixSurface.panelRaised.copy(alpha = 0.33f),
             border = BorderStroke(AerixSpacing.hairline, activeAccent.copy(alpha = 0.45f))
         ) {
             Row(
@@ -134,20 +134,46 @@ fun WallpapersScreen(modifier: Modifier = Modifier) {
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus)
             ) {
-                // Active theme swatch
-                Box(
-                    modifier = Modifier
-                        .size(32.dp)
-                        .clip(RoundedCornerShape(AerixRadii.compact))
-                        .background(activeAccent.copy(alpha = 0.18f))
-                        .border(AerixSpacing.hairline, activeAccent, RoundedCornerShape(AerixRadii.compact)),
-                    contentAlignment = Alignment.Center
+                // Left side of the bar: the one switch for everything that moves, and the blur
+                // meter that governs every wallpaper rather than a single one.
+                Surface(
+                    shape = RoundedCornerShape(AerixRadii.compact),
+                    color = if (AerixPreferences.themeMotion) activeAccent.copy(alpha = 0.22f) else AerixSurface.panel,
+                    border = BorderStroke(
+                        AerixSpacing.hairline,
+                        if (AerixPreferences.themeMotion) activeAccent else AerixSurface.borderSoft
+                    ),
+                    onClick = { AerixPreferences.saveThemeMotion(!AerixPreferences.themeMotion) }
                 ) {
-                    Box(
+                    Text(
+                        text = stringResource(
+                            if (AerixPreferences.themeMotion) R.string.aerix_wallpaper_motion_on
+                            else R.string.aerix_wallpaper_motion_off
+                        ),
+                        color = if (AerixPreferences.themeMotion) activeAccent else AerixSurface.textPrimary,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = AerixSpacing.smPlus, vertical = AerixSpacing.smCompact)
+                    )
+                }
+                Column {
+                    Text(
+                        text = stringResource(R.string.aerix_wallpaper_blur, AerixPreferences.backgroundBlur),
+                        color = AerixSurface.textSecondary,
+                        fontSize = 10.sp
+                    )
+                    Slider(
+                        value = AerixPreferences.backgroundBlur.toFloat(),
+                        onValueChange = { AerixPreferences.saveBackgroundBlur(it.toInt()) },
+                        valueRange = 0f..20f,
                         modifier = Modifier
-                            .size(14.dp)
-                            .clip(CircleShape)
-                            .background(activeAccent)
+                            .width(104.dp)
+                            .height(22.dp),
+                        colors = SliderDefaults.colors(
+                            thumbColor = activeAccent,
+                            activeTrackColor = activeAccent,
+                            inactiveTrackColor = AerixSurface.canvas
+                        )
                     )
                 }
 
@@ -248,72 +274,6 @@ fun WallpapersScreen(modifier: Modifier = Modifier) {
             }
         }
 
-        // ---- motion and blur: one switch and one meter, for every wallpaper -------------------
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .liquidGlass(
-                    shape = RoundedCornerShape(AerixRadii.cardSmall),
-                    tint = AerixSurface.glassTint,
-                    strength = 0.9f,
-                    elevation = AerixMetrics.glassFloatingElevation
-                ),
-            shape = RoundedCornerShape(AerixRadii.cardSmall),
-            color = AerixSurface.panelRaised.copy(alpha = 0.66f),
-            border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft)
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = AerixSpacing.md, vertical = AerixSpacing.smCompact),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus)
-            ) {
-                // One button for everything that moves, in this page and in the launcher chrome.
-                Surface(
-                    shape = RoundedCornerShape(AerixRadii.compact),
-                    color = if (AerixPreferences.themeMotion) activeAccent.copy(alpha = 0.2f) else AerixSurface.panel,
-                    border = BorderStroke(
-                        AerixSpacing.hairline,
-                        if (AerixPreferences.themeMotion) activeAccent else AerixSurface.borderSoft
-                    ),
-                    onClick = { AerixPreferences.saveThemeMotion(!AerixPreferences.themeMotion) }
-                ) {
-                    Text(
-                        text = stringResource(
-                            if (AerixPreferences.themeMotion) R.string.aerix_wallpaper_motion_on
-                            else R.string.aerix_wallpaper_motion_off
-                        ),
-                        color = if (AerixPreferences.themeMotion) activeAccent else AerixSurface.textPrimary,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = AerixSpacing.smPlus, vertical = AerixSpacing.smCompact)
-                    )
-                }
-
-                // Blur meter: applied to every wallpaper, bundled or custom, from the same setting
-                // the Appearance page uses.
-                Text(
-                    text = stringResource(R.string.aerix_wallpaper_blur, AerixPreferences.backgroundBlur),
-                    color = AerixSurface.textSecondary,
-                    fontSize = 11.sp
-                )
-                Slider(
-                    value = AerixPreferences.backgroundBlur.toFloat(),
-                    onValueChange = { AerixPreferences.saveBackgroundBlur(it.toInt()) },
-                    valueRange = 0f..20f,
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(24.dp),
-                    colors = SliderDefaults.colors(
-                        thumbColor = activeAccent,
-                        activeTrackColor = activeAccent,
-                        inactiveTrackColor = AerixSurface.canvas
-                    )
-                )
-            }
-        }
-
         // ---- three column grid of the HD wallpapers -------------------------------------------
         LazyVerticalGrid(
             columns = GridCells.Fixed(3),
@@ -365,7 +325,7 @@ private fun WallpaperPresetCard(preset: AerixWallpaperPreset, isSelected: Boolea
             )
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(AerixRadii.control),
-        color = AerixSurface.panelRaised.copy(alpha = 0.68f),
+        color = AerixSurface.panelRaised.copy(alpha = 0.34f),
         border = BorderStroke(
             width = if (isSelected) 2.dp else AerixSpacing.hairline,
             color = if (isSelected) preset.accentColor else AerixSurface.panelRaised
