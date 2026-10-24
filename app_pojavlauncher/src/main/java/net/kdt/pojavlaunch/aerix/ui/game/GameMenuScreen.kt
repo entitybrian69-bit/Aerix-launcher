@@ -364,6 +364,7 @@ private fun MenuHeader(compact: Boolean, versionLine: String) {
 @Composable
 private fun LoadingWallpaperRow(accent: Color, compact: Boolean) {
     val checked = AerixPreferences.loadingWallpaper
+    val context = LocalContext.current
     val shape = RoundedCornerShape(AerixRadii.card)
     Row(
         modifier = Modifier
@@ -373,7 +374,7 @@ private fun LoadingWallpaperRow(accent: Color, compact: Boolean) {
             .border(1.dp, AerixSurface.borderSoft, shape)
             .clickable(role = Role.Switch) {
                 AerixPreferences.saveLoadingWallpaper(!checked)
-                AerixLoadingWallpaper.refresh(LocalContext.current)
+                AerixLoadingWallpaper.refresh(context)
             }
             .padding(
                 horizontal = if (compact) AerixSpacing.smPlus else AerixSpacing.md,
@@ -420,7 +421,7 @@ private fun LoadingWallpaperRow(accent: Color, compact: Boolean) {
             checked = checked,
             onCheckedChange = { value ->
                 AerixPreferences.saveLoadingWallpaper(value)
-                AerixLoadingWallpaper.refresh(LocalContext.current)
+                AerixLoadingWallpaper.refresh(context)
             },
             colors = SwitchDefaults.colors(
                 checkedThumbColor = AerixSurface.onAccent,
