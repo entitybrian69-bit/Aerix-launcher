@@ -213,29 +213,89 @@ private fun DrawScope.drawScene(animation: AerixAnimation, t: Float) {
         SceneFeature.WAVES, SceneFeature.NONE -> drawSun(w, horizon, t, animation.accent, setting = false)
     }
 
-    // 3. Land, painted back to front. Each layer moves a little more than the one behind it, which
-    //    is what reads as depth.
+    // 2b. Clouds, built the way Minecraft builds them: long flat slabs of blocks sliding across the
+    //     sky, each row at its own height and speed.
+    val cloudBlock = max(5f, w / 46f)
+    for (row in 0 until 3) {
+        val rowY = h * (0.10f + 0.085f * row)
+        val speed = 0.02f + 0.012f * row
+        val span = w * 1.6f
+        val offset = ((t * span * speed * 6f) + row * span * 0.37f) % span
+        var blocks = 0
+        while (blocks < 9) {
+            val segment = (row * 5 + blocks * 3) % 11
+            if (segment < 5) {
+                val bx = -w * 0.3f + offset - span * 0.5f + blocks * span * 0.11f
+                drawRect(
+                    color = Color.White.copy(alpha = 0.055f + 0.012f * row),
+                    topLeft = Offset(bx, rowY + (row % 2) * h * 0.012f),
+                    size = Size(cloudBlock * (2 + segment % 3), cloudBlock)
+                )
+            }
+            blocks++
+        }
+    }
+
+    // 3. Land, painted back to front as blocky terrain: every column is one block wide and its
+    //    height snaps to whole blocks, so the ground reads as cubes instead of as a smooth hill.
+    //    Each layer drifts at its own speed, which is what reads as depth.
+    val block = max(6f, w / 26f)
     animation.hills.forEachIndexed { index, color ->
         val depth = (index + 1f) / animation.hills.size
-        val baseY = horizon - h * 0.10f + h * 0.075f * index
+        val baseY = horizon - h * 0.10f + h * 0.085f * index
         val amplitude = h * (0.035f + 0.03f * index)
         val phase = index * 1.7f
-        val drift = sin(t * TAU * (0.14f + 0.05f * index) + phase) * w * 0.012f * depth
-        val path = Path().apply {
-            moveTo(-w * 0.1f + drift, baseY)
-            var x = -w * 0.1f
-            while (x <= w * 1.1f) {
-                val y = baseY +
-                    sin((x / w) * 3.1f + phase + t * TAU * 0.18f) * amplitude * 0.6f +
-                    sin((x / w) * 7.3f + phase * 2f) * amplitude * 0.28f
-                lineTo(x + drift, y)
-                x += w / 24f
-            }
-            lineTo(w * 1.1f, h)
-            lineTo(-w * 0.1f, h)
-            close()
+        val drift = sin(t * TAU * (0.10f + 0.04f * index) + phase) * w * 0.010f * depth
+        var x = -w * 0.1f + drift
+        while (x <= w * 1.1f) {
+            val wave = sin((x / w) * 3.1f + phase + t * TAU * 0.12f) * amplitude * 0.6f +
+                sin((x / w) * 7.3f + phase * 2f) * amplitude * 0.28f
+            val steps = (wave / (block * 0.9f)).toInt()
+            val top = baseY - steps * block * 0.9f
+            drawRect(
+                color = color,
+                topLeft = Offset(x, top),
+                size = Size(block + 0.7f, h - top)
+            )
+            x += block
         }
-        drawPath(path, color)
+    }
+
+    // 3b. Trees on the nearest ground: two-block trunks under square canopies that lean with the
+    //     wind, the way they do in game.
+    val front = animation.hills.lastOrNull()
+    if (front != null) {
+        val trunkColor = Color(front.red * 0.42f, front.green * 0.34f, front.blue * 0.30f, 1f)
+        val leafColor = Color(
+            (front.red * 0.55f + animation.accent.red * 0.18f).coerceIn(0f, 1f),
+            (front.green * 0.62f + animation.accent.green * 0.14f).coerceIn(0f, 1f),
+            (front.blue * 0.48f + animation.accent.blue * 0.12f).coerceIn(0f, 1f),
+            1f
+        )
+        val treeBaseY = h * 0.78f
+        val trunkBlock = block * 0.9f
+        for (i in 0 until 4) {
+            val sway = sin(t * TAU * 0.22f + i * 1.3f) * block * 0.35f
+            val treeX = w * (0.12f + 0.24f * i) + sway
+            // Trunk: three blocks tall, one block wide.
+            drawRect(
+                color = trunkColor,
+                topLeft = Offset(treeX, treeBaseY - trunkBlock * 3f),
+                size = Size(trunkBlock, trunkBlock * 3f)
+            )
+            // Canopy: a plus-shaped cluster of leaf blocks, slightly wider than the trunk.
+            val canopyTop = treeBaseY - trunkBlock * 6.4f
+            for (cx in -1..1) {
+                for (cy in 0..2) {
+                    if ((cx == -1 || cx == 1) && cy == 0) continue
+                    drawRect(
+                        color = leafColor,
+                        topLeft = Offset(treeX + cx * trunkBlock, canopyTop + cy * trunkBlock),
+                        size = Size(trunkBlock + 0.7f, trunkBlock + 0.7f)
+                    )
+                }
+            }
+        }
     }
 
     // 4. Water or ground in front, with the ripples that make it read as liquid.
@@ -297,7 +357,13 @@ private fun DrawScope.drawSun(w: Float, horizon: Float, t: Float, color: Color, 
         radius = radius * 5.2f,
         center = Offset(x, y)
     )
-    drawCircle(Color(0xFFFFF6E0).copy(alpha = 0.92f), radius = radius, center = Offset(x, y))
+    // Minecraft's own sun and moon are square textures, so the core is a square with a soft glow
+    // behind it rather than a disc.
+    drawRect(
+        color = Color(0xFFFFF6E0).copy(alpha = 0.94f),
+        topLeft = Offset(x - radius, y - radius),
+        size = Size(radius * 2f, radius * 2f)
+    )
     drawRect(
         brush = Brush.verticalGradient(
             colors = listOf(Color.Transparent, color.copy(alpha = 0.18f)),

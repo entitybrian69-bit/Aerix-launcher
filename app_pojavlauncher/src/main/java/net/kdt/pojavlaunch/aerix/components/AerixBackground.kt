@@ -105,11 +105,11 @@ fun AerixBackground(modifier: Modifier = Modifier, content: @Composable BoxScope
     val motion = ThemeMotion.rememberEnabled()
     val animation = animationById(id)
     Box(modifier.fillMaxSize().background(AerixSurface.canvas)) {
-        // A video wallpaper is played, not decoded: it is the one kind that is real footage.
-        if (id == AerixThemeManager.WALLPAPER_VIDEO) {
-            val file = AerixThemeManager.videoWallpaperFile(context)
-            if (file.isFile) {
-                VideoWallpaper(file = file, motion = motion, modifier = Modifier.fillMaxSize())
+        // An imported wallpaper is played, not drawn: a clip or an animated image the user brought.
+        if (AerixThemeManager.isClipId(id)) {
+            val file = AerixThemeManager.clipFile(context, id)
+            if (file != null && file.isFile) {
+                MediaWallpaper(file = file, motion = motion, modifier = Modifier.fillMaxSize())
                 Box(Modifier.fillMaxSize().background(AerixThemeManager.screenScrim()))
                 content()
                 return@Box

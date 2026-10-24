@@ -50,8 +50,9 @@ data class AerixWallpaperPreset(
 object AerixThemeManager {
     const val WALLPAPER_NONE = "none"
     const val WALLPAPER_CUSTOM = "custom"
-    const val WALLPAPER_VIDEO = "video"
-    private const val CUSTOM_VIDEO_FILE = "aerix_video_wallpaper"
+    /** Imported wallpapers are addressed as `clip:<file name>`, so several can coexist. */
+    const val WALLPAPER_CLIP_PREFIX = "clip:"
+    private const val CLIP_DIR = "aerix_clips"
     private const val CUSTOM_WALLPAPER_FILE = "aerix_custom_wallpaper"
 
     /** Bumped every time the wallpaper changes so the background reloads its bitmap. */
@@ -91,8 +92,21 @@ object AerixThemeManager {
 
     fun customWallpaperFile(context: Context): File = File(context.filesDir, CUSTOM_WALLPAPER_FILE)
 
-    /** Where an imported video wallpaper lives. It survives restarts and costs the APK nothing. */
-    fun videoWallpaperFile(context: Context): File = File(context.filesDir, CUSTOM_VIDEO_FILE)
+    /** Where imported wallpapers live. They survive restarts and cost the APK nothing. */
+    fun clipDir(context: Context): File = File(context.filesDir, CLIP_DIR)
+
+    fun clips(context: Context): List<File> =
+        clipDir(context).listFiles()?.filter { it.isFile }?.sortedBy { it.name.lowercase() } ?: emptyList()
+
+    fun isClipId(id: String): Boolean = id.startsWith(WALLPAPER_CLIP_PREFIX)
+
+    fun clipFile(context: Context, id: String): File? {
+        if (!isClipId(id)) return null
+        val name = id.removePrefix(WALLPAPER_CLIP_PREFIX)
+        return clips(context).firstOrNull { it.name == name }
+    }
+
+    fun clipId(file: File): String = WALLPAPER_CLIP_PREFIX + file.name
 
     @Composable
     fun currentAccent(): Color = if (AerixPreferences.colorTheme == AerixColorTheme.CUSTOM) {
@@ -117,13 +131,31 @@ object AerixThemeManager {
     }
 
     /**
-     * Applies an imported video as the wallpaper. Real footage, chosen by the user: the launcher
-     * itself ships none, so nothing is added to the download.
+     * Imports a clip or animated image and makes it the wallpaper.
+     *
+     * Real footage and real looped animation, brought by the user: the launcher itself ships none,
+     * so nothing is added to the download, and any number of them can be kept.
      */
-    fun applyVideoWallpaper(context: Context, source: java.io.InputStream) {
-        net.kdt.pojavlaunch.aerix.components.installVideoWallpaper(context.filesDir, source, CUSTOM_VIDEO_FILE)
-        AerixPreferences.saveSelectedWallpaper(WALLPAPER_VIDEO)
+    fun importClip(context: Context, displayName: String?, source: java.io.InputStream): File {
+        val file = net.kdt.pojavlaunch.aerix.components.importMediaWallpaper(
+            clipDir(context), displayName, source
+        )
+        applyClip(file)
+        return file
+    }
+
+    fun applyClip(file: File) {
+        AerixPreferences.saveSelectedWallpaper(clipId(file))
         wallpaperRevision++
+    }
+
+    fun deleteClip(context: Context, file: File) {
+        val wasActive = AerixPreferences.selectedWallpaper == clipId(file)
+        file.delete()
+        if (wasActive) {
+            AerixPreferences.saveSelectedWallpaper(wallpapers.first().id)
+            wallpaperRevision++
+        }
     }
 
     /** Applies one of the 25 animated wallpapers: same accent behaviour as a photographic preset. */

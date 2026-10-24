@@ -95,6 +95,8 @@ import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
 import net.kdt.pojavlaunch.aerix.theme.AerixWallpaperPreset
 import net.kdt.pojavlaunch.aerix.components.AerixAnimations
 import net.kdt.pojavlaunch.aerix.components.paintScenePreview
+import net.kdt.pojavlaunch.aerix.components.rememberClipThumbnail
+import net.kdt.pojavlaunch.aerix.components.MEDIA_WALLPAPER_MIME
 import net.kdt.pojavlaunch.aerix.components.AerixAnimation
 import net.kdt.pojavlaunch.aerix.components.isAnimationId
 
@@ -111,17 +113,28 @@ fun WallpapersScreen(modifier: Modifier = Modifier) {
     val selectedAnimation = remember(selectedId) { AerixAnimations.firstOrNull { it.id == selectedId } }
     val opacitySetting = AerixPreferences.backgroundOpacity
 
-    val videoPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+    // Any clip or animated image on the device: they are copied into app storage, so the launcher
+    // can show real footage without shipping any of it.
+    val clipPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             scope.launch {
                 runCatching {
-                    context.contentResolver.openInputStream(uri)?.use { input ->
-                        AerixThemeManager.applyVideoWallpaper(context, input)
-                    } ?: error("The file could not be read")
+                    val name = context.contentResolver.query(
+                        uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null
+                    )?.use { cursor ->
+                        if (cursor.moveToFirst()) cursor.getString(0) else null
+                    }
+                    withContext(Dispatchers.IO) {
+                        val input = context.contentResolver.openInputStream(uri)
+                            ?: error("The file could not be read")
+                        AerixThemeManager.importClip(context, name, input)
+                    }
                 }.onFailure { Toast.makeText(context, failedText, Toast.LENGTH_LONG).show() }
             }
         }
     }
+
+    val clips = remember(selectedId) { AerixThemeManager.clips(context) }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
@@ -345,7 +358,7 @@ fun WallpapersScreen(modifier: Modifier = Modifier) {
                     shape = RoundedCornerShape(AerixRadii.compact),
                     color = activeAccent,
                     contentColor = AerixSurface.onAccent,
-                    onClick = { videoPicker.launch("video/*") }
+                    onClick = { clipPicker.launch(MEDIA_WALLPAPER_MIME) }
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = AerixSpacing.md, vertical = AerixSpacing.xsPlus),
@@ -364,7 +377,7 @@ fun WallpapersScreen(modifier: Modifier = Modifier) {
                         )
                     }
                 }
-                if (selectedId == AerixThemeManager.WALLPAPER_VIDEO) {
+                if (AerixThemeManager.isClipId(selectedId)) {
                     Text(
                         text = stringResource(R.string.aerix_wallpaper_video_active),
                         color = activeAccent,
@@ -385,6 +398,14 @@ fun WallpapersScreen(modifier: Modifier = Modifier) {
             verticalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus)
         ) {
             if (showAnimations) {
+                items(items = clips, key = { "clip:" + it.absolutePath }) { clip ->
+                    ClipCard(
+                        file = clip,
+                        isSelected = selectedId == AerixThemeManager.clipId(clip),
+                        onClick = { AerixThemeManager.applyClip(clip) },
+                        onDelete = { AerixThemeManager.deleteClip(context, clip) }
+                    )
+                }
                 items(items = AerixAnimations, key = { it.id }) { animation ->
                     AnimationCard(
                         animation = animation,
@@ -470,6 +491,107 @@ private fun AnimationCard(animation: AerixAnimation, isSelected: Boolean, onClic
                 )
                 Text(
                     text = animation.biome,
+                    color = AerixSurface.textSecondary,
+                    fontSize = 9.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
+/**
+ * A wallpaper the user brought in: real footage or a real looping animation.
+ *
+ * The card shows a frame from the clip itself, so the grid mixes their own clips with the drawn
+ * scenes and everything looks like what it will be.
+ */
+@Composable
+private fun ClipCard(
+    file: java.io.File,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    onDelete: () -> Unit
+) {
+    val shape = RoundedCornerShape(AerixRadii.control)
+    val accent = AerixThemeManager.currentAccent()
+    val thumbnail = rememberClipThumbnail(file)
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .clickable(onClick = onClick),
+        shape = shape,
+        color = AerixSurface.panelRaised,
+        border = BorderStroke(
+            width = if (isSelected) 2.dp else AerixSpacing.hairline,
+            color = if (isSelected) accent else AerixSurface.panelRaised
+        )
+    ) {
+        Column {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(16f / 9f)
+                    .background(AerixSurface.panelTrack)
+            ) {
+                if (thumbnail != null) {
+                    Image(
+                        bitmap = thumbnail,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                }
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(AerixSpacing.xsPlus),
+                    shape = RoundedCornerShape(AerixRadii.compact),
+                    color = AerixSurface.canvas.copy(alpha = 0.62f)
+                ) {
+                    Text(
+                        text = stringResource(R.string.aerix_clip_badge),
+                        color = accent,
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = 0.8.sp,
+                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                    )
+                }
+                // Removing a clip lives on the corner of its own card, never in a menu.
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(AerixSpacing.xsPlus)
+                        .size(18.dp)
+                        .clickable(onClick = onDelete),
+                    shape = RoundedCornerShape(AerixRadii.compact),
+                    color = AerixSurface.canvas.copy(alpha = 0.62f)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            text = "\u00D7",
+                            color = AerixSurface.textSecondary,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+            Column(modifier = Modifier.padding(AerixSpacing.xsPlus)) {
+                Text(
+                    text = file.nameWithoutExtension,
+                    color = AerixSurface.textPrimary,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = stringResource(R.string.aerix_clip_kind),
                     color = AerixSurface.textSecondary,
                     fontSize = 9.sp,
                     maxLines = 1,
