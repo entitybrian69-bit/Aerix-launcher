@@ -108,7 +108,6 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     private GyroControl mGyroControl = null;
     private ControlLayout mControlLayout;
     private HotbarView mHotbarView;
-    private View mLoadingScreen;
     private GameRenderer mGameRenderer;
 
     Instance instance;
@@ -389,12 +388,6 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         mFpsView = findViewById(R.id.main_fps_view);
         mGameMenuOverlay = findViewById(R.id.game_menu_overlay);
         mHotbarView = findViewById(R.id.hotbar_view);
-        mLoadingScreen = findViewById(R.id.main_loading_screen);
-        // The loading screen can carry the launcher's wallpaper, with its own toggle, so the player
-        // can switch it on or off while the game is starting.
-        if (mLoadingScreen instanceof android.view.ViewGroup) {
-            net.kdt.pojavlaunch.aerix.loading.AerixLoadingWallpaper.attach((android.view.ViewGroup) mLoadingScreen);
-        }
     }
 
     @Override
@@ -403,8 +396,7 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         ContextExecutor.setActivity(this);
         if(PREF_ENABLE_GYRO) mGyroControl.enable();
         PLATFORM.setHovered(true);
-        // The readout is only shown once the game itself is on screen.
-        if(mLoadingScreen == null) updateFpsViewVisibility();
+        updateFpsViewVisibility();
     }
 
     /** Show the frame rate readout only when the player asked for it. */
@@ -445,9 +437,6 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
 
     @Override
     protected void onDestroy() {
-        // Whatever happened, nothing of ours outlives the activity: if the player backs out during
-        // loading, the wallpaper goes with the screen.
-        net.kdt.pojavlaunch.aerix.loading.AerixLoadingWallpaper.detach();
         if (mRecorder != null) mRecorder.destroy();
         super.onDestroy();
         ContextExecutor.clearActivity();
@@ -473,7 +462,7 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     @Override
     protected void onPostResume() {
         super.onPostResume();
-        if(mLoadingScreen != null && !(PLATFORM instanceof DummyBackend)) hideLoadingScreen();
+        if(!(PLATFORM instanceof DummyBackend)) hideLoadingScreen();
         if(launcherGLView != null)  // Useful when backing out of the app
             Tools.MAIN_HANDLER.postDelayed(() -> launcherGLView.refreshSize(), 500);
     }
@@ -643,20 +632,16 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         }
     }
 
+    /**
+     * Called once the game's own window is up.
+     *
+     * There is no loading screen to take down any more: the game activity shows its controls and
+     * its overlay from the first frame, so there is nothing covering them to remove. What is left
+     * to do here is let the frame rate readout appear now that the game, not the boot, is what is
+     * on screen.
+     */
     public void hideLoadingScreen(){
-        if(mLoadingScreen == null) return;
         updateFpsViewVisibility();
-        // The game window is here: the wallpaper, and anything decoding it, goes now - before the
-        // Mojang logo is on screen.
-        net.kdt.pojavlaunch.aerix.loading.AerixLoadingWallpaper.detach();
-        mLoadingScreen.animate()
-                .alpha(0f)
-                .setDuration(300)
-                .withEndAction(() -> {
-                    ((ViewGroup) mLoadingScreen.getParent()).removeView(mLoadingScreen);
-                    mLoadingScreen = null;
-                })
-                .start();
     }
 
     @Override

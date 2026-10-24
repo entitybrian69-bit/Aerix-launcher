@@ -65,27 +65,6 @@
 
 		</net.kdt.pojavlaunch.customcontrols.ControlLayout>
 
-		<!--
-			The loading screen. Deliberately empty apart from a spinner: no title, no warning text,
-			no buttons. The wallpaper is drawn into this frame from code when the player has turned
-			it on in the in-game menu; until then it is opaque black, which is the default.
-		-->
-		<FrameLayout
-			android:id="@+id/main_loading_screen"
-			android:layout_width="match_parent"
-			android:layout_height="match_parent"
-			android:background="#FF000000"
-			android:visibility="visible"
-			>
-
-			<ProgressBar
-				android:id="@+id/main_loading_screen_progress"
-				android:layout_width="24dp"
-				android:layout_height="24dp"
-				android:layout_gravity="center"
-				android:indeterminate="true" />
-		</FrameLayout>
-
 		<!-- The in game menu: a full screen Compose overlay, hidden until the button opens it.
 		     It is composed once and stays out of the way (and out of the frame budget) while the
 		     game runs. -->
