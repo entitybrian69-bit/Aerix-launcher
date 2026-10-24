@@ -629,7 +629,7 @@ Your original layout is kept unchanged. Continue importing?</string>
     <string name="aerix_guide_library_title">Your library</string>
     <string name="aerix_guide_library_body">All your instances live here. Tap one to select it, hold it to edit the version, mods and renderer for that instance only.</string>
     <string name="aerix_guide_play_title">Pick, then play</string>
-    <string name="aerix_guide_play_body">The panel on the right always shows the selected instance. Play launches it; the gear beside it opens that instance's settings.</string>
+    <string name="aerix_guide_play_body">The panel on the right always shows the selected instance. Play launches it; the gear beside it opens the settings for that instance.</string>
     <string name="aerix_guide_renderer_title">Renderers</string>
     <string name="aerix_guide_renderer_body">Emesis is bundled and works everywhere. If a game will not start, this is the first setting to try - another renderer, or a lower resolution.</string>
     <string name="aerix_guide_wallpapers_title">Make it yours</string>
