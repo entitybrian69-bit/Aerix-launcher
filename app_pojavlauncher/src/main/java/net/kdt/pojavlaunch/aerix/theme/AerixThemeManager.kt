@@ -111,6 +111,15 @@ object AerixThemeManager {
         wallpaperRevision++
     }
 
+    /** Applies one of the 25 animated wallpapers: same accent behaviour as a photographic preset. */
+    fun applyAnimation(animation: net.kdt.pojavlaunch.aerix.components.AerixAnimation) {
+        AerixPreferences.saveSelectedWallpaper(animation.id)
+        AerixPreferences.saveCustomColor(animation.accentColor().toArgb())
+        AerixPreferences.saveColorTheme(AerixColorTheme.CUSTOM)
+        if (AerixPreferences.backgroundOpacity >= 95) AerixPreferences.saveBackgroundOpacity(72)
+        wallpaperRevision++
+    }
+
     fun clearWallpaper(context: Context) {
         customWallpaperFile(context).delete()
         AerixPreferences.saveSelectedWallpaper(WALLPAPER_NONE)

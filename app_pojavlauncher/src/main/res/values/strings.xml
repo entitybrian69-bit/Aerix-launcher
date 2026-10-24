@@ -70,6 +70,9 @@
     <string name="mcl_setting_renderer_mobileglues">MobileGlues (OpenGL ES) - (1.17+ only)</string>
     <string name="mcl_setting_renderer_sfpew">SFPEW/MobileGlues (OpenGL ES) - (all versions)</string>
     <string name="mcl_setting_renderer_proton">Proton (OpenGL over PowerVR) - 32-bit devices only</string>
+    <string name="aerix_wallpaper_tab_wallpaper">Wallpapers</string>
+    <string name="aerix_wallpaper_tab_animations">Animations</string>
+    <string name="aerix_animation_live">LIVE</string>
     <string name="aerix_wallpaper_blur">Blur %1$d dp</string>
     <string name="aerix_wallpaper_motion_on">Motion on</string>
     <string name="aerix_wallpaper_motion_off">Motion off</string>

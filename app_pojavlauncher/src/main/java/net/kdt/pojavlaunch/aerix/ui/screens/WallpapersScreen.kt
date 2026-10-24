@@ -41,6 +41,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -60,7 +61,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveableCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -88,6 +95,9 @@ import net.kdt.pojavlaunch.aerix.theme.AerixSpacing
 import net.kdt.pojavlaunch.aerix.theme.AerixSurface
 import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
 import net.kdt.pojavlaunch.aerix.theme.AerixWallpaperPreset
+import net.kdt.pojavlaunch.aerix.components.AerixAnimations
+import net.kdt.pojavlaunch.aerix.components.AerixAnimation
+import net.kdt.pojavlaunch.aerix.components.isAnimationId
 
 @Composable
 fun WallpapersScreen(modifier: Modifier = Modifier) {
@@ -97,7 +107,9 @@ fun WallpapersScreen(modifier: Modifier = Modifier) {
     val failedText = stringResource(R.string.aerix_wallpaper_failed)
 
     val selectedId = AerixPreferences.selectedWallpaper
+    var showAnimations by rememberSaveable { mutableStateOf(isAnimationId(selectedId)) }
     val selectedPreset = remember(selectedId) { AerixThemeManager.wallpapers.firstOrNull { it.id == selectedId } }
+    val selectedAnimation = remember(selectedId) { AerixAnimations.firstOrNull { it.id == selectedId } }
     val opacitySetting = AerixPreferences.backgroundOpacity
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
@@ -179,7 +191,11 @@ fun WallpapersScreen(modifier: Modifier = Modifier) {
 
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = stringResource(R.string.aerix_wallpaper_header, AerixThemeManager.wallpapers.size),
+                        text = if (showAnimations) {
+                            stringResource(R.string.aerix_wallpaper_header, AerixAnimations.size)
+                        } else {
+                            stringResource(R.string.aerix_wallpaper_header, AerixThemeManager.wallpapers.size)
+                        },
                         color = Color.White,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.ExtraBold,
@@ -188,6 +204,7 @@ fun WallpapersScreen(modifier: Modifier = Modifier) {
                     )
                     Text(
                         text = when {
+                            selectedAnimation != null -> "${selectedAnimation.title} \u00B7 ${selectedAnimation.biome}"
                             selectedPreset != null -> stringResource(
                                 R.string.aerix_wallpaper_active_line,
                                 selectedPreset.title,
@@ -274,7 +291,37 @@ fun WallpapersScreen(modifier: Modifier = Modifier) {
             }
         }
 
-        // ---- three column grid of the HD wallpapers -------------------------------------------
+        // ---- two grids: the 25 photographs, and the 25 animated scenes -----------------------
+        // Both live on this page; the buttons switch which one is showing.
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
+        ) {
+            listOf(
+                stringResource(R.string.aerix_wallpaper_tab_wallpaper) to false,
+                stringResource(R.string.aerix_wallpaper_tab_animations) to true
+            ).forEach { (label, animations) ->
+                val active = showAnimations == animations
+                Surface(
+                    shape = RoundedCornerShape(AerixRadii.compact),
+                    color = if (active) activeAccent.copy(alpha = 0.22f) else AerixSurface.panel,
+                    border = BorderStroke(
+                        AerixSpacing.hairline,
+                        if (active) activeAccent else AerixSurface.borderSoft
+                    ),
+                    onClick = { showAnimations = animations }
+                ) {
+                    Text(
+                        text = label,
+                        color = if (active) activeAccent else AerixSurface.textPrimary,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = AerixSpacing.md, vertical = AerixSpacing.xsPlus)
+                    )
+                }
+            }
+        }
+
         LazyVerticalGrid(
             columns = GridCells.Fixed(3),
             modifier = Modifier
@@ -284,14 +331,113 @@ fun WallpapersScreen(modifier: Modifier = Modifier) {
             horizontalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus),
             verticalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus)
         ) {
-            items(
-                items = AerixThemeManager.wallpapers,
-                key = { it.id }
-            ) { preset ->
-                WallpaperPresetCard(
-                    preset = preset,
-                    isSelected = selectedId == preset.id,
-                    onClick = { AerixThemeManager.applyPreset(preset) }
+            if (showAnimations) {
+                items(items = AerixAnimations, key = { it.id }) { animation ->
+                    AnimationCard(
+                        animation = animation,
+                        isSelected = selectedId == animation.id,
+                        onClick = { AerixThemeManager.applyAnimation(animation) }
+                    )
+                }
+            } else {
+                items(
+                    items = AerixThemeManager.wallpapers,
+                    key = { it.id }
+                ) { preset ->
+                    WallpaperPresetCard(
+                        preset = preset,
+                        isSelected = selectedId == preset.id,
+                        onClick = { AerixThemeManager.applyPreset(preset) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * One of the 25 animated scenes in the grid.
+ *
+ * The preview is painted from the scene's own sky and accent rather than run live: twenty five
+ * running scenes at once would cost far more than it shows, and tapping the card puts the real
+ * thing full screen immediately.
+ */
+@Composable
+private fun AnimationCard(animation: AerixAnimation, isSelected: Boolean, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(AerixRadii.control)
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .clickable(onClick = onClick),
+        shape = shape,
+        color = AerixSurface.panelRaised,
+        border = BorderStroke(
+            width = if (isSelected) 2.dp else AerixSpacing.hairline,
+            color = if (isSelected) animation.accent else AerixSurface.panelRaised
+        )
+    ) {
+        Column {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(16f / 9f)
+                    .background(Brush.verticalGradient(animation.sky))
+            ) {
+                // Silhouettes and the scene's glow, so every preview is recognisably its own scene.
+                animation.hills.forEachIndexed { index, color ->
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .fillMaxHeight(0.34f + 0.12f * index)
+                            .align(Alignment.BottomCenter)
+                            .background(color)
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .size(46.dp)
+                        .align(Alignment.TopEnd)
+                        .padding(end = AerixSpacing.sm)
+                        .background(
+                            brush = Brush.radialGradient(
+                                listOf(animation.accent.copy(alpha = 0.55f), Color.Transparent)
+                            ),
+                            shape = CircleShape
+                        )
+                )
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(AerixSpacing.xsPlus),
+                    shape = RoundedCornerShape(AerixRadii.compact),
+                    color = AerixSurface.canvas.copy(alpha = 0.55f)
+                ) {
+                    Text(
+                        text = stringResource(R.string.aerix_animation_live),
+                        color = animation.accent,
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = 0.8.sp,
+                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                    )
+                }
+            }
+            Column(modifier = Modifier.padding(AerixSpacing.xsPlus)) {
+                Text(
+                    text = animation.title,
+                    color = AerixSurface.textPrimary,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = animation.biome,
+                    color = AerixSurface.textSecondary,
+                    fontSize = 9.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
         }

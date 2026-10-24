@@ -93,6 +93,7 @@ fun AerixBackground(modifier: Modifier = Modifier, content: @Composable BoxScope
     val cacheKey = "$id|$revision|$softness"
     var image by remember(cacheKey) { mutableStateOf(wallpaperCacheBitmap.takeIf { wallpaperCacheKey == cacheKey }) }
     LaunchedEffect(cacheKey) {
+        if (animationById(id) != null) return@LaunchedEffect
         if (wallpaperCacheKey != cacheKey || wallpaperCacheBitmap == null) {
             val decoded = withContext(Dispatchers.IO) { runCatching { decodeWallpaper(context, id, softness) }.getOrNull() }
             wallpaperCacheKey = cacheKey
@@ -102,7 +103,19 @@ fun AerixBackground(modifier: Modifier = Modifier, content: @Composable BoxScope
     }
     // One switch for the whole launcher: the accent motion and everything on this page obey it.
     val motion = ThemeMotion.rememberEnabled()
+    val animation = animationById(id)
     Box(modifier.fillMaxSize().background(AerixSurface.canvas)) {
+        // An animated wallpaper is drawn, not decoded: it needs no bitmap and no asset.
+        if (animation != null) {
+            AnimatedScene(
+                animation = animation,
+                motion = motion,
+                modifier = Modifier.fillMaxSize().let { if (renderBlur) it.blur(blurDp.dp * 0.5f) else it }
+            )
+            Box(Modifier.fillMaxSize().background(AerixThemeManager.screenScrim()))
+            content()
+            return@Box
+        }
         val bitmap = image
         if (bitmap != null) {
             // The drift is a layer transform, so it costs a redraw and never a recomposition; the
