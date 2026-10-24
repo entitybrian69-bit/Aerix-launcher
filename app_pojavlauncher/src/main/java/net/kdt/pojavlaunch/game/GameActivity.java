@@ -141,7 +141,12 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
             finish();
             return;
         }
-        mGameRenderer = new GameRenderer(instance.getLaunchRenderer());
+        // A saved renderer tag can point at a plugin that is no longer usable (an Emesis plugin the
+        // launcher now bundles itself, or one whose libraries have gone). Resolving it here keeps
+        // the game on the renderer the player expects instead of a silent fallback.
+        String launchRenderer = instance.getLaunchRenderer();
+        String resolvedRenderer = net.kdt.pojavlaunch.aerix.bridge.PojavPluginBridge.resolveLaunchTag(launchRenderer);
+        mGameRenderer = new GameRenderer(resolvedRenderer != null ? resolvedRenderer : launchRenderer);
         net.kdt.pojavlaunch.aerix.bridge.PojavPluginBridge.applyLaunchOverride(this, mGameRenderer, instance.getLaunchRenderer());
 
         if(GpuUtils.getGlInfo().isAdreno() && !PREF_ZINK_PREFER_SYSTEM_DRIVER) {

@@ -80,6 +80,11 @@ class AerixRendererPlugin(
 
     override fun compatibleDevice(context: Context): Boolean {
         if (!File(nativeLibDir).isDirectory) return false
+        // A plugin that declares a library it does not actually package used to be accepted, and
+        // the failure only surfaced later, inside LWJGL's dlopen - which is fatal and takes the
+        // whole game down at window creation. Check the declared libraries here, where refusing a
+        // plugin is harmless and the launcher simply keeps its own renderer.
+        if (!declaresItsLibraries()) return false
         if (metadataVersion < 2) return true
         val gles = context.getSystemService(ActivityManager::class.java)?.deviceConfigurationInfo?.reqGlEsVersion ?: 0
         val abi = (if (android.os.Process.is64Bit()) Build.SUPPORTED_64_BIT_ABIS else Build.SUPPORTED_32_BIT_ABIS).firstOrNull() ?: return false
@@ -117,6 +122,20 @@ class AerixRendererPlugin(
         envMap["POJAVEXEC_EGL"] = eglName
         packagedLibrary(eglName)?.let { envMap["SDL_EGL_LIBRARY"] = it }
         packagedLibrary(glName)?.let { envMap["SDL_OPENGL_LIBRARY"] = it }
+    }
+
+    /**
+     * True when every library this plugin declares is really there.
+     *
+     * Names that belong to the platform loader are expected to be absent from the plugin and are
+     * not judged; anything else it names has to exist, or loading it later fails fatally.
+     */
+    private fun declaresItsLibraries(): Boolean {
+        fun usable(name: String): Boolean =
+            packagedLibrary(name) != null || name in SYSTEM_LIBRARIES
+        if (!usable(glName)) return false
+        if (eglName == glName) return true
+        return usable(eglName)
     }
 
     /** Values passed directly to MojoExec; inspecting this plan never loads native code. */
@@ -207,6 +226,8 @@ object PojavPluginBridge {
     private const val EMESIS_PACKAGE_PREFIX = "com.emesis"
     private const val EMESIS_RENDERER_ID = "emesis"
     private const val EMESIS_LIBRARY = "libemesis.so"
+    /** Libraries the platform provides, which a plugin is not expected to package. */
+    private val SYSTEM_LIBRARIES = setOf("libEGL.so", "libGLESv2.so", "libGLESv1_CM.so", "libGL.so", "libGL.so.1")
 
     /**
      * Renderer plugins the launcher ships with, probed by name on every scan.
@@ -338,6 +359,24 @@ object PojavPluginBridge {
         return status
     }
 
+    /**
+     * The renderer to actually launch with.
+     *
+     * A stale selection is a real case: the tag of an Emesis plugin that is now ignored because the
+     * launcher ships Emesis itself, or of a plugin whose libraries are gone. Returning that tag
+     * would drop the player onto the fallback renderer silently; an Emesis selection becomes the
+     * bundled Emesis, and anything else keeps the built-in choice that was already made.
+     */
+    @JvmStatic
+    fun resolveLaunchTag(rendererTag: String?): String? {
+        if (rendererTag == null || !rendererTag.startsWith(AerixRendererPlugin.TAG_PREFIX)) return rendererTag
+        if (findByTag(rendererTag) != null) return rendererTag
+        if (net.kdt.pojavlaunch.game.renderer.impl.EmesisRenderSpec.available()) {
+            return net.kdt.pojavlaunch.game.renderer.def.Renderers.EMESIS_RENDERER
+        }
+        return null
+    }
+
     /** Display name for a renderer tag, including the "plugin:" tags. */
     fun labelForTag(tag: String?): String? = findByTag(tag)?.displayName
 
@@ -356,6 +395,13 @@ object PojavPluginBridge {
         try {
             if (plugins.isEmpty()) loadPlugins(context, force = true)
             val plugin = findByTag(rendererTag)
+            if (plugin != null && !File(plugin.glLibraryPath()).isFile) {
+                // The plugin is installed but its OpenGL library is not on disk. Passing that path
+                // to LWJGL is exactly the crash this check exists to prevent.
+                Log.w("AerixRendererPlugin", "Selected plugin ${plugin.packageName} has no usable GL library; keeping the built-in renderer")
+                Logger.appendToLog("Renderer plugin ${plugin.packageName} has no usable GL library; using the built-in renderer")
+                return
+            }
             if (plugin == null) {
                 Log.w("AerixRendererPlugin", "Selected renderer plugin is not installed; keeping built-in renderer")
                 return
@@ -548,6 +594,17 @@ object PojavPluginBridge {
         val eglRaw = parts.getOrNull(2) ?: glName
         if (parts.size < 3 && emesisStyle && EMESIS_LIBRARY !in dlopen) dlopen.add(EMESIS_LIBRARY)
         val eglName = if (eglRaw.startsWith("/")) "$nativeDir$eglRaw" else eglRaw
+
+        // The launcher ships Emesis itself, complete and matched to its own libraries. An
+        // installed Emesis plugin that is older, partial or built for another ABI would only
+        // shadow it - and when its libraries are missing the game dies at window creation - so
+        // the bundled renderer wins and the plugin is left alone.
+        if (rendererId == EMESIS_RENDERER_ID &&
+            net.kdt.pojavlaunch.game.renderer.impl.EmesisRenderSpec.available()
+        ) {
+            note("${info.packageName}: ignored, the launcher ships its own Emesis")
+            return null
+        }
 
         val brand = AerixRendererBrands.forPackage(info.packageName)
         AerixRendererPlugin(
