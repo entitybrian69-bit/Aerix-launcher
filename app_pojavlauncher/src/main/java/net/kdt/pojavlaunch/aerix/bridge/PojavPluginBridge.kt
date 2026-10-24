@@ -48,6 +48,9 @@ import net.kdt.pojavlaunch.game.renderer.RenderSpec
 import net.kdt.pojavlaunch.game.renderer.RendererCache
 import java.io.File
 
+/** Libraries the platform provides, which a plugin is not expected to package. */
+private val SYSTEM_LIBRARIES = setOf("libEGL.so", "libGLESv2.so", "libGLESv1_CM.so", "libGL.so", "libGL.so.1")
+
 class AerixRendererPlugin(
     val packageName: String,
     val appName: String,
@@ -226,8 +229,7 @@ object PojavPluginBridge {
     private const val EMESIS_PACKAGE_PREFIX = "com.emesis"
     private const val EMESIS_RENDERER_ID = "emesis"
     private const val EMESIS_LIBRARY = "libemesis.so"
-    /** Libraries the platform provides, which a plugin is not expected to package. */
-    private val SYSTEM_LIBRARIES = setOf("libEGL.so", "libGLESv2.so", "libGLESv1_CM.so", "libGL.so", "libGL.so.1")
+
 
     /**
      * Renderer plugins the launcher ships with, probed by name on every scan.
