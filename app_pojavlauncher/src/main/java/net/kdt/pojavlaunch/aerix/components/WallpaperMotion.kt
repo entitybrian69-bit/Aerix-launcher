@@ -179,7 +179,9 @@ private fun DrawScope.drawCropped(
 
     val dstX = fromX.toInt()
     val dstY = (top + yOffset).toInt()
-    drawImageRect(
+    // `drawImage` with a source and destination rectangle is the DrawScope member for this: it
+    // samples one region of the picture and places it at a chosen spot.
+    drawImage(
         image = bitmap,
         srcOffset = IntOffset(srcLeft.toInt(), 0),
         srcSize = IntSize(srcWidth.toInt().coerceAtLeast(1), imageH),
