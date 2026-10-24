@@ -23,6 +23,7 @@ package net.kdt.pojavlaunch.aerix.components
 import android.content.Context
 import android.graphics.BitmapFactory
 import android.os.Build
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -39,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -138,26 +140,17 @@ fun AerixBackground(modifier: Modifier = Modifier, content: @Composable BoxScope
         }
         val bitmap = image
         if (bitmap != null) {
-            // The drift is a layer transform, so it costs a redraw and never a recomposition; the
-            // blur sits outside it and therefore applies to every wallpaper, including custom ones.
-            val imageModifier = Modifier
-                .fillMaxSize()
-                .let { if (renderBlur) it.blur(blurDp.dp) else it }
-            // The picture is drawn as moving strips rather than a still image, so the wallpaper
-            // itself is what moves - not only what floats over it.
-            AnimatedWallpaper(bitmap = bitmap, motion = motion, modifier = imageModifier)
-            if (motion) {
-                WallpaperLightLayer(
-                    accent = AerixThemeManager.currentAccent(),
-                    effect = wallpaperEffectFor(id),
-                    modifier = Modifier.fillMaxSize()
-                )
-                WallpaperParticleLayer(
-                    effect = wallpaperEffectFor(id),
-                    accent = AerixThemeManager.currentAccent(),
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
+            // The 25 photographs and any custom picture are still pictures: they are drawn exactly
+            // as they are, with the blur on top when it is set. No drift, no light layer, no
+            // particles over them. Motion belongs to the animations, not to a photograph.
+            Image(
+                bitmap = bitmap,
+                contentDescription = null,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .let { if (renderBlur) it.blur(blurDp.dp) else it },
+                contentScale = ContentScale.Crop
+            )
             Box(Modifier.fillMaxSize().background(AerixThemeManager.screenScrim()))
         } else {
             Box(
