@@ -390,6 +390,11 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         mGameMenuOverlay = findViewById(R.id.game_menu_overlay);
         mHotbarView = findViewById(R.id.hotbar_view);
         mLoadingScreen = findViewById(R.id.main_loading_screen);
+        // The loading screen can carry the launcher's wallpaper, with its own toggle, so the player
+        // can switch it on or off while the game is starting.
+        if (mLoadingScreen instanceof android.view.ViewGroup) {
+            net.kdt.pojavlaunch.aerix.loading.AerixLoadingWallpaper.attach((android.view.ViewGroup) mLoadingScreen);
+        }
     }
 
     @Override
@@ -638,7 +643,9 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     public void hideLoadingScreen(){
         if(mLoadingScreen == null) return;
         updateFpsViewVisibility();
-        ((TextView) mLoadingScreen.findViewById(R.id.main_loading_screen_text)).setText(getString(R.string.loading_screen_booted, PLATFORM.backendName()));
+        // The game window is here: the wallpaper, and anything decoding it, goes now - before the
+        // Mojang logo is on screen.
+        net.kdt.pojavlaunch.aerix.loading.AerixLoadingWallpaper.detach();
         mLoadingScreen.animate()
                 .alpha(0f)
                 .setDuration(300)
