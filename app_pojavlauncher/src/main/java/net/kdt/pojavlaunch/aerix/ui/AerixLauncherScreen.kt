@@ -46,6 +46,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -60,6 +64,11 @@ import net.kdt.pojavlaunch.aerix.components.AerixBackground
 import net.kdt.pojavlaunch.aerix.festivals.FestivalEffectsHost
 import net.kdt.pojavlaunch.aerix.festivals.FestivalTitleText
 import net.kdt.pojavlaunch.aerix.festivals.rememberTodayFestivals
+import net.kdt.pojavlaunch.aerix.guide.AerixGuideOverlay
+import net.kdt.pojavlaunch.aerix.guide.AerixGuideState
+import net.kdt.pojavlaunch.aerix.guide.GuideRegistry
+import net.kdt.pojavlaunch.aerix.guide.LocalGuideRegistry
+import net.kdt.pojavlaunch.aerix.guide.rememberGuideSteps
 import net.kdt.pojavlaunch.aerix.theme.AerixSpacing
 import net.kdt.pojavlaunch.aerix.theme.AerixSurface
 import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
@@ -117,9 +126,21 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
     val transitionType = AerixPreferences.swapAnimateType
     val extent = AerixPreferences.extentScale()
     val festivals = rememberTodayFestivals()
+    // The first-run tour: components register where they are, the overlay highlights them.
+    val guideRegistry = remember { GuideRegistry() }
+    val guideSteps = rememberGuideSteps()
+    LaunchedEffect(Unit) {
+        AerixGuideState.startOnFirstRun()
+        // The steps highlight things on the home page, so the tour brings you there rather than
+        // starting on whichever section the launcher was left on.
+        if (AerixGuideState.running && AerixNav.section != LauncherSection.HOME) {
+            AerixNav.navigate(LauncherSection.HOME)
+        }
+    }
 
     BackHandler(enabled = AerixNav.canGoBack) { AerixNav.back() }
 
+    CompositionLocalProvider(LocalGuideRegistry provides guideRegistry) {
     AerixBackground {
       FestivalEffectsHost(festivals = festivals, modifier = Modifier.fillMaxSize()) {
         // The wallpaper and the festival effects run to the edges of the display; the shell
@@ -225,8 +246,20 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
                     )
                 }
             }
+
+            // Drawn last so it sits above the rail, the pages and the install panel. Only on the
+            // home page: the steps highlight things that live there.
+            if (AerixGuideState.running && section == LauncherSection.HOME) {
+                key(AerixGuideState.runId) {
+                    AerixGuideOverlay(
+                        steps = guideSteps,
+                        onFinished = { AerixGuideState.finish() }
+                    )
+                }
+            }
         }
       }
+    }
     }
 }
 

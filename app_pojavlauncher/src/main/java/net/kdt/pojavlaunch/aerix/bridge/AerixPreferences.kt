@@ -55,6 +55,8 @@ object AerixPreferences {
     const val KEY_FESTIVAL_EFFECTS = "launcherFestivalEffects"
     /** Accent pulses and glows. Read as Compose state, so the switch applies without a restart. */
     const val KEY_THEME_MOTION = "launcherThemeMotion"
+    /** True once the first-run guide has been completed or skipped. */
+    const val KEY_GUIDE_PLAYED = "launcherGuidePlayed"
     const val KEY_LOG_TEXT_SIZE = "logTextSize"
     const val KEY_LOG_BUFFER_FLUSH_INTERVAL = "logBufferFlushInterval"
     const val KEY_ASSET_PLATFORM = "assetPlatformSource"
@@ -110,6 +112,9 @@ object AerixPreferences {
      * repaints whatever is on screen instead of asking the user to restart.
      */
     var themeMotion by mutableStateOf(true)
+    /** Set once the first-run tour has been shown, so it never appears again on its own. */
+    var guidePlayed by mutableStateOf(false)
+        private set
         private set
 
     /** Aerix "logTextSize" (5..20 sp) used by the log viewer. */
@@ -158,6 +163,7 @@ object AerixPreferences {
         animateExtent = p.getInt(KEY_ANIMATE_EXTENT, 3).coerceIn(0, 10)
         festivalEffects = p.getBoolean(KEY_FESTIVAL_EFFECTS, false)
         themeMotion = p.getBoolean(KEY_THEME_MOTION, true)
+        guidePlayed = p.getBoolean(KEY_GUIDE_PLAYED, false)
         logTextSize = p.getInt(KEY_LOG_TEXT_SIZE, 15).coerceIn(5, 20)
         logBufferFlushInterval = p.getInt(KEY_LOG_BUFFER_FLUSH_INTERVAL, DEFAULT_LOG_BUFFER_FLUSH_INTERVAL).coerceIn(100, 1000)
         assetPlatformSource = runCatching {
@@ -250,6 +256,11 @@ object AerixPreferences {
     fun saveThemeMotion(value: Boolean) {
         themeMotion = value
         edit { putBoolean(KEY_THEME_MOTION, value) }
+    }
+
+    fun saveGuidePlayed(value: Boolean) {
+        guidePlayed = value
+        edit { putBoolean(KEY_GUIDE_PLAYED, value) }
     }
 
     fun saveFestivalEffects(value: Boolean) {

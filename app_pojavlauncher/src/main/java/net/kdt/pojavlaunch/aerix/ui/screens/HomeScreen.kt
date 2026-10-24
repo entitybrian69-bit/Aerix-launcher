@@ -107,6 +107,8 @@ import net.kdt.pojavlaunch.aerix.components.QuietEmptyState
 import net.kdt.pojavlaunch.aerix.components.liquidGlass
 import net.kdt.pojavlaunch.aerix.theme.AerixMetrics
 import net.kdt.pojavlaunch.aerix.theme.AerixRadii
+import net.kdt.pojavlaunch.aerix.guide.AerixGuideState
+import net.kdt.pojavlaunch.aerix.guide.guideAnchor
 import net.kdt.pojavlaunch.aerix.theme.AerixSpacing
 import net.kdt.pojavlaunch.aerix.theme.AerixSurface
 import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
@@ -219,6 +221,7 @@ fun HomeScreen(activity: FragmentActivity, navigate: (LauncherSection) -> Unit) 
                     instances = instances,
                     actions = actions,
                     modifier = Modifier
+                        .guideAnchor(AerixGuideState.PLAY)
                         .weight(ActionMenuWeight)
                         .fillMaxHeight()
                         .padding(
@@ -546,7 +549,16 @@ private fun CompactHomeDashboard(
                 QuickTiles(count, accent, actions, Modifier.fillMaxWidth(), scrollable = true)
             }
         }
-        item { ActiveWorldPanel(selected, accent, actions, Modifier.fillMaxWidth().height(190.dp)) }
+        // On a phone the action panel is not drawn, so the play step points at the world card here.
+        item {
+            ActiveWorldPanel(
+                selected, accent, actions,
+                Modifier
+                    .fillMaxWidth()
+                    .height(190.dp)
+                    .guideAnchor(AerixGuideState.PLAY)
+            )
+        }
         item { TaskSummaryPanel(taskCount, accent, Modifier.fillMaxWidth().height(74.dp)) }
         item { RecentWorldsPanel(recent, selected, accent, actions, Modifier.fillMaxWidth(), lazy = false) }
         item { QuickToolsPanel(accent, actions, Modifier.fillMaxWidth(), scrollable = false) }

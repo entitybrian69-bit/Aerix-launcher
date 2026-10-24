@@ -620,4 +620,22 @@ Your original layout is kept unchanged. Continue importing?</string>
     <string name="fps_overlay_unavailable">FPS unavailable</string>
     <string name="fps_overlay_value">%1$d FPS (avg. %2$d)</string>
     <string name="fps_overlay_drag">Drag the FPS counter to move it</string>
+
+    <!-- First-run guide, after Zalith Launcher 2's spotlight tour. -->
+    <string name="aerix_guide_welcome_title">Welcome to %1$s</string>
+    <string name="aerix_guide_welcome_body">A short tour of the four places you will use most. Tap anywhere to move on; it will not show again.</string>
+    <string name="aerix_guide_create_title">Create an instance</string>
+    <string name="aerix_guide_create_body">Every world starts here: pick a Minecraft version, name it, and Aerix sets up the rest. Vanilla or modded, it is the same button.</string>
+    <string name="aerix_guide_library_title">Your library</string>
+    <string name="aerix_guide_library_body">All your instances live here. Tap one to select it, hold it to edit the version, mods and renderer for that instance only.</string>
+    <string name="aerix_guide_play_title">Pick, then play</string>
+    <string name="aerix_guide_play_body">The panel on the right always shows the selected instance. Play launches it; the gear beside it opens that instance's settings.</string>
+    <string name="aerix_guide_renderer_title">Renderers</string>
+    <string name="aerix_guide_renderer_body">Emesis is bundled and works everywhere. If a game will not start, this is the first setting to try - another renderer, or a lower resolution.</string>
+    <string name="aerix_guide_wallpapers_title">Make it yours</string>
+    <string name="aerix_guide_wallpapers_body">25 photographs, 12 real recorded Minecraft animations, and any clip of your own. The accent colour follows whatever you pick.</string>
+    <string name="aerix_guide_end_title">That is everything</string>
+    <string name="aerix_guide_end_body">Add an account from the avatar at the bottom of the rail, then create your first instance. The guide can be shown again from Settings.</string>
+    <string name="aerix_guide_replay">Show the guide again</string>
+    <string name="aerix_guide_replay_body">Replays the tour of the launcher from the start. It only runs by itself the first time.</string>
 </resources>

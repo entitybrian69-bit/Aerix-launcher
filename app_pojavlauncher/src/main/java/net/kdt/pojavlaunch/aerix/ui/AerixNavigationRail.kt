@@ -71,6 +71,8 @@ import net.kdt.pojavlaunch.aerix.components.liquidGlass
 import net.kdt.pojavlaunch.aerix.theme.AERIX_COMPACT_HEIGHT_THRESHOLD_DP
 import net.kdt.pojavlaunch.aerix.theme.AerixMetrics
 import net.kdt.pojavlaunch.aerix.theme.AerixRadii
+import net.kdt.pojavlaunch.aerix.guide.AerixGuideState
+import net.kdt.pojavlaunch.aerix.guide.guideAnchor
 import net.kdt.pojavlaunch.aerix.theme.AerixSpacing
 import net.kdt.pojavlaunch.aerix.theme.AerixSurface
 import net.kdt.pojavlaunch.aerix.theme.ThemeMotion
@@ -179,20 +181,24 @@ fun AerixNavigationRail(
                 RailIconItem(R.drawable.aerix_ic_home_filled, stringResource(R.string.aerix_nav_home),
                     selectedSection == LauncherSection.HOME, activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.HOME) }
                 RailIconItem(R.drawable.aerix_ic_add, stringResource(R.string.create_instance),
-                    selectedSection == LauncherSection.CREATE_INSTANCE, activeAccent, expandedRail, compactRail, onCreateInstance)
+                    selectedSection == LauncherSection.CREATE_INSTANCE, activeAccent, expandedRail, compactRail,
+                    onClick = onCreateInstance, guideKey = AerixGuideState.CREATE)
                 RailIconItem(R.drawable.aerix_ic_dashboard_filled, stringResource(R.string.aerix_nav_library),
-                    librarySelected(selectedSection), activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.LIBRARY) }
+                    librarySelected(selectedSection), activeAccent, expandedRail, compactRail,
+                    onClick = { onNavigate(LauncherSection.LIBRARY) }, guideKey = AerixGuideState.LIBRARY)
                 RailIconItem(R.drawable.aerix_ic_public, stringResource(R.string.aerix_nav_discover),
                     discoverSelected(selectedSection), activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.DISCOVER) }
                 RailIconItem(R.drawable.aerix_ic_rocket_launch_filled, "Our other new releases",
                     selectedSection == LauncherSection.OTHER_RELEASES, activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.OTHER_RELEASES) }
                 RailIconItem(R.drawable.aerix_ic_format_paint_outlined, stringResource(R.string.aerix_nav_wallpapers),
-                    wallpapersSelected(selectedSection), activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.WALLPAPERS) }
+                    wallpapersSelected(selectedSection), activeAccent, expandedRail, compactRail,
+                    onClick = { onNavigate(LauncherSection.WALLPAPERS) }, guideKey = AerixGuideState.WALLPAPERS)
 
                 HorizontalDivider(modifier = Modifier.width(28.dp).padding(vertical = AerixSpacing.xxs), color = AerixSurface.borderSoft)
 
                 RailIconItem(R.drawable.aerix_ic_settings_filled, stringResource(R.string.aerix_nav_settings),
-                    settingsSelected(selectedSection), activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.SETTINGS) }
+                    settingsSelected(selectedSection), activeAccent, expandedRail, compactRail,
+                    onClick = { onNavigate(LauncherSection.SETTINGS) }, guideKey = AerixGuideState.SETTINGS)
 
                 RailIconItem(R.drawable.aerix_ic_group_outlined, stringResource(R.string.aerix_nav_contribution),
                     selectedSection == LauncherSection.CONTRIBUTION || selectedSection == LauncherSection.CONTRIBUTION_DETAIL,
@@ -237,7 +243,9 @@ private fun RailIconItem(
     accentColor: Color,
     expanded: Boolean,
     compact: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    /** Names this item for the first-run guide, so the tour can point at it. */
+    guideKey: String? = null
 ) {
     // The selected item uses the current theme accent; icon, fill and border update together.
     val selectedContentColor = MaterialTheme.colorScheme.onPrimary
@@ -268,6 +276,7 @@ private fun RailIconItem(
     val itemShape = RoundedCornerShape(AerixRadii.control)
     Box(
         modifier = Modifier
+            .then(if (guideKey != null) Modifier.guideAnchor(guideKey) else Modifier)
             .size(width = itemWidth, height = itemHeight)
             .clip(itemShape)
             .background(containerColor)
