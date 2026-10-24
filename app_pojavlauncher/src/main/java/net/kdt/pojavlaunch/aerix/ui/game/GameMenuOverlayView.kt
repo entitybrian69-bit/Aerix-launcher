@@ -98,6 +98,8 @@ class GameMenuOverlayView @JvmOverloads constructor(
     fun showMenu() {
         if (isMenuShown()) return
         targetState.value = PojavGameDownloadsBridge.runningTarget()
+        // Who the game is running as, for the character panel. Loaded once, no network.
+        PojavAccountBridge.ensureLoaded()
         installContent()
         visibility = VISIBLE
         revisionState.intValue++

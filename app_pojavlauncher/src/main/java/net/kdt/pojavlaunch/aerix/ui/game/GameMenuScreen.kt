@@ -34,6 +34,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -42,6 +43,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -52,17 +54,22 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -71,6 +78,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -80,12 +89,19 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.math.abs
+import kotlin.math.exp
+import kotlin.math.roundToInt
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 import net.kdt.pojavlaunch.R
 import net.kdt.pojavlaunch.aerix.bridge.AerixAccount
 import net.kdt.pojavlaunch.aerix.bridge.AerixPreferences
+import net.kdt.pojavlaunch.aerix.components.AerixSkinPreview3D
 import net.kdt.pojavlaunch.aerix.bridge.GameDownloadTarget
 import net.kdt.pojavlaunch.aerix.bridge.PojavAccountBridge
 import net.kdt.pojavlaunch.aerix.theme.AerixRadii
+import net.kdt.pojavlaunch.authenticator.AuthType
 import net.kdt.pojavlaunch.aerix.theme.AerixSpacing
 import net.kdt.pojavlaunch.aerix.theme.AerixSurface
 import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
@@ -226,102 +242,98 @@ private fun GameMenuMainPage(
         contentAlignment = Alignment.Center
     ) {
         val compact = maxHeight < 480.dp
-        val columnWidth = maxWidth.coerceAtMost(760.dp)
+        val columnWidth = maxWidth.coerceAtMost(980.dp)
         Column(
             modifier = Modifier
                 .width(columnWidth)
-                .verticalScroll(rememberScrollState())
                 .padding(horizontal = AerixSpacing.mdPlus, vertical = AerixSpacing.sm),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
             MenuHeader(compact = compact, versionLine = versionLine)
             Spacer(Modifier.height(if (compact) AerixSpacing.sm else AerixSpacing.mdPlus))
 
-            LoadingWallpaperRow(accent = palette.accent, compact = compact)
-            Spacer(Modifier.height(if (compact) AerixSpacing.sm else AerixSpacing.mdPlus))
+            Row(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                // Left half: every action, small and stacked. The other half belongs to the player.
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(AerixSpacing.xs)
+                ) {
+                    CompactMenuButton(
+                        label = stringResource(R.string.aerix_ingame_menu_controls),
+                        iconRes = R.drawable.aerix_ic_touch_app_outlined,
+                        color = palette.tiles[0],
+                        compact = compact,
+                        onClick = { onCloseRequest(); callbacks.onCustomControls() }
+                    )
+                    CompactMenuButton(
+                        label = stringResource(R.string.aerix_ingame_menu_keycode),
+                        iconRes = R.drawable.aerix_ic_keyboard_outlined,
+                        color = palette.tiles[1],
+                        compact = compact,
+                        onClick = { onCloseRequest(); callbacks.onSendCustomKey() }
+                    )
+                    CompactMenuButton(
+                        label = stringResource(R.string.aerix_ingame_menu_quick_settings),
+                        iconRes = R.drawable.aerix_ic_settings_filled,
+                        color = palette.tiles[2],
+                        compact = compact,
+                        onClick = { onCloseRequest(); callbacks.onQuickSettings() }
+                    )
+                    CompactMenuButton(
+                        label = stringResource(R.string.aerix_ingame_menu_downloads),
+                        iconRes = R.drawable.aerix_ic_cloud_download,
+                        color = palette.tiles[3],
+                        compact = compact,
+                        onClick = onOpenDownloads
+                    )
+                    CompactMenuButton(
+                        label = stringResource(R.string.aerix_ingame_menu_logs),
+                        iconRes = R.drawable.aerix_ic_terminal_outlined,
+                        color = palette.tiles[4],
+                        compact = compact,
+                        onClick = { onCloseRequest(); callbacks.onLogOutput() }
+                    )
+                    CompactMenuButton(
+                        label = stringResource(R.string.aerix_ingame_menu_force_close),
+                        iconRes = R.drawable.aerix_ic_close,
+                        color = palette.tiles[5],
+                        compact = compact,
+                        onClick = { onCloseRequest(); callbacks.onForceCloseGame() }
+                    )
+                    CompactMenuButton(
+                        label = if (net.kdt.pojavlaunch.recording.RecordingState.isActive()) "Stop recording" else "Screen recorder",
+                        iconRes = R.drawable.aerix_ic_record,
+                        color = palette.tiles[0],
+                        compact = compact,
+                        onClick = { onCloseRequest(); callbacks.onScreenRecorder() }
+                    )
+                    LoadingWallpaperRow(accent = palette.accent, compact = compact)
 
-            val tileHeight = if (compact) 74.dp else 100.dp
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus)
-            ) {
-                MenuTile(
-                    label = stringResource(R.string.aerix_ingame_menu_controls),
-                    iconRes = R.drawable.aerix_ic_touch_app_outlined,
-                    color = palette.tiles[0],
+                    Spacer(Modifier.height(AerixSpacing.xs))
+                    ResumeButton(
+                        color = palette.resume,
+                        compact = compact,
+                        onClick = callbacks::onResumeGame
+                    )
+                }
+
+                Spacer(Modifier.width(AerixSpacing.md))
+
+                // Right half: the character the game is running as, and how they signed in.
+                AccountStage(
+                    account = account,
+                    accent = palette.accent,
                     compact = compact,
-                    onClick = { onCloseRequest(); callbacks.onCustomControls() },
-                    modifier = Modifier.weight(1f).height(tileHeight)
-                )
-                MenuTile(
-                    label = stringResource(R.string.aerix_ingame_menu_keycode),
-                    iconRes = R.drawable.aerix_ic_keyboard_outlined,
-                    color = palette.tiles[1],
-                    compact = compact,
-                    onClick = { onCloseRequest(); callbacks.onSendCustomKey() },
-                    modifier = Modifier.weight(1f).height(tileHeight)
-                )
-                MenuTile(
-                    label = stringResource(R.string.aerix_ingame_menu_quick_settings),
-                    iconRes = R.drawable.aerix_ic_settings_filled,
-                    color = palette.tiles[2],
-                    compact = compact,
-                    onClick = { onCloseRequest(); callbacks.onQuickSettings() },
-                    modifier = Modifier.weight(1f).height(tileHeight)
+                    modifier = Modifier.weight(1f).fillMaxHeight()
                 )
             }
 
-            Spacer(Modifier.height(AerixSpacing.smPlus))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus)
-            ) {
-                MenuTile(
-                    label = stringResource(R.string.aerix_ingame_menu_downloads),
-                    iconRes = R.drawable.aerix_ic_cloud_download,
-                    color = palette.tiles[3],
-                    compact = compact,
-                    onClick = onOpenDownloads,
-                    modifier = Modifier.weight(1f).height(tileHeight)
-                )
-                MenuTile(
-                    label = stringResource(R.string.aerix_ingame_menu_logs),
-                    iconRes = R.drawable.aerix_ic_terminal_outlined,
-                    color = palette.tiles[4],
-                    compact = compact,
-                    onClick = { onCloseRequest(); callbacks.onLogOutput() },
-                    modifier = Modifier.weight(1f).height(tileHeight)
-                )
-                MenuTile(
-                    label = stringResource(R.string.aerix_ingame_menu_force_close),
-                    iconRes = R.drawable.aerix_ic_close,
-                    color = palette.tiles[5],
-                    compact = compact,
-                    onClick = { onCloseRequest(); callbacks.onForceCloseGame() },
-                    modifier = Modifier.weight(1f).height(tileHeight)
-                )
-            }
-
-            Spacer(Modifier.height(if (compact) AerixSpacing.smPlus else AerixSpacing.md))
-            MenuTile(
-                label = if (net.kdt.pojavlaunch.recording.RecordingState.isActive()) "Stop recording" else "Screen recorder",
-                iconRes = R.drawable.aerix_ic_record,
-                color = palette.tiles[0], compact = compact,
-                onClick = { onCloseRequest(); callbacks.onScreenRecorder() },
-                modifier = Modifier.fillMaxWidth().height(if (compact) 48.dp else 60.dp)
-            )
             Spacer(Modifier.height(AerixSpacing.sm))
-            ResumeButton(
-                color = palette.resume,
-                compact = compact,
-                onClick = callbacks::onResumeGame
-            )
-            Spacer(Modifier.height(if (compact) AerixSpacing.sm else AerixSpacing.mdPlus))
             MenuBottomBar(
-                account = account,
                 versionLine = versionLine,
-                accent = palette.accent,
                 compact = compact,
                 onClose = onCloseRequest
             )
@@ -365,7 +377,7 @@ private fun MenuHeader(compact: Boolean, versionLine: String) {
 private fun LoadingWallpaperRow(accent: Color, compact: Boolean) {
     val context = LocalContext.current
     val checked = AerixPreferences.loadingWallpaper
-    val shape = RoundedCornerShape(AerixRadii.card)
+    val shape = RoundedCornerShape(AerixRadii.controlSmall)
 
     fun apply(value: Boolean) {
         AerixPreferences.saveLoadingWallpaper(value)
@@ -375,51 +387,38 @@ private fun LoadingWallpaperRow(accent: Color, compact: Boolean) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .height(if (compact) 34.dp else 40.dp)
             .clip(shape)
-            .background(AerixSurface.panelTrack.copy(alpha = 0.55f))
-            .border(1.dp, AerixSurface.borderSoft, shape)
+            .background(accent.copy(alpha = 0.10f))
+            .border(1.dp, accent.copy(alpha = 0.35f), shape)
             .clickable(role = Role.Switch) { apply(!checked) }
-            .padding(
-                horizontal = if (compact) AerixSpacing.smPlus else AerixSpacing.md,
-                vertical = if (compact) AerixSpacing.xs else AerixSpacing.sm
-            ),
+            .padding(horizontal = AerixSpacing.sm),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
             modifier = Modifier
-                .size(if (compact) 28.dp else 34.dp)
-                .clip(RoundedCornerShape(AerixRadii.controlSmall))
-                .background(accent.copy(alpha = 0.18f)),
+                .size(if (compact) 20.dp else 24.dp)
+                .clip(RoundedCornerShape(AerixRadii.micro))
+                .background(accent.copy(alpha = 0.22f)),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 painter = painterResource(R.drawable.aerix_ic_wallpaper),
                 contentDescription = null,
                 tint = accent,
-                modifier = Modifier.size(if (compact) 15.dp else 18.dp)
+                modifier = Modifier.size(if (compact) 13.dp else 15.dp)
             )
-        }
-        Spacer(Modifier.width(AerixSpacing.smPlus))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = stringResource(R.string.aerix_ingame_menu_loading_wallpaper),
-                color = AerixSurface.textPrimary,
-                fontSize = if (compact) 11.sp else 12.sp,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            if (!compact) {
-                Text(
-                    text = stringResource(R.string.aerix_ingame_menu_loading_wallpaper_summary),
-                    color = AerixSurface.textMuted,
-                    fontSize = 10.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
         }
         Spacer(Modifier.width(AerixSpacing.sm))
+        Text(
+            text = stringResource(R.string.aerix_ingame_menu_loading_wallpaper),
+            color = AerixSurface.textPrimary,
+            fontSize = if (compact) 10.sp else 11.5.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
+        )
         Switch(
             checked = checked,
             onCheckedChange = { apply(it) },
@@ -435,60 +434,55 @@ private fun LoadingWallpaperRow(accent: Color, compact: Boolean) {
 }
 
 @Composable
-private fun MenuTile(
+private fun CompactMenuButton(
     label: String,
     iconRes: Int,
     color: Color,
     compact: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier
+    onClick: () -> Unit
 ) {
-    val shape = RoundedCornerShape(AerixRadii.cardLarge)
+    val shape = RoundedCornerShape(AerixRadii.controlSmall)
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) 0.95f else 1f, label = "menuTile")
+    val scale by animateFloatAsState(if (pressed) 0.97f else 1f, label = "compactButton")
 
-    Column(
-        modifier = modifier
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(if (compact) 34.dp else 40.dp)
             .graphicsLayer { scaleX = scale; scaleY = scale }
             .clip(shape)
-            .background(
-                Brush.verticalGradient(
-                    listOf(color.copy(alpha = 0.22f), color.copy(alpha = 0.06f))
-                )
-            )
-            .border(1.dp, color.copy(alpha = 0.45f), shape)
+            .background(color.copy(alpha = 0.10f))
+            .border(1.dp, color.copy(alpha = 0.35f), shape)
             .clickable(
                 interactionSource = interaction,
                 indication = null,
                 role = Role.Button,
                 onClick = onClick
             )
-            .padding(AerixSpacing.smCompact),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+            .padding(horizontal = AerixSpacing.sm),
+        verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
             modifier = Modifier
-                .size(if (compact) 36.dp else 44.dp)
-                .clip(RoundedCornerShape(AerixRadii.control))
-                .background(color.copy(alpha = 0.2f)),
+                .size(if (compact) 20.dp else 24.dp)
+                .clip(RoundedCornerShape(AerixRadii.micro))
+                .background(color.copy(alpha = 0.22f)),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 painter = painterResource(iconRes),
                 contentDescription = null,
                 tint = color,
-                modifier = Modifier.size(if (compact) 20.dp else 24.dp)
+                modifier = Modifier.size(if (compact) 13.dp else 15.dp)
             )
         }
-        Spacer(Modifier.height(AerixSpacing.xsPlus))
+        Spacer(Modifier.width(AerixSpacing.sm))
         Text(
             text = label,
             color = AerixSurface.textPrimary,
-            fontSize = if (compact) 10.sp else 12.sp,
+            fontSize = if (compact) 10.sp else 11.5.sp,
             fontWeight = FontWeight.SemiBold,
-            textAlign = TextAlign.Center,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
@@ -497,15 +491,16 @@ private fun MenuTile(
 
 @Composable
 private fun ResumeButton(color: Color, compact: Boolean, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(AerixRadii.control)
+    val shape = RoundedCornerShape(AerixRadii.controlSmall)
     val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) 0.98f else 1f, label = "resumeButton")
     val onColor = if (color.luminance() > 0.45f) AerixSurface.canvas else Color.White
+    val pressedState by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (pressedState) 0.98f else 1f, label = "resumeButton")
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .height(if (compact) 34.dp else 40.dp)
             .graphicsLayer { scaleX = scale; scaleY = scale }
             .clip(shape)
             .background(Brush.horizontalGradient(listOf(color, color.copy(alpha = 0.8f))))
@@ -514,8 +509,7 @@ private fun ResumeButton(color: Color, compact: Boolean, onClick: () -> Unit) {
                 indication = null,
                 role = Role.Button,
                 onClick = onClick
-            )
-            .padding(vertical = if (compact) AerixSpacing.smCompact else AerixSpacing.mdTight),
+            ),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -523,13 +517,13 @@ private fun ResumeButton(color: Color, compact: Boolean, onClick: () -> Unit) {
             painter = painterResource(R.drawable.aerix_ic_play_arrow_filled),
             contentDescription = null,
             tint = onColor,
-            modifier = Modifier.size(if (compact) 16.dp else 20.dp)
+            modifier = Modifier.size(if (compact) 13.dp else 15.dp)
         )
         Spacer(Modifier.width(AerixSpacing.sm))
         Text(
             text = stringResource(R.string.aerix_ingame_menu_resume),
             color = onColor,
-            fontSize = if (compact) 13.sp else 15.sp,
+            fontSize = if (compact) 11.sp else 12.sp,
             fontWeight = FontWeight.Bold
         )
     }
@@ -537,9 +531,7 @@ private fun ResumeButton(color: Color, compact: Boolean, onClick: () -> Unit) {
 
 @Composable
 private fun MenuBottomBar(
-    account: AerixAccount?,
     versionLine: String,
-    accent: Color,
     compact: Boolean,
     onClose: () -> Unit
 ) {
@@ -547,39 +539,7 @@ private fun MenuBottomBar(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-            val face = account?.face
-            if (face != null) {
-                Image(
-                    bitmap = face,
-                    contentDescription = null,
-                    modifier = Modifier.size(26.dp).clip(CircleShape)
-                )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .size(26.dp)
-                        .clip(CircleShape)
-                        .background(accent.copy(alpha = 0.22f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = account?.username?.take(1)?.uppercase() ?: "?",
-                        color = accent,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-            Spacer(Modifier.width(AerixSpacing.sm))
-            Text(
-                text = account?.username ?: stringResource(R.string.aerix_ingame_menu_no_account),
-                color = AerixSurface.textSecondary,
-                fontSize = 12.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
+        Spacer(Modifier.weight(1f))
 
         Text(
             text = versionLine,
@@ -608,3 +568,340 @@ private fun MenuBottomBar(
         }
     }
 }
+
+/**
+ * The right half of the menu: the character the game is running as.
+ *
+ * The figure is the player's own skin, the cape and the Wide/Slim model included, and it turns
+ * through a full 360° under a horizontal drag - with a little momentum, so a flick keeps it
+ * spinning and settles.
+ *
+ * Under it, the name - tap it to see the other accounts - and under that, the way this account
+ * signed in.
+ */
+@Composable
+private fun AccountStage(
+    account: AerixAccount?,
+    accent: Color,
+    compact: Boolean,
+    modifier: Modifier = Modifier
+) {
+    var showPicker by remember { mutableStateOf(false) }
+    var showBlocked by remember { mutableStateOf(false) }
+    var azimuth by remember(account?.username) { mutableFloatStateOf(28f) }
+    val scope = rememberCoroutineScope()
+    val tracker = remember(account?.username) { VelocityTracker() }
+    var flingJob by remember(account?.username) { mutableStateOf<Job?>(null) }
+    val shape = RoundedCornerShape(AerixRadii.cardLarge)
+    val name = account?.username ?: stringResource(R.string.aerix_ingame_menu_no_account)
+
+    Column(
+        modifier = modifier
+            .clip(shape)
+            .background(AerixSurface.panelTrack.copy(alpha = 0.45f))
+            .border(1.dp, AerixSurface.borderSoft, shape)
+            .padding(AerixSpacing.sm),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .clip(RoundedCornerShape(AerixRadii.control))
+                .pointerInput(account?.username) {
+                    detectHorizontalDragGestures(
+                        onDragStart = {
+                            flingJob?.cancel()
+                            flingJob = null
+                            tracker.resetTracking()
+                        },
+                        onDragEnd = {
+                            val release = tracker.calculateVelocity().x * GAME_DOLL_DEG_PER_PX
+                            flingJob?.cancel()
+                            if (abs(release) < GAME_DOLL_FLING_MIN) {
+                                flingJob = null
+                                return@detectHorizontalDragGestures
+                            }
+                            flingJob = scope.launch {
+                                var velocity = release
+                                var lastFrame = withFrameNanos { it }
+                                while (abs(velocity) > GAME_DOLL_FLING_STOP) {
+                                    val now = withFrameNanos { it }
+                                    val dt = ((now - lastFrame) / 1_000_000_000f).coerceIn(0f, 0.05f)
+                                    lastFrame = now
+                                    azimuth = (azimuth + velocity * dt).mod(360f)
+                                    velocity *= exp(-GAME_DOLL_FLING_FRICTION * dt)
+                                }
+                                flingJob = null
+                            }
+                        },
+                        onDragCancel = {
+                            flingJob?.cancel()
+                            flingJob = null
+                        },
+                        onHorizontalDrag = { change, dragAmount ->
+                            tracker.addPosition(change.uptimeMillis, change.position)
+                            azimuth = (azimuth + dragAmount * GAME_DOLL_DEG_PER_PX).mod(360f)
+                        }
+                    )
+                }
+        ) {
+            // A soft halo behind the figure so it stands off the glass.
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.radialGradient(
+                            listOf(accent.copy(alpha = 0.18f), Color.Transparent)
+                        )
+                    )
+            )
+            AerixSkinPreview3D(
+                account = account,
+                azimuth = azimuth.roundToInt(),
+                interactionEnabled = false,
+                modifier = Modifier.fillMaxSize()
+            )
+            Text(
+                text = stringResource(R.string.aerix_ingame_menu_rotate_hint),
+                color = AerixSurface.textMuted,
+                fontSize = 9.sp,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = AerixSpacing.xxs)
+            )
+        }
+
+        Spacer(Modifier.height(AerixSpacing.xs))
+
+        // The name. Tapping it is how the player asks to be somebody else.
+        Row(
+            modifier = Modifier
+                .clip(RoundedCornerShape(AerixRadii.controlSmall))
+                .clickable(role = Role.Button) { showPicker = true }
+                .padding(horizontal = AerixSpacing.sm, vertical = AerixSpacing.xxs),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = name,
+                color = AerixSurface.textPrimary,
+                fontSize = if (compact) 13.sp else 15.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(Modifier.width(AerixSpacing.xs))
+            Icon(
+                painter = painterResource(R.drawable.aerix_ic_arrow_drop_down_rounded),
+                contentDescription = stringResource(R.string.aerix_ingame_menu_switch_account),
+                tint = accent,
+                modifier = Modifier.size(16.dp)
+            )
+        }
+
+        // How this account signed in: Microsoft, Ely.by or offline.
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            AuthIcon(account?.authType, accent)
+            Spacer(Modifier.width(AerixSpacing.xs))
+            Text(
+                text = authLabel(account?.authType),
+                color = AerixSurface.textMuted,
+                fontSize = if (compact) 10.sp else 11.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1
+            )
+        }
+    }
+
+    if (showPicker) {
+        AccountPickerDialog(
+            accounts = PojavAccountBridge.accounts,
+            currentKey = account?.key,
+            accent = accent,
+            onDismiss = { showPicker = false },
+            onPick = {
+                // Switching accounts cannot happen here: the running game already has its session.
+                showPicker = false
+                showBlocked = true
+            }
+        )
+    }
+
+    if (showBlocked) {
+        AlertDialog(
+            onDismissRequest = { showBlocked = false },
+            title = {
+                Text(
+                    text = stringResource(R.string.aerix_ingame_menu_switch_blocked_title),
+                    color = AerixSurface.textPrimary,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text(
+                    text = stringResource(R.string.aerix_ingame_menu_switch_blocked),
+                    color = AerixSurface.textSecondary
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { showBlocked = false }) {
+                    Text(stringResource(R.string.aerix_ingame_menu_switch_blocked_ok), color = accent)
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun AuthIcon(authType: AuthType?, accent: Color) {
+    val iconRes = when (authType) {
+        AuthType.MICROSOFT -> R.drawable.ic_auth_ms
+        AuthType.ELY_BY -> R.drawable.ic_auth_elyby
+        else -> R.drawable.aerix_ic_person_outlined
+    }
+    // The Microsoft and Ely.by marks keep their own colours; only the generic person
+    // glyph is tinted with the accent.
+    Icon(
+        painter = painterResource(iconRes),
+        contentDescription = null,
+        tint = if (authType == AuthType.LOCAL || authType == null) accent.copy(alpha = 0.85f)
+        else Color.Unspecified,
+        modifier = Modifier.size(13.dp)
+    )
+}
+
+@Composable
+private fun authLabel(authType: AuthType?): String = when (authType) {
+    AuthType.MICROSOFT -> stringResource(R.string.aerix_accounts_type_microsoft)
+    AuthType.ELY_BY -> stringResource(R.string.aerix_accounts_type_elyby)
+    AuthType.LOCAL -> stringResource(R.string.aerix_accounts_type_local)
+    null -> stringResource(R.string.aerix_ingame_menu_no_account)
+}
+
+/**
+ * The accounts already made, so the player can see who they could be next time.
+ *
+ * Picking one cannot take effect here - the game in front of them is already signed in - so the
+ * caller answers it with the dashboard reminder.
+ */
+@Composable
+private fun AccountPickerDialog(
+    accounts: List<AerixAccount>,
+    currentKey: String?,
+    accent: Color,
+    onDismiss: () -> Unit,
+    onPick: (AerixAccount) -> Unit
+) {
+    val shape = RoundedCornerShape(AerixRadii.control)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = stringResource(R.string.aerix_accounts_title),
+                color = AerixSurface.textPrimary,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            if (accounts.isEmpty()) {
+                Text(
+                    text = stringResource(R.string.aerix_accounts_empty),
+                    color = AerixSurface.textSecondary
+                )
+            } else {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height((minOf(accounts.size, 4) * 56).dp) // keep the dialog inside the screen
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(AerixSpacing.xs)
+                ) {
+                    accounts.forEach { entry ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp)
+                                .clip(shape)
+                                .background(
+                                    if (entry.key == currentKey) accent.copy(alpha = 0.14f)
+                                    else AerixSurface.panelTrack.copy(alpha = 0.45f)
+                                )
+                                .border(
+                                    1.dp,
+                                    if (entry.key == currentKey) accent.copy(alpha = 0.45f)
+                                    else AerixSurface.borderSoft,
+                                    shape
+                                )
+                                .clickable(role = Role.Button) { onPick(entry) }
+                                .padding(horizontal = AerixSpacing.sm),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            val face = entry.face
+                            if (face != null) {
+                                Image(
+                                    bitmap = face,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(26.dp).clip(CircleShape)
+                                )
+                            } else {
+                                Box(
+                                    modifier = Modifier
+                                        .size(26.dp)
+                                        .clip(CircleShape)
+                                        .background(accent.copy(alpha = 0.22f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = entry.username.take(1).uppercase(),
+                                        color = accent,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                            Spacer(Modifier.width(AerixSpacing.sm))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = entry.username,
+                                    color = AerixSurface.textPrimary,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = authLabel(entry.authType),
+                                    color = AerixSurface.textMuted,
+                                    fontSize = 10.sp,
+                                    maxLines = 1
+                                )
+                            }
+                            if (entry.key == currentKey) {
+                                Text(
+                                    text = stringResource(R.string.aerix_accounts_current),
+                                    color = accent,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.aerix_ingame_menu_switch_blocked_ok), color = accent)
+            }
+        }
+    )
+}
+
+private const val GAME_DOLL_DEG_PER_PX = 0.45f
+private const val GAME_DOLL_FLING_FRICTION = 5f
+private const val GAME_DOLL_FLING_MIN = 60f
+private const val GAME_DOLL_FLING_STOP = 20f

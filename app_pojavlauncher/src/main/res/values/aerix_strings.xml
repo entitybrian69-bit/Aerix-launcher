@@ -570,4 +570,11 @@
     <!-- Aerix menu: the wallpaper behind the controls while the game starts. -->
     <string name="aerix_ingame_menu_loading_wallpaper">Use wallpaper as loading background</string>
     <string name="aerix_ingame_menu_loading_wallpaper_summary">Your wallpaper - or animation - instead of black until the game window appears.</string>
+
+    <!-- Aerix menu: the account panel and the reminder when switching is attempted in game. -->
+    <string name="aerix_ingame_menu_switch_account">Switch account</string>
+    <string name="aerix_ingame_menu_rotate_hint">Drag to rotate</string>
+    <string name="aerix_ingame_menu_switch_blocked_title">Cannot switch account</string>
+    <string name="aerix_ingame_menu_switch_blocked">You must be in the game dashboard in order to switch account</string>
+    <string name="aerix_ingame_menu_switch_blocked_ok">OK</string>
 </resources>

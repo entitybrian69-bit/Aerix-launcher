@@ -157,6 +157,35 @@ object PojavAccountBridge : LoginListener {
         focusedAccountKey = null
     }
 
+    /**
+     * Loads the saved accounts once, for screens that only need to read them - the in-game menu,
+     * which shows who the game is running as. Unlike [reload] this never touches the network: it is
+     * called while the game is running and must stay cheap.
+     */
+    fun ensureLoaded() {
+        if (accounts.isNotEmpty()) return
+        val ctx = appContext
+        PojavApplication.sExecutorService.execute {
+            val rows = runCatching { Accounts.load() }.getOrNull()?.let { result ->
+                val now = System.currentTimeMillis()
+                result.accounts.map { account ->
+                    val faceBitmap = resolveAccountFaceBitmap(ctx, account)
+                    AerixAccount(
+                        source = account,
+                        username = account.username ?: "",
+                        authType = account.authType ?: AuthType.LOCAL,
+                        expired = (account.authType ?: AuthType.LOCAL).requiresLogin() && now > account.expiresAt,
+                        face = runCatching { faceBitmap?.asImageBitmap() }.getOrNull()
+                    )
+                } to result.selectionIndex
+            } ?: return@execute
+            Tools.runOnUiThread {
+                accounts = rows.first
+                selectedIndex = rows.second
+            }
+        }
+    }
+
     /** Same flow as AccountSpinner.reload(): load on the executor, then refresh the selected account. */
     fun reload() {
         val ctx = appContext
