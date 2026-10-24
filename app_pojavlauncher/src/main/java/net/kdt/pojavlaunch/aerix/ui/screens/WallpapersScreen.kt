@@ -30,6 +30,7 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -93,6 +94,7 @@ import net.kdt.pojavlaunch.aerix.theme.AerixSurface
 import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
 import net.kdt.pojavlaunch.aerix.theme.AerixWallpaperPreset
 import net.kdt.pojavlaunch.aerix.components.AerixAnimations
+import net.kdt.pojavlaunch.aerix.components.paintScenePreview
 import net.kdt.pojavlaunch.aerix.components.AerixAnimation
 import net.kdt.pojavlaunch.aerix.components.isAnimationId
 
@@ -108,6 +110,18 @@ fun WallpapersScreen(modifier: Modifier = Modifier) {
     val selectedPreset = remember(selectedId) { AerixThemeManager.wallpapers.firstOrNull { it.id == selectedId } }
     val selectedAnimation = remember(selectedId) { AerixAnimations.firstOrNull { it.id == selectedId } }
     val opacitySetting = AerixPreferences.backgroundOpacity
+
+    val videoPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) {
+            scope.launch {
+                runCatching {
+                    context.contentResolver.openInputStream(uri)?.use { input ->
+                        AerixThemeManager.applyVideoWallpaper(context, input)
+                    } ?: error("The file could not be read")
+                }.onFailure { Toast.makeText(context, failedText, Toast.LENGTH_LONG).show() }
+            }
+        }
+    }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
@@ -319,6 +333,48 @@ fun WallpapersScreen(modifier: Modifier = Modifier) {
             }
         }
 
+        // Real footage, brought by the user: the launcher ships no video, so this is the way to
+        // have an actual animated Minecraft clip behind the interface instead of a drawn scene.
+        if (showAnimations) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(AerixRadii.compact),
+                    color = activeAccent,
+                    contentColor = AerixSurface.onAccent,
+                    onClick = { videoPicker.launch("video/*") }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = AerixSpacing.md, vertical = AerixSpacing.xsPlus),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(AerixSpacing.xs)
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.aerix_ic_add),
+                            contentDescription = null,
+                            modifier = Modifier.size(13.dp)
+                        )
+                        Text(
+                            text = stringResource(R.string.aerix_wallpaper_video_button),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                    }
+                }
+                if (selectedId == AerixThemeManager.WALLPAPER_VIDEO) {
+                    Text(
+                        text = stringResource(R.string.aerix_wallpaper_video_active),
+                        color = activeAccent,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+
         LazyVerticalGrid(
             columns = GridCells.Fixed(3),
             modifier = Modifier
@@ -379,30 +435,13 @@ private fun AnimationCard(animation: AerixAnimation, isSelected: Boolean, onClic
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(16f / 9f)
-                    .background(Brush.verticalGradient(animation.sky))
             ) {
-                // Silhouettes and the scene's glow, so every preview is recognisably its own scene.
-                animation.hills.forEachIndexed { index, color ->
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .fillMaxHeight(0.34f + 0.12f * index)
-                            .align(Alignment.BottomCenter)
-                            .background(color)
-                    )
+                // The preview is the scene itself, painted at a fixed moment: sky, its own light,
+                // the hills and the water, exactly as it will look behind the launcher. A still of
+                // the real thing reads far better than any gradient stand-in.
+                Canvas(Modifier.fillMaxSize()) {
+                    paintScenePreview(animation)
                 }
-                Box(
-                    modifier = Modifier
-                        .size(46.dp)
-                        .align(Alignment.TopEnd)
-                        .padding(end = AerixSpacing.sm)
-                        .background(
-                            brush = Brush.radialGradient(
-                                listOf(animation.accent.copy(alpha = 0.55f), Color.Transparent)
-                            ),
-                            shape = CircleShape
-                        )
-                )
                 Surface(
                     modifier = Modifier
                         .align(Alignment.TopStart)

@@ -73,6 +73,8 @@
     <string name="aerix_wallpaper_tab_wallpaper">Wallpapers</string>
     <string name="aerix_wallpaper_tab_animations">Animations</string>
     <string name="aerix_animation_live">LIVE</string>
+    <string name="aerix_wallpaper_video_button">Add video</string>
+    <string name="aerix_wallpaper_video_active">Video wallpaper active</string>
     <string name="aerix_wallpaper_blur">Blur %1$d dp</string>
     <string name="aerix_wallpaper_motion_on">Motion on</string>
     <string name="aerix_wallpaper_motion_off">Motion off</string>

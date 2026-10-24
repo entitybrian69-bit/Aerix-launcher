@@ -92,13 +92,13 @@ private const val ZOOM_MAX = 1.22f
 /**
  * The wallpaper itself, moving.
  *
- * A still photo cannot have its trees sway, but it can be made to *feel* like it is breathing: the
- * picture is drawn as many narrow strips, each nudged on its own by a slow wave. That produces a
- * per-region shimmer over the entire frame - water, haze, drifting air - instead of one flat pan,
- * and it works on every Android version because it is plain drawing, not a shader.
+ * A still photo cannot have its trees sway, so the whole frame is what moves: a slow breathing zoom
+ * and pan, kept inside the zoom margin so no edge is ever exposed. It is a single smooth transform -
+ * an earlier attempt split the picture into columns and moved them independently, which showed up
+ * on screen as vertical strips across the picture, so that is gone.
  *
- * On top of that the whole image slowly breathes and pans, so the composition moves as a whole
- * while its parts move against each other.
+ * The part-level shimmer is done by the light and particle layers on top, which move against the
+ * picture instead of cutting it up.
  */
 @Composable
 fun AnimatedWallpaper(bitmap: ImageBitmap, motion: Boolean, modifier: Modifier = Modifier) {
@@ -118,80 +118,30 @@ fun AnimatedWallpaper(bitmap: ImageBitmap, motion: Boolean, modifier: Modifier =
         val imageH = bitmap.height
         if (imageW <= 0 || imageH <= 0 || size.width <= 0f || size.height <= 0f) return@Canvas
 
-        // Cover the screen, then add the breathing zoom on top so no edge is ever exposed.
-        val zoom = if (motion) ZOOM_MIN + (ZOOM_MAX - ZOOM_MIN) * (0.5f + 0.5f * sin((t * 2f * PI_F).toFloat())) else 1f
+        // Cover the screen, then breathe inside the margin that covering gives us.
+        val zoom = if (motion) ZOOM_MIN + (ZOOM_MAX - ZOOM_MIN) * (0.5f + 0.5f * sin(t * TAU_F)) else ZOOM_MIN
         val cover = max(size.width / imageW, size.height / imageH) * zoom
         val drawW = imageW * cover
         val drawH = imageH * cover
-        // A slow pan, kept inside the zoom margin.
-        val panX = if (motion) (drawW - size.width) * 0.5f * (0.5f + 0.5f * sin((t * 2f * PI_F + 1.7f).toFloat())) else (drawW - size.width) * 0.5f
-        val panY = if (motion) (drawH - size.height) * 0.5f * (0.5f + 0.5f * sin((t * 2f * PI_F * 0.7f + 0.4f).toFloat())) else (drawH - size.height) * 0.5f
-        val left = -panX
-        val top = -panY
+        val slackX = (drawW - size.width).coerceAtLeast(0f)
+        val slackY = (drawH - size.height).coerceAtLeast(0f)
+        val panX = if (motion) slackX * 0.5f * (0.5f + 0.5f * sin(t * TAU_F + 1.7f)) else slackX * 0.5f
+        val panY = if (motion) slackY * 0.5f * (0.5f + 0.5f * sin(t * TAU_F * 0.7f + 0.4f)) else slackY * 0.5f
 
-        if (!motion) {
-            drawCropped(bitmap, left, top, drawW, drawH, 0f, 0f, 0f)
-            return@Canvas
-        }
-
-        // Strip warp: each column gets its own offset, so the whole frame shimmers.
-        val strips = STRIP_COUNT
-        val amplitude = size.width * 0.010f
-        val drift = size.height * 0.006f
-        for (index in 0 until strips) {
-            // Overlap by a pixel: a seam between strips would be visible on a bright wallpaper.
-            val x0 = size.width * index / strips
-            val x1 = size.width * (index + 1) / strips + 1f
-            val phase = index * 0.42f
-            val wave = sin((t * 2f * PI_F).toFloat() + phase) * amplitude +
-                sin((t * 4f * PI_F).toFloat() + phase * 1.7f) * amplitude * 0.45f
-            val bob = cos((t * 2f * PI_F * 0.8f).toFloat() + phase * 0.6f) * drift
-            drawCropped(bitmap, left, top, drawW, drawH, x0 + wave, x1 + wave, bob)
-        }
+        // One whole-frame blit: no seams, no per-column work.
+        drawImage(
+            image = bitmap,
+            srcOffset = IntOffset.Zero,
+            srcSize = IntSize(imageW, imageH),
+            dstOffset = IntOffset((-panX).toInt(), (-panY).toInt()),
+            dstSize = IntSize(drawW.toInt().coerceAtLeast(1), drawH.toInt().coerceAtLeast(1))
+        )
     }
 }
 
-/** 2π as a constant so the trigonometric phases stay readable. */
+/** 2π, kept readable where the motion phases are written. */
 private const val PI_F = 3.1415927f
-
-/** Draws the columns between [x0] and [x1], sampled from the matching part of the picture. */
-private fun DrawScope.drawCropped(
-    bitmap: ImageBitmap,
-    left: Float,
-    top: Float,
-    drawW: Float,
-    drawH: Float,
-    x0: Float,
-    x1: Float,
-    yOffset: Float
-) {
-    val imageW = bitmap.width
-    val imageH = bitmap.height
-    if (drawW <= 0f || drawH <= 0f) return
-    // With no column given, the whole picture is one strip.
-    val fromX = if (x0 == 0f && x1 == 0f) 0f else x0
-    val toX = if (x0 == 0f && x1 == 0f) size.width else x1
-
-    val srcLeft = ((fromX - left) / drawW * imageW).coerceIn(0f, imageW.toFloat())
-    val srcRight = ((toX - left) / drawW * imageW).coerceIn(0f, imageW.toFloat())
-    val srcWidth = (srcRight - srcLeft)
-    if (srcWidth < 0.5f) return
-
-    val dstX = fromX.toInt()
-    val dstY = (top + yOffset).toInt()
-    // `drawImage` with a source and destination rectangle is the DrawScope member for this: it
-    // samples one region of the picture and places it at a chosen spot.
-    drawImage(
-        image = bitmap,
-        srcOffset = IntOffset(srcLeft.toInt(), 0),
-        srcSize = IntSize(srcWidth.toInt().coerceAtLeast(1), imageH),
-        dstOffset = IntOffset(dstX, dstY),
-        dstSize = IntSize((toX - fromX).toInt().coerceAtLeast(1), drawH.toInt().coerceAtLeast(1))
-    )
-}
-
-/** Columns used by the strip warp. More is smoother, and 44 is invisible to the eye on a phone. */
-private const val STRIP_COUNT = 44
+private const val TAU_F = 6.2831855f
 
 /**
  * Light moving across the whole picture: two sun washes that drift, a band of haze that crosses the

@@ -50,6 +50,8 @@ data class AerixWallpaperPreset(
 object AerixThemeManager {
     const val WALLPAPER_NONE = "none"
     const val WALLPAPER_CUSTOM = "custom"
+    const val WALLPAPER_VIDEO = "video"
+    private const val CUSTOM_VIDEO_FILE = "aerix_video_wallpaper"
     private const val CUSTOM_WALLPAPER_FILE = "aerix_custom_wallpaper"
 
     /** Bumped every time the wallpaper changes so the background reloads its bitmap. */
@@ -89,6 +91,9 @@ object AerixThemeManager {
 
     fun customWallpaperFile(context: Context): File = File(context.filesDir, CUSTOM_WALLPAPER_FILE)
 
+    /** Where an imported video wallpaper lives. It survives restarts and costs the APK nothing. */
+    fun videoWallpaperFile(context: Context): File = File(context.filesDir, CUSTOM_VIDEO_FILE)
+
     @Composable
     fun currentAccent(): Color = if (AerixPreferences.colorTheme == AerixColorTheme.CUSTOM) {
         Color(AerixPreferences.customColor)
@@ -108,6 +113,16 @@ object AerixThemeManager {
         AerixPreferences.saveCustomColor(preset.accentColor.toArgb())
         AerixPreferences.saveColorTheme(AerixColorTheme.CUSTOM)
         if (AerixPreferences.backgroundOpacity >= 95) AerixPreferences.saveBackgroundOpacity(72)
+        wallpaperRevision++
+    }
+
+    /**
+     * Applies an imported video as the wallpaper. Real footage, chosen by the user: the launcher
+     * itself ships none, so nothing is added to the download.
+     */
+    fun applyVideoWallpaper(context: Context, source: java.io.InputStream) {
+        net.kdt.pojavlaunch.aerix.components.installVideoWallpaper(context.filesDir, source, CUSTOM_VIDEO_FILE)
+        AerixPreferences.saveSelectedWallpaper(WALLPAPER_VIDEO)
         wallpaperRevision++
     }
 

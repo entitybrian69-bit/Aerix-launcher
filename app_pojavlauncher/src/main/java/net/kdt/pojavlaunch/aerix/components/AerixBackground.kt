@@ -105,6 +105,16 @@ fun AerixBackground(modifier: Modifier = Modifier, content: @Composable BoxScope
     val motion = ThemeMotion.rememberEnabled()
     val animation = animationById(id)
     Box(modifier.fillMaxSize().background(AerixSurface.canvas)) {
+        // A video wallpaper is played, not decoded: it is the one kind that is real footage.
+        if (id == AerixThemeManager.WALLPAPER_VIDEO) {
+            val file = AerixThemeManager.videoWallpaperFile(context)
+            if (file.isFile) {
+                VideoWallpaper(file = file, motion = motion, modifier = Modifier.fillMaxSize())
+                Box(Modifier.fillMaxSize().background(AerixThemeManager.screenScrim()))
+                content()
+                return@Box
+            }
+        }
         // An animated wallpaper is drawn, not decoded: it needs no bitmap and no asset.
         if (animation != null) {
             AnimatedScene(

@@ -175,6 +175,15 @@ fun AnimatedScene(animation: AerixAnimation, motion: Boolean, modifier: Modifier
 
 private const val TAU = 6.2831855f
 
+/**
+ * Paints a scene at a fixed moment. The wallpaper grid uses this for its previews: a scene drawn at
+ * a chosen time is far closer to the real thing than any gradient stand-in, and a still frame costs
+ * nothing while twenty five of them sit on screen.
+ */
+fun DrawScope.paintScenePreview(animation: AerixAnimation, moment: Float = 0.18f) {
+    drawScene(animation, moment)
+}
+
 private fun DrawScope.drawScene(animation: AerixAnimation, t: Float) {
     val w = size.width
     val h = size.height
