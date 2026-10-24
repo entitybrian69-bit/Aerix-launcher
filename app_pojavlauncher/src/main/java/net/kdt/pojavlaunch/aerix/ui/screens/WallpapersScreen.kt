@@ -50,6 +50,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -59,12 +60,12 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -103,6 +104,26 @@ import net.kdt.pojavlaunch.aerix.components.rememberRawClipThumbnail
 import net.kdt.pojavlaunch.aerix.components.AerixAnimation
 import net.kdt.pojavlaunch.aerix.components.isAnimationId
 
+/**
+ * Which half of the wallpapers page is showing.
+ *
+ * It lives here rather than in the composable because applying a clip changes the theme, which
+ * rebuilds the settings screen around this page; a local remember slot can then come back reset and
+ * the page appears to jump to Wallpapers by itself after every tap.
+ */
+private object WallpaperSection {
+    var showAnimations by mutableStateOf(false)
+    var initialised = false
+
+    fun initialise(selectedId: String) {
+        if (initialised) return
+        initialised = true
+        showAnimations = AerixThemeManager.isBundledClipId(selectedId) ||
+            AerixThemeManager.isClipId(selectedId) ||
+            isAnimationId(selectedId)
+    }
+}
+
 @Composable
 fun WallpapersScreen(modifier: Modifier = Modifier) {
     val context = LocalContext.current
@@ -111,7 +132,11 @@ fun WallpapersScreen(modifier: Modifier = Modifier) {
     val failedText = stringResource(R.string.aerix_wallpaper_failed)
 
     val selectedId = AerixPreferences.selectedWallpaper
-    var showAnimations by rememberSaveable { mutableStateOf(isAnimationId(selectedId)) }
+    // Kept outside the composable: applying a clip switches the theme, which rebuilds this screen,
+    // and a rememberSaveable slot could come back initialised to Wallpapers - the page would jump
+    // out from under the tap.
+    WallpaperSection.initialise(selectedId)
+    var showAnimations by remember { WallpaperSection.showAnimations }
     val selectedPreset = remember(selectedId) { AerixThemeManager.wallpapers.firstOrNull { it.id == selectedId } }
     val selectedAnimation = remember(selectedId) { AerixAnimations.firstOrNull { it.id == selectedId } }
     val opacitySetting = AerixPreferences.backgroundOpacity
@@ -137,7 +162,14 @@ fun WallpapersScreen(modifier: Modifier = Modifier) {
         }
     }
 
-    val clips = remember(selectedId) { AerixThemeManager.clips(context) }
+    // Reading the folder touches disk, so it happens off the composition. A new import or a delete
+    // bumps the theme revision, which re-reads the list.
+    val clipRevision = AerixThemeManager.wallpaperRevision
+    var clips by remember(clipRevision) { mutableStateOf<List<java.io.File>>(emptyList()) }
+    LaunchedEffect(clipRevision) {
+        clips = withContext(Dispatchers.IO) { AerixThemeManager.clips(context) }
+    }
+    val gridState = rememberLazyGridState()
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
@@ -219,7 +251,7 @@ fun WallpapersScreen(modifier: Modifier = Modifier) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = if (showAnimations) {
-                            stringResource(R.string.aerix_wallpaper_header, AerixAnimations.size)
+                            stringResource(R.string.aerix_wallpaper_header, BundledClips.size + clips.size)
                         } else {
                             stringResource(R.string.aerix_wallpaper_header, AerixThemeManager.wallpapers.size)
                         },
@@ -337,7 +369,11 @@ fun WallpapersScreen(modifier: Modifier = Modifier) {
                         AerixSpacing.hairline,
                         if (active) activeAccent else AerixSurface.borderSoft
                     ),
-                    onClick = { showAnimations = animations }
+                    onClick = {
+                        showAnimations = animations
+                        WallpaperSection.showAnimations = animations
+                        if (!animations) gridState.scrollToItem(0)
+                    }
                 ) {
                     Text(
                         text = label,
@@ -380,6 +416,7 @@ fun WallpapersScreen(modifier: Modifier = Modifier) {
 
         LazyVerticalGrid(
             columns = GridCells.Fixed(3),
+            state = gridState,
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f),
@@ -402,13 +439,6 @@ fun WallpapersScreen(modifier: Modifier = Modifier) {
                         isSelected = selectedId == AerixThemeManager.clipId(clip),
                         onClick = { AerixThemeManager.applyClip(clip) },
                         onDelete = { AerixThemeManager.deleteClip(context, clip) }
-                    )
-                }
-                items(items = AerixAnimations, key = { it.id }) { animation ->
-                    AnimationCard(
-                        animation = animation,
-                        isSelected = selectedId == animation.id,
-                        onClick = { AerixThemeManager.applyAnimation(animation) }
                     )
                 }
             } else {

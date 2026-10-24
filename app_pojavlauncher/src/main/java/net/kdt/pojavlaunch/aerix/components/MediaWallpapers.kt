@@ -68,6 +68,7 @@ fun RawVideoWallpaper(
 ) {
     val context = LocalContext.current
     VideoSurface(
+        sourceKey = "raw:$resId",
         motion = motion,
         modifier = modifier,
         onError = onError,
@@ -87,6 +88,7 @@ fun VideoWallpaper(
     onError: () -> Unit = {}
 ) {
     VideoSurface(
+        sourceKey = "file:${file.absolutePath}",
         motion = motion,
         modifier = modifier,
         onError = onError,
@@ -105,6 +107,7 @@ fun VideoWallpaper(
  */
 @Composable
 private fun VideoSurface(
+    sourceKey: String,
     motion: Boolean,
     modifier: Modifier,
     onError: () -> Unit,
@@ -122,7 +125,9 @@ private fun VideoSurface(
         }
     }
 
-    DisposableEffect(textureView) {
+    // Keyed on the source as well as the view: picking a different clip has to tear the player down
+    // and open the new one, otherwise the previous clip keeps playing and the tap looks ignored.
+    DisposableEffect(textureView, sourceKey) {
         val media = MediaPlayer()
         player = media
         var surface: Surface? = null
@@ -294,11 +299,32 @@ fun importMediaWallpaper(dir: File, displayName: String?, source: java.io.InputS
     return target
 }
 
+/**
+ * Decoded card previews, kept for the life of the process.
+ *
+ * Without this a card that scrolls out of view is disposed, and coming back re-decodes its frame -
+ * which is what made scrolling up feel like the whole grid was reloading. Ten small bitmaps cost
+ * almost nothing and never need decoding twice.
+ */
+private object ThumbnailCache {
+    private val entries = HashMap<String, ImageBitmap>()
+    fun get(key: String): ImageBitmap? = entries[key]
+    fun put(key: String, value: ImageBitmap) { entries[key] = value }
+}
+
 /** A still of an imported clip, for its card in the grid. */
 @Composable
 fun rememberClipThumbnail(file: File): ImageBitmap? {
-    val thumb by produceState<ImageBitmap?>(initialValue = null, file.absolutePath) {
-        value = withContext(Dispatchers.IO) { decodeClipStill(file)?.asImageBitmap() }
+    val key = "file:${file.absolutePath}"
+    val thumb by produceState<ImageBitmap?>(initialValue = ThumbnailCache.get(key), key) {
+        val cached = ThumbnailCache.get(key)
+        if (cached != null) {
+            value = cached
+        } else {
+            val decoded = withContext(Dispatchers.IO) { decodeClipStill(file)?.asImageBitmap() }
+            if (decoded != null) ThumbnailCache.put(key, decoded)
+            value = decoded
+        }
     }
     return thumb
 }
@@ -307,7 +333,13 @@ fun rememberClipThumbnail(file: File): ImageBitmap? {
 @Composable
 fun rememberRawClipThumbnail(resId: Int): ImageBitmap? {
     val context = LocalContext.current
-    val thumb by produceState<ImageBitmap?>(initialValue = null, resId) {
+    val key = "raw:$resId"
+    val thumb by produceState<ImageBitmap?>(initialValue = ThumbnailCache.get(key), key) {
+        val cached = ThumbnailCache.get(key)
+        if (cached != null) {
+            value = cached
+            return@produceState
+        }
         value = withContext(Dispatchers.IO) {
             runCatching {
                 val retriever = MediaMetadataRetriever()
