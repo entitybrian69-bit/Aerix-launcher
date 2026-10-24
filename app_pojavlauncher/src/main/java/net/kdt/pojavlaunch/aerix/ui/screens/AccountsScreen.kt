@@ -343,7 +343,7 @@ fun AccountsScreen(activity: FragmentActivity) {
                         .fillMaxWidth()
                         .padding(vertical = 8.dp),
                     shape = RoundedCornerShape(18.dp),
-                    color = AerixSurface.panelRaised.copy(alpha = 0.7f),
+                    color = AerixSurface.panelRaised.copy(alpha = 0.35f),
                     border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft)
                 ) {
                     Box(
@@ -463,7 +463,7 @@ private fun MiraiAccountItemRow(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
-        color = AerixSurface.panelRaised.copy(alpha = 0.85f),
+        color = AerixSurface.panelRaised.copy(alpha = 0.42f),
         border = BorderStroke(
             width = if (isCurrent) 1.dp else AerixSpacing.hairline,
             color = if (isCurrent) accent.copy(alpha = 0.45f) else AerixSurface.borderSoft
@@ -835,7 +835,7 @@ private fun MiraiSkinLibraryCard(
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(16.dp),
-        color = AerixSurface.panelRaised.copy(alpha = 0.85f),
+        color = AerixSurface.panelRaised.copy(alpha = 0.42f),
         border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft),
         onClick = onClick
     ) {

@@ -93,6 +93,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import net.kdt.pojavlaunch.R
 import net.kdt.pojavlaunch.aerix.bridge.AerixInstance
+import net.kdt.pojavlaunch.aerix.bridge.GameDownloadTarget
 import net.kdt.pojavlaunch.aerix.bridge.PojavAccountBridge
 import net.kdt.pojavlaunch.aerix.bridge.PojavInstanceBridge
 import net.kdt.pojavlaunch.aerix.bridge.PojavLaunchBridge
@@ -106,6 +107,8 @@ import net.kdt.pojavlaunch.aerix.components.QuietEmptyState
 import net.kdt.pojavlaunch.aerix.components.liquidGlass
 import net.kdt.pojavlaunch.aerix.theme.AerixMetrics
 import net.kdt.pojavlaunch.aerix.theme.AerixRadii
+import net.kdt.pojavlaunch.aerix.guide.AerixGuideState
+import net.kdt.pojavlaunch.aerix.guide.guideAnchor
 import net.kdt.pojavlaunch.aerix.theme.AerixSpacing
 import net.kdt.pojavlaunch.aerix.theme.AerixSurface
 import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
@@ -126,7 +129,17 @@ private const val DOLL_FLING_FRICTION = 5f
 private const val DOLL_FLING_MIN_VELOCITY = 60f
 private const val DOLL_FLING_STOP_VELOCITY = 20f
 
-private val mcVersionRegex = Regex("""(\d+\.\d+(?:\.\d+)?)""")
+/**
+ * "Fabric 1.16.5" - the loader and the version of the game it runs, never the loader's own
+ * version. A loader id ("fabric-loader-0.16.10-1.16.5") carries both numbers, and the first one is
+ * the loader's, so the Minecraft version has to be picked by shape: see
+ * [GameDownloadTarget.minecraftVersionIn].
+ */
+private fun instanceVersionLabel(versionId: String, vanilla: String): String {
+    val mcVersion = GameDownloadTarget.minecraftVersionIn(versionId) ?: versionId
+    val loader = loaderLabel(versionId, vanilla)
+    return if (loader == vanilla) mcVersion else "$loader $mcVersion"
+}
 
 private class HomeActions(
     val play: () -> Unit,
@@ -208,6 +221,7 @@ fun HomeScreen(activity: FragmentActivity, navigate: (LauncherSection) -> Unit) 
                     instances = instances,
                     actions = actions,
                     modifier = Modifier
+                        .guideAnchor(AerixGuideState.PLAY)
                         .weight(ActionMenuWeight)
                         .fillMaxHeight()
                         .padding(
@@ -241,12 +255,14 @@ private fun ActionMenuCard(
     var dollFlingJob by remember(account?.username) { mutableStateOf<Job?>(null) }
     var showInstanceMenu by remember { mutableStateOf(false) }
 
+    // The loader and the version of the game: "Fabric 1.16.5". The loader's own version
+    // ("0.16.10") is not what the player picked and does not belong on the card.
     val versionSubtitle = remember(selected, vanilla) {
-        if (selected == null) "Select Instance"
-        else {
-            val loader = loaderLabel(selected.versionId, vanilla)
-            val mcVer = mcVersionRegex.find(selected.versionId)?.value ?: selected.versionId
-            if (loader == vanilla) "Minecraft $mcVer" else "$loader $mcVer"
+        when {
+            selected == null -> "Select Instance"
+            loaderLabel(selected.versionId, vanilla) == vanilla ->
+                "Minecraft ${GameDownloadTarget.minecraftVersionIn(selected.versionId) ?: selected.versionId}"
+            else -> instanceVersionLabel(selected.versionId, vanilla)
         }
     }
 
@@ -488,15 +504,17 @@ private fun WideHomeDashboard(
                 .weight(0.57f),
             horizontalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus)
         ) {
-            LiquidHomeHero(selected, count, accent, actions, Modifier.weight(1.55f).fillMaxHeight())
+            // The hero banner is gone: the active world now opens the page, and everything that
+            // used to sit below it moves up into the space it took.
+            ActiveWorldPanel(selected, accent, actions, Modifier.weight(1.55f).fillMaxHeight())
             Column(
                 modifier = Modifier
                     .weight(0.85f)
                     .fillMaxHeight(),
                 verticalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus)
             ) {
-                ActiveWorldPanel(selected, accent, actions, Modifier.weight(1f))
                 TaskSummaryPanel(taskCount, accent, Modifier.height(74.dp))
+                QuickToolsPanel(accent, actions, Modifier.weight(1f), scrollable = true)
             }
         }
         QuickTiles(count, accent, actions, Modifier.fillMaxWidth().height(78.dp), scrollable = false)
@@ -506,8 +524,7 @@ private fun WideHomeDashboard(
                 .weight(0.43f),
             horizontalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus)
         ) {
-            RecentWorldsPanel(recent, selected, accent, actions, Modifier.weight(1.7f).fillMaxHeight(), lazy = true)
-            QuickToolsPanel(accent, actions, Modifier.weight(0.72f).fillMaxHeight(), scrollable = true)
+            RecentWorldsPanel(recent, selected, accent, actions, Modifier.weight(1f).fillMaxHeight(), lazy = true)
         }
     }
 }
@@ -526,14 +543,22 @@ private fun CompactHomeDashboard(
         contentPadding = PaddingValues(bottom = AerixSpacing.xxl),
         verticalArrangement = Arrangement.spacedBy(AerixSpacing.md)
     ) {
-        item { LiquidHomeHero(selected, count, accent, actions, Modifier.fillMaxWidth().height(312.dp)) }
         item {
             Column(verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm)) {
                 HomeSectionLabel(stringResource(R.string.aerix_home_your_space), null)
                 QuickTiles(count, accent, actions, Modifier.fillMaxWidth(), scrollable = true)
             }
         }
-        item { ActiveWorldPanel(selected, accent, actions, Modifier.fillMaxWidth().height(190.dp)) }
+        // On a phone the action panel is not drawn, so the play step points at the world card here.
+        item {
+            ActiveWorldPanel(
+                selected, accent, actions,
+                Modifier
+                    .fillMaxWidth()
+                    .height(190.dp)
+                    .guideAnchor(AerixGuideState.PLAY)
+            )
+        }
         item { TaskSummaryPanel(taskCount, accent, Modifier.fillMaxWidth().height(74.dp)) }
         item { RecentWorldsPanel(recent, selected, accent, actions, Modifier.fillMaxWidth(), lazy = false) }
         item { QuickToolsPanel(accent, actions, Modifier.fillMaxWidth(), scrollable = false) }
@@ -559,149 +584,6 @@ private fun QuickTiles(count: Int, accent: Color, actions: HomeActions, modifier
                 onClick = style.second,
                 modifier = if (scrollable) Modifier.width(198.dp).height(78.dp) else Modifier.weight(1f).fillMaxHeight()
             )
-        }
-    }
-}
-
-@Composable
-private fun LiquidHomeHero(selected: AerixInstance?, count: Int, accent: Color, actions: HomeActions, modifier: Modifier) {
-    val shape = RoundedCornerShape(AerixRadii.hero)
-    Box(
-        modifier = modifier
-            .clip(shape)
-            .border(BorderStroke(AerixSpacing.hairline, AerixSurface.borderHighlight.copy(alpha = 0.62f)), shape)
-    ) {
-        Image(
-            painter = painterResource(R.drawable.aerix_hero_bg),
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize()
-        )
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .drawWithCache {
-                    val width = size.width.coerceAtLeast(1f)
-                    val height = size.height.coerceAtLeast(1f)
-                    val longEdge = maxOf(width, height)
-                    val center = Offset(width * 0.92f, height * 0.1f)
-                    val inset = 30.dp.toPx()
-                    val rimWidth = 1.dp.toPx()
-                    val wash = Brush.horizontalGradient(
-                        colors = listOf(
-                            AerixSurface.canvas.copy(alpha = 0.90f),
-                            AerixSurface.canvas.copy(alpha = 0.82f),
-                            AerixSurface.canvas.copy(alpha = 0.30f),
-                            AerixSurface.canvas.copy(alpha = 0.07f)
-                        ),
-                        startX = 0f,
-                        endX = width
-                    )
-                    val lens = Brush.radialGradient(
-                        colors = listOf(AerixSurface.glassBlue.copy(alpha = 0.36f), AerixSurface.glassViolet.copy(alpha = 0.12f), Color.Transparent),
-                        center = center,
-                        radius = longEdge * 0.72f
-                    )
-                    onDrawBehind {
-                        drawRect(brush = wash)
-                        drawCircle(brush = lens, radius = longEdge * 0.72f, center = center)
-                        drawLine(
-                            color = Color.White.copy(alpha = 0.5f),
-                            start = Offset(inset, rimWidth * 0.5f),
-                            end = Offset(width - inset, rimWidth * 0.5f),
-                            strokeWidth = rimWidth
-                        )
-                    }
-                }
-        )
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = AerixSpacing.xxl, vertical = AerixSpacing.xl),
-            verticalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(AerixSpacing.sm)) {
-                Box(Modifier.size(8.dp).clip(CircleShape).background(AerixSurface.success))
-                Text(
-                    text = stringResource(if (selected != null) R.string.aerix_home_ready else R.string.aerix_home_empty),
-                    color = AerixSurface.textPrimary.copy(alpha = 0.88f),
-                    fontSize = 10.sp,
-                    letterSpacing = 1.5.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-            Column(modifier = Modifier.fillMaxWidth(0.76f), verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm)) {
-                Text(
-                    text = stringResource(if (selected != null) R.string.aerix_home_ready_title else R.string.aerix_home_empty_title),
-                    style = MaterialTheme.typography.headlineLarge,
-                    fontWeight = FontWeight.Black,
-                    color = Color.White,
-                    lineHeight = 42.sp,
-                    maxLines = 2
-                )
-                Text(
-                    text = stringResource(if (selected != null) R.string.aerix_home_ready_sub else R.string.aerix_home_empty_sub),
-                    fontSize = 13.sp,
-                    lineHeight = 19.sp,
-                    color = AerixSurface.textPrimary.copy(alpha = 0.78f),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Row(
-                    modifier = Modifier.padding(top = AerixSpacing.xs),
-                    horizontalArrangement = Arrangement.spacedBy(AerixSpacing.xs),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    MetaPill(text = selected?.name ?: stringResource(R.string.aerix_home_quick_library_sub, count), iconRes = R.drawable.aerix_ic_dashboard_filled)
-                    if (selected != null) {
-                        MetaPill(
-                            text = loaderLabel(selected.versionId, stringResource(R.string.aerix_home_vanilla)),
-                            iconRes = R.drawable.aerix_ic_videogame_asset_outlined
-                        )
-                    }
-                }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus), verticalAlignment = Alignment.CenterVertically) {
-                Surface(
-                    modifier = Modifier
-                        .height(46.dp)
-                        .liquidGlass(shape = CircleShape, tint = accent, strength = 0.92f, elevation = AerixMetrics.glassSelectedElevation),
-                    shape = CircleShape,
-                    color = accent,
-                    contentColor = AerixSurface.onAccent,
-                    shadowElevation = 0.dp,
-                    onClick = if (selected != null) actions.play else actions.create
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = AerixSpacing.lg),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
-                    ) {
-                        Icon(
-                            painter = painterResource(if (selected != null) R.drawable.aerix_ic_play_arrow_filled else R.drawable.aerix_ic_add),
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Text(
-                            text = stringResource(if (selected != null) R.string.aerix_home_play_now else R.string.aerix_home_create_world),
-                            fontSize = 11.sp,
-                            letterSpacing = 0.8.sp,
-                            fontWeight = FontWeight.ExtraBold
-                        )
-                    }
-                }
-                Text(
-                    text = stringResource(R.string.aerix_home_open_library),
-                    color = Color.White.copy(alpha = 0.88f),
-                    fontSize = 10.sp,
-                    letterSpacing = 0.8.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier
-                        .clip(CircleShape)
-                        .clickable(onClick = actions.library)
-                        .padding(horizontal = AerixSpacing.md, vertical = AerixSpacing.smPlus)
-                )
-            }
         }
     }
 }
@@ -750,7 +632,10 @@ private fun ActiveWorldPanel(selected: AerixInstance?, accent: Color, actions: H
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        text = selected?.let { "${loaderLabel(it.versionId, vanilla)}  ·  ${stringResource(R.string.aerix_home_minecraft, it.versionId)}" }
+                        text = selected?.let {
+                            val mcVersion = GameDownloadTarget.minecraftVersionIn(it.versionId) ?: it.versionId
+                            "${loaderLabel(it.versionId, vanilla)}  ·  ${stringResource(R.string.aerix_home_minecraft, mcVersion)}"
+                        }
                             ?: stringResource(R.string.aerix_home_create_first),
                         color = AerixSurface.textSecondary,
                         fontSize = 11.sp,
@@ -916,7 +801,7 @@ private fun RecentWorldRow(instance: AerixInstance, isSelected: Boolean, accent:
         modifier = Modifier
             .fillMaxWidth()
             .clip(shape)
-            .background(if (isSelected) accent.copy(alpha = 0.14f) else AerixSurface.panelRaised.copy(alpha = 0.35f))
+            .background(if (isSelected) accent.copy(alpha = 0.14f) else AerixSurface.panelRaised.copy(alpha = 0.17f))
             .clickable(role = Role.Button) { actions.select(instance) }
             .padding(horizontal = AerixSpacing.sm, vertical = AerixSpacing.xs),
         verticalAlignment = Alignment.CenterVertically,
@@ -926,7 +811,7 @@ private fun RecentWorldRow(instance: AerixInstance, isSelected: Boolean, accent:
         Column(modifier = Modifier.weight(1f)) {
             Text(text = instance.name, color = AerixSurface.textPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
-                text = "${loaderLabel(instance.versionId, vanilla)} · ${instance.versionId}",
+                text = instanceVersionLabel(instance.versionId, vanilla),
                 color = AerixSurface.textSecondary,
                 fontSize = 10.sp,
                 maxLines = 1,

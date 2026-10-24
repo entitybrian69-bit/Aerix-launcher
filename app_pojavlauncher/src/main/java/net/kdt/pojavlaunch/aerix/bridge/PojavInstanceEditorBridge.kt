@@ -95,6 +95,17 @@ object PojavInstanceEditorBridge {
         return true
     }
 
+    /** Keep an open editor from saving stale loader metadata after an external installer returns. */
+    internal fun syncLoaderState(installed: Instance) {
+        val current = draft ?: return
+        if (current.instance.instanceId != installed.instanceId) return
+        if (current.instance.versionId != installed.versionId) {
+            current.versionId = installed.versionId.orEmpty()
+            current.instance.versionId = installed.versionId
+        }
+        current.instance.installer = installed.installer
+    }
+
     fun close() {
         draft = null
         awaitingControlLayout = false

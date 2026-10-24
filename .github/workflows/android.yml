@@ -61,8 +61,15 @@ jobs:
 
       - name: Build Debug .apk (Full)
         run: |
-          # Build the launcher
-          gradle :app_pojavlauncher:assembleFullDebug
+          # Build the launcher. A failure repeats the compiler's own lines as annotations, because
+          # the raw job log is not always reachable from where the release is checked.
+          if ! gradle :app_pojavlauncher:assembleFullDebug > /tmp/gradle-full.log 2>&1; then
+            grep -E "^e: |error: |Apostrophe|Unresolved reference|What went wrong|^FAILURE" /tmp/gradle-full.log | head -25 | cut -c1-300 | while IFS= read -r line; do
+              echo "::error title=compile::$line"
+            done
+            tail -40 /tmp/gradle-full.log
+            exit 1
+          fi
           mv app_pojavlauncher/build/outputs/apk/full/debug/app_pojavlauncher-full-debug.apk out/app-debug-full.apk
 
       - name: Build Debug .apk (No runtime)

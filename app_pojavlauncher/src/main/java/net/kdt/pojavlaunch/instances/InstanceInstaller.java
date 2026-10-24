@@ -40,6 +40,8 @@ public class InstanceInstaller implements ContextExecutorTask {
             "https://optifine.net/adloadx"
     };
 
+    /** Set for in-place updates so completion cannot change a different matching profile. */
+    public String targetInstanceId;
     public String installerJar;
     private transient File installerJarFile;
     private transient String mTransformedUrl;
@@ -93,12 +95,13 @@ public class InstanceInstaller implements ContextExecutorTask {
         String targetVersionId = ProfileWatcher.consumePendingVersion(assetManager);
         if(targetVersionId == null) return;
         for(Instance instance : Instances.loadAllInstances()) {
+            if (lastInstaller.targetInstanceId != null && !lastInstaller.targetInstanceId.equals(instance.getInstanceId())) continue;
             if(!lastInstaller.equals(instance.installer)) continue;
             instance.installer = null;
             instance.versionId = targetVersionId;
             instance.write();
         }
-        ExtraCore.setValue(ExtraConstants.REFRESH_VERSION_SPINNER, null);
+        InstanceRefreshEvents.notifyChanged();
     }
 
     public static void postInstallCheck(Context context) {

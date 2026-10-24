@@ -150,7 +150,7 @@ fun OfflineAccountScreen(activity: FragmentActivity, onClose: () -> Unit, onCrea
                         modifier = Modifier
                             .size(88.dp)
                             .clip(RoundedCornerShape(AerixRadii.cardSmall))
-                            .background(AerixSurface.panelRaised.copy(alpha = 0.45f))
+                            .background(AerixSurface.panelRaised.copy(alpha = 0.23f))
                             .border(BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft), RoundedCornerShape(AerixRadii.cardSmall)),
                         contentAlignment = Alignment.Center
                     ) {
@@ -251,7 +251,7 @@ private fun MethodChip(text: String, selected: Boolean, accent: Color, onClick: 
     Box(
         modifier = Modifier
             .clip(shape)
-            .background(if (selected) accent else AerixSurface.panelRaised.copy(alpha = 0.4f), shape)
+            .background(if (selected) accent else AerixSurface.panelRaised.copy(alpha = 0.2f), shape)
             .border(BorderStroke(AerixSpacing.hairline, if (selected) accent else AerixSurface.borderSoft), shape)
             .clickable(role = Role.Button, onClick = onClick)
             .padding(horizontal = AerixSpacing.smPlus, vertical = AerixSpacing.xs),

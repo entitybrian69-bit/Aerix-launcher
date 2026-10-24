@@ -18,6 +18,9 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentContainerView;
 import androidx.fragment.app.FragmentManager;
@@ -25,6 +28,7 @@ import androidx.fragment.app.FragmentManager;
 import com.kdt.mcgui.ProgressLayout;
 
 import net.kdt.pojavlaunch.aerix.bridge.AerixPreferences;
+import net.kdt.pojavlaunch.aerix.bridge.AerixWindowInsets;
 import net.kdt.pojavlaunch.aerix.ui.AerixMainFragment;
 import net.kdt.pojavlaunch.authenticator.accounts.Accounts;
 import net.kdt.pojavlaunch.extra.ExtraConstants;
@@ -147,8 +151,11 @@ public class LauncherActivity extends BaseActivity {
     };
     @Override
     protected boolean shouldIgnoreNotch() {
-        // The Aerix launcher is landscape-only; follow Pojav's "Ignore notch" preference like the game does.
-        return LauncherPreferences.PREF_IGNORE_NOTCH;
+        // The Aerix shell draws its wallpaper under the whole display and keeps the rail and the
+        // pages inside the safe area itself (AerixWindowInsets), so the window may use the cutout.
+        // Following the "Ignore notch" video preference here reserved a strip of the display for
+        // the camera and painted it black next to the UI.
+        return true;
     }
 
     @Override
@@ -162,6 +169,20 @@ public class LauncherActivity extends BaseActivity {
         // Must run before BaseActivity.onCreate, which reads setFullscreen()
         AerixPreferences.INSTANCE.init(getApplicationContext());
         super.onCreate(savedInstanceState);
+        // The decor receives the insets before the content view consumes them for its padding.
+        // Publishing them lets the Compose shell keep the rail and the pages on the safe area
+        // while its wallpaper stays full bleed. The camera cutout always has to be respected; the
+        // system bars only when the launcher is not fullscreen, since Tools.setInsetsMode pads the
+        // content for those itself and this would count them twice.
+        ViewCompat.setOnApplyWindowInsetsListener(getWindow().getDecorView(), (view, insets) -> {
+            int mask = WindowInsetsCompat.Type.displayCutout();
+            if (!AerixPreferences.INSTANCE.getFullScreen()) {
+                mask |= WindowInsetsCompat.Type.systemBars();
+            }
+            Insets safe = insets.getInsets(mask);
+            AerixWindowInsets.INSTANCE.update(safe.left, safe.top, safe.right, safe.bottom);
+            return insets;
+        });
         setContentView(R.layout.activity_pojav_launcher);
         MoJsonDownloader.prepareSubstitutionMap(getAssets());
 
@@ -203,6 +224,8 @@ public class LauncherActivity extends BaseActivity {
 
         mProgressLayout.observe(ProgressLayout.DOWNLOAD_GAME);
         mProgressLayout.observe(ProgressLayout.UNPACK_RUNTIME);
+        mProgressLayout.observe(ProgressLayout.EXTRACT_COMPONENTS);
+        mProgressLayout.observe(ProgressLayout.EXTRACT_SINGLE_FILES);
         mProgressLayout.observe(ProgressLayout.INSTALL_MODPACK);
         mProgressLayout.observe(ProgressLayout.AUTHENTICATE);
         mProgressLayout.observe(ProgressLayout.DOWNLOAD_VERSION_LIST);

@@ -50,6 +50,7 @@ import net.kdt.pojavlaunch.aerix.bridge.DeviceReport
 import net.kdt.pojavlaunch.aerix.bridge.PojavDeviceBridge
 import net.kdt.pojavlaunch.aerix.bridge.PojavNavigator
 import net.kdt.pojavlaunch.aerix.components.MetaPill
+import net.kdt.pojavlaunch.aerix.guide.AerixGuideState
 import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
 import net.kdt.pojavlaunch.aerix.components.AerixGhostButton
 import net.kdt.pojavlaunch.aerix.components.GlassPanel
@@ -83,6 +84,22 @@ fun AboutScreen(activity: FragmentActivity) {
                         Text(text = BuildConfig.APPLICATION_ID, color = AerixSurface.textMuted, fontSize = 11.sp)
                     }
                 }
+            }
+            // The tour only runs once by itself, so it has to be reachable afterwards.
+            GlassPanel(modifier = Modifier.fillMaxWidth()) {
+                SectionLabel(title = stringResource(R.string.aerix_guide_replay))
+                Text(
+                    text = stringResource(R.string.aerix_guide_replay_body),
+                    color = AerixSurface.textSecondary,
+                    fontSize = 12.sp,
+                    lineHeight = 17.sp,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                AerixGhostButton(
+                    stringResource(R.string.aerix_guide_replay),
+                    R.drawable.aerix_ic_info_outlined,
+                    { AerixGuideState.replay() }
+                )
             }
             DeviceReportPanel(activity)
             GlassPanel(modifier = Modifier.fillMaxWidth()) {

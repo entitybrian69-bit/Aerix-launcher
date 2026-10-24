@@ -20,6 +20,15 @@ static def getDateSeconds() {
     }
 }
 
+// One version source: the APK, About page and updater all read this same value.
+def aerixVersion = new Properties()
+rootProject.file('version.properties').withInputStream { aerixVersion.load(it) }
+def AERIX_VERSION_NAME = aerixVersion.getProperty('versionName')
+if (!(AERIX_VERSION_NAME ==~ /\d+\.\d+\.\d+/)) throw new GradleException('versionName must be major.minor.patch')
+def versionParts = AERIX_VERSION_NAME.split('\\.').collect { it.toInteger() }
+if (versionParts[1] >= 100 || versionParts[2] >= 100) throw new GradleException('Minor/patch must be below 100')
+def AERIX_VERSION_CODE = versionParts[0] * 10000 + versionParts[1] * 100 + versionParts[2]
+
 def getVersionName = {
     def currentBranch = grgit.branch.current()
     def latestCommit = grgit.log(maxCommits: 1)
@@ -35,10 +44,10 @@ def getVersionName = {
 
 def getCFApiKey = {
     String key = System.getenv("CURSEFORGE_API_KEY")
-    if(key != null) return key
+    if(key != null && !key.trim().isEmpty()) return key.trim()
     File curseforgeKeyFile = new File("./curseforge_key.txt")
     if(curseforgeKeyFile.canRead() && curseforgeKeyFile.isFile()) {
-        return curseforgeKeyFile.text
+        return curseforgeKeyFile.text.trim()
     }
     logger.warn('BUILD: You have no CurseForge key, the curseforge api will get disabled !')
     return "DUMMY"
@@ -73,6 +82,17 @@ android {
             keyAlias "android_github_release"
             keyPassword System.getenv("POJAV_KEYSTORE_PASSWORD")
         }
+        // The key the published Aerix builds are signed with. It travels with the project next to
+        // the other keystores, so a build never depends on a secret this repository may not have;
+        // AERIX_KEYSTORE_PASSWORD overrides the password in the environment for anyone who keeps
+        // the key out of the tree.
+        aerixRelease {
+            storeFile file("aerix_release.p12")
+            storeType "PKCS12"
+            storePassword System.getenv("AERIX_KEYSTORE_PASSWORD") ?: "aerix-release"
+            keyAlias "aerix"
+            keyPassword System.getenv("AERIX_KEYSTORE_PASSWORD") ?: "aerix-release"
+        }
         googlePlayBuild {
             storeFile file("pojav_gplay.jks")
             storePassword System.getenv("POJAV_GPLAY_KEYSTORE_PASSWORD")
@@ -93,15 +113,50 @@ android {
         }
     }
 
+    testOptions {
+        unitTests.includeAndroidResources = true
+    }
+
+    // Video wallpapers play straight from the APK, so they must not be compressed: a compressed
+    // resource cannot be opened as a file descriptor, which is what the player needs.
+    androidResources {
+        noCompress 'webm', 'mp4'
+    }
+
     defaultConfig {
         applicationId "net.kdt.pojavlaunch"
         minSdkVersion 23
         targetSdkVersion 36
-        versionCode getDateSeconds()
-        versionName getVersionName()
+        versionCode AERIX_VERSION_CODE
+        versionName AERIX_VERSION_NAME
         multiDexEnabled false //important
         resValue 'string', 'curseforge_api_key', getCFApiKey()
         resValue 'string', 'group_id', 'net.kdt'
+    }
+
+    /*
+     * One APK per CPU architecture, only when asked for with -PabiSplits. The release workflow asks.
+     *
+     * A phone only ever uses one of them, but a universal APK carries every set of native libraries
+     * at once - which is most of the download. Splitting gives a 64-bit phone roughly half the file,
+     * with nothing removed: the other build simply lives in another file.
+     *
+     * Only the two ARM builds are split, because those are the phones. The universal APK is always
+     * produced as well: it is what the x86 devices fall back to, and what the in-app updater uses if
+     * a release is ever missing a split.
+     *
+     * Opt-in rather than always on: the app bundle build does not accept split configuration, and
+     * the debug APK stays a single universal file for testing.
+     */
+    if (project.hasProperty("abiSplits")) {
+        splits {
+            abi {
+                enable true
+                reset()
+                include "armeabi-v7a", "arm64-v8a"
+                universalApk true
+            }
+        }
     }
 
     flavorDimensions  = ["runtime"]
@@ -119,13 +174,19 @@ android {
 
     buildTypes {
         debug {
+            // The testing APK is installed on ARM phones, and the renderer libs it now carries no
+            // longer fit the 100 MiB a repository file may have when all four ABIs are inside it.
+            // Only the two ARM ABIs are packaged here; release builds stay universal.
+            ndk {
+                abiFilters "arm64-v8a", "armeabi-v7a"
+            }
             applicationIdSuffix '.debug'
             minifyEnabled false
             shrinkResources false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             signingConfig signingConfigs.customDebug
             resValue "string", "app_name", "Aerix Launcher (Debug)"
-            resValue "string", "app_short_name", "PojavLauncher (Debug)"
+            resValue "string", "app_short_name", "Aerix Launcher (Debug)"
             resValue "string", "aerix_app_label", "Aerix Launcher (Debug)"
             resValue 'string', 'application_package', 'net.kdt.pojavlaunch.debug'
             resValue 'string', 'storageProviderAuthorities', 'net.kdt.pojavlaunch.scoped.gamefolder.debug'
@@ -145,9 +206,9 @@ android {
             // Don't set to true or java.awt will be a.a or something similar.
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-            signingConfig signingConfigs.customRelease
+            signingConfig signingConfigs.aerixRelease
             resValue "string", "app_name", "Aerix Launcher"
-            resValue "string", "app_short_name", "PojavLauncher"
+            resValue "string", "app_short_name", "Aerix Launcher"
             resValue "string", "aerix_app_label", "Aerix Launcher"
             resValue 'string', 'application_package', 'net.kdt.pojavlaunch'
             resValue 'string', 'storageProviderAuthorities', 'net.kdt.pojavlaunch.scoped.gamefolder'
@@ -162,7 +223,7 @@ android {
             signingConfig signingConfigs.customDebug // WIP, changeme
             applicationIdSuffix '.pub'
             resValue "string", "app_name", "Aerix Launcher (Nightly)"
-            resValue "string", "app_short_name", "PojavLauncher (Nightly)"
+            resValue "string", "app_short_name", "Aerix Launcher (Nightly)"
             resValue "string", "aerix_app_label", "Aerix Launcher (Nightly)"
             resValue 'string', 'application_package', 'net.kdt.pojavlaunch.pub'
             resValue 'string', 'storageProviderAuthorities', 'net.kdt.pojavlaunch.pub.scoped.gamefolder'
@@ -342,6 +403,10 @@ afterEvaluate {
 }
 
 dependencies {
+    testImplementation 'junit:junit:4.13.2'
+    // Real org.json on the unit-test classpath: the Android stub only throws "not mocked".
+    testImplementation 'org.json:json:20240303'
+    testImplementation 'org.robolectric:robolectric:4.14.1'
     implementation 'androidx.documentfile:documentfile:1.1.0'
     implementation platform('androidx.compose:compose-bom:2026.06.01')
     implementation 'androidx.compose.ui:ui'
@@ -352,6 +417,10 @@ dependencies {
     implementation 'androidx.lifecycle:lifecycle-runtime-compose:2.8.7'
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0'
     implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.8.7'
+    implementation 'androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7'
+    implementation 'androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.7'
+    implementation 'androidx.datastore:datastore-preferences:1.1.1'
+
 
     implementation 'javax.annotation:javax.annotation-api:1.3.2'
     implementation 'commons-codec:commons-codec:1.19.0'
@@ -387,4 +456,6 @@ dependencies {
     // implementation 'net.sourceforge.streamsupport:streamsupport-cfuture:1.7.0'
 
     implementation fileTree(dir: 'libs', include: ['*.jar', '*.aar'])
+
+    testImplementation 'org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0'
 }

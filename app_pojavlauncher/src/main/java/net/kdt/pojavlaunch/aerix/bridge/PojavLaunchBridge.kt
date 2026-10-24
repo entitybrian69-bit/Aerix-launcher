@@ -38,18 +38,44 @@ import net.kdt.pojavlaunch.prefs.LauncherPreferences
 import net.kdt.pojavlaunch.utils.jre.GameRunner
 
 object PojavLaunchBridge {
+    /**
+     * The Java version this instance really needs: the version metadata, raised by the mods it
+     * carries. A legacy game stays on Java 8; nothing is guessed from the "latest" version.
+     */
+    private fun requiredJavaVersion(instance: net.kdt.pojavlaunch.instances.Instance): Int {
+        val declared = runCatching {
+            Tools.getVersionInfo(instance.versionId)?.javaVersion?.majorVersion
+        }.getOrNull() ?: 8
+        return runCatching {
+            net.kdt.pojavlaunch.utils.jre.ModJavaRequirements.minimumJava(instance.gameDirectory, declared)
+        }.getOrDefault(declared)
+    }
+
+    /**
+     * The runtime to install when the launcher starts from nothing: the closest one at or above
+     * what the game needs, so a 1.8.9 instance gets Java 8 and not a 17 it cannot run on.
+     */
+    private fun runtimeFor(javaVersion: Int): NewJREUtil.ExternalRuntime {
+        val runtimes = NewJREUtil.ExternalRuntime.values().toList()
+        return runtimes.filter { it.majorVersion >= javaVersion }.minByOrNull { it.majorVersion }
+            ?: runtimes.maxByOrNull { it.majorVersion }!!
+    }
+
     private fun fire(activity: Activity) {
         try {
             val runtimes = runCatching { MultiRTUtils.getRuntimes() }.getOrDefault(emptyList())
             if (runtimes.isEmpty()) {
                 val appContext = activity.applicationContext
+                val wanted = Instances.loadSelectedInstance()?.let { runtimeFor(requiredJavaVersion(it)) }
+                    ?: NewJREUtil.ExternalRuntime.JRE_17
                 Toast.makeText(activity, R.string.downloading_java_runtime_uni, Toast.LENGTH_SHORT).show()
                 PojavApplication.sExecutorService.execute {
                     runCatching {
-                        NewJREUtil.ExternalRuntime.JRE_8.downloadRuntime(appContext.assets)
+                        wanted.downloadRuntime(appContext.assets)
                         val installed = MultiRTUtils.getRuntimes()
                         if (installed.isNotEmpty() && LauncherPreferences.PREF_DEFAULT_RUNTIME.isNullOrEmpty()) {
-                            LauncherPreferences.PREF_DEFAULT_RUNTIME = installed[0].name
+                            LauncherPreferences.PREF_DEFAULT_RUNTIME =
+                                installed.firstOrNull { it.name == wanted.name }?.name ?: installed[0].name
                             LauncherPreferences.DEFAULT_PREF.edit()
                                 .putString("defaultRuntime", LauncherPreferences.PREF_DEFAULT_RUNTIME)
                                 .apply()

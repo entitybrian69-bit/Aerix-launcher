@@ -66,16 +66,21 @@ enum class AerixLoader(
     @DrawableRes val iconRes: Int,
     @StringRes val taglineRes: Int,
     /** Whether the loader needs a Minecraft version from the list on the left. */
-    val usesGameVersion: Boolean
+    val usesGameVersion: Boolean,
+    /**
+     * Whether the loader publishes builds to choose from. Vanilla has none - there is nothing to
+     * pick between - so a vanilla instance is complete as soon as a Minecraft version is selected.
+     */
+    val hasBuilds: Boolean
 ) {
-    VANILLA("Vanilla", R.drawable.aerix_loader_vanilla, R.string.aerix_loader_vanilla_sub, true),
-    OPTIFINE("OptiFine", R.drawable.aerix_loader_optifine, R.string.aerix_loader_optifine_sub, true),
-    FABRIC("Fabric", R.drawable.ic_fabric, R.string.aerix_loader_fabric_sub, true),
-    FORGE("Forge", R.drawable.ic_forge, R.string.aerix_loader_forge_sub, true),
-    NEOFORGE("NeoForge", R.drawable.ic_neoforge, R.string.aerix_loader_neoforge_sub, true),
-    QUILT("Quilt", R.drawable.ic_quilt, R.string.aerix_loader_quilt_sub, true),
-    LEGACY_FABRIC("Legacy Fabric", R.drawable.aerix_loader_legacy_fabric, R.string.aerix_loader_legacy_fabric_sub, true),
-    BTA("BTA", R.drawable.aerix_loader_bta, R.string.aerix_loader_bta_sub, false)
+    VANILLA("Vanilla", R.drawable.aerix_loader_vanilla, R.string.aerix_loader_vanilla_sub, true, false),
+    OPTIFINE("OptiFine", R.drawable.aerix_loader_optifine, R.string.aerix_loader_optifine_sub, true, true),
+    FABRIC("Fabric", R.drawable.ic_fabric, R.string.aerix_loader_fabric_sub, true, true),
+    FORGE("Forge", R.drawable.ic_forge, R.string.aerix_loader_forge_sub, true, true),
+    NEOFORGE("NeoForge", R.drawable.ic_neoforge, R.string.aerix_loader_neoforge_sub, true, true),
+    QUILT("Quilt", R.drawable.ic_quilt, R.string.aerix_loader_quilt_sub, true, true),
+    LEGACY_FABRIC("Legacy Fabric", R.drawable.aerix_loader_legacy_fabric, R.string.aerix_loader_legacy_fabric_sub, true, true),
+    BTA("BTA", R.drawable.aerix_loader_bta, R.string.aerix_loader_bta_sub, false, true)
 }
 
 /** Version groups of Pojav's VersionListAdapter (installed, release, snapshot, old_beta, old_alpha). */
