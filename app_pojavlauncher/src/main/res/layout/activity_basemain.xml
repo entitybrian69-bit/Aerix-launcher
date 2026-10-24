@@ -50,13 +50,14 @@
 				android:inputType="textFilter|textImeMultiLine|textAutoComplete|textAutoCorrect"
 				tools:ignore="TouchTargetSizeCheck" />
 
+			<!-- Size and position are driven by DrawerPullButton itself, so the button keeps the
+			     place the player dragged it to. -->
 			<net.kdt.pojavlaunch.customcontrols.handleview.DrawerPullButton
 				android:id="@+id/drawer_button"
-				android:layout_width="40dp"
-				android:layout_height="20dp"
-				android:padding="8dp"
+				android:layout_width="wrap_content"
+				android:layout_height="wrap_content"
 				android:elevation="10dp"
-				android:layout_gravity="center_horizontal"/>
+				android:layout_gravity="top|start"/>
 			<net.kdt.pojavlaunch.customcontrols.mouse.HotbarView
 				android:id="@+id/hotbar_view"
 				android:layout_width="0px"
@@ -84,6 +85,28 @@
 				android:layout_gravity="center"
 				android:indeterminate="true" />
 		</FrameLayout>
+
+		<!-- The in game menu: a full screen Compose overlay, hidden until the button opens it.
+		     It is composed once and stays out of the way (and out of the frame budget) while the
+		     game runs. -->
+		<net.kdt.pojavlaunch.aerix.ui.game.GameMenuOverlayView
+			android:id="@+id/game_menu_overlay"
+			android:layout_width="match_parent"
+			android:layout_height="match_parent"
+			android:visibility="gone" />
+
+		<net.kdt.pojavlaunch.game.FpsView
+			android:id="@+id/main_fps_view"
+			android:layout_width="wrap_content"
+			android:layout_height="wrap_content"
+			android:layout_gravity="top|start"
+			android:layout_marginStart="8dp"
+			android:layout_marginTop="6dp"
+			android:paddingStart="7dp"
+			android:paddingEnd="7dp"
+			android:paddingTop="2dp"
+			android:paddingBottom="2dp"
+			android:visibility="gone" />
 
 		<com.kdt.LoggerView
 			android:id="@+id/mainLoggerView"
