@@ -131,9 +131,6 @@ val AerixAnimations: List<AerixAnimation> = listOf(
         listOf(Color(0xFF02090D), Color(0xFF062A31), Color(0xFF0B4A52)), listOf(Color(0xFF041417), Color(0xFF08242A), Color(0xFF0D3940)))
 )
 
-/** Its accent colour, as the theme manager wants it. */
-fun AerixAnimation.accentColor(): Color = accent
-
 /** The animation with this id, or null when the id names a photograph instead. */
 fun animationById(id: String): AerixAnimation? = AerixAnimations.firstOrNull { it.id == id }
 
