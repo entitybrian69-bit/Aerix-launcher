@@ -445,6 +445,9 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
 
     @Override
     protected void onDestroy() {
+        // Whatever happened, nothing of ours outlives the activity: if the player backs out during
+        // loading, the wallpaper goes with the screen.
+        net.kdt.pojavlaunch.aerix.loading.AerixLoadingWallpaper.detach();
         if (mRecorder != null) mRecorder.destroy();
         super.onDestroy();
         ContextExecutor.clearActivity();

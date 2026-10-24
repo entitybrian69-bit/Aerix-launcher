@@ -77,34 +77,14 @@ object AerixLoadingWallpaper {
     private var toggle: TextView? = null
     private var host: ViewGroup? = null
 
-    /** Adds the wallpaper layer and the toggle to [loadingScreen]. */
+    /** Adds the toggle to [loadingScreen], and the wallpaper too if it was left on. */
     @JvmStatic
     fun attach(loadingScreen: ViewGroup) {
         if (host === loadingScreen) return
         detach()
         host = loadingScreen
         runCatching { AerixPreferences.init(loadingScreen.context.applicationContext) }
-        enabled = AerixPreferences.loadingWallpaper
-
-        val wallpaper = ComposeView(loadingScreen.context).apply {
-            layoutParams = FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
-            )
-            ensureViewTreeOwners(this)
-            // Disposing when the view leaves the window is what stops a video wallpaper decoding
-            // after the loading screen is gone; the activity itself lives on with the game.
-            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindowOrReleasedFromPool)
-            setContent {
-                AerixLauncherTheme {
-                    if (enabled) AerixBackground { }
-                }
-            }
-            visibility = if (enabled) View.VISIBLE else View.GONE
-        }
-        // Behind the spinner, which is the first child already in the layout.
-        loadingScreen.addView(wallpaper, 0)
-        composeView = wallpaper
+        enabled = runCatching { AerixPreferences.loadingWallpaper }.getOrDefault(false)
 
         toggle = buildToggle(loadingScreen.context).also { button ->
             button.setOnClickListener { setEnabled(loadingScreen.context, !enabled) }
@@ -118,6 +98,48 @@ object AerixLoadingWallpaper {
             loadingScreen.addView(button, params)
         }
         applyState()
+    }
+
+    /**
+     * Builds the wallpaper layer the first time it is actually wanted. With the setting off - the
+     * default - nothing is created at all: no ComposeView, no composition, no recomposer, not a
+     * single allocation on the game's startup path.
+     */
+    private fun ensureComposeView(screen: ViewGroup) {
+        if (composeView != null) return
+        val wallpaper = ComposeView(screen.context).apply {
+            layoutParams = FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+            ensureViewTreeOwners(this)
+            // Disposing when the view leaves the window is what stops a video wallpaper decoding
+            // after the loading screen is gone; the activity itself lives on with the game.
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindowOrReleasedFromPool)
+            setContent {
+                AerixLauncherTheme {
+                    AerixBackground { }
+                }
+            }
+        }
+        // Behind the spinner, so the spinner stays on top of the wallpaper.
+        screen.addView(wallpaper, 0)
+        composeView = wallpaper
+    }
+
+    /**
+     * Drops the wallpaper layer completely. Its composition is disposed first, which runs the
+     * wallpaper's own teardown - releasing a video player rather than letting it decode into
+     * nowhere - and only then is the view removed from the hierarchy.
+     */
+    private fun dropComposeView() {
+        val view = composeView ?: return
+        composeView = null
+        runCatching {
+            view.visibility = View.GONE
+            view.disposeComposition()
+            (view.parent as? ViewGroup)?.removeView(view)
+        }
     }
 
     /** Switches the wallpaper on or off without leaving the screen. */
@@ -135,16 +157,10 @@ object AerixLoadingWallpaper {
     @JvmStatic
     fun detach() {
         enabled = false
-        composeView?.let { view ->
-            runCatching {
-                view.visibility = View.GONE
-                // Dispose first, so a video wallpaper stops decoding immediately rather than
-                // waiting for the detach callback.
-                view.disposeComposition()
-                (view.parent as? ViewGroup)?.removeView(view)
-            }
-        }
-        composeView = null
+        // Put the opaque black back before the layer goes, so the fade-out that follows is the
+        // same clean fade it has always been rather than a see-through one.
+        host?.setBackgroundColor(0xFF000000.toInt())
+        dropComposeView()
         toggle?.let { (it.parent as? ViewGroup)?.removeView(it) }
         toggle = null
         host = null
@@ -152,9 +168,15 @@ object AerixLoadingWallpaper {
 
     private fun applyState() {
         val screen = host ?: return
-        // Opaque black with nothing behind it, or see-through so the wallpaper shows.
-        screen.setBackgroundColor(if (enabled) 0x00000000 else 0xFF000000.toInt())
-        composeView?.visibility = if (enabled) View.VISIBLE else View.GONE
+        if (enabled) {
+            ensureComposeView(screen)
+            // Transparent, so the wallpaper underneath is what the player sees.
+            screen.setBackgroundColor(0x00000000)
+        } else {
+            // Off means off: the layer is disposed, not just hidden, so nothing keeps ticking.
+            dropComposeView()
+            screen.setBackgroundColor(0xFF000000.toInt())
+        }
         toggle?.let { styleToggle(it, enabled, accentColor()) }
     }
 
