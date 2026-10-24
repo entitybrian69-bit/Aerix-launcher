@@ -388,6 +388,12 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         mFpsView = findViewById(R.id.main_fps_view);
         mGameMenuOverlay = findViewById(R.id.game_menu_overlay);
         mHotbarView = findViewById(R.id.hotbar_view);
+        // The wallpaper that can stand in for the black screen while the game starts. It is added
+        // inside the control layout, above the game surface and under the buttons, so the controls
+        // and the Aerix menu button stay usable and visible the whole time.
+        if (mControlLayout != null) {
+            net.kdt.pojavlaunch.aerix.loading.AerixLoadingWallpaper.attach(mControlLayout);
+        }
     }
 
     @Override
@@ -437,6 +443,9 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
 
     @Override
     protected void onDestroy() {
+        // Nothing of ours outlives the activity: if the player backs out during the boot, the
+        // wallpaper goes with the screen.
+        net.kdt.pojavlaunch.aerix.loading.AerixLoadingWallpaper.detach();
         if (mRecorder != null) mRecorder.destroy();
         super.onDestroy();
         ContextExecutor.clearActivity();
@@ -642,6 +651,8 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
      */
     public void hideLoadingScreen(){
         updateFpsViewVisibility();
+        // The game window is here: the wallpaper, and anything decoding it, goes now.
+        net.kdt.pojavlaunch.aerix.loading.AerixLoadingWallpaper.detach();
     }
 
     @Override

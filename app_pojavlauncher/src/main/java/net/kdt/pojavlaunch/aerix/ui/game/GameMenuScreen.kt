@@ -53,6 +53,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -80,12 +82,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import net.kdt.pojavlaunch.R
 import net.kdt.pojavlaunch.aerix.bridge.AerixAccount
+import net.kdt.pojavlaunch.aerix.bridge.AerixPreferences
 import net.kdt.pojavlaunch.aerix.bridge.GameDownloadTarget
 import net.kdt.pojavlaunch.aerix.bridge.PojavAccountBridge
 import net.kdt.pojavlaunch.aerix.theme.AerixRadii
 import net.kdt.pojavlaunch.aerix.theme.AerixSpacing
 import net.kdt.pojavlaunch.aerix.theme.AerixSurface
 import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
+import net.kdt.pojavlaunch.aerix.loading.AerixLoadingWallpaper
 
 /** The pages of the in-game menu. */
 enum class GameMenuPage { MAIN, DOWNLOADS }
@@ -234,6 +238,9 @@ private fun GameMenuMainPage(
             MenuHeader(compact = compact, versionLine = versionLine)
             Spacer(Modifier.height(if (compact) AerixSpacing.sm else AerixSpacing.mdPlus))
 
+            LoadingWallpaperRow(accent = palette.accent, compact = compact)
+            Spacer(Modifier.height(if (compact) AerixSpacing.sm else AerixSpacing.mdPlus))
+
             val tileHeight = if (compact) 74.dp else 100.dp
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -343,6 +350,86 @@ private fun MenuHeader(compact: Boolean, versionLine: String) {
             fontSize = 11.sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+/**
+ * The switch for the wallpaper behind the game while it starts.
+ *
+ * It is here, in the Aerix menu, because that is the one screen the player can open during those
+ * first seconds - which means it can be flipped while the game is still booting and the change
+ * lands immediately, rather than on the next launch.
+ */
+@Composable
+private fun LoadingWallpaperRow(accent: Color, compact: Boolean) {
+    val context = LocalContext.current
+    val checked = AerixPreferences.loadingWallpaper
+    val shape = RoundedCornerShape(AerixRadii.card)
+
+    fun apply(value: Boolean) {
+        AerixPreferences.saveLoadingWallpaper(value)
+        AerixLoadingWallpaper.refresh(context)
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(AerixSurface.panelTrack.copy(alpha = 0.55f))
+            .border(1.dp, AerixSurface.borderSoft, shape)
+            .clickable(role = Role.Switch) { apply(!checked) }
+            .padding(
+                horizontal = if (compact) AerixSpacing.smPlus else AerixSpacing.md,
+                vertical = if (compact) AerixSpacing.xs else AerixSpacing.sm
+            ),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(if (compact) 28.dp else 34.dp)
+                .clip(RoundedCornerShape(AerixRadii.controlSmall))
+                .background(accent.copy(alpha = 0.18f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                painter = painterResource(R.drawable.aerix_ic_wallpaper),
+                contentDescription = null,
+                tint = accent,
+                modifier = Modifier.size(if (compact) 15.dp else 18.dp)
+            )
+        }
+        Spacer(Modifier.width(AerixSpacing.smPlus))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = stringResource(R.string.aerix_ingame_menu_loading_wallpaper),
+                color = AerixSurface.textPrimary,
+                fontSize = if (compact) 11.sp else 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (!compact) {
+                Text(
+                    text = stringResource(R.string.aerix_ingame_menu_loading_wallpaper_summary),
+                    color = AerixSurface.textMuted,
+                    fontSize = 10.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+        Spacer(Modifier.width(AerixSpacing.sm))
+        Switch(
+            checked = checked,
+            onCheckedChange = { apply(it) },
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = AerixSurface.onAccent,
+                checkedTrackColor = accent,
+                uncheckedThumbColor = AerixSurface.textSecondary,
+                uncheckedTrackColor = AerixSurface.panelTrack,
+                uncheckedBorderColor = AerixSurface.borderSoft
+            )
         )
     }
 }

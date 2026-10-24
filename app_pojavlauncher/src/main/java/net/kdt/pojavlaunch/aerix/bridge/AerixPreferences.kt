@@ -57,6 +57,8 @@ object AerixPreferences {
     const val KEY_THEME_MOTION = "launcherThemeMotion"
     /** True once the first-run guide has been completed or skipped. */
     const val KEY_GUIDE_PLAYED = "launcherGuidePlayed"
+    /** True when the launcher's wallpaper is drawn behind the controls while the game starts. */
+    const val KEY_LOADING_WALLPAPER = "loadingScreenWallpaper"
     const val KEY_LOG_TEXT_SIZE = "logTextSize"
     const val KEY_LOG_BUFFER_FLUSH_INTERVAL = "logBufferFlushInterval"
     const val KEY_ASSET_PLATFORM = "assetPlatformSource"
@@ -116,6 +118,10 @@ object AerixPreferences {
     var guidePlayed by mutableStateOf(false)
         private set
 
+    /** Draw the launcher's wallpaper behind the controls while the game starts. */
+    var loadingWallpaper by mutableStateOf(false)
+        private set
+
     /** Aerix "logTextSize" (5..20 sp) used by the log viewer. */
     var logTextSize by mutableIntStateOf(15)
 
@@ -163,6 +169,7 @@ object AerixPreferences {
         festivalEffects = p.getBoolean(KEY_FESTIVAL_EFFECTS, false)
         themeMotion = p.getBoolean(KEY_THEME_MOTION, true)
         guidePlayed = p.getBoolean(KEY_GUIDE_PLAYED, false)
+        loadingWallpaper = p.getBoolean(KEY_LOADING_WALLPAPER, false)
         logTextSize = p.getInt(KEY_LOG_TEXT_SIZE, 15).coerceIn(5, 20)
         logBufferFlushInterval = p.getInt(KEY_LOG_BUFFER_FLUSH_INTERVAL, DEFAULT_LOG_BUFFER_FLUSH_INTERVAL).coerceIn(100, 1000)
         assetPlatformSource = runCatching {
@@ -260,6 +267,11 @@ object AerixPreferences {
     fun saveGuidePlayed(value: Boolean) {
         guidePlayed = value
         edit { putBoolean(KEY_GUIDE_PLAYED, value) }
+    }
+
+    fun saveLoadingWallpaper(value: Boolean) {
+        loadingWallpaper = value
+        edit { putBoolean(KEY_LOADING_WALLPAPER, value) }
     }
 
     fun saveFestivalEffects(value: Boolean) {
