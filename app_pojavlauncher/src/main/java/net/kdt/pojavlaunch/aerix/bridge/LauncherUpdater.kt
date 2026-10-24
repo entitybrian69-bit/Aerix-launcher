@@ -64,7 +64,13 @@ internal object LauncherUpdater {
                             out.toByteArray()
                         }
                         require(bytes.size <= 256 * 1024) { "Release response is too large" }
-                        LauncherUpdatePolicy.release(bytes.toString(Charsets.UTF_8), BuildConfig.FLAVOR == "noruntime")
+                        LauncherUpdatePolicy.release(
+                            bytes.toString(Charsets.UTF_8),
+                            BuildConfig.FLAVOR == "noruntime",
+                            // The build for this device's own CPU: arm64 where it exists, arm32 on
+                            // the 32-bit phones, the universal APK where neither applies.
+                            LauncherUpdatePolicy.preferredAbi(Build.SUPPORTED_64_BIT_ABIS, Build.SUPPORTED_32_BIT_ABIS)
+                        )
                     }
                 } finally { response.disconnect(); connection = null }
                 withContext(Dispatchers.Main) {

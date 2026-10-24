@@ -135,21 +135,25 @@ android {
     }
 
     /*
-     * One APK per CPU architecture, only when asked for with -PabiSplits.
+     * One APK per CPU architecture, only when asked for with -PabiSplits. The release workflow asks.
      *
-     * A phone only ever uses one of them, but a universal APK carries every set of native
-     * libraries at once - which is most of the download. Splitting gives a 64-bit phone about
-     * 28 MB instead of 75 MB, with nothing removed: the other builds simply live in other files.
-     * The universal APK is still produced, so nothing about the release process has to change.
+     * A phone only ever uses one of them, but a universal APK carries every set of native libraries
+     * at once - which is most of the download. Splitting gives a 64-bit phone roughly half the file,
+     * with nothing removed: the other build simply lives in another file.
      *
-     * Opt-in rather than always on: the app bundle build does not accept split configuration.
+     * Only the two ARM builds are split, because those are the phones. The universal APK is always
+     * produced as well: it is what the x86 devices fall back to, and what the in-app updater uses if
+     * a release is ever missing a split.
+     *
+     * Opt-in rather than always on: the app bundle build does not accept split configuration, and
+     * the debug APK stays a single universal file for testing.
      */
     if (project.hasProperty("abiSplits")) {
         splits {
             abi {
                 enable true
                 reset()
-                include "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
+                include "armeabi-v7a", "arm64-v8a"
                 universalApk true
             }
         }

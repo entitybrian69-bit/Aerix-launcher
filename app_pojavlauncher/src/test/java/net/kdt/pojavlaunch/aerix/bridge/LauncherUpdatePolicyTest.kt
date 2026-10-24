@@ -66,4 +66,48 @@ class LauncherUpdatePolicyTest {
     @Test(expected = IllegalArgumentException::class) fun malformedChecksumIsRejected() {
         LauncherUpdatePolicy.release(metadata("Aerix-Launcher.apk", digest = "sha256:bad"), false)
     }
+
+    @Test fun theArchitectureDecidesWhichApkIsOffered() {
+        val arm64 = metadata(
+            "Aerix-Launcher-1.1.4-arm64-v8a.apk",
+            "Aerix-Launcher-1.1.4-armeabi-v7a.apk",
+            "Aerix-Launcher-1.1.4.apk"
+        )
+        assertEquals("Aerix-Launcher-1.1.4-arm64-v8a.apk",
+            LauncherUpdatePolicy.release(arm64, false, "arm64-v8a").asset.name)
+        assertEquals("Aerix-Launcher-1.1.4-armeabi-v7a.apk",
+            LauncherUpdatePolicy.release(arm64, false, "armeabi-v7a").asset.name)
+        // No split for this device: the universal build is used rather than failing.
+        assertEquals("Aerix-Launcher-1.1.4.apk",
+            LauncherUpdatePolicy.release(arm64, false, null).asset.name)
+    }
+    @Test fun aReleaseWithoutSplitsStillUpdates() {
+        val universalOnly = metadata("Aerix-Launcher-1.1.4.apk", "Aerix-Launcher-1.1.4-noruntime.apk")
+        assertEquals("Aerix-Launcher-1.1.4.apk",
+            LauncherUpdatePolicy.release(universalOnly, false, "arm64-v8a").asset.name)
+        assertEquals("Aerix-Launcher-1.1.4-noruntime.apk",
+            LauncherUpdatePolicy.release(universalOnly, true, "arm64-v8a").asset.name)
+    }
+    @Test fun theNoruntimeEditionPrefersItsOwnSplit() {
+        val release = metadata(
+            "Aerix-Launcher-1.1.4-arm64-v8a.apk",
+            "Aerix-Launcher-1.1.4-noruntime-arm64-v8a.apk",
+            "Aerix-Launcher-1.1.4-noruntime.apk"
+        )
+        assertEquals("Aerix-Launcher-1.1.4-noruntime-arm64-v8a.apk",
+            LauncherUpdatePolicy.release(release, true, "arm64-v8a").asset.name)
+        assertEquals("Aerix-Launcher-1.1.4-arm64-v8a.apk",
+            LauncherUpdatePolicy.release(release, false, "arm64-v8a").asset.name)
+    }
+    @Test fun theDevicePickUses64BitWhenThereIsOne() {
+        assertEquals("arm64-v8a", LauncherUpdatePolicy.preferredAbi(arrayOf("arm64-v8a", "armeabi-v7a"), arrayOf("armeabi-v7a")))
+        assertEquals("armeabi-v7a", LauncherUpdatePolicy.preferredAbi(arrayOf(), arrayOf("armeabi-v7a")))
+        // Neither ARM: x86 emulators and Chromebooks take the universal APK.
+        assertNull(LauncherUpdatePolicy.preferredAbi(arrayOf("x86_64"), arrayOf("x86")))
+    }
+    @Test fun theAssetNameSaysWhichBuildItIs() {
+        assertEquals("arm64", LauncherUpdateAsset("Aerix-Launcher-1.1.4-arm64-v8a.apk", "", 1, null).archLabel)
+        assertEquals("arm32", LauncherUpdateAsset("Aerix-Launcher-1.1.4-armeabi-v7a.apk", "", 1, null).archLabel)
+        assertNull(LauncherUpdateAsset("Aerix-Launcher-1.1.4.apk", "", 1, null).archLabel)
+    }
 }

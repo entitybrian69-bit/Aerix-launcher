@@ -168,7 +168,10 @@ internal fun LauncherUpdateDialog(activity: FragmentActivity, automatic: Boolean
                             }
                         }
                         LauncherUpdatePhase.AVAILABLE -> {
-                            Text("${release?.tag} · ${megabytes(release?.asset?.size ?: 0)} MB", color = accent,
+                            Text(
+                                "${release?.tag} · ${megabytes(release?.asset?.size ?: 0)} MB" +
+                                    (release?.asset?.archLabel?.let { " · $it" } ?: ""),
+                                color = accent,
                                 style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                             Text("Download the update here. Android will ask you to confirm installation; your instances stay in place.")
                             Text("See What's new for the published changes. Cancel or accept this download and this release won't prompt you again; manual updates remain in Settings.", style = MaterialTheme.typography.bodyMedium)
