@@ -248,6 +248,72 @@ fun WallpapersScreen(modifier: Modifier = Modifier) {
             }
         }
 
+        // ---- motion and blur: one switch and one meter, for every wallpaper -------------------
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .liquidGlass(
+                    shape = RoundedCornerShape(AerixRadii.cardSmall),
+                    tint = AerixSurface.glassTint,
+                    strength = 0.9f,
+                    elevation = AerixMetrics.glassFloatingElevation
+                ),
+            shape = RoundedCornerShape(AerixRadii.cardSmall),
+            color = AerixSurface.panelRaised.copy(alpha = 0.66f),
+            border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = AerixSpacing.md, vertical = AerixSpacing.smCompact),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus)
+            ) {
+                // One button for everything that moves, in this page and in the launcher chrome.
+                Surface(
+                    shape = RoundedCornerShape(AerixRadii.compact),
+                    color = if (AerixPreferences.themeMotion) activeAccent.copy(alpha = 0.2f) else AerixSurface.panel,
+                    border = BorderStroke(
+                        AerixSpacing.hairline,
+                        if (AerixPreferences.themeMotion) activeAccent else AerixSurface.borderSoft
+                    ),
+                    onClick = { AerixPreferences.saveThemeMotion(!AerixPreferences.themeMotion) }
+                ) {
+                    Text(
+                        text = stringResource(
+                            if (AerixPreferences.themeMotion) R.string.aerix_wallpaper_motion_on
+                            else R.string.aerix_wallpaper_motion_off
+                        ),
+                        color = if (AerixPreferences.themeMotion) activeAccent else AerixSurface.textPrimary,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = AerixSpacing.smPlus, vertical = AerixSpacing.smCompact)
+                    )
+                }
+
+                // Blur meter: applied to every wallpaper, bundled or custom, from the same setting
+                // the Appearance page uses.
+                Text(
+                    text = stringResource(R.string.aerix_wallpaper_blur, AerixPreferences.backgroundBlur),
+                    color = AerixSurface.textSecondary,
+                    fontSize = 11.sp
+                )
+                Slider(
+                    value = AerixPreferences.backgroundBlur.toFloat(),
+                    onValueChange = { AerixPreferences.saveBackgroundBlur(it.toInt()) },
+                    valueRange = 0f..20f,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(24.dp),
+                    colors = SliderDefaults.colors(
+                        thumbColor = activeAccent,
+                        activeTrackColor = activeAccent,
+                        inactiveTrackColor = AerixSurface.canvas
+                    )
+                )
+            }
+        }
+
         // ---- three column grid of the HD wallpapers -------------------------------------------
         LazyVerticalGrid(
             columns = GridCells.Fixed(3),

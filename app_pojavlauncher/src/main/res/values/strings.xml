@@ -70,8 +70,11 @@
     <string name="mcl_setting_renderer_mobileglues">MobileGlues (OpenGL ES) - (1.17+ only)</string>
     <string name="mcl_setting_renderer_sfpew">SFPEW/MobileGlues (OpenGL ES) - (all versions)</string>
     <string name="mcl_setting_renderer_proton">Proton (OpenGL over PowerVR) - 32-bit devices only</string>
+    <string name="aerix_wallpaper_blur">Blur %1$d dp</string>
+    <string name="aerix_wallpaper_motion_on">Motion on</string>
+    <string name="aerix_wallpaper_motion_off">Motion off</string>
     <string name="aerix_settings_theme_motion">Animated theme</string>
-    <string name="aerix_settings_theme_motion_sub">The accent pulses and the selected items glow. Turning this off applies immediately.</string>
+    <string name="aerix_settings_theme_motion_sub">The accent pulses, selected items glow, and every wallpaper drifts with its own particles. Turning this off applies immediately.</string>
     <string name="mcl_setting_renderer_emesis">Emesis (OpenGL 3.2+ core) - all versions</string>
     <string name="mcl_setting_renderer_emesis_description">A super performant renderer built only to outmatch and outperform every other renderer, supporting all devices and versions.</string>
     <string name="mcl_setting_renderer_freedreno_kgsl">Freedreno (KGSL) - all versions</string>

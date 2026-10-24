@@ -22,6 +22,7 @@ package net.kdt.pojavlaunch.aerix.components
 
 import android.content.Context
 import android.graphics.BitmapFactory
+import android.os.Build
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -46,11 +47,12 @@ import kotlinx.coroutines.withContext
 import net.kdt.pojavlaunch.aerix.bridge.AerixPreferences
 import net.kdt.pojavlaunch.aerix.theme.AerixSurface
 import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
+import net.kdt.pojavlaunch.aerix.theme.ThemeMotion
 
 private var wallpaperCacheKey: String? = null
 private var wallpaperCacheBitmap: ImageBitmap? = null
 
-private fun decodeWallpaper(context: Context, id: String): ImageBitmap? {
+private fun decodeWallpaper(context: Context, id: String, softness: Int = 1): ImageBitmap? {
     val bytes: ByteArray? = when (id) {
         AerixThemeManager.WALLPAPER_NONE -> null
         AerixThemeManager.WALLPAPER_CUSTOM -> {
@@ -66,7 +68,10 @@ private fun decodeWallpaper(context: Context, id: String): ImageBitmap? {
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
     val metrics = context.resources.displayMetrics
-    val target = maxOf(metrics.widthPixels, metrics.heightPixels).coerceAtLeast(1)
+    // softness > 1 decodes the picture at a fraction of the screen resolution. Drawn back up with
+    // bilinear filtering that reads as a blur, which is the only way to offer the blur meter on
+    // devices below Android 12, where a real blur effect does not exist.
+    val target = (maxOf(metrics.widthPixels, metrics.heightPixels) / softness).coerceAtLeast(1)
     var sample = 1
     while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= target) sample *= 2
     val options = BitmapFactory.Options().apply { inSampleSize = sample }
@@ -82,26 +87,45 @@ fun AerixBackground(modifier: Modifier = Modifier, content: @Composable BoxScope
     val context = LocalContext.current
     val id = AerixPreferences.selectedWallpaper
     val revision = AerixThemeManager.wallpaperRevision
-    val cacheKey = "$id|$revision"
+    val blurDp = AerixPreferences.backgroundBlur
+    // Android 12+ blurs with a render effect; below that the bitmap is decoded smaller, so the
+    // meter still does something on every device this launcher supports.
+    val renderBlur = blurDp > 0 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+    val softness = if (blurDp > 0 && !renderBlur) (1 + blurDp / 4).coerceIn(1, 6) else 1
+    val cacheKey = "$id|$revision|$softness"
     var image by remember(cacheKey) { mutableStateOf(wallpaperCacheBitmap.takeIf { wallpaperCacheKey == cacheKey }) }
     LaunchedEffect(cacheKey) {
         if (wallpaperCacheKey != cacheKey || wallpaperCacheBitmap == null) {
-            val decoded = withContext(Dispatchers.IO) { runCatching { decodeWallpaper(context, id) }.getOrNull() }
+            val decoded = withContext(Dispatchers.IO) { runCatching { decodeWallpaper(context, id, softness) }.getOrNull() }
             wallpaperCacheKey = cacheKey
             wallpaperCacheBitmap = decoded
             image = decoded
         }
     }
+    // One switch for the whole launcher: the accent motion and everything on this page obey it.
+    val motion = ThemeMotion.rememberEnabled()
     Box(modifier.fillMaxSize().background(AerixSurface.canvas)) {
         val bitmap = image
         if (bitmap != null) {
-            val blur = AerixPreferences.backgroundBlur
+            // The drift is a layer transform, so it costs a redraw and never a recomposition; the
+            // blur sits outside it and therefore applies to every wallpaper, including custom ones.
+            val imageModifier = Modifier
+                .fillMaxSize()
+                .wallpaperDrift(motion)
+                .let { if (renderBlur) it.blur(blurDp.dp) else it }
             Image(
                 bitmap = bitmap,
                 contentDescription = null,
-                modifier = if (blur > 0) Modifier.fillMaxSize().blur(blur.dp) else Modifier.fillMaxSize(),
+                modifier = imageModifier,
                 contentScale = ContentScale.Crop
             )
+            if (motion) {
+                WallpaperParticleLayer(
+                    effect = wallpaperEffectFor(id),
+                    accent = AerixThemeManager.currentAccent(),
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
             Box(Modifier.fillMaxSize().background(AerixThemeManager.screenScrim()))
         } else {
             Box(
