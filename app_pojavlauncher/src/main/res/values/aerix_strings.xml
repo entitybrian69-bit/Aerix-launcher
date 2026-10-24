@@ -566,7 +566,8 @@
     <string name="aerix_logo_size_default">Default</string>
     <string name="aerix_logo_size_accessibility">Aerix menu. Tap to open; drag to move; hold to resize.</string>
 
-    <!-- Loading screen: the wallpaper behind the game while it starts. -->
-    <string name="aerix_loading_wallpaper_toggle">Use wallpaper as loading background</string>
-    <string name="aerix_loading_wallpaper_on">Wallpaper as loading background: on</string>
+
+    <!-- In-game menu: the wallpaper behind the game while it starts. -->
+    <string name="aerix_ingame_menu_loading_wallpaper">Use wallpaper as loading background</string>
+    <string name="aerix_ingame_menu_loading_wallpaper_summary">Shows your current wallpaper - or animation - instead of black while the game starts.</string>
 </resources>

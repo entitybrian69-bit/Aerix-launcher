@@ -66,9 +66,9 @@
 		</net.kdt.pojavlaunch.customcontrols.ControlLayout>
 
 		<!--
-			The loading screen. Deliberately empty apart from a spinner: no title, no warning text.
-			The wallpaper is drawn into this frame from code when the player turns it on, and the
-			toggle lives at the bottom. It is opaque black until then, which is the default.
+			The loading screen. Deliberately empty apart from a spinner: no title, no warning text,
+			no buttons. The wallpaper is drawn into this frame from code when the player has turned
+			it on in the in-game menu; until then it is opaque black, which is the default.
 		-->
 		<FrameLayout
 			android:id="@+id/main_loading_screen"

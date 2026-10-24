@@ -20,20 +20,14 @@ package net.kdt.pojavlaunch.aerix.loading
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.graphics.Typeface
-import android.graphics.drawable.GradientDrawable
-import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
-import android.widget.TextView
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
-import androidx.core.view.ViewCompat
-import androidx.core.view.setPadding
 import androidx.activity.OnBackPressedDispatcherOwner
 import androidx.activity.findViewTreeOnBackPressedDispatcherOwner
 import androidx.activity.setViewTreeOnBackPressedDispatcherOwner
@@ -46,15 +40,13 @@ import androidx.lifecycle.setViewTreeViewModelStoreOwner
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.findViewTreeSavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
-import net.kdt.pojavlaunch.R
-import net.kdt.pojavlaunch.aerix.bridge.AerixColorTheme
 import net.kdt.pojavlaunch.aerix.bridge.AerixPreferences
 import net.kdt.pojavlaunch.aerix.components.AerixBackground
 import net.kdt.pojavlaunch.aerix.theme.AerixLauncherTheme
 
 /**
- * Puts the launcher's wallpaper behind the loading screen, and lets the player switch it on or off
- * from that screen itself.
+ * Puts the launcher's wallpaper behind the loading screen, when the player has asked for it in the
+ * in-game Aerix menu.
  *
  * Off - the default - the screen is opaque black, exactly as it always was.
  *
@@ -62,42 +54,41 @@ import net.kdt.pojavlaunch.aerix.theme.AerixLauncherTheme
  * recorded animations, or an imported clip, all through the same [AerixBackground] the launcher
  * uses. Nothing is special-cased, so it always matches what is set.
  *
- * The toggle works in place: the state is a Compose [mutableStateOf] and the preference is written
- * the moment it is tapped, so it applies immediately without leaving the game or the screen, and
- * it is remembered for next time.
+ * The switch that controls it is in the in-game Aerix menu, with the rest of the settings, and the
+ * choice is remembered for the next launch.
  *
  * Everything is torn down in [detach], which the activity calls as the game window appears - so the
  * wallpaper, and any video decoding with it, is gone before the Mojang logo is on screen.
  */
 object AerixLoadingWallpaper {
-    private const val AERIX_BLUE = 0xFF63C6F2.toInt()
-
     private var enabled by mutableStateOf(false)
     private var composeView: ComposeView? = null
-    private var toggle: TextView? = null
     private var host: ViewGroup? = null
 
-    /** Adds the toggle to [loadingScreen], and the wallpaper too if it was left on. */
+    /**
+     * Adds the wallpaper layer to [loadingScreen] when the setting is on. Nothing else is added:
+     * the switch that controls it lives in the in-game Aerix menu, not on the loading screen.
+     */
     @JvmStatic
     fun attach(loadingScreen: ViewGroup) {
         if (host === loadingScreen) return
         detach()
         host = loadingScreen
-        runCatching { AerixPreferences.init(loadingScreen.context.applicationContext) }
-        enabled = runCatching { AerixPreferences.loadingWallpaper }.getOrDefault(false)
-
-        toggle = buildToggle(loadingScreen.context).also { button ->
-            button.setOnClickListener { setEnabled(loadingScreen.context, !enabled) }
-            val params = FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply {
-                gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
-                bottomMargin = (56 * loadingScreen.resources.displayMetrics.density).toInt()
-            }
-            loadingScreen.addView(button, params)
-        }
+        enabled = readPref(loadingScreen.context)
         applyState()
+    }
+
+    /** Re-reads the setting, for the menu to call when the switch is flipped. */
+    @JvmStatic
+    fun refresh(context: Context) {
+        val screen = host ?: return
+        enabled = readPref(context)
+        applyState()
+    }
+
+    private fun readPref(context: Context): Boolean {
+        runCatching { AerixPreferences.init(context.applicationContext) }
+        return runCatching { AerixPreferences.loadingWallpaper }.getOrDefault(false)
     }
 
     /**
@@ -142,16 +133,8 @@ object AerixLoadingWallpaper {
         }
     }
 
-    /** Switches the wallpaper on or off without leaving the screen. */
-    @JvmStatic
-    fun setEnabled(context: Context, value: Boolean) {
-        enabled = value
-        runCatching { AerixPreferences.saveLoadingWallpaper(value) }
-        applyState()
-    }
-
     /**
-     * Removes the wallpaper and the toggle. Called when the game window appears: from that moment
+     * Removes the wallpaper. Called when the game window appears: from that moment
      * the game draws itself, and anything of ours still decoding would only cost frames.
      */
     @JvmStatic
@@ -161,8 +144,6 @@ object AerixLoadingWallpaper {
         // same clean fade it has always been rather than a see-through one.
         host?.setBackgroundColor(0xFF000000.toInt())
         dropComposeView()
-        toggle?.let { (it.parent as? ViewGroup)?.removeView(it) }
-        toggle = null
         host = null
     }
 
@@ -177,44 +158,7 @@ object AerixLoadingWallpaper {
             dropComposeView()
             screen.setBackgroundColor(0xFF000000.toInt())
         }
-        toggle?.let { styleToggle(it, enabled, accentColor()) }
     }
-
-    private fun buildToggle(context: Context): TextView = TextView(context).apply {
-        text = context.getString(R.string.aerix_loading_wallpaper_toggle)
-        textSize = 13f
-        typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        gravity = Gravity.CENTER
-        setPadding(dp(context, 18), dp(context, 11), dp(context, 18), dp(context, 11))
-        isClickable = true
-        isFocusable = true
-        elevation = dp(context, 6).toFloat()
-    }
-
-    /** The accent the launcher is using, read from the preferences rather than the theme. */
-    private fun accentColor(): Int = runCatching {
-        if (AerixPreferences.colorTheme == AerixColorTheme.CUSTOM) {
-            AerixPreferences.customColor
-        } else {
-            AERIX_BLUE
-        }
-    }.getOrDefault(AERIX_BLUE)
-
-    private fun styleToggle(button: TextView, on: Boolean, accentColor: Int) {
-        val shape = GradientDrawable().apply {
-            cornerRadius = dp(button.context, 20).toFloat()
-            setColor(if (on) accentColor else 0xE6141B24.toInt())
-            setStroke(dp(button.context, 1), if (on) accentColor else 0x66FFFFFF)
-        }
-        ViewCompat.setBackground(button, shape)
-        button.setTextColor(if (on) 0xFF0A1016.toInt() else 0xFFFFFFFF.toInt())
-        button.text = button.context.getString(
-            if (on) R.string.aerix_loading_wallpaper_on else R.string.aerix_loading_wallpaper_toggle
-        )
-    }
-
-    private fun dp(context: Context, value: Int): Int =
-        (value * context.resources.displayMetrics.density).toInt()
 
     /**
      * A ComposeView added to this activity's view tree needs the owners the activity provides;
