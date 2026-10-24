@@ -32,20 +32,21 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
+import androidx.compose.ui.graphics.toArgb
 import androidx.core.view.ViewCompat
 import androidx.core.view.setPadding
+import androidx.activity.OnBackPressedDispatcherOwner
+import androidx.activity.findViewTreeOnBackPressedDispatcherOwner
+import androidx.activity.setViewTreeOnBackPressedDispatcherOwner
 import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.OnBackPressedDispatcherOwner
-import androidx.lifecycle.SavedStateRegistryOwner
 import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.findViewTreeLifecycleOwner
-import androidx.lifecycle.findViewTreeOnBackPressedDispatcherOwner
-import androidx.lifecycle.findViewTreeSavedStateRegistryOwner
 import androidx.lifecycle.findViewTreeViewModelStoreOwner
 import androidx.lifecycle.setViewTreeLifecycleOwner
-import androidx.lifecycle.setViewTreeOnBackPressedDispatcherOwner
-import androidx.lifecycle.setViewTreeSavedStateRegistryOwner
 import androidx.lifecycle.setViewTreeViewModelStoreOwner
+import androidx.savedstate.SavedStateRegistryOwner
+import androidx.savedstate.findViewTreeSavedStateRegistryOwner
+import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import net.kdt.pojavlaunch.R
 import net.kdt.pojavlaunch.aerix.bridge.AerixPreferences
 import net.kdt.pojavlaunch.aerix.components.AerixBackground
@@ -153,8 +154,8 @@ object AerixLoadingWallpaper {
         // Opaque black with nothing behind it, or see-through so the wallpaper shows.
         screen.setBackgroundColor(if (enabled) 0x00000000 else 0xFF000000.toInt())
         composeView?.visibility = if (enabled) View.VISIBLE else View.GONE
-        val accent = runCatching { AerixThemeManager.currentAccent() }.getOrNull()
-        toggle?.let { styleToggle(it, enabled, accent?.value?.let { v -> (v shr 32).toInt() }) }
+        val accent = runCatching { AerixThemeManager.currentAccent().toArgb() }.getOrNull()
+        toggle?.let { styleToggle(it, enabled, accent) }
     }
 
     private fun buildToggle(context: Context): TextView = TextView(context).apply {
