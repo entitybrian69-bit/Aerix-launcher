@@ -119,8 +119,8 @@ object AerixThemeManager {
     fun applyBundledClip(clip: net.kdt.pojavlaunch.aerix.components.BundledClip) {
         AerixPreferences.saveSelectedWallpaper(bundledClipId(clip))
         AerixPreferences.saveCustomColor(clip.accent.toArgb())
-        AerixPreferences.saveThemeId(THEME_CUSTOM)
-        if (AerixPreferences.wallpaperOpacity >= 95) AerixPreferences.saveWallpaperOpacity(72)
+        AerixPreferences.saveColorTheme(AerixColorTheme.CUSTOM)
+        if (AerixPreferences.backgroundOpacity >= 95) AerixPreferences.saveBackgroundOpacity(72)
         wallpaperRevision++
     }
 
