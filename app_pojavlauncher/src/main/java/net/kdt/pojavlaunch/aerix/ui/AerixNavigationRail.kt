@@ -73,6 +73,9 @@ import net.kdt.pojavlaunch.aerix.theme.AerixMetrics
 import net.kdt.pojavlaunch.aerix.theme.AerixRadii
 import net.kdt.pojavlaunch.aerix.theme.AerixSpacing
 import net.kdt.pojavlaunch.aerix.theme.AerixSurface
+import net.kdt.pojavlaunch.aerix.theme.ThemeMotion
+import net.kdt.pojavlaunch.aerix.theme.accentGlow
+import net.kdt.pojavlaunch.aerix.theme.accentRing
 import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
 
 /** Primary destinations kept visible while the Aerix launcher is open. */
@@ -238,8 +241,12 @@ private fun RailIconItem(
 ) {
     // The selected item uses the current theme accent; icon, fill and border update together.
     val selectedContentColor = MaterialTheme.colorScheme.onPrimary
+    // With the animated theme on, the selected item's accent breathes and carries a glow. Off, it
+    // is the identical flat accent as before - and no animation is started for unselected items.
+    val motionOn = ThemeMotion.rememberEnabled()
+    val liveAccent = ThemeMotion.rememberPulse(accentColor, selected, motionOn)
     val containerColor by animateColorAsState(
-        targetValue = if (selected) accentColor else AerixSurface.panel,
+        targetValue = if (selected) liveAccent else AerixSurface.panel,
         animationSpec = tween(140),
         label = "railContainerColor"
     )
@@ -264,7 +271,9 @@ private fun RailIconItem(
             .size(width = itemWidth, height = itemHeight)
             .clip(itemShape)
             .background(containerColor)
-            .border(BorderStroke(AerixSpacing.hairline, if (selected) accentColor else AerixSurface.borderSoft), itemShape)
+            .accentGlow(liveAccent, selected, motionOn)
+            .accentRing(liveAccent, itemShape, selected, motionOn, AerixSpacing.hairline)
+            .border(BorderStroke(AerixSpacing.hairline, if (selected) liveAccent else AerixSurface.borderSoft), itemShape)
             .clickable(role = Role.Tab, onClick = onClick)
             .semantics { contentDescription = label },
         contentAlignment = Alignment.Center

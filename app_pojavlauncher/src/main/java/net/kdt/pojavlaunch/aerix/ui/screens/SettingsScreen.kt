@@ -144,6 +144,9 @@ import net.kdt.pojavlaunch.aerix.theme.AerixMetrics
 import net.kdt.pojavlaunch.aerix.theme.AerixRadii
 import net.kdt.pojavlaunch.aerix.theme.AerixSpacing
 import net.kdt.pojavlaunch.aerix.theme.AerixSurface
+import net.kdt.pojavlaunch.aerix.theme.ThemeMotion
+import net.kdt.pojavlaunch.aerix.theme.accentGlow
+import net.kdt.pojavlaunch.aerix.theme.accentRing
 import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
 import net.kdt.pojavlaunch.aerix.ui.AerixNav
 import net.kdt.pojavlaunch.aerix.ui.LauncherSection
@@ -453,8 +456,14 @@ private fun RendererTabContent(activity: FragmentActivity) {
                                 }
                                 PojavSettingsBridge.writeString(activity, "renderer", targetId)
                             }
+                            // The selected tile takes the accent as a pulsing glow; with the
+                            // animated theme off it is the same flat border as before, and no
+                            // animation is created at all.
+                            val motionOn = ThemeMotion.rememberEnabled()
+                            val accent = AerixThemeManager.currentAccent()
+                            val liveAccent = ThemeMotion.rememberPulse(accent, isSelected, motionOn)
                             val borderColor by animateColorAsState(
-                                targetValue = if (isSelected) AerixThemeManager.currentAccent() else AerixSurface.panelRaised,
+                                targetValue = if (isSelected) liveAccent else AerixSurface.panelRaised,
                                 animationSpec = tween(160),
                                 label = "rendererOptionBorder"
                             )
@@ -464,9 +473,13 @@ private fun RendererTabContent(activity: FragmentActivity) {
                                 label = "rendererOptionBg"
                             )
 
+                            val tileShape = RoundedCornerShape(AerixRadii.control)
                             Surface(
-                                modifier = Modifier.weight(1f),
-                                shape = RoundedCornerShape(AerixRadii.control),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .accentGlow(liveAccent, isSelected, motionOn)
+                                    .accentRing(liveAccent, tileShape, isSelected, motionOn, 1.5.dp),
+                                shape = tileShape,
                                 color = cardBg,
                                 border = BorderStroke(if (isSelected) 1.5.dp else AerixSpacing.hairline, borderColor),
                                 onClick = selectOption
@@ -1467,8 +1480,15 @@ private fun LauncherTabContent(activity: FragmentActivity) {
         // Group 3: Animation speed, extent & swap transition type
         item {
             SettingsCardColumn(modifier = Modifier.fillMaxWidth()) {
-                MiraiSliderSettingsCard(
+                MiraiSwitchSettingsCard(
                     position = CardPosition.Top,
+                    title = stringResource(R.string.aerix_settings_theme_motion),
+                    summary = stringResource(R.string.aerix_settings_theme_motion_sub),
+                    checked = AerixPreferences.themeMotion,
+                    onCheckedChange = { AerixPreferences.saveThemeMotion(it) }
+                )
+                MiraiSliderSettingsCard(
+                    position = CardPosition.Middle,
                     title = stringResource(R.string.aerix_settings_animate_speed),
                     summary = stringResource(R.string.aerix_settings_animate_speed_sub),
                     value = AerixPreferences.animateSpeed,
