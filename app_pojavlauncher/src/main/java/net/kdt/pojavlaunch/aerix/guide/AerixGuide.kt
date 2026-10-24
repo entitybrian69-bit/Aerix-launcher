@@ -132,8 +132,12 @@ fun AerixGuideOverlay(
         }
     }
 
-    val next = {
-        if (index >= steps.lastIndex) onFinished() else index++
+    val next: () -> Unit = {
+        if (index >= steps.lastIndex) {
+            onFinished()
+        } else {
+            index++
+        }
     }
 
     BoxWithConstraints(
@@ -212,6 +216,8 @@ fun AerixGuideOverlay(
             }
         } else {
             val cardPadding = with(density) { 16.dp.toPx() }
+            // Roughly the height of the card; below it the card goes above the anchor instead.
+            val cardSpaceGuess = with(density) { 190.dp.toPx() }
             val local = Rect(
                 left = anchor.left - origin.x,
                 top = anchor.top - origin.y,
@@ -229,7 +235,7 @@ fun AerixGuideOverlay(
                         .padding(start = with(density) { (local.right + cardPadding).toDp() }, end = 16.dp),
                     contentAlignment = Alignment.CenterStart
                 ) { card(Modifier) }
-            } else if (spaceBelow >= 170.dp.toPx() || spaceBelow >= spaceAbove) {
+            } else if (spaceBelow >= cardSpaceGuess || spaceBelow >= spaceAbove) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()

@@ -243,9 +243,9 @@ private fun RailIconItem(
     accentColor: Color,
     expanded: Boolean,
     compact: Boolean,
-    onClick: () -> Unit,
     /** Names this item for the first-run guide, so the tour can point at it. */
-    guideKey: String? = null
+    guideKey: String? = null,
+    onClick: () -> Unit
 ) {
     // The selected item uses the current theme accent; icon, fill and border update together.
     val selectedContentColor = MaterialTheme.colorScheme.onPrimary

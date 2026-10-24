@@ -115,7 +115,6 @@ object AerixPreferences {
     /** Set once the first-run tour has been shown, so it never appears again on its own. */
     var guidePlayed by mutableStateOf(false)
         private set
-        private set
 
     /** Aerix "logTextSize" (5..20 sp) used by the log viewer. */
     var logTextSize by mutableIntStateOf(15)
