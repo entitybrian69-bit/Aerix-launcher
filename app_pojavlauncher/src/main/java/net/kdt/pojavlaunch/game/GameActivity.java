@@ -675,12 +675,15 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     private void showGameMenu() {
         if (mGameMenuOverlay == null) return;
         drawerLayout.closeDrawers();
+        // The readout belongs to the game, not to the menu: it would sit on top of the buttons.
+        if (mFpsView != null) mFpsView.setVisibility(View.GONE);
         mGameMenuOverlay.showMenu();
     }
 
     private void hideGameMenu() {
         if (mGameMenuOverlay == null) return;
         mGameMenuOverlay.hideMenu();
+        updateFpsViewVisibility();
     }
 
     /**

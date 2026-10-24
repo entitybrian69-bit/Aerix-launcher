@@ -50,7 +50,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
@@ -87,6 +86,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.abs
@@ -153,7 +153,7 @@ private fun rememberGameMenuPalette(): GameMenuPalette {
  *
  * @param revision bumped by the host every time the menu is opened, so it animates in again
  * @param target instance the game runs, used by the downloader page
- * @param versionLine version of the launcher, shown in the bottom bar
+ * @param versionLine version of the launcher, shown under the title
  * @param onBackHandlerChanged receives the handler of the back button while the menu is on screen
  * @param onCloseRequest closes the menu
  */
@@ -168,7 +168,9 @@ fun GameMenuScreen(
 ) {
     val context = LocalContext.current
     val palette = rememberGameMenuPalette()
-    val account = remember { PojavAccountBridge.current }
+    // Read through the state, not remembered: the accounts are loaded from disk when the menu
+    // opens, and the panel has to fill in as soon as they arrive.
+    val account = PojavAccountBridge.current
     var page by remember { mutableStateOf(GameMenuPage.MAIN) }
     var shown by remember { mutableStateOf(false) }
 
@@ -242,18 +244,21 @@ private fun GameMenuMainPage(
         contentAlignment = Alignment.Center
     ) {
         val compact = maxHeight < 480.dp
-        val columnWidth = maxWidth.coerceAtMost(980.dp)
+        val columnWidth = maxWidth.coerceAtMost(1000.dp)
+        val rowHeight = if (compact) 46.dp else 52.dp
         Column(
             modifier = Modifier
                 .width(columnWidth)
+                .fillMaxHeight()
                 .padding(horizontal = AerixSpacing.mdPlus, vertical = AerixSpacing.sm),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            MenuHeader(compact = compact, versionLine = versionLine)
-            Spacer(Modifier.height(if (compact) AerixSpacing.sm else AerixSpacing.mdPlus))
-
-            Row(modifier = Modifier.fillMaxWidth().weight(1f)) {
-                // Left half: every action, small and stacked. The other half belongs to the player.
+            Row(
+                modifier = Modifier.fillMaxWidth().weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(AerixSpacing.md)
+            ) {
+                // Left half: the actions, starting with the two that matter most - back to the
+                // game, then the log. Everything is a full-width row, tall enough to hit.
                 Column(
                     modifier = Modifier
                         .weight(1f)
@@ -262,10 +267,28 @@ private fun GameMenuMainPage(
                     verticalArrangement = Arrangement.spacedBy(AerixSpacing.xs)
                 ) {
                     CompactMenuButton(
+                        label = stringResource(R.string.aerix_ingame_menu_resume),
+                        iconRes = R.drawable.aerix_ic_play_arrow_filled,
+                        color = palette.resume,
+                        compact = compact,
+                        height = rowHeight,
+                        emphasized = true,
+                        onClick = callbacks::onResumeGame
+                    )
+                    CompactMenuButton(
+                        label = stringResource(R.string.aerix_ingame_menu_logs),
+                        iconRes = R.drawable.aerix_ic_terminal_outlined,
+                        color = palette.tiles[4],
+                        compact = compact,
+                        height = rowHeight,
+                        onClick = { onCloseRequest(); callbacks.onLogOutput() }
+                    )
+                    CompactMenuButton(
                         label = stringResource(R.string.aerix_ingame_menu_controls),
                         iconRes = R.drawable.aerix_ic_touch_app_outlined,
                         color = palette.tiles[0],
                         compact = compact,
+                        height = rowHeight,
                         onClick = { onCloseRequest(); callbacks.onCustomControls() }
                     )
                     CompactMenuButton(
@@ -273,6 +296,7 @@ private fun GameMenuMainPage(
                         iconRes = R.drawable.aerix_ic_keyboard_outlined,
                         color = palette.tiles[1],
                         compact = compact,
+                        height = rowHeight,
                         onClick = { onCloseRequest(); callbacks.onSendCustomKey() }
                     )
                     CompactMenuButton(
@@ -280,6 +304,7 @@ private fun GameMenuMainPage(
                         iconRes = R.drawable.aerix_ic_settings_filled,
                         color = palette.tiles[2],
                         compact = compact,
+                        height = rowHeight,
                         onClick = { onCloseRequest(); callbacks.onQuickSettings() }
                     )
                     CompactMenuButton(
@@ -287,56 +312,48 @@ private fun GameMenuMainPage(
                         iconRes = R.drawable.aerix_ic_cloud_download,
                         color = palette.tiles[3],
                         compact = compact,
+                        height = rowHeight,
                         onClick = onOpenDownloads
-                    )
-                    CompactMenuButton(
-                        label = stringResource(R.string.aerix_ingame_menu_logs),
-                        iconRes = R.drawable.aerix_ic_terminal_outlined,
-                        color = palette.tiles[4],
-                        compact = compact,
-                        onClick = { onCloseRequest(); callbacks.onLogOutput() }
-                    )
-                    CompactMenuButton(
-                        label = stringResource(R.string.aerix_ingame_menu_force_close),
-                        iconRes = R.drawable.aerix_ic_close,
-                        color = palette.tiles[5],
-                        compact = compact,
-                        onClick = { onCloseRequest(); callbacks.onForceCloseGame() }
                     )
                     CompactMenuButton(
                         label = if (net.kdt.pojavlaunch.recording.RecordingState.isActive()) "Stop recording" else "Screen recorder",
                         iconRes = R.drawable.aerix_ic_record,
                         color = palette.tiles[0],
                         compact = compact,
+                        height = rowHeight,
                         onClick = { onCloseRequest(); callbacks.onScreenRecorder() }
                     )
-                    LoadingWallpaperRow(accent = palette.accent, compact = compact)
-
-                    Spacer(Modifier.height(AerixSpacing.xs))
-                    ResumeButton(
-                        color = palette.resume,
+                    CompactMenuButton(
+                        label = stringResource(R.string.aerix_ingame_menu_force_close),
+                        iconRes = R.drawable.aerix_ic_close,
+                        color = palette.tiles[5],
                         compact = compact,
-                        onClick = callbacks::onResumeGame
+                        height = rowHeight,
+                        onClick = { onCloseRequest(); callbacks.onForceCloseGame() }
                     )
+                    LoadingWallpaperRow(accent = palette.accent, compact = compact, height = rowHeight)
                 }
 
-                Spacer(Modifier.width(AerixSpacing.md))
-
-                // Right half: the character the game is running as, and how they signed in.
-                AccountStage(
-                    account = account,
-                    accent = palette.accent,
-                    compact = compact,
-                    modifier = Modifier.weight(1f).fillMaxHeight()
-                )
+                // Right half: the title, then the character the game is running as.
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    MenuHeader(compact = compact, versionLine = versionLine)
+                    Spacer(Modifier.height(AerixSpacing.sm))
+                    AccountStage(
+                        account = account,
+                        accent = palette.accent,
+                        compact = compact,
+                        modifier = Modifier.weight(1f).fillMaxWidth()
+                    )
+                }
             }
 
             Spacer(Modifier.height(AerixSpacing.sm))
-            MenuBottomBar(
-                versionLine = versionLine,
-                compact = compact,
-                onClose = onCloseRequest
-            )
+            MenuBottomBar(compact = compact, onClose = onCloseRequest)
         }
     }
 }
@@ -347,7 +364,7 @@ private fun MenuHeader(compact: Boolean, versionLine: String) {
         Image(
             painter = painterResource(R.drawable.ic_aerix_mark),
             contentDescription = null,
-            modifier = Modifier.size(if (compact) 34.dp else 44.dp)
+            modifier = Modifier.size(if (compact) 36.dp else 46.dp)
         )
         Spacer(Modifier.height(AerixSpacing.xs))
         Text(
@@ -374,7 +391,7 @@ private fun MenuHeader(compact: Boolean, versionLine: String) {
  * lands immediately, rather than on the next launch.
  */
 @Composable
-private fun LoadingWallpaperRow(accent: Color, compact: Boolean) {
+private fun LoadingWallpaperRow(accent: Color, compact: Boolean, height: Dp) {
     val context = LocalContext.current
     val checked = AerixPreferences.loadingWallpaper
     val shape = RoundedCornerShape(AerixRadii.controlSmall)
@@ -387,33 +404,33 @@ private fun LoadingWallpaperRow(accent: Color, compact: Boolean) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(if (compact) 34.dp else 40.dp)
+            .height(height)
             .clip(shape)
             .background(accent.copy(alpha = 0.10f))
             .border(1.dp, accent.copy(alpha = 0.35f), shape)
             .clickable(role = Role.Switch) { apply(!checked) }
-            .padding(horizontal = AerixSpacing.sm),
+            .padding(horizontal = AerixSpacing.smPlus),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
             modifier = Modifier
-                .size(if (compact) 20.dp else 24.dp)
-                .clip(RoundedCornerShape(AerixRadii.micro))
-                .background(accent.copy(alpha = 0.22f)),
+                .size(if (compact) 28.dp else 32.dp)
+                .clip(RoundedCornerShape(AerixRadii.compact))
+                .background(accent.copy(alpha = 0.24f)),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 painter = painterResource(R.drawable.aerix_ic_wallpaper),
                 contentDescription = null,
                 tint = accent,
-                modifier = Modifier.size(if (compact) 13.dp else 15.dp)
+                modifier = Modifier.size(if (compact) 16.dp else 18.dp)
             )
         }
         Spacer(Modifier.width(AerixSpacing.sm))
         Text(
             text = stringResource(R.string.aerix_ingame_menu_loading_wallpaper),
             color = AerixSurface.textPrimary,
-            fontSize = if (compact) 10.sp else 11.5.sp,
+            fontSize = if (compact) 11.sp else 12.5.sp,
             fontWeight = FontWeight.SemiBold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -439,50 +456,57 @@ private fun CompactMenuButton(
     iconRes: Int,
     color: Color,
     compact: Boolean,
-    onClick: () -> Unit
+    height: Dp,
+    onClick: () -> Unit,
+    emphasized: Boolean = false
 ) {
-    val shape = RoundedCornerShape(AerixRadii.controlSmall)
+    val shape = RoundedCornerShape(AerixRadii.control)
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val scale by animateFloatAsState(if (pressed) 0.97f else 1f, label = "compactButton")
+    val onColor = if (emphasized && color.luminance() > 0.45f) AerixSurface.canvas else AerixSurface.textPrimary
+    val background = if (emphasized) color.copy(alpha = 0.92f) else color.copy(alpha = 0.12f)
+    val outline = if (emphasized) color else color.copy(alpha = 0.38f)
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(if (compact) 34.dp else 40.dp)
+            .height(height)
             .graphicsLayer { scaleX = scale; scaleY = scale }
             .clip(shape)
-            .background(color.copy(alpha = 0.10f))
-            .border(1.dp, color.copy(alpha = 0.35f), shape)
+            .background(background)
+            .border(1.dp, outline, shape)
             .clickable(
                 interactionSource = interaction,
                 indication = null,
                 role = Role.Button,
                 onClick = onClick
             )
-            .padding(horizontal = AerixSpacing.sm),
+            .padding(horizontal = AerixSpacing.smPlus),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
             modifier = Modifier
-                .size(if (compact) 20.dp else 24.dp)
-                .clip(RoundedCornerShape(AerixRadii.micro))
-                .background(color.copy(alpha = 0.22f)),
+                .size(if (compact) 28.dp else 32.dp)
+                .clip(RoundedCornerShape(AerixRadii.compact))
+                .background(
+                    if (emphasized) onColor.copy(alpha = 0.14f) else color.copy(alpha = 0.24f)
+                ),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 painter = painterResource(iconRes),
                 contentDescription = null,
-                tint = color,
-                modifier = Modifier.size(if (compact) 13.dp else 15.dp)
+                tint = if (emphasized) onColor else color,
+                modifier = Modifier.size(if (compact) 16.dp else 18.dp)
             )
         }
-        Spacer(Modifier.width(AerixSpacing.sm))
+        Spacer(Modifier.width(AerixSpacing.smPlus))
         Text(
             text = label,
-            color = AerixSurface.textPrimary,
-            fontSize = if (compact) 10.sp else 11.5.sp,
-            fontWeight = FontWeight.SemiBold,
+            color = onColor,
+            fontSize = if (compact) 12.sp else 13.5.sp,
+            fontWeight = if (emphasized) FontWeight.Bold else FontWeight.SemiBold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
@@ -490,48 +514,7 @@ private fun CompactMenuButton(
 }
 
 @Composable
-private fun ResumeButton(color: Color, compact: Boolean, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(AerixRadii.controlSmall)
-    val interaction = remember { MutableInteractionSource() }
-    val onColor = if (color.luminance() > 0.45f) AerixSurface.canvas else Color.White
-    val pressedState by interaction.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressedState) 0.98f else 1f, label = "resumeButton")
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(if (compact) 34.dp else 40.dp)
-            .graphicsLayer { scaleX = scale; scaleY = scale }
-            .clip(shape)
-            .background(Brush.horizontalGradient(listOf(color, color.copy(alpha = 0.8f))))
-            .clickable(
-                interactionSource = interaction,
-                indication = null,
-                role = Role.Button,
-                onClick = onClick
-            ),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            painter = painterResource(R.drawable.aerix_ic_play_arrow_filled),
-            contentDescription = null,
-            tint = onColor,
-            modifier = Modifier.size(if (compact) 13.dp else 15.dp)
-        )
-        Spacer(Modifier.width(AerixSpacing.sm))
-        Text(
-            text = stringResource(R.string.aerix_ingame_menu_resume),
-            color = onColor,
-            fontSize = if (compact) 11.sp else 12.sp,
-            fontWeight = FontWeight.Bold
-        )
-    }
-}
-
-@Composable
 private fun MenuBottomBar(
-    versionLine: String,
     compact: Boolean,
     onClose: () -> Unit
 ) {
@@ -540,16 +523,6 @@ private fun MenuBottomBar(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Spacer(Modifier.weight(1f))
-
-        Text(
-            text = versionLine,
-            color = AerixSurface.textMuted,
-            fontSize = 10.sp,
-            maxLines = 1,
-            modifier = Modifier.widthIn(max = 220.dp)
-        )
-
-        Spacer(Modifier.width(AerixSpacing.md))
         Box(
             modifier = Modifier
                 .size(if (compact) 32.dp else 36.dp)

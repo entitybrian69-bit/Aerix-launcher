@@ -105,6 +105,8 @@ object PojavAccountBridge : LoginListener {
     val current: AerixAccount?
         get() = accounts.getOrNull(selectedIndex)
 
+    /** True while [ensureLoaded] is reading the accounts, so it only reads them once. */
+    private var loadingAccounts = false
     private var maxSteps = 5
     private var attached = false
     private var appContext: Context? = null
@@ -163,7 +165,8 @@ object PojavAccountBridge : LoginListener {
      * called while the game is running and must stay cheap.
      */
     fun ensureLoaded() {
-        if (accounts.isNotEmpty()) return
+        if (accounts.isNotEmpty() || loadingAccounts) return
+        loadingAccounts = true
         val ctx = appContext
         PojavApplication.sExecutorService.execute {
             val rows = runCatching { Accounts.load() }.getOrNull()?.let { result ->
@@ -178,10 +181,14 @@ object PojavAccountBridge : LoginListener {
                         face = runCatching { faceBitmap?.asImageBitmap() }.getOrNull()
                     )
                 } to result.selectionIndex
-            } ?: return@execute
+            }
             Tools.runOnUiThread {
-                accounts = rows.first
-                selectedIndex = rows.second
+                // Always released, so a failure does not stop the next attempt.
+                loadingAccounts = false
+                if (rows != null) {
+                    accounts = rows.first
+                    selectedIndex = rows.second
+                }
             }
         }
     }
