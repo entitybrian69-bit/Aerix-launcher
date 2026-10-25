@@ -766,7 +766,7 @@ private fun HdClipCard(
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = if (downloaded) clip.subtitle else "${clip.megabytes} · tap to download",
+                    text = if (downloaded) "${clip.subtitle} · ${clip.seconds}" else "${clip.resolution} · ${clip.seconds} · ${clip.megabytes}",
                     color = AerixSurface.textSecondary,
                     fontSize = 9.sp,
                     maxLines = 1,

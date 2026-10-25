@@ -1,8 +1,12 @@
 name: Publish HD clips
 
-# The five high-resolution clips are too large to build into the APK (about 50 MB), so the launcher
-# downloads them on demand. This puts the originals where it can reach them: as assets of the
-# `clips-hd-v1` release.
+# The five high-resolution clips would add about 17 MB to every download of the launcher, so it
+# fetches them on demand. This puts them where it can reach them: as assets of the `clips-hd-v2`
+# release.
+#
+# The files in hd-clips/ are the artist's originals cut to one or two second keyframe-aligned
+# loops, container rewritten and packets copied - no re-encode, so the picture is exactly the
+# original encoding. The sha256 in the app is of these exact bytes.
 #
 # The release is a prerelease on purpose. The in-app updater looks at the newest stable release, so
 # a clips release must never be the newest stable one or it would be offered as a launcher update.
@@ -33,7 +37,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
-          TAG=clips-hd-v1
+          TAG=clips-hd-v2
           if ! gh release view "$TAG" > /dev/null 2>&1; then
             gh release create "$TAG" --prerelease \
               --title "Aerix HD clips (4K/1440p pack)" \

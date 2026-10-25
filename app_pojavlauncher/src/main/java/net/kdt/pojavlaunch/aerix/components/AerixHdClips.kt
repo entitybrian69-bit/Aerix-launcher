@@ -45,6 +45,7 @@ data class HdClip(
     val title: String,
     val subtitle: String,
     val resolution: String,
+    val seconds: String,
     val bytes: Long,
     val sha256: String,
     val accent: Color,
@@ -56,13 +57,17 @@ data class HdClip(
 /**
  * The five clips of the high-resolution pack.
  *
- * These are the original files from the artist - 3840x2160, 2560x1440 and 1920x1080, at 11 to 38
- * Mbps. Bundling them would add about 50 MB to every download of the launcher, so they are fetched
- * the first time they are picked and then live in the same folder as imported clips. Full quality,
- * just not on everybody's disk by default.
+ * Each is a one to two second cut of the artist's original file - 3840x2160, 2560x1440 or
+ * 1920x1080, at the original bitrate - taken on keyframes with the container rewritten and the
+ * packets copied, so not a single frame is re-encoded. The cut point of each was picked by
+ * comparing candidate keyframes and keeping the pair whose first and last frames match most
+ * closely, which is what makes the loop look continuous instead of jumping.
+ *
+ * Bundling the five would add about 17 MB to every download of the launcher, so they are fetched
+ * the first time one is picked and then live in the same folder as imported clips.
  */
 object AerixHdClips {
-    private const val BASE = "https://github.com/entitybrian69-bit/Aerix-launcher/releases/download/clips-hd-v1/"
+    private const val BASE = "https://github.com/entitybrian69-bit/Aerix-launcher/releases/download/clips-hd-v2/"
 
     val clips: List<HdClip> = listOf(
         HdClip(
@@ -70,8 +75,9 @@ object AerixHdClips {
             title = "Autumn Mountains",
             subtitle = "Golden valley · 4K",
             resolution = "3840 × 2160",
-            bytes = 19_454_441L,
-            sha256 = "a5b02b28d5c66bca5fe0698c8b337cb9190021b8661b3a219fe0563f6d099183",
+            seconds = "1.5 s",
+            bytes = 8_066_100L,
+            sha256 = "2211b49b7a740ee009cecd9d466db0dada880e8cbf5cc684080a5f87d0322ba4",
             accent = Color(0xFFE8A85C),
             file = "aerix_hd_autumn_mountains.mp4"
         ),
@@ -80,8 +86,9 @@ object AerixHdClips {
             title = "Butterfly Garden",
             subtitle = "Sunlit garden · 1440p",
             resolution = "2560 × 1440",
-            bytes = 11_283_759L,
-            sha256 = "091d59ec92847292af5189a7a56f7af2d04eda4d3914ca9b82f2fdd26cb711ce",
+            seconds = "2.0 s",
+            bytes = 2_085_703L,
+            sha256 = "1caf4afe29b81e891f1299cb854b6b6d0d38797cd2044544ef09f9255949f9de",
             accent = Color(0xFF8FD46A),
             file = "aerix_hd_butterfly_garden.mp4"
         ),
@@ -90,8 +97,9 @@ object AerixHdClips {
             title = "Sakura Field",
             subtitle = "Blossom field · 1440p",
             resolution = "2560 × 1440",
-            bytes = 9_647_475L,
-            sha256 = "9a7ea94afa614dcff898c26ab93bd079d5706c7953584473416ed550c5471763",
+            seconds = "2.0 s",
+            bytes = 5_782_883L,
+            sha256 = "b67808d64c0563f3226bc538ed9f8ab6a4aeb98e81ed8c9083dbf8f4a44f389a",
             accent = Color(0xFFF2A6C0),
             file = "aerix_hd_sakura_field.mp4"
         ),
@@ -100,8 +108,9 @@ object AerixHdClips {
             title = "Night Sky",
             subtitle = "Stars over the hills · 1080p",
             resolution = "1920 × 1080",
-            bytes = 6_193_350L,
-            sha256 = "baf0704f32fad699e420a8ff005f2133db19425d3f8d31291da5006f938f4297",
+            seconds = "2.0 s",
+            bytes = 983_130L,
+            sha256 = "83598820eaa023f1ce8eece6c04bb3002d5811ff1d506f9e8f3a778360325052",
             accent = Color(0xFF7C8CF8),
             file = "aerix_hd_night_sky.mp4"
         ),
@@ -110,8 +119,9 @@ object AerixHdClips {
             title = "Wisteria Lake",
             subtitle = "Lake at night · 1080p",
             resolution = "1920 × 1080",
-            bytes = 5_457_526L,
-            sha256 = "1df295eb0d88e053bbb8d3aa6273d6732b79e0cbd1374699b406bdcf3825441f",
+            seconds = "2.0 s",
+            bytes = 1_138_012L,
+            sha256 = "0ca5ff61234698b2621fc465c266330585c645b215214313ee32380212c23d28",
             accent = Color(0xFFB48CF2),
             file = "aerix_hd_wisteria_lake.mp4"
         )
