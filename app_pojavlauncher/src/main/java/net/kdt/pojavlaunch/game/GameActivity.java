@@ -144,7 +144,14 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         // launcher now bundles itself, or one whose libraries have gone). Resolving it here keeps
         // the game on the renderer the player expects instead of a silent fallback.
         String launchRenderer = instance.getLaunchRenderer();
-        String resolvedRenderer = net.kdt.pojavlaunch.aerix.bridge.PojavPluginBridge.resolveLaunchTag(launchRenderer);
+        String resolvedRenderer = net.kdt.pojavlaunch.aerix.bridge.PojavPluginBridge.resolveLaunchTag(this, launchRenderer);
+        // The saved choice was a plugin that cannot be used on this device any more. Writing the
+        // replacement here means the renderer picker shows what the game actually runs on, instead
+        // of offering the same broken choice on the next launch.
+        if (resolvedRenderer != null && !resolvedRenderer.equals(launchRenderer)) {
+            instance.renderer = resolvedRenderer;
+            instance.maybeWrite();
+        }
         mGameRenderer = new GameRenderer(resolvedRenderer != null ? resolvedRenderer : launchRenderer);
         net.kdt.pojavlaunch.aerix.bridge.PojavPluginBridge.applyLaunchOverride(this, mGameRenderer, instance.getLaunchRenderer());
 

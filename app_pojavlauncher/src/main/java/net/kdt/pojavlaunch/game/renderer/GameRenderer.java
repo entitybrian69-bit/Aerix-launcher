@@ -20,10 +20,12 @@ import android.util.Log;
 
 import net.kdt.pojavlaunch.Logger;
 import net.kdt.pojavlaunch.Tools;
+import net.kdt.pojavlaunch.game.renderer.impl.EmesisRenderSpec;
 import net.kdt.pojavlaunch.game.renderer.impl.GLESRenderSpec;
 import net.kdt.pojavlaunch.game.renderer.impl.MesaRenderSpec;
 import net.kdt.pojavlaunch.prefs.LauncherPreferences;
 
+import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -159,6 +161,67 @@ public class GameRenderer {
     }
 
     /**
+     * The renderer the game is actually started on, after checking that the OpenGL library it names
+     * is really there.
+     *
+     * The library is handed to LWJGL as {@code -Dorg.lwjgl.opengl.libname}, and the JVM loads it
+     * while the game window is being created. When that path does not resolve, LWJGL throws
+     * {@code UnsatisfiedLinkError: ... not found} on the render thread and the game dies during
+     * startup, with no way for the player to reach the renderer picker and pick something else.
+     * An absolute path is therefore checked here, before the JVM is started, and a renderer whose
+     * library is missing is replaced: the bundled Emesis first (the same renderer most plugins
+     * provide), then the built-in fallback.
+     *
+     * @return the renderer to launch with; never one that names a library that is not on disk
+     */
+    public RenderSpec getLaunchableRenderer() {
+        RenderSpec spec = currentRenderer;
+        String library = spec.glLibraryPath();
+        if (libraryIsPresent(library)) return spec;
+
+        Logger.appendToLog("Renderer " + spec.name() + " names a library that is not on disk ("
+                + library + "); choosing a renderer that can actually load");
+        Log.e(TAG, "Renderer " + spec.name() + " cannot launch: " + library + " is missing");
+        spec = replacementRenderer(null);
+        currentRenderer = spec;
+        return spec;
+    }
+
+    /**
+     * The renderer to use when the chosen one cannot load. A plugin failure keeps the player on
+     * the renderer they meant to use by falling back to the bundled Emesis, which is the same
+     * translation layer, rather than dropping them onto GL4ES.
+     *
+     * @param failed the renderer that just failed, so it is not chosen again
+     */
+    private static RenderSpec replacementRenderer(RenderSpec failed) {
+        boolean emesisFailed = failed != null && EMESIS_RENDERER.equals(failed.tag());
+        if (!emesisFailed && EmesisRenderSpec.available()) {
+            RenderSpec emesis = getKnownRenderer(EMESIS_RENDERER);
+            if (emesis != null && libraryIsPresent(emesis.glLibraryPath())) {
+                Logger.appendToLog("Renderer: using the bundled Emesis instead");
+                return emesis;
+            }
+        }
+        RenderSpec fallback = getKnownRenderer(FALLBACK_RENDERER);
+        if (fallback != null) Logger.appendToLog("Renderer: using " + fallback.name() + " instead");
+        return fallback;
+    }
+
+    /**
+     * Whether a renderer's OpenGL library can be handed to LWJGL as it is.
+     *
+     * A bare name is resolved by the linker against the paths the process already has, which is
+     * how every built-in renderer works; an absolute path is only usable when the file is there.
+     */
+    public static boolean libraryIsPresent(String library) {
+        if (library == null || library.isEmpty()) return false;
+        if (!library.startsWith("/")) return true;
+        File file = new File(library);
+        return file.isFile() && file.length() > 0;
+    }
+
+    /**
      * Set up the current renderer or fallback to {@link GameRenderer#FALLBACK_RENDERER} if failed
      *
      * @return whether the renderer setup was successful
@@ -181,9 +244,19 @@ public class GameRenderer {
             } else {
                 Log.e(TAG, "Failed to setup renderer " + currentRenderer.name() + ", falling back to " + FALLBACK_RENDERER);
             }
-            currentRenderer = getKnownRenderer(FALLBACK_RENDERER);
+            RenderSpec replacement = replacementRenderer(currentRenderer);
+            if (replacement != null) currentRenderer = replacement;
             setRendererLibraryPath(Tools.NATIVE_LIB_DIR, currentRenderer.librarySearchPath());
-            return currentRenderer.setupRenderer();
+            if (currentRenderer.setupRenderer()) return true;
+            // Last resort: the plain built-in renderer every device has.
+            RenderSpec fallback = getKnownRenderer(FALLBACK_RENDERER);
+            if (fallback != null && !FALLBACK_RENDERER.equals(currentRenderer.tag())) {
+                Logger.appendToLog("Renderer: " + currentRenderer.name() + " could not start either; using the built-in renderer");
+                currentRenderer = fallback;
+                setRendererLibraryPath(Tools.NATIVE_LIB_DIR, currentRenderer.librarySearchPath());
+                return currentRenderer.setupRenderer();
+            }
+            return false;
         }
         return true;
     }

@@ -334,7 +334,10 @@ public class GameRunner {
             System.exit(0);
         }
         // A renderer plugin may ship its own OpenGL library; built-in renderers keep the shim.
-        RenderSpec activeRenderer = gameRenderer.getCurrentRenderer();
+        // LWJGL loads this while the game window is being created, and a path that does not
+        // resolve takes the whole launch down with an UnsatisfiedLinkError on the render thread,
+        // so the renderer is only used when its library is really on disk.
+        RenderSpec activeRenderer = gameRenderer.getLaunchableRenderer();
         javaArgList.add("-Dorg.lwjgl.opengl.libname=" + activeRenderer.glLibraryPath());
         javaArgList.add("-Dorg.lwjgl.freetype.libname="+ Tools.NATIVE_LIB_DIR+"/libfreetype.so");
         // Renderer plugins that pick a compatibility core by game version read this property

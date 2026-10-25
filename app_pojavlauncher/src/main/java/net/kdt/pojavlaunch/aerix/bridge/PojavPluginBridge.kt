@@ -114,7 +114,18 @@ class AerixRendererPlugin(
      * only resolves to the EGL library, which is the wrong library whenever a plugin ships its
      * OpenGL implementation separately (PowerVR: `libpowervr.so` next to the system `libEGL.so`).
      */
-    override fun glLibraryPath(): String = packagedLibrary(glName) ?: "libGLMojo.so"
+    override fun glLibraryPath(): String = preloadedName ?: packagedLibrary(glName) ?: "libGLMojo.so"
+
+    /**
+     * Soname of the plugin's OpenGL library once it has been loaded into this process.
+     *
+     * Handing LWJGL the absolute path makes its dlopen depend on that exact file still being
+     * reachable at window-creation time; handing it the soname makes the linker return the copy
+     * that is already loaded, the same way the plugin's own host does. It is the difference
+     * between an UnsatisfiedLinkError during startup and a renderer that runs.
+     */
+    @Volatile
+    private var preloadedName: String? = null
 
     override fun setupEnvironment(context: Context, envMap: MutableMap<String, String>) {
         envMap.putAll(env)
@@ -125,6 +136,25 @@ class AerixRendererPlugin(
         envMap["POJAVEXEC_EGL"] = eglName
         packagedLibrary(eglName)?.let { envMap["SDL_EGL_LIBRARY"] = it }
         packagedLibrary(glName)?.let { envMap["SDL_OPENGL_LIBRARY"] = it }
+    }
+
+    /**
+     * Whether the native side of this plugin is there to be used: its library directory exists and
+     * every library it declares is a real, non-empty file (or a library of the platform).
+     *
+     * This is the cheap, static half of the question. Whether the library actually *loads* can only
+     * be answered by loading it, which [setupRenderer] does in the game process before the JVM is
+     * started - and where a failure is recoverable.
+     */
+    fun nativelyUsable(): Boolean {
+        if (!File(nativeLibDir).isDirectory) return false
+        fun present(name: String): Boolean {
+            if (name.isEmpty()) return false
+            if (name in SYSTEM_LIBRARIES) return true
+            val file = if (name.startsWith("/")) File(name) else File(nativeLibDir, name)
+            return file.isFile && file.length() > 0
+        }
+        return present(glName) && (eglName == glName || present(eglName))
     }
 
     /**
@@ -180,43 +210,60 @@ class AerixRendererPlugin(
     }
 
     override fun setupRenderer(): Boolean = try {
-        val initialize = {
-            if (RendererPluginV2.usesVulkan(rendererId, env)) MojoExec.preloadVulkan()
-            val plan = eglLaunchPlan()
-            // Load the plugin's own OpenGL library into the process first, the way the launchers
-            // these plugins were written for do: it registers the library under its soname, so the
-            // plugin's internal bare-name lookups resolve and LWJGL binds GL to an already loaded
-            // library instead of a second copy. A plugin that cannot be preloaded this way is not
-            // fatal here; the loader below still runs.
-            packagedLibrary(glName)?.let { gl ->
-                val preloaded = runCatching { System.load(gl) }
-                Logger.appendToLog("Renderer preload: $gl ok=${preloaded.isSuccess}" +
-                    (preloaded.exceptionOrNull()?.let { " (${it.javaClass.simpleName}: ${it.message})" } ?: ""))
-            }
-            // MojoExec builds one linker namespace per process out of this path and keeps it, so
-            // the plugin directory has to be in it before the first attempt.
-            GameRenderer.setRendererLibraryPath(Tools.NATIVE_LIB_DIR, nativeLibDir)
-            Logger.appendToLog("Renderer plan: tag=$pluginTag egl=${plan.library} eglDeclared=$eglName " +
-                "gl=${glLibraryPath()} gles=${plan.gles} major=${plan.major} " +
-                "namespaceBypass=${plan.namespaceBypass}")
-            var loaded = false
-            for ((library, bypass) in loadAttempts(plan)) {
-                loaded = MojoExec.prepareEgl(library, bypass, plan.gles, plan.major)
-                Logger.appendToLog("Renderer native load: tag=$pluginTag egl=$library gles=${plan.gles} " +
-                    "major=${plan.major} namespaceBypass=$bypass loaded=$loaded")
-                if (loaded) break
-            }
-            // prepareEgl only dlopens the provider. EGL context creation happens later in GLFW/SDL.
-            Logger.appendToLog("Renderer native setup finished loaded=$loaded tag=$pluginTag; EGL context/gameplay not yet verified")
-            loaded
-        }
-        initialize()
+        initializeRenderer()
     } catch (error: Exception) {
         Logger.appendToLog("Renderer initialization failed: tag=$pluginTag ${error.javaClass.simpleName}: ${error.message}")
         Log.e("AerixRendererPlugin", "Renderer initialization failed", error); false
     } catch (error: LinkageError) {
         Logger.appendToLog("Renderer native linkage failed: tag=$pluginTag ${error.javaClass.simpleName}: ${error.message}")
         Log.e("AerixRendererPlugin", "Renderer native linkage failed", error); false
+    }
+
+    private fun initializeRenderer(): Boolean {
+        if (RendererPluginV2.usesVulkan(rendererId, env)) MojoExec.preloadVulkan()
+        val plan = eglLaunchPlan()
+        // Load the plugin's own OpenGL library into the process first, the way the launchers these
+        // plugins were written for do: it registers the library under its soname, so the plugin's
+        // internal bare-name lookups resolve and LWJGL binds GL to an already loaded library
+        // instead of a second copy.
+        //
+        // This library is the one LWJGL is told to open, and it does so while the game window is
+        // being created: a library that cannot be loaded there is fatal to the launch. Loading it
+        // here first turns that into a plain "this renderer does not work on this device", which
+        // the launcher can recover from.
+        val gl = packagedLibrary(glName)
+        if (gl != null) {
+            val preloaded = runCatching { System.load(gl) }
+            Logger.appendToLog("Renderer preload: $gl ok=${preloaded.isSuccess}" +
+                (preloaded.exceptionOrNull()?.let { " (${it.javaClass.simpleName}: ${it.message})" } ?: ""))
+            if (preloaded.isFailure) {
+                Logger.appendToLog("Renderer plugin $packageName cannot load its OpenGL library; " +
+                    "leaving the plugin for a renderer that works")
+                return false
+            }
+            // Loaded: LWJGL will be given the soname, so it binds to this copy.
+            preloadedName = File(gl).name
+        } else if (!glName.startsWith("/") && glName !in SYSTEM_LIBRARIES) {
+            Logger.appendToLog("Renderer plugin $packageName declares $glName, which is not in its " +
+                "library directory $nativeLibDir; leaving the plugin for a renderer that works")
+            return false
+        }
+        // MojoExec builds one linker namespace per process out of this path and keeps it, so the
+        // plugin directory has to be in it before the first attempt.
+        GameRenderer.setRendererLibraryPath(Tools.NATIVE_LIB_DIR, nativeLibDir)
+        Logger.appendToLog("Renderer plan: tag=$pluginTag egl=${plan.library} eglDeclared=$eglName " +
+            "gl=${glLibraryPath()} gles=${plan.gles} major=${plan.major} " +
+            "namespaceBypass=${plan.namespaceBypass}")
+        var loaded = false
+        for ((library, bypass) in loadAttempts(plan)) {
+            loaded = MojoExec.prepareEgl(library, bypass, plan.gles, plan.major)
+            Logger.appendToLog("Renderer native load: tag=$pluginTag egl=$library gles=${plan.gles} " +
+                "major=${plan.major} namespaceBypass=$bypass loaded=$loaded")
+            if (loaded) break
+        }
+        // prepareEgl only dlopens the provider. EGL context creation happens later in GLFW/SDL.
+        Logger.appendToLog("Renderer native setup finished loaded=$loaded tag=$pluginTag; EGL context/gameplay not yet verified")
+        return loaded
     }
 
     companion object {
@@ -370,9 +417,13 @@ object PojavPluginBridge {
      * bundled Emesis, and anything else keeps the built-in choice that was already made.
      */
     @JvmStatic
-    fun resolveLaunchTag(rendererTag: String?): String? {
+    fun resolveLaunchTag(context: Context?, rendererTag: String?): String? {
         if (rendererTag == null || !rendererTag.startsWith(AerixRendererPlugin.TAG_PREFIX)) return rendererTag
-        if (findByTag(rendererTag) != null) return rendererTag
+        if (context != null) runCatching { loadPlugins(context) }
+        if (findByTag(rendererTag)?.nativelyUsable() == true) return rendererTag
+        Logger.appendToLog("Renderer $rendererTag is installed but its libraries are missing" +
+            " (or it is no longer installed); the launcher will not launch on it")
+        // The renderer the player meant to use is the one this launcher now bundles itself.
         if (net.kdt.pojavlaunch.game.renderer.impl.EmesisRenderSpec.available()) {
             return net.kdt.pojavlaunch.game.renderer.def.Renderers.EMESIS_RENDERER
         }
@@ -397,7 +448,7 @@ object PojavPluginBridge {
         try {
             if (plugins.isEmpty()) loadPlugins(context, force = true)
             val plugin = findByTag(rendererTag)
-            if (plugin != null && !File(plugin.glLibraryPath()).isFile) {
+            if (plugin != null && !plugin.nativelyUsable()) {
                 // The plugin is installed but its OpenGL library is not on disk. Passing that path
                 // to LWJGL is exactly the crash this check exists to prevent.
                 Log.w("AerixRendererPlugin", "Selected plugin ${plugin.packageName} has no usable GL library; keeping the built-in renderer")

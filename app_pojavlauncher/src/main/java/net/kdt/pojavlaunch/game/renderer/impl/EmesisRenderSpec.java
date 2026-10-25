@@ -63,6 +63,9 @@ public class EmesisRenderSpec implements RenderSpec {
         return Renderers.EMESIS_RENDERER;
     }
 
+    /** Set once the library has been loaded into this process; see [glLibraryPath]. */
+    private volatile boolean preloaded;
+
     /** The renderer brings its own EGL, so the host must not create a context from the system one. */
     @Override
     public String library() {
@@ -70,10 +73,18 @@ public class EmesisRenderSpec implements RenderSpec {
         return library.isFile() ? library.getAbsolutePath() : LIBRARY;
     }
 
-    /** LWJGL binds OpenGL to the same library: it exports the GL entry points too. */
+    /**
+     * LWJGL binds OpenGL to the same library: it exports the GL entry points too.
+     *
+     * Once the library is in the process, its bare soname is what LWJGL is given: the linker
+     * returns the copy that is already loaded, instead of opening the file again by path while the
+     * game window is being created - which fails with an UnsatisfiedLinkError that takes the
+     * whole launch down when the path is not reachable from there.
+     */
     @Override
     public String glLibraryPath() {
         File library = new File(Tools.NATIVE_LIB_DIR, LIBRARY);
+        if (preloaded) return LIBRARY;
         return library.isFile() ? library.getAbsolutePath() : LIBRARY;
     }
 
@@ -107,8 +118,13 @@ public class EmesisRenderSpec implements RenderSpec {
         // Load the renderer into the process first, the way the plugin's host does: it registers
         // under its soname, so the renderer's own lookups resolve to this copy and LWJGL binds GL
         // to an already loaded library instead of a second one.
+        //
+        // A refusal here is not fatal on its own: the EGL load below is the one that decides
+        // whether this renderer can run, and it loads the same file. It is logged because when
+        // both fail, the message is what explains the launch that could not start.
         try {
             System.load(path);
+            preloaded = true;
         } catch (Throwable error) {
             Logger.appendToLog("Emesis preload failed: " + error.getClass().getSimpleName() + ": " + error.getMessage());
         }
