@@ -117,6 +117,9 @@ object PojavInstanceBridge {
         PojavApplication.sExecutorService.execute {
             val result = runCatching {
                 val display = Instances.loadDisplay()
+                // Modpack instances without the pack's own artwork get it in the background; the
+                // refresh it fires redraws this list with the publisher's logo in place.
+                PojavModpackIcons.sweep(context, display.list)
                 val rows = uniqueInstanceRows(display.list.map { instance ->
                     val icon = runCatching {
                         InstanceIconProvider.fetchIcon(context.resources, instance).toAerixBitmap()
@@ -138,7 +141,10 @@ object PojavInstanceBridge {
                 result.onSuccess { (rows, index, editorInstance) ->
                     instances = rows
                     selectedIndex = index
-                    editorInstance?.let { PojavInstanceEditorBridge.syncLoaderState(it) }
+                    editorInstance?.let {
+                        PojavInstanceEditorBridge.syncLoaderState(it)
+                        PojavInstanceEditorBridge.syncIcon(context, it)
+                    }
                 }.onFailure { Tools.showErrorRemote(it) }
                 loading = false
             }

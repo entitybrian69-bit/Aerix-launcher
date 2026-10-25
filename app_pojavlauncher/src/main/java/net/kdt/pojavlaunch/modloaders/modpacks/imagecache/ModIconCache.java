@@ -12,7 +12,9 @@ import net.kdt.pojavlaunch.progresskeeper.DownloaderProgressWrapper;
 import net.kdt.pojavlaunch.utils.DownloadUtils;
 import net.kdt.pojavlaunch.utils.FileUtils;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
@@ -23,6 +25,8 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 public class ModIconCache {
+    /** Instance icons are drawn small; publishing art is not kept bigger than this for them. */
+    private static final int ICON_MIN_EDGE_PX = 384;
     ThreadPoolExecutor cacheLoaderPool = new ThreadPoolExecutor(10,
             10,
             1000,
@@ -95,9 +99,9 @@ public class ModIconCache {
      * of falling back to a stock icon.
      *
      * The image normally sits in the browse cache already - the player looked at it a moment before
-     * installing. When it does not (a cache wipe, an install from a link, the app having restarted),
-     * the pack's own URL is fetched here rather than silently leaving the instance with the stock
-     * icon.
+     * installing. When it does not (Discovery draws its cards from its own memory cache, a cache wipe,
+     * the app having restarted), the pack's own URL is fetched here rather than silently leaving the
+     * instance with the stock icon.
      *
      * @param imageUrl the pack's image, used only when the cache has nothing
      */
@@ -116,6 +120,27 @@ public class ModIconCache {
         writeInstanceImage(instance, imageTag);
     }
 
+    /**
+     * Store the image the publisher gave a pack as the icon of the instance built from it.
+     *
+     * @param imageBytes the pack's image, as downloaded
+     * @return whether the instance now carries that image
+     */
+    public static boolean writeInstanceIcon(Instance instance, byte[] imageBytes) {
+        if(imageBytes == null || imageBytes.length == 0) return false;
+        Bitmap bitmap = decodeDownsampled(imageBytes);
+        if(bitmap == null) return false;
+        try {
+            instance.encodeNewIcon(bitmap);
+            return true;
+        } catch (IOException e) {
+            Log.i("ModIconCache", "Failed to reencode icon for instance", e);
+            return false;
+        } finally {
+            bitmap.recycle();
+        }
+    }
+
     public static void writeInstanceImage(Instance instance, String imageTag) {
         File imagePath = new File(Tools.DIR_CACHE, "mod_icons/"+imageTag+".ca");
         Log.i("IconCache", "Creating base64 version of icon "+imageTag);
@@ -124,12 +149,39 @@ public class ModIconCache {
             return;
         }
         try {
-            Bitmap bitmap = BitmapFactory.decodeFile(imagePath.getAbsolutePath());
-            if(bitmap == null) return;
-            instance.encodeNewIcon(bitmap);
+            writeInstanceIcon(instance, readFileBytes(imagePath));
         }catch (IOException e) {
-            Log.i("ModIconCache", "Failed to reencode icon for instance");
-            e.printStackTrace();
+            Log.i("ModIconCache", "Failed to read the cached modpack icon", e);
         }
+    }
+
+    private static byte[] readFileBytes(File file) throws IOException {
+        try (FileInputStream inputStream = new FileInputStream(file);
+             ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+            byte[] buffer = new byte[8192];
+            int read;
+            while ((read = inputStream.read(buffer)) != -1) outputStream.write(buffer, 0, read);
+            return outputStream.toByteArray();
+        }
+    }
+
+    /**
+     * Decode an icon at roughly the size it is shown at. Publisher artwork can be a couple of
+     * thousand pixels of flat colour; keeping that would bloat every instance with a needless file.
+     */
+    private static Bitmap decodeDownsampled(byte[] imageBytes) {
+        BitmapFactory.Options bounds = new BitmapFactory.Options();
+        bounds.inJustDecodeBounds = true;
+        BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.length, bounds);
+        if(bounds.outWidth <= 0 || bounds.outHeight <= 0) return null;
+
+        int sample = 1;
+        while (bounds.outWidth / (sample * 2) >= ICON_MIN_EDGE_PX &&
+                bounds.outHeight / (sample * 2) >= ICON_MIN_EDGE_PX) {
+            sample *= 2;
+        }
+        BitmapFactory.Options options = new BitmapFactory.Options();
+        options.inSampleSize = sample;
+        return BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.length, options);
     }
 }

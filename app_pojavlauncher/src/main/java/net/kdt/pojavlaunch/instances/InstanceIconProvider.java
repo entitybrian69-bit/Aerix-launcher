@@ -18,9 +18,20 @@ import java.util.Objects;
 
 public class InstanceIconProvider {
     public static final String FALLBACK_ICON_NAME = "default";
-    private static final Map<Integer, Drawable> sIconCache = new HashMap<>();
+    private static final Map<String, CachedIcon> sIconCache = new HashMap<>();
     private static final Map<String, Drawable> sStaticIconCache = new HashMap<>();
     private static final Map<String, Integer> sStaticIcons = new HashMap<>();
+
+    /** A resolved icon plus the icon file stamp it was read from; 0 means a built-in loader mark. */
+    private static final class CachedIcon {
+        final Drawable drawable;
+        final long stamp;
+
+        CachedIcon(Drawable drawable, long stamp) {
+            this.drawable = drawable;
+            this.stamp = stamp;
+        }
+    }
 
     static {
         // A plain Minecraft instance is a grass block, not the launcher's own logo: the icon is
@@ -63,20 +74,29 @@ public class InstanceIconProvider {
 
     /**
      * Fetch an icon from the cache, or load it if it's not cached.
+     *
+     * The cache is keyed by the instance directory and the moment the icon file was last written,
+     * not by the object handed in: the instance list is rebuilt every time it refreshes, and an
+     * instance that has just been given a modpack's logo has to show it rather than the loader mark
+     * that was cached for it a moment earlier.
+     *
      * @param resources the Resources object, used for creating drawables
      * @param instance the instance
      * @return an icon drawable
      */
     public static @NonNull Drawable fetchIcon(Resources resources, @NonNull DisplayInstance instance) {
-        int identityHashCode = System.identityHashCode(instance);
+        String cacheKey = instance.getIconCacheKey();
+        File iconLocation = instance.getOwnIconLocation();
+        boolean hasIconFile = iconLocation != null && iconLocation.isFile();
+        long stamp = hasIconFile ? iconLocation.lastModified() : 0L;
 
-        Drawable cachedIcon = sIconCache.get(identityHashCode);
-        if(cachedIcon != null) return cachedIcon;
+        CachedIcon cached = sIconCache.get(cacheKey);
+        if(cached != null && cached.stamp == stamp) return cached.drawable;
 
-        Drawable instanceIcon = fetchInstanceFileIcon(resources, identityHashCode, instance.getInstanceIconLocation());
-        if(instanceIcon != null) return instanceIcon;
-
-        return fetchStaticIcon(resources, identityHashCode, instance.icon);
+        Drawable iconDrawable = hasIconFile ? decodeIconFile(resources, iconLocation) : null;
+        if(iconDrawable == null) iconDrawable = fetchStaticIcon(resources, instance.icon);
+        sIconCache.put(cacheKey, new CachedIcon(iconDrawable, stamp));
+        return iconDrawable;
     }
 
     /**
@@ -84,27 +104,25 @@ public class InstanceIconProvider {
      * instance icon file (or re-fetched from the static cache)
      * @param key the instance
      */
-    public static void dropIcon(@NonNull Instance key) {
-        sIconCache.remove(System.identityHashCode(key));
+    public static void dropIcon(@NonNull DisplayInstance key) {
+        sIconCache.remove(key.getIconCacheKey());
     }
 
-    private static Drawable fetchInstanceFileIcon(Resources resources, int identityHash, File iconLocation) {
+    private static Drawable decodeIconFile(Resources resources, File iconLocation) {
         if(!iconLocation.isFile() || !iconLocation.canRead()) return null;
         Bitmap iconBitmap = BitmapFactory.decodeFile(iconLocation.getAbsolutePath());
         if(iconBitmap == null) return null;
-        Drawable iconDrawable = new BitmapDrawable(resources, iconBitmap);
-        sIconCache.put(identityHash, iconDrawable);
-        return iconDrawable;
+        return new BitmapDrawable(resources, iconBitmap);
     }
 
-    private static Drawable fetchStaticIcon(Resources resources, int identityHash, String icon) {
-        Drawable staticIcon = sStaticIconCache.get(icon);
+    private static Drawable fetchStaticIcon(Resources resources, String icon) {
+        String iconName = icon != null ? icon : FALLBACK_ICON_NAME;
+        Drawable staticIcon = sStaticIconCache.get(iconName);
         if(staticIcon == null) {
-            if(icon != null) staticIcon = getStaticIcon(resources, icon);
+            staticIcon = getStaticIcon(resources, iconName);
             if(staticIcon == null) staticIcon = fetchFallbackIcon(resources);
-            sStaticIconCache.put(icon, staticIcon);
+            sStaticIconCache.put(iconName, staticIcon);
         }
-        sIconCache.put(identityHash, staticIcon);
         return staticIcon;
     }
 

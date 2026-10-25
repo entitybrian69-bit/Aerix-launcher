@@ -28,6 +28,15 @@ public class Instance extends DisplayInstance {
     public String selectedRuntime;
     public String controlLayout;
     public boolean sharedData;
+    /**
+     * The artwork the publisher of the modpack this instance was built from uses, and the pack it
+     * belongs to. Kept so the pack's logo can be restored if the icon file is ever lost - the
+     * launcher's own mark is not a stand-in for it.
+     */
+    public String modpackIconUrl;
+    public String modpackProjectId;
+    /** "modrinth" or "curseforge" for an instance built from a modpack, null otherwise. */
+    public String modpackSource;
 
     protected Instance() {
     }

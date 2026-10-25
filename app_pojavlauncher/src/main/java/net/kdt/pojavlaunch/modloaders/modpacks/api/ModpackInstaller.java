@@ -14,7 +14,9 @@ import net.kdt.pojavlaunch.instances.Instance;
 import net.kdt.pojavlaunch.lifecycle.ContextExecutor;
 import net.kdt.pojavlaunch.modloaders.modpacks.api.modloader.LoaderInstaller;
 import net.kdt.pojavlaunch.modloaders.modpacks.imagecache.ModIconCache;
+import net.kdt.pojavlaunch.modloaders.modpacks.models.Constants;
 import net.kdt.pojavlaunch.modloaders.modpacks.models.ModDetail;
+import net.kdt.pojavlaunch.modloaders.modpacks.models.ModItem;
 import net.kdt.pojavlaunch.progresskeeper.DownloaderProgressWrapper;
 import net.kdt.pojavlaunch.utils.DownloadUtils;
 import net.kdt.pojavlaunch.utils.FileUtils;
@@ -27,7 +29,7 @@ import java.util.concurrent.Callable;
 public class ModpackInstaller {
 
     public static LoaderInstaller installModpack(String modpackName, String title, File modpackFile, String icon, InstallFunction installFunction) throws IOException {
-        return installModpack(modpackName, title, modpackFile, icon, null, installFunction);
+        return installModpack(modpackName, title, modpackFile, icon, null, null, installFunction);
     }
 
     /**
@@ -36,9 +38,25 @@ public class ModpackInstaller {
      */
     public static LoaderInstaller installModpack(String modpackName, String title, File modpackFile, String icon,
                                                  String iconImageUrl, InstallFunction installFunction) throws IOException {
+        return installModpack(modpackName, title, modpackFile, icon, iconImageUrl, null, installFunction);
+    }
+
+    /**
+     * @param artSource the pack this instance is built from. Its project id and image are recorded
+     *                  on the instance, so the publisher's artwork can be fetched again later even
+     *                  when this install happened without a cached image.
+     */
+    public static LoaderInstaller installModpack(String modpackName, String title, File modpackFile, String icon,
+                                                 String iconImageUrl, ModItem artSource, InstallFunction installFunction) throws IOException {
         // Build a new minecraft instance, folder first
         LoaderInstaller loaderInstaller;
-        Instance instance = Instances.createInstance(i-> i.name = title, modpackName.substring(0, Math.min(16,modpackName.length())));
+        Instance instance = Instances.createInstance(i-> {
+            i.name = title;
+            if (artSource == null) return;
+            i.modpackIconUrl = artSource.imageUrl;
+            i.modpackProjectId = artSource.id;
+            i.modpackSource = artSource.apiSource == Constants.SOURCE_MODRINTH ? "modrinth" : "curseforge";
+        }, modpackName.substring(0, Math.min(16,modpackName.length())));
         try {
             // Install the modpack
             loaderInstaller = installFunction.installModpack(modpackFile, instance.getGameDirectory());
@@ -106,7 +124,7 @@ public class ModpackInstaller {
             throw e;
         }
 
-        return installModpack(modpackName, name, modpackFile, icon, modDetail.imageUrl, installFunction);
+        return installModpack(modpackName, name, modpackFile, icon, modDetail.imageUrl, modDetail, installFunction);
     }
 
     public interface InstallFunction {

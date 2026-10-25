@@ -95,6 +95,18 @@ object PojavInstanceEditorBridge {
         return true
     }
 
+    /**
+     * Re-read the icon shown on the open editor after something gave the instance new artwork - a
+     * modpack install, or the sweep that restores a pack's own logo.
+     */
+    internal fun syncIcon(context: Context, updated: Instance) {
+        val current = draft ?: return
+        if (current.instance.instanceId != updated.instanceId) return
+        current.icon = runCatching {
+            InstanceIconProvider.fetchIcon(context.resources, updated).toAerixBitmap()
+        }.getOrNull()
+    }
+
     /** Keep an open editor from saving stale loader metadata after an external installer returns. */
     internal fun syncLoaderState(installed: Instance) {
         val current = draft ?: return
