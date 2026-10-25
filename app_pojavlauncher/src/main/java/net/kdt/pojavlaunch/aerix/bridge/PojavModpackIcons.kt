@@ -98,6 +98,16 @@ object PojavModpackIcons {
             instance.modpackIconUrl.isNullOrBlank()
         ) return
 
+        // An instance with no recorded pack is only worth searching for when it is built on a
+        // modloader: a modpack always is, a hand-made vanilla instance never is.
+        if (instance.modpackSource.isNullOrBlank() &&
+            InstanceIconProvider.loaderIconFor(instance.versionId) == null
+        ) {
+            instance.modpackSource = SOURCE_NONE
+            instance.maybeWrite()
+            return
+        }
+
         var iconUrl = instance.modpackIconUrl?.takeIf { it.isNotBlank() }
         if (iconUrl == null) {
             val project = findPack(context, instance) ?: return
