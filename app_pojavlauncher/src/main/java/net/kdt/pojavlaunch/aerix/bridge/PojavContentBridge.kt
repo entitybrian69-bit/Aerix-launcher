@@ -147,7 +147,7 @@ object PojavContentBridge {
                     lastModified = file.lastModified()
                 )
             }
-            .sortedWith(compareByDescending<ContentEntry> { it.enabled }.thenBy { it.displayTitle.lowercase() })
+            .sortedWith(ContentListPolicy.order)
     }
 
     private fun accepts(kind: ContentKind, file: File): Boolean {

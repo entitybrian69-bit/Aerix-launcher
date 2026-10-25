@@ -36,6 +36,7 @@ public class Downloader {
     private final AtomicLong mInternetUsageCounter = new AtomicLong();
     private final AtomicBoolean mUseSizeProgress = new AtomicBoolean(true);
     private final SpeedCalculator mSpeedCalculator = new SpeedCalculator();
+    private volatile DownloadControl mControl;
     private ExecutorService mDownloadService;
     private ExecutorService mVerifyService;
 
@@ -44,8 +45,32 @@ public class Downloader {
     }
 
     protected void runDownloads(ArrayList<? extends TaskMetadata> downloads) throws IOException, InterruptedException {
-        insertMetadata(downloads);
-        performDownloads(downloads);
+        mControl = DownloadControl.begin(mProgressKey);
+        try {
+            insertMetadata(downloads);
+            performDownloads(downloads);
+            mControl.checkpoint();
+        } finally {
+            // Also stop worker pools on cancellation/failure, not just the success path.
+            mControl.cancel();
+            if (mDownloadService != null) mDownloadService.shutdownNow();
+            if (mVerifyService != null) mVerifyService.shutdownNow();
+            awaitStopped(mDownloadService);
+            awaitStopped(mVerifyService);
+            DownloadControl.end(mProgressKey, mControl);
+            mControl = null;
+        }
+    }
+
+    private static void awaitStopped(ExecutorService service) {
+        if (service == null) return;
+        boolean interrupted = Thread.interrupted();
+        try {
+            while (!service.isTerminated()) {
+                try { service.awaitTermination(100, TimeUnit.MILLISECONDS); }
+                catch (InterruptedException e) { interrupted = true; }
+            }
+        } finally { if (interrupted) Thread.currentThread().interrupt(); }
     }
 
     private void performDownloads(ArrayList<? extends TaskMetadata> metadata) throws IOException, InterruptedException {
@@ -69,6 +94,7 @@ public class Downloader {
         }
         double totalMegabytes = totalSize / ONE_MEGABYTE;
         while(mDownloadedFileCounter.get() < totalCount) {
+            checkCancelled();
             IOException exception = mThreadException.get();
             if(exception != null) throw exception;
             if(sizeCounter) reportSizeProgress(totalMegabytes);
@@ -96,6 +122,7 @@ public class Downloader {
             for(TaskMetadata element : reducedList) executorService.submit(new CompleteMetadataTask(element, this));
             executorService.shutdown();
             while (!executorService.awaitTermination(33, TimeUnit.MILLISECONDS)) {
+                checkCancelled();
                 IOException exception = mThreadException.get();
                 if(exception != null) throw exception;
                 reportCountProgress(R.string.newerdl_inserting_metadata_count, reducedList.size());
@@ -104,6 +131,7 @@ public class Downloader {
     }
 
     private double getSpeed() {
+        if (mControl != null && mControl.isPaused()) return 0;
         return mSpeedCalculator.feed(mInternetUsageCounter.get()) / ONE_MEGABYTE;
     }
 
@@ -121,6 +149,16 @@ public class Downloader {
         ProgressLayout.setProgress(mProgressKey, progress, R.string.newerdl_downloading_files_size,
                 downloadedMegabytes, totalMegabytes, getSpeed()
         );
+    }
+
+    protected void checkpoint() throws IOException {
+        DownloadControl control = mControl;
+        if (control != null) control.checkpoint();
+    }
+
+    protected void checkCancelled() throws IOException {
+        DownloadControl control = mControl;
+        if (control != null) control.checkCancelled();
     }
 
     protected void taskException(IOException e) {
@@ -150,7 +188,11 @@ public class Downloader {
     private void copy(InputStream inputStream, OutputStream outputStream, BytesCopiedListener listener) throws IOException {
         byte[] buffer = getBuffer();
         int readLen;
-        while((readLen = inputStream.read(buffer)) != -1) {
+        while (true) {
+            checkpoint();
+            readLen = inputStream.read(buffer);
+            if (readLen == -1) break;
+            checkpoint();
             outputStream.write(buffer, 0, readLen);
             if(listener != null) listener.onBytesCopied(readLen);
             mInternetUsageCounter.getAndAdd(readLen);
@@ -159,6 +201,7 @@ public class Downloader {
 
     private static HttpURLConnection openConnection(URL url) throws IOException {
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+        connection.setConnectTimeout(10000);
         connection.setReadTimeout(10000);
         connection.setRequestProperty("User-Agent", DownloadUtils.USER_AGENT);
         connection.setDoInput(true);

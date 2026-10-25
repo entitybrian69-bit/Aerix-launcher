@@ -17,10 +17,20 @@
     <uses-permission
         android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
+    <!-- Renderer plugins are ordinary APKs installed by the user. Android 11+ hides them from
+         getInstalledApplications unless this permission is present, so plugin discovery depends on it.
+         Aerix ships APKs directly from GitHub Releases, where the Play package-visibility policy
+         does not apply. -->
+    <uses-permission
+        android:name="android.permission.QUERY_ALL_PACKAGES"
+        tools:ignore="QueryAllPackagesPermission" />
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
     <uses-permission android:name="android.permission.VIBRATE"/>                         
@@ -28,6 +38,7 @@
     <application
         android:name="net.kdt.pojavlaunch.PojavApplication"
         android:allowBackup="true"
+        android:allowAudioPlaybackCapture="true"
         android:allowNativeHeapPointerTagging="false"
         android:appCategory="game"
         android:hasFragileUserData="true"
@@ -125,6 +136,14 @@
             android:screenOrientation="sensorLandscape" />
 
         <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.updates"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/update_paths" />
+        </provider>
+
+        <provider
             android:name="net.kdt.pojavlaunch.scoped.FolderProvider"
             android:authorities="@string/storageProviderAuthorities"
             android:exported="true"
@@ -140,6 +159,10 @@
             android:exported="false"
             android:screenOrientation="sensorLandscape"
             android:theme="@style/MojoLauncher.AppTheme" />
+
+        <service android:name="net.kdt.pojavlaunch.recording.ScreenRecordingService"
+            android:exported="false" android:process=":game"
+            android:foregroundServiceType="mediaProjection|microphone" />
 
         <service
             android:name="net.kdt.pojavlaunch.mobileglues.MgQueryService"
@@ -161,5 +184,15 @@
         <package android:name="net.kdt.pojavlaunch"/>
         <package android:name="net.kdt.pojavlaunch.debug"/>
         <package android:name="net.kdt.pojavlaunch.pub"/>
+        <!-- The renderer plugins this launcher brands. Listed explicitly so they stay visible
+             even on devices that withhold QUERY_ALL_PACKAGES. -->
+        <package android:name="com.entitybrian.emesis"/>
+        <package android:name="np.proton.renderer.powervr"/>
+        <!-- Fallback visibility for plugin APKs that ship a launcher activity, used when the
+             package visibility permission above is not granted. -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
     </queries>
 </manifest>

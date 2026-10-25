@@ -37,6 +37,8 @@ static void *logger_thread(void* param) {
     ssize_t  rsize;
     char buf[2050];
     while((rsize = read(pfd[0], buf, sizeof(buf)-1)) > 0) {
+        // recordBuffer uses strstr: terminate the bytes actually read, not stale stack memory.
+        buf[rsize] = 0;
         bool shouldRecordString = recordBuffer(buf, rsize); //record with newline int latestlog
         if(buf[rsize-1]=='\n') {
             rsize=rsize-1; //truncate

@@ -6,6 +6,7 @@ import android.util.Log;
 import com.google.gson.Gson;
 
 import net.kdt.pojavlaunch.Tools;
+import net.kdt.pojavlaunch.BuildConfig;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -58,19 +59,30 @@ public class ApiHandler {
 
     public static String getRaw(Map<String, String> headers, String url) {
         Log.d("ApiHandler", url);
+        HttpURLConnection conn = null;
         try {
-            HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
-            addHeaders(conn, headers);
-            InputStream inputStream = conn.getInputStream();
-            String data = Tools.read(inputStream);
-            Log.d(ApiHandler.class.toString(), data);
-            inputStream.close();
-            conn.disconnect();
-            return data;
+            conn = (HttpURLConnection) new URL(url).openConnection();
+            configureGetConnection(conn, headers);
+            try (InputStream inputStream = conn.getInputStream()) {
+                return Tools.read(inputStream);
+            }
         } catch (IOException e) {
-            e.printStackTrace();
+            // Do not dump response bodies or credentials into account/game logs.
+            Log.w("ApiHandler", "API request failed: " + e.getClass().getSimpleName());
+        } finally {
+            if (conn != null) conn.disconnect();
         }
         return null;
+    }
+
+    static void configureGetConnection(HttpURLConnection conn, Map<String, String> headers) {
+        conn.setConnectTimeout(8000);
+        conn.setReadTimeout(15000);
+        conn.setInstanceFollowRedirects(headers == null || !headers.containsKey("x-api-key"));
+        conn.setRequestProperty("Accept", "application/json");
+        conn.setRequestProperty("User-Agent", "AerixLauncher/" + BuildConfig.VERSION_NAME +
+                " (+https://github.com/entitybrian69-bit/Aerix-launcher)");
+        addHeaders(conn, headers);
     }
 
     public static String postRaw(String url, String body) {

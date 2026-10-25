@@ -1,0 +1,107 @@
+package net.kdt.pojavlaunch.aerix.bridge
+
+import com.google.gson.JsonObject
+import com.google.gson.JsonParser
+import java.io.File
+
+/** V2 metadata interoperability. For installed external renderer plugins. */
+internal data class RendererPluginConfig(
+    val name: String, val id: String, val gl: String, val egl: String,
+    val env: Map<String, String>, val minVersion: String?, val maxVersion: String?
+)
+
+internal object RendererPluginV2 {
+    private val libraryName = Regex("lib[A-Za-z0-9_.+-]+\\.so")
+    private val environmentKey = Regex("[A-Za-z_][A-Za-z0-9_]*")
+
+    fun usesVulkan(id: String, env: Map<String, String>): Boolean =
+        id.contains("zink", true) || id.contains("vulkan", true) ||
+            env["MESA_LOADER_DRIVER_OVERRIDE"].orEmpty().trim().equals("zink", true)
+
+    // Legacy Mesa plugins may need desktop EGL without being Vulkan renderers.
+    // A blank Mesa override must not select a desktop context.
+    fun usesDesktopGl(id: String, env: Map<String, String>): Boolean =
+        usesVulkan(id, env) || !env["MESA_LOADER_DRIVER_OVERRIDE"].isNullOrBlank()
+
+    /** Check the ELF class/machine against this process, not just the device's advertised ABIs. */
+    fun matchesElfAbi(file: File, abi: String): Boolean = runCatching {
+        val expected = when (abi) {
+            "arm64-v8a" -> 2 to 183
+            "armeabi-v7a", "armeabi" -> 1 to 40
+            "x86_64" -> 2 to 62
+            "x86" -> 1 to 3
+            else -> return@runCatching false
+        }
+        file.inputStream().use { input ->
+            val bytes = ByteArray(20)
+            var offset = 0
+            while (offset < bytes.size) {
+                val count = input.read(bytes, offset, bytes.size - offset)
+                if (count <= 0) return@use false
+                offset += count
+            }
+            bytes[0] == 0x7f.toByte() && bytes[1] == 'E'.code.toByte() &&
+                bytes[2] == 'L'.code.toByte() && bytes[3] == 'F'.code.toByte() &&
+                bytes[4].toInt() == expected.first && bytes[5].toInt() == 1 && bytes[6].toInt() == 1 &&
+                bytes[16].toInt() == 3 && bytes[17].toInt() == 0 &&
+                ((bytes[18].toInt() and 255) or ((bytes[19].toInt() and 255) shl 8)) == expected.second
+        }
+    }.getOrDefault(false)
+
+    /** Resolve only packaged native libraries. A metadata marker is not a literal dlopen path. */
+    fun nativeLibrary(value: String, directory: File, systemEgl: Boolean = false): String {
+        if (systemEgl && value == "libEGL.so") return value
+        val name = value.removePrefix("**|")
+        require(libraryName.matches(name)) { "Invalid plugin native library path" }
+        val root = directory.canonicalFile
+        val file = File(root, name).canonicalFile
+        require(file.parentFile == root && file.isFile) { "Plugin native library is missing for this ABI: $name" }
+        return file.absolutePath
+    }
+
+    fun parse(json: String, nativeDirectory: File): RendererPluginConfig {
+        require(json.length <= 64 * 1024) { "Renderer metadata exceeds limit" }
+        val root = JsonParser.parseString(json).asJsonObject
+        val name = root.required("displayName").also { require(it.isNotBlank() && it.length <= 160) }
+        val id = root.required("rendererId").also { require(Regex("[A-Za-z0-9_.-]{1,128}").matches(it)) }
+        val gl = nativeLibrary(root.required("rendererGLPath"), nativeDirectory)
+        val egl = nativeLibrary(root.required("rendererEGLPath"), nativeDirectory, systemEgl = true)
+        // Do not silently ignore libraries a plugin needs preloaded.
+        require(root.getAsJsonArray("dlopenLibPaths")?.size()?.let { it == 0 } != false) {
+            "This V2 plugin requires preloading, which this adapter does not yet support"
+        }
+        val env = linkedMapOf<String, String>()
+        val variables = root.getAsJsonArray("env")
+        require((variables?.size() ?: 0) <= 128)
+        variables?.forEach { element ->
+            val variable = element.asJsonObject
+            val key = variable.required("key")
+            require(environmentKey.matches(key) && !env.containsKey(key)) { "Invalid or duplicate environment key" }
+            val value = when (variable.required("type")) {
+                "NormalEnv" -> variable.required("value")
+                "SelectableEnv" -> if (variable.get("check")?.takeUnless { it.isJsonNull }?.asBoolean != false) {
+                    val items = variable.getAsJsonObject("items")
+                    items.required("defaultValue").also { default ->
+                        require(items.getAsJsonArray("values").any { it.asString == default })
+                    }
+                } else null
+                "CustomizableEnv" -> variable.optional("defaultValue")
+                "ToggleableEnv" -> if (variable.get("toggle")?.asBoolean != false) variable.required("value") else null
+                else -> error("Unsupported V2 environment type")
+            }
+            if (value != null) {
+                require(value.length <= 8192 && '\u0000' !in value && '\n' !in value && '\r' !in value)
+                env[key] = if (value.startsWith("**|")) nativeLibrary(value, nativeDirectory) else value.also {
+                    require(!it.contains("**|")) { "Unsupported embedded native-path marker" }
+                }
+            }
+        }
+        // A plugin may declare its own POJAV_RENDERER (the launcher-facing tag) inside its
+        // environment; it does not have to be the same string as the config id, and a mismatch is
+        // not a reason to reject a plugin that is otherwise valid. The launcher overwrites this
+        // variable with the selected renderer id before launch anyway.
+        return RendererPluginConfig(name, id, gl, egl, env, root.optional("minMCVer"), root.optional("maxMCVer"))
+    }
+    private fun JsonObject.optional(key: String): String? = get(key)?.takeUnless { it.isJsonNull }?.asString
+    private fun JsonObject.required(key: String): String = requireNotNull(optional(key)) { "Missing $key" }
+}

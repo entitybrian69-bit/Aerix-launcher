@@ -261,6 +261,8 @@ public class GameRunner {
 
         int requiredJavaVersion = 8;
         if(versionInfo.javaVersion != null) requiredJavaVersion = versionInfo.javaVersion.majorVersion;
+        requiredJavaVersion = ModJavaRequirements.minimumJava(gamedir, requiredJavaVersion);
+        Log.i("GameRunner", "Minimum Java including enabled mod requirements: " + requiredJavaVersion);
 
         Runtime runtime = MultiRTUtils.forceReread(pickRuntime(instance, requiredJavaVersion));
 
@@ -331,8 +333,30 @@ public class GameRunner {
             if(showDialog(activity, R.string.gr_err_renderer_load_Failed)) return;
             System.exit(0);
         }
-        javaArgList.add("-Dorg.lwjgl.opengl.libname=libGLMojo.so");
+        // A renderer plugin may ship its own OpenGL library; built-in renderers keep the shim.
+        // LWJGL loads this while the game window is being created, and a path that does not
+        // resolve takes the whole launch down with an UnsatisfiedLinkError on the render thread,
+        // so the renderer is only used when its library is really on disk.
+        RenderSpec activeRenderer = gameRenderer.getLaunchableRenderer();
+        javaArgList.add("-Dorg.lwjgl.opengl.libname=" + activeRenderer.glLibraryPath());
         javaArgList.add("-Dorg.lwjgl.freetype.libname="+ Tools.NATIVE_LIB_DIR+"/libfreetype.so");
+        // Renderer plugins that pick a compatibility core by game version read this property
+        // (Emesis does), so state the version instead of letting them guess from the classpath.
+        if (versionId != null && !versionId.isEmpty()) {
+            javaArgList.add("-Dpojav.mc.version=" + versionId);
+            if (activeRenderer instanceof net.kdt.pojavlaunch.aerix.bridge.AerixRendererPlugin) {
+                // The same value as an environment variable: a plugin reads /proc/self/cmdline for
+                // the -D form, and that file holds the application's command line, not the JVM
+                // arguments of an in-process VM. Without it the plugin cannot tell which core to
+                // use and falls back to its own default.
+                try {
+                    android.system.Os.setenv("pojav.mc.version", versionId, true);
+                    android.system.Os.setenv("emesis.mc.version", versionId, true);
+                } catch (android.system.ErrnoException error) {
+                    Log.w("GameRunner", "Could not state the game version to the renderer", error);
+                }
+            }
+        }
 
         activity.runOnUiThread(() -> Toast.makeText(activity, activity.getString(R.string.autoram_info_msg,LauncherPreferences.PREF_RAM_ALLOCATION), Toast.LENGTH_SHORT).show());
 
