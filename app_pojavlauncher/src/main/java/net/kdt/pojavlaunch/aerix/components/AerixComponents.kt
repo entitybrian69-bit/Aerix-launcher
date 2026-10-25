@@ -481,8 +481,10 @@ fun ActionSettingRow(title: String, summary: String?, onClick: () -> Unit, @Draw
 /** Converts any Android drawable (instance icons, skin faces) into an ImageBitmap for Compose. */
 fun Drawable.toAerixBitmap(sizePx: Int = 128): ImageBitmap {
     if (this is BitmapDrawable && bitmap != null) return bitmap.asImageBitmap()
-    val w = if (intrinsicWidth > 0) intrinsicWidth else sizePx
-    val h = if (intrinsicHeight > 0) intrinsicHeight else sizePx
+    // Loader marks are vector drawables with a 24dp intrinsic size; rendered at that they turn to
+    // mush on a card, so they are drawn at the requested size instead.
+    val w = if (intrinsicWidth > sizePx) intrinsicWidth else sizePx
+    val h = if (intrinsicHeight > sizePx) intrinsicHeight else sizePx
     val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
     setBounds(0, 0, w, h)

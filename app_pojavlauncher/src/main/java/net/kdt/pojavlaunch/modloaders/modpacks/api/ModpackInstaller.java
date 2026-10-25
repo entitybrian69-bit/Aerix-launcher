@@ -27,6 +27,15 @@ import java.util.concurrent.Callable;
 public class ModpackInstaller {
 
     public static LoaderInstaller installModpack(String modpackName, String title, File modpackFile, String icon, InstallFunction installFunction) throws IOException {
+        return installModpack(modpackName, title, modpackFile, icon, null, installFunction);
+    }
+
+    /**
+     * @param iconImageUrl the pack's own image, so an instance installed without the browse cache
+     *                     still ends up with the pack's logo rather than a stock one
+     */
+    public static LoaderInstaller installModpack(String modpackName, String title, File modpackFile, String icon,
+                                                 String iconImageUrl, InstallFunction installFunction) throws IOException {
         // Build a new minecraft instance, folder first
         LoaderInstaller loaderInstaller;
         Instance instance = Instances.createInstance(i-> i.name = title, modpackName.substring(0, Math.min(16,modpackName.length())));
@@ -46,7 +55,7 @@ public class ModpackInstaller {
                 instance.versionId = versionId;
             }
             instance.write();
-            ModIconCache.writeInstanceImage(instance, icon);
+            ModIconCache.writeInstanceImage(instance, icon, iconImageUrl);
 
             Instances.setSelectedInstance(instance);
             if(loaderInstaller.requiresGuiInstallation()) {
@@ -97,7 +106,7 @@ public class ModpackInstaller {
             throw e;
         }
 
-        return installModpack(modpackName, name, modpackFile, icon, installFunction);
+        return installModpack(modpackName, name, modpackFile, icon, modDetail.imageUrl, installFunction);
     }
 
     public interface InstallFunction {

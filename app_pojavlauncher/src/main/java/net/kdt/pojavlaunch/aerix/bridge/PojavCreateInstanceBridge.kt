@@ -251,6 +251,7 @@ object PojavCreateInstanceBridge {
                 Instances.createInstance({ i ->
                     i.name = name.ifEmpty { null }
                     i.versionId = version
+                    i.icon = "vanilla"
                     i.sharedData = true
                 }, prefix)
             }
@@ -266,7 +267,7 @@ object PojavCreateInstanceBridge {
                     ?: throw IOException(context.getString(R.string.fabric_dl_cant_read_meta, utils.name))
                 Instances.createInstance({ i ->
                     i.name = name.ifEmpty { utils.name }
-                    i.icon = utils.iconName
+                    i.icon = if (loader == AerixLoader.LEGACY_FABRIC) "legacy_fabric" else utils.iconName
                     i.versionId = versionId
                 }, prefix.ifEmpty { versionId })
             }
@@ -296,6 +297,9 @@ object PojavCreateInstanceBridge {
                     val installer = OptiFineUtils.createInstaller(version)
                     val created = Instances.createInstance({ i ->
                         i.name = name.ifEmpty { "OptiFine" }
+                        // Without this the instance fell back to the stock icon and showed the
+                        // launcher's logo instead of OptiFine's.
+                        i.icon = "optifine"
                         i.installer = installer
                         i.sharedData = true
                     }, prefix.ifEmpty { "OptiFine" })

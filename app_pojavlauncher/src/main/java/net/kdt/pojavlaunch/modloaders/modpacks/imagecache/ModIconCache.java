@@ -4,8 +4,11 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.util.Log;
 
+import net.kdt.pojavlaunch.R;
 import net.kdt.pojavlaunch.Tools;
 import net.kdt.pojavlaunch.instances.Instance;
+import net.kdt.pojavlaunch.progresskeeper.DownloaderProgressWrapper;
+import net.kdt.pojavlaunch.utils.DownloadUtils;
 import net.kdt.pojavlaunch.utils.FileUtils;
 
 import java.io.File;
@@ -85,6 +88,32 @@ public class ModIconCache {
      * @param imageTag the icon tag
      * @return the base64 encoded image or null if not cached
      */
+
+    /**
+     * Writes a modpack's own image onto its instance, so the launcher shows the pack's logo instead
+     * of falling back to a stock icon.
+     *
+     * The image normally sits in the browse cache already - the player looked at it a moment before
+     * installing. When it does not (a cache wipe, an install from a link, the app having restarted),
+     * the pack's own URL is fetched here rather than silently leaving the instance with the stock
+     * icon.
+     *
+     * @param imageUrl the pack's image, used only when the cache has nothing
+     */
+    public static void writeInstanceImage(Instance instance, String imageTag, String imageUrl) {
+        File imagePath = new File(Tools.DIR_CACHE, "mod_icons/" + imageTag + ".ca");
+        if((!imagePath.isFile() || !imagePath.canRead()) && imageUrl != null && !imageUrl.isEmpty()) {
+            try {
+                FileUtils.ensureDirectory(imagePath.getParentFile());
+                DownloadUtils.downloadFileMonitored(imageUrl, imagePath, new byte[8192],
+                        new DownloaderProgressWrapper(R.string.modpack_download_downloading_metadata,
+                                ProgressLayout.INSTALL_MODPACK));
+            } catch (Exception e) {
+                Log.i("ModIconCache", "Could not fetch the modpack image", e);
+            }
+        }
+        writeInstanceImage(instance, imageTag);
+    }
 
     public static void writeInstanceImage(Instance instance, String imageTag) {
         File imagePath = new File(Tools.DIR_CACHE, "mod_icons/"+imageTag+".ca");
