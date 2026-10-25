@@ -96,6 +96,8 @@ import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
 import net.kdt.pojavlaunch.aerix.theme.AerixWallpaperPreset
 import net.kdt.pojavlaunch.aerix.components.AerixAnimations
 import net.kdt.pojavlaunch.aerix.components.paintScenePreview
+import net.kdt.pojavlaunch.aerix.components.AerixHdClips
+import net.kdt.pojavlaunch.aerix.components.HdClip
 import net.kdt.pojavlaunch.aerix.components.rememberClipThumbnail
 import net.kdt.pojavlaunch.aerix.components.MEDIA_WALLPAPER_MIME
 import net.kdt.pojavlaunch.aerix.components.BundledClip
@@ -169,6 +171,11 @@ fun WallpapersScreen(modifier: Modifier = Modifier) {
     LaunchedEffect(clipRevision) {
         clips = withContext(Dispatchers.IO) { AerixThemeManager.clips(context) }
     }
+    // The high-resolution pack is saved into the same folder as the player's own imports, so it is
+    // taken back out of that list here: those five are drawn by their own cards, which know whether
+    // they have been downloaded yet.
+    val hdFileNames = remember { AerixHdClips.clips.map { it.file }.toSet() }
+    val importedClips = clips.filterNot { it.name in hdFileNames }
     val gridState = rememberLazyGridState()
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
@@ -251,7 +258,10 @@ fun WallpapersScreen(modifier: Modifier = Modifier) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = if (showAnimations) {
-                            stringResource(R.string.aerix_wallpaper_header, BundledClips.size + clips.size)
+                            stringResource(
+                                R.string.aerix_wallpaper_header,
+                                BundledClips.size + AerixHdClips.clips.size + importedClips.size
+                            )
                         } else {
                             stringResource(R.string.aerix_wallpaper_header, AerixThemeManager.wallpapers.size)
                         },
@@ -433,7 +443,34 @@ fun WallpapersScreen(modifier: Modifier = Modifier) {
                         onClick = { AerixThemeManager.applyBundledClip(clip) }
                     )
                 }
-                items(items = clips, key = { "clip:" + it.absolutePath }) { clip ->
+                items(items = AerixHdClips.clips, key = { "hd:" + it.id }) { hd ->
+                    val saved = AerixHdClips.file(context, hd)
+                    val downloaded = AerixHdClips.isDownloaded(context, hd)
+                    HdClipCard(
+                        clip = hd,
+                        downloaded = downloaded,
+                        downloading = AerixHdClips.downloadingId == hd.id,
+                        progress = AerixHdClips.progress,
+                        isSelected = downloaded && selectedId == AerixThemeManager.clipId(saved),
+                        onClick = {
+                            if (downloaded) {
+                                AerixThemeManager.applyClip(saved)
+                            } else if (AerixHdClips.downloadingId == null) {
+                                scope.launch {
+                                    val file = AerixHdClips.download(context, hd)
+                                    if (file != null) {
+                                        AerixThemeManager.applyClip(file)
+                                    } else {
+                                        val message = AerixHdClips.failure ?: "The download failed"
+                                        Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                                        AerixHdClips.clearFailure()
+                                    }
+                                }
+                            }
+                        }
+                    )
+                }
+                items(items = importedClips, key = { "clip:" + it.absolutePath }) { clip ->
                     ClipCard(
                         file = clip,
                         isSelected = selectedId == AerixThemeManager.clipId(clip),
@@ -593,6 +630,143 @@ private fun BundledClipCard(clip: BundledClip, isSelected: Boolean, onClick: () 
                 )
                 Text(
                     text = clip.subtitle,
+                    color = AerixSurface.textSecondary,
+                    fontSize = 9.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
+/**
+ * One clip of the high-resolution pack.
+ *
+ * Until it is downloaded the card is a placeholder that says what it is, how big and how sharp, and
+ * downloads it on tap - the pack is far too large to put in everybody's APK. Once downloaded it
+ * behaves exactly like the player's own imported clip, because that is what it is: the original
+ * file, byte for byte, in the same folder.
+ */
+@Composable
+private fun HdClipCard(
+    clip: HdClip,
+    downloaded: Boolean,
+    downloading: Boolean,
+    progress: Float,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    val shape = RoundedCornerShape(AerixRadii.control)
+    val context = LocalContext.current
+    val thumbnail = if (downloaded) rememberClipThumbnail(java.io.File(AerixThemeManager.clipDir(context), clip.file)) else null
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .clickable(onClick = onClick),
+        shape = shape,
+        color = AerixSurface.panelRaised,
+        border = BorderStroke(
+            width = if (isSelected) 2.dp else AerixSpacing.hairline,
+            color = if (isSelected) clip.accent else AerixSurface.panelRaised
+        )
+    ) {
+        Column {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(16f / 9f)
+                    .background(AerixSurface.panelTrack),
+                contentAlignment = Alignment.Center
+            ) {
+                if (thumbnail != null) {
+                    Image(
+                        bitmap = thumbnail,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    // Not downloaded yet: the accent wash stands in for the missing frame.
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    listOf(clip.accent.copy(alpha = 0.34f), clip.accent.copy(alpha = 0.10f))
+                                )
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.aerix_ic_cloud_download),
+                            contentDescription = null,
+                            tint = clip.accent,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                }
+
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(AerixSpacing.xsPlus),
+                    shape = RoundedCornerShape(AerixRadii.compact),
+                    color = AerixSurface.canvas.copy(alpha = 0.62f)
+                ) {
+                    Text(
+                        text = "HD",
+                        color = clip.accent,
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = 0.8.sp,
+                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                    )
+                }
+
+                if (downloading) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(AerixSurface.canvas.copy(alpha = 0.55f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "${(progress * 100).toInt()}%",
+                            color = clip.accent,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .fillMaxWidth()
+                            .height(3.dp)
+                            .background(clip.accent.copy(alpha = 0.25f))
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(progress.coerceIn(0f, 1f))
+                                .fillMaxHeight()
+                                .background(clip.accent)
+                        )
+                    }
+                }
+            }
+            Column(modifier = Modifier.padding(AerixSpacing.xsPlus)) {
+                Text(
+                    text = clip.title,
+                    color = AerixSurface.textPrimary,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = if (downloaded) clip.subtitle else "${clip.megabytes} · tap to download",
                     color = AerixSurface.textSecondary,
                     fontSize = 9.sp,
                     maxLines = 1,

@@ -1,0 +1,52 @@
+name: Publish HD clips
+
+# The five high-resolution clips are too large to build into the APK (about 50 MB), so the launcher
+# downloads them on demand. This puts the originals where it can reach them: as assets of the
+# `clips-hd-v1` release.
+#
+# The release is a prerelease on purpose. The in-app updater looks at the newest stable release, so
+# a clips release must never be the newest stable one or it would be offered as a launcher update.
+#
+# Run it whenever hd-clips/ changes. It is safe to run again: assets that already exist are left
+# alone, so the bytes a phone is verifying never change underneath it.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "arena/2f1249a3-aerix-launcher" ]
+    paths: [ "hd-clips/**", ".github/workflows/hd-clips-publish.yml" ]
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 1
+
+      - name: Upload the clips that are missing from the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          TAG=clips-hd-v1
+          if ! gh release view "$TAG" > /dev/null 2>&1; then
+            gh release create "$TAG" --prerelease \
+              --title "Aerix HD clips (4K/1440p pack)" \
+              --notes "Full-quality clip pack for Aerix Launcher, downloaded on demand so the APK stays small. Nothing here is re-encoded: the files are the originals, and the launcher checks each one against the sha256 baked into the app."
+          fi
+          existing=$(gh release view "$TAG" --json assets -q '.assets[].name')
+          for file in hd-clips/*.mp4; do
+            name=$(basename "$file")
+            if printf '%s\n' "$existing" | grep -qx "$name"; then
+              echo "$name already published"
+            else
+              echo "uploading $name ($(stat -c%s "$file") bytes)"
+              gh release upload "$TAG" "$file"
+            fi
+          done
+          gh release view "$TAG" --json assets -q '.assets[] | "\(.name) \(.size) \(.state)"'
