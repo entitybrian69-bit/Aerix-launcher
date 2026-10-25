@@ -689,22 +689,27 @@ private fun HdClipCard(
                         contentScale = ContentScale.Crop
                     )
                 } else {
-                    // Not downloaded yet: the accent wash stands in for the missing frame.
+                    // Not downloaded yet. Without a frame the card used to be a coloured square with
+                    // a cloud on it, which said nothing about what the animation looks like; the
+                    // poster shipped with the pack is a real frame of this exact clip.
+                    Image(
+                        painter = painterResource(clip.poster),
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
                     Box(
                         modifier = Modifier
-                            .fillMaxSize()
-                            .background(
-                                Brush.verticalGradient(
-                                    listOf(clip.accent.copy(alpha = 0.34f), clip.accent.copy(alpha = 0.10f))
-                                )
-                            ),
+                            .align(Alignment.Center)
+                            .size(34.dp)
+                            .background(AerixSurface.canvas.copy(alpha = 0.55f), CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             painter = painterResource(R.drawable.aerix_ic_cloud_download),
                             contentDescription = null,
-                            tint = clip.accent,
-                            modifier = Modifier.size(22.dp)
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                 }

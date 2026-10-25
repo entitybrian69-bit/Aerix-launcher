@@ -20,6 +20,7 @@
 package net.kdt.pojavlaunch.aerix.components
 
 import android.content.Context
+import androidx.annotation.DrawableRes
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -27,6 +28,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import net.kdt.pojavlaunch.R
 import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
 import java.io.File
 import java.net.HttpURLConnection
@@ -39,6 +41,8 @@ import java.security.MessageDigest
  * @param file name it is saved under, which is also its file name in the pack
  * @param sha256 of the exact published file, checked after the download so what lands on the phone
  *        is byte for byte the original. Nothing is re-encoded, here or anywhere else.
+ * @param poster a real frame of the clip, shipped in the APK so the card shows the actual scene
+ *        before the clip itself has been downloaded
  */
 data class HdClip(
     val id: String,
@@ -49,7 +53,8 @@ data class HdClip(
     val bytes: Long,
     val sha256: String,
     val accent: Color,
-    val file: String
+    val file: String,
+    @DrawableRes val poster: Int
 ) {
     val megabytes: String get() = String.format(java.util.Locale.US, "%.1f MB", bytes / 1048576.0)
 }
@@ -79,7 +84,8 @@ object AerixHdClips {
             bytes = 8_066_100L,
             sha256 = "2211b49b7a740ee009cecd9d466db0dada880e8cbf5cc684080a5f87d0322ba4",
             accent = Color(0xFFE8A85C),
-            file = "aerix_hd_autumn_mountains.mp4"
+            file = "aerix_hd_autumn_mountains.mp4",
+            poster = R.drawable.aerix_hd_poster_autumn_mountains
         ),
         HdClip(
             id = "hd_butterfly_garden",
@@ -90,7 +96,8 @@ object AerixHdClips {
             bytes = 2_085_703L,
             sha256 = "1caf4afe29b81e891f1299cb854b6b6d0d38797cd2044544ef09f9255949f9de",
             accent = Color(0xFF8FD46A),
-            file = "aerix_hd_butterfly_garden.mp4"
+            file = "aerix_hd_butterfly_garden.mp4",
+            poster = R.drawable.aerix_hd_poster_butterfly_garden
         ),
         HdClip(
             id = "hd_sakura_field",
@@ -101,7 +108,8 @@ object AerixHdClips {
             bytes = 5_782_883L,
             sha256 = "b67808d64c0563f3226bc538ed9f8ab6a4aeb98e81ed8c9083dbf8f4a44f389a",
             accent = Color(0xFFF2A6C0),
-            file = "aerix_hd_sakura_field.mp4"
+            file = "aerix_hd_sakura_field.mp4",
+            poster = R.drawable.aerix_hd_poster_sakura_field
         ),
         HdClip(
             id = "hd_flower_forest_train",
@@ -112,7 +120,8 @@ object AerixHdClips {
             bytes = 4_017_656L,
             sha256 = "2e62c1b6c49dd2310ad569add0e5d1e7243605f732c88618e6eb7382bac46d27",
             accent = Color(0xFFE3C46A),
-            file = "aerix_hd_flower_forest_train.mp4"
+            file = "aerix_hd_flower_forest_train.mp4",
+            poster = R.drawable.aerix_hd_poster_flower_forest_train
         ),
         HdClip(
             id = "hd_night_sky",
@@ -123,7 +132,8 @@ object AerixHdClips {
             bytes = 983_130L,
             sha256 = "83598820eaa023f1ce8eece6c04bb3002d5811ff1d506f9e8f3a778360325052",
             accent = Color(0xFF7C8CF8),
-            file = "aerix_hd_night_sky.mp4"
+            file = "aerix_hd_night_sky.mp4",
+            poster = R.drawable.aerix_hd_poster_night_sky
         ),
         HdClip(
             id = "hd_wisteria_lake",
@@ -134,7 +144,8 @@ object AerixHdClips {
             bytes = 1_138_012L,
             sha256 = "0ca5ff61234698b2621fc465c266330585c645b215214313ee32380212c23d28",
             accent = Color(0xFFB48CF2),
-            file = "aerix_hd_wisteria_lake.mp4"
+            file = "aerix_hd_wisteria_lake.mp4",
+            poster = R.drawable.aerix_hd_poster_wisteria_lake
         )
     )
 
