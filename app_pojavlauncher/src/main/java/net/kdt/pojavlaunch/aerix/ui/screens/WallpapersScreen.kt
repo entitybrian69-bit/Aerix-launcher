@@ -102,7 +102,6 @@ import net.kdt.pojavlaunch.aerix.components.rememberClipThumbnail
 import net.kdt.pojavlaunch.aerix.components.MEDIA_WALLPAPER_MIME
 import net.kdt.pojavlaunch.aerix.components.BundledClip
 import net.kdt.pojavlaunch.aerix.components.BundledClips
-import net.kdt.pojavlaunch.aerix.components.rememberRawClipThumbnail
 import net.kdt.pojavlaunch.aerix.components.AerixAnimation
 import net.kdt.pojavlaunch.aerix.components.isAnimationId
 
@@ -573,7 +572,6 @@ private fun AnimationCard(animation: AerixAnimation, isSelected: Boolean, onClic
 @Composable
 private fun BundledClipCard(clip: BundledClip, isSelected: Boolean, onClick: () -> Unit) {
     val shape = RoundedCornerShape(AerixRadii.control)
-    val thumbnail = rememberRawClipThumbnail(clip.rawRes)
 
     Surface(
         modifier = Modifier
@@ -594,14 +592,14 @@ private fun BundledClipCard(clip: BundledClip, isSelected: Boolean, onClick: () 
                     .aspectRatio(16f / 9f)
                     .background(AerixSurface.panelTrack)
             ) {
-                if (thumbnail != null) {
-                    Image(
-                        bitmap = thumbnail,
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                }
+                // A real frame of this exact clip, shipped at 640x360 so the grid shows the scene
+                // immediately instead of spinning up a video decoder per card.
+                Image(
+                    painter = painterResource(clip.poster),
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
                 Surface(
                     modifier = Modifier
                         .align(Alignment.TopStart)
@@ -824,6 +822,26 @@ private fun ClipCard(
                         contentDescription = null,
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop
+                    )
+                } else {
+                    // The frame is read out of the player's own file the first time it is shown;
+                    // until then the card is a wash of the theme accent rather than an empty box.
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    listOf(accent.copy(alpha = 0.34f), accent.copy(alpha = 0.10f))
+                                )
+                            )
+                    )
+                    Icon(
+                        painter = painterResource(R.drawable.aerix_ic_play_arrow_filled),
+                        contentDescription = null,
+                        tint = Color.White.copy(alpha = 0.85f),
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .size(22.dp)
                     )
                 }
                 Surface(
