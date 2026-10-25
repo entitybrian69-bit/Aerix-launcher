@@ -1,6 +1,6 @@
 /*
  * Aerix Launcher UI layer for PojavLauncher.
- * The high-resolution clip pack: five 4K/1440p/1080p Minecraft loops that are downloaded on demand
+ * The high-resolution clip pack: six 4K/1440p/1080p Minecraft loops that are downloaded on demand
  * instead of shipped inside the APK.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -55,7 +55,7 @@ data class HdClip(
 }
 
 /**
- * The five clips of the high-resolution pack.
+ * The six clips of the high-resolution pack.
  *
  * Each is a one to two second cut of the artist's original file - 3840x2160, 2560x1440 or
  * 1920x1080, at the original bitrate - taken on keyframes with the container rewritten and the
@@ -63,7 +63,7 @@ data class HdClip(
  * comparing candidate keyframes and keeping the pair whose first and last frames match most
  * closely, which is what makes the loop look continuous instead of jumping.
  *
- * Bundling the five would add about 17 MB to every download of the launcher, so they are fetched
+ * Bundling the six would add about 21 MB to every download of the launcher, so they are fetched
  * the first time one is picked and then live in the same folder as imported clips.
  */
 object AerixHdClips {
@@ -102,6 +102,17 @@ object AerixHdClips {
             sha256 = "b67808d64c0563f3226bc538ed9f8ab6a4aeb98e81ed8c9083dbf8f4a44f389a",
             accent = Color(0xFFF2A6C0),
             file = "aerix_hd_sakura_field.mp4"
+        ),
+        HdClip(
+            id = "hd_flower_forest_train",
+            title = "Flower Forest Train",
+            subtitle = "Train in bloom · 1440p",
+            resolution = "2560 × 1440",
+            seconds = "1.0 s",
+            bytes = 4_017_656L,
+            sha256 = "2e62c1b6c49dd2310ad569add0e5d1e7243605f732c88618e6eb7382bac46d27",
+            accent = Color(0xFFE3C46A),
+            file = "aerix_hd_flower_forest_train.mp4"
         ),
         HdClip(
             id = "hd_night_sky",
