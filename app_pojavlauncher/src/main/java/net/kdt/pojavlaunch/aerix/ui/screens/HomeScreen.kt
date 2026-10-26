@@ -111,6 +111,10 @@ import net.kdt.pojavlaunch.aerix.theme.AerixSurface
 import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
 import net.kdt.pojavlaunch.aerix.ui.AerixNav
 import net.kdt.pojavlaunch.aerix.ui.LauncherSection
+import net.kdt.pojavlaunch.aerix.ui.screens.social.SocialAvatar
+import net.kdt.pojavlaunch.aerix.ui.screens.social.SocialHubStore
+import net.kdt.pojavlaunch.aerix.ui.screens.social.SocialPalette
+import net.kdt.pojavlaunch.aerix.ui.screens.social.SocialShellState
 import net.kdt.pojavlaunch.contracts.OpenDocumentWithExtension
 import kotlin.math.abs
 import kotlin.math.exp
@@ -145,7 +149,8 @@ private class HomeActions(
     val downloads: () -> Unit,
     val fileManager: () -> Unit,
     val logs: () -> Unit,
-    val accounts: () -> Unit
+    val accounts: () -> Unit,
+    val social: () -> Unit
 )
 
 @Composable
@@ -182,7 +187,9 @@ fun HomeScreen(activity: FragmentActivity, navigate: (LauncherSection) -> Unit) 
         downloads = { navigate(LauncherSection.DISCOVER) },
         fileManager = { navigate(LauncherSection.FILES) },
         logs = { navigate(LauncherSection.LOGS) },
-        accounts = { navigate(LauncherSection.ACCOUNTS) }
+        accounts = { navigate(LauncherSection.ACCOUNTS) },
+        // The one launcher-side way into Social: the dashboard widget opens the shell.
+        social = { SocialShellState.enter() }
     )
 
     // Mirai LauncherScreen: content dashboard on the left (weight 7.4f) and the docked 3D skin
@@ -496,6 +503,7 @@ private fun WideHomeDashboard(
                 verticalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus)
             ) {
                 ActiveWorldPanel(selected, accent, actions, Modifier.weight(1f))
+                SocialWidgetCard(modifier = Modifier.fillMaxWidth().height(84.dp), onClick = actions.social)
                 TaskSummaryPanel(taskCount, accent, Modifier.height(74.dp))
             }
         }
@@ -534,6 +542,7 @@ private fun CompactHomeDashboard(
             }
         }
         item { ActiveWorldPanel(selected, accent, actions, Modifier.fillMaxWidth().height(190.dp)) }
+        item { SocialWidgetCard(modifier = Modifier.fillMaxWidth().height(84.dp), onClick = actions.social) }
         item { TaskSummaryPanel(taskCount, accent, Modifier.fillMaxWidth().height(74.dp)) }
         item { RecentWorldsPanel(recent, selected, accent, actions, Modifier.fillMaxWidth(), lazy = false) }
         item { QuickToolsPanel(accent, actions, Modifier.fillMaxWidth(), scrollable = false) }
@@ -701,6 +710,81 @@ private fun LiquidHomeHero(selected: AerixInstance?, count: Int, accent: Color, 
                         .clickable(onClick = actions.library)
                         .padding(horizontal = AerixSpacing.md, vertical = AerixSpacing.smPlus)
                 )
+            }
+        }
+    }
+}
+
+/**
+ * The one Play-dashboard widget for Social: online friend count and faces, in the fixed
+ * Social purple (never the launcher accent). Tapping it opens the Social shell; there is
+ * no Social entry in the launcher rail.
+ */
+@Composable
+private fun SocialWidgetCard(modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val accent = SocialPalette.accent
+    val online = SocialHubStore.onlineCount
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(AerixRadii.card),
+        color = AerixSurface.panel,
+        border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft),
+        onClick = onClick
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = AerixSpacing.smPlus, vertical = AerixSpacing.sm),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(30.dp)
+                        .clip(RoundedCornerShape(AerixRadii.controlSmall))
+                        .background(accent.copy(alpha = 0.16f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.aerix_ic_group_outlined),
+                        contentDescription = null,
+                        tint = accent,
+                        modifier = Modifier.size(17.dp)
+                    )
+                }
+                Spacer(Modifier.width(AerixSpacing.sm))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Social",
+                        color = AerixSurface.textPrimary,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "$online friends online",
+                        color = AerixSurface.textSecondary,
+                        fontSize = 11.sp
+                    )
+                }
+                Row {
+                    SocialHubStore.friends.filter { it.online }.take(3).forEachIndexed { index, friend ->
+                        Box(modifier = Modifier.offset(x = if (index == 0) 0.dp else (-8).dp)) {
+                            SocialAvatar(size = 26, name = friend.name)
+                        }
+                    }
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Open social",
+                    color = AerixSurface.textSecondary,
+                    fontSize = 11.sp,
+                    modifier = Modifier.weight(1f)
+                )
+                Text("›", color = accent, fontSize = 16.sp, fontWeight = FontWeight.Bold)
             }
         }
     }

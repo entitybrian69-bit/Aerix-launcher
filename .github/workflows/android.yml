@@ -56,6 +56,35 @@ jobs:
       - name: Create out directory
         run: mkdir out
 
+      # A failed Gradle build only leaves "Process completed with exit code 1" in the job, and the
+      # log files themselves are not reachable from everywhere, so the compiler errors are repeated
+      # as annotations: those are always readable through the API. One annotation carries all of
+      # them, because GitHub only shows ten annotations per step and a build can carry more errors.
+      - name: Prepare the failure reporter
+        shell: bash
+        run: |
+          cat > report_gradle_failure.sh <<'HELPER'
+          report_gradle_failure() {
+            label=$1
+            log=$2
+            errors=$({ grep -aE '^e: ' "$log" | head -20
+              grep -aE 'error: |Execution failed|What went wrong|FAILED|Could not|Caused by' "$log" | head -40
+            } | sed 's/%/%25/g; s/\r//g' | tr '\n' '|' | cut -c1-6000)
+            echo "::error title=gradle $label::${errors:-no error line matched}"
+            tailmsg=$(tail -c 1500 "$log" | tr '\n' '|' | sed 's/%/%25/g')
+            echo "::error title=gradle $label tail::$tailmsg"
+          }
+          HELPER
+
+      - name: Run unit tests
+        shell: bash
+        run: |
+          . ./report_gradle_failure.sh
+          if ! gradle :app_pojavlauncher:testFullDebugUnitTest 2>&1 | tee unit-tests.log; then
+            report_gradle_failure "unit-tests" unit-tests.log
+            exit 1
+          fi
+
       - name: Build Publishing .aab
         if: github.repository_owner == 'TeamPojavLauncher' && github.ref_name == 'v3_openjdk'
         run: |

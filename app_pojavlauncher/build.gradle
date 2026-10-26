@@ -400,4 +400,6 @@ dependencies {
     // implementation 'net.sourceforge.streamsupport:streamsupport-cfuture:1.7.0'
 
     implementation fileTree(dir: 'libs', include: ['*.jar', '*.aar'])
+
+    testImplementation 'junit:junit:4.13.2'
 }
