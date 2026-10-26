@@ -177,5 +177,6 @@ class GameMenuOverlayView @JvmOverloads constructor(
         override fun onQuickSettings() = Unit
         override fun onCustomControls() = Unit
         override fun onRequestStoragePermission() = Unit
+        override fun onSwitchAccount(account: net.kdt.pojavlaunch.aerix.bridge.AerixAccount) = Unit
     }
 }

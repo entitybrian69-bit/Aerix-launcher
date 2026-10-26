@@ -571,10 +571,11 @@
     <string name="aerix_ingame_menu_loading_wallpaper">Use wallpaper as loading background</string>
     <string name="aerix_ingame_menu_loading_wallpaper_summary">Your wallpaper - or animation - instead of black until the game window appears.</string>
 
-    <!-- Aerix menu: the account panel and the reminder when switching is attempted in game. -->
+    <!-- Aerix menu: the account panel and the restart it needs to switch accounts in game. -->
     <string name="aerix_ingame_menu_switch_account">Switch account</string>
     <string name="aerix_ingame_menu_rotate_hint">Drag to rotate</string>
-    <string name="aerix_ingame_menu_switch_blocked_title">Cannot switch account</string>
-    <string name="aerix_ingame_menu_switch_blocked">You must be in the game dashboard in order to switch account</string>
-    <string name="aerix_ingame_menu_switch_blocked_ok">OK</string>
+    <string name="aerix_ingame_menu_switch_restart_title">Switch account</string>
+    <string name="aerix_ingame_menu_switch_restart">The game is signed in as %1$s. Switching to %2$s restarts it, so the world you are in now is closed.</string>
+    <string name="aerix_ingame_menu_switch_restart_confirm">Switch and restart</string>
+    <string name="aerix_ingame_menu_switch_restart_cancel">Not now</string>
 </resources>

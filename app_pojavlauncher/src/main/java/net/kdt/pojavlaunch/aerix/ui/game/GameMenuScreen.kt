@@ -121,6 +121,14 @@ interface GameMenuCallbacks {
     fun onCustomControls()
     /** Opens the system dialog that gives the launcher access to the instance storage. */
     fun onRequestStoragePermission()
+    /**
+     * Signs the game in as [account].
+     *
+     * The running game already holds the session it started with, so the only way to become
+     * somebody else is to start it again: the host signs out, signs in as the new account and
+     * launches the game with it.
+     */
+    fun onSwitchAccount(account: AerixAccount)
 }
 
 /** Colours of the menu, all derived from the accent of the current launcher theme. */
@@ -347,6 +355,8 @@ private fun GameMenuMainPage(
                         account = account,
                         accent = palette.accent,
                         compact = compact,
+                        callbacks = callbacks,
+                        onCloseRequest = onCloseRequest,
                         modifier = Modifier.weight(1f).fillMaxWidth()
                     )
                 }
@@ -549,18 +559,21 @@ private fun MenuBottomBar(
  * through a full 360° under a horizontal drag - with a little momentum, so a flick keeps it
  * spinning and settles.
  *
- * Under it, the name - tap it to see the other accounts - and under that, the way this account
- * signed in.
+ * Under it, the name - tap it to see the other accounts, and to switch to one of them - and under
+ * that, the way this account signed in.
  */
 @Composable
 private fun AccountStage(
     account: AerixAccount?,
     accent: Color,
     compact: Boolean,
+    callbacks: GameMenuCallbacks,
+    onCloseRequest: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var showPicker by remember { mutableStateOf(false) }
-    var showBlocked by remember { mutableStateOf(false) }
+    /** The account waiting on the restart confirmation. */
+    var pendingSwitch by remember { mutableStateOf<AerixAccount?>(null) }
     var azimuth by remember(account?.username) { mutableFloatStateOf(28f) }
     val scope = rememberCoroutineScope()
     val tracker = remember(account?.username) { VelocityTracker() }
@@ -696,33 +709,50 @@ private fun AccountStage(
             currentKey = account?.key,
             accent = accent,
             onDismiss = { showPicker = false },
-            onPick = {
-                // Switching accounts cannot happen here: the running game already has its session.
+            onPick = { picked ->
                 showPicker = false
-                showBlocked = true
+                // Picking the account that is already signed in changes nothing.
+                if (picked.key != account?.key) pendingSwitch = picked
             }
         )
     }
 
-    if (showBlocked) {
+    if (pendingSwitch != null) {
+        val picked = pendingSwitch!!
         AlertDialog(
-            onDismissRequest = { showBlocked = false },
+            onDismissRequest = { pendingSwitch = null },
             title = {
                 Text(
-                    text = stringResource(R.string.aerix_ingame_menu_switch_blocked_title),
+                    text = stringResource(R.string.aerix_ingame_menu_switch_restart_title),
                     color = AerixSurface.textPrimary,
                     fontWeight = FontWeight.Bold
                 )
             },
             text = {
                 Text(
-                    text = stringResource(R.string.aerix_ingame_menu_switch_blocked),
+                    text = stringResource(
+                        R.string.aerix_ingame_menu_switch_restart,
+                        account?.username ?: "",
+                        picked.username
+                    ),
                     color = AerixSurface.textSecondary
                 )
             },
             confirmButton = {
-                TextButton(onClick = { showBlocked = false }) {
-                    Text(stringResource(R.string.aerix_ingame_menu_switch_blocked_ok), color = accent)
+                TextButton(onClick = {
+                    pendingSwitch = null
+                    onCloseRequest()
+                    callbacks.onSwitchAccount(picked)
+                }) {
+                    Text(stringResource(R.string.aerix_ingame_menu_switch_restart_confirm), color = accent)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingSwitch = null }) {
+                    Text(
+                        text = stringResource(R.string.aerix_ingame_menu_switch_restart_cancel),
+                        color = AerixSurface.textSecondary
+                    )
                 }
             }
         )
@@ -756,10 +786,11 @@ private fun authLabel(authType: AuthType?): String = when (authType) {
 }
 
 /**
- * The accounts already made, so the player can see who they could be next time.
+ * The accounts already made, so the player can pick who to be next.
  *
- * Picking one cannot take effect here - the game in front of them is already signed in - so the
- * caller answers it with the dashboard reminder.
+ * The game in front of them is already signed in and cannot change its session, so a pick is
+ * answered with a restart confirmation: the launcher comes back up as that account and starts the
+ * game again.
  */
 @Composable
 private fun AccountPickerDialog(
@@ -868,7 +899,7 @@ private fun AccountPickerDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.aerix_ingame_menu_switch_blocked_ok), color = accent)
+                Text(stringResource(R.string.aerix_account_cancel), color = accent)
             }
         }
     )

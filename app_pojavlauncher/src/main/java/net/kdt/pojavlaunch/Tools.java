@@ -927,6 +927,29 @@ public final class Tools {
         context.getApplicationContext().startActivity(intent);
     }
 
+    /** Extra asking the launcher to start the game again as soon as it is up. */
+    public static final String EXTRA_RELAUNCH_GAME = "aerix.relaunchGame";
+    /** Extra naming the account the game should come back as; its accounts file name. */
+    public static final String EXTRA_SWITCH_ACCOUNT = "aerix.switchAccount";
+
+    /**
+     * Restarts the launcher activity with a request to start the game again.
+     *
+     * Used when something only a new game session can apply - a different account, above all -
+     * was changed from inside the game. The launcher comes back with the new choice already made
+     * and launches from there, so the player lands in the game signed in as somebody else instead
+     * of being told to go and do it by hand.
+     *
+     * @param accountKey the account to sign in as, or null to keep the current one
+     */
+    public static void restartLauncherActivityAndLaunch(Context context, String accountKey){
+        Intent intent = new Intent(context, LauncherActivity.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        intent.putExtra(EXTRA_RELAUNCH_GAME, true);
+        if (accountKey != null) intent.putExtra(EXTRA_SWITCH_ACCOUNT, accountKey);
+        context.getApplicationContext().startActivity(intent);
+    }
+
     @SuppressLint("DefaultLocale")
     public static String formatFileSize(long bytes) {
         if (bytes <= 0) return "0 B";

@@ -56,6 +56,7 @@ import net.kdt.pojavlaunch.Logger;
 import net.kdt.pojavlaunch.Tools;
 import net.kdt.pojavlaunch.authenticator.accounts.Accounts;
 import net.kdt.pojavlaunch.aerix.bridge.AerixPreferences;
+import net.kdt.pojavlaunch.aerix.bridge.AerixAccount;
 import net.kdt.pojavlaunch.aerix.ui.game.GameMenuCallbacks;
 import net.kdt.pojavlaunch.aerix.ui.game.GameMenuOverlayView;
 import net.kdt.pojavlaunch.customcontrols.ControlButtonMenuListener;
@@ -296,6 +297,11 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
             public void onRequestStoragePermission() {
                 requestStorageAccess();
             }
+
+            @Override
+            public void onSwitchAccount(AerixAccount account) {
+                switchAccount(account);
+            }
         });
         drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED);
         launcherGLView.mCursorView.setCursorScale(LauncherPreferences.PREF_MOUSESCALE);
@@ -524,6 +530,33 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         GameRunner.launchGame(this, account, instance, versionId, classpath, mGameRenderer);
         //Note that we actually stall in the above function, even if the game crashes. But let's be safe.
         Tools.runOnUiThread(()-> mServiceBinder.isActive = false);
+    }
+
+    /**
+     * Signs the game in as [account] by starting it again.
+     *
+     * The running game holds the session it was launched with; nothing inside it can be told to
+     * become somebody else. So the launcher is brought back up with the chosen account and asked to
+     * start the game again - what a player would otherwise have to do by hand, from the dashboard,
+     * which is exactly the trip this panel used to send them on instead of switching.
+     */
+    private void switchAccount(AerixAccount account) {
+        if (account == null) return;
+        Logger.appendToLog("Switching account to " + account.getUsername()
+                + "; restarting the game");
+        try {
+            // The account is selected by the launcher process, not here: the saved choice is a
+            // preference, and this process is about to be killed - a write from here would race
+            // with its own death, and the launcher's copy of the preference is the one that counts.
+            Tools.restartLauncherActivityAndLaunch(this, account.getKey());
+        } catch (Throwable error) {
+            Log.e("GameActivity", "Could not switch account", error);
+            Tools.showErrorRemote(error);
+            return;
+        }
+        // Let the launch request reach the system before this process dies, so the switch cannot
+        // be swallowed on the way out.
+        Tools.MAIN_HANDLER.postDelayed(Tools::fullyExit, 700L);
     }
 
     private void dialogSendCustomKey() {
