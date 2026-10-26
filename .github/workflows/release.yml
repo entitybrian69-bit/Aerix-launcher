@@ -7,9 +7,10 @@ name: Release CI
 # A marked push has to touch this file to be seen at all, so each release cuts a
 # one line note here recording what it shipped.
 #
-# Last cut: v1.5.5 - eleven animated pixel-art control themes, an in-game
-# account switch that actually switches, and renderer launches that fall back
-# instead of dying.
+# Last cut: v1.5.6 - the first-run guide no longer closes the launcher. The
+# tour's card was offset from a component that could be off canvas, which made
+# Compose reject a negative padding (report: Android 9, AerixGuide.kt:235).
+# Everything from 1.5.5 ships unchanged.
 #
 # The job only produces artifacts. Publishing them is a separate, deliberate
 # step. Each edition goes up three times, named after version.properties:
