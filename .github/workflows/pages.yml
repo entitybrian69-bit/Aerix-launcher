@@ -13,7 +13,9 @@ name: Website
 
 on:
   push:
-    branches: [ "arena/96c87123-aerix-launcher" ]
+    # Every branch the site is actually edited on. The old list named one arena
+    # branch that no longer exists, so a docs change could never deploy.
+    branches: [ "v3_openjdk", "arena/2f1249a3-aerix-launcher" ]
     paths: [ "docs/**", ".github/workflows/pages.yml" ]
   workflow_dispatch:
 
