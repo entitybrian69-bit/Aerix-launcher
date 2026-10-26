@@ -577,29 +577,40 @@
         android:textSize="12sp"
         app:layout_constraintTop_toBottomOf="@+id/theme_scroll" />
 
-    <androidx.appcompat.widget.SwitchCompat
-        android:id="@+id/theme_haptics_switch"
-        android:layout_width="0dp"
+    <LinearLayout
+        android:id="@+id/theme_switches"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:minHeight="@dimen/_30sdp"
-        android:text="@string/ctrl_theme_haptics"
-        android:textSize="12sp"
-        app:layout_constraintEnd_toStartOf="@+id/theme_sound_switch"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/theme_apply_all_button"
-        app:layout_constraintWidth_percent="0.5" />
+        android:orientation="horizontal"
+        app:layout_constraintTop_toBottomOf="@+id/theme_apply_all_button">
 
-    <androidx.appcompat.widget.SwitchCompat
-        android:id="@+id/theme_sound_switch"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:minHeight="@dimen/_30sdp"
-        android:text="@string/ctrl_theme_sound"
-        android:textSize="12sp"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toEndOf="@+id/theme_haptics_switch"
-        app:layout_constraintTop_toBottomOf="@+id/theme_apply_all_button"
-        app:layout_constraintWidth_percent="0.5" />
+        <androidx.appcompat.widget.SwitchCompat
+            android:id="@+id/theme_animate_switch"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:minHeight="@dimen/_30sdp"
+            android:text="@string/ctrl_theme_animate"
+            android:textSize="11sp" />
+
+        <androidx.appcompat.widget.SwitchCompat
+            android:id="@+id/theme_haptics_switch"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:minHeight="@dimen/_30sdp"
+            android:text="@string/ctrl_theme_haptics"
+            android:textSize="11sp" />
+
+        <androidx.appcompat.widget.SwitchCompat
+            android:id="@+id/theme_sound_switch"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:minHeight="@dimen/_30sdp"
+            android:text="@string/ctrl_theme_sound"
+            android:textSize="11sp" />
+    </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
 

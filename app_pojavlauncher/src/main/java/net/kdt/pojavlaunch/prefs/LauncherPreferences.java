@@ -83,6 +83,8 @@ public class LauncherPreferences {
     public static boolean PREF_CONTROL_THEME_HAPTICS = true;
     /** Control themes: the system key click, played on touch down. */
     public static boolean PREF_CONTROL_THEME_SOUND = true;
+    /** Control themes: the art keeps moving at rest. Off makes a themed control completely still. */
+    public static boolean PREF_CONTROL_THEME_ANIMATED = true;
     public static boolean PREF_UBWC_WORKAROUND = false;
     /** Whether the frame rate counter is drawn over the game. */
     public static boolean PREF_SHOW_FPS = true;
@@ -141,6 +143,7 @@ public class LauncherPreferences {
         PREF_BUTTON_TRANSPARENCY = (short) DEFAULT_PREF.getInt("buttonTransparency", 100);
         PREF_CONTROL_THEME_HAPTICS = DEFAULT_PREF.getBoolean("controlThemeHaptics", true);
         PREF_CONTROL_THEME_SOUND = DEFAULT_PREF.getBoolean("controlThemeSound", true);
+        PREF_CONTROL_THEME_ANIMATED = DEFAULT_PREF.getBoolean("controlThemeAnimated", true);
         PREF_UBWC_WORKAROUND = DEFAULT_PREF.getBoolean("ubwcWorkaround", false);
         PREF_SHOW_FPS = DEFAULT_PREF.getBoolean("show_fps", true);
 

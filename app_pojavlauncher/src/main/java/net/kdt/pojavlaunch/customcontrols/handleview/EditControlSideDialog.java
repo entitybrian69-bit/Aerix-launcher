@@ -6,16 +6,20 @@ import static android.view.View.VISIBLE;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Color;
+import android.graphics.BitmapFactory;
+import android.graphics.Outline;
 import android.graphics.drawable.GradientDrawable;
 import android.util.Log;
 import android.util.TypedValue;
 import android.view.Gravity;
+import android.view.ViewOutlineProvider;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.SeekBar;
 import android.widget.Spinner;
@@ -96,7 +100,9 @@ public class EditControlSideDialog extends SideDialogView {
     // Control themes
     private LinearLayout mThemeChipRow;
     private Button mThemeApplyAllButton;
-    private androidx.appcompat.widget.SwitchCompat mThemeHapticsSwitch, mThemeSoundSwitch;
+    private androidx.appcompat.widget.SwitchCompat mThemeAnimateSwitch, mThemeHapticsSwitch, mThemeSoundSwitch;
+    /** Theme thumbnails, decoded once for the whole editor. */
+    private static final java.util.HashMap<Integer, android.graphics.Bitmap> THEME_THUMBS = new java.util.HashMap<>();
     private final List<ThemeChip> mThemeChips = new ArrayList<>();
 
     public EditControlSideDialog(Context context, ViewGroup parent) {
@@ -389,6 +395,7 @@ public class EditControlSideDialog extends SideDialogView {
 
         mThemeChipRow = mDialogContent.findViewById(R.id.theme_chip_row);
         mThemeApplyAllButton = mDialogContent.findViewById(R.id.theme_apply_all_button);
+        mThemeAnimateSwitch = mDialogContent.findViewById(R.id.theme_animate_switch);
         mThemeHapticsSwitch = mDialogContent.findViewById(R.id.theme_haptics_switch);
         mThemeSoundSwitch = mDialogContent.findViewById(R.id.theme_sound_switch);
     }
@@ -617,6 +624,22 @@ public class EditControlSideDialog extends SideDialogView {
 
         mThemeApplyAllButton.setOnClickListener(v -> applyThemeToAllControls());
 
+        mThemeAnimateSwitch.setChecked(LauncherPreferences.PREF_CONTROL_THEME_ANIMATED);
+        mThemeAnimateSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            LauncherPreferences.PREF_CONTROL_THEME_ANIMATED = isChecked;
+            LauncherPreferences.DEFAULT_PREF.edit()
+                    .putBoolean("controlThemeAnimated", isChecked).apply();
+            // Redraw every control, so the change is visible immediately rather than at next launch.
+            if (mCurrentlyEditedButton != null) {
+                ControlLayout layout = mCurrentlyEditedButton.getControlLayoutParent();
+                if (layout != null) {
+                    for (ControlInterface button : layout.getButtonChildren()) {
+                        button.getControlView().invalidate();
+                    }
+                }
+            }
+        });
+
         mThemeHapticsSwitch.setChecked(LauncherPreferences.PREF_CONTROL_THEME_HAPTICS);
         mThemeHapticsSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
             LauncherPreferences.PREF_CONTROL_THEME_HAPTICS = isChecked;
@@ -636,25 +659,48 @@ public class EditControlSideDialog extends SideDialogView {
 
     private void addThemeChip(@androidx.annotation.Nullable ControlTheme theme) {
         Context context = mDialogContent.getContext();
-        TextView chip = new TextView(context);
-        chip.setText(theme == null ? R.string.ctrl_theme_off : theme.nameRes);
-        chip.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f);
-        chip.setGravity(Gravity.CENTER);
-        chip.setAllCaps(false);
-        int padH = dp(12), padV = dp(8);
-        chip.setPadding(padH, padV, padH, padV);
-        chip.setMinWidth(dp(74));
-        chip.setTextColor(theme != null && theme.textColor != 0 ? theme.textColor : Color.WHITE);
+        int size = dp(58);
 
-        GradientDrawable background = new GradientDrawable();
-        background.setCornerRadius(dp(10));
+        // The chip is the picture itself, so the strip is the preview: what is tapped is what the
+        // control will wear.
+        LinearLayout chip = new LinearLayout(context);
+        chip.setOrientation(LinearLayout.VERTICAL);
+        chip.setGravity(Gravity.CENTER_HORIZONTAL);
+        chip.setPadding(dp(4), dp(4), dp(4), dp(4));
+
+        GradientDrawable frame = new GradientDrawable();
+        frame.setCornerRadius(dp(12));
+        frame.setColor(0x33101820);
+        chip.setBackground(frame);
+
+        ImageView art = new ImageView(context);
+        art.setLayoutParams(new LinearLayout.LayoutParams(size, size));
+        art.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        art.setClipToOutline(true);
+        final float corner = dp(9);
+        art.setOutlineProvider(new ViewOutlineProvider() {
+            @Override
+            public void getOutline(View view, Outline outline) {
+                outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), corner);
+            }
+        });
+        art.setImageBitmap(theme == null ? null : thumbnail(context, theme.art, size));
         if (theme == null) {
-            background.setColor(0xFF232A31); // Off: the plain control, no colour of its own.
-        } else {
-            background.setOrientation(GradientDrawable.Orientation.TOP_BOTTOM);
-            background.setColors(new int[]{theme.accent, theme.accent2});
+            // "Off" has no picture: a plain grey swatch stands for the untouched control.
+            GradientDrawable plain = new GradientDrawable();
+            plain.setCornerRadius(corner);
+            plain.setColor(0xFF39424C);
+            art.setBackground(plain);
         }
-        chip.setBackground(background);
+        chip.addView(art);
+
+        TextView label = new TextView(context);
+        label.setText(theme == null ? R.string.ctrl_theme_off : theme.nameRes);
+        label.setTextSize(TypedValue.COMPLEX_UNIT_SP, 9f);
+        label.setGravity(Gravity.CENTER);
+        label.setMaxLines(1);
+        label.setPadding(0, dp(3), 0, 0);
+        chip.addView(label);
 
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
@@ -663,7 +709,27 @@ public class EditControlSideDialog extends SideDialogView {
 
         chip.setOnClickListener(v -> selectTheme(theme));
         mThemeChipRow.addView(chip);
-        mThemeChips.add(new ThemeChip(theme, background));
+        mThemeChips.add(new ThemeChip(theme, frame, label));
+    }
+
+    /** Decodes a theme's art down to a thumbnail; each one is decoded once for the whole editor. */
+    private android.graphics.Bitmap thumbnail(Context context, int res, int size) {
+        android.graphics.Bitmap cached = THEME_THUMBS.get(res);
+        if (cached != null) return cached;
+        BitmapFactory.Options bounds = new BitmapFactory.Options();
+        bounds.inJustDecodeBounds = true;
+        BitmapFactory.decodeResource(context.getResources(), res, bounds);
+        int sample = 1;
+        int shortest = Math.min(bounds.outWidth, bounds.outHeight);
+        while (shortest / (sample * 2) >= size) sample *= 2;
+
+        BitmapFactory.Options options = new BitmapFactory.Options();
+        options.inSampleSize = sample;
+        options.inScaled = false;
+        android.graphics.Bitmap bitmap =
+                BitmapFactory.decodeResource(context.getResources(), res, options);
+        if (bitmap != null) THEME_THUMBS.put(res, bitmap);
+        return bitmap;
     }
 
     /** Puts [theme] on the control being edited, and previews it once. */
@@ -681,9 +747,9 @@ public class EditControlSideDialog extends SideDialogView {
             boolean selected = chip.theme == null
                     ? themeId == null || themeId.isEmpty()
                     : themeId != null && themeId.equals(chip.theme.id);
-            chip.background.setStroke(dp(selected ? 2 : 1),
-                    selected ? Color.WHITE : 0x55FFFFFF);
-            chip.background.setAlpha(selected || chip.theme == null ? 255 : 190);
+            chip.frame.setStroke(dp(selected ? 2 : 1), selected ? Color.WHITE : 0x33FFFFFF);
+            chip.frame.setColor(selected ? 0x44FFFFFF : 0x33101820);
+            chip.label.setTextColor(selected ? Color.WHITE : 0xFFB9C6D0);
         }
     }
 
@@ -727,14 +793,17 @@ public class EditControlSideDialog extends SideDialogView {
         return (int) (value * mDialogContent.getResources().getDisplayMetrics().density);
     }
 
-    /** One chip in the strip: the theme it stands for, and the background it is drawn with. */
+    /** One chip in the strip: the theme it stands for, its frame and its label. */
     private static final class ThemeChip {
         @androidx.annotation.Nullable final ControlTheme theme;
-        final GradientDrawable background;
+        final GradientDrawable frame;
+        final TextView label;
 
-        ThemeChip(@androidx.annotation.Nullable ControlTheme theme, GradientDrawable background) {
+        ThemeChip(@androidx.annotation.Nullable ControlTheme theme, GradientDrawable frame,
+                  TextView label) {
             this.theme = theme;
-            this.background = background;
+            this.frame = frame;
+            this.label = label;
         }
     }
 

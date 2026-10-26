@@ -127,8 +127,9 @@ public class ControlButton extends TextView implements ControlInterface {
             super.onDraw(canvas);
             mThemePainter.drawFront(canvas, getWidth(), getHeight(), mComputedRadius);
             canvas.restoreToCount(save);
-            // Only while the spring is still moving: at rest nothing schedules another frame.
-            if(mThemePainter.isAnimating()) postInvalidateOnAnimation();
+            // Only while something is still moving: with ambience off, a resting themed control
+            // requests no frames at all.
+            if(mThemePainter.wantsFrame()) postInvalidateOnAnimation();
             return;
         }
 

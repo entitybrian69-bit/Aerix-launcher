@@ -1,42 +1,50 @@
 package net.kdt.pojavlaunch.customcontrols.theme;
 
+import androidx.annotation.DrawableRes;
 import androidx.annotation.StringRes;
 
 /**
  * One animated look a control can wear.
  *
- * <p>A theme is a description, not a drawing: it says which fill the control wears at rest, what
- * happens under a finger, what the phone should feel and say. The drawing lives in
- * {@link ControlThemePainter}, so adding a theme is a one line entry in {@link ControlThemes}, and
- * removing it is deleting that line - a layout that still names it simply falls back to the stock
- * control.
+ * <p>Each theme is a piece of pixel art from the launcher's own collection, plus the motion that
+ * art suggests: rockets climb, nebulae drift, stars twinkle, the black hole's ring turns. The
+ * drawing lives in {@link ControlThemePainter}, so removing a theme is deleting its line in
+ * {@link ControlThemes} - a layout that still names it falls back to the stock control.
  *
  * <p>Themes only ever change paint. They never touch key delivery, timing or hit areas: a themed
  * button sends exactly the same key event as an unthemed one, on the same frame.
  */
 public final class ControlTheme {
 
-    /** How the control is painted while nothing is happening. */
-    public enum Fill {
-        /** One flat colour. */
-        SOLID,
-        /** Two colours, top to bottom. */
-        GRADIENT,
-        /** A dark wash with a bright inner rim - frosted glass. */
-        GLASS,
-        /** See-through middle, thick coloured edge. */
-        OUTLINE,
-        /** Diagonal stripes - carbon fibre, matrix, caution tape. */
-        STRIPES,
-        /** Horizontal scanlines - CRT, hologram, arcade. */
-        SCANLINE
+    /** What the artwork does while the control is at rest. */
+    public enum Ambient {
+        /** The whole picture slides across and wraps - clouds, nebulae, patterns. */
+        DRIFT,
+        /** The picture climbs, like the rockets printed on it. */
+        RISE,
+        /** Stars light up and dim at their own pace, over a still sky. */
+        TWINKLE,
+        /** The picture bobs and breathes very slightly, like a held card. */
+        SWAY,
+        /** A ring turns around the middle - an accretion disk. */
+        ORBIT,
+        /** The picture's brightness jitters, like interference on a screen. */
+        FLICKER,
+        /** The picture turns slowly, so a swirl keeps swirling. */
+        SHIMMER,
+        /** A soft glow breathes behind the control - moonlight. */
+        GLOW,
+        /** A streak of light crosses the control every couple of seconds - a comet. */
+        SWEEP,
+        /** The picture slides sideways, slowly, like a wide sky. */
+        SCROLL
     }
 
     /** What happens between touch down and release. */
     public enum Press {
         /** The edge lights up and fades. */
         GLOW,
-        /** The whole control squashes under the finger and springs back. */
+        /** The control squashes under the finger and springs back. */
         SQUASH,
         /** A circle spreads out from the middle. */
         RIPPLE,
@@ -54,27 +62,29 @@ public final class ControlTheme {
 
     public final String id;
     @StringRes public final int nameRes;
-    public final int accent;
-    public final int accent2;
-    public final Fill fill;
+    /** The pixel art this theme wears. */
+    @DrawableRes public final int art;
+    public final Ambient ambient;
     public final Press press;
+    /** Wash drawn over the art so the label stays readable on it. */
+    public final int scrim;
+    /** Text colour that survives the wash, or 0 to keep the layout's own. */
+    public final int textColor;
     /** {@link android.view.HapticFeedbackConstants} value, felt on touch down. */
     public final int haptic;
     /** {@link android.media.AudioManager} sound effect, played on touch down. */
     public final int sound;
-    /** Text colour for themes too light for white, or 0 to keep the layout's own. */
-    public final int textColor;
 
-    ControlTheme(String id, @StringRes int nameRes, int accent, int accent2, Fill fill, Press press,
-                 int haptic, int sound, int textColor) {
+    ControlTheme(String id, @StringRes int nameRes, @DrawableRes int art, Ambient ambient,
+                 Press press, int scrim, int textColor, int haptic, int sound) {
         this.id = id;
         this.nameRes = nameRes;
-        this.accent = accent;
-        this.accent2 = accent2;
-        this.fill = fill;
+        this.art = art;
+        this.ambient = ambient;
         this.press = press;
+        this.scrim = scrim;
+        this.textColor = textColor;
         this.haptic = haptic;
         this.sound = sound;
-        this.textColor = textColor;
     }
 }

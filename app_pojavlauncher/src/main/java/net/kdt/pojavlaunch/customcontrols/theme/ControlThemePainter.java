@@ -1,12 +1,18 @@
 package net.kdt.pojavlaunch.customcontrols.theme;
 
 import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.BitmapShader;
 import android.graphics.Canvas;
 import android.graphics.LinearGradient;
+import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Path;
+import android.graphics.RadialGradient;
 import android.graphics.RectF;
 import android.graphics.Shader;
+import android.graphics.SweepGradient;
 import android.media.AudioManager;
 import android.os.SystemClock;
 import android.view.View;
@@ -16,16 +22,25 @@ import androidx.annotation.Nullable;
 
 import net.kdt.pojavlaunch.prefs.LauncherPreferences;
 
+import java.util.HashMap;
+
 /**
- * Draws a {@link ControlTheme} on a control and animates it under the finger.
+ * Draws a {@link ControlTheme} on a control: its pixel art, the motion that art suggests, and the
+ * animation under the finger.
  *
- * <p>The animation is a small damped spring, advanced inside the view's own draw pass and driven by
- * {@link View#postInvalidateOnAnimation()} only while it is still moving. At rest a themed control
- * is a couple of rounded rectangles, the same order of cost as a plain one, and nothing runs while
- * the screen is not being drawn.
+ * <p>Two things are animated, and they are kept apart on purpose:
  *
- * <p>Presses and releases only ever change numbers here. The key event is sent by the control on
- * the frame the finger lands, exactly as before - a theme can never delay or swallow an input.
+ * <ul>
+ *   <li><b>Ambience</b> - the picture itself, always moving in the way its art implies. Cheap by
+ *   construction: the art is one <i>BitmapShader</i> on one rounded rectangle, moved by a matrix,
+ *   and the extras on top are a handful of dots and one gradient. It is capped at
+ *   {@value #AMBIENT_FRAME_MS} ms per frame so a busy game is not charged for it.</li>
+ *   <li><b>Press</b> - a small damped spring, run only while a finger is on the control.</li>
+ * </ul>
+ *
+ * <p>Neither ever touches input: the key event is still sent by the control on the frame the
+ * finger lands. Ambience can be switched off entirely from the editor, and then a themed control
+ * costs one shader draw and nothing else - no frames are requested at all.
  */
 public final class ControlThemePainter {
 
@@ -33,33 +48,50 @@ public final class ControlThemePainter {
     private static final float STIFFNESS = 620f;
     /** Spring friction. Lower bounces more; this one overshoots slightly and settles fast. */
     private static final float DAMPING = 21f;
-    /** Below this the spring is close enough to call it done and stop asking for frames. */
     private static final float REST_POSITION = 0.003f;
     private static final float REST_SPEED = 0.06f;
-    /** Longest step integrated at once, and the size of the fixed sub steps. */
     private static final float MAX_STEP = 0.05f;
     private static final float SUB_STEP = 0.008f;
-    /** How far past 1 the overshoot is allowed to push the press value. */
     private static final float MAX_PRESS = 1.3f;
+    /** Ambience is redrawn at this interval at most - about 25 fps, enough for slow motion. */
+    private static final long AMBIENT_FRAME_MS = 40L;
+    /** How many twinkling dots a starry theme draws. */
+    private static final int TWINKLES = 14;
 
-    private final Paint mFill = new Paint(Paint.ANTI_ALIAS_FLAG);
+    /** Decoded artwork, shared by every control wearing the same theme. */
+    private static final HashMap<Integer, Bitmap> BITMAPS = new HashMap<>(16);
+
+    private final Paint mArt = new Paint(Paint.FILTER_BITMAP_FLAG | Paint.ANTI_ALIAS_FLAG);
+    private final Paint mScrim = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint mEdge = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint mExtra = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Path mClip = new Path();
+    private final Matrix mMatrix = new Matrix();
     private final RectF mRect = new RectF();
+    private final Path mClip = new Path();
+    private final float[] mTwinkleX = new float[TWINKLES];
+    private final float[] mTwinkleY = new float[TWINKLES];
+    private final float[] mTwinklePhase = new float[TWINKLES];
 
     @Nullable private ControlTheme mTheme;
+    @Nullable private Bitmap mBitmap;
+    @Nullable private BitmapShader mShader;
     @Nullable private AudioManager mAudio;
+    @Nullable private Context mContext;
 
     private float mPress, mVelocity, mTarget;
     private long mLastFrame;
     private boolean mAnimating;
+    /** Random enough starting point, so two controls never twinkle in lock step. */
+    private final long mSeed = (long) (Math.random() * 4096);
 
     private int mCachedWidth = -1, mCachedHeight = -1;
     private float mCachedRadius = -1f;
-    @Nullable private LinearGradient mCachedFill, mCachedGloss, mCachedSheen;
+    @Nullable private SweepGradient mOrbitShader;
+    @Nullable private RadialGradient mGlowShader;
+    @Nullable private LinearGradient mStreakShader;
 
     private float mDensity = 1f;
+    private long mLastAmbientFrame;
 
     public ControlThemePainter() {
         mEdge.setStyle(Paint.Style.STROKE);
@@ -68,26 +100,40 @@ public final class ControlThemePainter {
     /** Called once the view exists, so density and the audio service can be resolved. */
     public void attach(View view) {
         mDensity = view.getResources().getDisplayMetrics().density;
-        mAudio = (AudioManager) view.getContext().getApplicationContext()
-                .getSystemService(Context.AUDIO_SERVICE);
+        mContext = view.getContext().getApplicationContext();
+        mAudio = (AudioManager) mContext.getSystemService(Context.AUDIO_SERVICE);
+        for (int i = 0; i < TWINKLES; i++) {
+            mTwinkleX[i] = hash(i * 3 + 1);
+            mTwinkleY[i] = hash(i * 3 + 2);
+            mTwinklePhase[i] = hash(i * 3 + 3) * 6.283f;
+        }
     }
 
     public void setTheme(@Nullable ControlTheme theme) {
         if (mTheme == theme) return;
         mTheme = theme;
+        mBitmap = theme == null ? null : art(theme.art);
+        mShader = null;
         mPress = 0f;
         mVelocity = 0f;
         mTarget = 0f;
         mAnimating = false;
-        clearShaders();
+        mCachedWidth = mCachedHeight = -1;
+        mCachedRadius = -1f;
+        mOrbitShader = mGlowShader = mStreakShader = null;
     }
 
     public boolean hasTheme() {
         return mTheme != null;
     }
 
-    public boolean isAnimating() {
-        return mAnimating;
+    /** True while something - a press or the ambient motion - still wants frames. */
+    public boolean wantsFrame() {
+        return mAnimating || (mTheme != null && ambientRunning());
+    }
+
+    private boolean ambientRunning() {
+        return LauncherPreferences.PREF_CONTROL_THEME_ANIMATED;
     }
 
     // ---------------------------------------------------------------- input
@@ -134,8 +180,8 @@ public final class ControlThemePainter {
     // ---------------------------------------------------------------- drawing
 
     /**
-     * Paints everything that belongs under the control's text, and leaves the canvas transformed
-     * so the text squashes or grows with the theme.
+     * Paints the art, its motion and the wash that keeps the label readable, and leaves the canvas
+     * transformed so the label squashes or grows with the theme.
      *
      * @return the save count to hand back to {@link Canvas#restoreToCount(int)}
      */
@@ -143,34 +189,54 @@ public final class ControlThemePainter {
                         boolean overBitmap) {
         int save = canvas.save();
         ControlTheme theme = mTheme;
-        if (theme == null || width <= 0 || height <= 0) return save;
+        if (theme == null || width <= 0 || height <= 0 || mBitmap == null) return save;
 
-        advance();
+        advanceSpring();
         float press = clampPress();
         if (width != mCachedWidth || height != mCachedHeight || radius != mCachedRadius) {
-            rebuildGeometry(width, height, radius);
+            mCachedWidth = width;
+            mCachedHeight = height;
+            mCachedRadius = radius;
+            mOrbitShader = mGlowShader = null;
+            mStreakShader = null;
+            mRect.set(0f, 0f, width, height);
+            mClip.reset();
+            mClip.addRoundRect(mRect, radius, radius, Path.Direction.CW);
+            buildShader();
         }
+        if (mShader == null) return save;
 
         float scale = 1f;
         if (theme.press == ControlTheme.Press.SQUASH) scale = 1f - 0.085f * press;
         else if (theme.press == ControlTheme.Press.LIFT) scale = 1f + 0.05f * press;
         if (scale != 1f) canvas.scale(scale, scale, width / 2f, height / 2f);
 
-        // No clipping here: every shape below is drawn as a rounded rectangle already, and clipping
-        // a path is not antialiased on Android - it would give the corners a jagged edge.
-        paintFill(canvas, width, height, radius, activated, press, overBitmap);
+        float time = ambientTime();
+        applyArtMatrix(width, height, time, press);
+
+        // A control that already has the player's own picture keeps it: the theme becomes a moving
+        // tint over it instead of covering it up.
+        mArt.setAlpha(overBitmap ? 105 : 255);
+        mArt.setShader(mShader);
+        canvas.drawRoundRect(mRect, radius, radius, mArt);
+        mArt.setShader(null);
+
+        mScrim.setShader(null);
+        mScrim.setColor(theme.scrim);
+        mScrim.setAlpha(overBitmap ? Math.min(255, (theme.scrim >>> 24) / 2) : (theme.scrim >>> 24));
+        canvas.drawRoundRect(mRect, radius, radius, mScrim);
+
+        paintAmbient(canvas, width, height, radius, theme, time, press, activated);
         return save;
     }
 
-    /** Paints the light, ripples and sweeps that belong over the text. */
+    /** Paints the light, ripples and sweeps that belong over the label. */
     public void drawFront(Canvas canvas, int width, int height, float radius) {
         ControlTheme theme = mTheme;
         if (theme == null || width <= 0 || height <= 0) return;
         float press = clampPress();
         if (press <= 0.001f) return;
 
-        // These are the only shapes that could spill out of the control's rounded corners, and they
-        // are translucent, so clipping them here costs nothing visible.
         int save = canvas.save();
         canvas.clipPath(mClip);
         switch (theme.press) {
@@ -185,150 +251,152 @@ public final class ControlThemePainter {
         canvas.restoreToCount(save);
     }
 
-    private void rebuildGeometry(int width, int height, float radius) {
-        mCachedWidth = width;
-        mCachedHeight = height;
-        mCachedRadius = radius;
-        clearShaders();
-        mRect.set(0f, 0f, width, height);
-        mClip.reset();
-        mClip.addRoundRect(mRect, radius, radius, Path.Direction.CW);
-    }
-
-    private void clearShaders() {
-        mCachedFill = null;
-        mCachedGloss = null;
-        mCachedSheen = null;
-    }
-
-    private void paintFill(Canvas canvas, int width, int height, float radius,
-                           boolean activated, float press, boolean overBitmap) {
+    /** Scales the art so it always covers the control, then lets the theme move it. */
+    private void applyArtMatrix(int width, int height, float time, float press) {
+        Bitmap bitmap = mBitmap;
+        if (bitmap == null) return;
+        float cover = Math.max(width / (float) bitmap.getWidth(), height / (float) bitmap.getHeight());
         ControlTheme theme = mTheme;
-        float strength = 0.55f + (activated ? 0.25f : 0f) + 0.20f * press;
+        if (theme == null) return;
 
-        if (overBitmap) {
-            // A control that already has a picture keeps it: the theme becomes a tint and a set of
-            // press effects on top, instead of throwing the player's chosen image away.
-            strength *= 0.45f;
-        } else {
-            // Everything starts from a dark coat, so the stock background is genuinely covered: a
-            // themed control looks like the theme, not like the theme laid over the old button.
-            mFill.setShader(null);
-            mFill.setColor(0xFF0E141A);
-            mFill.setAlpha(alpha(0.80f));
-            canvas.drawRoundRect(mRect, radius, radius, mFill);
+        float extra = 1f;
+        float dx = 0f, dy = 0f, rotate = 0f;
+        switch (theme.ambient) {
+            case DRIFT: {
+                float period = 14000f;
+                dx = -wrap(time, period) / period * bitmap.getWidth() * cover;
+                dy = -wrap(time + 3000f, period) / period * bitmap.getHeight() * cover * 0.5f;
+                break;
+            }
+            case RISE: {
+                // Rockets climbing: the pattern moves up and wraps, slower than a scroll so it reads
+                // as floating rather than as a treadmill.
+                float period = 9000f;
+                dy = -wrap(time, period) / period * bitmap.getHeight() * cover;
+                break;
+            }
+            case SCROLL: {
+                float period = 16000f;
+                dx = -wrap(time, period) / period * bitmap.getWidth() * cover;
+                break;
+            }
+            case SWAY: {
+                float swell = (float) Math.sin(time / 2600f);
+                dx = swell * dp(3f);
+                dy = (float) Math.cos(time / 3100f) * dp(2f);
+                break;
+            }
+            case SHIMMER: {
+                // A little over-scale, so a turning rectangle never shows its corners.
+                extra = 1.22f;
+                rotate = wrap(time, 120000f) / 120000f * 360f;
+                break;
+            }
+            case FLICKER:
+            case TWINKLE:
+            case ORBIT:
+            case GLOW:
+            case SWEEP:
+            default:
+                break;
         }
+        if (press > 0.001f) extra *= 1f + 0.06f * press;
 
-        switch (theme.fill) {
-            case SOLID: {
-                mFill.setColor(theme.accent);
-                mFill.setAlpha(alpha(strength));
-                canvas.drawRoundRect(mRect, radius, radius, mFill);
-                paintTopGloss(canvas, width, height, radius, 0.10f + 0.12f * press);
-                break;
-            }
-            case GRADIENT: {
-                mFill.setShader(fillGradient(width, height));
-                mFill.setAlpha(alpha(strength));
-                canvas.drawRoundRect(mRect, radius, radius, mFill);
-                mFill.setShader(null);
-                paintTopGloss(canvas, width, height, radius, 0.12f + 0.10f * press);
-                break;
-            }
-            case GLASS: {
-                mFill.setColor(theme.accent);
-                mFill.setAlpha(alpha(0.10f + 0.18f * press));
-                canvas.drawRoundRect(mRect, radius, radius, mFill);
-                float inset = dp(1.5f);
-                mRect.inset(inset, inset);
-                mEdge.setShader(null);
-                mEdge.setStrokeWidth(dp(1.5f));
-                mEdge.setColor(0xFFFFFFFF);
-                mEdge.setAlpha(alpha(0.20f + 0.22f * press));
-                canvas.drawRoundRect(mRect, Math.max(0f, radius - inset), Math.max(0f, radius - inset), mEdge);
-                mRect.inset(-inset, -inset);
-                paintTopGloss(canvas, width, height, radius, 0.16f + 0.10f * press);
-                break;
-            }
-            case OUTLINE: {
-                // Hollow middle, hot edge - the neon family.
-                mFill.setColor(theme.accent);
-                mFill.setAlpha(alpha(0.07f + 0.13f * press));
-                canvas.drawRoundRect(mRect, radius, radius, mFill);
-                float inset = dp(1.5f);
-                mRect.inset(inset, inset);
-                mEdge.setShader(null);
-                mEdge.setStrokeWidth(dp(2f));
-                mEdge.setColor(theme.accent);
-                mEdge.setAlpha(alpha(0.80f + 0.20f * press));
-                canvas.drawRoundRect(mRect, Math.max(0f, radius - inset), Math.max(0f, radius - inset), mEdge);
-                mRect.inset(-inset, -inset);
-                break;
-            }
-            case STRIPES: {
-                mFill.setColor(theme.accent2);
-                mFill.setAlpha(alpha(strength));
-                canvas.drawRoundRect(mRect, radius, radius, mFill);
-                paintStripes(canvas, width, height, press);
-                break;
-            }
-            case SCANLINE: {
-                mFill.setColor(theme.accent2);
-                mFill.setAlpha(alpha(strength));
-                canvas.drawRoundRect(mRect, radius, radius, mFill);
-                paintScanlines(canvas, width, height, press);
-                break;
-            }
+        float total = cover * extra;
+        mMatrix.reset();
+        mMatrix.postScale(total, total);
+        if (rotate != 0f) mMatrix.postRotate(rotate, bitmap.getWidth() / 2f, bitmap.getHeight() / 2f);
+        // Centre first, then the theme's own offset.
+        dx += (width - bitmap.getWidth() * total) / 2f;
+        dy += (height - bitmap.getHeight() * total) / 2f;
+        mMatrix.postTranslate(dx, dy);
+        mShader.setLocalMatrix(mMatrix);
+    }
+
+    private void paintAmbient(Canvas canvas, int width, int height, float radius,
+                              ControlTheme theme, float time, float press, boolean activated) {
+        switch (theme.ambient) {
+            case TWINKLE: paintTwinkles(canvas, width, height, time, press); break;
+            case ORBIT: paintOrbit(canvas, width, height, radius, time, press); break;
+            case GLOW: paintMoonGlow(canvas, width, height, radius, time, press, activated); break;
+            case SWEEP: paintAmbientStreak(canvas, width, height, time, press); break;
+            case FLICKER: paintFlicker(canvas, width, height, radius, time); break;
             default: break;
         }
     }
 
-    /** A soft light catch along the top edge - what separates a surface from a flat colour. */
-    private void paintTopGloss(Canvas canvas, int width, int height, float radius, float strength) {
-        float glossHeight = Math.min(height * 0.45f, dp(28f));
-        if (glossHeight <= 0f) return;
-        mExtra.setShader(glossGradient(glossHeight));
-        mExtra.setAlpha(alpha(Math.min(1f, strength)));
+    /** Stars that light up and dim at their own pace - the stardust and star-cross skies. */
+    private void paintTwinkles(Canvas canvas, int width, int height, float time, float press) {
+        mExtra.setShader(null);
         mExtra.setStyle(Paint.Style.FILL);
-        mRect.set(0f, 0f, width, glossHeight);
-        canvas.drawRoundRect(mRect, radius, radius, mExtra);
+        for (int i = 0; i < TWINKLES; i++) {
+            float phase = time / 900f + mTwinklePhase[i] + mSeed;
+            float pulse = 0.5f + 0.5f * (float) Math.sin(phase);
+            float alpha = (0.18f + 0.72f * pulse) * (1f + 0.3f * press);
+            mExtra.setColor(0xFFFFFFFF);
+            mExtra.setAlpha(alpha(alpha));
+            float size = dp(i % 3 == 0 ? 2.2f : 1.3f) * (0.8f + 0.5f * pulse);
+            canvas.drawCircle(mTwinkleX[i] * width, mTwinkleY[i] * height, size, mExtra);
+        }
+    }
+
+    /** The accretion disk of the black hole, turning. */
+    private void paintOrbit(Canvas canvas, int width, int height, float radius, float time,
+                            float press) {
+        if (mOrbitShader == null) {
+            int[] colours = {0x00FFFFFF, 0xAAE1BEE7, 0x00FFFFFF, 0x66B39DDB, 0x00FFFFFF};
+            mOrbitShader = new SweepGradient(width / 2f, height / 2f, colours, null);
+        }
+        int save = canvas.save();
+        canvas.rotate(wrap(time, 12000f) / 12000f * 360f, width / 2f, height / 2f);
+        mExtra.setShader(mOrbitShader);
+        mExtra.setStyle(Paint.Style.STROKE);
+        mExtra.setStrokeWidth(dp(2f + 1.5f * press));
+        mExtra.setAlpha(alpha(0.55f + 0.35f * press));
+        mRect.set(width * 0.10f, height * 0.16f, width * 0.90f, height * 0.84f);
+        canvas.drawOval(mRect, mExtra);
+        mExtra.setShader(null);
+        mExtra.setStyle(Paint.Style.FILL);
         mRect.set(0f, 0f, width, height);
+        canvas.restoreToCount(save);
+    }
+
+    /** Moonlight breathing behind the label. */
+    private void paintMoonGlow(Canvas canvas, int width, int height, float radius, float time,
+                               float press, boolean activated) {
+        if (mGlowShader == null) {
+            mGlowShader = new RadialGradient(width * 0.5f, height * 0.42f, Math.max(width, height) * 0.7f,
+                    new int[]{0x66FFF7DC, 0x00FFF7DC}, null, Shader.TileMode.CLAMP);
+        }
+        float breathe = 0.5f + 0.5f * (float) Math.sin(time / 1500f);
+        mExtra.setShader(mGlowShader);
+        mExtra.setAlpha(alpha((0.25f + 0.35f * breathe + 0.3f * press) * (activated ? 1.25f : 1f)));
+        canvas.drawRoundRect(mRect, radius, radius, mExtra);
         mExtra.setShader(null);
     }
 
-    private void paintStripes(Canvas canvas, int width, int height, float press) {
-        ControlTheme theme = mTheme;
-        mExtra.setShader(null);
-        mExtra.setColor(theme.accent);
-        mExtra.setAlpha(alpha(0.30f + 0.35f * press));
-        mExtra.setStrokeWidth(dp(3f));
-        mExtra.setStyle(Paint.Style.STROKE);
-        float step = dp(9f);
-        float offset = press * step; // The texture slides under the finger.
-        for (float start = -height + offset; start < width + height; start += step) {
-            canvas.drawLine(start, height, start + height, 0f, mExtra);
-        }
-        mExtra.setStyle(Paint.Style.FILL);
+    /** The comet's own streak, crossing every few seconds. */
+    private void paintAmbientStreak(Canvas canvas, int width, int height, float time, float press) {
+        float period = 2600f;
+        float progress = wrap(time, period) / period;
+        if (progress > 0.45f) return; // Off-screen half the time, so it reads as occasional.
+        paintStreak(canvas, width, height, progress / 0.45f, 0.55f + 0.4f * press);
     }
 
-    private void paintScanlines(Canvas canvas, int width, int height, float press) {
-        ControlTheme theme = mTheme;
+    /** Interference: the whole control's brightness jitters in short steps. */
+    private void paintFlicker(Canvas canvas, int width, int height, float radius, float time) {
+        long step = (long) (time / 120f);
+        float noise = hash(step + mSeed);
         mExtra.setShader(null);
-        mExtra.setStrokeWidth(dp(1f));
-        mExtra.setStyle(Paint.Style.STROKE);
-        float step = dp(4f);
-        int line = 0;
-        for (float y = step; y < height; y += step, line++) {
-            boolean bright = (line & 1) == 0;
-            mExtra.setColor(bright ? theme.accent : 0xFF000000);
-            mExtra.setAlpha(alpha(bright ? 0.16f + 0.25f * press : 0.12f));
-            canvas.drawLine(0f, y, width, y, mExtra);
-        }
         mExtra.setStyle(Paint.Style.FILL);
+        mExtra.setColor(noise > 0.5f ? 0xFFFFFFFF : 0xFF0A1014);
+        mExtra.setAlpha(alpha(0.06f + 0.16f * noise));
+        canvas.drawRoundRect(mRect, radius, radius, mExtra);
     }
+
+    // ---------------------------------------------------------------- press effects
 
     private void paintGlow(Canvas canvas, float press, float radius) {
-        ControlTheme theme = mTheme;
         mEdge.setShader(null);
         // Three shrinking rings, brightest at the edge: reads as light spilling inwards, without a
         // blur, which would cost far too much to do every frame in game.
@@ -336,7 +404,7 @@ public final class ControlThemePainter {
             float inset = dp(1.5f + i * 2.5f);
             mRect.inset(inset, inset);
             mEdge.setStrokeWidth(dp(2.5f - i * 0.5f));
-            mEdge.setColor(i == 0 ? theme.accent2 : theme.accent);
+            mEdge.setColor(i == 0 ? 0xFFFFFFFF : 0xFFB3E5FC);
             mEdge.setAlpha(alpha((0.55f - i * 0.16f) * press));
             canvas.drawRoundRect(mRect, Math.max(0f, radius - inset), Math.max(0f, radius - inset), mEdge);
             mRect.inset(-inset, -inset);
@@ -346,52 +414,69 @@ public final class ControlThemePainter {
     private void paintRipple(Canvas canvas, int width, int height, float press) {
         mExtra.setShader(null);
         mExtra.setStyle(Paint.Style.FILL);
-        mExtra.setColor(mTheme.accent);
-        mExtra.setAlpha(alpha(0.38f * (1f - press)));
+        mExtra.setColor(0xFFFFFFFF);
+        mExtra.setAlpha(alpha(0.34f * (1f - press)));
         float maxRadius = (float) Math.hypot(width, height) / 2f;
         canvas.drawCircle(width / 2f, height / 2f, maxRadius * (0.10f + 0.95f * press), mExtra);
     }
 
     private void paintRing(Canvas canvas, int width, int height, float press) {
-        mEdge.setShader(null);
-        mEdge.setStrokeWidth(dp(2.5f));
-        mEdge.setColor(mTheme.accent2);
-        mEdge.setAlpha(alpha(0.55f * (1f - press)));
+        mExtra.setShader(null);
+        mExtra.setStyle(Paint.Style.STROKE);
+        mExtra.setStrokeWidth(dp(2.5f));
+        mExtra.setColor(0xFFE1BEE7);
+        mExtra.setAlpha(alpha(0.6f * (1f - press)));
         float maxRadius = (float) Math.hypot(width, height) / 2f;
-        canvas.drawCircle(width / 2f, height / 2f, maxRadius * (0.25f + 0.85f * press), mEdge);
+        canvas.drawCircle(width / 2f, height / 2f, maxRadius * (0.25f + 0.85f * press), mExtra);
+        mExtra.setStyle(Paint.Style.FILL);
     }
 
     private void paintFlash(Canvas canvas, float radius, float press) {
         mExtra.setShader(null);
         mExtra.setStyle(Paint.Style.FILL);
         mExtra.setColor(0xFFFFFFFF);
-        mExtra.setAlpha(alpha(0.30f * press));
+        mExtra.setAlpha(alpha(0.32f * press));
         canvas.drawRoundRect(mRect, radius, radius, mExtra);
     }
 
     private void paintSheen(Canvas canvas, int width, int height, float press) {
-        float bandWidth = Math.max(dp(18f), width * 0.55f);
-        float x = -bandWidth + (width + bandWidth * 2f) * press;
-        mExtra.setShader(sheenGradient(bandWidth));
+        paintStreak(canvas, width, height, press, 1f);
+    }
+
+    /** A diagonal band of light travelling left to right; used by sheen and by the comet theme. */
+    private void paintStreak(Canvas canvas, int width, int height, float progress, float strength) {
+        float band = Math.max(dp(22f), width * 0.55f);
+        float x = -band + (width + band * 2f) * progress;
+        if (mStreakShader == null || mCachedWidth != width) {
+            mStreakShader = new LinearGradient(0f, 0f, band, 0f,
+                    new int[]{0x00FFFFFF, 0x66FFFFFF, 0x00FFFFFF},
+                    new float[]{0f, 0.5f, 1f}, Shader.TileMode.CLAMP);
+        }
+        mExtra.setShader(mStreakShader);
         mExtra.setStyle(Paint.Style.FILL);
-        mExtra.setAlpha(alpha(Math.min(1f, press * 2f)));
-        canvas.drawRect(x, 0f, x + bandWidth, height, mExtra);
+        mExtra.setAlpha(alpha(Math.min(1f, strength)));
+        canvas.save();
+        canvas.translate(x, 0f);
+        canvas.shear(-0.35f, 0f);
+        canvas.drawRect(0f, -height, band, height * 2f, mExtra);
+        canvas.restore();
         mExtra.setShader(null);
     }
 
     private void paintFillUp(Canvas canvas, int width, int height, float radius, float press) {
-        mFill.setShader(null);
-        mFill.setColor(mTheme.accent);
-        mFill.setAlpha(alpha(0.45f * press));
+        mExtra.setShader(null);
+        mExtra.setStyle(Paint.Style.FILL);
+        mExtra.setColor(0xFFFFFFFF);
+        mExtra.setAlpha(alpha(0.22f * press));
         float top = height * (1f - press);
         mRect.set(0f, top - radius, width, height);
-        canvas.drawRoundRect(mRect, radius, radius, mFill);
+        canvas.drawRoundRect(mRect, radius, radius, mExtra);
         mRect.set(0f, 0f, width, height);
     }
 
     // ---------------------------------------------------------------- animation
 
-    private void advance() {
+    private void advanceSpring() {
         if (!mAnimating) return;
         long now = SystemClock.uptimeMillis();
         if (mLastFrame == 0L) {
@@ -418,43 +503,56 @@ public final class ControlThemePainter {
         }
     }
 
+    /** Clock for the ambience, quantised so a 120 Hz screen does not ask for twice the work. */
+    private float ambientTime() {
+        long now = SystemClock.uptimeMillis();
+        if (now - mLastAmbientFrame < AMBIENT_FRAME_MS) {
+            // Reuse the last tick: the picture simply holds for a frame or two.
+            return (mLastAmbientFrame + mSeed) / 1000f;
+        }
+        mLastAmbientFrame = now;
+        return (now + mSeed) / 1000f;
+    }
+
     private float clampPress() {
-        // Some overshoot past 1 is wanted - it is what makes the squash feel springy - but bounded.
         if (mPress < 0f) return 0f;
-        if (mPress > MAX_PRESS) return MAX_PRESS;
-        return mPress;
-    }
-
-    // ---------------------------------------------------------------- shaders
-
-    private LinearGradient fillGradient(int width, int height) {
-        if (mCachedFill == null) {
-            ControlTheme theme = mTheme;
-            mCachedFill = new LinearGradient(0f, 0f, width * 0.25f, height,
-                    theme.accent, theme.accent2, Shader.TileMode.CLAMP);
-        }
-        return mCachedFill;
-    }
-
-    private LinearGradient glossGradient(float glossHeight) {
-        if (mCachedGloss == null) {
-            mCachedGloss = new LinearGradient(0f, 0f, 0f, glossHeight,
-                    0xFFFFFFFF, 0x00FFFFFF, Shader.TileMode.CLAMP);
-        }
-        return mCachedGloss;
-    }
-
-    private LinearGradient sheenGradient(float bandWidth) {
-        if (mCachedSheen == null) {
-            mCachedSheen = new LinearGradient(0f, 0f, bandWidth, 0f,
-                    new int[]{0x00FFFFFF, 0x66FFFFFF, 0x00FFFFFF},
-                    new float[]{0f, 0.5f, 1f},
-                    Shader.TileMode.CLAMP);
-        }
-        return mCachedSheen;
+        return Math.min(mPress, MAX_PRESS);
     }
 
     // ---------------------------------------------------------------- helpers
+
+    private void buildShader() {
+        Bitmap bitmap = mBitmap;
+        if (bitmap == null) return;
+        mShader = new BitmapShader(bitmap, Shader.TileMode.REPEAT, Shader.TileMode.REPEAT);
+    }
+
+    @Nullable
+    private Bitmap art(int res) {
+        Bitmap cached = BITMAPS.get(res);
+        if (cached != null) return cached;
+        if (mContext == null) return null;
+        try {
+            BitmapFactory.Options options = new BitmapFactory.Options();
+            options.inScaled = false;
+            Bitmap bitmap = BitmapFactory.decodeResource(mContext.getResources(), res, options);
+            if (bitmap != null) BITMAPS.put(res, bitmap);
+            return bitmap;
+        } catch (RuntimeException ignored) {
+            return null;
+        }
+    }
+
+    private static float wrap(float value, float period) {
+        float v = value % period;
+        return v < 0f ? v + period : v;
+    }
+
+    /** Cheap deterministic 0..1 noise, so the twinkles are steady instead of re-rolled per frame. */
+    private static float hash(float value) {
+        float x = (float) Math.sin(value * 12.9898f) * 43758.5453f;
+        return x - (float) Math.floor(x);
+    }
 
     private float dp(float value) {
         return value * mDensity;
@@ -463,8 +561,7 @@ public final class ControlThemePainter {
     private static int alpha(float value) {
         int a = (int) (value * 255f);
         if (a < 0) return 0;
-        if (a > 255) return 255;
-        return a;
+        return Math.min(a, 255);
     }
 
     /** Applies the theme's text colour to a control, or the fallback when it wants none. */
