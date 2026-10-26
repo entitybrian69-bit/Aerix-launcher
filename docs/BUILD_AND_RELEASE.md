@@ -52,15 +52,19 @@ Public APKs are **not** stored in this repository. `Aerix-Launcher.apk` is
 around 118 MB, which is above GitHub's 100 MB per-file limit, so release builds
 live as assets on the GitHub Releases page and nowhere else.
 
-Current public release: **v1.4.0**, tag target `6f790e7`.
+Current public release: **v1.5.5**, tag target `50c5f66`.
 
-| Asset | Size | SHA-256 |
-|---|---|---|
-| `Aerix-Launcher-1.4.0.apk` | 121,248,012 | `2da4e4e3ff0e657b4e4c68c2fbfc738c71552a1bfc495a945a7dc66ce973cba3` |
-| `Aerix-Launcher-1.4.0-noruntime.apk` | 92,137,418 | `7726574de9a6b001d30455bcdf01a9f764fa2a29ac039ea3b6c85e2bf6f14463` |
-| `Aerix-Launcher.apk` | 121,248,012 | same bytes as the 1.4.0 APK |
-| `Aerix-Launcher-noruntime.apk` | 92,137,418 | same bytes as the 1.4.0 no-runtime APK |
-| `SHA256SUMS` | 372 | `3c7cfe2dbeb47ad293d9cee4fae1dcd5f2c4eef4b3cda66d73f60ddbdd54a7da` |
+| Asset | Size |
+|---|---|
+| `Aerix-Launcher-1.5.5-arm64-v8a.apk` | 75,446,473 |
+| `Aerix-Launcher-1.5.5-armeabi-v7a.apk` | 75,690,202 |
+| `Aerix-Launcher-1.5.5.apk` | 133,370,306 |
+| `Aerix-Launcher-1.5.5-noruntime-arm64-v8a.apk` | 46,336,041 |
+| `Aerix-Launcher-1.5.5-noruntime-armeabi-v7a.apk` | 46,579,762 |
+| `Aerix-Launcher-1.5.5-noruntime.apk` | 104,259,870 |
+| `Aerix-Launcher.apk` | same bytes as the 1.5.5 universal APK |
+| `Aerix-Launcher-noruntime.apk` | same bytes as the 1.5.5 no-runtime APK |
+| `SHA256SUMS` | hashes of every file above — take them from the release, never retyped here |
 
 The unversioned names are copies of the same files. The download buttons on the
 website point at `releases/latest/download/<name>`, so a release has to carry
