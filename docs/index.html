@@ -4,214 +4,426 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Aerix Launcher — Minecraft: Java Edition on Android</title>
-<meta name="description" content="Aerix Launcher brings Minecraft: Java Edition to Android: instances, renderers, accounts, skins and a content browser in one launcher. Private by design, updated often, tested on real phones.">
-<meta name="theme-color" content="#07131d">
+<meta name="description" content="Aerix Launcher runs Minecraft: Java Edition on Android. Instances, twelve renderers, accounts and skin wardrobe, eleven animated control themes, 25 wallpapers and a content browser — private by design, tested on real phones.">
+<meta name="theme-color" content="#05070d">
 <meta name="color-scheme" content="dark">
 <link rel="icon" href="assets/aerix-logo.png">
 <link rel="apple-touch-icon" href="assets/aerix-logo.png">
 <link rel="canonical" href="https://entitybrian69-bit.github.io/Aerix-launcher/">
 <meta property="og:type" content="website">
+<meta property="og:site_name" content="Aerix Launcher">
 <meta property="og:title" content="Aerix Launcher — Minecraft: Java Edition on Android">
-<meta property="og:description" content="Instances, renderers, accounts, skins and a content browser in one launcher.">
+<meta property="og:description" content="Aerix Launcher runs Minecraft: Java Edition on Android. Instances, twelve renderers, accounts and skin wardrobe, eleven animated control themes, 25 wallpapers and a content browser — private by design, tested on real phones.">
 <meta property="og:url" content="https://entitybrian69-bit.github.io/Aerix-launcher/">
 <meta property="og:image" content="https://entitybrian69-bit.github.io/Aerix-launcher/assets/screenshots/shot-home.jpg">
 <meta property="og:image:alt" content="The Aerix Launcher home screen">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="site.css">
 </head>
 <body>
-<!-- animated aurora: five soft bands drifting behind everything, purely decorative -->
-<div class="aurora" aria-hidden="true">
-  <span class="band band-1"></span>
-  <span class="band band-2"></span>
-  <span class="band band-3"></span>
-  <span class="curtain curtain-1"></span>
-  <span class="curtain curtain-2"></span>
-</div>
-
 <a class="skip" href="#main">Skip to content</a>
 
 <header class="nav">
   <a class="brand" href="index.html">
-    <img class="brand-logo" src="assets/aerix-logo.png" alt="Aerix Launcher logo" width="40" height="40">
-    <span class="brand-text">AERIX<span class="brand-sub">LAUNCHER</span></span>
+    <img src="assets/aerix-logo.png" alt="" width="34" height="34">
+    <span>AERIX<small>LAUNCHER</small></span>
   </a>
-
   <nav class="nav-links" id="navLinks" aria-label="Pages">
-      <a href="index.html" class="is-active" aria-current="page">Home</a>
-      <a href="screenshots.html">Screenshots</a>
+      <a href="index.html" aria-current="page">Home</a>
       <a href="features.html">Features</a>
       <a href="renderers.html">Renderers</a>
+      <a href="screenshots.html">Gallery</a>
       <a href="install.html">Install</a>
       <a href="faq.html">FAQ</a>
   </nav>
-
-  <div class="nav-actions">
-    <a class="icon-btn" href="https://github.com/entitybrian69-bit/Aerix-launcher" target="_blank" rel="noopener" aria-label="GitHub repository"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg></a>
-    <a class="btn btn-discord btn-sm" href="https://discord.gg/RS7q9KaCm6" target="_blank" rel="noopener">
-      <span class="dot" aria-hidden="true"></span>Discord
-    </a>
-    <button class="nav-toggle" id="navToggle" type="button" aria-expanded="false" aria-controls="navLinks" aria-label="Open menu">
-      <span></span><span></span><span></span>
-    </button>
-  </div>
+  <a class="nav-cta" href="index.html#download">Download</a>
+  <button class="nav-toggle" id="navToggle" type="button" aria-expanded="false" aria-controls="navLinks" aria-label="Open menu">
+    <span></span><span></span><span></span>
+  </button>
 </header>
+
 <main id="main">
 
   <section class="hero">
-    <div class="hero-glow" aria-hidden="true"></div>
-    <div class="hero-copy">
-      <p class="chip"><span class="pulse" aria-hidden="true"></span><span id="releaseChipText">latest release</span></p>
-      <h1>Minecraft: Java Edition <span class="accent">on Android</span></h1>
-      <p class="lede">
-        Instances, renderers, accounts, skins, capes and a content browser in one launcher.
-        Private by design, updated often, tested on real phones.
+    <div class="wrap hero-grid">
+      <div>
+        <p class="eyebrow"><span class="dot" aria-hidden="true"></span>Version <span data-release-version>1.5.5</span> is out</p>
+        <h1>Minecraft: Java&nbsp;Edition, <span class="accent">on your phone</span>.</h1>
+        <p class="lede">
+          Instances, twelve renderers, accounts and a full skin wardrobe, animated control
+          themes and a content browser — in one launcher that stays out of the way once the
+          game is running.
+        </p>
+        <div class="btn-row">
+          <a class="btn btn-primary" href="https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest/download/Aerix-Launcher.apk" download data-primary-download>
+            Download for Android <span class="btn-size">72 MB</span>
+          </a>
+          <a class="btn btn-ghost" href="#new">What's new</a>
+        </div>
+        <p class="hero-meta">
+          <span>Android 6.0+</span>
+          <span>arm64, armv7 and universal builds</span>
+          <span id="downloadFacts">v1.5.5 · 72.0 MB</span>
+        </p>
+      </div>
+      <div class="device">
+        <span class="glow" aria-hidden="true"></span>
+        <img src="assets/screenshots/shot-home.jpg" alt="The Aerix Launcher home screen, with the dashboard over a Minecraft wallpaper" width="1200" height="537">
+      </div>
+    </div>
+  </section>
+
+  <section class="section" aria-label="At a glance">
+    <div class="wrap">
+      <div class="stats reveal">
+        <div><strong>12</strong><span>renderers, one picker</span></div>
+        <div><strong>11</strong><span>animated control themes</span></div>
+        <div><strong>31</strong><span>wallpapers, photos and clips</span></div>
+        <div><strong>Every</strong><span>version from 1.7 to 1.21+</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="new">
+    <div class="wrap">
+      <div class="release reveal">
+        <div>
+          <span class="kicker">Latest release</span>
+          <h2>1.5.5 — controls that move</h2>
+          <p class="muted">
+            The biggest change is on your thumb: every control can now wear a piece of animated
+            pixel art, and the in-game account switch finally switches.
+          </p>
+          <div class="btn-row">
+            <a class="btn btn-ghost btn-sm" href="https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest" target="_blank" rel="noopener" data-release-link>
+              Read the full notes
+            </a>
+          </div>
+        </div>
+        <ul class="release-list">
+          <li><span class="mark" aria-hidden="true">✦</span><span><b>Eleven control themes.</b> Pixel art picked in the editor — rockets climb, nebulae drift, the black hole's ring turns — with haptics and key sounds per theme.</span></li>
+          <li><span class="mark" aria-hidden="true">✦</span><span><b>Switch accounts in game.</b> Pick an account, confirm the restart, and the launcher comes back signed in as them with the game already starting.</span></li>
+          <li><span class="mark" aria-hidden="true">✦</span><span><b>A renderer that cannot load no longer kills the launch.</b> The bundled Emesis, then GL4ES, are chosen before the JVM starts.</span></li>
+          <li><span class="mark" aria-hidden="true">✦</span><span><b>Six HD clips</b> at full quality, with a real frame on every card.</span></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="themes-title">
+    <div class="wrap">
+      <div class="section-head reveal">
+        <span class="kicker">New in 1.5.5</span>
+        <h2 id="themes-title">Controls that look like something</h2>
+        <p>
+          Open the control editor and scroll to <b>Control themes</b>. The strip is the artwork
+          itself: tap one and the control wears it, with its own press animation, haptic tick and
+          key sound. Off puts the plain control back, and one button applies the theme you picked
+          to every control in the layout.
+        </p>
+      </div>
+      <div class="reveal">
+        <div class="theme-strip">
+      <figure class="theme" title="Tea Party — drifts, ripples">
+        <img src="assets/themes/teapots.jpg" alt="Tea Party control theme" loading="lazy" width="420" height="420">
+        <span>Tea Party</span>
+      </figure>
+      <figure class="theme" title="Rocket Ride — climbs, lifts">
+        <img src="assets/themes/rockets.jpg" alt="Rocket Ride control theme" loading="lazy" width="420" height="420">
+        <span>Rocket Ride</span>
+      </figure>
+      <figure class="theme" title="Nebula — drifts, glows">
+        <img src="assets/themes/nebula.jpg" alt="Nebula control theme" loading="lazy" width="420" height="420">
+        <span>Nebula</span>
+      </figure>
+      <figure class="theme" title="Stardust — twinkles">
+        <img src="assets/themes/stardust.jpg" alt="Stardust control theme" loading="lazy" width="420" height="420">
+        <span>Stardust</span>
+      </figure>
+      <figure class="theme" title="Aurora — slides, sweeps">
+        <img src="assets/themes/aurora.jpg" alt="Aurora control theme" loading="lazy" width="420" height="420">
+        <span>Aurora</span>
+      </figure>
+      <figure class="theme" title="Galaxy — turns, glows">
+        <img src="assets/themes/galaxy.jpg" alt="Galaxy control theme" loading="lazy" width="420" height="420">
+        <span>Galaxy</span>
+      </figure>
+      <figure class="theme" title="Moonrise — breathes">
+        <img src="assets/themes/moonrise.jpg" alt="Moonrise control theme" loading="lazy" width="420" height="420">
+        <span>Moonrise</span>
+      </figure>
+      <figure class="theme" title="Event Horizon — ring turns">
+        <img src="assets/themes/horizon.jpg" alt="Event Horizon control theme" loading="lazy" width="420" height="420">
+        <span>Event Horizon</span>
+      </figure>
+      <figure class="theme" title="Static — jitters">
+        <img src="assets/themes/static.jpg" alt="Static control theme" loading="lazy" width="420" height="420">
+        <span>Static</span>
+      </figure>
+      <figure class="theme" title="Star Cross — twinkles">
+        <img src="assets/themes/starcross.jpg" alt="Star Cross control theme" loading="lazy" width="420" height="420">
+        <span>Star Cross</span>
+      </figure>
+      <figure class="theme" title="Comet Grid — comet crosses">
+        <img src="assets/themes/comet.jpg" alt="Comet Grid control theme" loading="lazy" width="420" height="420">
+        <span>Comet Grid</span>
+      </figure>
+    </div>
+      </div>
+      <p class="small muted mt-32">
+        <b>Move it</b> freezes the motion if you would rather have a still themed control;
+        <b>Feel it</b> and <b>Hear it</b> switch the haptics and the click. Themes only ever change
+        paint — a key press is still sent on the frame your finger lands, so nothing is delayed.
       </p>
-      <div class="cta-row">
-        <a class="btn btn-primary btn-lg" id="downloadBtn" href="https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest/download/Aerix-Launcher.apk" download>
-          <span class="btn-ico" aria-hidden="true">↓</span>Download the latest APK
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="features-title">
+    <div class="wrap">
+      <div class="section-head reveal">
+        <span class="kicker">Everything in the box</span>
+        <h2 id="features-title">Built to be used, not configured</h2>
+        <p>No first-run wizard, no hidden paywall, no account you have to make for the launcher itself.</p>
+      </div>
+      <div class="grid grid-3 reveal">
+        <article class="card">
+          <div class="icon" aria-hidden="true">◆</div>
+          <h3>Instances</h3>
+          <p>Vanilla, Fabric, Forge, NeoForge, Quilt and OptiFine — each instance keeps its own
+             version, mods, renderer and settings, and shows its loader's own mark.</p>
+          <div class="tag-row"><span class="tag">per-instance settings</span></div>
+        </article>
+        <article class="card">
+          <div class="icon" aria-hidden="true">◇</div>
+          <h3>Twelve renderers</h3>
+          <p>Emesis is bundled and works almost everywhere. Zink, LTW, GL4ES, MobileGlues and
+             the rest are one tap away when a device wants something else.</p>
+          <div class="tag-row"><span class="tag">auto fallback</span></div>
+        </article>
+        <article class="card">
+          <div class="icon" aria-hidden="true">○</div>
+          <h3>Accounts &amp; skins</h3>
+          <p>Microsoft, Ely.by and offline accounts, each with its own skin, cape and
+             Wide/Slim model, previewed on a character you can spin.</p>
+          <div class="tag-row"><span class="tag">skin wardrobe</span></div>
+        </article>
+        <article class="card">
+          <div class="icon" aria-hidden="true">◈</div>
+          <h3>Content browser</h3>
+          <p>Search CurseForge and Modrinth for mods, modpacks, shaders and resource packs,
+             and install them straight into the instance you are building.</p>
+          <div class="tag-row"><span class="tag">publisher artwork</span></div>
+        </article>
+        <article class="card">
+          <div class="icon" aria-hidden="true">▣</div>
+          <h3>Custom controls</h3>
+          <p>Move, resize and restyle every button, add drawers and joysticks, import a
+             <code>.json</code> layout from elsewhere — or start from the built-in pad.</p>
+          <div class="tag-row"><span class="tag">editor built in</span></div>
+        </article>
+        <article class="card">
+          <div class="icon" aria-hidden="true">◐</div>
+          <h3>Look and feel</h3>
+          <p>25 photographs and six recorded HD clips, an accent that follows what you pick,
+             and an in-game menu built around your character.</p>
+          <div class="tag-row"><span class="tag">no seams</span></div>
+        </article>
+      </div>
+      <p class="mt-32"><a href="features.html">The full feature list →</a></p>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="gallery-title">
+    <div class="wrap">
+      <div class="section-head reveal">
+        <span class="kicker">Gallery</span>
+        <h2 id="gallery-title">What it actually looks like</h2>
+        <p>Real screenshots from the released build — no mockups.</p>
+      </div>
+      <div class="reveal">
+        <div class="shots">
+      <figure class="shot">
+        <a href="assets/screenshots/shot-home.jpg" data-lightbox aria-label="Open Home full size">
+          <img src="assets/screenshots/shot-home.jpg" alt="The dashboard, with your world behind it" loading="lazy" width="1200" height="537">
         </a>
-        <a class="btn btn-ghost btn-lg" href="install.html">How to install</a>
-      </div>
-      <p class="meta" id="downloadMeta">Android 8.0+ · release build, signed with the project key</p>
-      <p class="meta small"><span id="downloadFacts">v1.1.1 · 112.5 MB · 16 Oct 2026</span> · <a id="releaseNotes" href="https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest" target="_blank" rel="noopener">release notes</a></p>
-      <p class="meta small" id="downloadAlt">Smaller download: <a href="https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest/download/Aerix-Launcher-noruntime.apk" download>Aerix-Launcher-noruntime.apk</a> — the same launcher, with the Java runtime fetched on demand.</p>
-      <p class="meta small checksum">SHA-256 <code id="downloadSha">on the release page</code></p>
-    </div>
-
-    <div class="hero-art">
-      <figure class="shot shot-lg float-a">
-        <img src="assets/screenshots/shot-home.jpg" alt="Aerix Launcher home screen with a recent world and the Play button" width="1200" height="537" loading="eager" decoding="async">
+        <figcaption><b>Home</b><span>The dashboard, with your world behind it</span></figcaption>
       </figure>
-      <div class="shot-pair">
-        <figure class="shot float-b">
-          <img src="assets/screenshots/shot-discover.jpg" alt="Discover screen browsing mods with filters" width="1200" height="537" loading="lazy" decoding="async">
-        </figure>
-        <figure class="shot float-c">
-          <img src="assets/screenshots/shot-instances.jpg" alt="Create New Instance screen with the version list and loader grid" width="1200" height="537" loading="lazy" decoding="async">
-        </figure>
-      </div>
-    </div>
-  </section>
-
-  <section class="strip reveal" aria-label="At a glance">
-    <div class="strip-item"><strong id="releaseVersion">1.1.0</strong><span>current release</span></div>
-    <div class="strip-item"><strong>Android 8.0+</strong><span>minimum version</span></div>
-    <div class="strip-item"><strong>GPL-3.0</strong><span>open source</span></div>
-    <div class="strip-item"><strong>No trackers</strong><span>no ads, no telemetry</span></div>
-  </section>
-
-  <section class="section">
-    <header class="section-head reveal">
-      <p class="eyebrow">Start here</p>
-      <h2>Three pages tell you everything</h2>
-      <p class="section-lede">What the launcher looks like, what it does, and how to get it running.</p>
-    </header>
-    <div class="cards start-cards">
-      <article class="card reveal">
-        <span class="card-ico" aria-hidden="true">📸</span>
-        <h3>Screenshots</h3>
-        <p>All six screens of the current build — home, instances, discover, wallpapers, renderers and accounts.</p>
-        <a class="card-link" href="screenshots.html">See the screens</a>
-      </article>
-      <article class="card reveal">
-        <span class="card-ico" aria-hidden="true">🧩</span>
-        <h3>Features</h3>
-        <p>The render stack, RAM control, accounts, skins and capes, the content browser and the control editor.</p>
-        <a class="card-link" href="features.html">Read the features</a>
-      </article>
-      <article class="card reveal">
-        <span class="card-ico" aria-hidden="true">📥</span>
-        <h3>Install</h3>
-        <p>Three steps, which file to pick, and the one note about package names worth knowing first.</p>
-        <a class="card-link" href="install.html">How to install</a>
-      </article>
-    </div>
-  </section>
-
-  <section class="section">
-    <header class="section-head reveal">
-      <p class="eyebrow">Screenshots</p>
-      <h2>A look inside</h2>
-      <p class="section-lede">Every image is from the current build — no concepts, no mock-ups.</p>
-    </header>
-    <div class="rail">
-      <article class="tile reveal">
-        <figure class="shot"><img src="assets/screenshots/shot-home.jpg" alt="Home" width="1200" height="537" loading="eager" decoding="async"></figure>
-        <h3>Home</h3>
-        <p>Create a World, Open Library and PLAY are one touch away.</p>
-      </article>
-      <article class="tile reveal">
-        <figure class="shot"><img src="assets/screenshots/shot-discover.jpg" alt="Discover" width="1200" height="537" loading="lazy" decoding="async"></figure>
-        <h3>Discover</h3>
-        <p>Mods, modpacks, shaders and resource packs with real filters.</p>
-      </article>
-      <article class="tile reveal">
-        <figure class="shot"><img src="assets/screenshots/shot-accounts.jpg" alt="Accounts &amp; skins" width="1200" height="537" loading="lazy" decoding="async"></figure>
-        <h3>Accounts &amp; skins</h3>
-        <p>Microsoft, offline or auth-server accounts, with a 3D preview.</p>
-      </article>
-
-    </div>
-    <div class="cta-row">
-      <a class="btn btn-ghost" href="screenshots.html">See all six screenshots</a>
-    </div>
-  </section>
-
-  <section class="section">
-    <div class="split">
-      <figure class="shot shot-wide reveal">
-        <img src="assets/screenshots/shot-renderer.jpg" alt="Renderer list with Auto Smart Pick, vgpu, VGPU, LTW, LTW Legacy and Kopper Zink" width="1200" height="537" loading="lazy" decoding="async">
+      <figure class="shot">
+        <a href="assets/screenshots/shot-instances.jpg" data-lightbox aria-label="Open New instance full size">
+          <img src="assets/screenshots/shot-instances.jpg" alt="Pick a version and a loader, and go" loading="lazy" width="1200" height="537">
+        </a>
+        <figcaption><b>New instance</b><span>Pick a version and a loader, and go</span></figcaption>
       </figure>
-      <div class="split-copy reveal">
-        <p class="eyebrow">Renderers</p>
-        <h2>Picked per version, not per launcher</h2>
-        <p class="section-lede">Aerix bundles MobileGlues for Minecraft 1.17+, two VGPU options for 1.16.5 and older, and chooses the right renderer for each version by default — with every option still one tap away.</p>
-        <a class="card-link" href="renderers.html">See the whole lineup</a>
+      <figure class="shot">
+        <a href="assets/screenshots/shot-renderer.jpg" data-lightbox aria-label="Open Renderers full size">
+          <img src="assets/screenshots/shot-renderer.jpg" alt="Twelve backends, one picker" loading="lazy" width="1200" height="537">
+        </a>
+        <figcaption><b>Renderers</b><span>Twelve backends, one picker</span></figcaption>
+      </figure>
+    </div>
+      </div>
+      <p class="mt-32"><a href="screenshots.html">All six screens →</a></p>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="clips-title">
+    <div class="wrap">
+      <div class="section-head reveal">
+        <span class="kicker">Wallpapers</span>
+        <h2 id="clips-title">Six animations, recorded in game</h2>
+        <p>
+          Full quality, downloaded on demand, looping over one or two seconds. Nothing is
+          decoded while you play — they only run on the launcher screens.
+        </p>
+      </div>
+      <div class="reveal">
+        <div class="clips">
+      <figure class="clip">
+        <img src="assets/hd/autumn-mountains.jpg" alt="Autumn Mountains animation" loading="lazy" width="1200" height="675">
+        <em>4K</em>
+        <span>Autumn Mountains</span>
+      </figure>
+      <figure class="clip">
+        <img src="assets/hd/butterfly-garden.jpg" alt="Butterfly Garden animation" loading="lazy" width="1200" height="675">
+        <em>1440p</em>
+        <span>Butterfly Garden</span>
+      </figure>
+      <figure class="clip">
+        <img src="assets/hd/sakura-field.jpg" alt="Sakura Field animation" loading="lazy" width="1200" height="675">
+        <em>1440p</em>
+        <span>Sakura Field</span>
+      </figure>
+      <figure class="clip">
+        <img src="assets/hd/flower-forest-train.jpg" alt="Flower Forest Train animation" loading="lazy" width="1200" height="675">
+        <em>1440p</em>
+        <span>Flower Forest Train</span>
+      </figure>
+      <figure class="clip">
+        <img src="assets/hd/night-sky.jpg" alt="Night Sky animation" loading="lazy" width="1200" height="675">
+        <em>1080p</em>
+        <span>Night Sky</span>
+      </figure>
+      <figure class="clip">
+        <img src="assets/hd/wisteria-lake.jpg" alt="Wisteria Lake animation" loading="lazy" width="1200" height="675">
+        <em>1080p</em>
+        <span>Wisteria Lake</span>
+      </figure>
+    </div>
       </div>
     </div>
   </section>
 
-  <section class="section creator">
-    <div class="creator-card reveal">
-      <img class="creator-avatar" src="assets/creator-entitybrian.jpg" alt="entitybrian" width="132" height="132" loading="lazy" decoding="async">
-      <div class="creator-text">
-        <p class="eyebrow">Who made it</p>
-        <h2>entitybrian</h2>
-        <p class="creator-role">Owner, developer, tester</p>
-        <p>entitybrian designs, writes, tests and ships Aerix Launcher. No studio, no outsourced UI, no AI pass that “fills in the screens” — the person who adds offline capes is the person who checks them on another phone, and who cuts a release when it is actually ready.</p>
-        <div class="cta-row">
-          <a class="btn btn-ghost" href="https://github.com/entitybrian69-bit" target="_blank" rel="noopener">GitHub profile</a>
-          <a class="btn btn-discord" href="https://discord.gg/RS7q9KaCm6" target="_blank" rel="noopener"><span class="dot" aria-hidden="true"></span>Join the Discord</a>
+  <section class="section" id="download">
+    <div class="wrap">
+      <div class="download reveal">
+        <span class="kicker">Download</span>
+        <h2>Get Aerix Launcher <span class="muted" style="font-size:0.55em;font-weight:600">v<span data-release-version>1.5.5</span></span></h2>
+        <p class="muted" style="max-width:56ch">
+          One APK per architecture, so nothing you cannot use is in the file you download. Not
+          sure which one? Take the first — it covers almost every phone made since 2016.
+        </p>
+
+        <div class="dl-grid">
+          <a class="dl-card" href="https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest/download/Aerix-Launcher.apk" download data-dl="arm64">
+            <strong>arm64-v8a <span class="tag hot">recommended</span></strong>
+            <small class="asset">Aerix-Launcher-1.5.5-arm64-v8a.apk</small>
+            <span class="size">72.0 MB</span>
+            <small>64-bit phones — nearly all of them</small>
+          </a>
+          <a class="dl-card" href="https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest" target="_blank" rel="noopener" data-dl="armv7">
+            <strong>armeabi-v7a</strong>
+            <small class="asset">Aerix-Launcher-1.5.5-armeabi-v7a.apk</small>
+            <span class="size">72.2 MB</span>
+            <small>Older 32-bit phones</small>
+          </a>
+          <a class="dl-card" href="https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest/download/Aerix-Launcher.apk" download data-dl="universal">
+            <strong>Universal</strong>
+            <small class="asset">Aerix-Launcher-1.5.5.apk</small>
+            <span class="size">127.2 MB</span>
+            <small>Every architecture, including x86 — the fallback</small>
+          </a>
+        </div>
+
+        <div class="dl-foot">
+          <span>Also on the release: <a href="https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest/download/Aerix-Launcher-noruntime.apk" download>no-runtime build</a> (99.4 MB) — same launcher, Java fetched on first launch.</span>
+          <span><a href="https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest/download/SHA256SUMS" target="_blank" rel="noopener">SHA-256 checksums</a></span>
+          <span>Signed with the project key · updates in place</span>
         </div>
       </div>
     </div>
+  </section>
 
-    <aside class="discord-card reveal">
-      <p class="eyebrow">Community</p>
-      <h2>Discord</h2>
-      <p>Join other Aerix users, report a problem, and suggest what should land next.</p>
-      <p class="discord-link">discord.gg/RS7q9KaCm6</p>
-      <a class="btn btn-discord btn-lg" href="https://discord.gg/RS7q9KaCm6" target="_blank" rel="noopener"><span class="dot" aria-hidden="true"></span>Open the invite</a>
-    </aside>
+  <section class="section">
+    <div class="wrap">
+      <div class="grid grid-3 reveal">
+        <article class="card spotlight">
+          <h3>Free, and no account to make</h3>
+          <p>Aerix has no sign-up of its own. Bring a Microsoft account, an Ely.by account, or
+             play offline — nothing about you is sent anywhere but the login you chose.</p>
+        </article>
+        <article class="card">
+          <h3>Your data stays on your phone</h3>
+          <p>Instances, worlds, accounts and settings all live in the launcher's own storage.
+             No telemetry, no analytics, no ads.</p>
+        </article>
+        <article class="card">
+          <h3>Updates itself</h3>
+          <p>The in-app updater reads the newest release, picks the build that matches your
+             device, and installs over the old one without touching your data.</p>
+        </article>
+      </div>
+    </div>
   </section>
 
 </main>
 
 <footer class="footer">
-  <div class="footer-left">
-    <img class="footer-avatar" src="assets/creator-entitybrian.jpg" alt="" width="44" height="44" loading="lazy" decoding="async">
-    <div>
-      <p class="footer-name">Made by entitybrian</p>
-      <p class="footer-sub">designs it, writes it, tests it on real phones</p>
+  <div class="wrap">
+    <div class="footer-grid">
+      <div>
+        <a class="brand" href="index.html">
+          <img src="assets/aerix-logo.png" alt="" width="34" height="34">
+          <span>AERIX<small>LAUNCHER</small></span>
+        </a>
+        <p class="small" style="max-width:32ch">
+          Minecraft: Java Edition on Android — instances, renderers, accounts and a
+          content browser in one launcher.
+        </p>
+      </div>
+      <div>
+        <h4>The launcher</h4>
+        <ul>
+          <li><a href="features.html">Features</a></li>
+          <li><a href="renderers.html">Renderers</a></li>
+          <li><a href="screenshots.html">Gallery</a></li>
+          <li><a href="install.html">Install guide</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Get it</h4>
+        <ul>
+          <li><a href="index.html#download">Download</a></li>
+          <li><a href="https://github.com/entitybrian69-bit/Aerix-launcher/releases" target="_blank" rel="noopener">All releases</a></li>
+          <li><a href="https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest/download/SHA256SUMS" target="_blank" rel="noopener">Checksums</a></li>
+          <li><a href="faq.html">FAQ</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Project</h4>
+        <ul>
+          <li><a href="https://github.com/entitybrian69-bit/Aerix-launcher" target="_blank" rel="noopener">GitHub</a></li>
+          <li><a href="https://discord.gg/RS7q9KaCm6" target="_blank" rel="noopener">Discord</a></li>
+          <li><a href="https://github.com/entitybrian69-bit/Aerix-launcher/issues" target="_blank" rel="noopener">Report a bug</a></li>
+          <li><a href="https://github.com/entitybrian69-bit/Aerix-launcher/blob/v3_openjdk/PRIVACY_POLICY.md" target="_blank" rel="noopener">Privacy</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© <span id="year">2026</span> Aerix Launcher. Not affiliated with Mojang or Microsoft.</span>
+      <span>Minecraft is a trademark of Mojang Synergies AB.</span>
     </div>
   </div>
-  <div class="footer-right">
-    <a href="https://discord.gg/RS7q9KaCm6" target="_blank" rel="noopener">discord.gg/RS7q9KaCm6</a>
-    <p class="footer-sub">GPL-3.0 · <a href="https://github.com/entitybrian69-bit/Aerix-launcher" target="_blank" rel="noopener">github.com/entitybrian69-bit/Aerix-launcher</a></p>
-  </div>
 </footer>
-
-<script src="app.js" defer></script>
+<script src="site.js" defer></script>
 </body>
 </html>

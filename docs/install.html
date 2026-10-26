@@ -4,135 +4,195 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Install — Aerix Launcher</title>
-<meta name="description" content="How to install Aerix Launcher on Android: download the newest APK, allow the install, and create your first instance.">
-<meta name="theme-color" content="#07131d">
+<meta name="description" content="How to install Aerix Launcher on Android: which APK to pick, allowing the install, first launch, adding an account and creating an instance — plus how updates work.">
+<meta name="theme-color" content="#05070d">
 <meta name="color-scheme" content="dark">
 <link rel="icon" href="assets/aerix-logo.png">
 <link rel="apple-touch-icon" href="assets/aerix-logo.png">
 <link rel="canonical" href="https://entitybrian69-bit.github.io/Aerix-launcher/install.html">
-<link rel="stylesheet" href="styles.css">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Aerix Launcher">
+<meta property="og:title" content="Install — Aerix Launcher">
+<meta property="og:description" content="How to install Aerix Launcher on Android: which APK to pick, allowing the install, first launch, adding an account and creating an instance — plus how updates work.">
+<meta property="og:url" content="https://entitybrian69-bit.github.io/Aerix-launcher/install.html">
+<meta property="og:image" content="https://entitybrian69-bit.github.io/Aerix-launcher/assets/screenshots/shot-home.jpg">
+<meta property="og:image:alt" content="The Aerix Launcher home screen">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="site.css">
 </head>
 <body>
-<!-- animated aurora: five soft bands drifting behind everything, purely decorative -->
-<div class="aurora" aria-hidden="true">
-  <span class="band band-1"></span>
-  <span class="band band-2"></span>
-  <span class="band band-3"></span>
-  <span class="curtain curtain-1"></span>
-  <span class="curtain curtain-2"></span>
-</div>
-
 <a class="skip" href="#main">Skip to content</a>
 
 <header class="nav">
   <a class="brand" href="index.html">
-    <img class="brand-logo" src="assets/aerix-logo.png" alt="Aerix Launcher logo" width="40" height="40">
-    <span class="brand-text">AERIX<span class="brand-sub">LAUNCHER</span></span>
+    <img src="assets/aerix-logo.png" alt="" width="34" height="34">
+    <span>AERIX<small>LAUNCHER</small></span>
   </a>
-
   <nav class="nav-links" id="navLinks" aria-label="Pages">
       <a href="index.html">Home</a>
-      <a href="screenshots.html">Screenshots</a>
       <a href="features.html">Features</a>
       <a href="renderers.html">Renderers</a>
-      <a href="install.html" class="is-active" aria-current="page">Install</a>
+      <a href="screenshots.html">Gallery</a>
+      <a href="install.html" aria-current="page">Install</a>
       <a href="faq.html">FAQ</a>
   </nav>
-
-  <div class="nav-actions">
-    <a class="icon-btn" href="https://github.com/entitybrian69-bit/Aerix-launcher" target="_blank" rel="noopener" aria-label="GitHub repository"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg></a>
-    <a class="btn btn-discord btn-sm" href="https://discord.gg/RS7q9KaCm6" target="_blank" rel="noopener">
-      <span class="dot" aria-hidden="true"></span>Discord
-    </a>
-    <button class="nav-toggle" id="navToggle" type="button" aria-expanded="false" aria-controls="navLinks" aria-label="Open menu">
-      <span></span><span></span><span></span>
-    </button>
-  </div>
+  <a class="nav-cta" href="index.html#download">Download</a>
+  <button class="nav-toggle" id="navToggle" type="button" aria-expanded="false" aria-controls="navLinks" aria-label="Open menu">
+    <span></span><span></span><span></span>
+  </button>
 </header>
+
+  <section class="page-head">
+    <div class="wrap">
+      <span class="kicker">Install</span>
+      <h1>About a minute, start to a world</h1>
+      <p>Aerix is a plain APK, installed from outside the Play Store. Android will warn you once; that warning is normal for any app installed this way.</p>
+    </div>
+  </section>
+
 <main id="main">
-
-  <section class="section page-hero">
-    <p class="eyebrow">Install</p>
-    <h1>Three steps to play</h1>
-    <p class="lede">Android 8.0 or newer, best on 4 GB of RAM or more. The button below always points at the newest release.</p>
-  </section>
-
-
-  <section class="section" id="download">
-    <div class="cta-band reveal download-band">
-      <div>
-        <p class="chip"><span class="pulse" aria-hidden="true"></span><span id="releaseChipText">latest release</span></p>
-        <h2>Get the launcher</h2>
-        <p id="downloadMeta">Android 8.0+ · release build, signed with the project key</p>
-        <p class="meta small"><span id="downloadFacts">v1.1.1 · 112.5 MB · 16 Oct 2026</span> · <a id="releaseNotes" href="https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest" target="_blank" rel="noopener">release notes</a></p>
-        <p class="meta small" id="downloadAlt">Smaller download: <a href="https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest/download/Aerix-Launcher-noruntime.apk" download>Aerix-Launcher-noruntime.apk</a> — the same launcher, with the Java runtime fetched on demand.</p>
-        <p class="meta small checksum">SHA-256 <code id="downloadSha">on the release page</code></p>
-        <p class="meta small">The APK is published on <a href="https://github.com/entitybrian69-bit/Aerix-launcher/releases" target="_blank" rel="noopener">GitHub Releases</a>; the buttons above download the file itself, with no GitHub page in between.</p>
+  <section class="section">
+    <div class="wrap">
+      <div class="grid grid-2" style="align-items:start">
+        <div>
+          <ol class="steps reveal">
+            <li><h3>Download the right file</h3><p>Almost every phone made since 2016 wants <b>arm64-v8a</b>. If yours is older, take <b>armeabi-v7a</b>; if you are unsure, the universal build always works.</p></li>
+            <li><h3>Allow the install</h3><p>Your browser will ask whether to allow installs from this source. Allow it once, then tap the downloaded file.</p></li>
+            <li><h3>Add an account</h3><p>Open the launcher, tap the avatar at the bottom of the rail, and sign in with Microsoft, Ely.by, or make an offline account.</p></li>
+            <li><h3>Create an instance</h3><p>Pick a version and a loader. For a first run, vanilla with no mods is the fastest way to find out whether the device and renderer are happy.</p></li>
+            <li><h3>Press play</h3><p>The first launch downloads the game and the Java runtime it needs. Later launches start straight into the game.</p></li>
+          </ol>
+        </div>
+        <div class="reveal">
+          <div class="download">
+            <h3 style="margin-top:0">Which APK?</h3>
+            <div class="dl-grid" style="grid-template-columns:1fr;margin-top:14px">
+              <a class="dl-card" href="https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest/download/Aerix-Launcher.apk" download data-dl="arm64">
+                <strong>arm64-v8a <span class="tag hot">recommended</span></strong>
+                <small class="asset">Aerix-Launcher-1.5.5-arm64-v8a.apk</small>
+                <span class="size">72.0 MB</span>
+                <small>64-bit phones — nearly all of them</small>
+              </a>
+              <a class="dl-card" href="https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest/download/Aerix-Launcher.apk" download data-dl="armv7">
+                <strong>armeabi-v7a</strong>
+                <small class="asset">Aerix-Launcher-1.5.5-armeabi-v7a.apk</small>
+                <span class="size">72.2 MB</span>
+                <small>Older 32-bit phones</small>
+              </a>
+              <a class="dl-card" href="https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest/download/Aerix-Launcher.apk" download data-dl="universal">
+                <strong>Universal</strong>
+                <small class="asset">Aerix-Launcher-1.5.5.apk</small>
+                <span class="size">127.2 MB</span>
+                <small>Every architecture — the safe fallback</small>
+              </a>
+            </div>
+            <p class="small muted mt-32">
+              The <a href="https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest/download/Aerix-Launcher-noruntime.apk" download>no-runtime build</a>
+              is smaller because it fetches Java on first launch instead of carrying it.
+            </p>
+          </div>
+        </div>
       </div>
-      <div class="cta-actions">
-        <a class="btn btn-primary btn-lg" id="downloadBtn" href="https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest/download/Aerix-Launcher.apk" download>
-          <span class="btn-ico" aria-hidden="true">↓</span>Download the latest APK
-        </a>
+
+      <div class="callout mt-32">
+        <span aria-hidden="true">◆</span>
+        <p><strong>Updating:</strong> install the new APK over the old one. Do not uninstall first —
+        that deletes your instances, worlds, accounts and wallpapers. The in-app updater does this
+        for you and picks the build that matches your device.</p>
       </div>
     </div>
   </section>
 
   <section class="section">
-    <ol class="steps">
-      <li class="card reveal">
-        <span class="step-n">1</span>
-        <h3>Download the APK</h3>
-        <p>Take the full build unless you are short on space: it carries its own Java runtime. The no-runtime build is smaller and fetches the runtime on demand.</p>
-      </li>
-      <li class="card reveal">
-        <span class="step-n">2</span>
-        <h3>Allow the install</h3>
-        <p>Android will ask to allow installing apps from unknown sources the first time. Aerix is signed with the project's own release key.</p>
-      </li>
-      <li class="card reveal">
-        <span class="step-n">3</span>
-        <h3>Pick a version and play</h3>
-        <p>Create an instance, add an offline account or sign in with Microsoft, equip a skin and cape, and launch.</p>
-      </li>
-    </ol>
-
-    <div class="note reveal">
-      <h3>A note on package names</h3>
-      <p>The release build installs as <code>net.kdt.pojavlaunch</code>. The earlier test builds used the <code>.debug</code> package, so the two can sit side by side — but their instances and game data do not carry over, and an installed original PojavLauncher has to be removed first because the signature differs.</p>
-    </div>
-
-    <div class="note reveal">
-      <h3>Keeping it current</h3>
-      <p>Aerix checks GitHub Releases for you: Settings → About → Check for update compares your build and points you at the newest APK. This page's download button asks the same API, so it never hands out an old file.</p>
+    <div class="wrap">
+      <div class="section-head reveal">
+        <span class="kicker">Requirements</span>
+        <h2>What it needs</h2>
+      </div>
+      <div class="grid grid-3 reveal">
+        <article class="card"><h3>Android 6.0 or newer</h3><p>Both 64-bit and 32-bit devices are supported, with a build for each.</p></article>
+        <article class="card"><h3>About 2 GB of storage</h3><p>More for modded instances — a big pack plus its Java runtime grows quickly.</p></article>
+        <article class="card"><h3>2 GB of RAM, realistically 3+</h3><p>Vanilla is comfortable on 2 GB; modpacks want more, and the launcher lets you allocate it per instance.</p></article>
+      </div>
     </div>
   </section>
 
   <section class="section">
-    <div class="cta-band reveal">
-      <div>
-        <h2>Stuck on a step?</h2>
-        <p>The Discord is the fastest place to get an answer — the same invite is in the footer of every page.</p>
+    <div class="wrap">
+      <div class="section-head reveal">
+        <span class="kicker">When something goes wrong</span>
+        <h2>The four fixes that solve most launches</h2>
       </div>
-      <div class="cta-actions"><a class="btn btn-discord" href="https://discord.gg/RS7q9KaCm6" target="_blank" rel="noopener"><span class="dot" aria-hidden="true"></span>Join the Discord</a><a class="btn btn-ghost" href="faq.html">Read the FAQ</a></div>
+      <div class="grid grid-2 reveal">
+        <article class="card"><h3>1. Change the renderer</h3><p>Instance settings → renderer. Emesis by default; Zink or OpenLTW on newer phones; GL4ES for old versions. <a href="renderers.html">The full lineup →</a></p></article>
+        <article class="card"><h3>2. Lower the resolution</h3><p>It fixes more launches than any renderer change, and it is reversible.</p></article>
+        <article class="card"><h3>3. Give it more memory</h3><p>A pack that closes itself mid-load is usually short of heap, not broken.</p></article>
+        <article class="card"><h3>4. Read the log</h3><p>In-game menu → Log output, or the log in the launcher. The last line before the crash names the mod almost every time.</p></article>
+      </div>
     </div>
   </section>
 
+  <section class="section">
+    <div class="wrap">
+      <div class="download reveal">
+        <h2 style="margin-top:0">Ready?</h2>
+        <p class="muted">Android 6.0+ · signed with the project key · updates in place.</p>
+        <div class="btn-row">
+          <a class="btn btn-primary" href="https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest/download/Aerix-Launcher.apk" download data-primary-download>Download for Android <span class="btn-size">72 MB</span></a>
+          <a class="btn btn-ghost" href="faq.html">Common questions</a>
+        </div>
+      </div>
+    </div>
+  </section>
 </main>
 
 <footer class="footer">
-  <div class="footer-left">
-    <img class="footer-avatar" src="assets/creator-entitybrian.jpg" alt="" width="44" height="44" loading="lazy" decoding="async">
-    <div>
-      <p class="footer-name">Made by entitybrian</p>
-      <p class="footer-sub">designs it, writes it, tests it on real phones</p>
+  <div class="wrap">
+    <div class="footer-grid">
+      <div>
+        <a class="brand" href="index.html">
+          <img src="assets/aerix-logo.png" alt="" width="34" height="34">
+          <span>AERIX<small>LAUNCHER</small></span>
+        </a>
+        <p class="small" style="max-width:32ch">
+          Minecraft: Java Edition on Android — instances, renderers, accounts and a
+          content browser in one launcher.
+        </p>
+      </div>
+      <div>
+        <h4>The launcher</h4>
+        <ul>
+          <li><a href="features.html">Features</a></li>
+          <li><a href="renderers.html">Renderers</a></li>
+          <li><a href="screenshots.html">Gallery</a></li>
+          <li><a href="install.html">Install guide</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Get it</h4>
+        <ul>
+          <li><a href="index.html#download">Download</a></li>
+          <li><a href="https://github.com/entitybrian69-bit/Aerix-launcher/releases" target="_blank" rel="noopener">All releases</a></li>
+          <li><a href="https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest/download/SHA256SUMS" target="_blank" rel="noopener">Checksums</a></li>
+          <li><a href="faq.html">FAQ</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Project</h4>
+        <ul>
+          <li><a href="https://github.com/entitybrian69-bit/Aerix-launcher" target="_blank" rel="noopener">GitHub</a></li>
+          <li><a href="https://discord.gg/RS7q9KaCm6" target="_blank" rel="noopener">Discord</a></li>
+          <li><a href="https://github.com/entitybrian69-bit/Aerix-launcher/issues" target="_blank" rel="noopener">Report a bug</a></li>
+          <li><a href="https://github.com/entitybrian69-bit/Aerix-launcher/blob/v3_openjdk/PRIVACY_POLICY.md" target="_blank" rel="noopener">Privacy</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© <span id="year">2026</span> Aerix Launcher. Not affiliated with Mojang or Microsoft.</span>
+      <span>Minecraft is a trademark of Mojang Synergies AB.</span>
     </div>
   </div>
-  <div class="footer-right">
-    <a href="https://discord.gg/RS7q9KaCm6" target="_blank" rel="noopener">discord.gg/RS7q9KaCm6</a>
-    <p class="footer-sub">GPL-3.0 · <a href="https://github.com/entitybrian69-bit/Aerix-launcher" target="_blank" rel="noopener">github.com/entitybrian69-bit/Aerix-launcher</a></p>
-  </div>
 </footer>
-
-<script src="app.js" defer></script>
+<script src="site.js" defer></script>
 </body>
 </html>
