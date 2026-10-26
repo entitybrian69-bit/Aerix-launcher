@@ -345,7 +345,9 @@ code, kbd, .mono {
 
 @media (max-width: 560px) {
   .btn-row { display: grid; gap: 12px; }
-  .btn-row .btn { width: 100%; padding: 16px 20px; }
+  .btn-row .btn { width: 100%; padding: 15px 18px; }
+  .btn { font-size: 0.84rem; letter-spacing: 0.045em; }
+  .btn .btn-size { font-size: 0.78rem; padding-left: 9px; }
   .hero-meta { font-size: 0.78rem; }
 }
 
