@@ -343,6 +343,12 @@ code, kbd, .mono {
 .nav-toggle[aria-expanded="true"] span::before { transform: translateY(6px) rotate(45deg); }
 .nav-toggle[aria-expanded="true"] span::after { transform: translateY(-6px) rotate(-45deg); }
 
+@media (max-width: 560px) {
+  .btn-row { display: grid; gap: 12px; }
+  .btn-row .btn { width: 100%; padding: 16px 20px; }
+  .hero-meta { font-size: 0.78rem; }
+}
+
 @media (max-width: 940px) {
   .nav-toggle { display: block; }
   .nav-links {
@@ -472,7 +478,6 @@ code, kbd, .mono {
 .hero h1 .accent {
   color: var(--crimson);
   position: relative;
-  white-space: nowrap;
 }
 .hero h1 .accent::after {
   content: "";

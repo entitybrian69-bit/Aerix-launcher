@@ -262,7 +262,7 @@ def build_index():
         </p>
         <div class="btn-row">
           <a class="btn btn-primary" href="{DOWNLOAD_URL}" download data-primary-download>
-            Download for Android <span class="btn-size">72 MB</span>
+            <span class="nowrap">Download for Android</span> <span class="btn-size">72 MB</span>
           </a>
           <a class="btn btn-ghost" href="#whats-new">What's new</a>
         </div>
@@ -972,7 +972,7 @@ def build_install():
         <h2 style="margin-top:0">Ready?</h2>
         <p class="muted">Android 6.0+ · signed with the project key · updates in place.</p>
         <div class="btn-row">
-          <a class="btn btn-primary" href="{DOWNLOAD_URL}" download data-primary-download>Download for Android <span class="btn-size">72 MB</span></a>
+          <a class="btn btn-primary" href="{DOWNLOAD_URL}" download data-primary-download><span class="nowrap">Download for Android</span> <span class="btn-size">72 MB</span></a>
           <a class="btn btn-ghost" href="faq.html">Common questions</a>
         </div>
       </div>
