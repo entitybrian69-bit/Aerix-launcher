@@ -69,6 +69,9 @@ h3 { font-size: clamp(1.1rem, 1.7vw, 1.3rem); letter-spacing: -0.01em; }
 p { margin: 0 0 1em; }
 p:last-child { margin-bottom: 0; }
 
+figure { margin: 0; }
+figcaption { margin: 0; }
+
 code, kbd, .mono {
   font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
   font-size: 0.9em;
@@ -267,7 +270,7 @@ code, kbd, .mono {
 
 .hero {
   position: relative;
-  padding: clamp(48px, 9vw, 104px) 0 clamp(40px, 6vw, 76px);
+  padding: clamp(44px, 8vw, 96px) 0 clamp(28px, 4vw, 48px);
   overflow: hidden;
 }
 
@@ -385,7 +388,7 @@ code, kbd, .mono {
 
 section { position: relative; }
 
-.section { padding: clamp(56px, 8vw, 96px) 0; }
+.section { padding: clamp(46px, 6vw, 78px) 0; }
 
 .section-head {
   max-width: 62ch;
@@ -513,7 +516,7 @@ section { position: relative; }
 
 .theme-strip {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(146px, 1fr));
   gap: 12px;
 }
 
@@ -585,16 +588,14 @@ section { position: relative; }
 .shot:hover img { transform: scale(1.03); }
 .shot:hover { border-color: var(--line-strong); }
 .shot figcaption {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 13px 16px;
+  display: grid;
+  gap: 3px;
+  padding: 13px 16px 15px;
   font-size: 0.88rem;
   color: var(--muted);
 }
-.shot figcaption b { color: var(--text); font-weight: 650; }
-.shot figcaption span { text-align: right; font-size: 0.82rem; }
+.shot figcaption b { color: var(--text); font-weight: 650; font-size: 0.95rem; }
+.shot figcaption span { font-size: 0.83rem; line-height: 1.45; }
 
 /* lightbox */
 .lightbox {
