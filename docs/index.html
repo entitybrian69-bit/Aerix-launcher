@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Aerix Launcher — Minecraft: Java Edition on Android</title>
 <meta name="description" content="Aerix Launcher runs Minecraft: Java Edition on Android. Instances, twelve renderers, accounts and skin wardrobe, eleven animated control themes, 25 wallpapers and a content browser — private by design, tested on real phones.">
-<meta name="theme-color" content="#05070d">
-<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#c8102e">
+<meta name="color-scheme" content="light">
 <link rel="icon" href="assets/aerix-logo.png">
 <link rel="apple-touch-icon" href="assets/aerix-logo.png">
 <link rel="canonical" href="https://entitybrian69-bit.github.io/Aerix-launcher/">
@@ -21,25 +21,36 @@
 <link rel="stylesheet" href="site.css">
 </head>
 <body>
+<div class="bg" aria-hidden="true">
+  <span class="bg-grid"></span>
+  <span class="bg-ribbon r1"></span>
+  <span class="bg-ribbon r2"></span>
+  <span class="bg-ribbon r3"></span>
+  <span class="bg-dots"></span>
+  <span class="bg-arc a1"></span>
+  <span class="bg-arc a2"></span>
+</div>
 <a class="skip" href="#main">Skip to content</a>
 
 <header class="nav">
-  <a class="brand" href="index.html">
-    <img src="assets/aerix-logo.png" alt="" width="34" height="34">
-    <span>AERIX<small>LAUNCHER</small></span>
-  </a>
-  <nav class="nav-links" id="navLinks" aria-label="Pages">
+  <div class="wrap nav-inner">
+    <a class="brand" href="index.html">
+      <img src="assets/aerix-logo.png" alt="" width="34" height="34">
+      <span>AERIX<small>LAUNCHER</small></span>
+    </a>
+    <nav class="nav-links" id="navLinks" aria-label="Pages">
       <a href="index.html" aria-current="page">Home</a>
       <a href="features.html">Features</a>
       <a href="renderers.html">Renderers</a>
       <a href="screenshots.html">Gallery</a>
       <a href="install.html">Install</a>
       <a href="faq.html">FAQ</a>
-  </nav>
-  <a class="nav-cta" href="index.html#download">Download</a>
-  <button class="nav-toggle" id="navToggle" type="button" aria-expanded="false" aria-controls="navLinks" aria-label="Open menu">
-    <span></span><span></span><span></span>
-  </button>
+    </nav>
+    <a class="nav-cta" href="index.html#download">Download</a>
+    <button class="nav-toggle" id="navToggle" type="button" aria-expanded="false" aria-controls="navLinks" aria-label="Open menu">
+      <span></span>
+    </button>
+  </div>
 </header>
 
 <main id="main">
@@ -58,7 +69,7 @@
           <a class="btn btn-primary" href="https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest/download/Aerix-Launcher.apk" download data-primary-download>
             Download for Android <span class="btn-size">72 MB</span>
           </a>
-          <a class="btn btn-ghost" href="#new">What's new</a>
+          <a class="btn btn-ghost" href="#whats-new">What's new</a>
         </div>
         <p class="hero-meta">
           <span>Android 6.0+</span>
@@ -73,39 +84,69 @@
     </div>
   </section>
 
-  <section class="section" aria-label="At a glance">
+  <section class="section" aria-label="At a glance" style="padding-top:clamp(28px,4vw,44px)">
     <div class="wrap">
       <div class="stats reveal">
-        <div><strong>12</strong><span>renderers, one picker</span></div>
-        <div><strong>11</strong><span>animated control themes</span></div>
-        <div><strong>31</strong><span>wallpapers, photos and clips</span></div>
-        <div><strong>Every</strong><span>version from 1.7 to 1.21+</span></div>
+        <div><strong data-count="12">12</strong><span>renderers, one picker</span></div>
+        <div><strong data-count="11">11</strong><span>animated control themes</span></div>
+        <div><strong data-count="31">31</strong><span>wallpapers, photos and clips</span></div>
+        <div><strong>1.7–1.21+</strong><span>every Minecraft version</span></div>
       </div>
     </div>
   </section>
 
-  <section class="section" id="new">
+  <div class="ticker" aria-hidden="true">
+    <div class="ticker-track">
+      <span>Instances</span><span>Twelve renderers</span><span>Control themes</span><span>Accounts and skins</span><span>Content browser</span><span>HD clips</span><span>No telemetry</span><span>Windows, worlds, mods</span>
+      <span>Instances</span><span>Twelve renderers</span><span>Control themes</span><span>Accounts and skins</span><span>Content browser</span><span>HD clips</span><span>No telemetry</span><span>Windows, worlds, mods</span>
+    </div>
+  </div>
+
+  <section class="section" id="whats-new" aria-labelledby="log-title">
     <div class="wrap">
-      <div class="release reveal">
-        <div>
-          <span class="kicker">Latest release</span>
-          <h2>1.5.6 — the guide stops crashing</h2>
-          <p class="muted">
-            A bug-fix release. The first-run tour could close the launcher on some phones, and now
-            it cannot — everything from 1.5.5 is unchanged and still here.
-          </p>
-          <div class="btn-row">
-            <a class="btn btn-ghost btn-sm" href="https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest" target="_blank" rel="noopener" data-release-link>
-              Read the full notes
-            </a>
-          </div>
+      <div class="section-head reveal">
+        <span class="kicker">The latest game log</span>
+        <h2 id="log-title">What <span style="color:var(--crimson)">1.5.6</span> includes</h2>
+        <p>
+          Every release writes its own log, and this is the current one — the change you can
+          feel first, then the details that make it hold. The full history is in the release notes.
+        </p>
+      </div>
+
+      <div class="log reveal">
+        <div class="log-bar">
+          <span class="lights" aria-hidden="true"><i></i><i></i><i></i></span>
+          <code>aerix@launcher:~$ release-notes --current</code>
+          <span class="log-tag">v1.5.6</span>
         </div>
-        <ul class="release-list">
-          <li><span class="mark" aria-hidden="true">✦</span><span><b>The tour no longer takes the launcher down.</b> It offset its card from the component it was pointing at; when that component was not on screen the offset went negative, and Compose throws on a negative padding. Reported on Android 9 — the crash is <code>AerixGuide.kt:235</code>, and this release fixes it.</span></li>
-          <li><span class="mark" aria-hidden="true">✦</span><span><b>Off-screen steps fall back to the centred card.</b> A rail item left of the overlay, a page still sliding in, or a card already scrolled away — the tour keeps going instead of pointing at nothing.</span></li>
-          <li><span class="mark" aria-hidden="true">✦</span><span><b>Every padding is clamped</b> to a finite, non-negative value inside the overlay, so no measurement, now or later, can crash a launch.</span></li>
-          <li><span class="mark" aria-hidden="true">✦</span><span><b>Nothing else changed</b> — eleven control themes, in-game account switching, the Emesis → GL4ES renderer fallback and the six HD clips all ship as they were.</span></li>
-        </ul>
+        <ol class="log-rows">
+          <li>
+            <span class="n">01</span>
+            <span><b>The first-run guide can no longer close the launcher</b>
+            The tour positioned its card from the component it was pointing at. When that component was off screen the offset went negative, and Compose rejects a negative padding — first launch died on <code>AerixGuide.kt:235</code>. The anchor is now validated and clipped before anything is drawn.</span>
+          </li>
+          <li>
+            <span class="n">02</span>
+            <span><b>A step that points at nothing falls back to the centred card</b>
+            A rail item left of the overlay, a page still sliding in, a card already scrolled away — the tour keeps going instead of pointing at empty space.</span>
+          </li>
+          <li>
+            <span class="n">03</span>
+            <span><b>Every padding is clamped</b>
+            Finite, never negative, never larger than the space it is applied to. Unbounded and zero-size measurements are handled instead of divided against, so no future component can take a launch down either.</span>
+          </li>
+          <li>
+            <span class="n">04</span>
+            <span><b>Everything from 1.5.5 ships unchanged</b>
+            Eleven animated control themes, account switching inside a running game, the Emesis → GL4ES renderer fallback, and six HD clips at full quality.</span>
+          </li>
+        </ol>
+        <div class="log-foot">
+          <span>Patch release · build 10506 · published 26 Oct 2026</span>
+          <a class="btn btn-sm" href="https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest" target="_blank" rel="noopener" data-release-link>
+            Read the full notes
+          </a>
+        </div>
       </div>
     </div>
   </section>
@@ -113,7 +154,7 @@
   <section class="section" aria-labelledby="themes-title">
     <div class="wrap">
       <div class="section-head reveal">
-        <span class="kicker">New in 1.5.5</span>
+        <span class="kicker">The stand-out feature</span>
         <h2 id="themes-title">Controls that look like something</h2>
         <p>
           Open the control editor and scroll to <b>Control themes</b>. The strip is the artwork

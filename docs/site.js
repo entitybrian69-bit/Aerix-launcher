@@ -1,11 +1,12 @@
 /* ============================================================================
    Aerix Launcher — site script
 
-   Four small jobs, no dependencies, no build step:
+   Five small jobs, no dependencies, no build step:
      1. keep the download links and their sizes true to the newest release,
      2. open screenshots in a lightbox,
      3. run the mobile menu and the sticky header,
-     4. reveal sections as they scroll in.
+     4. reveal sections as they scroll in,
+     5. count the stat band up when it comes into view.
 
    Everything degrades: with JavaScript off the buttons still point at GitHub's
    releases/latest permalinks, which download straight away.
@@ -185,6 +186,10 @@
     function onScroll() {
       if (!nav) return;
       nav.classList.toggle('is-stuck', window.scrollY > 8);
+      var doc = document.documentElement;
+      var span = doc.scrollHeight - window.innerHeight;
+      var done = span > 0 ? Math.min(1, Math.max(0, window.scrollY / span)) : 0;
+      nav.style.setProperty('--progress', done.toFixed(4));
     }
 
     onScroll();
@@ -238,11 +243,49 @@
     items.forEach(function (el) { observer.observe(el); });
   }
 
+  /* ── the stat band counts itself in ─────────────────────────────────────── */
+
+  function setupCounters() {
+    var numbers = all('[data-count]');
+    if (!numbers.length) return;
+
+    var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduced || !('IntersectionObserver' in window)) return;
+
+    function run(el) {
+      var target = parseInt(el.getAttribute('data-count'), 10);
+      if (!isFinite(target)) return;
+      var start = null;
+      var seen = 0;
+      function step(now) {
+        if (start === null) start = now;
+        var t = Math.min(1, (now - start) / 900);
+        var eased = 1 - Math.pow(1 - t, 3);
+        var value = Math.round(target * eased);
+        if (value !== seen) { el.textContent = String(value); seen = value; }
+        if (t < 1) requestAnimationFrame(step);
+        else el.textContent = String(target);
+      }
+      requestAnimationFrame(step);
+    }
+
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (!entry.isIntersecting) return;
+        observer.unobserve(entry.target);
+        run(entry.target);
+      });
+    }, { threshold: 0.4 });
+
+    numbers.forEach(function (el) { observer.observe(el); });
+  }
+
   /* ── go ─────────────────────────────────────────────────────────────────── */
 
   function start() {
     setupNav();
     setupReveal();
+    setupCounters();
     setupLightbox();
     loadRelease();
   }
