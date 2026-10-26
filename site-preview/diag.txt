@@ -40,14 +40,15 @@ none
      512x512 box=34x34        complete=True assets/aerix-logo.png
          0x0 box=0x0          complete=True None
 
+== theme strip ==
+{'width': 1180, 'cols': '120.438px 120.438px 120.453px 120.438px 120.453px 120.438px 120.453px 120.438px 120.438px', 'display': 'grid'}
+== ancestor chain ==
+ 1180 grid         cols=120.438px 120.438px 120.453px 120.438px 120.453px 120.438px    maxW=none     pad=0px              div.theme-strip
+ 1180 block        cols=none                                                           maxW=none     pad=0px              div.reveal is-in
+ 1180 block        cols=none                                                           maxW=none     pad=0px              div.wrap
+ 1440 block        cols=none                                                           maxW=none     pad=96px 0px         section.section
+ 1440 block        cols=none                                                           maxW=none     pad=0px              main.
+ 1440 block        cols=none                                                           maxW=none     pad=0px              body.
+
 == reveal elements never shown ==
-section-head reveal | DIV
-reveal | DIV
-section-head reveal | DIV
-grid grid-3 reveal | DIV
-section-head reveal | DIV
-reveal | DIV
-section-head reveal | DIV
-reveal | DIV
-download reveal | DIV
-grid grid-3 reveal | DIV
+none
