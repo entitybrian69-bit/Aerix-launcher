@@ -278,8 +278,8 @@ code, kbd, .mono {
   inset: -10% -12% auto -12%;
   height: 118%;
   background: url("assets/wp/the-end.jpg") center 30% / cover no-repeat;
-  filter: blur(14px) saturate(120%) brightness(0.5);
-  opacity: 0.55;
+  filter: blur(12px) saturate(128%) brightness(0.78);
+  opacity: 0.82;
   transform: scale(1.06);
   -webkit-mask-image: radial-gradient(120% 92% at 50% 0%, #000 0%, rgba(0, 0, 0, 0.72) 46%, transparent 78%);
   mask-image: radial-gradient(120% 92% at 50% 0%, #000 0%, rgba(0, 0, 0, 0.72) 46%, transparent 78%);
@@ -290,7 +290,7 @@ code, kbd, .mono {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(5, 7, 13, 0.35), rgba(5, 7, 13, 0.86) 62%, var(--bg));
+  background: linear-gradient(180deg, rgba(5, 7, 13, 0.18), rgba(5, 7, 13, 0.74) 58%, var(--bg));
   pointer-events: none;
 }
 
