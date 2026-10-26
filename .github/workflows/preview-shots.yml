@@ -47,6 +47,32 @@ jobs:
       - name: Screenshot every page
         run: python tools/shoot_site.py
 
+      # The log is not readable through the API, so the parts worth checking are surfaced as
+      # annotations instead: console errors, and any section that never revealed.
+      - name: Report what the pages did
+        if: always()
+        run: |
+          python - <<'PY'
+          import pathlib, urllib.parse
+          p = pathlib.Path("site-preview/diag.txt")
+          if not p.exists():
+              print("::error title=no diag::site-preview/diag.txt missing")
+              raise SystemExit(0)
+          text = p.read_text()
+          def section(name, stop):
+              try:
+                  body = text.split(name, 1)[1].split(stop, 1)[0]
+              except IndexError:
+                  return "?"
+              return " | ".join(l.strip() for l in body.strip().splitlines() if l.strip())
+          console = section("== console errors ==", "== sections")
+          hidden = section("== reveal elements never shown ==", "\Z")
+          print(f"::notice title=Console::{console[:900]}")
+          print(f"::notice title=Never revealed::{hidden[:900]}")
+          print(f"::notice title=Pages::" + " | ".join(
+              l.strip() for l in text.split("== images ==")[0].splitlines() if l.strip().startswith(tuple("0123456789"))))
+          PY
+
       - uses: actions/upload-artifact@v4
         with:
           name: site-preview

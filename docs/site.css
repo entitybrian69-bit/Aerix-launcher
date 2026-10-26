@@ -77,6 +77,15 @@ code, kbd, .mono {
   font-size: 0.9em;
 }
 
+:not(pre) > code {
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: rgba(53, 227, 194, 0.1);
+  border: 1px solid rgba(53, 227, 194, 0.22);
+  color: #b8f4e6;
+  white-space: nowrap;
+}
+
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
