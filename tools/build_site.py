@@ -36,6 +36,10 @@ DOWNLOAD_URL = "https://github.com/entitybrian69-bit/Aerix-launcher/releases/lat
 REPO_URL = "https://github.com/entitybrian69-bit/Aerix-launcher"
 DISCORD_URL = "https://discord.gg/RS7q9KaCm6"
 SITE_URL = "https://entitybrian69-bit.github.io/Aerix-launcher/"
+OWNER_NAME = "entitybrian"
+OWNER_ROLE = "Owner · Core developer · Tester · Maintainer"
+OWNER_GITHUB = "https://github.com/entitybrian69-bit"
+OWNER_AVATAR = "assets/creator-entitybrian.jpg"
 
 THEMES = [
     ("teapots", "Tea Party", "drifts, ripples"),
@@ -175,6 +179,13 @@ FOOTER = """
           <li><a href="https://github.com/entitybrian69-bit/Aerix-launcher/blob/v3_openjdk/PRIVACY_POLICY.md" target="_blank" rel="noopener">Privacy</a></li>
         </ul>
       </div>
+    </div>
+    <div class="footer-credit">
+      <img src="assets/creator-entitybrian.jpg" alt="" width="48" height="48" loading="lazy">
+      <p>
+        <b>entitybrian</b> — Owner · Core developer · Tester · Maintainer<br>
+        <a href="index.html#creator">Who builds Aerix</a> · <a href="https://github.com/entitybrian69-bit" target="_blank" rel="noopener">GitHub profile</a>
+      </p>
     </div>
     <div class="footer-bottom">
       <span>© <span id="year">2026</span> Aerix Launcher. Not affiliated with Mojang or Microsoft.</span>
@@ -454,6 +465,58 @@ def build_index():
     </div>
   </section>
 
+  <section class="section" id="creator" aria-labelledby="creator-title">
+    <div class="wrap">
+      <div class="section-head reveal">
+        <span class="kicker">Who builds this</span>
+        <h2 id="creator-title">One person, on purpose</h2>
+        <p>
+          Aerix is not a studio product. It is designed, coded, tested on real phones and shipped
+          by its owner — so the person answering your issue is the person who wrote the screen you
+          are asking about.
+        </p>
+      </div>
+
+      <div class="creator-grid">
+        <article class="creator-card reveal">
+          <img class="creator-logo" src="{OWNER_AVATAR}" alt="{OWNER_NAME}, owner and core developer of Aerix Launcher"
+               width="736" height="736" loading="lazy">
+          <div class="creator-body">
+            <h3>{OWNER_NAME}</h3>
+            <p class="creator-role">{OWNER_ROLE}</p>
+            <p class="creator-bio">
+              Writes the launcher, the controls and the interface, cuts every release, and keeps the
+              issue tracker. No outsourced screens and no generated layouts — the same hands build it
+              and test it on another phone before it ships.
+            </p>
+            <div class="creator-links">
+              <a class="btn btn-sm btn-ghost" href="{OWNER_GITHUB}" target="_blank" rel="noopener">GitHub profile</a>
+              <a class="btn btn-sm btn-ghost" href="{DISCORD_URL}" target="_blank" rel="noopener">Discord</a>
+              <a class="btn btn-sm btn-ghost" href="{REPO_URL}/issues" target="_blank" rel="noopener">Report a bug</a>
+            </div>
+          </div>
+        </article>
+
+        <aside class="counter-card reveal" aria-labelledby="counter-title">
+          <span class="kicker" id="counter-title">Live from GitHub</span>
+          <p class="counter-number" data-downloads-box>
+            <span data-downloads>—</span>
+          </p>
+          <p class="counter-label">APK downloads, counted across every release</p>
+          <dl class="counter-meta">
+            <div><dt>Latest release</dt><dd>v<span data-release-version>{VERSION}</span></dd></div>
+            <div><dt>Published</dt><dd><span data-release-date>26 Oct 2026</span></dd></div>
+            <div><dt>Source</dt><dd><a href="{REPO_URL}/releases" target="_blank" rel="noopener">github.com · releases</a></dd></div>
+          </dl>
+          <p class="counter-note">
+            Read from the GitHub API when this page loads: it is the sum of the download counts the
+            release files report, not a number kept by hand.
+          </p>
+        </aside>
+      </div>
+    </div>
+  </section>
+
   <section class="section" id="download">
     <div class="wrap">
       <div class="download reveal">
@@ -488,6 +551,7 @@ def build_index():
         <div class="dl-foot">
           <span>Also on the release: <a href="https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest/download/Aerix-Launcher-noruntime.apk" download>no-runtime build</a> (99.4 MB) — same launcher, Java fetched on first launch.</span>
           <span><a href="https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest/download/SHA256SUMS" target="_blank" rel="noopener">SHA-256 checksums</a></span>
+          <span>Downloaded <b data-downloads>—</b> times from GitHub</span>
           <span>Signed with the project key · updates in place</span>
         </div>
       </div>

@@ -6,7 +6,8 @@
      2. open screenshots in a lightbox,
      3. run the mobile menu and the sticky header,
      4. reveal sections as they scroll in,
-     5. count the stat band up when it comes into view.
+     5. count the stat band up when it comes into view,
+     6. total the APK downloads GitHub reports for every release.
 
    Everything degrades: with JavaScript off the buttons still point at GitHub's
    releases/latest permalinks, which download straight away.
@@ -108,6 +109,45 @@
       if (date) parts.push(date);
       facts.textContent = parts.filter(Boolean).join(' · ');
     }
+  }
+
+  /* ── downloads, summed from the releases themselves ─────────────────────── */
+
+  function setupDownloads() {
+    var targets = all('[data-downloads]');
+    if (!targets.length || !window.fetch) return;
+
+    var api = 'https://api.github.com/repos/' + REPO + '/releases?per_page=100';
+    var total = 0;
+    var seen = {};
+
+    function paint() {
+      if (!total) return;
+      var text = total.toLocaleString();
+      targets.forEach(function (el) {
+        el.textContent = text;
+        el.classList.add('is-live');
+      });
+    }
+
+    function add(list) {
+      (list || []).forEach(function (release) {
+        var id = release.id || release.tag_name;
+        if (seen[id]) return;
+        seen[id] = true;
+        (release.assets || []).forEach(function (asset) {
+          if (!/\.apk$/i.test(asset.name || '')) return;
+          if (typeof asset.download_count === 'number') total += asset.download_count;
+        });
+      });
+    }
+
+    // One page covers 100 releases; that is already more than this project will ever publish,
+    // and a failure only means the counter keeps its placeholder.
+    fetch(api, { headers: { Accept: 'application/vnd.github+json' } })
+      .then(function (response) { return response.ok ? response.json() : []; })
+      .then(function (list) { add(list); paint(); })
+      .catch(function () { /* leave the dashes */ });
   }
 
   function loadRelease() {
@@ -288,6 +328,7 @@
     setupCounters();
     setupLightbox();
     loadRelease();
+    setupDownloads();
   }
 
   if (document.readyState === 'loading') {
