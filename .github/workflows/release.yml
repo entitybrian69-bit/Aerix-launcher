@@ -7,8 +7,9 @@ name: Release CI
 # A marked push has to touch this file to be seen at all, so each release cuts a
 # one line note here recording what it shipped.
 #
-# Last cut: v1.5.4 - per-architecture APKs, and an in-game menu rebuilt around
-# the player's character.
+# Last cut: v1.5.5 - eleven animated pixel-art control themes, an in-game
+# account switch that actually switches, and renderer launches that fall back
+# instead of dying.
 #
 # The job only produces artifacts. Publishing them is a separate, deliberate
 # step. Each edition goes up three times, named after version.properties:
