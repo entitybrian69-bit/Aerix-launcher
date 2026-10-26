@@ -460,7 +460,7 @@ public final class ControlThemePainter {
         mExtra.setAlpha(alpha(Math.min(1f, strength)));
         canvas.save();
         canvas.translate(x, 0f);
-        canvas.shear(-0.35f, 0f);
+        canvas.skew(-0.35f, 0f);
         canvas.drawRect(0f, -height, band, height * 2f, mExtra);
         canvas.restore();
         mExtra.setShader(null);

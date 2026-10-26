@@ -1,22 +1,7 @@
 package net.kdt.pojavlaunch.customcontrols.theme;
 
-import static net.kdt.pojavlaunch.customcontrols.theme.ControlTheme.Ambient.DRIFT;
-import static net.kdt.pojavlaunch.customcontrols.theme.ControlTheme.Ambient.FLICKER;
-import static net.kdt.pojavlaunch.customcontrols.theme.ControlTheme.Ambient.GLOW;
-import static net.kdt.pojavlaunch.customcontrols.theme.ControlTheme.Ambient.ORBIT;
-import static net.kdt.pojavlaunch.customcontrols.theme.ControlTheme.Ambient.RISE;
-import static net.kdt.pojavlaunch.customcontrols.theme.ControlTheme.Ambient.SCROLL;
-import static net.kdt.pojavlaunch.customcontrols.theme.ControlTheme.Ambient.SHIMMER;
-import static net.kdt.pojavlaunch.customcontrols.theme.ControlTheme.Ambient.SWEEP;
-import static net.kdt.pojavlaunch.customcontrols.theme.ControlTheme.Ambient.TWINKLE;
-import static net.kdt.pojavlaunch.customcontrols.theme.ControlTheme.Press.FILL;
-import static net.kdt.pojavlaunch.customcontrols.theme.ControlTheme.Press.FLASH;
-import static net.kdt.pojavlaunch.customcontrols.theme.ControlTheme.Press.GLOW;
-import static net.kdt.pojavlaunch.customcontrols.theme.ControlTheme.Press.LIFT;
-import static net.kdt.pojavlaunch.customcontrols.theme.ControlTheme.Press.RING;
-import static net.kdt.pojavlaunch.customcontrols.theme.ControlTheme.Press.RIPPLE;
-import static net.kdt.pojavlaunch.customcontrols.theme.ControlTheme.Press.SHEEN;
-import static net.kdt.pojavlaunch.customcontrols.theme.ControlTheme.Press.SQUASH;
+import net.kdt.pojavlaunch.customcontrols.theme.ControlTheme.Ambient;
+import net.kdt.pojavlaunch.customcontrols.theme.ControlTheme.Press;
 
 import android.media.AudioManager;
 import android.view.HapticFeedbackConstants;
@@ -63,57 +48,57 @@ public final class ControlThemes {
 
         // A pale teapot pattern: drifts like something floating, and ripples when touched.
         themes.add(new ControlTheme("teapots", R.string.ctrl_theme_teapots,
-                R.drawable.ctrl_theme_teapot, DRIFT, RIPPLE,
+                R.drawable.ctrl_theme_teapot, Ambient.DRIFT, Press.RIPPLE,
                 0x40FFFFFF, DARK_TEXT, SOFT, SND_CLICK));
 
         // Rockets: the pattern climbs, and the control lifts under the finger.
         themes.add(new ControlTheme("rockets", R.string.ctrl_theme_rockets,
-                R.drawable.ctrl_theme_rocket, RISE, LIFT,
+                R.drawable.ctrl_theme_rocket, Ambient.RISE, Press.LIFT,
                 0x59000000, 0, TAP, SND_UP));
 
         // Nebula and moons: slow drift, glowing edge, a low heavy tick.
         themes.add(new ControlTheme("nebula", R.string.ctrl_theme_nebula,
-                R.drawable.ctrl_theme_nebula, DRIFT, GLOW,
+                R.drawable.ctrl_theme_nebula, Ambient.DRIFT, Press.GLOW,
                 0x4D000000, 0, TICK, SND_SPACE));
 
         // Sparse stardust sky: stars twinkle, ripple spreads from the touch.
         themes.add(new ControlTheme("stardust", R.string.ctrl_theme_stardust,
-                R.drawable.ctrl_theme_stardust, TWINKLE, RIPPLE,
+                R.drawable.ctrl_theme_stardust, Ambient.TWINKLE, Press.RIPPLE,
                 0x66000000, 0, TICK, SND_DOWN));
 
         // A wide aurora: slides sideways under a sweeping highlight.
         themes.add(new ControlTheme("aurora", R.string.ctrl_theme_aurora,
-                R.drawable.ctrl_theme_aurora, SCROLL, SHEEN,
+                R.drawable.ctrl_theme_aurora, Ambient.SCROLL, Press.SHEEN,
                 0x59000000, 0, SOFT, SND_CLICK));
 
         // A galaxy swirl: turns slowly, glows on press.
         themes.add(new ControlTheme("galaxy", R.string.ctrl_theme_galaxy,
-                R.drawable.ctrl_theme_galaxy, SHIMMER, GLOW,
+                R.drawable.ctrl_theme_galaxy, Ambient.SHIMMER, Press.GLOW,
                 0x59000000, 0, TICK, SND_SPACE));
 
         // Moon over a sunset: the glow breathes; press flashes like moonlight.
         themes.add(new ControlTheme("moonrise", R.string.ctrl_theme_moonrise,
-                R.drawable.ctrl_theme_moonrise, GLOW, FLASH,
+                R.drawable.ctrl_theme_moonrise, Ambient.GLOW, Press.FLASH,
                 0x4D000000, 0, SOFT, SND_SPACE));
 
         // Black hole: the disk turns, press sends a ring outward.
         themes.add(new ControlTheme("horizon", R.string.ctrl_theme_horizon,
-                R.drawable.ctrl_theme_horizon, ORBIT, RING,
+                R.drawable.ctrl_theme_horizon, Ambient.ORBIT, Press.RING,
                 0x59000000, 0, HEAVY, SND_RETURN));
 
         // Cyan interference: jitters like a bad signal, flash on press.
         themes.add(new ControlTheme("static", R.string.ctrl_theme_static,
-                R.drawable.ctrl_theme_static, FLICKER, FLASH,
+                R.drawable.ctrl_theme_static, Ambient.FLICKER, Press.FLASH,
                 0x4D000000, 0, CLICK, SND_KEY));
 
         // Blue sky full of coloured crosses: everything twinkles at its own pace.
         themes.add(new ControlTheme("starcross", R.string.ctrl_theme_starcross,
-                R.drawable.ctrl_theme_starcross, TWINKLE, GLOW,
+                R.drawable.ctrl_theme_starcross, Ambient.TWINKLE, Press.GLOW,
                 0x59000000, 0, TAP, SND_UP));
 
         // Vaporwave comet: a streak crosses on its own, and again when pressed.
         themes.add(new ControlTheme("comet", R.string.ctrl_theme_comet,
-                R.drawable.ctrl_theme_comet, SWEEP, FILL,
+                R.drawable.ctrl_theme_comet, Ambient.SWEEP, Press.FILL,
                 0x4D000000, 0, CLICK, SND_RETURN));
 
         ALL = Collections.unmodifiableList(themes);
