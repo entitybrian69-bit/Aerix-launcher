@@ -638,4 +638,39 @@ Your original layout is kept unchanged. Continue importing?</string>
     <string name="aerix_guide_end_body">Add an account from the avatar at the bottom of the rail, then create your first instance. The guide can be shown again from Settings.</string>
     <string name="aerix_guide_replay">Show the guide again</string>
     <string name="aerix_guide_replay_body">Replays the tour of the launcher from the start. It only runs by itself the first time.</string>
+
+    <!-- Control themes: the animated looks a control can wear, picked in the control editor. -->
+    <string name="ctrl_theme_title">Control themes</string>
+    <string name="ctrl_theme_hint">Tap a look to wear it. Off gives the plain control back.</string>
+    <string name="ctrl_theme_off">Off</string>
+    <string name="ctrl_theme_apply_all">Apply to all controls</string>
+    <string name="ctrl_themes_applied">%1$d controls now wear this theme</string>
+    <string name="ctrl_theme_haptics">Feel it</string>
+    <string name="ctrl_theme_sound">Hear it</string>
+
+    <string name="ctrl_theme_neon_pulse">Neon Pulse</string>
+    <string name="ctrl_theme_hologram">Hologram</string>
+    <string name="ctrl_theme_cyber">Cyberdeck</string>
+    <string name="ctrl_theme_obsidian">Obsidian</string>
+    <string name="ctrl_theme_plasma">Plasma</string>
+    <string name="ctrl_theme_glass">Frosted Glass</string>
+    <string name="ctrl_theme_frost">Ice</string>
+    <string name="ctrl_theme_ripple">Ripple</string>
+    <string name="ctrl_theme_arcade">Retro Arcade</string>
+    <string name="ctrl_theme_pixel">Pixel Pad</string>
+    <string name="ctrl_theme_matrix">Matrix</string>
+    <string name="ctrl_theme_carbon">Carbon</string>
+    <string name="ctrl_theme_chrome">Chrome</string>
+    <string name="ctrl_theme_gold">Gold Foil</string>
+    <string name="ctrl_theme_sapphire">Sapphire</string>
+    <string name="ctrl_theme_emerald">Emerald</string>
+    <string name="ctrl_theme_crimson">Crimson</string>
+    <string name="ctrl_theme_amethyst">Amethyst</string>
+    <string name="ctrl_theme_toxic">Toxic</string>
+    <string name="ctrl_theme_aurora">Aurora</string>
+    <string name="ctrl_theme_ember">Ember</string>
+    <string name="ctrl_theme_ocean">Deep Ocean</string>
+    <string name="ctrl_theme_sunset">Sunset</string>
+    <string name="ctrl_theme_sakura">Sakura</string>
+    <string name="ctrl_theme_vaporwave">Vaporwave</string>
 </resources>

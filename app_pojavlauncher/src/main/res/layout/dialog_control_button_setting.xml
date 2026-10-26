@@ -525,5 +525,81 @@
         app:layout_constraintTop_toBottomOf="@+id/visibility_game_checkbox" />
 
 
+    <!-- CONTROL THEMES SECTION -->
+    <View
+        android:id="@+id/theme_divider"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginTop="10dp"
+        android:background="#33FFFFFF"
+        app:layout_constraintTop_toBottomOf="@+id/visibility_menu_checkbox" />
+
+    <TextView
+        android:id="@+id/theme_title_textView"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:text="@string/ctrl_theme_title"
+        android:textStyle="bold"
+        app:layout_constraintTop_toBottomOf="@+id/theme_divider" />
+
+    <TextView
+        android:id="@+id/theme_hint_textView"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:alpha="0.7"
+        android:text="@string/ctrl_theme_hint"
+        android:textSize="11sp"
+        app:layout_constraintTop_toBottomOf="@+id/theme_title_textView" />
+
+    <HorizontalScrollView
+        android:id="@+id/theme_scroll"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:fillViewport="false"
+        android:scrollbars="none"
+        app:layout_constraintTop_toBottomOf="@+id/theme_hint_textView">
+
+        <LinearLayout
+            android:id="@+id/theme_chip_row"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingVertical="6dp" />
+    </HorizontalScrollView>
+
+    <Button
+        android:id="@+id/theme_apply_all_button"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/_32sdp"
+        android:text="@string/ctrl_theme_apply_all"
+        android:textAllCaps="false"
+        android:textSize="12sp"
+        app:layout_constraintTop_toBottomOf="@+id/theme_scroll" />
+
+    <androidx.appcompat.widget.SwitchCompat
+        android:id="@+id/theme_haptics_switch"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:minHeight="@dimen/_30sdp"
+        android:text="@string/ctrl_theme_haptics"
+        android:textSize="12sp"
+        app:layout_constraintEnd_toStartOf="@+id/theme_sound_switch"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/theme_apply_all_button"
+        app:layout_constraintWidth_percent="0.5" />
+
+    <androidx.appcompat.widget.SwitchCompat
+        android:id="@+id/theme_sound_switch"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:minHeight="@dimen/_30sdp"
+        android:text="@string/ctrl_theme_sound"
+        android:textSize="12sp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toEndOf="@+id/theme_haptics_switch"
+        app:layout_constraintTop_toBottomOf="@+id/theme_apply_all_button"
+        app:layout_constraintWidth_percent="0.5" />
+
 </androidx.constraintlayout.widget.ConstraintLayout>
 

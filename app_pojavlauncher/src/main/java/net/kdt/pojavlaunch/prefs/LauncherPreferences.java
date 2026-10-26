@@ -78,6 +78,11 @@ public class LauncherPreferences {
     public static boolean PREF_ALSOFT_FORCE_OPENSL = false;
     public static boolean PREF_SHOW_MEMORY_WARNING_DIALOG = true;
     public static short PREF_BUTTON_TRANSPARENCY = 100;
+
+    /** Control themes: felt on touch down, and heard, unless the player turns either off. */
+    public static boolean PREF_CONTROL_THEME_HAPTICS = true;
+    /** Control themes: the system key click, played on touch down. */
+    public static boolean PREF_CONTROL_THEME_SOUND = true;
     public static boolean PREF_UBWC_WORKAROUND = false;
     /** Whether the frame rate counter is drawn over the game. */
     public static boolean PREF_SHOW_FPS = true;
@@ -134,6 +139,8 @@ public class LauncherPreferences {
         PREF_ALSOFT_FORCE_OPENSL = DEFAULT_PREF.getBoolean("alsoftForceOpenSL", false);
         PREF_SHOW_MEMORY_WARNING_DIALOG = DEFAULT_PREF.getBoolean("showMemoryWarning", true);
         PREF_BUTTON_TRANSPARENCY = (short) DEFAULT_PREF.getInt("buttonTransparency", 100);
+        PREF_CONTROL_THEME_HAPTICS = DEFAULT_PREF.getBoolean("controlThemeHaptics", true);
+        PREF_CONTROL_THEME_SOUND = DEFAULT_PREF.getBoolean("controlThemeSound", true);
         PREF_UBWC_WORKAROUND = DEFAULT_PREF.getBoolean("ubwcWorkaround", false);
         PREF_SHOW_FPS = DEFAULT_PREF.getBoolean("show_fps", true);
 

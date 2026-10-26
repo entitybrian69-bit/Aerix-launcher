@@ -24,6 +24,8 @@ import net.kdt.pojavlaunch.Tools;
 import net.kdt.pojavlaunch.customcontrols.ControlData;
 import net.kdt.pojavlaunch.customcontrols.ControlLayout;
 import net.kdt.pojavlaunch.customcontrols.handleview.EditControlSideDialog;
+import net.kdt.pojavlaunch.customcontrols.theme.ControlThemePainter;
+import net.kdt.pojavlaunch.customcontrols.theme.ControlThemes;
 import net.kdt.pojavlaunch.prefs.LauncherPreferences;
 
 import net.kdt.pojavlaunch.CallbackBridge;
@@ -43,6 +45,8 @@ public class ControlButton extends TextView implements ControlInterface {
     private boolean mHasBitmap;
 
     protected boolean mIsToggled = false;
+    /** Draws and animates this control's theme. Inert when the control wears none. */
+    private final ControlThemePainter mThemePainter = new ControlThemePainter();
 
     public ControlButton(ControlLayout layout, ControlData properties) {
         super(layout.getContext());
@@ -56,6 +60,7 @@ public class ControlButton extends TextView implements ControlInterface {
 
         //setOnLongClickListener(this);
 
+        mThemePainter.attach(this);
         //When a button is created, the width/height has yet to be processed to fit the scaling.
         setProperties(preProcessProperties(properties, layout));
 
@@ -96,15 +101,37 @@ public class ControlButton extends TextView implements ControlInterface {
         ControlInterface.super.setProperties(properties, changePos);
 
         mHasBitmap = Tools.isValidString(mProperties.bitmapTag);
+        // Needed by the theme painter too: a themed control with a picture still has corners.
+        mComputedRadius = ControlInterface.super.computeCornerRadius(mProperties.cornerRadius);
 
         if(mHasBitmap) setupBitmapTint();
         else setupNormalTint();
 
+        mThemePainter.setTheme(ControlThemes.byId(mProperties.theme));
+        mThemePainter.applyTextColor(this, Color.WHITE);
+
         setText(properties.name);
+    }
+
+    /** The painter, so the editor can preview a theme the moment it is picked. */
+    public ControlThemePainter getThemePainter() {
+        return mThemePainter;
     }
 
     @Override
     protected void onDraw(Canvas canvas) {
+        if(mThemePainter.hasTheme()) {
+            // Theme under the text, text (scaled with the theme), then the theme's light on top.
+            int save = mThemePainter.drawBack(canvas, getWidth(), getHeight(), mComputedRadius,
+                    isActivated(), mHasBitmap);
+            super.onDraw(canvas);
+            mThemePainter.drawFront(canvas, getWidth(), getHeight(), mComputedRadius);
+            canvas.restoreToCount(save);
+            // Only while the spring is still moving: at rest nothing schedules another frame.
+            if(mThemePainter.isAnimating()) postInvalidateOnAnimation();
+            return;
+        }
+
         super.onDraw(canvas);
         // Bitmap uses a tint list, so don't do any custom rendering
         if(mHasBitmap || !isActivated()) return;
@@ -139,6 +166,10 @@ public class ControlButton extends TextView implements ControlInterface {
 
     @Override
     public void handlePressed() {
+        // Paint and feedback only - the key event below is sent on this same frame, never queued
+        // behind the animation.
+        mThemePainter.press();
+        mThemePainter.playFeedback(this);
         if(!getProperties().isToggle){
             sendKeyPresses(true);
         }
@@ -146,6 +177,7 @@ public class ControlButton extends TextView implements ControlInterface {
 
     @Override
     public void handleReleased() {
+        mThemePainter.release();
         if(!triggerToggle()) {
             sendKeyPresses(false);
         }
