@@ -52,18 +52,22 @@ Public APKs are **not** stored in this repository. `Aerix-Launcher.apk` is
 around 118 MB, which is above GitHub's 100 MB per-file limit, so release builds
 live as assets on the GitHub Releases page and nowhere else.
 
-Current public release: **v1.5.5**, tag target `50c5f66`.
+Current public release: **v1.5.6**, tag target `eb7f6b5`.
+
+A patch release over 1.5.5: the first-run guide stopped positioning its card from a component that
+could be off canvas, which made Compose reject a negative padding and close the launcher
+(`AerixGuide.kt:235`, reported on Android 9). No feature changed.
 
 | Asset | Size |
 |---|---|
-| `Aerix-Launcher-1.5.5-arm64-v8a.apk` | 75,446,473 |
-| `Aerix-Launcher-1.5.5-armeabi-v7a.apk` | 75,690,202 |
-| `Aerix-Launcher-1.5.5.apk` | 133,370,306 |
-| `Aerix-Launcher-1.5.5-noruntime-arm64-v8a.apk` | 46,336,041 |
-| `Aerix-Launcher-1.5.5-noruntime-armeabi-v7a.apk` | 46,579,762 |
-| `Aerix-Launcher-1.5.5-noruntime.apk` | 104,259,870 |
-| `Aerix-Launcher.apk` | same bytes as the 1.5.5 universal APK |
-| `Aerix-Launcher-noruntime.apk` | same bytes as the 1.5.5 no-runtime APK |
+| `Aerix-Launcher-1.5.6-arm64-v8a.apk` | 75,446,672 |
+| `Aerix-Launcher-1.5.6-armeabi-v7a.apk` | 75,690,400 |
+| `Aerix-Launcher-1.5.6.apk` | 133,370,508 |
+| `Aerix-Launcher-1.5.6-noruntime-arm64-v8a.apk` | 46,336,179 |
+| `Aerix-Launcher-1.5.6-noruntime-armeabi-v7a.apk` | 46,579,888 |
+| `Aerix-Launcher-1.5.6-noruntime.apk` | 104,260,005 |
+| `Aerix-Launcher.apk` | same bytes as the 1.5.6 universal APK |
+| `Aerix-Launcher-noruntime.apk` | same bytes as the 1.5.6 no-runtime APK |
 | `SHA256SUMS` | hashes of every file above — take them from the release, never retyped here |
 
 The unversioned names are copies of the same files. The download buttons on the
