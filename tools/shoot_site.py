@@ -145,10 +145,15 @@ def main():
         capture(page, "/install.html", OUT / "install-phone.png", PHONE, full=False)
         browser.close()
 
-    for f in OUT.glob("*.png"):
+    # Small JPEGs: enough to judge the design, small enough to keep in the repo while it is
+    # being reviewed. PNGs are deleted after conversion.
+    for f in sorted(OUT.glob("*.png")):
+        out = f.with_suffix(".jpg")
         with Image.open(f) as im:
-            if im.width > 1000:
-                im.resize((1000, round(im.height * 1000 / im.width)), Image.LANCZOS).save(f, optimize=True)
+            if im.width > 900:
+                im = im.resize((900, round(im.height * 900 / im.width)), Image.LANCZOS)
+            im.convert("RGB").save(out, quality=76, optimize=True, progressive=True)
+        f.unlink()
 
 
 if __name__ == "__main__":
