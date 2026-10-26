@@ -3,20 +3,20 @@ none
 
 == sections (top / height / opacity / class) ==
      0     71 op=1     header.nav
-    71    687 op=1     section.hero
-   758    269 op=1     section.section
-  1078    995 op=1     section.section
-  2073    945 op=1     section.section
-  3018   1055 op=1     section.section
-  4072    706 op=1     section.section
-  4778    927 op=1     section.section
-  5705    685 op=1     section.section
-  6390    342 op=1     section.section
-  6792    316 op=1     footer.footer
+    71    798 op=1     section.hero
+   869    269 op=1     section.section
+  1189    995 op=1     section.section
+  2184    945 op=1     section.section
+  3129   1055 op=1     section.section
+  4183    706 op=1     section.section
+  4889    927 op=1     section.section
+  5816    685 op=1     section.section
+  6501    342 op=1     section.section
+  6903    316 op=1     footer.footer
 
 == images ==
      512x512 box=34x34        complete=True assets/aerix-logo.png
-    1200x537 box=442x206      complete=True assets/screenshots/shot-home.jpg
+    1200x537 box=514x240      complete=True assets/screenshots/shot-home.jpg
      420x420 box=188x188      complete=True assets/themes/teapots.jpg
      420x420 box=188x188      complete=True assets/themes/rockets.jpg
      336x420 box=188x188      complete=True assets/themes/nebula.jpg
