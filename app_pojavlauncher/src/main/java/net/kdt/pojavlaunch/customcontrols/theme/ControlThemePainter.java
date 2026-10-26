@@ -120,7 +120,9 @@ public final class ControlThemePainter {
         mAnimating = false;
         mCachedWidth = mCachedHeight = -1;
         mCachedRadius = -1f;
-        mOrbitShader = mGlowShader = mStreakShader = null;
+        mOrbitShader = null;
+        mGlowShader = null;
+        mStreakShader = null;
     }
 
     public boolean hasTheme() {
@@ -197,7 +199,8 @@ public final class ControlThemePainter {
             mCachedWidth = width;
             mCachedHeight = height;
             mCachedRadius = radius;
-            mOrbitShader = mGlowShader = null;
+            mOrbitShader = null;
+            mGlowShader = null;
             mStreakShader = null;
             mRect.set(0f, 0f, width, height);
             mClip.reset();

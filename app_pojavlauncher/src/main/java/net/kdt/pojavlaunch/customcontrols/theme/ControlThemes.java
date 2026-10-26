@@ -7,7 +7,6 @@ import static net.kdt.pojavlaunch.customcontrols.theme.ControlTheme.Ambient.ORBI
 import static net.kdt.pojavlaunch.customcontrols.theme.ControlTheme.Ambient.RISE;
 import static net.kdt.pojavlaunch.customcontrols.theme.ControlTheme.Ambient.SCROLL;
 import static net.kdt.pojavlaunch.customcontrols.theme.ControlTheme.Ambient.SHIMMER;
-import static net.kdt.pojavlaunch.customcontrols.theme.ControlTheme.Ambient.SWAY;
 import static net.kdt.pojavlaunch.customcontrols.theme.ControlTheme.Ambient.SWEEP;
 import static net.kdt.pojavlaunch.customcontrols.theme.ControlTheme.Ambient.TWINKLE;
 import static net.kdt.pojavlaunch.customcontrols.theme.ControlTheme.Press.FILL;
