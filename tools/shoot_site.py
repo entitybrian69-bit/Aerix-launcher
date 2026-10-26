@@ -23,11 +23,12 @@ PHONE = {"width": 390, "height": 844}
 
 PRIME = """
 async () => {
+  document.documentElement.style.scrollBehavior = 'auto';
   const step = Math.round(window.innerHeight * 0.75);
   const end = document.body.scrollHeight;
   for (let y = 0; y < end; y += step) {
-    window.scrollTo(0, y);
-    await new Promise(r => setTimeout(r, 110));
+    window.scrollTo({ top: y, behavior: 'instant' });
+    await new Promise(r => setTimeout(r, 90));
   }
   window.scrollTo(0, 0);
   await new Promise(r => setTimeout(r, 700));
@@ -71,6 +72,25 @@ DIAG = """
       complete: el.complete
     });
   });
+  const strip = document.querySelector('.theme-strip');
+  if (strip) {
+    out.strip = { width: Math.round(strip.getBoundingClientRect().width), cols: getComputedStyle(strip).gridTemplateColumns, display: getComputedStyle(strip).display };
+    out.chain = [];
+    let el = strip;
+    while (el && el !== document.documentElement) {
+      const cs = getComputedStyle(el);
+      out.chain.push({
+        tag: el.tagName.toLowerCase() + '.' + (el.className || ''),
+        w: Math.round(el.getBoundingClientRect().width),
+        display: cs.display,
+        cols: cs.gridTemplateColumns,
+        maxW: cs.maxWidth,
+        flex: cs.flex,
+        pad: cs.padding,
+      });
+      el = el.parentElement;
+    }
+  }
   document.querySelectorAll('.reveal').forEach(el => {
     if (!el.classList.contains('is-in')) out.hidden.push(el.className + ' | ' + el.tagName);
   });
@@ -93,6 +113,13 @@ def diagnose(page):
     for i in data['images']:
         lines.append(f"{i['natural']:>12} box={i['box']:<12} complete={i['complete']} {i['src']}")
     lines.append('')
+    if data.get('strip'):
+        lines.append('== theme strip ==')
+        lines.append(str(data['strip']))
+        lines.append('== ancestor chain ==')
+        for c in data['chain']:
+            lines.append(f"{c['w']:>5} {c['display']:<12} cols={c['cols'][:60]:<62} maxW={c['maxW']:<8} pad={c['pad']:<16} {c['tag']}")
+        lines.append('')
     lines.append('== reveal elements never shown ==')
     lines += data['hidden'] or ['none']
     (OUT / 'diag.txt').write_text('\n'.join(lines))
