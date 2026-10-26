@@ -8,15 +8,12 @@ on:
       - "docs/**"
       - "tools/shoot_site.py"
       - ".github/workflows/preview-shots.yml"
+    branches-ignore:
+      - v3_openjdk
   workflow_dispatch:
-    inputs:
-      commit_shots:
-        description: Commit the PNGs back to this branch
-        type: boolean
-        default: true
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: preview-shots-${{ github.ref }}
@@ -56,13 +53,3 @@ jobs:
           path: site-preview/
           if-no-files-found: error
 
-      - name: Commit shots back to the branch
-        if: ${{ github.event_name == 'push' || inputs.commit_shots }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -f site-preview
-          if git diff --cached --quiet; then echo "no change"; else
-            git commit -m "chore: site preview shots [skip ci]"
-            git push origin HEAD:${{ github.ref_name }}
-          fi
