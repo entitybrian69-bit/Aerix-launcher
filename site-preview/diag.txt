@@ -1,0 +1,53 @@
+== console errors ==
+none
+
+== sections (top / height / opacity / class) ==
+     0     69 op=1     header.nav
+    69    763 op=1     section.hero
+   832    305 op=1     section.section
+  1137    581 op=1     section.section
+  1718    719 op=1     section.section
+  2437   1101 op=1     section.section
+  3538    662 op=1     section.section
+  4200    917 op=1     section.section
+  5117    729 op=1     section.section
+  5846    395 op=1     section.section
+  6331    299 op=1     footer.footer
+
+== images ==
+     512x512 box=34x34        complete=True assets/aerix-logo.png
+    1200x537 box=529x243      complete=True assets/screenshots/shot-home.jpg
+     420x420 box=39x39        complete=True assets/themes/teapots.jpg
+     420x420 box=39x39        complete=True assets/themes/rockets.jpg
+     336x420 box=39x39        complete=True assets/themes/nebula.jpg
+     420x308 box=39x39        complete=True assets/themes/stardust.jpg
+     420x167 box=39x39        complete=True assets/themes/aurora.jpg
+     420x420 box=39x39        complete=True assets/themes/galaxy.jpg
+     315x420 box=39x39        complete=True assets/themes/moonrise.jpg
+     420x276 box=39x39        complete=True assets/themes/horizon.jpg
+     420x167 box=39x39        complete=True assets/themes/static.jpg
+     420x420 box=39x39        complete=True assets/themes/starcross.jpg
+     420x405 box=39x39        complete=True assets/themes/comet.jpg
+    1200x537 box=381x170      complete=True assets/screenshots/shot-home.jpg
+    1200x537 box=381x170      complete=True assets/screenshots/shot-instances.jpg
+    1200x537 box=381x170      complete=True assets/screenshots/shot-renderer.jpg
+    1200x675 box=301x187      complete=True assets/hd/autumn-mountains.jpg
+    1200x675 box=301x187      complete=True assets/hd/butterfly-garden.jpg
+    1200x675 box=301x187      complete=True assets/hd/sakura-field.jpg
+    1200x675 box=301x187      complete=True assets/hd/flower-forest-train.jpg
+    1200x675 box=301x187      complete=True assets/hd/night-sky.jpg
+    1200x675 box=301x187      complete=True assets/hd/wisteria-lake.jpg
+     512x512 box=34x34        complete=True assets/aerix-logo.png
+         0x0 box=0x0          complete=True None
+
+== reveal elements never shown ==
+section-head reveal | DIV
+reveal | DIV
+section-head reveal | DIV
+grid grid-3 reveal | DIV
+section-head reveal | DIV
+reveal | DIV
+section-head reveal | DIV
+reveal | DIV
+download reveal | DIV
+grid grid-3 reveal | DIV
