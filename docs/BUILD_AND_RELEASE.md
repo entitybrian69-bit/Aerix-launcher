@@ -11,7 +11,7 @@ asks for a release and confirms it.
 | Checksum | `apk/Aerix-Launcher-debug.apk.sha256` |
 | Build info | `apk/DEBUG_BUILD.txt` (commit, workflow run, build time) |
 | CI artifact | Actions run of **Aerix debug (testing)**, artifact `aerix-debug-apk` |
-| Source | this branch (`version.properties` = `1.5.5`) |
+| Source | this branch (`version.properties` = `1.5.6`) |
 | Variant | `noruntimeDebug` |
 | applicationId | `net.kdt.pojavlaunch.debug` |
 | Label | Aerix Launcher (Debug) |

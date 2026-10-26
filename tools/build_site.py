@@ -12,6 +12,17 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 DOCS = ROOT / "docs"
 
+
+def current_version() -> str:
+    """The version the site advertises, straight from the file the APKs are built from."""
+    for line in (ROOT / "version.properties").read_text().splitlines():
+        if line.startswith("versionName="):
+            return line.split("=", 1)[1].strip()
+    raise SystemExit("version.properties has no versionName")
+
+
+VERSION = current_version()
+
 NAV = [
     ("index.html", "Home"),
     ("features.html", "Features"),
@@ -231,7 +242,7 @@ def build_index():
   <section class="hero">
     <div class="wrap hero-grid">
       <div>
-        <p class="eyebrow"><span class="dot" aria-hidden="true"></span>Version <span data-release-version>1.5.5</span> is out</p>
+        <p class="eyebrow"><span class="dot" aria-hidden="true"></span>Version <span data-release-version>{VERSION}</span> is out</p>
         <h1>Minecraft: Java&nbsp;Edition, <span class="accent">on your phone</span>.</h1>
         <p class="lede">
           Instances, twelve renderers, accounts and a full skin wardrobe, animated control
@@ -247,7 +258,7 @@ def build_index():
         <p class="hero-meta">
           <span>Android 6.0+</span>
           <span>arm64, armv7 and universal builds</span>
-          <span id="downloadFacts">v1.5.5 · 26 Oct 2026</span>
+          <span id="downloadFacts">v{VERSION} · 26 Oct 2026</span>
         </p>
       </div>
       <div class="device">
@@ -273,10 +284,10 @@ def build_index():
       <div class="release reveal">
         <div>
           <span class="kicker">Latest release</span>
-          <h2>1.5.5 — controls that move</h2>
+          <h2>{VERSION} — the guide stops crashing</h2>
           <p class="muted">
-            The biggest change is on your thumb: every control can now wear a piece of animated
-            pixel art, and the in-game account switch finally switches.
+            A bug-fix release. The first-run tour could close the launcher on some phones, and now
+            it cannot — everything from 1.5.5 is unchanged and still here.
           </p>
           <div class="btn-row">
             <a class="btn btn-ghost btn-sm" href="https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest" target="_blank" rel="noopener" data-release-link>
@@ -285,10 +296,10 @@ def build_index():
           </div>
         </div>
         <ul class="release-list">
-          <li><span class="mark" aria-hidden="true">✦</span><span><b>Eleven control themes.</b> Pixel art picked in the editor — rockets climb, nebulae drift, the black hole's ring turns — with haptics and key sounds per theme.</span></li>
-          <li><span class="mark" aria-hidden="true">✦</span><span><b>Switch accounts in game.</b> Pick an account, confirm the restart, and the launcher comes back signed in as them with the game already starting.</span></li>
-          <li><span class="mark" aria-hidden="true">✦</span><span><b>A renderer that cannot load no longer kills the launch.</b> The bundled Emesis, then GL4ES, are chosen before the JVM starts.</span></li>
-          <li><span class="mark" aria-hidden="true">✦</span><span><b>Six HD clips</b> at full quality, with a real frame on every card.</span></li>
+          <li><span class="mark" aria-hidden="true">✦</span><span><b>The tour no longer takes the launcher down.</b> It offset its card from the component it was pointing at; when that component was not on screen the offset went negative, and Compose throws on a negative padding. Reported on Android 9 — the crash is <code>AerixGuide.kt:235</code>, and this release fixes it.</span></li>
+          <li><span class="mark" aria-hidden="true">✦</span><span><b>Off-screen steps fall back to the centred card.</b> A rail item left of the overlay, a page still sliding in, or a card already scrolled away — the tour keeps going instead of pointing at nothing.</span></li>
+          <li><span class="mark" aria-hidden="true">✦</span><span><b>Every padding is clamped</b> to a finite, non-negative value inside the overlay, so no measurement, now or later, can crash a launch.</span></li>
+          <li><span class="mark" aria-hidden="true">✦</span><span><b>Nothing else changed</b> — eleven control themes, in-game account switching, the Emesis → GL4ES renderer fallback and the six HD clips all ship as they were.</span></li>
         </ul>
       </div>
     </div>
@@ -406,7 +417,7 @@ def build_index():
     <div class="wrap">
       <div class="download reveal">
         <span class="kicker">Download</span>
-        <h2>Get Aerix Launcher <span class="muted" style="font-size:0.55em;font-weight:600">v<span data-release-version>1.5.5</span></span></h2>
+        <h2>Get Aerix Launcher <span class="muted" style="font-size:0.55em;font-weight:600">v<span data-release-version>{VERSION}</span></span></h2>
         <p class="muted" style="max-width:56ch">
           One APK per architecture, so nothing you cannot use is in the file you download. Not
           sure which one? Take the first — it covers almost every phone made since 2016.
@@ -415,19 +426,19 @@ def build_index():
         <div class="dl-grid">
           <a class="dl-card" href="{DOWNLOAD_URL}" download data-dl="arm64">
             <strong>arm64-v8a <span class="tag hot">recommended</span></strong>
-            <small class="asset">Aerix-Launcher-1.5.5-arm64-v8a.apk</small>
+            <small class="asset">Aerix-Launcher-{VERSION}-arm64-v8a.apk</small>
             <span class="size">72.0 MB</span>
             <small>64-bit phones — nearly all of them</small>
           </a>
           <a class="dl-card" href="https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest" target="_blank" rel="noopener" data-dl="armv7">
             <strong>armeabi-v7a</strong>
-            <small class="asset">Aerix-Launcher-1.5.5-armeabi-v7a.apk</small>
+            <small class="asset">Aerix-Launcher-{VERSION}-armeabi-v7a.apk</small>
             <span class="size">72.2 MB</span>
             <small>Older 32-bit phones</small>
           </a>
           <a class="dl-card" href="{DOWNLOAD_URL}" download data-dl="universal">
             <strong>Universal</strong>
-            <small class="asset">Aerix-Launcher-1.5.5.apk</small>
+            <small class="asset">Aerix-Launcher-{VERSION}.apk</small>
             <span class="size">127.2 MB</span>
             <small>Every architecture, including x86 — the fallback</small>
           </a>
@@ -709,7 +720,7 @@ def build_renderers():
 
       <div class="table-wrap reveal mt-32">
         <table>
-          <caption class="small muted" style="text-align:left;padding:14px 18px">The full lineup, as it ships in 1.5.5.</caption>
+          <caption class="small muted" style="text-align:left;padding:14px 18px">The full lineup, as it ships in {VERSION}.</caption>
           <thead>
             <tr><th scope="col">Renderer</th><th scope="col">What it is</th><th scope="col">What it does</th><th scope="col">Reach for it when</th></tr>
           </thead>
@@ -851,19 +862,19 @@ def build_install():
             <div class="dl-grid" style="grid-template-columns:1fr;margin-top:14px">
               <a class="dl-card" href="{DOWNLOAD_URL}" download data-dl="arm64">
                 <strong>arm64-v8a <span class="tag hot">recommended</span></strong>
-                <small class="asset">Aerix-Launcher-1.5.5-arm64-v8a.apk</small>
+                <small class="asset">Aerix-Launcher-{VERSION}-arm64-v8a.apk</small>
                 <span class="size">72.0 MB</span>
                 <small>64-bit phones — nearly all of them</small>
               </a>
               <a class="dl-card" href="{DOWNLOAD_URL}" download data-dl="armv7">
                 <strong>armeabi-v7a</strong>
-                <small class="asset">Aerix-Launcher-1.5.5-armeabi-v7a.apk</small>
+                <small class="asset">Aerix-Launcher-{VERSION}-armeabi-v7a.apk</small>
                 <span class="size">72.2 MB</span>
                 <small>Older 32-bit phones</small>
               </a>
               <a class="dl-card" href="{DOWNLOAD_URL}" download data-dl="universal">
                 <strong>Universal</strong>
-                <small class="asset">Aerix-Launcher-1.5.5.apk</small>
+                <small class="asset">Aerix-Launcher-{VERSION}.apk</small>
                 <span class="size">127.2 MB</span>
                 <small>Every architecture — the safe fallback</small>
               </a>
