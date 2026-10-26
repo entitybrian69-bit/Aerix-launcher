@@ -3,6 +3,11 @@ name: Site preview shots
 # Temporary helper: renders the static site in headless Chromium so the pages can
 # be eyeballed without a local browser. Manual only; never wired into deploy.
 on:
+  push:
+    paths:
+      - "docs/**"
+      - "tools/shoot_site.py"
+      - ".github/workflows/preview-shots.yml"
   workflow_dispatch:
     inputs:
       commit_shots:
@@ -52,7 +57,7 @@ jobs:
           if-no-files-found: error
 
       - name: Commit shots back to the branch
-        if: ${{ inputs.commit_shots }}
+        if: ${{ github.event_name == 'push' || inputs.commit_shots }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
