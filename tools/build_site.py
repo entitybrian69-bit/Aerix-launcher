@@ -247,7 +247,7 @@ def build_index():
         <p class="hero-meta">
           <span>Android 6.0+</span>
           <span>arm64, armv7 and universal builds</span>
-          <span id="downloadFacts">v1.5.5 · 72.0 MB</span>
+          <span id="downloadFacts">v1.5.5 · 26 Oct 2026</span>
         </p>
       </div>
       <div class="device">

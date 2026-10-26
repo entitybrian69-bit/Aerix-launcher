@@ -104,7 +104,6 @@
     if (facts) {
       var parts = [];
       if (version) parts.push('v' + version);
-      if (primary) parts.push(megabytes(primary.size));
       if (date) parts.push(date);
       facts.textContent = parts.filter(Boolean).join(' · ');
     }
