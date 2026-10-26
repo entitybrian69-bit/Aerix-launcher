@@ -56,6 +56,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import net.kdt.pojavlaunch.aerix.theme.AerixRadii
@@ -99,6 +100,11 @@ fun Modifier.guideAnchor(key: String): Modifier {
         if (registry.anchors[key] != bounds) registry.anchors[key] = bounds
     }
 }
+
+/** Finite, with a real area: bounds from a detached or not-yet-measured component are neither. */
+private fun Rect.isUsable(): Boolean =
+    left.isFinite() && top.isFinite() && right.isFinite() && bottom.isFinite() &&
+        right > left && bottom > top
 
 /**
  * The tour itself: a dark scrim with a cut-out around the current step's component, and a card
@@ -155,11 +161,35 @@ fun AerixGuideOverlay(
                 onClick = next
             )
     ) {
-        val width = constraints.maxWidth.toFloat()
-        val height = constraints.maxHeight.toFloat()
+        // Bounded sizes only: an unbounded pass would make every "is there room" test meaningless.
+        val width = if (constraints.hasBoundedWidth) constraints.maxWidth.toFloat() else 0f
+        val height = if (constraints.hasBoundedHeight) constraints.maxHeight.toFloat() else 0f
         val density = androidx.compose.ui.platform.LocalDensity.current
         val holePadding = with(density) { 6.dp.toPx() }
         val corner = with(density) { 18.dp.toPx() }
+        val cardPadding = with(density) { 16.dp.toPx() }
+        val cardSpaceGuess = with(density) { 190.dp.toPx() }
+
+        // The spotlit component in overlay pixels, clipped to the overlay itself.
+        //
+        // Anchor bounds are not guaranteed to be on canvas. A step can point at a rail item that
+        // sits left of this overlay, at a component that is still sliding in, or at one that has
+        // scrolled away - and a stale or off-canvas rect used to turn into a negative padding,
+        // which Compose rejects with "Padding must be non-negative" (the 1.5.5 guide crash).
+        // Whatever is not visibly on screen now simply gets the centred card and no hole.
+        val frame = Rect(0f, 0f, width, height)
+        val spotlight = anchor
+            ?.let { Rect(it.left - origin.x, it.top - origin.y, it.right - origin.x, it.bottom - origin.y) }
+            ?.takeIf { it.isUsable() }
+            ?.intersect(frame)
+            ?.takeIf { it.width > 2f && it.height > 2f }
+
+        // Padding in dp for a pixel offset, clamped into the overlay: never negative, never larger
+        // than the space it is applied to, and never NaN or infinite on an odd measurement.
+        val paddingPx: (Float, Float) -> Dp = { px, limit ->
+            val safe = if (px.isFinite()) px.coerceIn(0f, maxOf(limit - 1f, 0f)) else 0f
+            with(density) { safe.toDp() }
+        }
 
         androidx.compose.foundation.Canvas(
             modifier = Modifier
@@ -171,15 +201,15 @@ fun AerixGuideOverlay(
         ) {
             // The scrim, then the hole punched out of it.
             drawRect(color = Color(0xFF050B12).copy(alpha = 0.82f))
-            val hole = anchor?.let {
+            val hole = spotlight?.let {
                 Rect(
-                    left = it.left - origin.x - holePadding,
-                    top = it.top - origin.y - holePadding,
-                    right = it.right - origin.x + holePadding,
-                    bottom = it.bottom - origin.y + holePadding
+                    left = (it.left - holePadding).coerceIn(0f, width),
+                    top = (it.top - holePadding).coerceIn(0f, height),
+                    right = (it.right + holePadding).coerceIn(0f, width),
+                    bottom = (it.bottom + holePadding).coerceIn(0f, height)
                 )
             }
-            if (hole != null) {
+            if (hole != null && hole.width > 0f && hole.height > 0f) {
                 drawRoundRect(
                     color = Color.Transparent,
                     topLeft = Offset(hole.left, hole.top),
@@ -210,43 +240,34 @@ fun AerixGuideOverlay(
             )
         }
 
-        if (anchor == null) {
+        if (spotlight == null) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 card(Modifier.padding(AerixSpacing.lg))
             }
         } else {
-            val cardPadding = with(density) { 16.dp.toPx() }
-            // Roughly the height of the card; below it the card goes above the anchor instead.
-            val cardSpaceGuess = with(density) { 190.dp.toPx() }
-            val local = Rect(
-                left = anchor.left - origin.x,
-                top = anchor.top - origin.y,
-                right = anchor.right - origin.x,
-                bottom = anchor.bottom - origin.y
-            )
-            val spaceBelow = height - local.bottom
-            val spaceAbove = local.top
-            val spaceRight = width - local.right
+            val spaceBelow = height - spotlight.bottom
+            val spaceAbove = spotlight.top
+            val spaceRight = width - spotlight.right
             if (spaceRight > width * 0.34f) {
-                // Wide layouts: the card sits to the right of the rail, clear of the anchor.
+                // Wide layouts: the card sits to the right of the spotlight, clear of it.
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(start = with(density) { (local.right + cardPadding).toDp() }, end = 16.dp),
+                        .padding(start = paddingPx(spotlight.right + cardPadding, width), end = 16.dp),
                     contentAlignment = Alignment.CenterStart
                 ) { card(Modifier) }
             } else if (spaceBelow >= cardSpaceGuess || spaceBelow >= spaceAbove) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(top = with(density) { (local.bottom + cardPadding).toDp() }, end = 16.dp),
+                        .padding(top = paddingPx(spotlight.bottom + cardPadding, height), end = 16.dp),
                     contentAlignment = Alignment.TopCenter
                 ) { card(Modifier) }
             } else {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(bottom = with(density) { (height - local.top + cardPadding).toDp() }),
+                        .padding(bottom = paddingPx(height - spotlight.top + cardPadding, height)),
                     contentAlignment = Alignment.BottomCenter
                 ) { card(Modifier) }
             }
