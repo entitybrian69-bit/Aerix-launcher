@@ -114,7 +114,24 @@ class AerixRendererPlugin(
      * only resolves to the EGL library, which is the wrong library whenever a plugin ships its
      * OpenGL implementation separately (PowerVR: `libpowervr.so` next to the system `libEGL.so`).
      */
-    override fun glLibraryPath(): String = preloadedName ?: packagedLibrary(glName) ?: "libGLMojo.so"
+    override fun glLibraryPath(): String {
+        // Loaded into this process already: handing LWJGL the soname makes the linker return that
+        // copy instead of opening the plugin's file a second time while the game window is being
+        // created - which is the dlopen that fails, fatally, when the file cannot be reached from
+        // here.
+        preloadedName?.let { return it }
+        val packaged = packagedLibrary(glName) ?: return "libGLMojo.so"
+        // Not preloaded (this renderer was not set up): only a copy in this app's own storage can
+        // be opened by this process at all. Handing over the plugin's own /data/app/~~…/lib/<abi>
+        // path is exactly the UnsatisfiedLinkError this avoids - the linker cannot reach another
+        // package's directory and reports the path as "not found" even though the file is on
+        // disk, which is fatal while the game window is created. An empty value makes the launch
+        // fall back to a renderer that works instead of crashing.
+        return if (PojavPluginBridge.isInOwnStorage(packaged)) packaged else ""
+    }
+
+    /** True once the plugin's OpenGL library has been loaded into this process. */
+    fun isPreloaded(): Boolean = preloadedName != null
 
     /**
      * Soname of the plugin's OpenGL library once it has been loaded into this process.
@@ -513,25 +530,81 @@ object PojavPluginBridge {
      * conventional per-ABI directory before giving up on the plugin.
      */
     private fun nativeLibraryDirOf(context: Context, info: ApplicationInfo): String? {
-        info.nativeLibraryDir?.let { dir -> if (File(dir).isDirectory) return dir }
         // The device ABI, which is also the one the plugin's libraries must match. This used to
         // read ApplicationInfo.primaryCpuAbi, a field that is not part of the public SDK stubs.
         val abi = (if (android.os.Process.is64Bit()) Build.SUPPORTED_64_BIT_ABIS
             else Build.SUPPORTED_32_BIT_ABIS).firstOrNull() ?: return null
+        val candidates = ArrayList<File>(3)
+        info.nativeLibraryDir?.let { candidates.add(File(it)) }
         if (Build.VERSION.SDK_INT >= 24) {
             val dataDir = runCatching { info.dataDir }.getOrNull()
-            if (!dataDir.isNullOrEmpty()) {
-                val unpacked = File(dataDir, "lib/$abi")
-                if (unpacked.isDirectory) return unpacked.absolutePath
-            }
+            if (!dataDir.isNullOrEmpty()) candidates.add(File(dataDir, "lib/$abi"))
         }
         // Shared, read-only library directory used when the ABI matches the launcher itself.
-        val appLibrary = File(info.sourceDir).parentFile?.let { File(it, "lib/$abi") }
-        if (appLibrary != null && appLibrary.isDirectory) return appLibrary.absolutePath
+        File(info.sourceDir).parentFile?.let { candidates.add(File(it, "lib/$abi")) }
+        val directory = candidates.firstOrNull { it.isDirectory }
+        if (directory != null) {
+            // Android gives every app its own linker namespace: a library unpacked into the
+            // plugin's own directories can be listed here but cannot be dlopen'ed by this
+            // process - the linker answers "library … not found" for the absolute path. Copying
+            // the libraries into this app's storage is what makes the plugin usable at all.
+            if (isInOwnStorage(directory.absolutePath)) return directory.absolutePath
+            return mirrorLibraries(context, info, directory)
+                ?: extractLibrariesFromApk(context, info, abi)
+        }
         // Nothing was unpacked for this package. An APK can keep its libraries compressed inside
         // itself (`extractNativeLibs="false"`), in which case Android never creates a library
         // directory. Unpack them ourselves, per ABI, into our private storage.
         return extractLibrariesFromApk(context, info, abi)
+    }
+
+    /**
+     * Directories this process may load native code from: its own app data, its cache and its
+     * library directory. Anything outside them belongs to another package and is out of reach.
+     */
+    private fun ownStorageRoots(): List<File> = listOfNotNull(
+        Tools.DIR_DATA?.let { File(it) },
+        Tools.DIR_CACHE,
+        Tools.NATIVE_LIB_DIR?.let { File(it) }
+    )
+
+    internal fun isInOwnStorage(path: String): Boolean {
+        if (path.isEmpty()) return false
+        val target = File(path).absoluteFile.path
+        for (root in ownStorageRoots()) {
+            val rootPath = root.absolutePath
+            if (target == rootPath || target.startsWith(rootPath + File.separator)) return true
+        }
+        return false
+    }
+
+    /** Copies the `.so` files of [source] into this app's storage, next to each other. */
+    private fun mirrorLibraries(context: Context, info: ApplicationInfo, source: File): String? {
+        val target = File(context.noBackupFilesDir, "renderer-libs/" + info.packageName)
+        val stamp = File(target, ".stamp")
+        val expected = info.sourceDir + "|mirror|" + source.absolutePath + "|" + source.lastModified()
+        if (stamp.isFile && runCatching { stamp.readText() }.getOrNull() == expected) {
+            val unpacked = target.listFiles()
+            if (unpacked != null && unpacked.any { it.name.endsWith(".so") }) return target.absolutePath
+        }
+        return runCatching {
+            val libraries = source.listFiles()
+                ?.filter { it.isFile && it.name.endsWith(".so") }
+                .orEmpty()
+            if (libraries.isEmpty()) return@runCatching null
+            if (target.exists()) target.deleteRecursively()
+            if (!target.mkdirs() && !target.isDirectory) return@runCatching null
+            for (library in libraries) {
+                val copy = File(target, library.name)
+                library.inputStream().use { input -> copy.outputStream().use { output -> input.copyTo(output) } }
+                // Locked down and executable, so the linker maps it the way it maps an unpacked
+                // native library of this app.
+                copy.setReadable(true, true)
+                copy.setExecutable(true, true)
+            }
+            stamp.writeText(expected)
+            target.absolutePath
+        }.getOrNull()
     }
 
     /** Unpacks the libraries of `lib/<abi>` of a plugin APK that keeps them compressed. */

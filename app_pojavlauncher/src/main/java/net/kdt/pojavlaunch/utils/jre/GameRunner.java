@@ -12,6 +12,7 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import net.kdt.pojavlaunch.Architecture;
 import net.kdt.pojavlaunch.JVersionList;
+import net.kdt.pojavlaunch.Logger;
 import net.kdt.pojavlaunch.Tools;
 import net.kdt.pojavlaunch.authenticator.accounts.Account;
 import net.kdt.pojavlaunch.game.renderer.def.Renderers;
@@ -338,6 +339,8 @@ public class GameRunner {
         // resolve takes the whole launch down with an UnsatisfiedLinkError on the render thread,
         // so the renderer is only used when its library is really on disk.
         RenderSpec activeRenderer = gameRenderer.getLaunchableRenderer();
+        Logger.appendToLog("LWJGL OpenGL library: " + activeRenderer.glLibraryPath()
+                + " (renderer " + activeRenderer.name() + ")");
         javaArgList.add("-Dorg.lwjgl.opengl.libname=" + activeRenderer.glLibraryPath());
         javaArgList.add("-Dorg.lwjgl.freetype.libname="+ Tools.NATIVE_LIB_DIR+"/libfreetype.so");
         // Renderer plugins that pick a compatibility core by game version read this property

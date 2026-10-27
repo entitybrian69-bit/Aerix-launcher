@@ -177,10 +177,16 @@ public class GameRenderer {
     public RenderSpec getLaunchableRenderer() {
         RenderSpec spec = currentRenderer;
         String library = spec.glLibraryPath();
-        if (libraryIsPresent(library)) return spec;
+        if (libraryIsPresent(library)) {
+            // The one line that says which renderer the JVM is really started on, and which
+            // library LWJGL was told to bind OpenGL to.
+            Logger.appendToLog("Renderer at launch: " + spec.name() + " (" + spec.tag() + ") gl=" + library);
+            return spec;
+        }
 
-        Logger.appendToLog("Renderer " + spec.name() + " names a library that is not on disk ("
-                + library + "); choosing a renderer that can actually load");
+        Logger.appendToLog("Renderer " + spec.name() + " names a library that cannot be opened by "
+                + "this process (" + (library.isEmpty() ? "<none>" : library)
+                + "); choosing a renderer that can actually load");
         Log.e(TAG, "Renderer " + spec.name() + " cannot launch: " + library + " is missing");
         spec = replacementRenderer(null);
         currentRenderer = spec;
@@ -218,7 +224,27 @@ public class GameRenderer {
         if (library == null || library.isEmpty()) return false;
         if (!library.startsWith("/")) return true;
         File file = new File(library);
-        return file.isFile() && file.length() > 0;
+        if (!file.isFile() || file.length() == 0) return false;
+        // Android gives every app its own linker namespace. A library that sits in another
+        // package's directory (/data/app/~~…/com.someone.else-…/lib/arm64) is not reachable from
+        // this process: dlopen reports the absolute path as "not found" even though the file is
+        // really there, and that error is thrown while the game window is created, which takes
+        // the whole launch down. Only a path inside this app's own storage can be handed to
+        // LWJGL.
+        return isInOwnStorage(file);
+    }
+
+    /** Whether [file] lives in this app's own data, cache or native library directory. */
+    private static boolean isInOwnStorage(File file) {
+        String path = file.getAbsolutePath();
+        String[] roots = {Tools.DIR_DATA, Tools.NATIVE_LIB_DIR,
+                Tools.DIR_CACHE != null ? Tools.DIR_CACHE.getAbsolutePath() : null};
+        for (String root : roots) {
+            if (root == null || root.isEmpty()) continue;
+            if (root.endsWith("/")) root = root.substring(0, root.length() - 1);
+            if (path.equals(root) || path.startsWith(root + "/")) return true;
+        }
+        return false;
     }
 
     /**
