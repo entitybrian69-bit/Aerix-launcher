@@ -247,13 +247,28 @@ object AerixDiscordPresence {
 }
 
 /**
+ * The Discord application the presence is published under, registered once for the project as
+ * "Aerix Launcher" (Developer Portal → New Application). Its name is the title on the card, so it
+ * has to be this application and not a per-user one: every install shows the same card with no
+ * setup. A user can still override it in Settings → Launcher; blank means "use this".
+ */
+object AerixDiscordApp {
+    const val DEFAULT_APPLICATION_ID = "1563812135744839771"
+}
+
+/**
  * Discord application ids are 17–20 digit numbers. Anything else (an empty field, a client id, a
  * public key) is rejected before it can reach Discord, which would otherwise drop the connection.
  */
 object DiscordAppId {
-    fun asLong(context: Context?): Long? {
+    /** The override from settings, or the application id this build ships with. */
+    fun effective(): String {
         val raw = AerixPreferences.discordAppId.trim().trim('"', '\'')
-        if (raw.length < 15) return null
+        return if (raw.length >= 15) raw else AerixDiscordApp.DEFAULT_APPLICATION_ID
+    }
+
+    fun asLong(context: Context?): Long? {
+        val raw = effective()
         val id = raw.toLongOrNull() ?: return null
         return id.takeIf { it > 0 }
     }

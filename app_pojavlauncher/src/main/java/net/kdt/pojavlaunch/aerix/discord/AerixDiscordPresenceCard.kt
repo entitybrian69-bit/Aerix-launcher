@@ -76,9 +76,9 @@ fun DiscordPresenceSettingsCard() {
         MiraiTextInputSettingsCard(
             value = appId,
             title = "Discord application ID",
-            summary = "Create an application at discord.com/developers and paste its ID here. " +
-                "Its name is what appears above the two lines, so call it Aerix Launcher.",
-            label = "Application ID, e.g. 1234567890123456789",
+            summary = "Already set to the Aerix Launcher application, so nothing has to be done here. " +
+                "Fill this in only to publish under a different Discord application.",
+            label = "Built in: 1563812135744839771 — override if you know why",
             position = CardPosition.Bottom,
             onValueChange = { raw ->
                 val clean = raw.filter { it.isDigit() }.take(20)
