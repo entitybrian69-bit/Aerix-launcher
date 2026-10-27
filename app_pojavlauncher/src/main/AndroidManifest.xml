@@ -188,11 +188,17 @@
              even on devices that withhold QUERY_ALL_PACKAGES. -->
         <package android:name="com.entitybrian.emesis"/>
         <package android:name="np.proton.renderer.powervr"/>
+        <!-- Discord Rich Presence: the Discord app publishes presence through this bound service. -->
+        <package android:name="com.discord"/>
+        <package android:name="cocobo1.pupu.app"/>
         <!-- Fallback visibility for plugin APKs that ship a launcher activity, used when the
              package visibility permission above is not granted. -->
         <intent>
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+        <intent>
+            <action android:name="com.discord.socialsdk.rpc.IDiscordRpcService"/>
         </intent>
     </queries>
 </manifest>

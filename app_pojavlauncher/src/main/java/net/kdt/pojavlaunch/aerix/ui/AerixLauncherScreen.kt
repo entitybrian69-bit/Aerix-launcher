@@ -47,6 +47,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
@@ -61,6 +62,7 @@ import net.kdt.pojavlaunch.aerix.bridge.AerixWindowInsets
 import net.kdt.pojavlaunch.aerix.bridge.PojavAccountBridge
 import net.kdt.pojavlaunch.aerix.bridge.PojavInstanceEditorBridge
 import net.kdt.pojavlaunch.aerix.components.AerixBackground
+import net.kdt.pojavlaunch.aerix.discord.AerixDiscordPresence
 import net.kdt.pojavlaunch.aerix.festivals.FestivalEffectsHost
 import net.kdt.pojavlaunch.aerix.festivals.FestivalTitleText
 import net.kdt.pojavlaunch.aerix.festivals.rememberTodayFestivals
@@ -136,6 +138,16 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
         if (AerixGuideState.running && AerixNav.section != LauncherSection.HOME) {
             AerixNav.navigate(LauncherSection.HOME)
         }
+    }
+
+    // Discord Rich Presence: the launcher is on screen, and it says which page you are on.
+    // attach() is a no-op when the setting is off, no application id is set, or Discord is absent.
+    DisposableEffect(Unit) {
+        AerixDiscordPresence.attach(activity)
+        onDispose { AerixDiscordPresence.detach() }
+    }
+    LaunchedEffect(section) {
+        AerixDiscordPresence.inLauncher(section.name)
     }
 
     BackHandler(enabled = AerixNav.canGoBack) { AerixNav.back() }

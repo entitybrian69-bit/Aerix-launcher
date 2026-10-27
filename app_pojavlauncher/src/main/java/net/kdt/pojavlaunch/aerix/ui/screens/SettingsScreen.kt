@@ -135,6 +135,7 @@ import net.kdt.pojavlaunch.aerix.components.MiraiListSettingsCard
 import net.kdt.pojavlaunch.aerix.components.MiraiRendererSummaryLayout
 import net.kdt.pojavlaunch.aerix.components.ModrinthMetaPill
 import net.kdt.pojavlaunch.aerix.components.SettingsCardColumn
+import net.kdt.pojavlaunch.aerix.discord.DiscordPresenceSettingsCard
 import net.kdt.pojavlaunch.aerix.components.getMiraiGlobalRendererId
 import net.kdt.pojavlaunch.aerix.components.liquidGlass
 import net.kdt.pojavlaunch.aerix.components.miraiRendererEntries
@@ -1410,6 +1411,11 @@ private fun LauncherTabContent(activity: FragmentActivity) {
         contentPadding = PaddingValues(bottom = AerixSpacing.xxl),
         verticalArrangement = Arrangement.spacedBy(AerixSpacing.md)
     ) {
+        // Discord Rich Presence: what your own profile shows while the launcher is open.
+        item {
+            DiscordPresenceSettingsCard()
+        }
+
         // Group 1: Color theme, custom color, festival effects, full screen (Mirai LauncherSettingsScreen)
         item {
             SettingsCardColumn(modifier = Modifier.fillMaxWidth()) {

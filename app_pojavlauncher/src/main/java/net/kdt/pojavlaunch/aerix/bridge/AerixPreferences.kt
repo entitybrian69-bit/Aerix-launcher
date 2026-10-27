@@ -68,6 +68,10 @@ object AerixPreferences {
     const val KEY_FAVORITES = "aerixFavoriteProjects"
     /** JSON array of pinned instance names (mirai VersionsManageScreen "Pinned" tab). */
     const val KEY_PINNED_INSTANCES = "aerixPinnedInstances"
+    /** Discord Rich Presence: show "Playing Aerix Launcher" on the player's own profile. */
+    const val KEY_DISCORD_PRESENCE = "aerixDiscordPresence"
+    /** The Discord application id the presence is published under (Developer Portal). */
+    const val KEY_DISCORD_APP_ID = "aerixDiscordAppId"
 
     const val DEFAULT_CUSTOM_COLOR = 0xFF8DEFE0.toInt()
     const val DEFAULT_BACKGROUND_OPACITY = 60
@@ -149,6 +153,14 @@ object AerixPreferences {
     var pinnedJson by mutableStateOf("[]")
         private set
 
+    /** Aerix "aerixDiscordPresence": publish what the launcher is doing to the Discord app. */
+    var discordPresenceEnabled by mutableStateOf(true)
+        private set
+
+    /** Aerix "aerixDiscordAppId": the Discord application the presence is shown under. */
+    var discordAppId by mutableStateOf("")
+        private set
+
     fun init(context: Context) {
         val p = context.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
         prefs = p
@@ -179,11 +191,23 @@ object AerixPreferences {
         logRetentionDays = p.getInt(KEY_LOG_RETENTION_DAYS, 7).coerceIn(1, 14)
         favoritesJson = p.getString(KEY_FAVORITES, "[]") ?: "[]"
         pinnedJson = p.getString(KEY_PINNED_INSTANCES, "[]") ?: "[]"
+        discordPresenceEnabled = p.getBoolean(KEY_DISCORD_PRESENCE, true)
+        discordAppId = p.getString(KEY_DISCORD_APP_ID, "") ?: ""
     }
 
     fun saveFavoritesJson(value: String) {
         favoritesJson = value
         edit { putString(KEY_FAVORITES, value) }
+    }
+
+    fun saveDiscordPresenceEnabled(value: Boolean) {
+        discordPresenceEnabled = value
+        edit { putBoolean(KEY_DISCORD_PRESENCE, value) }
+    }
+
+    fun saveDiscordAppId(value: String) {
+        discordAppId = value.trim().filter { it.isDigit() }
+        edit { putString(KEY_DISCORD_APP_ID, discordAppId) }
     }
 
     fun savePinnedJson(value: String) {
