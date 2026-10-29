@@ -33,12 +33,16 @@ holds profiles, friend lists and messages, and a debug APK on your phone that yo
 ### 1b. Copy the two launcher values
 
 9. Left sidebar → **Project Settings** (the gear) → **API**.
-10. Copy these two and keep them for Part 4:
-    - **Project URL** — looks like `https://abcdefgh.supabase.co`
-    - **anon public** — a long string starting with `eyJ`
+10. Copy these two and keep them for Part 3:
+    - **Project URL** — looks like `https://abcdefgh.supabase.co`. If the page does not show it,
+      it is under **Settings → General → Project ID**: the URL is `https://<Project ID>.supabase.co`.
+    - **The publishable key** — Supabase's current name for the public client key. It starts with
+      `sb_publishable_`. (Older projects show it under the **Legacy anon, service_role** tab as the
+      `anon` key, a long string starting with `eyJ`. Either one works.)
 
-Both are safe to share: the anon key is meant to be public and is protected by the row-level
-security you just installed. **Never** share the `service_role` key.
+Both are safe to share: the publishable key is public by design and is protected by the row-level
+security you just installed. **Never** share the **secret** key or anything named `service_role` —
+that one bypasses the security rules.
 
 ---
 
