@@ -159,6 +159,30 @@ object SocialBackend {
         return false
     }
 
+    /**
+     * Sends the confirmation mail again, for the players who sign up while the project still asks
+     * for a confirmed address. Harmless when the address is already confirmed.
+     */
+    suspend fun resendConfirmation(address: String): Boolean {
+        val ok = attempt {
+            call(
+                "POST",
+                "$PROJECT_URL/auth/v1/resend",
+                JsonObject().apply {
+                    addProperty("type", "signup")
+                    addProperty("email", address.trim())
+                }.toString(),
+                authenticated = false
+            )
+        }
+        lastError = if (ok == null) "Could not send the mail. Try again in a minute." else null
+        return ok != null
+    }
+
+    /** True when the last failure was the project asking for a confirmed email address. */
+    fun needsConfirmation(): Boolean =
+        lastError?.contains("confirm", ignoreCase = true) == true
+
     private fun storeSession(json: JsonObject) {
         accessToken = json.stringOrNull("access_token")
         refreshToken = json.stringOrNull("refresh_token")
