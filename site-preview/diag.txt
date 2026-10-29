@@ -11,9 +11,9 @@ none
   4183    706 op=1     section.section
   4889    927 op=1     section.section
   5816    871 op=1     section.section
-  6687    818 op=1     section.section
-  7506    342 op=1     section.section
-  7908    413 op=1     footer.footer
+  6687    685 op=1     section.section
+  7372    342 op=1     section.section
+  7775    413 op=1     footer.footer
 
 == images ==
      512x512 box=34x34        complete=True assets/aerix-logo.png
