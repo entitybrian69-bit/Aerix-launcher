@@ -13,9 +13,8 @@ name: Website
 
 on:
   push:
-    # Every branch the site is actually edited on. The old list named one arena
-    # branch that no longer exists, so a docs change could never deploy.
-    branches: [ "v3_openjdk", "arena/**" ]
+    # Deploy from the main branch allowed by the github-pages environment protection rule.
+    branches: [ "v3_openjdk" ]
     paths: [ "docs/**", ".github/workflows/pages.yml" ]
   workflow_dispatch:
 
