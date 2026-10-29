@@ -147,6 +147,7 @@ private class HomeActions(
     val select: (AerixInstance) -> Unit,
     val edit: (AerixInstance) -> Unit,
     val create: () -> Unit,
+    val socials: () -> Unit,
     val explore: () -> Unit,
     val library: () -> Unit,
     val files: () -> Unit,
@@ -182,6 +183,7 @@ fun HomeScreen(activity: FragmentActivity, navigate: (LauncherSection) -> Unit) 
         select = { PojavInstanceBridge.select(it) },
         edit = { PojavInstanceBridge.edit(activity, it) },
         create = { AerixNav.navigate(LauncherSection.CREATE_INSTANCE) },
+        socials = { navigate(LauncherSection.SOCIALS) },
         explore = { navigate(LauncherSection.DISCOVER) },
         library = { navigate(LauncherSection.LIBRARY) },
         files = { PojavInstanceBridge.openGameDirectory(activity) },
@@ -570,7 +572,10 @@ private fun QuickTiles(count: Int, accent: Color, actions: HomeActions, modifier
     val rowModifier = if (scrollable) modifier.horizontalScroll(rememberScrollState()) else modifier
     Row(modifier = rowModifier, horizontalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus)) {
         val tiles = listOf(
-            Triple(R.drawable.aerix_ic_add, stringResource(R.string.aerix_home_quick_create) to stringResource(R.string.aerix_home_quick_create_sub), accent to actions.create),
+            // The card that used to open the instance creator now opens Socials: creating an
+            // instance lives on the rail's + button and in the library, where it is not competing
+            // with the one thing the launcher can do that no other launcher can.
+            Triple(R.drawable.aerix_ic_people, stringResource(R.string.aerix_home_quick_socials) to stringResource(R.string.aerix_home_quick_socials_sub), accent to actions.socials),
             Triple(R.drawable.aerix_ic_search, stringResource(R.string.aerix_home_quick_explore) to stringResource(R.string.aerix_home_quick_explore_sub), AerixSurface.glassBlue to actions.explore),
             Triple(R.drawable.aerix_ic_dashboard_filled, stringResource(R.string.aerix_home_quick_library) to stringResource(R.string.aerix_home_quick_library_sub, count), AerixSurface.glassViolet to actions.library),
             Triple(R.drawable.aerix_ic_folder_outlined, stringResource(R.string.aerix_home_quick_files) to stringResource(R.string.aerix_home_quick_files_sub), AerixSurface.glassRose to actions.fileManager)

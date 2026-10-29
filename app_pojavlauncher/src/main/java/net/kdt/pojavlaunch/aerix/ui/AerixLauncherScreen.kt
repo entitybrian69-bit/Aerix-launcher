@@ -92,6 +92,7 @@ import net.kdt.pojavlaunch.aerix.ui.screens.AerixInstallPill
 import net.kdt.pojavlaunch.aerix.ui.screens.LogScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.OfflineAccountScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.SettingsScreen
+import net.kdt.pojavlaunch.aerix.ui.screens.SocialsScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.WallpapersScreen
 
 @Composable
@@ -178,6 +179,7 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
                             LauncherSection.OTHER_RELEASES -> net.kdt.pojavlaunch.aerix.ui.screens.OtherReleasesScreen(activity, navigate)
                             LauncherSection.HOME -> HomeScreen(activity, navigate)
                             LauncherSection.LIBRARY -> LibraryScreen(activity)
+                            LauncherSection.SOCIALS -> SocialsScreen(activity)
                             LauncherSection.DISCOVER, LauncherSection.DOWNLOADS -> DiscoverScreen(activity, navigate)
                             LauncherSection.FILES -> FileManagerScreen(activity)
                             LauncherSection.LOGS -> LogScreen(activity)

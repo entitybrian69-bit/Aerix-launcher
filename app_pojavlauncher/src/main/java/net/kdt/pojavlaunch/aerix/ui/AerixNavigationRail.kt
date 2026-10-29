@@ -84,6 +84,8 @@ import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
 enum class LauncherSection {
     HOME,
     LIBRARY,
+    /** Friends, messages and parties - the social launcher, opened from Home and the rail. */
+    SOCIALS,
     DISCOVER,
     OTHER_RELEASES,
     DOWNLOADS,
@@ -186,6 +188,8 @@ fun AerixNavigationRail(
                 RailIconItem(R.drawable.aerix_ic_dashboard_filled, stringResource(R.string.aerix_nav_library),
                     librarySelected(selectedSection), activeAccent, expandedRail, compactRail,
                     onClick = { onNavigate(LauncherSection.LIBRARY) }, guideKey = AerixGuideState.LIBRARY)
+                RailIconItem(R.drawable.aerix_ic_people, stringResource(R.string.aerix_home_quick_socials),
+                    selectedSection == LauncherSection.SOCIALS, activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.SOCIALS) }
                 RailIconItem(R.drawable.aerix_ic_public, stringResource(R.string.aerix_nav_discover),
                     discoverSelected(selectedSection), activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.DISCOVER) }
                 RailIconItem(R.drawable.aerix_ic_rocket_launch_filled, "Our other new releases",
