@@ -100,7 +100,9 @@ end ';
 
 -- ---- the profile card: fields, counts and ranks in one round trip ------------------------
 
-create or replace function public.profile_card(p_username text) returns jsonb
+drop function if exists public.profile_card();
+
+create or replace function public.profile_card(p_username text default null) returns jsonb
 language plpgsql security definer set search_path = public as 'declare
     p public.profiles;
     friends_count int;
