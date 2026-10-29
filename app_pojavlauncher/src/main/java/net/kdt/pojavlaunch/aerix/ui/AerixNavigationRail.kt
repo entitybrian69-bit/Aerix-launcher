@@ -188,8 +188,8 @@ fun AerixNavigationRail(
                 RailIconItem(R.drawable.aerix_ic_dashboard_filled, stringResource(R.string.aerix_nav_library),
                     librarySelected(selectedSection), activeAccent, expandedRail, compactRail,
                     onClick = { onNavigate(LauncherSection.LIBRARY) }, guideKey = AerixGuideState.LIBRARY)
-                RailIconItem(R.drawable.aerix_ic_people, stringResource(R.string.aerix_home_quick_socials),
-                    selectedSection == LauncherSection.SOCIALS, activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.SOCIALS) }
+                // Socials is not a rail entry: it opens from the Home dashboard and brings its own
+                // sidebar, so it is not listed next to the launcher's own sections.
                 RailIconItem(R.drawable.aerix_ic_public, stringResource(R.string.aerix_nav_discover),
                     discoverSelected(selectedSection), activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.DISCOVER) }
                 RailIconItem(R.drawable.aerix_ic_rocket_launch_filled, "Our other new releases",

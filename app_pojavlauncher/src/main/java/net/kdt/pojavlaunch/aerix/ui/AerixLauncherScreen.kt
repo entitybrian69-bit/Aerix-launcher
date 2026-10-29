@@ -160,11 +160,15 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
         // itself stays clear of the camera cutout and of the system bars.
         Box(modifier = Modifier.fillMaxSize().padding(AerixWindowInsets.padding())) {
             Row(modifier = Modifier.fillMaxSize()) {
-                AerixNavigationRail(
-                    selectedSection = section,
-                    onNavigate = navigate,
-                    onCreateInstance = { AerixNav.navigate(LauncherSection.CREATE_INSTANCE) }
-                )
+                // The social space has its own sidebar and takes the whole window; every other
+                // section keeps the launcher's rail.
+                if (section != LauncherSection.SOCIALS) {
+                    AerixNavigationRail(
+                        selectedSection = section,
+                        onNavigate = navigate,
+                        onCreateInstance = { AerixNav.navigate(LauncherSection.CREATE_INSTANCE) }
+                    )
+                }
                 Box(
                     modifier = Modifier
                         .weight(1f)
@@ -179,7 +183,7 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
                             LauncherSection.OTHER_RELEASES -> net.kdt.pojavlaunch.aerix.ui.screens.OtherReleasesScreen(activity, navigate)
                             LauncherSection.HOME -> HomeScreen(activity, navigate)
                             LauncherSection.LIBRARY -> LibraryScreen(activity)
-                            LauncherSection.SOCIALS -> SocialsScreen(activity)
+                            LauncherSection.SOCIALS -> SocialsScreen(activity) { AerixNav.finishTo(LauncherSection.HOME) }
                             LauncherSection.DISCOVER, LauncherSection.DOWNLOADS -> DiscoverScreen(activity, navigate)
                             LauncherSection.FILES -> FileManagerScreen(activity)
                             LauncherSection.LOGS -> LogScreen(activity)
