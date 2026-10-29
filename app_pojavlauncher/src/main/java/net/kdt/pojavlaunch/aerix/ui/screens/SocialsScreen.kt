@@ -17,6 +17,7 @@ package net.kdt.pojavlaunch.aerix.ui.screens
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -178,65 +179,102 @@ private fun SocialsSignIn(activity: FragmentActivity) {
         }
     }
 
+    // Landscape: the card is a single row - the mark and the promise on the left, the form on the
+    // right - so both buttons stay on screen at every phone height. Nothing scrolls.
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Surface(
-            shape = RoundedCornerShape(28.dp),
+            shape = RoundedCornerShape(24.dp),
             color = SocialCard,
-            shadowElevation = 8.dp,
-            modifier = Modifier.width(430.dp)
+            shadowElevation = 8.dp
         ) {
-            Column(
-                modifier = Modifier.padding(horizontal = 34.dp, vertical = 30.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+            Row(
+                modifier = Modifier.padding(horizontal = 26.dp, vertical = 20.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(26.dp)
             ) {
-                Surface(shape = RoundedCornerShape(14.dp), color = SocialCrimson) {
-                    Icon(
-                        painter = painterResource(R.drawable.ic_aerix_mark),
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.padding(10.dp).size(24.dp)
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.width(178.dp)
+                ) {
+                    Surface(shape = RoundedCornerShape(13.dp), color = SocialCrimson) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_aerix_mark),
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.padding(9.dp).size(22.dp)
+                        )
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    Text("Aerix Social", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = SocialInk)
+                    Spacer(Modifier.height(3.dp))
+                    Text(
+                        "Play with friends without leaving the game",
+                        fontSize = 11.sp,
+                        color = SocialMuted,
+                        lineHeight = 15.sp
                     )
                 }
-                Spacer(Modifier.height(14.dp))
-                Text("Aerix Social", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = SocialInk)
-                Text("Sign in to play with friends", fontSize = 13.sp, color = SocialMuted)
-                Spacer(Modifier.height(20.dp))
-                SocialField(address, { address = it }, "Email")
-                Spacer(Modifier.height(10.dp))
-                SocialField(password, { password = it }, "Password", secret = true)
-                Spacer(Modifier.height(16.dp))
-                SocialWideButton(if (working) "Please wait…" else "Sign in", SocialCrimson, Color.White) {
-                    if (!working) submit(false)
-                }
-                Spacer(Modifier.height(8.dp))
-                SocialWideButton("Create an account", Color(0xFF1D1D22), Color.White) {
-                    if (!working) submit(true)
-                }
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    text = if (SocialBackend.GOOGLE_WEB_CLIENT_ID.isEmpty())
-                        "Google sign-in unlocks as soon as the Web client ID is added."
-                    else "Google sign-in is ready.",
-                    fontSize = 11.sp,
-                    color = SocialMuted
-                )
-                SocialBackend.lastError?.let { message ->
-                    Spacer(Modifier.height(10.dp))
-                    Text(text = message, color = SocialCrimson, fontSize = 12.sp)
-                }
-                // Somebody signing up while the project still asks for a confirmed address lands
-                // here: the button sends the mail again instead of leaving them stuck.
-                if (SocialBackend.needsConfirmation()) {
+
+                Column(modifier = Modifier.width(300.dp)) {
+                    SocialField(address, { address = it }, "Email")
                     Spacer(Modifier.height(8.dp))
-                    SocialWideButton("Resend confirmation email", Color(0xFFEFECE9), SocialInk) {
-                        scope.launch {
-                            val sent = SocialBackend.resendConfirmation(address)
+                    SocialField(password, { password = it }, "Password", secret = true)
+                    Spacer(Modifier.height(12.dp))
+                    SocialWideButton(if (working) "Please wait…" else "Sign in", SocialCrimson, Color.White) {
+                        if (!working) submit(false)
+                    }
+                    Spacer(Modifier.height(7.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            "Create an account",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = SocialCrimson,
+                            modifier = Modifier.padding(4.dp).clickable { if (!working) submit(true) }
+                        )
+                        Text(
+                            "Forgot password?",
+                            fontSize = 12.sp,
+                            color = SocialMuted,
+                            modifier = Modifier.padding(4.dp)
+                        )
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    SocialWideButton("Continue with Google", Color(0xFFF2EFEC), SocialInk) {
+                        val opened = SocialBackend.beginGoogleSignIn(activity)
+                        if (!opened) {
                             Toast.makeText(
                                 activity,
-                                if (sent) "Confirmation email sent to ${address.trim()}" else "Could not send the email",
+                                "Google sign-in needs the Google provider switched on in Supabase",
                                 Toast.LENGTH_LONG
                             ).show()
                         }
+                    }
+                    SocialBackend.lastError?.let { message ->
+                        Spacer(Modifier.height(8.dp))
+                        Text(text = message, color = SocialCrimson, fontSize = 11.sp)
+                    }
+                    if (SocialBackend.needsConfirmation()) {
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            "Resend confirmation email",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = SocialCrimson,
+                            modifier = Modifier.padding(4.dp).clickable {
+                                scope.launch {
+                                    val sent = SocialBackend.resendConfirmation(address)
+                                    Toast.makeText(
+                                        activity,
+                                        if (sent) "Sent to ${address.trim()}" else "Could not send the email",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                }
+                            }
+                        )
                     }
                 }
             }
@@ -256,6 +294,7 @@ private fun SocialField(
         onValueChange = onValueChange,
         label = { Text(label, fontSize = 13.sp) },
         singleLine = true,
+        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 14.sp),
         visualTransformation = if (secret) PasswordVisualTransformation() else androidx.compose.ui.text.input.VisualTransformation.None,
         shape = RoundedCornerShape(12.dp),
         colors = OutlinedTextFieldDefaults.colors(

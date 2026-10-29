@@ -168,11 +168,35 @@ public class LauncherActivity extends BaseActivity {
         return AerixPreferences.INSTANCE.getFullScreen();
     }
 
+    /**
+     * The browser comes back here with the tokens of a Socials sign-in in the URI fragment.
+     *
+     * Handled before {@link #onCreate} does its work so the session is already restored when the
+     * Socials page is first drawn.
+     */
+    private void handleSocialSignIn(Intent intent) {
+        if (intent == null || intent.getData() == null) return;
+        String data = intent.getData().toString();
+        if (!data.startsWith(net.kdt.pojavlaunch.aerix.social.SocialBackend.OAUTH_REDIRECT)) return;
+        net.kdt.pojavlaunch.aerix.social.SocialBackend.attach(getApplicationContext());
+        boolean restored = net.kdt.pojavlaunch.aerix.social.SocialBackend.completeBrowserSession(data);
+        Toast.makeText(this, restored ? "Signed in to Socials" : "Sign-in did not complete",
+                Toast.LENGTH_LONG).show();
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        handleSocialSignIn(intent);
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         // Must run before BaseActivity.onCreate, which reads setFullscreen()
         AerixPreferences.INSTANCE.init(getApplicationContext());
         super.onCreate(savedInstanceState);
+        handleSocialSignIn(getIntent());
         // The decor receives the insets before the content view consumes them for its padding.
         // Publishing them lets the Compose shell keep the rail and the pages on the safe area
         // while its wallpaper stays full bleed. The camera cutout always has to be respected; the

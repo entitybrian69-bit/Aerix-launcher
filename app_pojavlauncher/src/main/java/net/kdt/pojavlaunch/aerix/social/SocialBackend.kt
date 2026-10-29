@@ -65,6 +65,9 @@ object SocialBackend {
     /** Set once the Google Web client ID exists; until then the Google button explains itself. */
     const val GOOGLE_WEB_CLIENT_ID = ""
 
+    /** The scheme the browser comes back on after a Google sign-in (see the manifest). */
+    const val OAUTH_REDIRECT = "aerix-social://auth"
+
     var signedIn by mutableStateOf(false)
         private set
     var email by mutableStateOf<String?>(null)
@@ -157,6 +160,53 @@ object SocialBackend {
         }
         lastError = "Account created. Confirm it from your email, then sign in."
         return false
+    }
+
+    /**
+     * Google sign-in without any Google SDK: the browser opens the project's own authorization
+     * endpoint, the player picks an account there, and the tokens come back on [OAUTH_REDIRECT],
+     * which the launcher activity hands to [completeBrowserSession].
+     *
+     * @return false when the provider is not switched on in Supabase, so the caller can say so
+     */
+    fun beginGoogleSignIn(context: Context): Boolean {
+        val url = "$PROJECT_URL/auth/v1/authorize?provider=google" +
+            "&redirect_to=" + java.net.URLEncoder.encode(OAUTH_REDIRECT, "UTF-8")
+        return try {
+            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
+                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(intent)
+            true
+        } catch (error: Throwable) {
+            Log.w(TAG, "Could not open the Google sign-in page", error)
+            false
+        }
+    }
+
+    /**
+     * Finishes a browser sign-in: the redirect carries the tokens in its fragment.
+     *
+     * @return true when a session was restored from [redirect]
+     */
+    fun completeBrowserSession(redirect: String?): Boolean {
+        if (redirect.isNullOrBlank()) return false
+        val fragment = redirect.substringAfter('#', "")
+        if (fragment.isEmpty()) return false
+        val values = fragment.split('&').mapNotNull { pair ->
+            val index = pair.indexOf('=')
+            if (index <= 0) null
+            else pair.substring(0, index) to android.net.Uri.decode(pair.substring(index + 1))
+        }.toMap()
+        val token = values["access_token"] ?: return false
+        val refresh = values["refresh_token"] ?: return false
+        accessToken = token
+        refreshToken = refresh
+        expiresAtMs = System.currentTimeMillis() + ((values["expires_in"]?.toLongOrNull() ?: 3600L) * 1000) - 60_000
+        signedIn = true
+        appContext?.getSharedPreferences(PREFS, Context.MODE_PRIVATE)?.edit()
+            ?.putString("refresh_token", refresh)
+            ?.apply()
+        return true
     }
 
     /**
