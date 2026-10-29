@@ -22,16 +22,37 @@ holds profiles, friend lists and messages, and a debug APK on your phone that yo
 
 ### 1a. Create the tables
 
-> **Already ran it before?** Paste the whole `supabase/schema.sql` again — it is idempotent and
-> adds the new profile columns, follows, ranks, the image bucket and the invite-code lookup.
+The database is installed in **three small files**, one after another. They are split on purpose:
+a phone copy of one enormous file cuts a statement in half, and Postgres then complains about an
+unterminated `$$` — which is exactly what happens when the paste is truncated.
 
-5. In the left sidebar tap **SQL Editor** → **New query**.
-6. Open this file in another tab and copy all of it:
-   `https://github.com/entitybrian69-bit/Aerix-launcher/blob/arena/2f1249a3-aerix-launcher/supabase/schema.sql`
-   — on the GitHub page tap the **copy** icon at the top right of the file box.
-7. Paste it into the SQL editor and tap **Run**.
-8. You should see **Success. No rows returned**. That means profiles, friendships and messages now
-   exist, each locked so a user can only read their own conversations.
+Run them in this order, each time in **SQL Editor → New query → paste → Run**:
+
+| Step | File | What it adds |
+|---|---|---|
+| 1 | `supabase/step1-tables.sql` | tables, columns, indexes, the image bucket |
+| 2 | `supabase/step2-functions.sql` | the lookup and counting functions |
+| 3 | `supabase/step3-policies.sql` | who is allowed to read and write what |
+
+Raw links, tap any of them and use GitHub's copy icon:
+
+```
+https://github.com/entitybrian69-bit/Aerix-launcher/raw/arena/2f1249a3-aerix-launcher/supabase/step1-tables.sql
+https://github.com/entitybrian69-bit/Aerix-launcher/raw/arena/2f1249a3-aerix-launcher/supabase/step2-functions.sql
+https://github.com/entitybrian69-bit/Aerix-launcher/raw/arena/2f1249a3-aerix-launcher/supabase/step3-policies.sql
+```
+
+Each one finishes with **Success. No rows returned.** Warnings about something already existing are
+fine — every statement can be run twice.
+
+> **Already ran the old single file?** Still run all three, in order. Step 1 adds the new profile
+> columns, step 2 adds the profile functions, step 3 replaces the "anyone can read any profile"
+> rule with the private one. `supabase/schema.sql` is the same three steps in one file, if you
+> prefer a single paste.
+
+Check it worked: **Table Editor → profiles** should now list `username`, `name`, `country`, `bio`,
+`avatar_url`, `banner_url`, `skin_url`, `cape_url`, `status_text`, `looking_to_play`, `onboarded`,
+`username_changed_at`.
 
 ### 1b. Copy the two launcher values
 
