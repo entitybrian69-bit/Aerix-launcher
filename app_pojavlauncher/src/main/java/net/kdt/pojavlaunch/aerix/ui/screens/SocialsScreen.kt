@@ -147,21 +147,6 @@ fun SocialsScreen(activity: FragmentActivity) {
                     Spacer(Modifier.height(10.dp))
                     Text(text = message, color = SocialCrimson, fontSize = 12.sp)
                 }
-                // Somebody signing up while the project still asks for a confirmed address lands
-                // here: the button sends the mail again instead of leaving them stuck.
-                if (SocialBackend.needsConfirmation()) {
-                    Spacer(Modifier.height(8.dp))
-                    SocialWideButton("Resend confirmation email", Color(0xFFEFECE9), SocialInk) {
-                        scope.launch {
-                            val sent = SocialBackend.resendConfirmation(address)
-                            Toast.makeText(
-                                activity,
-                                if (sent) "Confirmation email sent to ${address.trim()}" else "Could not send the email",
-                                Toast.LENGTH_LONG
-                            ).show()
-                        }
-                    }
-                }
             }
         }
     }
@@ -238,6 +223,21 @@ private fun SocialsSignIn(activity: FragmentActivity) {
                 SocialBackend.lastError?.let { message ->
                     Spacer(Modifier.height(10.dp))
                     Text(text = message, color = SocialCrimson, fontSize = 12.sp)
+                }
+                // Somebody signing up while the project still asks for a confirmed address lands
+                // here: the button sends the mail again instead of leaving them stuck.
+                if (SocialBackend.needsConfirmation()) {
+                    Spacer(Modifier.height(8.dp))
+                    SocialWideButton("Resend confirmation email", Color(0xFFEFECE9), SocialInk) {
+                        scope.launch {
+                            val sent = SocialBackend.resendConfirmation(address)
+                            Toast.makeText(
+                                activity,
+                                if (sent) "Confirmation email sent to ${address.trim()}" else "Could not send the email",
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
+                    }
                 }
             }
         }
