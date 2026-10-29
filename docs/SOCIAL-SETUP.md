@@ -37,9 +37,9 @@ Run them in this order, each time in **SQL Editor → New query → paste → Ru
 Raw links, tap any of them and use GitHub's copy icon:
 
 ```
-https://github.com/entitybrian69-bit/Aerix-launcher/raw/arena/2f1249a3-aerix-launcher/supabase/step1-tables.sql
-https://github.com/entitybrian69-bit/Aerix-launcher/raw/arena/2f1249a3-aerix-launcher/supabase/step2-functions.sql
-https://github.com/entitybrian69-bit/Aerix-launcher/raw/arena/2f1249a3-aerix-launcher/supabase/step3-policies.sql
+https://github.com/entitybrian69-bit/Aerix-launcher/raw/arena/e95bf452-aerix-launcher/supabase/step1-tables.sql
+https://github.com/entitybrian69-bit/Aerix-launcher/raw/arena/e95bf452-aerix-launcher/supabase/step2-functions.sql
+https://github.com/entitybrian69-bit/Aerix-launcher/raw/arena/e95bf452-aerix-launcher/supabase/step3-policies.sql
 ```
 
 Each one finishes with **Success. No rows returned.** Warnings about something already existing are
@@ -162,7 +162,7 @@ works with any email. Part 2 only adds the Google button on top.
 ## Part 4 — Testing each stage · ~5 minutes each
 
 1. Tap the APK link I send →
-   `https://github.com/entitybrian69-bit/Aerix-launcher/raw/arena/2f1249a3-aerix-launcher/apk/Aerix-Launcher-debug.apk`
+   `https://github.com/entitybrian69-bit/Aerix-launcher/releases/download/debug-latest/Aerix-Launcher-debug.apk`
 2. When Android says the app is already installed, choose **Update / Install anyway**. Do **not**
    uninstall — uninstalling deletes your instances and accounts.
 3. **Debug builds install next to your normal Aerix** (package `net.kdt.pojavlaunch.debug`), so you can

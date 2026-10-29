@@ -1,6 +1,7 @@
 name: Aerix debug (testing)
 
-# Builds the APK that all testing happens on and stores it in apk/.
+# Builds the APK that all testing happens on and attaches it to the `debug-latest`
+# GitHub Release (prerelease, so `releases/latest` stays on the public stable release).
 # This workflow only ever builds the "noruntime" debug variant:
 #   applicationId net.kdt.pojavlaunch.debug, signed with app_pojavlauncher/debug.keystore
 # so it installs next to the public launcher and can never be mistaken for, or
@@ -9,7 +10,7 @@ name: Aerix debug (testing)
 
 on:
   push:
-    branches: [ "arena/2f1249a3-aerix-launcher" ]
+    branches: [ "v3_openjdk", "arena/**" ]
     paths:
       - "app_pojavlauncher/src/**"
       - "app_pojavlauncher/*.gradle"
@@ -118,47 +119,59 @@ jobs:
           path: ${{ env.APK_PATH }}
           retention-days: 30
 
-      - name: Store the debug APK in apk/
-        if: github.event_name == 'push'
+      - name: Publish debug APK to GitHub Release (debug-latest)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
           set -e
-          SHORT=${GITHUB_SHA:0:7}
-          git rm -q --ignore-unmatch 'apk/*.apk'
-          git rm -q --ignore-unmatch 'apk/*.sha256'
-          mkdir -p apk
-          cp "$APK_PATH" "apk/$APK_NAME"
-          ( cd apk && sha256sum "$APK_NAME" > "$APK_NAME.sha256" )
+          TAG="debug-latest"
+          SHORT="${GITHUB_SHA:0:7}"
+          BUILT_AT="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+          STAGE="$(mktemp -d)"
+          cp "$APK_PATH" "$STAGE/$APK_NAME"
+          ( cd "$STAGE" && sha256sum "$APK_NAME" > "$APK_NAME.sha256" )
+          SHA256="$(cut -d' ' -f1 "$STAGE/$APK_NAME.sha256")"
           {
             echo "kind: debug (testing only)"
             echo "name: $APK_NAME (universal, arm64 + arm32)"
+            echo "branch: $GITHUB_REF_NAME"
             echo "commit: $GITHUB_SHA"
             echo "run: $GITHUB_RUN_ID"
-            echo "built: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
-            echo 'package: net.kdt.pojavlaunch.debug'
-            echo "note: not a public release; the release APKs live in GitHub Releases"
-          } > apk/DEBUG_BUILD.txt
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          SIZE=$(stat -c %s "$APK_PATH")
-          # GitHub refuses files over 100 MiB. Say so instead of failing the whole build; the
-          # artifact above still carries the APK.
-          if [ "$SIZE" -gt 104857600 ]; then
-            echo "::warning title=debug-apk-too-large::APK is $SIZE bytes, over the 100 MiB repository limit; only the workflow artifact has it"
-            exit 0
+            echo "built: $BUILT_AT"
+            echo "sha256: $SHA256"
+            echo "package: net.kdt.pojavlaunch.debug"
+            echo "note: side-by-side testing build; public stable releases live under v* tags"
+          } > "$STAGE/DEBUG_BUILD.txt"
+          {
+            echo "Side-by-side testing build (\`net.kdt.pojavlaunch.debug\`) — installs next to the public launcher without touching its data."
+            echo ""
+            echo "- **Direct download:** [\`$APK_NAME\`](https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/$APK_NAME)"
+            echo "- **Branch:** \`$GITHUB_REF_NAME\`"
+            echo "- **Commit:** \`$SHORT\` (\`$GITHUB_SHA\`)"
+            echo "- **Built:** \`$BUILT_AT\`"
+            echo "- **SHA-256:** \`$SHA256\`"
+          } > "$STAGE/RELEASE_NOTES.md"
+
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" --clobber \
+              "$STAGE/$APK_NAME" \
+              "$STAGE/$APK_NAME.sha256" \
+              "$STAGE/DEBUG_BUILD.txt"
+            gh release edit "$TAG" \
+              --prerelease \
+              --target "$GITHUB_SHA" \
+              --title "Aerix Debug Build (latest)" \
+              --notes-file "$STAGE/RELEASE_NOTES.md"
+          else
+            gh release create "$TAG" \
+              --prerelease \
+              --target "$GITHUB_SHA" \
+              --title "Aerix Debug Build (latest)" \
+              --notes-file "$STAGE/RELEASE_NOTES.md" \
+              "$STAGE/$APK_NAME" \
+              "$STAGE/$APK_NAME.sha256" \
+              "$STAGE/DEBUG_BUILD.txt"
           fi
-          git add apk
-          git commit -m "Build: Aerix debug APK $SHORT (run $GITHUB_RUN_ID)"
-          # Another run may have stored its APK meanwhile; integrate and retry instead of failing
-          # the build over a push race.
-          stored=0
-          for attempt in 1 2 3; do
-            if git push origin "HEAD:${GITHUB_REF_NAME}"; then stored=1; break; fi
-            git pull --rebase --autostash origin "${GITHUB_REF_NAME}" || true
-            sleep 10
-          done
-          if [ "$stored" -ne 1 ]; then
-            echo "::warning title=debug-apk-not-stored::could not push apk/$APK_NAME after three attempts"
-            exit 0
-          fi
-          echo "::notice title=debug-apk::apk/$APK_NAME from $SHORT"
+          rm -rf "$STAGE"
+          echo "::notice title=debug-apk::https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/$APK_NAME (from $SHORT)"

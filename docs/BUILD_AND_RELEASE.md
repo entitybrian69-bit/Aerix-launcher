@@ -7,9 +7,10 @@ asks for a release and confirms it.
 
 | | |
 |---|---|
-| File | `apk/Aerix-Launcher-debug.apk` |
-| Checksum | `apk/Aerix-Launcher-debug.apk.sha256` |
-| Build info | `apk/DEBUG_BUILD.txt` (commit, workflow run, build time) |
+| Release tag | `debug-latest` (prerelease on GitHub Releases) |
+| Direct APK | `https://github.com/entitybrian69-bit/Aerix-launcher/releases/download/debug-latest/Aerix-Launcher-debug.apk` |
+| Checksum | `https://github.com/entitybrian69-bit/Aerix-launcher/releases/download/debug-latest/Aerix-Launcher-debug.apk.sha256` |
+| Build info | `https://github.com/entitybrian69-bit/Aerix-launcher/releases/download/debug-latest/DEBUG_BUILD.txt` |
 | CI artifact | Actions run of **Aerix debug (testing)**, artifact `aerix-debug-apk` |
 | Source | this branch (`version.properties` = `1.5.6`) |
 | Variant | `noruntimeDebug` |
@@ -21,20 +22,18 @@ Because the applicationId ends in `.debug`, this APK installs next to the public
 launcher on the same phone. Both can be open at once, and updating the debug
 build never touches the released app or its data.
 
-The `noruntime` flavor does not embed a Java runtime, so the APK stays under the
-100 MB file limit that GitHub applies to files stored in the repository. The
-launcher downloads the runtime it needs on first launch.
+The `noruntime` flavor does not embed a Java runtime, keeping downloads smaller;
+the launcher downloads the runtime it needs on first launch. APKs are never
+committed to Git (`apk/` is ignored).
 
 ### When it is rebuilt
 
 `.github/workflows/aerix-debug.yml` runs on every push to the working branch that
 touches the app sources, Gradle files, submodules or the workflow itself. It also
 has a manual trigger. The job builds the APK, checks that the package name really
-is `net.kdt.pojavlaunch.debug`, uploads it as an artifact, and commits it to
-`apk/` so the newest test build always sits at a fixed path.
-
-Commits made by that job only replace the files in `apk/`; they carry no other
-changes.
+is `net.kdt.pojavlaunch.debug`, uploads it as an Actions artifact, and attaches
+it to the `debug-latest` GitHub Release (marked as a prerelease so `releases/latest`
+remains the public stable release).
 
 ### Building one locally
 

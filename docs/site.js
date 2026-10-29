@@ -41,7 +41,7 @@
 
   function newestRelease(releases) {
     var usable = (releases || []).filter(function (r) {
-      return r && !r.draft && r.tag_name && (r.assets || []).some(function (a) {
+      return r && !r.draft && !r.prerelease && r.tag_name && (r.assets || []).some(function (a) {
         return /\.apk$/i.test(a.name || '');
       });
     });
