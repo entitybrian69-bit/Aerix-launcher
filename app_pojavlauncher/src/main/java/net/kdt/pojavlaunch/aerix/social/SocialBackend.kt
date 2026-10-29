@@ -82,6 +82,14 @@ object SocialBackend {
     var lastError by mutableStateOf<String?>(null)
         private set
 
+    fun clearError() {
+        lastError = null
+    }
+
+    fun reportError(message: String) {
+        lastError = message
+    }
+
     private var accessToken: String? = null
     private var refreshToken: String? = null
     private var userId: String? = null
@@ -117,6 +125,9 @@ object SocialBackend {
         email = null
         mcUsername = null
         friends = emptyList()
+        myProfile = null
+        onboardingDismissedForSession = false
+        unread = 0
         lastError = null
         appContext?.getSharedPreferences(PREFS, Context.MODE_PRIVATE)?.edit()?.clear()?.apply()
     }
@@ -209,9 +220,13 @@ object SocialBackend {
         accessToken = token
         refreshToken = refresh
         expiresAtMs = System.currentTimeMillis() + ((values["expires_in"]?.toLongOrNull() ?: 3600L) * 1000) - 60_000
+        applyJwtClaims(token)
         signedIn = true
+        onboardingDismissedForSession = false
         appContext?.getSharedPreferences(PREFS, Context.MODE_PRIVATE)?.edit()
             ?.putString("refresh_token", refresh)
+            ?.putString("user_id", userId)
+            ?.putString("email", email)
             ?.apply()
         return true
     }
@@ -270,8 +285,25 @@ object SocialBackend {
             ?.apply()
     }
 
+    private fun applyJwtClaims(token: String?) {
+        if (token.isNullOrBlank()) return
+        val parts = token.split('.')
+        if (parts.size < 2) return
+        val payload = runCatching {
+            val raw = parts[1]
+            val padded = raw + "=".repeat((4 - raw.length % 4) % 4)
+            val decoded = android.util.Base64.decode(padded, android.util.Base64.URL_SAFE)
+            JsonParser.parseString(String(decoded, Charsets.UTF_8)) as? JsonObject
+        }.getOrNull() ?: return
+        payload.stringOrNull("sub")?.takeIf { it.isNotBlank() }?.let { if (userId == null) userId = it }
+        payload.stringOrNull("email")?.takeIf { it.isNotBlank() }?.let { if (email == null) email = it }
+    }
+
     private suspend fun ensureToken() {
-        if (accessToken != null && System.currentTimeMillis() < expiresAtMs) return
+        if (accessToken != null && System.currentTimeMillis() < expiresAtMs) {
+            if (userId == null) applyJwtClaims(accessToken)
+            return
+        }
         val token = refreshToken ?: return
         val body = JsonObject().apply { addProperty("refresh_token", token) }
         val json = asObject(
@@ -529,6 +561,26 @@ object SocialBackend {
     val needsOnboarding: Boolean
         get() = myProfile?.onboarded != true
 
+    /** Set when the player taps "Later" on the first-run form; session-only, nothing is written. */
+    var onboardingDismissedForSession by mutableStateOf(false)
+        private set
+
+    /** True when the first-run profile setup form should occupy the social panel right now. */
+    val showOnboarding: Boolean
+        get() = needsOnboarding && !onboardingDismissedForSession
+
+    /** Dismisses the first-run setup form for this session without writing anything. */
+    fun deferOnboardingForSession() {
+        lastError = null
+        onboardingDismissedForSession = true
+    }
+
+    /** Re-opens the first-run setup form when the player taps "Finish setup". */
+    fun resumeOnboarding() {
+        lastError = null
+        onboardingDismissedForSession = false
+    }
+
     suspend fun loadMyProfile(): SocialProfile? {
         val card = attempt {
             ensureToken()
@@ -537,6 +589,7 @@ object SocialBackend {
         }
         if (card != null) {
             myProfile = card
+            if (userId == null) userId = card.id
             mcUsername = card.mcUsername ?: mcUsername
         }
         return card
@@ -647,7 +700,7 @@ object SocialBackend {
     ): Boolean {
         val saved = attempt {
             ensureToken()
-            val me = userId ?: return@attempt null
+            val me = userId ?: myProfile?.id ?: return@attempt null
             val row = JsonObject().apply {
                 addProperty("id", me)
                 addProperty("name", name?.trim()?.takeIf { it.isNotBlank() })
@@ -682,14 +735,16 @@ object SocialBackend {
      */
     suspend fun uploadImage(folder: String, bytes: ByteArray, extension: String = "png"): String? =
         withContext(Dispatchers.IO) {
-            val me = userId
+            lastError = null
+            ensureToken()
+            val me = userId ?: myProfile?.id
             val token = accessToken
             if (me == null || token == null) {
-                lastError = "Sign in first"
+                if (lastError == null) lastError = "Sign in first"
                 return@withContext null
             }
             val path = "$me/${folder}-${System.currentTimeMillis()}.$extension"
-            val mime = when (extension.lowercase()) {
+            val mime = when (extension.lowercase(Locale.US)) {
                 "jpg", "jpeg" -> "image/jpeg"
                 "webp" -> "image/webp"
                 else -> "image/png"
@@ -699,6 +754,7 @@ object SocialBackend {
                     .openConnection() as HttpURLConnection).apply {
                     requestMethod = "POST"
                     doOutput = true
+                    setFixedLengthStreamingMode(bytes.size)
                     connectTimeout = 20000
                     readTimeout = 30000
                     setRequestProperty("apikey", PUBLISHABLE_KEY)
@@ -712,9 +768,12 @@ object SocialBackend {
                     ?.bufferedReader()?.use { it.readText() } ?: ""
                 connection.disconnect()
                 if (code !in 200..299) {
-                    lastError = serverMessage(text) ?: "Upload failed (HTTP $code)"
+                    val detail = serverMessage(text)?.takeIf { it.isNotBlank() }
+                        ?: text.trim().take(140).takeIf { it.isNotBlank() }
+                    lastError = if (detail != null) "$detail (HTTP $code)" else "Upload failed (HTTP $code)"
                     return@withContext null
                 }
+                lastError = null
                 "$PROJECT_URL/storage/v1/object/public/social-media/$path"
             } catch (error: Throwable) {
                 Log.w(TAG, "Upload failed", error)
@@ -974,6 +1033,7 @@ object SocialBackend {
             if (text.isBlank()) JsonParser.parseString("{}") else JsonParser.parseString(text)
         } catch (error: Throwable) {
             Log.w(TAG, "$method $url failed", error)
+            lastError = error.message ?: "Network error"
             null
         }
     }

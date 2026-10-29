@@ -195,10 +195,11 @@ fun SocialsScreen(activity: FragmentActivity, onExit: () -> Unit = {}) {
         else -> SocialDestination.Page(tab)
     }
 
-    // Back leaves the conversation first, then returns to Friends, then leaves the social space.
-    // The social space owns the whole window, so its back never falls through to the launcher.
+    // Back dismisses an active onboarding prompt first, then leaves a chat or profile, then
+    // returns to Friends, then leaves the social space.
     BackHandler(enabled = true) {
         when {
+            signedIn && SocialBackend.showOnboarding -> SocialBackend.deferOnboardingForSession()
             chatWith != null -> chatWith = null
             profileOpen -> profileOpen = false
             tab != SocialTab.FRIENDS -> tab = SocialTab.FRIENDS
@@ -219,14 +220,16 @@ fun SocialsScreen(activity: FragmentActivity, onExit: () -> Unit = {}) {
         SocialSidebar(
             tab = tab,
             signedIn = signedIn,
-            inChat = chatWith != null || profileOpen,
+            inChat = chatWith != null || profileOpen || SocialBackend.showOnboarding,
             onTab = { picked ->
+                SocialBackend.deferOnboardingForSession()
                 chatWith = null
                 profileOpen = false
                 tab = picked
             },
             onExit = onExit,
             onProfile = {
+                SocialBackend.deferOnboardingForSession()
                 chatWith = null
                 profileUser = null
                 profileOpen = true
@@ -249,14 +252,14 @@ fun SocialsScreen(activity: FragmentActivity, onExit: () -> Unit = {}) {
         ) {
             if (!signedIn) {
                 SocialSignIn(activity)
-            } else if (SocialBackend.needsOnboarding) {
-                // First sign-in: the profile form takes the panel until it is filled in.
+            } else if (SocialBackend.showOnboarding) {
+                // First sign-in: the profile form takes the panel until completed or deferred for this session.
                 SocialProfileForm(
                     activity = activity,
                     profile = SocialBackend.myProfile,
                     editing = false,
-                    onClose = { },
-                    onSaved = { }
+                    onClose = { SocialBackend.deferOnboardingForSession() },
+                    onSaved = { SocialBackend.deferOnboardingForSession() }
                 )
             } else {
                 AnimatedContent(
@@ -854,6 +857,19 @@ private fun SocialFriendsPage(
                             )
                         }
                     }
+                    if (SocialBackend.needsOnboarding) {
+                        Spacer(Modifier.height(10.dp))
+                        Text(
+                            "Pick a username and customize your card so friends can find you.",
+                            fontSize = 11.sp,
+                            lineHeight = 15.sp,
+                            color = AerixSurface.textSecondary
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        SocialSmallButton("Finish setup", true) {
+                            SocialBackend.resumeOnboarding()
+                        }
+                    }
                 }
             }
         }
@@ -1063,7 +1079,12 @@ private fun SocialSettingsPage(
             )
             Spacer(Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SocialSmallButton("Resync name and head", true) {
+                if (SocialBackend.needsOnboarding) {
+                    SocialSmallButton("Finish setup", true) {
+                        SocialBackend.resumeOnboarding()
+                    }
+                }
+                SocialSmallButton("Resync name and head", !SocialBackend.needsOnboarding) {
                     scope.launch {
                         SocialBackend.rememberMinecraftName(PojavAccountBridge.current?.username)
                         SocialBackend.loadProfile()

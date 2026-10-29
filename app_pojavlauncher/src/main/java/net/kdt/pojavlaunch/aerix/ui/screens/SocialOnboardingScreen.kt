@@ -58,7 +58,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -109,13 +111,20 @@ fun SocialProfileForm(
 
     val steps = listOf("You", "About", "Look")
 
+    LaunchedEffect(Unit) {
+        SocialBackend.clearError()
+    }
+
     fun finish() {
         if (draft.username.length < 3) {
-            Toast.makeText(activity, "Pick a username first", Toast.LENGTH_SHORT).show()
+            val msg = "Pick a username first"
+            SocialBackend.reportError(msg)
+            Toast.makeText(activity, msg, Toast.LENGTH_SHORT).show()
             step = 0
             return
         }
         busy = true
+        SocialBackend.clearError()
         scope.launch {
             // The username is the only field the database has an opinion about.
             if (!usernameLocked || draft.username.trim() != profile?.username) {
@@ -123,6 +132,7 @@ fun SocialProfileForm(
                 if (problem != null) {
                     busy = false
                     step = 0
+                    SocialBackend.reportError(problem)
                     Toast.makeText(activity, problem, Toast.LENGTH_LONG).show()
                     return@launch
                 }
@@ -158,30 +168,40 @@ fun SocialProfileForm(
         if (step < steps.lastIndex) step++ else finish()
     }
 
+    fun reportPickerError(message: String) {
+        SocialBackend.reportError(message)
+        Toast.makeText(activity, message, Toast.LENGTH_LONG).show()
+    }
+
     fun upload(kind: String, bytes: ByteArray, extension: String, apply: (String) -> Unit) {
         uploading = kind
+        SocialBackend.clearError()
         scope.launch {
             val url = SocialBackend.uploadImage(kind, bytes, extension)
             uploading = null
-            if (url != null) apply(url)
-            else Toast.makeText(
-                activity,
-                SocialBackend.lastError ?: "Upload failed",
-                Toast.LENGTH_LONG
-            ).show()
+            if (url != null) {
+                cacheSocialImage(url, bytes)
+                apply(url)
+            } else {
+                Toast.makeText(
+                    activity,
+                    SocialBackend.lastError ?: "Upload failed",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
         }
     }
 
-    val pickAvatar = rememberPicturePicker(512, false) { bytes, ext ->
+    val pickAvatar = rememberPicturePicker(512, false, onError = ::reportPickerError) { bytes, ext ->
         upload("avatar", bytes, ext) { draft.avatarUrl = it }
     }
-    val pickBanner = rememberPicturePicker(1280, false) { bytes, ext ->
+    val pickBanner = rememberPicturePicker(1280, false, onError = ::reportPickerError) { bytes, ext ->
         upload("banner", bytes, ext) { draft.bannerUrl = it }
     }
-    val pickSkin = rememberPicturePicker(0, true) { bytes, ext ->
+    val pickSkin = rememberPicturePicker(0, true, onError = ::reportPickerError) { bytes, ext ->
         upload("skin", bytes, ext) { draft.skinUrl = it }
     }
-    val pickCape = rememberPicturePicker(0, true) { bytes, ext ->
+    val pickCape = rememberPicturePicker(0, true, onError = ::reportPickerError) { bytes, ext ->
         upload("cape", bytes, ext) { draft.capeUrl = it }
     }
 
@@ -222,6 +242,7 @@ fun SocialProfileForm(
                     modifier = Modifier
                         .width(width.dp)
                         .height(22.dp)
+                        .clip(CircleShape)
                         .background(
                             color = if (active) {
                                 net.kdt.pojavlaunch.aerix.theme.AerixThemeManager.currentAccent()
@@ -230,7 +251,8 @@ fun SocialProfileForm(
                                 AerixSurface.panelTrack
                             },
                             shape = CircleShape
-                        ),
+                        )
+                        .clickable { if (!busy) step = index },
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -272,10 +294,11 @@ fun SocialProfileForm(
                     else -> LookStep(
                         draft = draft,
                         uploading = uploading,
-                        pickAvatar = pickAvatar,
-                        pickBanner = pickBanner,
-                        pickSkin = pickSkin,
-                        pickCape = pickCape
+                        errorMessage = SocialBackend.lastError,
+                        pickAvatar = { if (uploading == null) pickAvatar() },
+                        pickBanner = { if (uploading == null) pickBanner() },
+                        pickSkin = { if (uploading == null) pickSkin() },
+                        pickCape = { if (uploading == null) pickCape() }
                     )
                 }
             }
@@ -297,9 +320,9 @@ fun SocialProfileForm(
                 onClick = { goNext() }
             )
         }
-        SocialBackend.lastError?.takeIf { editing }?.let { message ->
+        SocialBackend.lastError?.let { message ->
             Spacer(Modifier.height(4.dp))
-            Text(message, fontSize = 10.sp, color = AerixSurface.danger)
+            Text(message, fontSize = 11.sp, color = AerixSurface.danger)
         }
     }
 }
@@ -382,18 +405,24 @@ private fun AboutStep(draft: ProfileDraft) {
 private fun LookStep(
     draft: ProfileDraft,
     uploading: String?,
+    errorMessage: String?,
     pickAvatar: () -> Unit,
     pickBanner: () -> Unit,
     pickSkin: () -> Unit,
     pickCape: () -> Unit
 ) {
-    Row(horizontalArrangement = Arrangement.spacedBy(AerixSpacing.md)) {
+    val busy = uploading != null
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(AerixSpacing.md)
+    ) {
         SocialPickBox(
             label = if (uploading == "avatar") "Uploading…" else "Logo",
             url = draft.avatarUrl,
             fallbackIcon = R.drawable.aerix_ic_person_outlined,
             shape = CircleShape,
-            modifier = Modifier.size(76.dp),
+            width = 76.dp,
+            height = 76.dp,
             onClick = pickAvatar
         )
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -403,7 +432,12 @@ private fun LookStep(
                 fontSize = 10.sp,
                 color = AerixSurface.textMuted
             )
-            SocialButton("Choose logo", filled = false, onClick = pickAvatar)
+            SocialButton(
+                label = if (uploading == "avatar") "Uploading…" else "Choose logo",
+                filled = false,
+                enabled = !busy,
+                onClick = pickAvatar
+            )
         }
     }
     Spacer(Modifier.height(AerixSpacing.xs))
@@ -412,15 +446,24 @@ private fun LookStep(
         url = draft.bannerUrl,
         fallbackIcon = R.drawable.aerix_ic_format_paint_outlined,
         shape = RoundedCornerShape(AerixRadii.cardLarge),
-        modifier = Modifier.fillMaxWidth().height(78.dp),
+        width = null,
+        height = 84.dp,
         onClick = pickBanner
     )
-    Row(horizontalArrangement = Arrangement.spacedBy(AerixSpacing.md)) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(AerixSpacing.md)
+    ) {
         Column(modifier = Modifier.weight(1f)) {
             Text("Background image", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = AerixSurface.textPrimary)
             Text("The wide picture behind your logo", fontSize = 10.sp, color = AerixSurface.textMuted)
             Spacer(Modifier.height(6.dp))
-            SocialButton("Choose background", filled = false, onClick = pickBanner)
+            SocialButton(
+                label = if (uploading == "banner") "Uploading…" else "Choose background",
+                filled = false,
+                enabled = !busy,
+                onClick = pickBanner
+            )
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             SocialPickBox(
@@ -428,11 +471,19 @@ private fun LookStep(
                 url = draft.skinUrl,
                 fallbackIcon = R.drawable.aerix_ic_person_outlined,
                 shape = RoundedCornerShape(AerixRadii.control),
-                modifier = Modifier.size(54.dp),
+                width = 64.dp,
+                height = 64.dp,
+                contentScale = ContentScale.Fit,
                 onClick = pickSkin
             )
             Spacer(Modifier.height(4.dp))
-            Text("Skin", fontSize = 9.sp, color = AerixSurface.textMuted)
+            Text(
+                if (uploading == "skin") "Uploading…" else "Choose skin",
+                fontSize = 10.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = AerixSurface.accent,
+                modifier = Modifier.clickable(enabled = !busy, onClick = pickSkin).padding(horizontal = 4.dp, vertical = 2.dp)
+            )
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             SocialPickBox(
@@ -440,11 +491,30 @@ private fun LookStep(
                 url = draft.capeUrl,
                 fallbackIcon = R.drawable.aerix_ic_format_paint_outlined,
                 shape = RoundedCornerShape(AerixRadii.control),
-                modifier = Modifier.size(54.dp),
+                width = 64.dp,
+                height = 64.dp,
+                contentScale = ContentScale.Fit,
                 onClick = pickCape
             )
             Spacer(Modifier.height(4.dp))
-            Text("Cape", fontSize = 9.sp, color = AerixSurface.textMuted)
+            Text(
+                if (uploading == "cape") "Uploading…" else "Choose cape",
+                fontSize = 10.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = AerixSurface.accent,
+                modifier = Modifier.clickable(enabled = !busy, onClick = pickCape).padding(horizontal = 4.dp, vertical = 2.dp)
+            )
+        }
+    }
+    if (!errorMessage.isNullOrBlank()) {
+        Spacer(Modifier.height(AerixSpacing.xs))
+        SocialPanel(Modifier.fillMaxWidth()) {
+            Text(
+                text = errorMessage,
+                fontSize = 11.sp,
+                color = AerixSurface.danger,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+            )
         }
     }
     Spacer(Modifier.height(AerixSpacing.sm))

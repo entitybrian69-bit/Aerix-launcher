@@ -162,7 +162,7 @@ fun SocialProfilePage(
             ProfileView.EDIT -> SocialProfileForm(
                 activity = activity,
                 profile = profile,
-                editing = true,
+                editing = profile?.onboarded == true,
                 onClose = { view = ProfileView.CARD },
                 onSaved = {
                     view = ProfileView.CARD
@@ -245,7 +245,14 @@ private fun ProfileCard(
             title = profile?.displayName ?: if (loading) "Profile" else "Profile",
             onBack = onBack,
             trailing = {
-                if (isMe) SocialButton("Edit profile", filled = false, onClick = onEdit)
+                if (isMe) {
+                    val incomplete = profile?.onboarded != true
+                    SocialButton(
+                        label = if (incomplete) "Finish setup" else "Edit profile",
+                        filled = incomplete,
+                        onClick = onEdit
+                    )
+                }
             }
         )
         Spacer(Modifier.height(AerixSpacing.sm))

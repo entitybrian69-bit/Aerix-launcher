@@ -56,6 +56,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -68,6 +69,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -89,6 +91,14 @@ import java.net.URL
 /** Pictures downloaded once per session: avatars and banners are asked for on every screen. */
 private val remoteImageCache = HashMap<String, ImageBitmap?>()
 
+/** Stores a freshly uploaded picture in the session cache so it renders immediately without re-downloading. */
+fun cacheSocialImage(url: String, bytes: ByteArray) {
+    val decoded = runCatching { BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap() }.getOrNull()
+    if (decoded != null) {
+        remoteImageCache[url] = decoded
+    }
+}
+
 @Composable
 fun SocialRemoteImage(
     url: String?,
@@ -99,8 +109,13 @@ fun SocialRemoteImage(
 ) {
     var bitmap by remember(url) { mutableStateOf(remoteImageCache[url]) }
     LaunchedEffect(url) {
-        if (url.isNullOrBlank() || remoteImageCache.containsKey(url)) {
-            bitmap = remoteImageCache[url]
+        if (url.isNullOrBlank()) {
+            bitmap = null
+            return@LaunchedEffect
+        }
+        val cached = remoteImageCache[url]
+        if (cached != null) {
+            bitmap = cached
             return@LaunchedEffect
         }
         val loaded = withContext(Dispatchers.IO) {
@@ -115,7 +130,9 @@ fun SocialRemoteImage(
                 BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
             }.getOrNull()
         }
-        remoteImageCache[url] = loaded
+        if (loaded != null) {
+            remoteImageCache[url] = loaded
+        }
         bitmap = loaded
     }
     Box(
@@ -138,7 +155,7 @@ fun SocialRemoteImage(
                 painter = painterResource(fallbackIcon),
                 contentDescription = null,
                 tint = AerixSurface.textMuted,
-                modifier = Modifier.fillMaxSize(0.55f)
+                modifier = Modifier.size(24.dp)
             )
         }
     }
@@ -388,33 +405,59 @@ fun SocialPersonRow(
     }
 }
 
-/** A picture the player picked, already decoded and shown in a box of a fixed shape. */
+/** A picture the player picked, already decoded and shown in a clickable box of a real fixed size. */
 @Composable
 fun SocialPickBox(
     label: String,
     url: String?,
     fallbackIcon: Int,
     shape: Shape,
+    width: Dp? = null,
+    height: Dp = 76.dp,
+    contentScale: ContentScale = ContentScale.Crop,
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = modifier) {
-        Box(contentAlignment = Alignment.BottomCenter) {
-            SocialRemoteImage(
-                url = url,
-                fallbackIcon = fallbackIcon,
-                modifier = Modifier.fillMaxSize().clickable(onClick = onClick),
-                shape = shape
-            )
-            Box(
-                modifier = Modifier
-                    .padding(bottom = 4.dp)
-                    .clip(CircleShape)
-                    .background(AerixSurface.canvas.copy(alpha = 0.62f))
-                    .padding(horizontal = 7.dp, vertical = 2.dp)
-            ) {
-                Text(label, fontSize = 9.sp, color = AerixSurface.textPrimary, fontWeight = FontWeight.Bold)
-            }
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.96f else 1f,
+        animationSpec = spring(dampingRatio = 0.7f, stiffness = 900f),
+        label = "pickBoxPress"
+    )
+    val boxSize = if (width != null) {
+        Modifier.size(width = width, height = height)
+    } else {
+        Modifier.fillMaxWidth().height(height)
+    }
+    Box(
+        modifier = modifier
+            .then(boxSize)
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .clip(shape)
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                role = Role.Button,
+                onClick = onClick
+            ),
+        contentAlignment = Alignment.BottomCenter
+    ) {
+        SocialRemoteImage(
+            url = url,
+            fallbackIcon = fallbackIcon,
+            modifier = Modifier.fillMaxSize(),
+            shape = shape,
+            contentScale = contentScale
+        )
+        Box(
+            modifier = Modifier
+                .padding(bottom = 4.dp)
+                .clip(CircleShape)
+                .background(AerixSurface.canvas.copy(alpha = 0.72f))
+                .padding(horizontal = 7.dp, vertical = 2.dp)
+        ) {
+            Text(label, fontSize = 9.sp, color = AerixSurface.textPrimary, fontWeight = FontWeight.Bold)
         }
     }
 }
@@ -428,20 +471,47 @@ fun SocialPickBox(
 fun rememberPicturePicker(
     maxDimension: Int,
     keepPixels: Boolean,
+    onError: (String) -> Unit = {},
     onPicked: (ByteArray, String) -> Unit
 ): () -> Unit {
     val context = LocalContext.current
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        if (uri == null) return@rememberLauncherForActivityResult
-        // The decode happens on the IO dispatcher inside the helper, never on the UI thread.
-        Thread {
-            val result = encodePicture(context, uri, maxDimension, keepPixels)
-            if (result != null) {
-                android.os.Handler(context.mainLooper).post { onPicked(result.first, result.second) }
-            }
-        }.start()
+    val currentOnPicked by rememberUpdatedState(onPicked)
+    val currentOnError by rememberUpdatedState(onError)
+    val mainHandler = remember(context) { android.os.Handler(context.mainLooper) }
+    val handleUri: (Uri?) -> Unit = { uri ->
+        if (uri != null) {
+            Thread {
+                runCatching { encodePicture(context, uri, maxDimension, keepPixels) }
+                    .onSuccess { result ->
+                        mainHandler.post {
+                            if (result != null) {
+                                currentOnPicked(result.first, result.second)
+                            } else {
+                                currentOnError("Could not decode the selected image.")
+                            }
+                        }
+                    }
+                    .onFailure { err ->
+                        mainHandler.post {
+                            currentOnError(err.message ?: "Could not read the selected image.")
+                        }
+                    }
+            }.start()
+        }
     }
-    return { launcher.launch("image/*") }
+    val contentLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent(), handleUri)
+    val documentLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument(), handleUri)
+    return {
+        try {
+            contentLauncher.launch("image/*")
+        } catch (_: Throwable) {
+            try {
+                documentLauncher.launch(arrayOf("image/*"))
+            } catch (err: Throwable) {
+                currentOnError(err.message ?: "No image picker app found on this device.")
+            }
+        }
+    }
 }
 
 private fun encodePicture(
@@ -449,30 +519,54 @@ private fun encodePicture(
     uri: Uri,
     maxDimension: Int,
     keepPixels: Boolean
-): Pair<ByteArray, String>? = runCatching {
-    val original = context.contentResolver.openInputStream(uri)?.use {
-        BitmapFactory.decodeStream(it)
-    } ?: return null
-    val scaled = if (keepPixels) {
-        original
-    } else {
-        val longest = maxOf(original.width, original.height)
-        if (longest <= maxDimension) original else {
-            val ratio = maxDimension.toFloat() / longest
-            Bitmap.createScaledBitmap(
-                original,
-                (original.width * ratio).toInt().coerceAtLeast(1),
-                (original.height * ratio).toInt().coerceAtLeast(1),
-                true
-            )
+): Pair<ByteArray, String>? {
+    val rawBytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+        ?.takeIf { it.isNotEmpty() } ?: return null
+
+    if (keepPixels) {
+        val check = BitmapFactory.decodeByteArray(rawBytes, 0, rawBytes.size) ?: return null
+        val isPng = rawBytes.size >= 8 &&
+            rawBytes[0] == 0x89.toByte() &&
+            rawBytes[1] == 0x50.toByte() &&
+            rawBytes[2] == 0x4E.toByte() &&
+            rawBytes[3] == 0x47.toByte()
+        if (isPng) {
+            check.recycle()
+            return rawBytes to "png"
+        }
+        val stream = ByteArrayOutputStream()
+        check.compress(Bitmap.CompressFormat.PNG, 100, stream)
+        check.recycle()
+        return stream.toByteArray() to "png"
+    }
+
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeByteArray(rawBytes, 0, rawBytes.size, bounds)
+    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+
+    var sample = 1
+    if (maxDimension > 0) {
+        while (maxOf(bounds.outWidth / (sample * 2), bounds.outHeight / (sample * 2)) >= maxDimension) {
+            sample *= 2
         }
     }
-    val stream = ByteArrayOutputStream()
-    if (keepPixels) {
-        scaled.compress(Bitmap.CompressFormat.PNG, 100, stream)
-        stream.toByteArray() to "png"
+    val decodeOpts = BitmapFactory.Options().apply { inSampleSize = sample }
+    val original = BitmapFactory.decodeByteArray(rawBytes, 0, rawBytes.size, decodeOpts) ?: return null
+    val longest = maxOf(original.width, original.height)
+    val scaled = if (maxDimension <= 0 || longest <= maxDimension) {
+        original
     } else {
-        scaled.compress(Bitmap.CompressFormat.JPEG, 88, stream)
-        stream.toByteArray() to "jpg"
+        val ratio = maxDimension.toFloat() / longest
+        Bitmap.createScaledBitmap(
+            original,
+            (original.width * ratio).toInt().coerceAtLeast(1),
+            (original.height * ratio).toInt().coerceAtLeast(1),
+            true
+        )
     }
-}.getOrNull()
+    val stream = ByteArrayOutputStream()
+    scaled.compress(Bitmap.CompressFormat.JPEG, 88, stream)
+    if (scaled !== original) scaled.recycle()
+    original.recycle()
+    return stream.toByteArray() to "jpg"
+}
