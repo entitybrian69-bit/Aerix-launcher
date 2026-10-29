@@ -129,7 +129,9 @@ works with any email. Part 2 only adds the Google button on top.
    uninstall — uninstalling deletes your instances and accounts.
 3. **Debug builds install next to your normal Aerix** (package `net.kdt.pojavlaunch.debug`), so you can
    keep playing on the normal one while testing.
-4. Open the debug app → **Socials** on Home or the rail.
+4. Open the debug app → **Socials**, the first tile on the Home dashboard. It takes the whole
+   window and brings its own sidebar (Friends, Messages, Activity, Settings); the arrow at the top
+   of that sidebar comes back to the launcher.
 5. Tell me, in plain words, what happened. If something is broken, also send the launcher log:
    **Settings → Logs → share**, or the crash dialog's copy button.
 
@@ -141,6 +143,9 @@ What each stage should look like when it works:
 | 2 | Add a second account (a friend's phone, or a second Gmail as a test user) → send a request → accept it → both see each other online |
 | 3 | Send a message from one account, read it on the other within a couple of seconds |
 | 4 | Open the in-game menu during Minecraft → Socials panel → chat with a friend without leaving the game |
+
+Socials is no longer a rail entry: it opens from the Home dashboard and replaces the launcher's
+rail with its own while it is up.
 
 ---
 
