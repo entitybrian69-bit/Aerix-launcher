@@ -188,9 +188,9 @@ private fun SocialsSignIn(activity: FragmentActivity) {
             shadowElevation = 8.dp
         ) {
             Row(
-                modifier = Modifier.padding(horizontal = 26.dp, vertical = 20.dp),
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(26.dp)
+                horizontalArrangement = Arrangement.spacedBy(24.dp)
             ) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -215,15 +215,35 @@ private fun SocialsSignIn(activity: FragmentActivity) {
                     )
                 }
 
-                Column(modifier = Modifier.width(300.dp)) {
+                Column(modifier = Modifier.width(316.dp)) {
                     SocialField(address, { address = it }, "Email")
-                    Spacer(Modifier.height(8.dp))
-                    SocialField(password, { password = it }, "Password", secret = true)
-                    Spacer(Modifier.height(12.dp))
-                    SocialWideButton(if (working) "Please wait…" else "Sign in", SocialCrimson, Color.White) {
-                        if (!working) submit(false)
-                    }
                     Spacer(Modifier.height(7.dp))
+                    SocialField(password, { password = it }, "Password", secret = true)
+                    Spacer(Modifier.height(10.dp))
+                    // Both ways in, side by side, so nothing sits below the fold in landscape.
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Box(Modifier.weight(1f)) {
+                            SocialWideButton(if (working) "Please wait…" else "Sign in", SocialCrimson, Color.White) {
+                                if (!working) submit(false)
+                            }
+                        }
+                        Box(Modifier.weight(1f)) {
+                            SocialWideButton("Continue with Google", Color(0xFFF2EFEC), SocialInk) {
+                                val opened = SocialBackend.beginGoogleSignIn(activity)
+                                if (!opened) {
+                                    Toast.makeText(
+                                        activity,
+                                        "Google sign-in needs the Google provider switched on in Supabase",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                }
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(6.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
@@ -233,25 +253,29 @@ private fun SocialsSignIn(activity: FragmentActivity) {
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             color = SocialCrimson,
-                            modifier = Modifier.padding(4.dp).clickable { if (!working) submit(true) }
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                .clickable { if (!working) submit(true) }
                         )
                         Text(
                             "Forgot password?",
                             fontSize = 12.sp,
                             color = SocialMuted,
-                            modifier = Modifier.padding(4.dp)
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                .clickable {
+                                    if (address.isBlank()) {
+                                        Toast.makeText(activity, "Type your email first", Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        scope.launch {
+                                            val sent = SocialBackend.sendPasswordReset(address)
+                                            Toast.makeText(
+                                                activity,
+                                                if (sent) "Reset link sent to ${address.trim()}" else "Could not send the link",
+                                                Toast.LENGTH_LONG
+                                            ).show()
+                                        }
+                                    }
+                                }
                         )
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    SocialWideButton("Continue with Google", Color(0xFFF2EFEC), SocialInk) {
-                        val opened = SocialBackend.beginGoogleSignIn(activity)
-                        if (!opened) {
-                            Toast.makeText(
-                                activity,
-                                "Google sign-in needs the Google provider switched on in Supabase",
-                                Toast.LENGTH_LONG
-                            ).show()
-                        }
                     }
                     SocialBackend.lastError?.let { message ->
                         Spacer(Modifier.height(8.dp))

@@ -175,7 +175,8 @@ object SocialBackend {
     @JvmStatic
     fun beginGoogleSignIn(context: Context): Boolean {
         val url = "$PROJECT_URL/auth/v1/authorize?provider=google" +
-            "&redirect_to=" + java.net.URLEncoder.encode(OAUTH_REDIRECT, "UTF-8")
+            "&redirect_to=" + java.net.URLEncoder.encode(OAUTH_REDIRECT, "UTF-8") +
+            "&apikey=" + java.net.URLEncoder.encode(PUBLISHABLE_KEY, "UTF-8")
         return try {
             val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
                 .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -231,6 +232,20 @@ object SocialBackend {
             )
         }
         lastError = if (ok == null) "Could not send the mail. Try again in a minute." else null
+        return ok != null
+    }
+
+    /** Mails a reset link, so a forgotten password is not a dead end. */
+    suspend fun sendPasswordReset(address: String): Boolean {
+        val ok = attempt {
+            call(
+                "POST",
+                "$PROJECT_URL/auth/v1/recover",
+                JsonObject().apply { addProperty("email", address.trim()) }.toString(),
+                authenticated = false
+            )
+        }
+        lastError = if (ok == null) "Could not send the reset mail. Try again in a minute." else null
         return ok != null
     }
 

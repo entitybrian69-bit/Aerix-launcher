@@ -48,8 +48,10 @@ that one bypasses the security rules.
 
 ## Part 2 — Google sign-in · ~12 minutes
 
-Two client IDs are needed. The **Android** one tells Google which app is asking; the **Web** one is
-what Supabase uses to finish the sign-in.
+The launcher has no Google code in it and never asks me for a client ID. When you tap **Continue with
+Google**, the phone opens the browser on your own Supabase project, Supabase does the talking to
+Google, and the phone comes back into the launcher on `aerix-social://auth`. So everything below is
+configured **in your Google account and your Supabase dashboard only**.
 
 1. Open **https://console.cloud.google.com** and sign in with the Google account you want to own the
    project.
@@ -69,49 +71,53 @@ what Supabase uses to finish the sign-in.
    (Keeping the app in *Testing* means no Google review is needed. Up to 100 test accounts can sign
    in. Publish later when you want everyone to be able to.)
 
-### 2b. Android client
+### 2b. Web client — the only one you need
 
 8. **APIs & Services → Credentials → Create credentials → OAuth client ID**.
-9. **Application type: Android**.
-10. Fill in:
-    - **Name:** `Aerix Android debug`
-    - **Package name:** `net.kdt.pojavlaunch.debug`
-    - **SHA-1 certificate fingerprint:** `17:D6:F8:A1:A3:8E:B2:EF:B7:B2:C7:A7:75:99:9C:F4:0D:46:84:10`
-11. **Create**. Nothing to copy here — this one just has to exist.
+9. **Application type: Web application**.
+10. **Name:** `Aerix Supabase`
+11. Under **Authorised redirect URIs** tap **Add URI** and enter exactly this, with no slash on the
+    end:
 
-### 2c. Web client (the one Supabase needs)
+    ```
+    https://lktupxfszfefsoyksfkg.supabase.co/auth/v1/callback
+    ```
 
-12. **Create credentials → OAuth client ID** again.
-13. **Application type: Web application**.
-14. **Name:** `Aerix Supabase`
-15. Under **Authorised redirect URIs** tap **Add URI** and enter exactly:
-    `https://YOUR-PROJECT-REF.supabase.co/auth/v1/callback`
-    Replace `YOUR-PROJECT-REF` with the subdomain from the Project URL in Part 1b.
-    Example: project URL `https://abcdefgh.supabase.co` → redirect `https://abcdefgh.supabase.co/auth/v1/callback`
-16. **Create**, then copy the **Client ID** and **Client secret** from the dialog.
+12. **Create**, then copy the **Client ID** and the **Client secret**. Both go straight into Supabase
+    in the next step — they are never sent to me, and there is no Android client ID to create.
 
-### 2d. Hand the Web client to Supabase
+### 2c. Hand it to Supabase
 
-17. Back in **Supabase → Authentication → Providers → Google**.
-18. Turn **Enable Sign In with Google** on.
-19. Paste the **Client ID** and **Client secret** from step 16 → **Save**.
-20. Still in Authentication → **URL Configuration**: set **Site URL** to
-    `https://YOUR-PROJECT-REF.supabase.co` and add the same address under **Redirect URLs** → **Save**.
+13. **Supabase → Authentication → Sign In / Providers → Google**.
+14. Turn **Enable Sign In with Google** on.
+15. Paste the **Client ID** and **Client secret** from step 12 → **Save**.
+16. Still in Authentication → **URL Configuration**:
+    - **Site URL:** `https://lktupxfszfefsoyksfkg.supabase.co`
+    - **Redirect URLs → Add URL:** `aerix-social://auth`
+    - **Save**.
+
+That last line is what brings the phone back into the launcher. Without it Google finishes the
+sign-in in the browser and the launcher never hears about it.
+
+### 2d. If the browser says "provider is not enabled"
+
+That message means step 14 or 15 is not saved yet. Nothing to reinstall — save it, then tap the
+Google button again. If it says "redirect_uri_mismatch", the address in step 11 has a typo (a
+trailing `/` is the usual one).
 
 ---
 
-## Part 3 — Send me three things
+## Part 3 — What I already have
 
-Paste these into the chat (in this order, one message is fine):
+Both values are already in the build, so there is nothing to send:
 
-1. **Supabase Project URL** — `https://....supabase.co`
-2. **Supabase anon public key** — `eyJ...`
-3. **Google Web Client ID** — `....apps.googleusercontent.com`
+- **Project URL** — `https://lktupxfszfefsoyksfkg.supabase.co`
+- **Publishable key** — `sb_publishable_...` (it is public; row-level security is the real boundary)
 
-Do **not** send: the database password, the Client secret, or anything named `service_role`.
-They stay with you.
+Never send the database password, the Google **Client secret**, or anything named `service_role`.
 
-Within a few hours of that message you get the first APK with real sign-in.
+**Email sign-in works right now** — Parts 1 and 3 are done, so the card's Sign in / Create account
+works with any email. Part 2 only adds the Google button on top.
 
 ---
 
@@ -131,7 +137,7 @@ What each stage should look like when it works:
 
 | Stage | You should see |
 |---|---|
-| 1 | Tap *Continue with Google* → Google account picker → back in Socials, your name and head in Settings → Account |
+| 1 | The sign-in card fits the screen with **Sign in** and **Continue with Google** both visible → tap Google → account picker → back in Socials, your name and head under Settings → Account |
 | 2 | Add a second account (a friend's phone, or a second Gmail as a test user) → send a request → accept it → both see each other online |
 | 3 | Send a message from one account, read it on the other within a couple of seconds |
 | 4 | Open the in-game menu during Minecraft → Socials panel → chat with a friend without leaving the game |
@@ -140,13 +146,10 @@ What each stage should look like when it works:
 
 ## Part 5 — When we release 1.5.7
 
-The release build is signed with a different certificate than debug, so Google needs its fingerprint
-too:
-
-1. Add a **second Android OAuth client**: package `net.kdt.pojavlaunch`, with the release SHA-1.
-2. The release SHA-1 comes from the CI signing job or from **Play Console → Test and release →
-   App integrity → App signing key certificate**. Send it to me and I will hand you the exact value to
-   paste.
+Nothing changes for Google. The browser flow in Part 2 has no package name and no certificate
+fingerprint in it, so the release build signs in exactly like the debug one — same project, same
+client, same redirect. The only thing to do at release time is the normal signing ritual you already
+have.
 
 ---
 
@@ -154,10 +157,11 @@ too:
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| *Continue with Google* shows "developer error" | package name or SHA-1 does not match the APK | re-check Part 2b; the debug SHA-1 must be exactly the one above |
+| *Continue with Google* shows "provider is not enabled" | the Google provider is not saved in Supabase | Part 2c steps 14–15 |
+| *redirect_uri_mismatch* on Google's page | the callback address has a typo | Part 2b step 11 — `https://lktupxfszfefsoyksfkg.supabase.co/auth/v1/callback`, no trailing slash |
 | Google says *Access blocked: this app has not completed verification* | your Gmail is not in **Test users** | add it in Part 2a step 7 |
-| Comes back to the app but still signed out | redirect URI mismatch | Part 2c step 15 must match your project URL exactly, including `https://` and no trailing slash |
-| "Social backend not connected yet" inside the app | I have not added the keys to the build yet | that is expected until Part 3 is done |
+| Google page finishes but the app stays signed out | `aerix-social://auth` is missing from the redirect list | Part 2c step 16 |
+| Buttons cut off at the bottom of the card | old build | install the current APK — the card is a single row now and nothing scrolls |
 | SQL editor says *relation already exists* | you ran the schema twice | harmless, the file is idempotent — it is done |
 
 ---
