@@ -32,10 +32,7 @@ NAV = [
     ("faq.html", "FAQ"),
 ]
 
-DOWNLOAD_URL = f"https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest/download/Aerix-Launcher-{VERSION}-arm64-v8a.apk"
-DOWNLOAD_ARMV7_URL = f"https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest/download/Aerix-Launcher-{VERSION}-armeabi-v7a.apk"
-DOWNLOAD_UNIVERSAL_URL = "https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest/download/Aerix-Launcher.apk"
-DEBUG_DOWNLOAD_URL = "https://github.com/entitybrian69-bit/Aerix-launcher/releases/download/debug-latest/Aerix-Launcher-debug.apk"
+DOWNLOAD_URL = "https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest/download/Aerix-Launcher.apk"
 REPO_URL = "https://github.com/entitybrian69-bit/Aerix-launcher"
 DISCORD_URL = "https://discord.gg/RS7q9KaCm6"
 SITE_URL = "https://entitybrian69-bit.github.io/Aerix-launcher/"
@@ -537,13 +534,13 @@ def build_index():
             <span class="size">72.0 MB</span>
             <small>64-bit phones — nearly all of them</small>
           </a>
-          <a class="dl-card" href="{DOWNLOAD_ARMV7_URL}" download data-dl="armv7">
+          <a class="dl-card" href="https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest" target="_blank" rel="noopener" data-dl="armv7">
             <strong>armeabi-v7a</strong>
             <small class="asset">Aerix-Launcher-{VERSION}-armeabi-v7a.apk</small>
             <span class="size">72.2 MB</span>
             <small>Older 32-bit phones</small>
           </a>
-          <a class="dl-card" href="{DOWNLOAD_UNIVERSAL_URL}" download data-dl="universal">
+          <a class="dl-card" href="{DOWNLOAD_URL}" download data-dl="universal">
             <strong>Universal</strong>
             <small class="asset">Aerix-Launcher-{VERSION}.apk</small>
             <span class="size">127.2 MB</span>
@@ -556,14 +553,6 @@ def build_index():
           <span><a href="https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest/download/SHA256SUMS" target="_blank" rel="noopener">SHA-256 checksums</a></span>
           <span>Downloaded <b data-downloads>—</b> times from GitHub</span>
           <span>Signed with the project key · updates in place</span>
-        </div>
-      </div>
-
-      <div class="callout warn reveal mt-32" id="beta">
-        <span class="dot" aria-hidden="true">!</span>
-        <div>
-          <p class="mt-0"><strong>Beta / testing</strong> — <a href="{DEBUG_DOWNLOAD_URL}" download>Download testing APK (<code>Aerix-Launcher-debug.apk</code>)</a></p>
-          <p class="small muted">Warning: this testing build installs alongside the real app as <code>net.kdt.pojavlaunch.debug</code>.</p>
         </div>
       </div>
     </div>
@@ -982,13 +971,13 @@ def build_install():
                 <span class="size">72.0 MB</span>
                 <small>64-bit phones — nearly all of them</small>
               </a>
-              <a class="dl-card" href="{DOWNLOAD_ARMV7_URL}" download data-dl="armv7">
+              <a class="dl-card" href="{DOWNLOAD_URL}" download data-dl="armv7">
                 <strong>armeabi-v7a</strong>
                 <small class="asset">Aerix-Launcher-{VERSION}-armeabi-v7a.apk</small>
                 <span class="size">72.2 MB</span>
                 <small>Older 32-bit phones</small>
               </a>
-              <a class="dl-card" href="{DOWNLOAD_UNIVERSAL_URL}" download data-dl="universal">
+              <a class="dl-card" href="{DOWNLOAD_URL}" download data-dl="universal">
                 <strong>Universal</strong>
                 <small class="asset">Aerix-Launcher-{VERSION}.apk</small>
                 <span class="size">127.2 MB</span>
@@ -1008,14 +997,6 @@ def build_install():
         <p><strong>Updating:</strong> install the new APK over the old one. Do not uninstall first —
         that deletes your instances, worlds, accounts and wallpapers. The in-app updater does this
         for you and picks the build that matches your device.</p>
-      </div>
-
-      <div class="callout warn mt-32" id="beta">
-        <span class="dot" aria-hidden="true">!</span>
-        <div>
-          <p class="mt-0"><strong>Beta / testing</strong> — <a href="{DEBUG_DOWNLOAD_URL}" download>Download testing APK (<code>Aerix-Launcher-debug.apk</code>)</a></p>
-          <p class="small muted">Warning: this testing build installs alongside the real app as <code>net.kdt.pojavlaunch.debug</code>.</p>
-        </div>
       </div>
     </div>
   </section>

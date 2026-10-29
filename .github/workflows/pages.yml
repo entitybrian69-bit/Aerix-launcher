@@ -14,7 +14,13 @@ name: Website
 on:
   push:
     branches: [ "v3_openjdk", "arena/**" ]
-    paths: [ "docs/**", "tools/build_site.py", ".github/workflows/pages.yml" ]
+    paths:
+      - "docs/*.html"
+      - "docs/site.css"
+      - "docs/site.js"
+      - "docs/assets/**"
+      - "tools/build_site.py"
+      - ".github/workflows/pages.yml"
   workflow_dispatch:
 
 permissions:
@@ -35,7 +41,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Verify generated site and primary download link
+      - name: Verify generated site has only public release downloads
         run: |
           set -euo pipefail
           python3 tools/build_site.py
@@ -44,6 +50,11 @@ jobs:
           import re
           from pathlib import Path
 
+          for page_path in sorted(Path("docs").glob("*.html")):
+              html = page_path.read_text(encoding="utf-8")
+              assert "debug-latest" not in html and "Aerix-Launcher-debug" not in html, (
+                  f"{page_path}: public website must never link to a debug build"
+              )
           for page in ("docs/index.html", "docs/install.html"):
               html = Path(page).read_text(encoding="utf-8")
               primaries = re.findall(r'<a[^>]*data-primary-download[^>]*>', html)
@@ -51,8 +62,7 @@ jobs:
               for tag in primaries:
                   assert "/releases/latest/download/" in tag, f"{page}: primary button does not point at /releases/latest/download/: {tag}"
                   assert "debug" not in tag.lower(), f"{page}: primary button must never point at debug: {tag}"
-              assert 'id="beta"' in html and "net.kdt.pojavlaunch.debug" in html, f"{page}: missing labelled Beta / testing section"
-          print("Site verification passed: primary buttons target /releases/latest/download/ and debug-latest is isolated in #beta.")
+          print("Site verification passed: zero debug links on website, primary buttons target /releases/latest/download/.")
           PY
 
       - name: Is Pages set up for this workflow?

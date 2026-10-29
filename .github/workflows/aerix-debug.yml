@@ -171,6 +171,9 @@ jobs:
             echo "- **SHA-256:** \`$SHA256\`"
           } > "$STAGE/RELEASE_NOTES.md"
 
+          # Anchor the tag ref to the root 2020 keystore commit so GitHub's /releases list
+          # always sorts debug-latest below every public v* release and never touches the website.
+          ANCHOR_SHA="cadb0ab12ff45b582927361b703df878b37e0221"
           if gh release view "$TAG" > /dev/null 2>&1; then
             # Prune previous commit-stamped APKs so only the latest pair remains on debug-latest.
             for old_asset in $(gh release view "$TAG" --json assets --jq '.assets[].name' | grep -E '^Aerix-Launcher-debug-[0-9a-f]+\.apk$' || true); do
@@ -183,15 +186,16 @@ jobs:
               "$STAGE/$STAMPED_NAME" \
               "$STAGE/$APK_NAME.sha256" \
               "$STAGE/DEBUG_BUILD.txt"
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/$TAG" -f sha="$ANCHOR_SHA" -F force=true > /dev/null || true
             gh release edit "$TAG" \
               --prerelease \
-              --target "$GITHUB_SHA" \
+              --target "$ANCHOR_SHA" \
               --title "Aerix Debug Build (latest)" \
               --notes-file "$STAGE/RELEASE_NOTES.md"
           else
             gh release create "$TAG" \
               --prerelease \
-              --target "$GITHUB_SHA" \
+              --target "$ANCHOR_SHA" \
               --title "Aerix Debug Build (latest)" \
               --notes-file "$STAGE/RELEASE_NOTES.md" \
               "$STAGE/$APK_NAME" \
