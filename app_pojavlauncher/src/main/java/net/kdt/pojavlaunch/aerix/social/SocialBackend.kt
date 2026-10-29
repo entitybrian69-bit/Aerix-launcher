@@ -219,7 +219,7 @@ object SocialBackend {
             )
             val rows = json?.takeIf { it.isJsonArray }?.asJsonArray
             if (rows != null && rows.size() > 0) {
-                mcUsername = rows[0].asJsonObject.stringOrNull("mc_username")
+                mcUsername = (rows[0] as? JsonObject)?.stringOrNull("mc_username")
                     ?.takeIf { it.isNotBlank() } ?: storedMinecraftName()
             } else {
                 mcUsername = storedMinecraftName()
@@ -265,11 +265,11 @@ object SocialBackend {
             val outgoing = ArrayList<String>()
             val accepted = ArrayList<String>()
             for (element in rows) {
-                val row = element.asJsonObject
-                val requester = row.optString("requester")
-                val addressee = row.optString("addressee")
+                val row = element as? JsonObject ?: continue
+                val requester = row.stringOrNull("requester") ?: continue
+                val addressee = row.stringOrNull("addressee") ?: continue
                 val other = if (requester == me) addressee else requester
-                when (row.optString("status")) {
+                when (row.stringOrNull("status")) {
                     "accepted" -> accepted.add(other)
                     "pending" -> if (requester == me) outgoing.add(other) else incoming.add(other)
                 }
@@ -287,8 +287,8 @@ object SocialBackend {
             )
             val byId = HashMap<String, SocialFriend>()
             profiles?.takeIf { it.isJsonArray }?.asJsonArray?.forEach { element ->
-                val row = element.asJsonObject
-                val id = row.optString("id")
+                val row = element as? JsonObject ?: return@forEach
+                val id = row.stringOrNull("id") ?: return@forEach
                 byId[id] = SocialFriend(
                     id = id,
                     mcUsername = row.stringOrNull("mc_username")?.takeIf { it.isNotBlank() }
@@ -323,7 +323,7 @@ object SocialBackend {
                 lastError = "$clean has not opened Socials yet"
                 return@attempt null
             }
-            val target = rows[0].asJsonObject.optString("id")
+            val target = (rows[0] as? JsonObject)?.stringOrNull("id") ?: return@attempt null
             if (target == me) {
                 lastError = "That is you"
                 return@attempt null
@@ -379,12 +379,12 @@ object SocialBackend {
             val rows = json.takeIf { it.isJsonArray }?.asJsonArray
                 ?: return@attempt emptyList<SocialMessage>()
             rows.mapNotNull { element ->
-                val row = element.asJsonObject
+                val row = element as? JsonObject ?: return@mapNotNull null
                 SocialMessage(
-                    id = row.optLong("id"),
-                    sender = row.optString("sender"),
-                    recipient = row.optString("recipient"),
-                    body = row.optString("body"),
+                    id = row.longOr("id", 0L),
+                    sender = row.stringOrNull("sender") ?: "",
+                    recipient = row.stringOrNull("recipient") ?: "",
+                    body = row.stringOrNull("body") ?: "",
                     atMs = parseTimestamp(row.stringOrNull("created_at") ?: "")
                 )
             }
