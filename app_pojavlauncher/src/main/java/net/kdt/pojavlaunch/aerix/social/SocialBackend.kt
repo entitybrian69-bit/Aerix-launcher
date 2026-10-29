@@ -89,6 +89,7 @@ object SocialBackend {
 
     // ---- session ---------------------------------------------------------------------------
 
+    @JvmStatic
     fun attach(context: Context) {
         val app = context.applicationContext
         appContext = app
@@ -102,8 +103,10 @@ object SocialBackend {
     }
 
     /** This user's row id, so the chat knows which bubbles are theirs. */
+    @JvmStatic
     fun myUserId(): String? = userId
 
+    @JvmStatic
     fun signOut() {
         accessToken = null
         refreshToken = null
@@ -169,6 +172,7 @@ object SocialBackend {
      *
      * @return false when the provider is not switched on in Supabase, so the caller can say so
      */
+    @JvmStatic
     fun beginGoogleSignIn(context: Context): Boolean {
         val url = "$PROJECT_URL/auth/v1/authorize?provider=google" +
             "&redirect_to=" + java.net.URLEncoder.encode(OAUTH_REDIRECT, "UTF-8")
@@ -188,6 +192,7 @@ object SocialBackend {
      *
      * @return true when a session was restored from [redirect]
      */
+    @JvmStatic
     fun completeBrowserSession(redirect: String?): Boolean {
         if (redirect.isNullOrBlank()) return false
         val fragment = redirect.substringAfter('#', "")
@@ -230,6 +235,7 @@ object SocialBackend {
     }
 
     /** True when the last failure was the project asking for a confirmed email address. */
+    @JvmStatic
     fun needsConfirmation(): Boolean =
         lastError?.contains("confirm", ignoreCase = true) == true
 
@@ -270,6 +276,7 @@ object SocialBackend {
     // ---- profile ---------------------------------------------------------------------------
 
     /** What the launcher knows about this user's Minecraft name, remembered across sessions. */
+    @JvmStatic
     fun rememberMinecraftName(name: String?) {
         val trimmed = name?.trim()
         mcUsername = trimmed?.takeIf { it.isNotEmpty() }
