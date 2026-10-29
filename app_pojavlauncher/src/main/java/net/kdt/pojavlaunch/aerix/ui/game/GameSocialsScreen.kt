@@ -53,6 +53,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -86,6 +87,7 @@ private val IncomingBubble = Color(0xFF23232A)
  */
 @Composable
 fun GameSocialsScreen(accent: Color, onBack: () -> Unit) {
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var selected by remember { mutableStateOf<SocialFriend?>(null) }
     var messages by remember { mutableStateOf<List<SocialMessage>>(emptyList()) }
@@ -95,7 +97,7 @@ fun GameSocialsScreen(accent: Color, onBack: () -> Unit) {
 
     // Attach once; the launcher may have been in the background for hours while the game ran.
     LaunchedEffect(Unit) {
-        SocialBackend.attach(requireNotNull(androidx.compose.ui.platform.LocalContext.current))
+        SocialBackend.attach(context)
         ready = SocialBackend.signedIn
         if (ready) {
             SocialBackend.rememberMinecraftName(PojavAccountBridge.current?.username)
