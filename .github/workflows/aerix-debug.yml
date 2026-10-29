@@ -186,16 +186,15 @@ jobs:
               "$STAGE/$STAMPED_NAME" \
               "$STAGE/$APK_NAME.sha256" \
               "$STAGE/DEBUG_BUILD.txt"
-            gh api -X PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/$TAG" -f sha="$ANCHOR_SHA" -F force=true > /dev/null || true
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/$TAG" -f sha="$ANCHOR_SHA" -F force=true > /dev/null 2>&1 || true
             gh release edit "$TAG" \
               --prerelease \
-              --target "$ANCHOR_SHA" \
               --title "Aerix Debug Build (latest)" \
               --notes-file "$STAGE/RELEASE_NOTES.md"
           else
+            gh api -X POST "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/$TAG" -f sha="$ANCHOR_SHA" > /dev/null 2>&1 || true
             gh release create "$TAG" \
               --prerelease \
-              --target "$ANCHOR_SHA" \
               --title "Aerix Debug Build (latest)" \
               --notes-file "$STAGE/RELEASE_NOTES.md" \
               "$STAGE/$APK_NAME" \
