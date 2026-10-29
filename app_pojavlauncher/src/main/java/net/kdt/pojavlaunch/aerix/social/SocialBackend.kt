@@ -120,7 +120,7 @@ object SocialBackend {
                 addProperty("email", address.trim())
                 addProperty("password", password)
             }
-            val json = call("POST", "$PROJECT_URL/auth/v1/token?grant_type=password", body.toString())
+            val json = asObject(call("POST", "$PROJECT_URL/auth/v1/token?grant_type=password", body.toString()))
             if (json == null) {
                 lastError = "Wrong email or password"
                 return@attempt false
@@ -139,7 +139,7 @@ object SocialBackend {
                 addProperty("email", address.trim())
                 addProperty("password", password)
             }
-            val json = call("POST", "$PROJECT_URL/auth/v1/signup", body.toString())
+            val json = asObject(call("POST", "$PROJECT_URL/auth/v1/signup", body.toString()))
             if (json == null) {
                 lastError = "Could not create the account. Is that email already in use?"
                 return@attempt null
@@ -160,12 +160,12 @@ object SocialBackend {
     }
 
     private fun storeSession(json: JsonObject) {
-        accessToken = json.optString("access_token", null)
-        refreshToken = json.optString("refresh_token", null)
-        expiresAtMs = System.currentTimeMillis() + (json.optLong("expires_in", 3600) * 1000) - 60_000
-        val user = json.getAsJsonObject("user")
-        userId = user?.optString("id", null)
-        email = user?.optString("email", null)
+        accessToken = json.stringOrNull("access_token")
+        refreshToken = json.stringOrNull("refresh_token")
+        expiresAtMs = System.currentTimeMillis() + (json.longOr("expires_in", 3600) * 1000) - 60_000
+        val user = asObject(json.get("user"))
+        userId = user?.stringOrNull("id")
+        email = user?.stringOrNull("email")
         signedIn = true
         appContext?.getSharedPreferences(PREFS, Context.MODE_PRIVATE)?.edit()
             ?.putString("refresh_token", refreshToken)
@@ -178,11 +178,13 @@ object SocialBackend {
         if (accessToken != null && System.currentTimeMillis() < expiresAtMs) return
         val token = refreshToken ?: return
         val body = JsonObject().apply { addProperty("refresh_token", token) }
-        val json = call(
-            "POST",
-            "$PROJECT_URL/auth/v1/token?grant_type=refresh_token",
-            body.toString(),
-            authenticated = false
+        val json = asObject(
+            call(
+                "POST",
+                "$PROJECT_URL/auth/v1/token?grant_type=refresh_token",
+                body.toString(),
+                authenticated = false
+            )
         )
         if (json == null) {
             signOut()
@@ -217,7 +219,7 @@ object SocialBackend {
             )
             val rows = json?.takeIf { it.isJsonArray }?.asJsonArray
             if (rows != null && rows.size() > 0) {
-                mcUsername = rows[0].asJsonObject.optString("mc_username", null)
+                mcUsername = rows[0].asJsonObject.stringOrNull("mc_username")
                     ?.takeIf { it.isNotBlank() } ?: storedMinecraftName()
             } else {
                 mcUsername = storedMinecraftName()
@@ -289,10 +291,10 @@ object SocialBackend {
                 val id = row.optString("id")
                 byId[id] = SocialFriend(
                     id = id,
-                    mcUsername = row.optString("mc_username", null)?.takeIf { it.isNotBlank() }
-                        ?: row.optString("display_name", "Player"),
-                    displayName = row.optString("display_name", "Player"),
-                    lastSeenMs = parseTimestamp(row.optString("last_seen", "")),
+                    mcUsername = row.stringOrNull("mc_username")?.takeIf { it.isNotBlank() }
+                        ?: row.stringOrNull("display_name") ?: "Player",
+                    displayName = row.stringOrNull("display_name") ?: "Player",
+                    lastSeenMs = parseTimestamp(row.stringOrNull("last_seen") ?: ""),
                     pendingIncoming = id in incoming,
                     pendingOutgoing = id in outgoing
                 )
@@ -383,7 +385,7 @@ object SocialBackend {
                     sender = row.optString("sender"),
                     recipient = row.optString("recipient"),
                     body = row.optString("body"),
-                    atMs = parseTimestamp(row.optString("created_at", ""))
+                    atMs = parseTimestamp(row.stringOrNull("created_at") ?: "")
                 )
             }
         }
@@ -472,6 +474,21 @@ object SocialBackend {
             Log.w(TAG, "$method $url failed", error)
             null
         }
+    }
+
+    /** The body of a call, when it is a JSON object. */
+    private fun asObject(element: JsonElement?): JsonObject? = element as? JsonObject
+
+    /** A string field, or null when it is missing, null or not a string. */
+    private fun JsonObject.stringOrNull(key: String): String? {
+        val element = get(key) ?: return null
+        if (element.isJsonNull || !element.isJsonPrimitive) return null
+        return runCatching { element.asString }.getOrNull()
+    }
+
+    private fun JsonObject.longOr(key: String, fallback: Long): Long {
+        val element = get(key) ?: return fallback
+        return runCatching { element.asLong }.getOrDefault(fallback)
     }
 
     /** Supabase writes `2026-10-29T05:04:31.123456+00:00`; only the seconds matter here. */
