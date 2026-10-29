@@ -183,7 +183,7 @@ alter table public.follows enable row level security;
 
 drop policy if exists follows_read on public.follows;
 create policy follows_read on public.follows
-    for select to authenticated using (true);
+    for select to authenticated using (follower = auth.uid() or following = auth.uid());
 
 drop policy if exists follows_insert on public.follows;
 create policy follows_insert on public.follows
@@ -320,7 +320,7 @@ create policy parties_delete on public.parties
 
 drop policy if exists party_members_read on public.party_members;
 create policy party_members_read on public.party_members
-    for select to authenticated using (true);
+    for select to authenticated using (member = auth.uid());
 
 drop policy if exists party_members_insert on public.party_members;
 create policy party_members_insert on public.party_members

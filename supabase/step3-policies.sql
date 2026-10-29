@@ -6,11 +6,9 @@
 
 -- Row-level security for every table above, plus the storage rules for the social-media bucket.
 
--- Anyone signed in may read a profile (that is what makes a friend list possible).
+-- The old rule let anyone signed in read any profile. It is dropped here for good; the private
+-- rule further down replaces it.
 drop policy if exists profiles_read on public.profiles;
-
-create policy profiles_read on public.profiles
-    for select to authenticated using (true);
 
 -- A user may only create and change their own profile.
 drop policy if exists profiles_insert on public.profiles;
@@ -85,7 +83,7 @@ create policy profiles_read_related on public.profiles
 drop policy if exists follows_read on public.follows;
 
 create policy follows_read on public.follows
-    for select to authenticated using (true);
+    for select to authenticated using (follower = auth.uid() or following = auth.uid());
 
 drop policy if exists follows_insert on public.follows;
 
@@ -160,7 +158,7 @@ create policy parties_delete on public.parties
 drop policy if exists party_members_read on public.party_members;
 
 create policy party_members_read on public.party_members
-    for select to authenticated using (true);
+    for select to authenticated using (member = auth.uid());
 
 drop policy if exists party_members_insert on public.party_members;
 

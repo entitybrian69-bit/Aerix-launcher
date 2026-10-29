@@ -7,15 +7,10 @@
 -- Creates the profile columns, the friend graph, follows, blocks, reports, ranks, the party
 -- tables and the image bucket. No policies and no functions yet.
 
--- Aerix Launcher social layer — schema for the free Supabase tier.
---
--- Paste this whole file into Supabase -> SQL Editor -> New query -> Run, once.
--- It is idempotent: running it again does not break anything.
---
--- What it holds: one profile per signed-in user, the friend graph (with requests), and direct
--- messages. Nothing else. No images are stored here (Minecraft heads come from a CDN), and
--- messages older than 90 days are deleted automatically, so the 500 MB free tier stays flat
--- instead of filling up.
+-- What it holds: one profile per signed-in user (with username, name, country, bio, logo,
+-- background, skin, cape and status), the friend graph, follows, blocks, reports, rank grants,
+-- direct messages, and the party tables. Pictures live in the social-media storage bucket
+-- created at the bottom of this file.
 
 -- ---- profiles ----------------------------------------------------------------------------
 
