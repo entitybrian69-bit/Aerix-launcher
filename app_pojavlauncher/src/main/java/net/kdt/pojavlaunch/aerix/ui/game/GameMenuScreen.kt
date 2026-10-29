@@ -108,7 +108,7 @@ import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
 import net.kdt.pojavlaunch.aerix.loading.AerixLoadingWallpaper
 
 /** The pages of the in-game menu. */
-enum class GameMenuPage { MAIN, DOWNLOADS }
+enum class GameMenuPage { MAIN, DOWNLOADS, SOCIALS }
 
 /** Everything the menu asks the game activity to do. */
 interface GameMenuCallbacks {
@@ -191,7 +191,7 @@ fun GameMenuScreen(
     // The back button walks out of the downloader before it closes the menu.
     DisposableEffect(page) {
         onBackHandlerChanged {
-            if (page == GameMenuPage.DOWNLOADS) page = GameMenuPage.MAIN else onCloseRequest()
+            if (page == GameMenuPage.MAIN) onCloseRequest() else page = GameMenuPage.MAIN
         }
         onDispose { onBackHandlerChanged(null) }
     }
@@ -219,8 +219,19 @@ fun GameMenuScreen(
                     account = account,
                     versionLine = versionLine,
                     onCloseRequest = onCloseRequest,
-                    onOpenDownloads = { page = GameMenuPage.DOWNLOADS }
+                    onOpenDownloads = { page = GameMenuPage.DOWNLOADS },
+                    onOpenSocials = { page = GameMenuPage.SOCIALS }
                 )
+                GameMenuPage.SOCIALS -> Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = AerixSpacing.mdPlus, vertical = AerixSpacing.smPlus)
+                ) {
+                    GameSocialsScreen(
+                        accent = palette.accent,
+                        onBack = { page = GameMenuPage.MAIN }
+                    )
+                }
                 GameMenuPage.DOWNLOADS -> Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -245,7 +256,8 @@ private fun GameMenuMainPage(
     account: AerixAccount?,
     versionLine: String,
     onCloseRequest: () -> Unit,
-    onOpenDownloads: () -> Unit
+    onOpenDownloads: () -> Unit,
+    onOpenSocials: () -> Unit
 ) {
     BoxWithConstraints(
         modifier = Modifier.fillMaxSize(),
@@ -314,6 +326,14 @@ private fun GameMenuMainPage(
                         compact = compact,
                         height = rowHeight,
                         onClick = { onCloseRequest(); callbacks.onQuickSettings() }
+                    )
+                    CompactMenuButton(
+                        label = stringResource(R.string.aerix_home_quick_socials),
+                        iconRes = R.drawable.aerix_ic_people,
+                        color = palette.tiles[4],
+                        compact = compact,
+                        height = rowHeight,
+                        onClick = onOpenSocials
                     )
                     CompactMenuButton(
                         label = stringResource(R.string.aerix_ingame_menu_downloads),
