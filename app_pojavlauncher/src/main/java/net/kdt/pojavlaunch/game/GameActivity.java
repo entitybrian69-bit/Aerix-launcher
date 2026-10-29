@@ -459,6 +459,8 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         // Nothing of ours outlives the activity: if the player backs out during the boot, the
         // wallpaper goes with the screen.
         net.kdt.pojavlaunch.aerix.loading.AerixLoadingWallpaper.detach();
+        // The loopback endpoint that gave the game its profile and skin is done with the game.
+        net.kdt.pojavlaunch.aerix.bridge.AerixSkinServer.stop();
         if (mRecorder != null) mRecorder.destroy();
         super.onDestroy();
         ContextExecutor.clearActivity();

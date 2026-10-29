@@ -14,6 +14,7 @@ import net.kdt.pojavlaunch.Architecture;
 import net.kdt.pojavlaunch.JVersionList;
 import net.kdt.pojavlaunch.Logger;
 import net.kdt.pojavlaunch.Tools;
+import net.kdt.pojavlaunch.aerix.bridge.AerixSkinServer;
 import net.kdt.pojavlaunch.authenticator.accounts.Account;
 import net.kdt.pojavlaunch.game.renderer.def.Renderers;
 import net.kdt.pojavlaunch.game.renderer.impl.GLESRenderSpec;
@@ -312,6 +313,11 @@ public class GameRunner {
         FileUtils.ensureDirectory(lwjglExtractDir);
         javaArgList.add("-Dorg.lwjgl.system.SharedLibraryExtractPath="+lwjglExtractDir.getAbsolutePath());
 
+        // The skin chosen in the wardrobe only reaches the game this way: the game reads its own
+        // profile from the session service, so the launcher serves that profile (with the skin,
+        // cape and arm model) from a loopback endpoint and points the shipped authlib-injector at
+        // it. Without an equipped skin this adds nothing and the launch is unchanged.
+        javaArgList.addAll(AerixSkinServer.launchArguments(activity, account));
         addAuthlibInjectorArgs(javaArgList, account);
 
         mergeMoJsonArgs(javaArgList, getMoJsonJvmArgs(versionId));

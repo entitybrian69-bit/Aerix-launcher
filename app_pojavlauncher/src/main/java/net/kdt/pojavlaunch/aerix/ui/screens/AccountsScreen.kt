@@ -811,6 +811,14 @@ private fun MiraiSkinLibraryPanel(
                 }
             }
         }
+
+        // A skin picked here is handed to Minecraft by the launcher when the game starts, so it
+        // shows up the next time the instance is launched, not on the menu this is drawn on.
+        Text(
+            text = "Equipped skins, capes and the Wide/Slim model reach the game on your next launch.",
+            style = MaterialTheme.typography.labelMedium,
+            color = Color.White.copy(alpha = 0.6f)
+        )
     }
 }
 
