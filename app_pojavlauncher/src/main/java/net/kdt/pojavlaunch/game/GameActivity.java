@@ -96,6 +96,7 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     private static final int REQUEST_STORAGE_PERMISSION = 0x41E1;
     public static final String INTENT_LAUNCH_VERSION = "intent_version";
     public static final String INTENT_LAUNCH_CLASSPATH = "intent_classpath";
+    public static final String INTENT_LAUNCH_SERVER = "intent_launch_server";
 
     public static TouchCharInput touchCharInput;
     private GameView launcherGLView;
@@ -317,11 +318,16 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
             Bundle extras = Objects.requireNonNull(activityIntent.getExtras());
             String version = extras.getString(INTENT_LAUNCH_VERSION);
             File[] classpath = (File[]) extras.getSerializable(INTENT_LAUNCH_CLASSPATH);
+            String launchServer = extras.getString(INTENT_LAUNCH_SERVER);
 
             activityIntent.removeExtra(INTENT_LAUNCH_VERSION);
             activityIntent.removeExtra(INTENT_LAUNCH_CLASSPATH);
+            activityIntent.removeExtra(INTENT_LAUNCH_SERVER);
 
             setIntent(activityIntent);
+
+            GameRunner.setPendingServerAddress(launchServer);
+            net.kdt.pojavlaunch.aerix.social.SocialBackend.onGameStarted(this, instance, version);
 
             setTitle("MojoLauncher (" + version + ")");
 
@@ -456,6 +462,7 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
 
     @Override
     protected void onDestroy() {
+        net.kdt.pojavlaunch.aerix.social.SocialBackend.onGameStopped();
         // Nothing of ours outlives the activity: if the player backs out during the boot, the
         // wallpaper goes with the screen.
         net.kdt.pojavlaunch.aerix.loading.AerixLoadingWallpaper.detach();

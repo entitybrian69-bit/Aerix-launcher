@@ -333,6 +333,7 @@ private fun GameMenuMainPage(
                         color = palette.tiles[4],
                         compact = compact,
                         height = rowHeight,
+                        badgeCount = net.kdt.pojavlaunch.aerix.social.SocialBackend.totalActionableBadge,
                         onClick = onOpenSocials
                     )
                     CompactMenuButton(
@@ -488,7 +489,8 @@ private fun CompactMenuButton(
     compact: Boolean,
     height: Dp,
     onClick: () -> Unit,
-    emphasized: Boolean = false
+    emphasized: Boolean = false,
+    badgeCount: Int = 0
 ) {
     val shape = RoundedCornerShape(AerixRadii.control)
     val interaction = remember { MutableInteractionSource() }
@@ -538,8 +540,25 @@ private fun CompactMenuButton(
             fontSize = if (compact) 12.sp else 13.5.sp,
             fontWeight = if (emphasized) FontWeight.Bold else FontWeight.SemiBold,
             maxLines = 1,
-            overflow = TextOverflow.Ellipsis
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
         )
+        if (badgeCount > 0) {
+            Box(
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .background(AerixSurface.danger)
+                    .padding(horizontal = 6.dp, vertical = 1.5.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = if (badgeCount > 99) "99+" else "$badgeCount",
+                    color = AerixSurface.canvas,
+                    fontSize = 9.5.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+            }
+        }
     }
 }
 

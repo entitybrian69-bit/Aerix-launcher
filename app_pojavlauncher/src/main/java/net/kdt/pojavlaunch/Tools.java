@@ -931,6 +931,19 @@ public final class Tools {
     public static final String EXTRA_RELAUNCH_GAME = "aerix.relaunchGame";
     /** Extra naming the account the game should come back as; its accounts file name. */
     public static final String EXTRA_SWITCH_ACCOUNT = "aerix.switchAccount";
+    /** Extra naming the instance directory ID to switch to before relaunching. */
+    public static final String EXTRA_SWITCH_INSTANCE = "aerix.switchInstance";
+    /** Extra naming the multiplayer server address to auto-join on relaunch. */
+    public static final String EXTRA_LAUNCH_SERVER = "aerix.launchServer";
+
+    public static void restartLauncherActivityToSocialTarget(Context context, String instanceId, String serverAddress) {
+        Intent intent = new Intent(context, LauncherActivity.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        intent.putExtra(EXTRA_RELAUNCH_GAME, true);
+        if (instanceId != null && !instanceId.isEmpty()) intent.putExtra(EXTRA_SWITCH_INSTANCE, instanceId);
+        if (serverAddress != null && !serverAddress.isEmpty()) intent.putExtra(EXTRA_LAUNCH_SERVER, serverAddress);
+        context.getApplicationContext().startActivity(intent);
+    }
 
     /**
      * Restarts the launcher activity with a request to start the game again.

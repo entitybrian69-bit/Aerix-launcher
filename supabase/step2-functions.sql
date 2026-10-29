@@ -207,3 +207,124 @@ begin
         ''online'', player.last_seen > now() - interval ''2 minutes''
     );
 end ';
+
+-- ---- 30-day chat attachment cleanup & auto-expire party cleanup -------------------------
+
+create or replace function public.prune_chat_media() returns void
+language sql security definer set search_path = public as '    update public.messages
+        set attachment_url = null
+        where attachment_url is not null and created_at < now() - interval ''30 days'';
+    update public.party_messages
+        set attachment_url = null
+        where attachment_url is not null and created_at < now() - interval ''30 days'';';
+
+create or replace function public.prune_expired_parties() returns void
+language sql security definer set search_path = public as '    delete from public.parties where expires_at <= now();';
+
+-- ---- mutual friends on a pending request -------------------------------------------------
+
+create or replace function public.mutual_friends(p_other uuid) returns jsonb
+language plpgsql security definer set search_path = public as 'declare
+    me uuid := auth.uid();
+    mutual_ids uuid[];
+    names jsonb := ''[]''::jsonb;
+begin
+    if me is null or p_other is null then
+        return jsonb_build_object(''count'', 0, ''names'', ''[]''::jsonb);
+    end if;
+    select array_agg(x.fid) into mutual_ids from (
+        select case when f1.requester = me then f1.addressee else f1.requester end as fid
+        from public.friendships f1
+        where f1.status = ''accepted'' and (f1.requester = me or f1.addressee = me)
+        intersect
+        select case when f2.requester = p_other then f2.addressee else f2.requester end as fid
+        from public.friendships f2
+        where f2.status = ''accepted'' and (f2.requester = p_other or f2.addressee = p_other)
+    ) x;
+    if mutual_ids is null or array_length(mutual_ids, 1) is null then
+        return jsonb_build_object(''count'', 0, ''names'', ''[]''::jsonb);
+    end if;
+    select coalesce(jsonb_agg(coalesce(username, mc_username, display_name, ''Player'')), ''[]''::jsonb)
+        into names
+        from public.profiles
+        where id = any(mutual_ids);
+    return jsonb_build_object(''count'', coalesce(array_length(mutual_ids, 1), 0), ''names'', names);
+end ';
+
+-- ---- party host transfer and member kick -------------------------------------------------
+
+create or replace function public.transfer_party_host(p_party uuid, p_new_host uuid) returns boolean
+language plpgsql security definer set search_path = public as 'declare
+    me uuid := auth.uid();
+begin
+    if me is null or p_party is null or p_new_host is null then
+        return false;
+    end if;
+    if not exists (select 1 from public.parties where id = p_party and host = me) then
+        return false;
+    end if;
+    insert into public.party_members (party_id, member)
+        values (p_party, p_new_host)
+        on conflict (party_id, member) do nothing;
+    update public.parties set host = p_new_host where id = p_party and host = me;
+    return true;
+end ';
+
+create or replace function public.kick_party_member(p_party uuid, p_member uuid) returns boolean
+language plpgsql security definer set search_path = public as 'declare
+    me uuid := auth.uid();
+begin
+    if me is null or p_party is null or p_member is null or p_member = me then
+        return false;
+    end if;
+    if not exists (select 1 from public.parties where id = p_party and host = me) then
+        return false;
+    end if;
+    delete from public.party_members where party_id = p_party and member = p_member;
+    return true;
+end ';
+
+-- ---- public Looking-for-Group board ------------------------------------------------------
+
+create or replace function public.list_lfg_parties(
+    p_mc_version text default null,
+    p_loader text default null
+) returns jsonb
+language plpgsql security definer set search_path = public as 'begin
+    perform public.prune_expired_parties();
+    return coalesce((
+        select jsonb_agg(row_to_json(q)) from (
+            select
+                pa.id,
+                pa.host,
+                coalesce(pr.username, pr.mc_username, pr.display_name, ''Player'') as host_name,
+                pr.avatar_url as host_avatar,
+                pa.title,
+                pa.instance,
+                pa.version,
+                pa.mc_version,
+                pa.loader,
+                pa.modpack_source,
+                pa.modpack_id,
+                pa.modpack_icon_url,
+                pa.server_address,
+                pa.max_members,
+                (select count(*) from public.party_members pm where pm.party_id = pa.id)::int as member_count,
+                (extract(epoch from pa.expires_at) * 1000)::bigint as expires_at_ms,
+                (extract(epoch from pa.created_at) * 1000)::bigint as created_at_ms
+            from public.parties pa
+            join public.profiles pr on pr.id = pa.host
+            where pa.is_public = true
+              and pa.expires_at > now()
+              and not exists (
+                  select 1 from public.blocks b
+                  where (b.blocker = auth.uid() and b.blocked = pa.host)
+                     or (b.blocker = pa.host and b.blocked = auth.uid())
+              )
+              and (p_mc_version is null or p_mc_version = '''' or lower(coalesce(pa.mc_version, '''')) = lower(p_mc_version))
+              and (p_loader is null or p_loader = '''' or lower(coalesce(pa.loader, '''')) = lower(p_loader))
+            order by pa.created_at desc
+            limit 50
+        ) q
+    ), ''[]''::jsonb);
+end ';

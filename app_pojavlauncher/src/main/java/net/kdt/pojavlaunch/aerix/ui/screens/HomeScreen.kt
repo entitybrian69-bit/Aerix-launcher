@@ -500,6 +500,7 @@ private fun WideHomeDashboard(
             .padding(bottom = AerixSpacing.smPlus),
         verticalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus)
     ) {
+        SameVersionNudgeStrip(selected = selected, accent = accent, onOpenSocials = actions.socials)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -547,11 +548,16 @@ private fun CompactHomeDashboard(
     ) {
         item {
             Column(verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm)) {
+                SameVersionNudgeStrip(selected = selected, accent = accent, onOpenSocials = actions.socials)
                 HomeSectionLabel(stringResource(R.string.aerix_home_your_space), null)
                 QuickTiles(count, accent, actions, Modifier.fillMaxWidth(), scrollable = true)
             }
         }
-        // On a phone the action panel is not drawn, so the play step points at the world card here.
+        // Compact skin stage so narrow/portrait phones also display newly equipped skins on Home.
+        item {
+            CompactSkinStageCard(accent = accent, actions = actions)
+        }
+        // On a phone the side action panel is collapsed, so the play step points at the world card here.
         item {
             ActiveWorldPanel(
                 selected, accent, actions,
@@ -573,18 +579,20 @@ private fun QuickTiles(count: Int, accent: Color, actions: HomeActions, modifier
     // The Socials tile tells you who is around without opening anything.
     val socialContext = androidx.compose.ui.platform.LocalContext.current
     androidx.compose.runtime.LaunchedEffect(Unit) {
+        net.kdt.pojavlaunch.aerix.social.SocialBackend.attach(socialContext)
         if (net.kdt.pojavlaunch.aerix.social.SocialBackend.signedIn) {
-            net.kdt.pojavlaunch.aerix.social.SocialBackend.attach(socialContext)
             net.kdt.pojavlaunch.aerix.social.SocialBackend.refreshFriends()
+            net.kdt.pojavlaunch.aerix.social.SocialBackend.refreshParties()
+            net.kdt.pojavlaunch.aerix.social.SocialBackend.refreshPartyInvites()
             net.kdt.pojavlaunch.aerix.social.SocialBackend.unreadCount()
         }
     }
-    val playableNow = net.kdt.pojavlaunch.aerix.social.SocialBackend.friends.count { it.online }
-    val waiting = net.kdt.pojavlaunch.aerix.social.SocialBackend.unread
+    val playableNow = net.kdt.pojavlaunch.aerix.social.SocialBackend.friends.count { it.online && !it.pendingIncoming && !it.pendingOutgoing }
+    val waiting = net.kdt.pojavlaunch.aerix.social.SocialBackend.totalActionableBadge
     val socialSubtitle = when {
-        playableNow > 0 && waiting > 0 -> "$playableNow online · $waiting unread"
+        playableNow > 0 && waiting > 0 -> "$playableNow online · $waiting waiting"
         playableNow > 0 -> "$playableNow online now"
-        waiting > 0 -> "$waiting unread message${if (waiting == 1) "" else "s"}"
+        waiting > 0 -> "$waiting unread / invite${if (waiting == 1) "" else "s"}"
         else -> stringResource(R.string.aerix_home_quick_socials_sub)
     }
     Row(modifier = rowModifier, horizontalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus)) {
@@ -909,5 +917,142 @@ private fun HomeToolAction(label: String, iconRes: Int, accent: Color, onClick: 
             Icon(painter = painterResource(iconRes), contentDescription = null, tint = accent, modifier = Modifier.size(16.dp))
         }
         Text(text = label, color = AerixSurface.textPrimary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+@Composable
+private fun SameVersionNudgeStrip(
+    selected: AerixInstance?,
+    accent: Color,
+    onOpenSocials: () -> Unit
+) {
+    val myVer = remember(selected?.versionId) {
+        net.kdt.pojavlaunch.aerix.social.SocialBackend.extractMcVersion(selected?.versionId)
+    } ?: return
+    val matching = net.kdt.pojavlaunch.aerix.social.SocialBackend.friends.filter { f ->
+        !f.pendingIncoming && !f.pendingOutgoing && f.online && f.mcVersion.equals(myVer, ignoreCase = true)
+    }
+    if (matching.isEmpty()) return
+    val names = matching.take(2).joinToString(", ") { it.effectiveName }
+    val shape = RoundedCornerShape(AerixRadii.control)
+    Surface(
+        shape = shape,
+        color = accent.copy(alpha = 0.14f),
+        border = BorderStroke(AerixSpacing.hairline, accent.copy(alpha = 0.48f)),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(role = Role.Button, onClick = onOpenSocials)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = AerixSpacing.md, vertical = AerixSpacing.xsPlus),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
+        ) {
+            Icon(
+                painter = painterResource(R.drawable.aerix_ic_people),
+                contentDescription = null,
+                tint = accent,
+                modifier = Modifier.size(15.dp)
+            )
+            Text(
+                text = "$names ${if (matching.size == 1) "is" else "are"} also on $myVer — tap to party up or join!",
+                color = AerixSurface.textPrimary,
+                fontSize = 11.5.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+            Icon(
+                painter = painterResource(R.drawable.aerix_ic_chevron_right),
+                contentDescription = null,
+                tint = accent,
+                modifier = Modifier.size(15.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun CompactSkinStageCard(
+    accent: Color,
+    actions: HomeActions
+) {
+    val account = PojavAccountBridge.current
+    var azimuth by remember(account?.username) { mutableFloatStateOf(28f) }
+    val shape = RoundedCornerShape(AerixRadii.card)
+
+    Surface(
+        shape = shape,
+        color = AerixSurface.panel,
+        border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(148.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(AerixSpacing.smPlus),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(AerixSpacing.md)
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(104.dp)
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(AerixRadii.control))
+                    .background(AerixSurface.panelTrack.copy(alpha = 0.45f))
+                    .pointerInput(account?.username) {
+                        detectHorizontalDragGestures { _, dragAmount ->
+                            azimuth = (azimuth + dragAmount * DOLL_DRAG_DEG_PER_PX).mod(360f)
+                        }
+                    }
+                    .clickable(role = Role.Button) { actions.accounts() },
+                contentAlignment = Alignment.Center
+            ) {
+                AerixSkinPreview3D(
+                    account = account,
+                    azimuth = azimuth.roundToInt(),
+                    interactionEnabled = false,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(AerixSpacing.xs)
+            ) {
+                Text(
+                    text = account?.username ?: "No account selected",
+                    color = AerixSurface.textPrimary,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = if (account != null) "Active skin & cape · drag character to rotate" else "Tap to add an account or equip skins",
+                    color = AerixSurface.textMuted,
+                    fontSize = 11.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(Modifier.height(AerixSpacing.xxs))
+                Surface(
+                    shape = RoundedCornerShape(AerixRadii.controlSmall),
+                    color = accent.copy(alpha = 0.18f),
+                    border = BorderStroke(AerixSpacing.hairline, accent.copy(alpha = 0.5f)),
+                    modifier = Modifier.clickable(role = Role.Button) { actions.accounts() }
+                ) {
+                    Text(
+                        text = "Wardrobe & Skins",
+                        color = accent,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                    )
+                }
+            }
+        }
     }
 }

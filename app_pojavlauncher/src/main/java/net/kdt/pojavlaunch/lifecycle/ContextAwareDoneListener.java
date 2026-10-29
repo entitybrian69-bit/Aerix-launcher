@@ -1,12 +1,14 @@
 package net.kdt.pojavlaunch.lifecycle;
 
 import static net.kdt.pojavlaunch.game.GameActivity.INTENT_LAUNCH_CLASSPATH;
+import static net.kdt.pojavlaunch.game.GameActivity.INTENT_LAUNCH_SERVER;
 import static net.kdt.pojavlaunch.game.GameActivity.INTENT_LAUNCH_VERSION;
 
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 
+import net.kdt.pojavlaunch.aerix.bridge.PojavLaunchBridge;
 import net.kdt.pojavlaunch.game.GameActivity;
 import net.kdt.pojavlaunch.R;
 import net.kdt.pojavlaunch.Tools;
@@ -30,6 +32,10 @@ public class ContextAwareDoneListener implements MoJsonExtras.DoneListener, Cont
         Intent mainIntent = new Intent(context, GameActivity.class);
         mainIntent.putExtra(INTENT_LAUNCH_VERSION, mNormalizedVersionid);
         mainIntent.putExtra(INTENT_LAUNCH_CLASSPATH, classpath);
+        String pendingServer = PojavLaunchBridge.consumePendingServerAddress();
+        if (pendingServer != null && !pendingServer.isEmpty()) {
+            mainIntent.putExtra(INTENT_LAUNCH_SERVER, pendingServer);
+        }
         mainIntent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
         return mainIntent;
     }

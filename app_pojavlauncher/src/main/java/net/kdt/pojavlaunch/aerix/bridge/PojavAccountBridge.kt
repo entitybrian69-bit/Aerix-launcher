@@ -290,40 +290,51 @@ object PojavAccountBridge : LoginListener {
         PojavApplication.sExecutorService.execute {
             val safeStem = skinName.replace(Regex("[^A-Za-z0-9._-]"), "_").ifBlank { "Skin" }
             val cachedFile = File(skinsDirectory(), "$safeStem.png")
+            var resolvedSlim = isSlim
             val ok = runCatching {
-                var bytes: ByteArray? = null
-                for (url in candidateUrls) {
-                    bytes = runCatching {
-                        val conn = (java.net.URL(url).openConnection() as java.net.HttpURLConnection).apply {
-                            connectTimeout = 8000
-                            readTimeout = 8000
-                            instanceFollowRedirects = true
-                            setRequestProperty("User-Agent", "AerixLauncher/1.6")
-                        }
-                        try {
-                            if (conn.responseCode in 200..299) {
-                                conn.inputStream.use { it.readBytes() }
-                            } else null
-                        } finally {
-                            conn.disconnect()
-                        }
-                    }.getOrNull()
-                    if (bytes != null && bytes.isNotEmpty()) break
+                var normalized: Pair<ByteArray, Bitmap>? = null
+                val urlsToTry = ArrayList<String>(candidateUrls)
+                // Official Mojang texture fallback when searching by Minecraft player name.
+                if (skinName.matches(Regex("^[A-Za-z0-9_]{2,16}$"))) {
+                    resolveMojangSkinUrl(skinName)?.let { (mojangUrl, mojangSlim) ->
+                        urlsToTry.add(0, mojangUrl)
+                        resolvedSlim = mojangSlim
+                    }
                 }
-                if (bytes == null && cachedFile.isFile && cachedFile.length() > 0) {
-                    bytes = cachedFile.readBytes()
+                for (url in urlsToTry.distinct()) {
+                    val raw = downloadBytesFollowingRedirects(url) ?: continue
+                    val decoded = BitmapFactory.decodeByteArray(raw, 0, raw.size) ?: continue
+                    val valid = normalizeSkinPng(decoded)
+                    decoded.recycle()
+                    if (valid != null) {
+                        normalized = valid
+                        break
+                    }
                 }
-                val finalBytes = bytes ?: return@runCatching false
-                val decoded = BitmapFactory.decodeByteArray(finalBytes, 0, finalBytes.size)
-                    ?: return@runCatching false
+                if (normalized == null && cachedFile.isFile && cachedFile.length() > 0) {
+                    val raw = cachedFile.readBytes()
+                    val decoded = BitmapFactory.decodeByteArray(raw, 0, raw.size)
+                    if (decoded != null) {
+                        normalized = normalizeSkinPng(decoded)
+                        decoded.recycle()
+                    }
+                }
+                val (finalBytes, cleanBmp) = normalized ?: return@runCatching false
+                cachedFile.parentFile?.mkdirs()
                 cachedFile.writeBytes(finalBytes)
-                applySkinBytesToAccount(appCtx, account.source, finalBytes, decoded, safeStem)
-                decoded.recycle()
+                applySkinBytesToAccount(appCtx, account.source, finalBytes, cleanBmp, safeStem)
+                cleanBmp.recycle()
+                if (Accounts.getCurrent() == null || selectedIndex < 0) {
+                    Accounts.setCurrent(account.source)
+                }
                 true
             }.getOrDefault(false)
             Tools.runOnUiThread {
                 if (ok) {
-                    setSlimModel(appCtx, account, isSlim)
+                    if (selectedIndex < 0 && accounts.contains(account)) {
+                        selectedIndex = accounts.indexOf(account)
+                    }
+                    setSlimModel(appCtx, account, resolvedSlim)
                     wardrobeRevision++
                     reload()
                     Toast.makeText(appCtx, "Equipped skin: $skinName", Toast.LENGTH_SHORT).show()
@@ -333,6 +344,92 @@ object PojavAccountBridge : LoginListener {
                 onDone(ok)
             }
         }
+    }
+
+    private fun downloadBytesFollowingRedirects(initialUrl: String, maxHops: Int = 5): ByteArray? {
+        var currentUrl = initialUrl
+        repeat(maxHops) {
+            val conn = (java.net.URL(currentUrl).openConnection() as java.net.HttpURLConnection).apply {
+                connectTimeout = 9000
+                readTimeout = 9000
+                instanceFollowRedirects = true
+                setRequestProperty("User-Agent", "AerixLauncher/1.6")
+                setRequestProperty("Accept", "image/png,image/*;q=0.9,*/*;q=0.5")
+            }
+            try {
+                val code = conn.responseCode
+                if (code in 300..399) {
+                    val loc = conn.getHeaderField("Location") ?: return null
+                    currentUrl = java.net.URL(java.net.URL(currentUrl), loc).toString()
+                    return@repeat
+                }
+                if (code in 200..299) {
+                    return conn.inputStream.use { it.readBytes() }.takeIf { it.isNotEmpty() }
+                }
+                return null
+            } catch (_: Throwable) {
+                return null
+            } finally {
+                conn.disconnect()
+            }
+        }
+        return null
+    }
+
+    private fun resolveMojangSkinUrl(username: String): Pair<String, Boolean>? = runCatching {
+        val profileBytes = downloadBytesFollowingRedirects("https://api.mojang.com/users/profiles/minecraft/$username")
+            ?: return null
+        val uuid = com.google.gson.JsonParser.parseString(String(profileBytes, Charsets.UTF_8))
+            .asJsonObject.get("id")?.asString ?: return null
+        val sessionBytes = downloadBytesFollowingRedirects("https://sessionserver.mojang.com/session/minecraft/profile/$uuid")
+            ?: return null
+        val props = com.google.gson.JsonParser.parseString(String(sessionBytes, Charsets.UTF_8))
+            .asJsonObject.getAsJsonArray("properties") ?: return null
+        for (el in props) {
+            val obj = el.asJsonObject
+            if (obj.get("name")?.asString == "textures") {
+                val b64 = obj.get("value")?.asString ?: continue
+                val texJson = String(android.util.Base64.decode(b64, android.util.Base64.DEFAULT), Charsets.UTF_8)
+                val skinObj = com.google.gson.JsonParser.parseString(texJson)
+                    .asJsonObject.getAsJsonObject("textures")?.getAsJsonObject("SKIN") ?: continue
+                val url = skinObj.get("url")?.asString ?: continue
+                val slim = skinObj.getAsJsonObject("metadata")?.get("model")?.asString == "slim"
+                return url to slim
+            }
+        }
+        null
+    }.getOrNull()
+
+    /**
+     * Validates and normalizes any decoded skin bitmap into a clean ARGB_8888 PNG whose dimensions
+     * satisfy both skinview3d and Minecraft (width in {64, 128, 256, 512} and height in {w, w/2}).
+     */
+    private fun normalizeSkinPng(source: Bitmap): Pair<ByteArray, Bitmap>? {
+        val w = source.width
+        val h = source.height
+        if (w < 32 || h < 16) return null
+        // Reject non-skin aspect ratios (such as 100x100 avatars or error banners).
+        val isSquare = w == h
+        val isLegacyHalf = w == h * 2
+        if (!isSquare && !isLegacyHalf) return null
+
+        val targetW = when {
+            w <= 64 -> 64
+            w <= 128 -> 128
+            w <= 256 -> 256
+            else -> 512
+        }
+        val targetH = if (isLegacyHalf) targetW / 2 else targetW
+        val clean = Bitmap.createBitmap(targetW, targetH, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(clean)
+        val paint = Paint().apply { isFilterBitmap = false; isAntiAlias = false }
+        canvas.drawBitmap(source, Rect(0, 0, w, h), Rect(0, 0, targetW, targetH), paint)
+        val out = java.io.ByteArrayOutputStream()
+        if (!clean.compress(Bitmap.CompressFormat.PNG, 100, out)) {
+            clean.recycle()
+            return null
+        }
+        return out.toByteArray() to clean
     }
 
     /** Loads or downloads a 2D pixel face preview for a SkinLibrary entry. */
@@ -576,10 +673,17 @@ object PojavAccountBridge : LoginListener {
         val appCtx = context.applicationContext
         PojavApplication.sExecutorService.execute {
             val result = runCatching {
-                val bytes = appCtx.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                val rawBytes = appCtx.contentResolver.openInputStream(uri)?.use { it.readBytes() }
                     ?: return@runCatching false
-                val decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                val rawDecoded = BitmapFactory.decodeByteArray(rawBytes, 0, rawBytes.size)
                     ?: return@runCatching false
+                val normalized = normalizeSkinPng(rawDecoded)
+                val (bytes, decoded) = if (normalized != null) {
+                    rawDecoded.recycle()
+                    normalized
+                } else {
+                    rawBytes to rawDecoded
+                }
                 val displayName = queryDisplayName(appCtx, uri)
                     ?.removeSuffix(".png")
                     ?.replace(Regex("[^A-Za-z0-9 _-]"), "")
@@ -590,6 +694,9 @@ object PojavAccountBridge : LoginListener {
                 savedFile.writeBytes(bytes)
                 applySkinBytesToAccount(appCtx, account.source, bytes, decoded, savedFile.nameWithoutExtension)
                 decoded.recycle()
+                if (Accounts.getCurrent() == null || selectedIndex < 0) {
+                    Accounts.setCurrent(account.source)
+                }
                 true
             }.getOrDefault(false)
             Tools.runOnUiThread {
@@ -615,20 +722,31 @@ object PojavAccountBridge : LoginListener {
         PojavApplication.sExecutorService.execute {
             val ok = runCatching {
                 val file = preset.file
-                if (file == null || preset.id == "default") {
+                val applied = if (file == null || preset.id == "default") {
                     customSkinFile(account.source).delete()
                     customFaceFile(account.source).delete()
                     saveActivePresetId(appCtx, account.source, "default")
                     true
                 } else if (file.isFile) {
-                    val bytes = file.readBytes()
-                    val decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return@runCatching false
+                    val raw = file.readBytes()
+                    val rawDecoded = BitmapFactory.decodeByteArray(raw, 0, raw.size) ?: return@runCatching false
+                    val normalized = normalizeSkinPng(rawDecoded)
+                    val (bytes, decoded) = if (normalized != null) {
+                        rawDecoded.recycle()
+                        normalized
+                    } else {
+                        raw to rawDecoded
+                    }
                     applySkinBytesToAccount(appCtx, account.source, bytes, decoded, preset.id)
                     decoded.recycle()
                     true
                 } else {
                     false
                 }
+                if (applied && (Accounts.getCurrent() == null || selectedIndex < 0)) {
+                    Accounts.setCurrent(account.source)
+                }
+                applied
             }.getOrDefault(false)
             Tools.runOnUiThread {
                 if (ok) {
@@ -638,6 +756,38 @@ object PojavAccountBridge : LoginListener {
                 onDone(ok)
             }
         }
+    }
+
+    /** Crisp 2D full-body preview of [account]'s equipped skin (or default Steve), used while 3D WebGL loads or on non-WebGL devices. */
+    fun loadAccountBodyPreview(context: Context, account: AerixAccount?): ImageBitmap? {
+        val customBytes = resolveCustomSkinBytes(account)
+        if (customBytes != null) {
+            val bmp = BitmapFactory.decodeByteArray(customBytes, 0, customBytes.size)
+            if (bmp != null) {
+                val body = renderSkinBodyPreview(bmp).asImageBitmap()
+                bmp.recycle()
+                return body
+            }
+        }
+        if (account != null) {
+            val cacheFile = File(Tools.DIR_CACHE, "aerix-skin-${account.source.profileId}-${account.authType.name}.png")
+            if (cacheFile.isFile && cacheFile.length() > 0) {
+                val bmp = BitmapFactory.decodeFile(cacheFile.absolutePath)
+                if (bmp != null) {
+                    val body = renderSkinBodyPreview(bmp).asImageBitmap()
+                    bmp.recycle()
+                    return body
+                }
+            }
+        }
+        return runCatching {
+            context.assets.open("steve.png").use { stream ->
+                val bmp = BitmapFactory.decodeStream(stream) ?: return@use null
+                val body = renderSkinBodyPreview(bmp).asImageBitmap()
+                bmp.recycle()
+                body
+            }
+        }.getOrNull()
     }
 
     fun equipCapeFromUri(
@@ -657,10 +807,14 @@ object PojavAccountBridge : LoginListener {
                 val target = customCapeFile(account.source)
                 target.parentFile?.mkdirs()
                 target.writeBytes(bytes)
+                if (Accounts.getCurrent() == null) {
+                    Accounts.setCurrent(account.source)
+                }
                 true
             }.getOrDefault(false)
             Tools.runOnUiThread {
                 if (ok) {
+                    reload()
                     wardrobeRevision++
                     Toast.makeText(appCtx, "Cape equipped for ${account.username}", Toast.LENGTH_SHORT).show()
                 } else {

@@ -291,34 +291,54 @@ public class LauncherActivity extends BaseActivity {
         if (intent == null) return;
         boolean relaunch = intent.getBooleanExtra(Tools.EXTRA_RELAUNCH_GAME, false);
         String accountKey = intent.getStringExtra(Tools.EXTRA_SWITCH_ACCOUNT);
-        if (!relaunch && accountKey == null) return;
+        String instanceKey = intent.getStringExtra(Tools.EXTRA_SWITCH_INSTANCE);
+        String launchServer = intent.getStringExtra(Tools.EXTRA_LAUNCH_SERVER);
+        if (!relaunch && accountKey == null && instanceKey == null && launchServer == null) return;
         intent.removeExtra(Tools.EXTRA_RELAUNCH_GAME);
         intent.removeExtra(Tools.EXTRA_SWITCH_ACCOUNT);
+        intent.removeExtra(Tools.EXTRA_SWITCH_INSTANCE);
+        intent.removeExtra(Tools.EXTRA_LAUNCH_SERVER);
+        if (launchServer != null && !launchServer.isEmpty()) {
+            net.kdt.pojavlaunch.aerix.bridge.PojavLaunchBridge.setPendingServerAddress(launchServer);
+        }
         // After the first layout: the launch pipeline reads preferences the shell sets up, and the
         // progress overlay has to exist before it is asked to show itself.
         View root = findViewById(android.R.id.content);
         if (root == null) return;
-        if (accountKey == null) {
+        if (accountKey == null && instanceKey == null) {
             root.post(() -> ExtraCore.setValue(ExtraConstants.LAUNCH_GAME, true));
             return;
         }
         PojavApplication.sExecutorService.execute(() -> {
-            boolean switched = false;
-            try {
-                for (Account candidate : Accounts.load().accounts) {
-                    if (candidate.mSaveLocation != null &&
-                            candidate.mSaveLocation.getName().equals(accountKey)) {
-                        Accounts.setCurrent(candidate);
-                        switched = true;
-                        break;
+            if (instanceKey != null && !instanceKey.isEmpty()) {
+                try {
+                    net.kdt.pojavlaunch.instances.Instance targetInst =
+                            net.kdt.pojavlaunch.instances.Instances.loadInstance(instanceKey);
+                    if (targetInst != null) {
+                        net.kdt.pojavlaunch.instances.Instances.setSelectedInstance(targetInst);
                     }
+                } catch (Throwable error) {
+                    Log.w("LauncherActivity", "Could not select requested social instance", error);
                 }
-            } catch (IOException | RuntimeException error) {
-                Log.w("LauncherActivity", "Could not select the account to switch to", error);
             }
-            Logger.appendToLog(switched
-                    ? "Account switch: signed in as the account the game asked for"
-                    : "Account switch: the chosen account could not be found; keeping the current one");
+            boolean switched = false;
+            if (accountKey != null) {
+                try {
+                    for (Account candidate : Accounts.load().accounts) {
+                        if (candidate.mSaveLocation != null &&
+                                candidate.mSaveLocation.getName().equals(accountKey)) {
+                            Accounts.setCurrent(candidate);
+                            switched = true;
+                            break;
+                        }
+                    }
+                } catch (IOException | RuntimeException error) {
+                    Log.w("LauncherActivity", "Could not select the account to switch to", error);
+                }
+                Logger.appendToLog(switched
+                        ? "Account switch: signed in as the account the game asked for"
+                        : "Account switch: the chosen account could not be found; keeping the current one");
+            }
             Tools.runOnUiThread(() -> root.post(() -> ExtraCore.setValue(ExtraConstants.LAUNCH_GAME, true)));
         });
     }

@@ -27,11 +27,19 @@ drop policy if exists friendships_read on public.friendships;
 create policy friendships_read on public.friendships
     for select to authenticated using (auth.uid() = requester or auth.uid() = addressee);
 
--- Only the requester creates a request, and always as 'pending'.
+-- Only the requester creates a request, and always as 'pending', unless either side blocked the other.
 drop policy if exists friendships_insert on public.friendships;
 
 create policy friendships_insert on public.friendships
-    for insert to authenticated with check (auth.uid() = requester and status = 'pending');
+    for insert to authenticated with check (
+        auth.uid() = requester
+        and status = 'pending'
+        and not exists (
+            select 1 from public.blocks b
+            where (b.blocker = addressee and b.blocked = auth.uid())
+               or (b.blocker = auth.uid() and b.blocked = addressee)
+        )
+    );
 
 -- Either side may answer it (accept, decline), and either may remove the friendship.
 drop policy if exists friendships_update on public.friendships;
@@ -44,17 +52,30 @@ drop policy if exists friendships_delete on public.friendships;
 create policy friendships_delete on public.friendships
     for delete to authenticated using (auth.uid() = requester or auth.uid() = addressee);
 
--- Only the two people in a conversation can read it.
+-- Only the two people in a conversation can read it, and blocked pairs stop seeing new traffic.
 drop policy if exists messages_read on public.messages;
 
 create policy messages_read on public.messages
-    for select to authenticated using (auth.uid() = sender or auth.uid() = recipient);
+    for select to authenticated using (
+        (auth.uid() = sender or auth.uid() = recipient)
+        and not exists (
+            select 1 from public.blocks b
+            where (b.blocker = auth.uid() and (b.blocked = sender or b.blocked = recipient))
+        )
+    );
 
--- You may only send as yourself.
+-- You may only send as yourself, and server-side blocks forbid messaging in either direction.
 drop policy if exists messages_insert on public.messages;
 
 create policy messages_insert on public.messages
-    for insert to authenticated with check (auth.uid() = sender);
+    for insert to authenticated with check (
+        auth.uid() = sender
+        and not exists (
+            select 1 from public.blocks b
+            where (b.blocker = recipient and b.blocked = auth.uid())
+               or (b.blocker = auth.uid() and b.blocked = recipient)
+        )
+    );
 
 -- ---- who can read a profile --------------------------------------------------------------
 -- A profile is only readable by its owner and by people already connected to them - a friend, or
@@ -137,6 +158,7 @@ drop policy if exists parties_read on public.parties;
 create policy parties_read on public.parties
     for select to authenticated using (
         host = auth.uid()
+        or (is_public = true and expires_at > now())
         or exists (select 1 from public.party_members m where m.party_id = parties.id and m.member = auth.uid())
     );
 
@@ -148,7 +170,7 @@ create policy parties_insert on public.parties
 drop policy if exists parties_update on public.parties;
 
 create policy parties_update on public.parties
-    for update to authenticated using (auth.uid() = host);
+    for update to authenticated using (auth.uid() = host) with check (true);
 
 drop policy if exists parties_delete on public.parties;
 
@@ -158,17 +180,76 @@ create policy parties_delete on public.parties
 drop policy if exists party_members_read on public.party_members;
 
 create policy party_members_read on public.party_members
-    for select to authenticated using (member = auth.uid());
+    for select to authenticated using (
+        member = auth.uid()
+        or exists (select 1 from public.parties p where p.id = party_members.party_id and (p.host = auth.uid() or p.is_public = true))
+        or exists (select 1 from public.party_members self where self.party_id = party_members.party_id and self.member = auth.uid())
+    );
 
 drop policy if exists party_members_insert on public.party_members;
 
 create policy party_members_insert on public.party_members
-    for insert to authenticated with check (auth.uid() = member);
+    for insert to authenticated with check (
+        auth.uid() = member
+        and (
+            select count(*) from public.party_members pm where pm.party_id = party_members.party_id
+        ) < coalesce((select max_members from public.parties p where p.id = party_members.party_id), 16)
+    );
 
 drop policy if exists party_members_delete on public.party_members;
 
 create policy party_members_delete on public.party_members
-    for delete to authenticated using (auth.uid() = member);
+    for delete to authenticated using (
+        auth.uid() = member
+        or exists (select 1 from public.parties p where p.id = party_members.party_id and p.host = auth.uid())
+    );
+
+drop policy if exists party_messages_read on public.party_messages;
+
+create policy party_messages_read on public.party_messages
+    for select to authenticated using (
+        exists (select 1 from public.parties p where p.id = party_messages.party_id and p.host = auth.uid())
+        or exists (select 1 from public.party_members pm where pm.party_id = party_messages.party_id and pm.member = auth.uid())
+    );
+
+drop policy if exists party_messages_insert on public.party_messages;
+
+create policy party_messages_insert on public.party_messages
+    for insert to authenticated with check (
+        auth.uid() = sender
+        and (
+            exists (select 1 from public.parties p where p.id = party_messages.party_id and p.host = auth.uid())
+            or exists (select 1 from public.party_members pm where pm.party_id = party_messages.party_id and pm.member = auth.uid())
+        )
+    );
+
+drop policy if exists party_messages_update on public.party_messages;
+
+create policy party_messages_update on public.party_messages
+    for update to authenticated using (auth.uid() = sender) with check (auth.uid() = sender);
+
+drop policy if exists server_shares_read on public.server_shares;
+
+create policy server_shares_read on public.server_shares
+    for select to authenticated using (
+        owner = auth.uid()
+        or exists (
+            select 1 from public.friendships f
+            where f.status = 'accepted'
+              and ((f.requester = auth.uid() and f.addressee = server_shares.owner)
+                or (f.addressee = auth.uid() and f.requester = server_shares.owner))
+        )
+    );
+
+drop policy if exists server_shares_insert on public.server_shares;
+
+create policy server_shares_insert on public.server_shares
+    for insert to authenticated with check (auth.uid() = owner);
+
+drop policy if exists server_shares_delete on public.server_shares;
+
+create policy server_shares_delete on public.server_shares
+    for delete to authenticated using (auth.uid() = owner);
 
 drop policy if exists social_media_read on storage.objects;
 
@@ -195,3 +276,23 @@ create policy social_media_delete on storage.objects
     for delete to authenticated using (
         bucket_id = 'social-media' and (storage.foldername(name))[1] = auth.uid()::text
     );
+
+-- ---- Supabase Realtime publication (idempotent) ------------------------------------------
+
+do 'declare
+    tbl text;
+begin
+    if exists (select 1 from pg_publication where pubname = ''supabase_realtime'') then
+        foreach tbl in array array[
+            ''profiles'', ''friendships'', ''messages'',
+            ''parties'', ''party_members'', ''party_messages'', ''server_shares''
+        ] loop
+            if not exists (
+                select 1 from pg_publication_tables
+                where pubname = ''supabase_realtime'' and schemaname = ''public'' and tablename = tbl
+            ) then
+                execute format(''alter publication supabase_realtime add table public.%I'', tbl);
+            end if;
+        end loop;
+    end if;
+end ';

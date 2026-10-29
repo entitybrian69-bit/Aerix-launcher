@@ -47,6 +47,61 @@ import java.util.Map;
 import net.kdt.pojavlaunch.R;
 
 public class GameRunner {
+    private static volatile String sPendingServerAddress;
+
+    public static void setPendingServerAddress(String serverAddress) {
+        sPendingServerAddress = (serverAddress != null && !serverAddress.trim().isEmpty())
+                ? serverAddress.trim()
+                : null;
+    }
+
+    private static boolean usesQuickPlayMultiplayer(JVersionList.Version versionInfo, String versionId) {
+        String candidate = versionInfo != null && versionInfo.inheritsFrom != null
+                ? versionInfo.inheritsFrom
+                : (versionInfo != null && versionInfo.id != null ? versionInfo.id : versionId);
+        if (candidate != null) {
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile("(?:^|[^0-9])1\\.(\\d+)(?:\\.\\d+)?").matcher(candidate);
+            if (m.find()) {
+                try {
+                    return Integer.parseInt(m.group(1)) >= 20;
+                } catch (NumberFormatException ignored) {
+                }
+            }
+        }
+        try {
+            return !DateUtils.dateBefore(DateUtils.getOriginalReleaseDate(versionInfo), 2023, 3, 5);
+        } catch (Throwable ignored) {
+            return true;
+        }
+    }
+
+    private static void appendServerAutoConnectArgs(List<String> launchArgs, JVersionList.Version versionInfo, String versionId) {
+        String raw = sPendingServerAddress;
+        sPendingServerAddress = null;
+        if (raw == null || raw.isEmpty()) return;
+
+        if (usesQuickPlayMultiplayer(versionInfo, versionId)) {
+            launchArgs.add("--quickPlayMultiplayer");
+            launchArgs.add(raw);
+            return;
+        }
+
+        String host = raw;
+        String port = "25565";
+        int lastColon = raw.lastIndexOf(':');
+        if (lastColon > 0 && raw.indexOf(':') == lastColon && lastColon < raw.length() - 1) {
+            String maybePort = raw.substring(lastColon + 1);
+            if (maybePort.matches("\\d{1,5}")) {
+                host = raw.substring(0, lastColon);
+                port = maybePort;
+            }
+        }
+        launchArgs.add("--server");
+        launchArgs.add(host);
+        launchArgs.add("--port");
+        launchArgs.add(port);
+    }
+
     /**
      * Optimization mods based on Sodium can mitigate the render distance issue. Check if Sodium
      * or its derivative is currently installed to skip the render distance check.
@@ -271,6 +326,7 @@ public class GameRunner {
         // Pre-process specific files
         disableSplash(gamedir);
         List<String> launchArgs = getMoJsonClientArgs(account, versionInfo, gamedir);
+        appendServerAutoConnectArgs(launchArgs, versionInfo, versionId);
 
         // Select the appropriate openGL version
         OldVersionsUtils.selectOpenGlVersion(versionInfo);

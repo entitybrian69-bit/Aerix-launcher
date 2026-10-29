@@ -250,6 +250,34 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
                     .padding(top = AerixSpacing.xs, end = AerixSpacing.lg)
             )
 
+            // Live join toast ("Marie started 1.21.4 · Join?") from Supabase Realtime presence.
+            net.kdt.pojavlaunch.aerix.social.SocialBackend.activeJoinToast?.let { toast ->
+                net.kdt.pojavlaunch.aerix.ui.screens.SocialJoinToastBanner(
+                    toast = toast,
+                    onJoin = {
+                        net.kdt.pojavlaunch.aerix.social.SocialBackend.dismissJoinToast()
+                        val party = toast.partyId?.let { pid ->
+                            net.kdt.pojavlaunch.aerix.social.SocialBackend.parties.firstOrNull { it.id == pid }
+                        }
+                        net.kdt.pojavlaunch.aerix.bridge.PojavLaunchBridge.joinSocialSession(
+                            activity = activity,
+                            mcVersion = party?.mcVersion ?: toast.mcVersion,
+                            loaderName = party?.loader ?: toast.loader,
+                            instanceHint = party?.instanceName,
+                            modpackSource = party?.modpackSource,
+                            modpackId = party?.modpackId,
+                            modpackIconUrl = party?.modpackIconUrl,
+                            serverAddress = party?.serverAddress ?: toast.serverAddress,
+                            onNavigate = navigate
+                        )
+                    },
+                    onDismiss = { net.kdt.pojavlaunch.aerix.social.SocialBackend.dismissJoinToast() },
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = AerixSpacing.md)
+                )
+            }
+
             // Installs outlive the page that started them, so their two surfaces live here: the
             // panel with the progress bars, and the pill it collapses into when minimized.
             if (AerixInstallQueue.visible) {

@@ -191,6 +191,52 @@ alter table public.parties enable row level security;
 
 alter table public.party_members enable row level security;
 
+-- ---- party extras, party chat, shared servers and realtime -------------------------------
+
+alter table public.parties add column if not exists max_members int not null default 4;
+
+alter table public.parties add column if not exists loader text;
+
+alter table public.parties add column if not exists modpack_source text;
+
+alter table public.parties add column if not exists modpack_id text;
+
+alter table public.parties add column if not exists modpack_icon_url text;
+
+alter table public.parties add column if not exists server_address text;
+
+alter table public.parties add column if not exists is_public boolean not null default false;
+
+create table if not exists public.party_messages (
+    id              bigint generated always as identity primary key,
+    party_id        uuid not null references public.parties (id) on delete cascade,
+    sender          uuid not null references public.profiles (id) on delete cascade,
+    body            text not null check (char_length(body) between 1 and 2000),
+    reply_to        bigint references public.party_messages (id) on delete set null,
+    attachment_url  text,
+    edited_at       timestamptz,
+    created_at      timestamptz not null default now()
+);
+
+create index if not exists party_messages_party_idx on public.party_messages (party_id, created_at asc);
+
+alter table public.party_messages enable row level security;
+
+create table if not exists public.server_shares (
+    id              bigint generated always as identity primary key,
+    owner           uuid not null references public.profiles (id) on delete cascade,
+    name            text not null check (char_length(name) between 1 and 80),
+    address         text not null check (char_length(address) between 3 and 255),
+    mc_version      text,
+    loader          text,
+    description     text,
+    created_at      timestamptz not null default now()
+);
+
+create index if not exists server_shares_owner_idx on public.server_shares (owner, created_at desc);
+
+alter table public.server_shares enable row level security;
+
 -- ---- image storage -----------------------------------------------------------------------
 
 insert into storage.buckets (id, name, public)

@@ -29,6 +29,7 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -416,10 +417,117 @@ private fun ProfileCard(
         }
 
         if (!profile.isMe) {
+            val scope = rememberCoroutineScope()
+            val friendEntry = SocialBackend.friends.firstOrNull { it.id == profile.id && !it.pendingIncoming && !it.pendingOutgoing }
+            val blockedNow = SocialBackend.isBlocked(profile.id)
+            var mutualInfo by remember(profile.id) { mutableStateOf(0 to emptyList<String>()) }
+            var nicknameDialogOpen by remember { mutableStateOf(false) }
+            var nicknameDraft by remember(profile.id) { mutableStateOf(SocialBackend.getFriendNickname(profile.id).orEmpty()) }
+            var confirmBlockOpen by remember { mutableStateOf(false) }
+
+            LaunchedEffect(profile.id) {
+                mutualInfo = SocialBackend.loadMutualFriends(profile.id)
+            }
+
+            if (mutualInfo.first > 0) {
+                Spacer(Modifier.height(AerixSpacing.xs))
+                val preview = mutualInfo.second.take(3).joinToString(", ")
+                SocialTag(
+                    text = if (preview.isNotEmpty()) "${mutualInfo.first} mutual: $preview" else "${mutualInfo.first} mutual friends",
+                    tint = AerixThemeManager.currentAccent()
+                )
+            }
+
             Spacer(Modifier.height(AerixSpacing.sm))
-            Row(horizontalArrangement = Arrangement.spacedBy(AerixSpacing.sm)) {
-                SocialButton("Add friend", filled = false, onClick = onAddFriend)
+            Row(
+                modifier = Modifier.horizontalScroll(androidx.compose.foundation.rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
+            ) {
+                if (friendEntry == null && !blockedNow) {
+                    SocialButton("Add friend", filled = true, onClick = onAddFriend)
+                }
+                if (friendEntry != null) {
+                    SocialButton(
+                        label = if (friendEntry.pinned) "★ Pinned" else "☆ Favourite",
+                        filled = friendEntry.pinned
+                    ) {
+                        SocialBackend.toggleFriendPin(profile.id)
+                    }
+                    SocialButton(
+                        label = if (!friendEntry.nickname.isNullOrBlank()) "Nickname: ${friendEntry.nickname}" else "Set Nickname",
+                        filled = false
+                    ) {
+                        nicknameDraft = SocialBackend.getFriendNickname(profile.id).orEmpty()
+                        nicknameDialogOpen = true
+                    }
+                }
+                SocialButton(
+                    label = if (blockedNow) "Unblock" else "Block",
+                    filled = false
+                ) {
+                    if (blockedNow) {
+                        scope.launch {
+                            if (SocialBackend.unblock(profile.id)) {
+                                Toast.makeText(activity, "Unblocked ${profile.displayName}", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    } else {
+                        confirmBlockOpen = true
+                    }
+                }
                 SocialButton("Report", filled = false, onClick = onReport)
+            }
+
+            if (nicknameDialogOpen) {
+                AlertDialog(
+                    onDismissRequest = { nicknameDialogOpen = false },
+                    title = { Text("Nickname for ${profile.displayName}") },
+                    text = {
+                        SocialGlassInput(
+                            value = nicknameDraft,
+                            onValueChange = { nicknameDraft = it.take(32) },
+                            label = "Custom nickname (leave empty to reset)"
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            SocialBackend.setFriendNickname(profile.id, nicknameDraft)
+                            nicknameDialogOpen = false
+                        }) { Text("Save") }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { nicknameDialogOpen = false }) { Text("Cancel") }
+                    }
+                )
+            }
+
+            if (confirmBlockOpen) {
+                AlertDialog(
+                    onDismissRequest = { confirmBlockOpen = false },
+                    title = { Text("Block ${profile.displayName}?") },
+                    text = {
+                        Text(
+                            "Blocking removes your friendship and stops direct messages and friend requests in both directions.",
+                            fontSize = 12.sp
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            confirmBlockOpen = false
+                            scope.launch {
+                                val ok = SocialBackend.block(profile.id)
+                                Toast.makeText(
+                                    activity,
+                                    if (ok) "Blocked ${profile.displayName}" else "Could not block player",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        }) { Text("Block", color = AerixSurface.danger) }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { confirmBlockOpen = false }) { Text("Cancel") }
+                    }
+                )
             }
         }
         if (isMe) {
@@ -497,12 +605,13 @@ private fun SocialPeoplePage(
         people = when (relation) {
             "FOLLOWERS" -> SocialBackend.loadFollowers()
             "FOLLOWING" -> SocialBackend.loadFollowing()
-            else -> SocialBackend.friends.map { friend ->
+            else -> SocialBackend.friends.filter { !it.pendingIncoming && !it.pendingOutgoing }.map { friend ->
                 SocialProfile(
                     id = friend.id,
-                    username = friend.mcUsername,
-                    name = friend.displayName,
+                    username = friend.username ?: friend.mcUsername,
+                    name = friend.effectiveName,
                     mcUsername = friend.mcUsername,
+                    avatarUrl = friend.avatarUrl,
                     lastSeenMs = friend.lastSeenMs
                 )
             }
