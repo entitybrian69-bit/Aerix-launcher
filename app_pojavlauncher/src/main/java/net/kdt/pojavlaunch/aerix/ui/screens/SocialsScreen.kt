@@ -111,6 +111,12 @@ fun SocialsScreen(activity: FragmentActivity) {
         }
     }
     LaunchedEffect(signedIn) {
+        if (signedIn) {
+            // Catches the browser sign-in too, where the first effect ran while still signed out.
+            SocialBackend.rememberMinecraftName(account?.username)
+            SocialBackend.loadProfile()
+            SocialBackend.refreshFriends()
+        }
         while (signedIn) {
             SocialBackend.heartbeat()
             delay(60_000)
