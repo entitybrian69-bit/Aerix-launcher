@@ -570,12 +570,29 @@ private fun CompactHomeDashboard(
 @Composable
 private fun QuickTiles(count: Int, accent: Color, actions: HomeActions, modifier: Modifier, scrollable: Boolean) {
     val rowModifier = if (scrollable) modifier.horizontalScroll(rememberScrollState()) else modifier
+    // The Socials tile tells you who is around without opening anything.
+    val socialContext = androidx.compose.ui.platform.LocalContext.current
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        if (net.kdt.pojavlaunch.aerix.social.SocialBackend.signedIn) {
+            net.kdt.pojavlaunch.aerix.social.SocialBackend.attach(socialContext)
+            net.kdt.pojavlaunch.aerix.social.SocialBackend.refreshFriends()
+            net.kdt.pojavlaunch.aerix.social.SocialBackend.unreadCount()
+        }
+    }
+    val playableNow = net.kdt.pojavlaunch.aerix.social.SocialBackend.friends.count { it.online }
+    val waiting = net.kdt.pojavlaunch.aerix.social.SocialBackend.unread
+    val socialSubtitle = when {
+        playableNow > 0 && waiting > 0 -> "$playableNow online · $waiting unread"
+        playableNow > 0 -> "$playableNow online now"
+        waiting > 0 -> "$waiting unread message${if (waiting == 1) "" else "s"}"
+        else -> stringResource(R.string.aerix_home_quick_socials_sub)
+    }
     Row(modifier = rowModifier, horizontalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus)) {
         val tiles = listOf(
             // The card that used to open the instance creator now opens Socials: creating an
             // instance lives on the rail's + button and in the library, where it is not competing
             // with the one thing the launcher can do that no other launcher can.
-            Triple(R.drawable.aerix_ic_people, stringResource(R.string.aerix_home_quick_socials) to stringResource(R.string.aerix_home_quick_socials_sub), accent to actions.socials),
+            Triple(R.drawable.aerix_ic_people, stringResource(R.string.aerix_home_quick_socials) to socialSubtitle, accent to actions.socials),
             Triple(R.drawable.aerix_ic_search, stringResource(R.string.aerix_home_quick_explore) to stringResource(R.string.aerix_home_quick_explore_sub), AerixSurface.glassBlue to actions.explore),
             Triple(R.drawable.aerix_ic_dashboard_filled, stringResource(R.string.aerix_home_quick_library) to stringResource(R.string.aerix_home_quick_library_sub, count), AerixSurface.glassViolet to actions.library),
             Triple(R.drawable.aerix_ic_folder_outlined, stringResource(R.string.aerix_home_quick_files) to stringResource(R.string.aerix_home_quick_files_sub), AerixSurface.glassRose to actions.fileManager)

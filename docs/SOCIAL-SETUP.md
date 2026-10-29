@@ -22,6 +22,9 @@ holds profiles, friend lists and messages, and a debug APK on your phone that yo
 
 ### 1a. Create the tables
 
+> **Already ran it before?** Paste the whole `supabase/schema.sql` again — it is idempotent and
+> adds the new profile columns, follows, ranks, the image bucket and the invite-code lookup.
+
 5. In the left sidebar tap **SQL Editor** → **New query**.
 6. Open this file in another tab and copy all of it:
    `https://github.com/entitybrian69-bit/Aerix-launcher/blob/arena/2f1249a3-aerix-launcher/supabase/schema.sql`
@@ -106,6 +109,20 @@ Google button again. If it says "redirect_uri_mismatch", the address in step 11 
 trailing `/` is the usual one).
 
 ---
+
+## Part 2½ — Your profile (nothing to set up)
+
+The first time you sign in, the app asks for a **username** (letters and numbers, at least one of
+each), a name, a country, a bio, a logo, a background image, a skin and a cape. Pictures go into
+your own Supabase storage bucket, so the free 1 GB is plenty — logos and backgrounds are shrunk
+before upload, skins and capes are not touched.
+
+- Your **username can only change once a month**; the database enforces it, so reinstalling does
+  not reset it.
+- **People cannot browse you.** A profile is readable only by you and by people already connected
+  to you. A stranger can reach you in exactly two ways: typing your exact username, or your invite
+  code (`aerix-social://friend/XXXXXXXX`), copied from your profile with **Copy link**.
+- Weights: **Follow** is one-way and open, **Add friend** still needs an Accept.
 
 ## Part 3 — What I already have
 

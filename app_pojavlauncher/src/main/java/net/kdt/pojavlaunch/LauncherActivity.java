@@ -177,6 +177,15 @@ public class LauncherActivity extends BaseActivity {
     private void handleSocialSignIn(Intent intent) {
         if (intent == null || intent.getData() == null) return;
         String data = intent.getData().toString();
+        // aerix-social://friend/CODE opens that player's card inside the social space.
+        if (data.startsWith("aerix-social://friend/")) {
+            String code = data.substring("aerix-social://friend/".length());
+            net.kdt.pojavlaunch.aerix.social.SocialBackend.attach(getApplicationContext());
+            net.kdt.pojavlaunch.aerix.social.SocialBackend.acceptInvite(code);
+            net.kdt.pojavlaunch.aerix.ui.AerixNav.INSTANCE
+                    .navigate(net.kdt.pojavlaunch.aerix.ui.LauncherSection.SOCIALS);
+            return;
+        }
         if (!data.startsWith(net.kdt.pojavlaunch.aerix.social.SocialBackend.OAUTH_REDIRECT)) return;
         net.kdt.pojavlaunch.aerix.social.SocialBackend.attach(getApplicationContext());
         boolean restored = net.kdt.pojavlaunch.aerix.social.SocialBackend.completeBrowserSession(data);

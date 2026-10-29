@@ -130,6 +130,7 @@ fun SocialProfilePage(
     ) { current ->
         when (current) {
             ProfileView.CARD -> ProfileCard(
+                activity = activity,
                 profile = profile,
                 loading = loading,
                 isMe = isMe,
@@ -222,6 +223,7 @@ fun SocialProfilePage(
 
 @Composable
 private fun ProfileCard(
+    activity: FragmentActivity,
     profile: SocialProfile?,
     loading: Boolean,
     isMe: Boolean,
@@ -413,9 +415,45 @@ private fun ProfileCard(
                 SocialButton("Report", filled = false, onClick = onReport)
             }
         }
+        if (isMe) {
+            Spacer(Modifier.height(AerixSpacing.sm))
+            SocialPanel(Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "Invite code",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = AerixSurface.textPrimary
+                        )
+                        Text(
+                            SocialBackend.inviteCode() ?: "—",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = AerixThemeManager.currentAccent()
+                        )
+                    }
+                    SocialButton("Copy link", filled = false) {
+                        val code = SocialBackend.inviteCode() ?: return@SocialButton
+                        val clipboard = activity.getSystemService(android.content.Context.CLIPBOARD_SERVICE)
+                                as android.content.ClipboardManager
+                        clipboard.setPrimaryClip(
+                            android.content.ClipData.newPlainText(
+                                "Aerix invite",
+                                "aerix-social://friend/$code"
+                            )
+                        )
+                        Toast.makeText(activity, "Invite link copied", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        }
         Spacer(Modifier.height(AerixSpacing.sm))
         Text(
-            if (isMe) "Your profile is only reachable by typing your exact username." else
+            if (isMe) "Your profile is only reachable by your exact username or this code." else
                 "Found by username only — this profile is not listed anywhere.",
             fontSize = 9.sp,
             color = AerixSurface.textMuted

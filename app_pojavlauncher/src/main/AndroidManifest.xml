@@ -93,6 +93,9 @@
                 <data
                     android:host="auth"
                     android:scheme="aerix-social" />
+                <data
+                    android:host="friend"
+                    android:scheme="aerix-social" />
             </intent-filter>
         </activity>
         <activity

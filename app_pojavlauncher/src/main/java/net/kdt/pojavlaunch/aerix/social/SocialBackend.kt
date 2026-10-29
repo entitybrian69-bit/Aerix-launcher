@@ -575,6 +575,43 @@ object SocialBackend {
         return found
     }
 
+    /** This player's invite code: the first eight characters of the user id, upper case. */
+    fun inviteCode(): String? = myUserId()?.replace("-", "")?.take(8)?.uppercase()
+
+    /** A deep link arrived and the social space has not opened yet. */
+    var pendingInvite by mutableStateOf<String?>(null)
+        private set
+
+    /** Called from the activity when aerix-social://friend/CODE arrives. */
+    @JvmStatic
+    fun acceptInvite(code: String) {
+        pendingInvite = code.trim()
+    }
+
+    /** Reads and clears the invite, so it is only followed once. */
+    fun consumeInvite(): String? {
+        val code = pendingInvite
+        pendingInvite = null
+        return code
+    }
+
+    /** Looks a player up by their invite code - still an exact match, never a search. */
+    suspend fun findByCode(code: String): SocialProfile? = attempt {
+        ensureToken()
+        val body = JsonObject().apply { addProperty("p_code", code.trim()) }
+        val json = call("POST", "$PROJECT_URL/rest/v1/rpc/find_by_code", body.toString())
+        val row = json as? JsonObject ?: return@attempt null
+        SocialProfile(
+            id = row.stringOrNull("id") ?: return@attempt null,
+            username = row.stringOrNull("username"),
+            name = row.stringOrNull("name"),
+            mcUsername = row.stringOrNull("mc_username"),
+            avatarUrl = row.stringOrNull("avatar_url"),
+            country = row.stringOrNull("country"),
+            lastSeenMs = row.longOr("last_seen_ms", 0L)
+        )
+    }
+
     /**
      * Claims a username. Returns null when it worked, or the sentence to show the player - the
      * one-change-a-month rule lives in the database, not here.

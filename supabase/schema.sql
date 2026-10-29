@@ -513,3 +513,34 @@ create policy social_media_delete on storage.objects
     for delete to authenticated using (
         bucket_id = 'social-media' and (storage.foldername(name))[1] = auth.uid()::text
     );
+
+-- ---- invite codes ------------------------------------------------------------------------
+-- Every profile has a short code: the first eight characters of its id, no dashes. Sharing it is
+-- the second (and last) way to reach a stranger; it is derived, not stored, so nothing to mint.
+
+create or replace function public.find_by_code(p_code text) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+    player public.profiles;
+    clean text := upper(regexp_replace(coalesce(p_code, ''), '[^a-zA-Z0-9]', '', 'g'));
+begin
+    if char_length(clean) < 6 then
+        return null;
+    end if;
+    select * into player from public.profiles
+        where upper(left(replace(id::text, '-', ''), 8)) = left(clean, 8)
+        limit 1;
+    if player.id is null then
+        return null;
+    end if;
+    return jsonb_build_object(
+        'id', player.id,
+        'username', player.username,
+        'name', player.name,
+        'mc_username', player.mc_username,
+        'avatar_url', player.avatar_url,
+        'country', player.country,
+        'last_seen_ms', (extract(epoch from player.last_seen) * 1000)::bigint,
+        'online', player.last_seen > now() - interval '2 minutes'
+    );
+end $$;

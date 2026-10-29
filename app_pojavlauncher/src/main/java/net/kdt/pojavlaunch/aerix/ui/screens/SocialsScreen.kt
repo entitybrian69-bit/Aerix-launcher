@@ -158,6 +158,13 @@ fun SocialsScreen(activity: FragmentActivity, onExit: () -> Unit = {}) {
 
     LaunchedEffect(Unit) {
         SocialBackend.attach(activity)
+        // An aerix-social://friend/CODE link brings us here with a code waiting.
+        SocialBackend.consumeInvite()?.let { code ->
+            SocialBackend.findByCode(code)?.let { person ->
+                profileUser = person.username
+                profileOpen = true
+            }
+        }
         if (SocialBackend.signedIn) {
             SocialBackend.rememberMinecraftName(account?.username)
             SocialBackend.loadProfile()
@@ -1181,17 +1188,66 @@ private fun SocialChat(
                     horizontalArrangement = if (mine) Arrangement.End else Arrangement.Start
                 ) {
                     Column(horizontalAlignment = if (mine) Alignment.End else Alignment.Start) {
-                        Surface(
-                            shape = RoundedCornerShape(AerixRadii.cardSmall),
-                            color = if (mine) AerixThemeManager.currentAccent() else AerixSurface.panelRaised,
-                            border = if (mine) null else BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft)
-                        ) {
-                            Text(
-                                message.body,
-                                color = if (mine) AerixSurface.canvas else AerixSurface.textPrimary,
-                                fontSize = 12.sp,
-                                modifier = Modifier.padding(horizontal = 11.dp, vertical = 7.dp)
-                            )
+                        if (serverAddress(message.body) != null) {
+                            // A message that is only an address becomes a card you can copy into
+                            // the multiplayer list instead of retyping it.
+                            Surface(
+                                shape = RoundedCornerShape(AerixRadii.cardSmall),
+                                color = if (mine) AerixThemeManager.currentAccent() else AerixSurface.panelRaised,
+                                border = if (mine) null else BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 11.dp, vertical = 7.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column {
+                                        Text(
+                                            "Server address",
+                                            fontSize = 9.sp,
+                                            color = if (mine) AerixSurface.canvas.copy(alpha = 0.7f)
+                                            else AerixSurface.textMuted
+                                        )
+                                        Text(
+                                            serverAddress(message.body) ?: message.body,
+                                            color = if (mine) AerixSurface.canvas else AerixSurface.textPrimary,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        "Copy",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (mine) AerixSurface.canvas else AerixSurface.accent,
+                                        modifier = Modifier.clickable {
+                                            val clipboard = activity.getSystemService(
+                                                android.content.Context.CLIPBOARD_SERVICE
+                                            ) as android.content.ClipboardManager
+                                            clipboard.setPrimaryClip(
+                                                android.content.ClipData.newPlainText(
+                                                    "Server",
+                                                    serverAddress(message.body) ?: message.body
+                                                )
+                                            )
+                                            Toast.makeText(activity, "Address copied", Toast.LENGTH_SHORT).show()
+                                        }
+                                    )
+                                }
+                            }
+                        } else {
+                            Surface(
+                                shape = RoundedCornerShape(AerixRadii.cardSmall),
+                                color = if (mine) AerixThemeManager.currentAccent() else AerixSurface.panelRaised,
+                                border = if (mine) null else BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft)
+                            ) {
+                                Text(
+                                    message.body,
+                                    color = if (mine) AerixSurface.canvas else AerixSurface.textPrimary,
+                                    fontSize = 12.sp,
+                                    modifier = Modifier.padding(horizontal = 11.dp, vertical = 7.dp)
+                                )
+                            }
                         }
                         Text(timeLabel(message.atMs), fontSize = 9.sp, color = AerixSurface.textMuted)
                     }
@@ -1530,3 +1586,17 @@ private fun Modifier.socialStagger(index: Int, motion: Boolean): Modifier {
 
 private fun timeLabel(ms: Long): String =
     if (ms <= 0) "" else SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(ms))
+
+/** A message that is nothing but a Minecraft server address, e.g. play.example.net:25565. */
+private fun serverAddress(body: String): String? {
+    val text = body.trim()
+    val colon = text.lastIndexOf(':')
+    if (colon <= 0 || colon == text.lastIndex) return null
+    val host = text.substring(0, colon)
+    val port = text.substring(colon + 1)
+    if (port.length !in 2..5 || port.any { !it.isDigit() }) return null
+    if (host.length !in 3..253) return null
+    if (!host.contains('.') && !host.contains('-')) return null
+    if (host.any { !(it.isLetterOrDigit() || it == '.' || it == '-' || it == '_') }) return null
+    return text
+}
