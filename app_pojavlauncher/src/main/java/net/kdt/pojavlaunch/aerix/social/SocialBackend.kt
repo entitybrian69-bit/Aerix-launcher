@@ -379,17 +379,19 @@ object SocialBackend {
             val profiles = call(
                 "GET",
                 "$PROJECT_URL/rest/v1/profiles?id=in.($quoted)" +
-                    "&select=id,mc_username,display_name,last_seen"
+                    "&select=id,username,name,display_name,mc_username,avatar_url,last_seen"
             )
             val byId = HashMap<String, SocialFriend>()
             profiles?.takeIf { it.isJsonArray }?.asJsonArray?.forEach { element ->
                 val row = element as? JsonObject ?: return@forEach
                 val id = row.stringOrNull("id") ?: return@forEach
+                val display = row.stringOrNull("name") ?: row.stringOrNull("display_name")
                 byId[id] = SocialFriend(
                     id = id,
                     mcUsername = row.stringOrNull("mc_username")?.takeIf { it.isNotBlank() }
-                        ?: row.stringOrNull("display_name") ?: "Player",
-                    displayName = row.stringOrNull("display_name") ?: "Player",
+                        ?: row.stringOrNull("username")
+                        ?: display ?: "Player",
+                    displayName = display ?: "Player",
                     lastSeenMs = parseTimestamp(row.stringOrNull("last_seen") ?: ""),
                     pendingIncoming = id in incoming,
                     pendingOutgoing = id in outgoing
@@ -409,17 +411,14 @@ object SocialBackend {
         val sent = attempt {
             ensureToken()
             val me = userId ?: return@attempt null
-            val found = call(
-                "GET",
-                "$PROJECT_URL/rest/v1/profiles?mc_username=eq." +
-                    URLEncoder.encode(clean, "UTF-8") + "&select=id,mc_username"
-            )
-            val rows = found?.takeIf { it.isJsonArray }?.asJsonArray
-            if (rows == null || rows.size() == 0) {
-                lastError = "$clean has not opened Socials yet"
+            // One door only: an exact username, answered by the database.
+            val lookup = JsonObject().apply { addProperty("p_username", clean.removePrefix("@")) }
+            val found = call("POST", "$PROJECT_URL/rest/v1/rpc/find_player", lookup.toString())
+            val target = (found as? JsonObject)?.stringOrNull("id")
+            if (target == null) {
+                lastError = "No one is called @${clean.removePrefix("@")}"
                 return@attempt null
             }
-            val target = (rows[0] as? JsonObject)?.stringOrNull("id") ?: return@attempt null
             if (target == me) {
                 lastError = "That is you"
                 return@attempt null
@@ -518,6 +517,370 @@ object SocialBackend {
             call("POST", "$PROJECT_URL/rest/v1/rpc/touch_presence", "{}")
         }
     }
+
+    // ---- profile ----------------------------------------------------------------------------
+
+    /** The signed-in player's own card, refreshed whenever a profile screen opens. */
+    var myProfile by mutableStateOf<SocialProfile?>(null)
+        private set
+
+    /** True until the profile form has been filled in once; the app shows the form until then. */
+    val needsOnboarding: Boolean
+        get() = myProfile?.onboarded != true
+
+    suspend fun loadMyProfile(): SocialProfile? {
+        val card = attempt {
+            ensureToken()
+            val json = call("POST", "$PROJECT_URL/rest/v1/rpc/profile_card", "{}")
+            parseProfile(json)
+        }
+        if (card != null) {
+            myProfile = card
+            mcUsername = card.mcUsername ?: mcUsername
+        }
+        return card
+    }
+
+    /** Any profile, by exact username. The database only answers exact matches. */
+    suspend fun loadProfileCard(username: String): SocialProfile? = attempt {
+        ensureToken()
+        val body = JsonObject().apply { addProperty("p_username", username.trim()) }
+        parseProfile(call("POST", "$PROJECT_URL/rest/v1/rpc/profile_card", body.toString()))
+    }
+
+    /** Exact-username lookup used by "add friend". Returns null when nobody has that username. */
+    suspend fun findPlayer(username: String): SocialProfile? {
+        val clean = username.trim().removePrefix("@")
+        if (clean.length < 3) {
+            lastError = "Type the full username"
+            return null
+        }
+        val found = attempt {
+            ensureToken()
+            val body = JsonObject().apply { addProperty("p_username", clean) }
+            val json = call("POST", "$PROJECT_URL/rest/v1/rpc/find_player", body.toString())
+            val row = json as? JsonObject ?: return@attempt null
+            SocialProfile(
+                id = row.stringOrNull("id") ?: return@attempt null,
+                username = row.stringOrNull("username"),
+                name = row.stringOrNull("name"),
+                mcUsername = row.stringOrNull("mc_username"),
+                avatarUrl = row.stringOrNull("avatar_url"),
+                country = row.stringOrNull("country"),
+                lastSeenMs = row.longOr("last_seen_ms", 0L)
+            )
+        }
+        if (found == null && lastError == null) lastError = "No one is called @$clean"
+        return found
+    }
+
+    /**
+     * Claims a username. Returns null when it worked, or the sentence to show the player - the
+     * one-change-a-month rule lives in the database, not here.
+     */
+    suspend fun claimUsername(username: String): String? {
+        val clean = username.trim()
+        if (clean.length < 3) return "Use at least 3 characters."
+        if (clean.any { !it.isLetterOrDigit() && it != '_' }) return "Only letters, numbers and _ ."
+        if (clean.none { it.isLetter() }) return "The username needs at least one letter."
+        if (clean.none { it.isDigit() }) return "The username needs at least one number."
+        return attempt {
+            ensureToken()
+            val body = JsonObject().apply { addProperty("p_username", clean) }
+            val json = call("POST", "$PROJECT_URL/rest/v1/rpc/claim_username", body.toString())
+            // The function returns a JSON string: null on success, the message on failure.
+            if (json == null) return@attempt "Could not save the username."
+            if (json.isJsonNull) null else json.asString
+        }
+    }
+
+    /** Writes the whole profile card. Blank strings are stored as null so the UI can fall back. */
+    suspend fun saveProfile(
+        name: String?,
+        country: String?,
+        bio: String?,
+        avatarUrl: String?,
+        bannerUrl: String?,
+        skinUrl: String?,
+        capeUrl: String?,
+        onboarded: Boolean,
+        statusText: String? = null,
+        lookingToPlay: Boolean = false
+    ): Boolean {
+        val saved = attempt {
+            ensureToken()
+            val me = userId ?: return@attempt null
+            val row = JsonObject().apply {
+                addProperty("id", me)
+                addProperty("name", name?.trim()?.takeIf { it.isNotBlank() })
+                addProperty("display_name", name?.trim()?.takeIf { it.isNotBlank() })
+                addProperty("country", country?.trim()?.takeIf { it.isNotBlank() })
+                addProperty("bio", bio?.trim()?.takeIf { it.isNotBlank() })
+                addProperty("status_text", statusText?.trim()?.takeIf { it.isNotBlank() })
+                addProperty("looking_to_play", lookingToPlay)
+                addProperty("onboarded", onboarded)
+                if (avatarUrl != null) addProperty("avatar_url", avatarUrl)
+                if (bannerUrl != null) addProperty("banner_url", bannerUrl)
+                if (skinUrl != null) addProperty("skin_url", skinUrl)
+                if (capeUrl != null) addProperty("cape_url", capeUrl)
+            }
+            val result = call(
+                "POST",
+                "$PROJECT_URL/rest/v1/profiles?on_conflict=id",
+                JsonArray().apply { add(row) }.toString(),
+                extraHeaders = mapOf("Prefer" to "resolution=merge-duplicates,return=minimal")
+            )
+            if (result == null) lastError = lastError ?: "Could not save the profile"
+            result
+        }
+        loadMyProfile()
+        return saved != null
+    }
+
+    /**
+     * Puts a picture in the project's own storage bucket and returns its public URL, or null when
+     * the upload failed. Each file is named after the player, so the storage rules can insist that
+     * people only write inside their own folder.
+     */
+    suspend fun uploadImage(folder: String, bytes: ByteArray, extension: String = "png"): String? =
+        withContext(Dispatchers.IO) {
+            val me = userId
+            val token = accessToken
+            if (me == null || token == null) {
+                lastError = "Sign in first"
+                return@withContext null
+            }
+            val path = "$me/${folder}-${System.currentTimeMillis()}.$extension"
+            val mime = when (extension.lowercase()) {
+                "jpg", "jpeg" -> "image/jpeg"
+                "webp" -> "image/webp"
+                else -> "image/png"
+            }
+            try {
+                val connection = (URL("$PROJECT_URL/storage/v1/object/social-media/$path")
+                    .openConnection() as HttpURLConnection).apply {
+                    requestMethod = "POST"
+                    doOutput = true
+                    connectTimeout = 20000
+                    readTimeout = 30000
+                    setRequestProperty("apikey", PUBLISHABLE_KEY)
+                    setRequestProperty("Authorization", "Bearer $token")
+                    setRequestProperty("Content-Type", mime)
+                    setRequestProperty("x-upsert", "true")
+                    outputStream.use { it.write(bytes) }
+                }
+                val code = connection.responseCode
+                val text = (if (code in 200..299) connection.inputStream else connection.errorStream)
+                    ?.bufferedReader()?.use { it.readText() } ?: ""
+                connection.disconnect()
+                if (code !in 200..299) {
+                    lastError = serverMessage(text) ?: "Upload failed (HTTP $code)"
+                    return@withContext null
+                }
+                "$PROJECT_URL/storage/v1/object/public/social-media/$path"
+            } catch (error: Throwable) {
+                Log.w(TAG, "Upload failed", error)
+                lastError = error.message ?: "Upload failed"
+                null
+            }
+        }
+
+    // ---- follows ----------------------------------------------------------------------------
+
+    suspend fun setFollow(otherId: String, follow: Boolean): Boolean {
+        val done = attempt {
+            ensureToken()
+            val me = userId ?: return@attempt null
+            if (follow) {
+                call(
+                    "POST",
+                    "$PROJECT_URL/rest/v1/follows?on_conflict=follower,following",
+                    JsonArray().apply {
+                        add(JsonObject().apply {
+                            addProperty("follower", me)
+                            addProperty("following", otherId)
+                        })
+                    }.toString(),
+                    extraHeaders = mapOf("Prefer" to "resolution=merge-duplicates,return=minimal")
+                )
+            } else {
+                call("DELETE", "$PROJECT_URL/rest/v1/follows?follower=eq.$me&following=eq.$otherId")
+            } ?: return@attempt null
+            Unit
+        }
+        return done != null
+    }
+
+    /** Everyone following me, newest first. */
+    suspend fun loadFollowers(): List<SocialProfile> = loadRelated("follows?select=follower&following=eq.", "follower")
+
+    /** Everyone I follow, newest first. */
+    suspend fun loadFollowing(): List<SocialProfile> = loadRelated("follows?select=following&follower=eq.", "following")
+
+    private suspend fun loadRelated(query: String, column: String): List<SocialProfile> {
+        val list = attempt {
+            ensureToken()
+            val me = userId ?: return@attempt emptyList<SocialProfile>()
+            val json = call("GET", "$PROJECT_URL/rest/v1/$query$me&limit=100")
+                ?: return@attempt emptyList<SocialProfile>()
+            val ids = json.takeIf { it.isJsonArray }?.asJsonArray?.mapNotNull { element ->
+                (element as? JsonObject)?.stringOrNull(column)
+            } ?: return@attempt emptyList<SocialProfile>()
+            if (ids.isEmpty()) return@attempt emptyList<SocialProfile>()
+            val quoted = ids.joinToString(",") { "\"$it\"" }
+            val rows = call(
+                "GET",
+                "$PROJECT_URL/rest/v1/profiles?id=in.($quoted)&select=id,username,name,display_name,mc_username,avatar_url,country,last_seen"
+            )?.takeIf { it.isJsonArray }?.asJsonArray ?: return@attempt emptyList<SocialProfile>()
+            rows.mapNotNull { element ->
+                val row = element as? JsonObject ?: return@mapNotNull null
+                SocialProfile(
+                    id = row.stringOrNull("id") ?: return@mapNotNull null,
+                    username = row.stringOrNull("username"),
+                    name = row.stringOrNull("name") ?: row.stringOrNull("display_name"),
+                    mcUsername = row.stringOrNull("mc_username"),
+                    avatarUrl = row.stringOrNull("avatar_url"),
+                    country = row.stringOrNull("country"),
+                    lastSeenMs = parseTimestamp(row.stringOrNull("last_seen") ?: "")
+                )
+            }
+        }
+        return list ?: emptyList()
+    }
+
+    // ---- safety -----------------------------------------------------------------------------
+
+    suspend fun block(otherId: String): Boolean {
+        val done = attempt {
+            ensureToken()
+            val me = userId ?: return@attempt null
+            call(
+                "POST",
+                "$PROJECT_URL/rest/v1/blocks?on_conflict=blocker,blocked",
+                JsonArray().apply {
+                    add(JsonObject().apply {
+                        addProperty("blocker", me)
+                        addProperty("blocked", otherId)
+                    })
+                }.toString(),
+                extraHeaders = mapOf("Prefer" to "resolution=merge-duplicates,return=minimal")
+            ) ?: return@attempt null
+            call("DELETE", "$PROJECT_URL/rest/v1/friendships?or=(and(requester.eq.$me,addressee.eq.$otherId),and(requester.eq.$otherId,addressee.eq.$me))")
+            Unit
+        }
+        refreshFriends()
+        return done != null
+    }
+
+    suspend fun report(otherId: String, reason: String): Boolean = attempt {
+        ensureToken()
+        val me = userId ?: return@attempt false
+        call(
+            "POST",
+            "$PROJECT_URL/rest/v1/reports",
+            JsonArray().apply {
+                add(JsonObject().apply {
+                    addProperty("reporter", me)
+                    addProperty("target", otherId)
+                    addProperty("reason", reason.take(500))
+                })
+            }.toString(),
+            extraHeaders = mapOf("Prefer" to "return=minimal")
+        ) != null
+    } ?: false
+
+    // ---- presence and unread ----------------------------------------------------------------
+
+    /** Heartbeat with a status line and the "looking to play" flag. */
+    suspend fun setPresence(status: String?, looking: Boolean) {
+        if (!signedIn) return
+        attempt {
+            ensureToken()
+            call(
+                "POST",
+                "$PROJECT_URL/rest/v1/rpc/set_presence",
+                JsonObject().apply {
+                    addProperty("p_status", status?.take(60) ?: "")
+                    addProperty("p_looking", looking)
+                }.toString()
+            )
+        }
+    }
+
+    /** How many unread messages are waiting for me, across every conversation. */
+    suspend fun unreadCount(): Int {
+        val count = attempt {
+            ensureToken()
+            val me = userId ?: return@attempt 0
+            val json = call(
+                "GET",
+                "$PROJECT_URL/rest/v1/messages?select=id&recipient=eq.$me&read_at=is.null&limit=500"
+            ) ?: return@attempt 0
+            json.takeIf { it.isJsonArray }?.asJsonArray?.size() ?: 0
+        }
+        unread = count ?: 0
+        return unread
+    }
+
+    /** Marks everything [otherId] sent me as read, so their ticks turn on and the badge clears. */
+    suspend fun markRead(otherId: String) {
+        attempt {
+            ensureToken()
+            val me = userId ?: return@attempt Unit
+            call(
+                "PATCH",
+                "$PROJECT_URL/rest/v1/messages?recipient=eq.$me&sender=eq.$otherId&read_at=is.null",
+                JsonObject().apply { addProperty("read_at", isoNow()) }.toString(),
+                extraHeaders = mapOf("Prefer" to "return=minimal")
+            )
+            Unit
+        }
+        unreadCount()
+    }
+
+    private fun isoNow(): String {
+        val format = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
+        format.timeZone = TimeZone.getTimeZone("UTC")
+        return format.format(Date())
+    }
+
+    /** A profile card, parsed from either RPC's JSON. */
+    private fun parseProfile(json: JsonElement?): SocialProfile? {
+        val row = json as? JsonObject ?: return null
+        val id = row.stringOrNull("id") ?: return null
+        val ranks = row.get("ranks")?.takeIf { it.isJsonArray }?.asJsonArray
+            ?.mapNotNull { element -> runCatching { element.asString }.getOrNull() }
+            ?: emptyList()
+        return SocialProfile(
+            id = id,
+            username = row.stringOrNull("username"),
+            name = row.stringOrNull("name") ?: row.stringOrNull("display_name"),
+            mcUsername = row.stringOrNull("mc_username"),
+            country = row.stringOrNull("country"),
+            bio = row.stringOrNull("bio"),
+            avatarUrl = row.stringOrNull("avatar_url"),
+            bannerUrl = row.stringOrNull("banner_url"),
+            skinUrl = row.stringOrNull("skin_url"),
+            capeUrl = row.stringOrNull("cape_url"),
+            statusText = row.stringOrNull("status_text"),
+            lookingToPlay = row.get("looking_to_play")?.takeIf { it.isJsonPrimitive }?.asBoolean ?: false,
+            onboarded = row.get("onboarded")?.takeIf { it.isJsonPrimitive }?.asBoolean ?: false,
+            usernameChangedAtMs = parseTimestamp(row.stringOrNull("username_changed_at") ?: ""),
+            lastSeenMs = row.longOr("last_seen_ms", 0L),
+            followers = row.longOr("followers", 0L).toInt(),
+            following = row.longOr("following", 0L).toInt(),
+            friends = row.longOr("friends", 0L).toInt(),
+            messages = row.longOr("messages", 0L).toInt(),
+            ranks = ranks,
+            isMe = row.get("is_me")?.takeIf { it.isJsonPrimitive }?.asBoolean ?: false,
+            iFollow = row.get("i_follow")?.takeIf { it.isJsonPrimitive }?.asBoolean ?: false
+        )
+    }
+
+    /** Unread total, kept in step so the Home tile and the sidebar badge agree. */
+    var unread by mutableStateOf(0)
+        private set
+
 
     // ---- plumbing --------------------------------------------------------------------------
 

@@ -101,6 +101,7 @@ import net.kdt.pojavlaunch.aerix.components.liquidGlass
 import net.kdt.pojavlaunch.aerix.social.SocialBackend
 import net.kdt.pojavlaunch.aerix.social.SocialFriend
 import net.kdt.pojavlaunch.aerix.social.SocialMessage
+import net.kdt.pojavlaunch.aerix.social.SocialProfile
 import net.kdt.pojavlaunch.aerix.theme.AerixMetrics
 import net.kdt.pojavlaunch.aerix.theme.AerixRadii
 import net.kdt.pojavlaunch.aerix.theme.AerixSpacing
@@ -133,6 +134,11 @@ private sealed interface SocialDestination {
     data class Chat(val friend: SocialFriend) : SocialDestination {
         override val depth: Int get() = 1
     }
+
+    /** Your own card, or somebody else's, opened on top of a page. */
+    data class Profile(val username: String?) : SocialDestination {
+        override val depth: Int get() = 1
+    }
 }
 
 /**
@@ -145,6 +151,8 @@ fun SocialsScreen(activity: FragmentActivity, onExit: () -> Unit = {}) {
     val account = PojavAccountBridge.current
     var tab by remember { mutableStateOf(SocialTab.FRIENDS) }
     var chatWith by remember { mutableStateOf<SocialFriend?>(null) }
+    var profileOpen by remember { mutableStateOf(false) }
+    var profileUser by remember { mutableStateOf<String?>(null) }
     val signedIn = SocialBackend.signedIn
     val motion = ThemeMotion.rememberEnabled()
 
@@ -153,29 +161,39 @@ fun SocialsScreen(activity: FragmentActivity, onExit: () -> Unit = {}) {
         if (SocialBackend.signedIn) {
             SocialBackend.rememberMinecraftName(account?.username)
             SocialBackend.loadProfile()
+            SocialBackend.loadMyProfile()
             SocialBackend.refreshFriends()
+            SocialBackend.unreadCount()
         }
     }
     LaunchedEffect(signedIn) {
         if (signedIn) {
             SocialBackend.rememberMinecraftName(account?.username)
             SocialBackend.loadProfile()
+            SocialBackend.loadMyProfile()
             SocialBackend.refreshFriends()
+            SocialBackend.unreadCount()
         }
         while (signedIn) {
-            SocialBackend.heartbeat()
+            SocialBackend.setPresence(SocialBackend.myProfile?.statusText, SocialBackend.myProfile?.lookingToPlay ?: false)
             delay(60_000)
             SocialBackend.refreshFriends()
+            SocialBackend.unreadCount()
         }
     }
 
-    val destination: SocialDestination = chatWith?.let { SocialDestination.Chat(it) } ?: SocialDestination.Page(tab)
+    val destination: SocialDestination = when {
+        chatWith != null -> SocialDestination.Chat(chatWith!!)
+        profileOpen -> SocialDestination.Profile(profileUser)
+        else -> SocialDestination.Page(tab)
+    }
 
     // Back leaves the conversation first, then returns to Friends, then leaves the social space.
     // The social space owns the whole window, so its back never falls through to the launcher.
     BackHandler(enabled = true) {
         when {
             chatWith != null -> chatWith = null
+            profileOpen -> profileOpen = false
             tab != SocialTab.FRIENDS -> tab = SocialTab.FRIENDS
             else -> onExit()
         }
@@ -194,12 +212,18 @@ fun SocialsScreen(activity: FragmentActivity, onExit: () -> Unit = {}) {
         SocialSidebar(
             tab = tab,
             signedIn = signedIn,
-            inChat = chatWith != null,
+            inChat = chatWith != null || profileOpen,
             onTab = { picked ->
                 chatWith = null
+                profileOpen = false
                 tab = picked
             },
-            onExit = onExit
+            onExit = onExit,
+            onProfile = {
+                chatWith = null
+                profileUser = null
+                profileOpen = true
+            }
         )
         Spacer(Modifier.width(AerixSpacing.sm))
         Surface(
@@ -218,6 +242,15 @@ fun SocialsScreen(activity: FragmentActivity, onExit: () -> Unit = {}) {
         ) {
             if (!signedIn) {
                 SocialSignIn(activity)
+            } else if (SocialBackend.needsOnboarding) {
+                // First sign-in: the profile form takes the panel until it is filled in.
+                SocialProfileForm(
+                    activity = activity,
+                    profile = SocialBackend.myProfile,
+                    editing = false,
+                    onClose = { },
+                    onSaved = { }
+                )
             } else {
                 AnimatedContent(
                     targetState = destination,
@@ -242,10 +275,17 @@ fun SocialsScreen(activity: FragmentActivity, onExit: () -> Unit = {}) {
                             onBack = { chatWith = null },
                             onOpenSettings = null
                         )
+                        is SocialDestination.Profile -> SocialProfilePage(
+                            activity = activity,
+                            username = dest.username
+                        ) { profileOpen = false }
                         is SocialDestination.Page -> when (dest.tab) {
-                            SocialTab.FRIENDS -> SocialFriendsPage(activity, motion) { friend ->
+                            SocialTab.FRIENDS -> SocialFriendsPage(activity, motion, onOpenChat = { friend ->
                                 chatWith = friend
-                            }
+                            }, onOpenProfile = { who ->
+                                profileUser = who
+                                profileOpen = true
+                            })
                             SocialTab.MESSAGES -> SocialMessagesPage(activity, motion) { friend ->
                                 chatWith = friend
                             }
@@ -268,7 +308,8 @@ private fun SocialSidebar(
     signedIn: Boolean,
     inChat: Boolean,
     onTab: (SocialTab) -> Unit,
-    onExit: () -> Unit
+    onExit: () -> Unit,
+    onProfile: () -> Unit
 ) {
     val accent = AerixThemeManager.currentAccent()
     Column(
@@ -312,7 +353,14 @@ private fun SocialSidebar(
         SocialRailItem(R.drawable.aerix_ic_people, SocialTab.FRIENDS.label, signedIn && !inChat && tab == SocialTab.FRIENDS, accent, false) {
             onTab(SocialTab.FRIENDS)
         }
-        SocialRailItem(R.drawable.aerix_ic_chat, SocialTab.MESSAGES.label, signedIn && !inChat && tab == SocialTab.MESSAGES, accent, false) {
+        SocialRailItem(
+            R.drawable.aerix_ic_chat,
+            SocialTab.MESSAGES.label,
+            signedIn && !inChat && tab == SocialTab.MESSAGES,
+            accent,
+            false,
+            badge = SocialBackend.unread
+        ) {
             onTab(SocialTab.MESSAGES)
         }
         SocialRailItem(R.drawable.aerix_ic_bell, SocialTab.ACTIVITY.label, signedIn && !inChat && tab == SocialTab.ACTIVITY, accent, false) {
@@ -325,7 +373,10 @@ private fun SocialSidebar(
         Spacer(Modifier.weight(1f))
 
         if (signedIn) {
-            Box(contentAlignment = Alignment.BottomEnd) {
+            Box(
+                contentAlignment = Alignment.BottomEnd,
+                modifier = Modifier.clickable(role = Role.Button, onClick = onProfile)
+            ) {
                 SocialHead(SocialBackend.mcUsername ?: PojavAccountBridge.current?.username, 34)
                 Box(
                     modifier = Modifier
@@ -346,6 +397,7 @@ private fun SocialRailItem(
     selected: Boolean,
     accent: Color,
     compact: Boolean,
+    badge: Int = 0,
     onClick: () -> Unit
 ) {
     val motion = ThemeMotion.rememberEnabled()
@@ -371,6 +423,24 @@ private fun SocialRailItem(
             tint = tint,
             modifier = Modifier.size(if (compact) 16.dp else 18.dp)
         )
+        if (badge > 0) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 1.dp, end = 1.dp)
+                    .size(13.dp)
+                    .clip(CircleShape)
+                    .background(AerixSurface.danger),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    if (badge > 9) "9+" else "$badge",
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = AerixSurface.canvas
+                )
+            }
+        }
     }
 }
 
@@ -564,10 +634,13 @@ private fun SocialSignIn(activity: FragmentActivity) {
 private fun SocialFriendsPage(
     activity: FragmentActivity,
     motion: Boolean,
-    onOpenChat: (SocialFriend) -> Unit
+    onOpenChat: (SocialFriend) -> Unit,
+    onOpenProfile: (String?) -> Unit
 ) {
     val scope = rememberCoroutineScope()
     var query by remember { mutableStateOf("") }
+    var found by remember { mutableStateOf<SocialProfile?>(null) }
+    var searched by remember { mutableStateOf(false) }
     val friends = SocialBackend.friends
     val incoming = friends.filter { it.pendingIncoming }
     val accepted = friends.filter { !it.pendingIncoming && !it.pendingOutgoing }
@@ -592,12 +665,66 @@ private fun SocialFriendsPage(
                         label = "Add a friend by Minecraft name",
                         modifier = Modifier.weight(1f)
                     )
-                    SocialPillButton(label = "Send", filled = true) {
+                    SocialPillButton(label = "Find", filled = true) {
                         if (query.isBlank()) return@SocialPillButton
                         scope.launch {
-                            if (SocialBackend.addFriendByName(query)) {
-                                query = ""
-                                Toast.makeText(activity, "Request sent", Toast.LENGTH_SHORT).show()
+                            found = SocialBackend.findPlayer(query)
+                            searched = true
+                        }
+                    }
+                }
+                // Only an exact username finds anyone: nothing is listed, nothing is suggested.
+                if (searched) {
+                    Spacer(Modifier.height(AerixSpacing.xs))
+                    val match = found
+                    if (match == null) {
+                        Text(
+                            "No one is called @${query.trim().removePrefix("@")}",
+                            fontSize = 11.sp,
+                            color = AerixSurface.textMuted
+                        )
+                    } else {
+                        SocialGlassRow(modifier = Modifier.fillMaxWidth()) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                SocialHead(match.username, 30)
+                                Spacer(Modifier.width(8.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        match.displayName,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = AerixSurface.textPrimary
+                                    )
+                                    Text(
+                                        match.handle.ifBlank { "@${match.username}" },
+                                        fontSize = 10.sp,
+                                        color = AerixSurface.textMuted
+                                    )
+                                }
+                                SocialSmallButton("Add", true) {
+                                    val name = match.username ?: return@SocialSmallButton
+                                    scope.launch {
+                                        if (SocialBackend.addFriendByName(name)) {
+                                            query = ""
+                                            found = null
+                                            searched = false
+                                            Toast.makeText(activity, "Request sent", Toast.LENGTH_SHORT).show()
+                                        } else {
+                                            Toast.makeText(
+                                                activity,
+                                                SocialBackend.lastError ?: "Could not send",
+                                                Toast.LENGTH_LONG
+                                            ).show()
+                                        }
+                                    }
+                                }
+                                Spacer(Modifier.width(4.dp))
+                                SocialSmallButton("Profile", false) {
+                                    match.username?.let { onOpenProfile(it) }
+                                }
                             }
                         }
                     }
@@ -691,17 +818,11 @@ private fun SocialFriendsPage(
                         Text("Your profile", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = AerixSurface.textPrimary)
                         Spacer(Modifier.weight(1f))
                         Text(
-                            "Resync",
+                            "View",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             color = AerixSurface.accent,
-                            modifier = Modifier.clickable {
-                                scope.launch {
-                                    SocialBackend.rememberMinecraftName(PojavAccountBridge.current?.username)
-                                    SocialBackend.loadProfile()
-                                    Toast.makeText(activity, "Name and head updated", Toast.LENGTH_SHORT).show()
-                                }
-                            }
+                            modifier = Modifier.clickable { onOpenProfile(null) }
                         )
                     }
                     Spacer(Modifier.height(8.dp))
@@ -992,6 +1113,7 @@ private fun SocialChat(
         messages = SocialBackend.loadMessages(friend.id)
     }
     LaunchedEffect(friend.id) {
+        SocialBackend.markRead(friend.id)
         while (true) {
             reload()
             delay(3_000)
