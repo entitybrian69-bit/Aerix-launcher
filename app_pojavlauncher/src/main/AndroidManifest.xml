@@ -79,6 +79,7 @@
             android:label="@string/aerix_app_label"
             android:theme="@style/Aerix.Launcher"
             android:launchMode="singleTask"
+            android:exported="true"
             android:configChanges="keyboardHidden|orientation|screenSize|smallestScreenSize|screenLayout|keyboard|navigation"
             android:screenOrientation="sensorLandscape"
             android:windowSoftInputMode="adjustResize">
