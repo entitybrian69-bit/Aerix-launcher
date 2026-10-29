@@ -64,6 +64,15 @@ public class ControlData {
     public boolean displayInGame;
     public boolean displayInMenu;
     public String bitmapTag;
+    /**
+     * Id of the animated theme this control wears, or null for the stock look.
+     *
+     * <p>Saved with the layout, so a themed setup travels with the file. An id that no longer
+     * exists - a theme removed in a later update, or a file from somewhere else - simply draws
+     * the stock control: {@link net.kdt.pojavlaunch.customcontrols.theme.ControlThemes#byId} answers
+     * null and nothing breaks.
+     */
+    public String theme;
     private float width;         //Dp instead of Px now
     private float height;        //Dp instead of Px now
 
@@ -152,6 +161,7 @@ public class ControlData {
                 controlData.passThruEnabled,
                 controlData.bitmapTag
         );
+        this.theme = controlData.theme;
     }
 
     public static ControlData[] getSpecialButtons() {

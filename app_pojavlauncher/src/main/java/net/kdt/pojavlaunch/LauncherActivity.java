@@ -9,6 +9,7 @@ import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.system.Os;
+import android.util.Log;
 import android.view.View;
 import android.widget.Toast;
 
@@ -18,6 +19,9 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentContainerView;
 import androidx.fragment.app.FragmentManager;
@@ -25,7 +29,9 @@ import androidx.fragment.app.FragmentManager;
 import com.kdt.mcgui.ProgressLayout;
 
 import net.kdt.pojavlaunch.aerix.bridge.AerixPreferences;
+import net.kdt.pojavlaunch.aerix.bridge.AerixWindowInsets;
 import net.kdt.pojavlaunch.aerix.ui.AerixMainFragment;
+import net.kdt.pojavlaunch.authenticator.accounts.Account;
 import net.kdt.pojavlaunch.authenticator.accounts.Accounts;
 import net.kdt.pojavlaunch.extra.ExtraConstants;
 import net.kdt.pojavlaunch.extra.ExtraCore;
@@ -51,6 +57,8 @@ import net.kdt.pojavlaunch.tasks.MoJsonDownloader;
 import net.kdt.pojavlaunch.utils.NotificationUtils;
 
 import net.kdt.pojavlaunch.R;
+
+import java.io.IOException;
 
 public class LauncherActivity extends BaseActivity {
     public static final String SETTING_FRAGMENT_TAG = "SETTINGS_FRAGMENT";
@@ -147,8 +155,11 @@ public class LauncherActivity extends BaseActivity {
     };
     @Override
     protected boolean shouldIgnoreNotch() {
-        // The Aerix launcher is landscape-only; follow Pojav's "Ignore notch" preference like the game does.
-        return LauncherPreferences.PREF_IGNORE_NOTCH;
+        // The Aerix shell draws its wallpaper under the whole display and keeps the rail and the
+        // pages inside the safe area itself (AerixWindowInsets), so the window may use the cutout.
+        // Following the "Ignore notch" video preference here reserved a strip of the display for
+        // the camera and painted it black next to the UI.
+        return true;
     }
 
     @Override
@@ -157,11 +168,58 @@ public class LauncherActivity extends BaseActivity {
         return AerixPreferences.INSTANCE.getFullScreen();
     }
 
+    /**
+     * The browser comes back here with the tokens of a Socials sign-in in the URI fragment.
+     *
+     * Handled before {@link #onCreate} does its work so the session is already restored when the
+     * Socials page is first drawn.
+     */
+    private void handleSocialSignIn(Intent intent) {
+        if (intent == null || intent.getData() == null) return;
+        String data = intent.getData().toString();
+        // aerix-social://friend/CODE opens that player's card inside the social space.
+        if (data.startsWith("aerix-social://friend/")) {
+            String code = data.substring("aerix-social://friend/".length());
+            net.kdt.pojavlaunch.aerix.social.SocialBackend.attach(getApplicationContext());
+            net.kdt.pojavlaunch.aerix.social.SocialBackend.acceptInvite(code);
+            net.kdt.pojavlaunch.aerix.ui.AerixNav.INSTANCE
+                    .navigate(net.kdt.pojavlaunch.aerix.ui.LauncherSection.SOCIALS);
+            return;
+        }
+        if (!data.startsWith(net.kdt.pojavlaunch.aerix.social.SocialBackend.OAUTH_REDIRECT)) return;
+        net.kdt.pojavlaunch.aerix.social.SocialBackend.attach(getApplicationContext());
+        boolean restored = net.kdt.pojavlaunch.aerix.social.SocialBackend.completeBrowserSession(data);
+        Toast.makeText(this, restored ? "Signed in to Socials" : "Sign-in did not complete",
+                Toast.LENGTH_LONG).show();
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        handleSocialSignIn(intent);
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         // Must run before BaseActivity.onCreate, which reads setFullscreen()
         AerixPreferences.INSTANCE.init(getApplicationContext());
         super.onCreate(savedInstanceState);
+        handleSocialSignIn(getIntent());
+        // The decor receives the insets before the content view consumes them for its padding.
+        // Publishing them lets the Compose shell keep the rail and the pages on the safe area
+        // while its wallpaper stays full bleed. The camera cutout always has to be respected; the
+        // system bars only when the launcher is not fullscreen, since Tools.setInsetsMode pads the
+        // content for those itself and this would count them twice.
+        ViewCompat.setOnApplyWindowInsetsListener(getWindow().getDecorView(), (view, insets) -> {
+            int mask = WindowInsetsCompat.Type.displayCutout();
+            if (!AerixPreferences.INSTANCE.getFullScreen()) {
+                mask |= WindowInsetsCompat.Type.systemBars();
+            }
+            Insets safe = insets.getInsets(mask);
+            AerixWindowInsets.INSTANCE.update(safe.left, safe.top, safe.right, safe.bottom);
+            return insets;
+        });
         setContentView(R.layout.activity_pojav_launcher);
         MoJsonDownloader.prepareSubstitutionMap(getAssets());
 
@@ -203,11 +261,66 @@ public class LauncherActivity extends BaseActivity {
 
         mProgressLayout.observe(ProgressLayout.DOWNLOAD_GAME);
         mProgressLayout.observe(ProgressLayout.UNPACK_RUNTIME);
+        mProgressLayout.observe(ProgressLayout.EXTRACT_COMPONENTS);
+        mProgressLayout.observe(ProgressLayout.EXTRACT_SINGLE_FILES);
         mProgressLayout.observe(ProgressLayout.INSTALL_MODPACK);
         mProgressLayout.observe(ProgressLayout.AUTHENTICATE);
         mProgressLayout.observe(ProgressLayout.DOWNLOAD_VERSION_LIST);
         mProgressLayout.observe(ProgressLayout.INSTANCE_INSTALL);
         mProgressLayout.observe(ProgressLayout.DATA_MIGRATION);
+
+        // An account switch made from inside the game comes back here: the game process is gone and
+        // the player expects to be back in the game as the account they picked, not on a dashboard
+        // they did not ask for.
+        relaunchGameIfRequested();
+    }
+
+    /**
+     * Starts the game again when this activity was brought back by a request to do so.
+     *
+     * An account switch made from inside the game arrives this way. It is applied *here* on
+     * purpose: the choice is saved as a preference, and the game process that asked for the switch
+     * is killed a moment later - selecting the account there would race with that write, while
+     * this process owns the preference the launch reads.
+     *
+     * The extras are consumed immediately, so a configuration change or a later return to this
+     * activity never launches the game a second time.
+     */
+    private void relaunchGameIfRequested() {
+        Intent intent = getIntent();
+        if (intent == null) return;
+        boolean relaunch = intent.getBooleanExtra(Tools.EXTRA_RELAUNCH_GAME, false);
+        String accountKey = intent.getStringExtra(Tools.EXTRA_SWITCH_ACCOUNT);
+        if (!relaunch && accountKey == null) return;
+        intent.removeExtra(Tools.EXTRA_RELAUNCH_GAME);
+        intent.removeExtra(Tools.EXTRA_SWITCH_ACCOUNT);
+        // After the first layout: the launch pipeline reads preferences the shell sets up, and the
+        // progress overlay has to exist before it is asked to show itself.
+        View root = findViewById(android.R.id.content);
+        if (root == null) return;
+        if (accountKey == null) {
+            root.post(() -> ExtraCore.setValue(ExtraConstants.LAUNCH_GAME, true));
+            return;
+        }
+        PojavApplication.sExecutorService.execute(() -> {
+            boolean switched = false;
+            try {
+                for (Account candidate : Accounts.load().accounts) {
+                    if (candidate.mSaveLocation != null &&
+                            candidate.mSaveLocation.getName().equals(accountKey)) {
+                        Accounts.setCurrent(candidate);
+                        switched = true;
+                        break;
+                    }
+                }
+            } catch (IOException | RuntimeException error) {
+                Log.w("LauncherActivity", "Could not select the account to switch to", error);
+            }
+            Logger.appendToLog(switched
+                    ? "Account switch: signed in as the account the game asked for"
+                    : "Account switch: the chosen account could not be found; keeping the current one");
+            Tools.runOnUiThread(() -> root.post(() -> ExtraCore.setValue(ExtraConstants.LAUNCH_GAME, true)));
+        });
     }
 
     @Override

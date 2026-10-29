@@ -343,7 +343,7 @@ fun AccountsScreen(activity: FragmentActivity) {
                         .fillMaxWidth()
                         .padding(vertical = 8.dp),
                     shape = RoundedCornerShape(18.dp),
-                    color = AerixSurface.panelRaised.copy(alpha = 0.7f),
+                    color = AerixSurface.panelRaised.copy(alpha = 0.35f),
                     border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft)
                 ) {
                     Box(
@@ -463,7 +463,7 @@ private fun MiraiAccountItemRow(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
-        color = AerixSurface.panelRaised.copy(alpha = 0.85f),
+        color = AerixSurface.panelRaised.copy(alpha = 0.42f),
         border = BorderStroke(
             width = if (isCurrent) 1.dp else AerixSpacing.hairline,
             color = if (isCurrent) accent.copy(alpha = 0.45f) else AerixSurface.borderSoft
@@ -811,6 +811,14 @@ private fun MiraiSkinLibraryPanel(
                 }
             }
         }
+
+        // A skin picked here is handed to Minecraft by the launcher when the game starts, so it
+        // shows up the next time the instance is launched, not on the menu this is drawn on.
+        Text(
+            text = "Equipped skins, capes and the Wide/Slim model reach the game on your next launch.",
+            style = MaterialTheme.typography.labelMedium,
+            color = Color.White.copy(alpha = 0.6f)
+        )
     }
 }
 
@@ -835,7 +843,7 @@ private fun MiraiSkinLibraryCard(
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(16.dp),
-        color = AerixSurface.panelRaised.copy(alpha = 0.85f),
+        color = AerixSurface.panelRaised.copy(alpha = 0.42f),
         border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft),
         onClick = onClick
     ) {

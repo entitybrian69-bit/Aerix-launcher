@@ -105,6 +105,8 @@ object PojavAccountBridge : LoginListener {
     val current: AerixAccount?
         get() = accounts.getOrNull(selectedIndex)
 
+    /** True while [ensureLoaded] is reading the accounts, so it only reads them once. */
+    private var loadingAccounts = false
     private var maxSteps = 5
     private var attached = false
     private var appContext: Context? = null
@@ -155,6 +157,40 @@ object PojavAccountBridge : LoginListener {
 
     fun closeDetail() {
         focusedAccountKey = null
+    }
+
+    /**
+     * Loads the saved accounts once, for screens that only need to read them - the in-game menu,
+     * which shows who the game is running as. Unlike [reload] this never touches the network: it is
+     * called while the game is running and must stay cheap.
+     */
+    fun ensureLoaded() {
+        if (accounts.isNotEmpty() || loadingAccounts) return
+        loadingAccounts = true
+        val ctx = appContext
+        PojavApplication.sExecutorService.execute {
+            val rows = runCatching { Accounts.load() }.getOrNull()?.let { result ->
+                val now = System.currentTimeMillis()
+                result.accounts.map { account ->
+                    val faceBitmap = resolveAccountFaceBitmap(ctx, account)
+                    AerixAccount(
+                        source = account,
+                        username = account.username ?: "",
+                        authType = account.authType ?: AuthType.LOCAL,
+                        expired = (account.authType ?: AuthType.LOCAL).requiresLogin() && now > account.expiresAt,
+                        face = runCatching { faceBitmap?.asImageBitmap() }.getOrNull()
+                    )
+                } to result.selectionIndex
+            }
+            Tools.runOnUiThread {
+                // Always released, so a failure does not stop the next attempt.
+                loadingAccounts = false
+                if (rows != null) {
+                    accounts = rows.first
+                    selectedIndex = rows.second
+                }
+            }
+        }
     }
 
     /** Same flow as AccountSpinner.reload(): load on the executor, then refresh the selected account. */
@@ -398,14 +434,52 @@ object PojavAccountBridge : LoginListener {
         return raw.replace(Regex("[^A-Za-z0-9._-]"), "_")
     }
 
-    fun customSkinFile(account: Account): File =
-        File(Tools.DIR_CACHE, "aerix-custom-skin-${safeAccountTag(account)}.png")
+    /**
+     * Where the equipped skin, cape and face of every account are kept.
+     *
+     * These used to live in the cache directory, which the system is free to empty whenever it
+     * wants space: an equipped skin could then disappear between the wardrobe and the launch, and
+     * the game showed the default one with nothing in the launcher explaining why. Application
+     * data is only removed by the user.
+     */
+    private fun wardrobeDirectory(): File {
+        val dir = File(Tools.DIR_DATA, "aerix/wardrobe")
+        if (!dir.isDirectory) dir.mkdirs()
+        return dir
+    }
 
-    fun customCapeFile(account: Account): File =
-        File(Tools.DIR_CACHE, "aerix-custom-cape-${safeAccountTag(account)}.png")
+    /** Moves an equipped file out of the cache directory, once, keeping its contents. */
+    private fun persistentWardrobeFile(account: Account, name: String, legacyName: String): File {
+        val target = File(wardrobeDirectory(), name)
+        if (target.isFile) return target
+        val legacy = File(Tools.DIR_CACHE, legacyName)
+        if (legacy.isFile) {
+            runCatching {
+                target.parentFile?.mkdirs()
+                legacy.copyTo(target, overwrite = true)
+                legacy.delete()
+            }
+        }
+        return target
+    }
 
-    private fun customFaceFile(account: Account): File =
-        File(Tools.DIR_CACHE, "aerix-custom-face-${safeAccountTag(account)}.png")
+    fun customSkinFile(account: Account): File = persistentWardrobeFile(
+        account,
+        "skin-${safeAccountTag(account)}.png",
+        "aerix-custom-skin-${safeAccountTag(account)}.png"
+    )
+
+    fun customCapeFile(account: Account): File = persistentWardrobeFile(
+        account,
+        "cape-${safeAccountTag(account)}.png",
+        "aerix-custom-cape-${safeAccountTag(account)}.png"
+    )
+
+    private fun customFaceFile(account: Account): File = persistentWardrobeFile(
+        account,
+        "face-${safeAccountTag(account)}.png",
+        "aerix-custom-face-${safeAccountTag(account)}.png"
+    )
 
     fun resolveCustomSkinBytes(account: AerixAccount?): ByteArray? {
         if (account == null) return null
@@ -431,6 +505,12 @@ object PojavAccountBridge : LoginListener {
         val prefs = ctx.getSharedPreferences(WARDROBE_PREFS, Context.MODE_PRIVATE)
         return prefs.getBoolean("slim_${safeAccountTag(account.source)}", false)
     }
+
+    /** Wide/Slim choice of [account], as the game has to be told it (see [AerixSkinServer]). */
+    fun isSlimModelFor(context: Context, account: Account): Boolean =
+        context.applicationContext
+            .getSharedPreferences(WARDROBE_PREFS, Context.MODE_PRIVATE)
+            .getBoolean("slim_${safeAccountTag(account)}", false)
 
     fun setSlimModel(context: Context, account: AerixAccount, slim: Boolean) {
         context.applicationContext

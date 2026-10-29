@@ -50,6 +50,11 @@ data class AerixWallpaperPreset(
 object AerixThemeManager {
     const val WALLPAPER_NONE = "none"
     const val WALLPAPER_CUSTOM = "custom"
+    /** Imported wallpapers are addressed as `clip:<file name>`, so several can coexist. */
+    const val WALLPAPER_CLIP_PREFIX = "clip:"
+    /** Footage that ships with the launcher, addressed as `clipasset:<id>`. */
+    const val WALLPAPER_CLIP_ASSET_PREFIX = "clipasset:"
+    private const val CLIP_DIR = "aerix_clips"
     private const val CUSTOM_WALLPAPER_FILE = "aerix_custom_wallpaper"
 
     /** Bumped every time the wallpaper changes so the background reloads its bitmap. */
@@ -57,37 +62,67 @@ object AerixThemeManager {
         private set
 
     val wallpapers: List<AerixWallpaperPreset> = listOf(
-        AerixWallpaperPreset("wp_01_lush_caves", "Lush Glowberry Cave", "Lush Caves • Complementary Shaders", "wallpapers/wp_01_lush_caves.jpg", "Lush Teal", AerixSurface.accentDefault),
-        AerixWallpaperPreset("wp_02_cherry_blossom", "Cherry Blossom Grove", "Cherry Grove • BSL Shaders", "wallpapers/wp_02_cherry_blossom.jpg", "Sakura Pink", Color(0xFFF472B6)),
-        AerixWallpaperPreset("wp_03_sunset_river", "Golden Sunset River", "River Valley • SEUS Renewed", "wallpapers/wp_03_sunset_river.jpg", "Sunset Amber", Color(0xFFF59E0B)),
-        AerixWallpaperPreset("wp_04_crystal_river", "Crystal River Forest", "Birch & Oak River • Complementary", "wallpapers/wp_04_crystal_river.jpg", "River Cyan", Color(0xFF06B6D4)),
-        AerixWallpaperPreset("wp_05_nether_fortress", "Nether Lava Cavern", "Nether Wastes • RTX Shaders", "wallpapers/wp_05_nether_fortress.jpg", "Magma Orange", Color(0xFFF97316)),
-        AerixWallpaperPreset("wp_06_the_end", "The End Obsidian Pillars", "The End • Sildur's Vibrant", "wallpapers/wp_06_the_end.jpg", "Ender Amethyst", Color(0xFFA855F7)),
-        AerixWallpaperPreset("wp_07_ocean_arch", "Sunlight Ocean Arch", "Warm Ocean • Complementary", "wallpapers/wp_07_ocean_arch.jpg", "Ocean Azure", Color(0xFF38BDF8)),
-        AerixWallpaperPreset("wp_08_moonlit_lake", "Moonlit Birch Lake", "Night Forest • Nostalgia Shaders", "wallpapers/wp_08_moonlit_lake.jpg", "Moonlight Indigo", Color(0xFF818CF8)),
-        AerixWallpaperPreset("wp_09_flower_meadow", "Sunrise Flower Meadow", "Flower Forest • BSL Shaders", "wallpapers/wp_09_flower_meadow.jpg", "Rose Meadow", Color(0xFFEC4899)),
-        AerixWallpaperPreset("wp_10_spruce_mist", "Spruce Lake Morning Mist", "Old Growth Taiga • Bliss Shaders", "wallpapers/wp_10_spruce_mist.jpg", "Taiga Lime", Color(0xFF84CC16)),
-        AerixWallpaperPreset("wp_11_cherry_bee", "Honeybee Cherry Canopy", "Cherry Canopy • Complementary", "wallpapers/wp_11_cherry_bee.jpg", "Honey Gold", Color(0xFFFBBF24)),
-        AerixWallpaperPreset("wp_12_snowy_valley", "Snowy Peaks & Cherry Valley", "Jagged Peaks • Distant Horizons", "wallpapers/wp_12_snowy_valley.jpg", "Alpine Sky", Color(0xFF60A5FA)),
-        AerixWallpaperPreset("wp_13_frozen_glacier", "Frozen Glacier Ridge", "Frozen Peaks • Complementary", "wallpapers/wp_13_frozen_glacier.jpg", "Glacier Frost", Color(0xFF22D3EE)),
-        AerixWallpaperPreset("wp_14_cozy_village", "Cozy Plains Village", "Plains Village • SEUS PTGI", "wallpapers/wp_14_cozy_village.jpg", "Harvest Emerald", Color(0xFF10B981)),
-        AerixWallpaperPreset("wp_15_end_portal", "End Portal Starfield", "Stronghold Portal • Void Shaders", "wallpapers/wp_15_end_portal.jpg", "Portal Teal", Color(0xFF14B8A6)),
-        AerixWallpaperPreset("wp_16_ocean_monument", "Deep Ocean Monument", "Deep Ocean • Prismarine Shaders", "wallpapers/wp_16_ocean_monument.jpg", "Prismarine Blue", Color(0xFF3B82F6)),
-        AerixWallpaperPreset("wp_17_night_clouds", "Starry Night River", "Plains Night • Solas Shaders", "wallpapers/wp_17_night_clouds.jpg", "Starlight Violet", Color(0xFF8B5CF6)),
-        AerixWallpaperPreset("wp_18_crater_harbor", "Cherry Crater Village", "Cherry Basin • Vanilla+ Shaders", "wallpapers/wp_18_crater_harbor.jpg", "Coral Blossom", Color(0xFFFB7185)),
-        AerixWallpaperPreset("wp_19_sinkhole_falls", "Lush Sinkhole Waterfall", "Dripstone & Lush • Iris Shaders", "wallpapers/wp_19_sinkhole_falls.jpg", "Waterfall Mint", Color(0xFF2DD4BF)),
-        AerixWallpaperPreset("wp_20_sakura_sunbeams", "Sakura Sunbeams", "Cherry Glade • Complementary", "wallpapers/wp_20_sakura_sunbeams.jpg", "Orchid Sunbeam", Color(0xFFE879F9)),
-        AerixWallpaperPreset("wp_21_crimson_forest", "Crimson Forest Embers", "Nether Crimson Forest • Nether Shaders", "wallpapers/wp_21_crimson_forest.jpg", "Crimson Red", Color(0xFFE11D48)),
-        AerixWallpaperPreset("wp_22_amethyst_geode", "Amethyst Geode Lake", "Amethyst Geode • Crystal Shaders", "wallpapers/wp_22_amethyst_geode.jpg", "Amethyst Bloom", Color(0xFFA855F7)),
-        AerixWallpaperPreset("wp_23_bamboo_dawn", "Bamboo Sunrise", "Bamboo Jungle • Sunrise Shaders", "wallpapers/wp_23_bamboo_dawn.jpg", "Bamboo Dawn", Color(0xFF84CC16)),
-        AerixWallpaperPreset("wp_24_badlands_canyon", "Badlands Canyon River", "Badlands Mesa • Canyon Shaders", "wallpapers/wp_24_badlands_canyon.jpg", "Terracotta Sunset", Color(0xFFF97316)),
-        AerixWallpaperPreset("wp_25_deep_dark", "Deep Dark Sculk City", "Deep Dark • Sculk Shaders", "wallpapers/wp_25_deep_dark.jpg", "Sculk Abyss", Color(0xFF06B6D4))
+        AerixWallpaperPreset("wp_01_lush_caves", "Lush Glowberry Cave", "Lush Caves • Complementary Shaders", "wallpapers/wp_01_lush_caves.webp", "Lush Teal", AerixSurface.accentDefault),
+        AerixWallpaperPreset("wp_02_cherry_blossom", "Cherry Blossom Grove", "Cherry Grove • BSL Shaders", "wallpapers/wp_02_cherry_blossom.webp", "Sakura Pink", Color(0xFFF472B6)),
+        AerixWallpaperPreset("wp_03_sunset_river", "Golden Sunset River", "River Valley • SEUS Renewed", "wallpapers/wp_03_sunset_river.webp", "Sunset Amber", Color(0xFFF59E0B)),
+        AerixWallpaperPreset("wp_04_crystal_river", "Crystal River Forest", "Birch & Oak River • Complementary", "wallpapers/wp_04_crystal_river.webp", "River Cyan", Color(0xFF06B6D4)),
+        AerixWallpaperPreset("wp_05_nether_fortress", "Nether Lava Cavern", "Nether Wastes • RTX Shaders", "wallpapers/wp_05_nether_fortress.webp", "Magma Orange", Color(0xFFF97316)),
+        AerixWallpaperPreset("wp_06_the_end", "The End Obsidian Pillars", "The End • Sildur's Vibrant", "wallpapers/wp_06_the_end.webp", "Ender Amethyst", Color(0xFFA855F7)),
+        AerixWallpaperPreset("wp_07_ocean_arch", "Sunlight Ocean Arch", "Warm Ocean • Complementary", "wallpapers/wp_07_ocean_arch.webp", "Ocean Azure", Color(0xFF38BDF8)),
+        AerixWallpaperPreset("wp_08_moonlit_lake", "Moonlit Birch Lake", "Night Forest • Nostalgia Shaders", "wallpapers/wp_08_moonlit_lake.webp", "Moonlight Indigo", Color(0xFF818CF8)),
+        AerixWallpaperPreset("wp_09_flower_meadow", "Sunrise Flower Meadow", "Flower Forest • BSL Shaders", "wallpapers/wp_09_flower_meadow.webp", "Rose Meadow", Color(0xFFEC4899)),
+        AerixWallpaperPreset("wp_10_spruce_mist", "Spruce Lake Morning Mist", "Old Growth Taiga • Bliss Shaders", "wallpapers/wp_10_spruce_mist.webp", "Taiga Lime", Color(0xFF84CC16)),
+        AerixWallpaperPreset("wp_11_cherry_bee", "Honeybee Cherry Canopy", "Cherry Canopy • Complementary", "wallpapers/wp_11_cherry_bee.webp", "Honey Gold", Color(0xFFFBBF24)),
+        AerixWallpaperPreset("wp_12_snowy_valley", "Snowy Peaks & Cherry Valley", "Jagged Peaks • Distant Horizons", "wallpapers/wp_12_snowy_valley.webp", "Alpine Sky", Color(0xFF60A5FA)),
+        AerixWallpaperPreset("wp_13_frozen_glacier", "Frozen Glacier Ridge", "Frozen Peaks • Complementary", "wallpapers/wp_13_frozen_glacier.webp", "Glacier Frost", Color(0xFF22D3EE)),
+        AerixWallpaperPreset("wp_14_cozy_village", "Cozy Plains Village", "Plains Village • SEUS PTGI", "wallpapers/wp_14_cozy_village.webp", "Harvest Emerald", Color(0xFF10B981)),
+        AerixWallpaperPreset("wp_15_end_portal", "End Portal Starfield", "Stronghold Portal • Void Shaders", "wallpapers/wp_15_end_portal.webp", "Portal Teal", Color(0xFF14B8A6)),
+        AerixWallpaperPreset("wp_16_ocean_monument", "Deep Ocean Monument", "Deep Ocean • Prismarine Shaders", "wallpapers/wp_16_ocean_monument.webp", "Prismarine Blue", Color(0xFF3B82F6)),
+        AerixWallpaperPreset("wp_17_night_clouds", "Starry Night River", "Plains Night • Solas Shaders", "wallpapers/wp_17_night_clouds.webp", "Starlight Violet", Color(0xFF8B5CF6)),
+        AerixWallpaperPreset("wp_18_crater_harbor", "Cherry Crater Village", "Cherry Basin • Vanilla+ Shaders", "wallpapers/wp_18_crater_harbor.webp", "Coral Blossom", Color(0xFFFB7185)),
+        AerixWallpaperPreset("wp_19_sinkhole_falls", "Lush Sinkhole Waterfall", "Dripstone & Lush • Iris Shaders", "wallpapers/wp_19_sinkhole_falls.webp", "Waterfall Mint", Color(0xFF2DD4BF)),
+        AerixWallpaperPreset("wp_20_sakura_sunbeams", "Sakura Sunbeams", "Cherry Glade • Complementary", "wallpapers/wp_20_sakura_sunbeams.webp", "Orchid Sunbeam", Color(0xFFE879F9)),
+        AerixWallpaperPreset("wp_21_crimson_forest", "Crimson Forest Embers", "Nether Crimson Forest • Nether Shaders", "wallpapers/wp_21_crimson_forest.webp", "Crimson Red", Color(0xFFE11D48)),
+        AerixWallpaperPreset("wp_22_amethyst_geode", "Amethyst Geode Lake", "Amethyst Geode • Crystal Shaders", "wallpapers/wp_22_amethyst_geode.webp", "Amethyst Bloom", Color(0xFFA855F7)),
+        AerixWallpaperPreset("wp_23_bamboo_dawn", "Bamboo Sunrise", "Bamboo Jungle • Sunrise Shaders", "wallpapers/wp_23_bamboo_dawn.webp", "Bamboo Dawn", Color(0xFF84CC16)),
+        AerixWallpaperPreset("wp_24_badlands_canyon", "Badlands Canyon River", "Badlands Mesa • Canyon Shaders", "wallpapers/wp_24_badlands_canyon.webp", "Terracotta Sunset", Color(0xFFF97316)),
+        AerixWallpaperPreset("wp_25_deep_dark", "Deep Dark Sculk City", "Deep Dark • Sculk Shaders", "wallpapers/wp_25_deep_dark.webp", "Sculk Abyss", Color(0xFF06B6D4))
     )
 
     val selectedWallpaperId: String
         get() = AerixPreferences.selectedWallpaper
 
     fun customWallpaperFile(context: Context): File = File(context.filesDir, CUSTOM_WALLPAPER_FILE)
+
+    /** Where imported wallpapers live. They survive restarts and cost the APK nothing. */
+    fun clipDir(context: Context): File = File(context.filesDir, CLIP_DIR)
+
+    fun clips(context: Context): List<File> =
+        clipDir(context).listFiles()?.filter { it.isFile }?.sortedBy { it.name.lowercase() } ?: emptyList()
+
+    fun isClipId(id: String): Boolean = id.startsWith(WALLPAPER_CLIP_PREFIX)
+
+    fun clipFile(context: Context, id: String): File? {
+        if (!isClipId(id)) return null
+        val name = id.removePrefix(WALLPAPER_CLIP_PREFIX)
+        return clips(context).firstOrNull { it.name == name }
+    }
+
+    fun clipId(file: File): String = WALLPAPER_CLIP_PREFIX + file.name
+
+    fun isBundledClipId(id: String): Boolean = id.startsWith(WALLPAPER_CLIP_ASSET_PREFIX)
+
+    fun bundledClipId(clip: net.kdt.pojavlaunch.aerix.components.BundledClip): String =
+        WALLPAPER_CLIP_ASSET_PREFIX + clip.id
+
+    /** Applies footage that ships with the launcher. Its own palette becomes the accent. */
+    fun applyBundledClip(clip: net.kdt.pojavlaunch.aerix.components.BundledClip) {
+        AerixPreferences.saveSelectedWallpaper(bundledClipId(clip))
+        AerixPreferences.saveCustomColor(clip.accent.toArgb())
+        AerixPreferences.saveColorTheme(AerixColorTheme.CUSTOM)
+        if (AerixPreferences.backgroundOpacity >= 95) AerixPreferences.saveBackgroundOpacity(72)
+        wallpaperRevision++
+    }
 
     @Composable
     fun currentAccent(): Color = if (AerixPreferences.colorTheme == AerixColorTheme.CUSTOM) {
@@ -106,6 +141,43 @@ object AerixThemeManager {
     fun applyPreset(preset: AerixWallpaperPreset) {
         AerixPreferences.saveSelectedWallpaper(preset.id)
         AerixPreferences.saveCustomColor(preset.accentColor.toArgb())
+        AerixPreferences.saveColorTheme(AerixColorTheme.CUSTOM)
+        if (AerixPreferences.backgroundOpacity >= 95) AerixPreferences.saveBackgroundOpacity(72)
+        wallpaperRevision++
+    }
+
+    /**
+     * Imports a clip or animated image and makes it the wallpaper.
+     *
+     * Real footage and real looped animation, brought by the user: the launcher itself ships none,
+     * so nothing is added to the download, and any number of them can be kept.
+     */
+    fun importClip(context: Context, displayName: String?, source: java.io.InputStream): File {
+        val file = net.kdt.pojavlaunch.aerix.components.importMediaWallpaper(
+            clipDir(context), displayName, source
+        )
+        applyClip(file)
+        return file
+    }
+
+    fun applyClip(file: File) {
+        AerixPreferences.saveSelectedWallpaper(clipId(file))
+        wallpaperRevision++
+    }
+
+    fun deleteClip(context: Context, file: File) {
+        val wasActive = AerixPreferences.selectedWallpaper == clipId(file)
+        file.delete()
+        if (wasActive) {
+            AerixPreferences.saveSelectedWallpaper(wallpapers.first().id)
+            wallpaperRevision++
+        }
+    }
+
+    /** Applies one of the 25 animated wallpapers: same accent behaviour as a photographic preset. */
+    fun applyAnimation(animation: net.kdt.pojavlaunch.aerix.components.AerixAnimation) {
+        AerixPreferences.saveSelectedWallpaper(animation.id)
+        AerixPreferences.saveCustomColor(animation.accent.toArgb())
         AerixPreferences.saveColorTheme(AerixColorTheme.CUSTOM)
         if (AerixPreferences.backgroundOpacity >= 95) AerixPreferences.saveBackgroundOpacity(72)
         wallpaperRevision++

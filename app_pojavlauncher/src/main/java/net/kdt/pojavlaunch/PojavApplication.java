@@ -2,8 +2,10 @@ package net.kdt.pojavlaunch;
 
 import static android.content.Intent.FLAG_ACTIVITY_NEW_TASK;
 
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.os.Build;
@@ -12,6 +14,7 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 
+import net.kdt.pojavlaunch.aerix.bridge.PojavPluginBridge;
 import net.kdt.pojavlaunch.lifecycle.ContextExecutor;
 import net.kdt.pojavlaunch.mobileglues.MGApplication;
 import net.kdt.pojavlaunch.prefs.LauncherPreferences;
@@ -100,6 +103,48 @@ public class PojavApplication extends MGApplication {
 			ferrorIntent.putExtra("throwable", throwable);
 			ferrorIntent.setFlags(FLAG_ACTIVITY_NEW_TASK);
 			startActivity(ferrorIntent);
+		}
+		initRendererPlugins();
+	}
+
+	/**
+	 * Scans for renderer plugin APKs off the main thread so every renderer list already contains
+	 * them, then rescans when a plugin APK is installed, replaced or removed.
+	 */
+	private void initRendererPlugins() {
+		try {
+			sExecutorService.execute(() -> {
+				try {
+					PojavPluginBridge.loadPlugins(this);
+				} catch (Throwable pluginScanError) {
+					Log.w("PojavApplication", "Renderer plugin scan failed", pluginScanError);
+				}
+			});
+
+			BroadcastReceiver pluginPackageReceiver = new BroadcastReceiver() {
+				@Override
+				public void onReceive(Context context, Intent intent) {
+					sExecutorService.execute(() -> {
+						try {
+							PojavPluginBridge.refreshPlugins(context.getApplicationContext());
+						} catch (Throwable pluginRefreshError) {
+							Log.w("PojavApplication", "Renderer plugin refresh failed", pluginRefreshError);
+						}
+					});
+				}
+			};
+			IntentFilter pluginPackageFilter = new IntentFilter();
+			pluginPackageFilter.addAction(Intent.ACTION_PACKAGE_ADDED);
+			pluginPackageFilter.addAction(Intent.ACTION_PACKAGE_REMOVED);
+			pluginPackageFilter.addAction(Intent.ACTION_PACKAGE_REPLACED);
+			pluginPackageFilter.addDataScheme("package");
+			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+				registerReceiver(pluginPackageReceiver, pluginPackageFilter, Context.RECEIVER_NOT_EXPORTED);
+			} else {
+				registerReceiver(pluginPackageReceiver, pluginPackageFilter);
+			}
+		} catch (Throwable pluginInitError) {
+			Log.w("PojavApplication", "Renderer plugin support failed to initialize", pluginInitError);
 		}
 	}
 

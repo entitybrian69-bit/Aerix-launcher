@@ -10,6 +10,8 @@ import static net.kdt.pojavlaunch.game.renderer.def.Renderers.ZINK_RENDERER;
 import static net.kdt.pojavlaunch.game.renderer.def.Renderers.NGGL4ES_RENDERER;
 import static net.kdt.pojavlaunch.game.renderer.def.Renderers.MOBILEGLUES_RENDERER;
 import static net.kdt.pojavlaunch.game.renderer.def.Renderers.SFPEW_RENDERER;
+import static net.kdt.pojavlaunch.game.renderer.def.Renderers.PROTON_RENDERER;
+import static net.kdt.pojavlaunch.game.renderer.def.Renderers.EMESIS_RENDERER;
 
 import android.content.Context;
 import android.content.res.Resources;
@@ -43,7 +45,7 @@ public class RendererCache {
         Resources resources = context.getResources();
         // This is the list that controls em all!
         String[] renderers = {
-                GL4ES_RENDERER, NGGL4ES_RENDERER, ZINK_RENDERER, LTW_RENDERER, MOBILEGLUES_RENDERER, SFPEW_RENDERER, FREEDRENO_RENDERER, MESA_RENDERER, MESA_RENDERER_EXT, LEGACYZINK_RENDERER
+                GL4ES_RENDERER, NGGL4ES_RENDERER, ZINK_RENDERER, LTW_RENDERER, MOBILEGLUES_RENDERER, SFPEW_RENDERER, FREEDRENO_RENDERER, MESA_RENDERER, MESA_RENDERER_EXT, LEGACYZINK_RENDERER, PROTON_RENDERER, EMESIS_RENDERER
         };
         ArrayList<String> rendererIds = new ArrayList<>(renderers.length);
         ArrayList<String> rendererNames = new ArrayList<>(rendererIds);
@@ -63,7 +65,10 @@ public class RendererCache {
      * Destroy compatible renderers cache
      */
     public static void releaseRendererCache() {
-        sCompatibleRenderers.rendererIds.clear();
+        RendererCache cache = sCompatibleRenderers;
         sCompatibleRenderers = null;
+        // Nothing built the list yet: a plugin was installed or removed before the renderer list
+        // was ever shown, which used to throw a NullPointerException here.
+        if (cache != null) cache.rendererIds.clear();
     }
 }

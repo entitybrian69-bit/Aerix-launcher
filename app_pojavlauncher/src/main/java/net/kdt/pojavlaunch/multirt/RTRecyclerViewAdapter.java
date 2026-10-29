@@ -217,9 +217,7 @@ public class RTRecyclerViewAdapter extends RecyclerView.Adapter<RTRecyclerViewAd
             mCurrentDownloadableRuntime = runtime;
             mCurrentPosition = pos;
 
-            mJavaVersionTextView.setText(runtime.name
-                    .replace(".tar.xz", "")
-                    .replace("-", " "));
+            mJavaVersionTextView.setText(runtime.getLabel());
 
             mFullJavaVersionTextView.setText(R.string.global_not_installed);
             mFullJavaVersionTextView.setTextColor(mDefaultColors);

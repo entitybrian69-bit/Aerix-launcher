@@ -53,6 +53,12 @@ object AerixPreferences {
     const val KEY_SWAP_ANIMATE_TYPE = "launcherSwapAnimateType"
     const val KEY_ANIMATE_EXTENT = "launcherAnimateExtent"
     const val KEY_FESTIVAL_EFFECTS = "launcherFestivalEffects"
+    /** Accent pulses and glows. Read as Compose state, so the switch applies without a restart. */
+    const val KEY_THEME_MOTION = "launcherThemeMotion"
+    /** True once the first-run guide has been completed or skipped. */
+    const val KEY_GUIDE_PLAYED = "launcherGuidePlayed"
+    /** True when the launcher's wallpaper is drawn behind the controls while the game starts. */
+    const val KEY_LOADING_WALLPAPER = "loadingScreenWallpaper"
     const val KEY_LOG_TEXT_SIZE = "logTextSize"
     const val KEY_LOG_BUFFER_FLUSH_INTERVAL = "logBufferFlushInterval"
     const val KEY_ASSET_PLATFORM = "assetPlatformSource"
@@ -62,6 +68,10 @@ object AerixPreferences {
     const val KEY_FAVORITES = "aerixFavoriteProjects"
     /** JSON array of pinned instance names (mirai VersionsManageScreen "Pinned" tab). */
     const val KEY_PINNED_INSTANCES = "aerixPinnedInstances"
+    /** Discord Rich Presence: show "Playing Aerix Launcher" on the player's own profile. */
+    const val KEY_DISCORD_PRESENCE = "aerixDiscordPresence"
+    /** The Discord application id the presence is published under (Developer Portal). */
+    const val KEY_DISCORD_APP_ID = "aerixDiscordAppId"
 
     const val DEFAULT_CUSTOM_COLOR = 0xFF8DEFE0.toInt()
     const val DEFAULT_BACKGROUND_OPACITY = 60
@@ -103,6 +113,19 @@ object AerixPreferences {
     var festivalEffects by mutableStateOf(false)
         private set
 
+    /**
+     * Animated theme: the accent breathes and selected elements glow. Compose state, so flipping it
+     * repaints whatever is on screen instead of asking the user to restart.
+     */
+    var themeMotion by mutableStateOf(true)
+    /** Set once the first-run tour has been shown, so it never appears again on its own. */
+    var guidePlayed by mutableStateOf(false)
+        private set
+
+    /** Draw the launcher's wallpaper behind the controls while the game starts. */
+    var loadingWallpaper by mutableStateOf(false)
+        private set
+
     /** Aerix "logTextSize" (5..20 sp) used by the log viewer. */
     var logTextSize by mutableIntStateOf(15)
 
@@ -130,6 +153,14 @@ object AerixPreferences {
     var pinnedJson by mutableStateOf("[]")
         private set
 
+    /** Aerix "aerixDiscordPresence": publish what the launcher is doing to the Discord app. */
+    var discordPresenceEnabled by mutableStateOf(true)
+        private set
+
+    /** Aerix "aerixDiscordAppId": the Discord application the presence is shown under. */
+    var discordAppId by mutableStateOf("")
+        private set
+
     fun init(context: Context) {
         val p = context.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
         prefs = p
@@ -148,6 +179,9 @@ object AerixPreferences {
         }.getOrDefault(AerixTransitionType.JELLY_BOUNCE)
         animateExtent = p.getInt(KEY_ANIMATE_EXTENT, 3).coerceIn(0, 10)
         festivalEffects = p.getBoolean(KEY_FESTIVAL_EFFECTS, false)
+        themeMotion = p.getBoolean(KEY_THEME_MOTION, true)
+        guidePlayed = p.getBoolean(KEY_GUIDE_PLAYED, false)
+        loadingWallpaper = p.getBoolean(KEY_LOADING_WALLPAPER, false)
         logTextSize = p.getInt(KEY_LOG_TEXT_SIZE, 15).coerceIn(5, 20)
         logBufferFlushInterval = p.getInt(KEY_LOG_BUFFER_FLUSH_INTERVAL, DEFAULT_LOG_BUFFER_FLUSH_INTERVAL).coerceIn(100, 1000)
         assetPlatformSource = runCatching {
@@ -157,11 +191,23 @@ object AerixPreferences {
         logRetentionDays = p.getInt(KEY_LOG_RETENTION_DAYS, 7).coerceIn(1, 14)
         favoritesJson = p.getString(KEY_FAVORITES, "[]") ?: "[]"
         pinnedJson = p.getString(KEY_PINNED_INSTANCES, "[]") ?: "[]"
+        discordPresenceEnabled = p.getBoolean(KEY_DISCORD_PRESENCE, true)
+        discordAppId = p.getString(KEY_DISCORD_APP_ID, "") ?: ""
     }
 
     fun saveFavoritesJson(value: String) {
         favoritesJson = value
         edit { putString(KEY_FAVORITES, value) }
+    }
+
+    fun saveDiscordPresenceEnabled(value: Boolean) {
+        discordPresenceEnabled = value
+        edit { putBoolean(KEY_DISCORD_PRESENCE, value) }
+    }
+
+    fun saveDiscordAppId(value: String) {
+        discordAppId = value.trim().filter { it.isDigit() }
+        edit { putString(KEY_DISCORD_APP_ID, discordAppId) }
     }
 
     fun savePinnedJson(value: String) {
@@ -235,6 +281,21 @@ object AerixPreferences {
     fun saveAnimateExtent(value: Int) {
         animateExtent = value.coerceIn(0, 10)
         edit { putInt(KEY_ANIMATE_EXTENT, animateExtent) }
+    }
+
+    fun saveThemeMotion(value: Boolean) {
+        themeMotion = value
+        edit { putBoolean(KEY_THEME_MOTION, value) }
+    }
+
+    fun saveGuidePlayed(value: Boolean) {
+        guidePlayed = value
+        edit { putBoolean(KEY_GUIDE_PLAYED, value) }
+    }
+
+    fun saveLoadingWallpaper(value: Boolean) {
+        loadingWallpaper = value
+        edit { putBoolean(KEY_LOADING_WALLPAPER, value) }
     }
 
     fun saveFestivalEffects(value: Boolean) {
