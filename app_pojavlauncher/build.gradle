@@ -28,6 +28,10 @@ if (!(AERIX_VERSION_NAME ==~ /\d+\.\d+\.\d+/)) throw new GradleException('versio
 def versionParts = AERIX_VERSION_NAME.split('\\.').collect { it.toInteger() }
 if (versionParts[1] >= 100 || versionParts[2] >= 100) throw new GradleException('Minor/patch must be below 100')
 def AERIX_VERSION_CODE = versionParts[0] * 10000 + versionParts[1] * 100 + versionParts[2]
+// Debug testing APKs advance monotonically on every build so installing a new debug APK over an
+// existing net.kdt.pojavlaunch.debug install (whether 10506 or legacy 172005) never fails with
+// INSTALL_FAILED_VERSION_DOWNGRADE ("App not installed as package appears to be invalid").
+def AERIX_DEBUG_VERSION_CODE = ((long) (System.currentTimeMillis() / 1000L) - 1700000000L).toInteger()
 
 def getVersionName = {
     def currentBranch = grgit.branch.current()
@@ -265,6 +269,14 @@ android {
         buildConfig true
         compose true
         aidl true
+    }
+}
+
+androidComponents {
+    onVariants(selector().withBuildType("debug")) { variant ->
+        variant.outputs.each { output ->
+            output.versionCode.set(AERIX_DEBUG_VERSION_CODE)
+        }
     }
 }
 

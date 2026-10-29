@@ -100,8 +100,9 @@ jobs:
           exit "$code"
 
       - name: Check it is really the debug build
+        id: verify
         run: |
-          set -e
+          set -euo pipefail
           test -f "$APK_PATH"
           python3 -c "
           import sys
@@ -110,7 +111,17 @@ jobs:
           sys.exit(0 if wanted in data else 1)
           "
           echo "applicationId net.kdt.pojavlaunch.debug confirmed"
-          keytool -printcert -jarfile "$APK_PATH" | head -6
+
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          BT_DIR="$(ls -d "$SDK_ROOT"/build-tools/* | sort -V | tail -n 1)"
+          echo "Using build-tools: $BT_DIR"
+          "$BT_DIR/zipalign" -c 4 "$APK_PATH"
+          "$BT_DIR/apksigner" verify --verbose --min-sdk-version 23 --print-certs "$APK_PATH" | tee apksigner.txt
+          BADGING="$("$BT_DIR/aapt2" dump badging "$APK_PATH" | head -n 1)"
+          echo "$BADGING"
+          VCODE="$(printf '%s' "$BADGING" | sed -n "s/.*versionCode='\([0-9]*\)'.*/\1/p")"
+          echo "version_code=$VCODE" >> "$GITHUB_OUTPUT"
+          echo "::notice title=apk-verified::$BADGING"
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
@@ -122,21 +133,26 @@ jobs:
       - name: Publish debug APK to GitHub Release (debug-latest)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION_CODE: ${{ steps.verify.outputs.version_code }}
         shell: bash
         run: |
-          set -e
+          set -euo pipefail
           TAG="debug-latest"
           SHORT="${GITHUB_SHA:0:7}"
+          STAMPED_NAME="Aerix-Launcher-debug-$SHORT.apk"
           BUILT_AT="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
           STAGE="$(mktemp -d)"
           cp "$APK_PATH" "$STAGE/$APK_NAME"
+          cp "$APK_PATH" "$STAGE/$STAMPED_NAME"
           ( cd "$STAGE" && sha256sum "$APK_NAME" > "$APK_NAME.sha256" )
           SHA256="$(cut -d' ' -f1 "$STAGE/$APK_NAME.sha256")"
           {
             echo "kind: debug (testing only)"
             echo "name: $APK_NAME (universal, arm64 + arm32)"
+            echo "stamped: $STAMPED_NAME"
             echo "branch: $GITHUB_REF_NAME"
             echo "commit: $GITHUB_SHA"
+            echo "versionCode: $VERSION_CODE"
             echo "run: $GITHUB_RUN_ID"
             echo "built: $BUILT_AT"
             echo "sha256: $SHA256"
@@ -147,15 +163,24 @@ jobs:
             echo "Side-by-side testing build (\`net.kdt.pojavlaunch.debug\`) — installs next to the public launcher without touching its data."
             echo ""
             echo "- **Direct download:** [\`$APK_NAME\`](https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/$APK_NAME)"
+            echo "- **Commit-stamped download (avoids browser filename cache):** [\`$STAMPED_NAME\`](https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/$STAMPED_NAME)"
             echo "- **Branch:** \`$GITHUB_REF_NAME\`"
             echo "- **Commit:** \`$SHORT\` (\`$GITHUB_SHA\`)"
+            echo "- **versionCode:** \`$VERSION_CODE\`"
             echo "- **Built:** \`$BUILT_AT\`"
             echo "- **SHA-256:** \`$SHA256\`"
           } > "$STAGE/RELEASE_NOTES.md"
 
           if gh release view "$TAG" > /dev/null 2>&1; then
+            # Prune previous commit-stamped APKs so only the latest pair remains on debug-latest.
+            for old_asset in $(gh release view "$TAG" --json assets --jq '.assets[].name' | grep -E '^Aerix-Launcher-debug-[0-9a-f]+\.apk$' || true); do
+              if [ "$old_asset" != "$STAMPED_NAME" ]; then
+                gh release delete-asset "$TAG" "$old_asset" --yes || true
+              fi
+            done
             gh release upload "$TAG" --clobber \
               "$STAGE/$APK_NAME" \
+              "$STAGE/$STAMPED_NAME" \
               "$STAGE/$APK_NAME.sha256" \
               "$STAGE/DEBUG_BUILD.txt"
             gh release edit "$TAG" \
@@ -170,8 +195,9 @@ jobs:
               --title "Aerix Debug Build (latest)" \
               --notes-file "$STAGE/RELEASE_NOTES.md" \
               "$STAGE/$APK_NAME" \
+              "$STAGE/$STAMPED_NAME" \
               "$STAGE/$APK_NAME.sha256" \
               "$STAGE/DEBUG_BUILD.txt"
           fi
           rm -rf "$STAGE"
-          echo "::notice title=debug-apk::https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/$APK_NAME (from $SHORT)"
+          echo "::notice title=debug-apk::https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/$APK_NAME (versionCode $VERSION_CODE, from $SHORT)"

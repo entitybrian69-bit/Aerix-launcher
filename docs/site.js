@@ -17,6 +17,7 @@
   'use strict';
 
   var REPO = 'entitybrian69-bit/Aerix-launcher';
+  var LATEST_API = 'https://api.github.com/repos/' + REPO + '/releases/latest';
   var API = 'https://api.github.com/repos/' + REPO + '/releases?per_page=15';
 
   function $(id) { return document.getElementById(id); }
@@ -39,12 +40,15 @@
 
   /* ── the newest release ─────────────────────────────────────────────────── */
 
+  function isPublicRelease(r) {
+    return !!(r && !r.draft && !r.prerelease && r.tag_name && !/debug/i.test(r.tag_name) &&
+      (r.assets || []).some(function (a) {
+        return /\.apk$/i.test(a.name || '') && !/debug/i.test(a.name || '');
+      }));
+  }
+
   function newestRelease(releases) {
-    var usable = (releases || []).filter(function (r) {
-      return r && !r.draft && !r.prerelease && r.tag_name && (r.assets || []).some(function (a) {
-        return /\.apk$/i.test(a.name || '');
-      });
-    });
+    var usable = (releases || []).filter(isPublicRelease);
     return usable[0] || null;
   }
 
@@ -52,6 +56,7 @@
   function kindOf(name) {
     if (!/\.apk$/i.test(name)) return null;
     var n = name.toLowerCase();
+    if (n.indexOf('debug') !== -1) return null;
     var noruntime = n.indexOf('noruntime') !== -1;
     if (n.indexOf('arm64') !== -1) return noruntime ? 'noruntime-arm64' : 'arm64';
     if (n.indexOf('armeabi') !== -1) return noruntime ? 'noruntime-armv7' : 'armv7';
@@ -132,11 +137,12 @@
 
     function add(list) {
       (list || []).forEach(function (release) {
+        if (!release || release.draft || release.prerelease || /debug/i.test(release.tag_name || '')) return;
         var id = release.id || release.tag_name;
         if (seen[id]) return;
         seen[id] = true;
         (release.assets || []).forEach(function (asset) {
-          if (!/\.apk$/i.test(asset.name || '')) return;
+          if (!/\.apk$/i.test(asset.name || '') || /debug/i.test(asset.name || '')) return;
           if (typeof asset.download_count === 'number') total += asset.download_count;
         });
       });
@@ -152,12 +158,20 @@
 
   function loadRelease() {
     if (!window.fetch) return;
-    fetch(API, { headers: { Accept: 'application/vnd.github+json' } })
+    fetch(LATEST_API, { headers: { Accept: 'application/vnd.github+json' } })
       .then(function (r) {
         if (!r.ok) throw new Error('HTTP ' + r.status);
         return r.json();
       })
-      .then(function (releases) { applyRelease(newestRelease(releases)); })
+      .then(function (release) {
+        if (isPublicRelease(release)) {
+          applyRelease(release);
+          return null;
+        }
+        return fetch(API, { headers: { Accept: 'application/vnd.github+json' } })
+          .then(function (r2) { return r2.ok ? r2.json() : []; })
+          .then(function (releases) { applyRelease(newestRelease(releases)); });
+      })
       .catch(function () {
         /* Offline, rate limited, or blocked: the static links and sizes stay. */
       });
