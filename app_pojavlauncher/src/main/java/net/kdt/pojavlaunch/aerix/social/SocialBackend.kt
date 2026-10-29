@@ -466,7 +466,12 @@ object SocialBackend {
             connection.disconnect()
             if (code !in 200..299) {
                 Log.w(TAG, "$method $url -> $code $text")
-                if (code == 401) signOut()
+                // The server says what is wrong in its own words ("Email not confirmed",
+                // "Invalid login credentials"); show that instead of a generic sentence, so the
+                // screen explains the problem and can be screenshotted.
+                serverMessage(text)?.let { lastError = "$it (HTTP $code)" }
+                    ?: run { lastError = "Server said HTTP $code" }
+                if (code == 401 && authenticated && !url.contains("/auth/v1/token")) signOut()
                 return null
             }
             if (text.isBlank()) JsonParser.parseString("{}") else JsonParser.parseString(text)
@@ -474,6 +479,16 @@ object SocialBackend {
             Log.w(TAG, "$method $url failed", error)
             null
         }
+    }
+
+    /** The message inside a Supabase error body, or null when there is none. */
+    private fun serverMessage(body: String): String? {
+        if (body.isBlank()) return null
+        val json = runCatching { JsonParser.parseString(body) as? JsonObject }.getOrNull() ?: return null
+        return json.stringOrNull("msg")
+            ?: json.stringOrNull("message")
+            ?: json.stringOrNull("error_description")
+            ?: json.stringOrNull("error")
     }
 
     /** The body of a call, when it is a JSON object. */
