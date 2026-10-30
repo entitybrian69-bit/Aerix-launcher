@@ -4466,8 +4466,8 @@ object SocialBackend {
                 return false
             }
             if (notifiedDedupeKeys.size > 400) {
-                val it = notifiedDedupeKeys.iterator()
-                repeat(100) { if (it.hasNext()) { it.next(); it.remove() } }
+                val iter = notifiedDedupeKeys.iterator()
+                repeat(100) { if (iter.hasNext()) { iter.next(); iter.remove() } }
             }
             if (idKey != null) notifiedDedupeKeys.add(idKey)
             if (tmpKey != null) notifiedDedupeKeys.add(tmpKey)
