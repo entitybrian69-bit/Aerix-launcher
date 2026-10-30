@@ -47,4 +47,34 @@ public class LocaleUtils extends ContextWrapper {
 
         return new LocaleUtils(context);
     }
+
+    /**
+     * Initializes early locale preferences and updates Application resources WITHOUT wrapping
+     * {@code base} in a {@link ContextWrapper}. Android's {@code ActivityThread.handleReceiver}
+     * casts {@code app.getBaseContext()} directly to {@code android.app.ContextImpl}, so
+     * {@link android.app.Application#attachBaseContext(Context)} must keep the raw base context.
+     */
+    public static Context applyApplicationLocale(Context base) {
+        if (DEFAULT_PREF == null) {
+            DEFAULT_PREF = PreferenceManager.getDefaultSharedPreferences(base);
+            PREF_FORCE_ENGLISH = DEFAULT_PREF.getBoolean("force_english", false);
+        }
+
+        if (PREF_FORCE_ENGLISH) {
+            Resources resources = base.getResources();
+            Configuration configuration = resources.getConfiguration();
+
+            configuration.setLocale(Locale.ENGLISH);
+            Locale.setDefault(Locale.ENGLISH);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                LocaleList localeList = new LocaleList(Locale.ENGLISH);
+                LocaleList.setDefault(localeList);
+                configuration.setLocales(localeList);
+            }
+
+            resources.updateConfiguration(configuration, resources.getDisplayMetrics());
+        }
+
+        return base;
+    }
 }

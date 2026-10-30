@@ -163,12 +163,12 @@ public class PojavApplication extends MGApplication {
 
 	@Override
     protected void attachBaseContext(Context base) {
-        super.attachBaseContext(LocaleUtils.setLocale(base));
+        super.attachBaseContext(LocaleUtils.applyApplicationLocale(base));
     }
 
     @Override
     public void onConfigurationChanged(@NonNull Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
-        LocaleUtils.setLocale(this);
+        LocaleUtils.applyApplicationLocale(this);
     }
 }

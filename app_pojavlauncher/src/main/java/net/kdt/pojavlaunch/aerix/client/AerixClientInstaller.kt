@@ -111,6 +111,7 @@ object AerixClientInstaller {
             statusHeadline = "Installing Fabric ${pickedLoader.version} for $TARGET_MC_VERSION..."
             statusDetail = "Writing version JSON into versions/ directory"
             val fabricVersionId = FabriclikeUtils.FABRIC_UTILS.install(TARGET_MC_VERSION, pickedLoader.version)
+                ?: error("Failed to download Fabric $TARGET_MC_VERSION profile metadata.")
 
             // Step 2: Create or reuse isolated Aerix Client 1.16.5 Instance
             progressFraction = 0.24f

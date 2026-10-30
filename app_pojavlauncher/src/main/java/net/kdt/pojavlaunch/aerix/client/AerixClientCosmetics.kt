@@ -294,7 +294,12 @@ object AerixClientCosmetics {
             val decoded = BitmapFactory.decodeByteArray(existingSkinPng, 0, existingSkinPng.size)
                 ?: return existingSkinPng
             val copy = Bitmap.createBitmap(64, 64, Bitmap.Config.ARGB_8888)
-            Canvas(copy).drawBitmap(decoded, 0f, 0f, null)
+            val src = if (decoded.width == 64 && decoded.height == 64) {
+                decoded
+            } else {
+                Bitmap.createScaledBitmap(decoded, 64, 64, false)
+            }
+            Canvas(copy).drawBitmap(src, 0f, 0f, null)
             copy
         } else {
             buildDefaultBaseSkin64(slim)
