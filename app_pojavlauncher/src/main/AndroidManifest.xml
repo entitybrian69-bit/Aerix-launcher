@@ -33,6 +33,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <uses-permission android:name="android.permission.VIBRATE"/>                         
 
     <application
@@ -95,6 +96,9 @@
                     android:scheme="aerix-social" />
                 <data
                     android:host="friend"
+                    android:scheme="aerix-social" />
+                <data
+                    android:host="chat"
                     android:scheme="aerix-social" />
             </intent-filter>
         </activity>
@@ -193,6 +197,32 @@
             <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="This application is intended to run a 3rd-party piece of software which cannot be managed using the activity's saved instance state. This service is used for background persistence of this piece of software."/>
         </service>
+
+        <service
+            android:name="net.kdt.pojavlaunch.aerix.social.SocialMessagingService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Maintains a low-bandwidth Realtime listener so players receive direct and party message notifications with inline reply when the launcher UI is closed." />
+        </service>
+
+        <service
+            android:name="net.kdt.pojavlaunch.aerix.social.SocialInboxJobService"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
+
+        <receiver
+            android:name="net.kdt.pojavlaunch.aerix.social.SocialNotificationReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="net.kdt.pojavlaunch.aerix.ACTION_SOCIAL_DIRECT_REPLY" />
+                <action android:name="net.kdt.pojavlaunch.aerix.ACTION_SOCIAL_MARK_READ" />
+                <action android:name="net.kdt.pojavlaunch.aerix.ACTION_SOCIAL_RESTART_SYNC" />
+            </intent-filter>
+        </receiver>
     </application>
     <queries>
         <package android:name="net.kdt.pojavlaunch.ffmpeg"/>

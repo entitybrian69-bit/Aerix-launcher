@@ -147,6 +147,16 @@ object SocialBackend {
     var chatSoundsEnabled by mutableStateOf(true)
         private set
 
+    /** Background push-style message notifications + inline Direct Reply when app is closed. */
+    var backgroundNotificationsEnabled by mutableStateOf(true)
+        private set
+
+    /** Deep-link target set when tapping a message notification in Android's notification shade. */
+    var pendingOpenDmPeerId by mutableStateOf<String?>(null)
+        private set
+    var pendingOpenPartyId by mutableStateOf<String?>(null)
+        private set
+
     /**
      * Effective availability mode right now:
      * - `null` when Wi-Fi / internet is off (renders Offline immediately).
@@ -202,6 +212,33 @@ object SocialBackend {
         }
     }
 
+    fun toggleBackgroundNotifications(enabled: Boolean) {
+        backgroundNotificationsEnabled = enabled
+        prefs()?.edit()?.putBoolean("bg_notifications_enabled", enabled)?.apply()
+        appContext?.let { app ->
+            if (enabled && signedIn) {
+                SocialMessagingService.ensureRunningIfSignedIn(app)
+            } else {
+                SocialMessagingService.stop(app)
+                SocialInboxJobService.cancel(app)
+            }
+        }
+    }
+
+    @JvmStatic
+    fun requestOpenConversation(peerId: String? = null, partyId: String? = null) {
+        pendingOpenDmPeerId = peerId?.takeIf { it.isNotBlank() }
+        pendingOpenPartyId = partyId?.takeIf { it.isNotBlank() }
+    }
+
+    fun consumePendingOpenConversation(): Pair<String?, String?> {
+        val dm = pendingOpenDmPeerId
+        val party = pendingOpenPartyId
+        pendingOpenDmPeerId = null
+        pendingOpenPartyId = null
+        return dm to party
+    }
+
     /** Tracks which conversation is currently visible on screen for instant read-receipts & sound routing. */
     @Volatile var activeOpenPeerId: String? = null
         private set
@@ -211,6 +248,11 @@ object SocialBackend {
     fun setOpenConversation(peerId: String? = null, partyId: String? = null) {
         activeOpenPeerId = peerId
         activeOpenPartyId = partyId
+        if (!peerId.isNullOrBlank() || !partyId.isNullOrBlank()) {
+            appContext?.let { app ->
+                SocialNotificationHelper.clearConversationNotification(app, peerId = peerId, partyId = partyId)
+            }
+        }
     }
 
     /** Combined badge count (unread DMs + incoming friend requests + pending party invites). */
@@ -371,21 +413,24 @@ object SocialBackend {
 
                 val msgId = payload.longOr("id", System.currentTimeMillis())
                 val tempId = payload.stringOrNull("tempId")
-                val body = payload.stringOrNull("body") ?: return
+                val rawBody = payload.stringOrNull("body") ?: return
+                val decodedBody = SocialEnvelopeCodec.decodeDmBodyWithMeta(rawBody)
                 val atMs = payload.longOr("atMs", System.currentTimeMillis())
-                val replyTo = payload.get("replyTo")?.takeIf { !it.isJsonNull }?.asLong
-                val attachmentUrl = payload.stringOrNull("attachmentUrl")
+                val replyTo = payload.get("replyTo")?.takeIf { !it.isJsonNull }?.asLong ?: decodedBody.replyTo
+                val attachmentUrl = payload.stringOrNull("attachmentUrl") ?: decodedBody.attachmentUrl
                 val editedAtMs = payload.longOr("editedAtMs", 0L)
+                val senderNameHint = payload.stringOrNull("senderName")
 
                 val incoming = SocialMessage(
                     id = msgId,
                     sender = sender,
                     recipient = recipient,
-                    body = body,
+                    body = decodedBody.body,
                     atMs = atMs,
                     editedAtMs = editedAtMs,
                     replyTo = replyTo,
                     attachmentUrl = attachmentUrl,
+                    senderName = senderNameHint,
                     localTempId = tempId
                 )
 
@@ -393,15 +438,31 @@ object SocialBackend {
                 bgScope.launch(Dispatchers.Main) {
                     messageRevision++
                 }
-                if (sender != me && isBrandNew) {
-                    if (effectivePresenceMode != SocialPresenceMode.DND) {
-                        SocialSoundEffects.playMessageReceived()
+                if (sender != me) {
+                    if (msgId > 0L) {
+                        advanceLastSeenInboxId(me, msgId)
                     }
-                    if (activeOpenPeerId == sender) {
-                        bgScope.launch { markRead(sender) }
-                    } else {
+                    val viewingOpen = isLauncherInForeground && activeOpenPeerId == sender
+                    if (viewingOpen) {
+                        if (isBrandNew && effectivePresenceMode != SocialPresenceMode.DND) {
+                            SocialSoundEffects.playMessageReceived()
+                        }
+                        if (msgId > 0L || isBrandNew) {
+                            bgScope.launch { markRead(sender) }
+                        }
+                    } else if (isBrandNew) {
+                        if (isLauncherInForeground && effectivePresenceMode != SocialPresenceMode.DND) {
+                            SocialSoundEffects.playMessageReceived()
+                        }
                         bgScope.launch(Dispatchers.Main) { unread += 1 }
-                        bgScope.launch { unreadCount() }
+                        bgScope.launch {
+                            maybePostDmNotification(
+                                senderId = sender,
+                                senderNameHint = senderNameHint,
+                                message = incoming
+                            )
+                            unreadCount()
+                        }
                     }
                 }
             }
@@ -499,8 +560,20 @@ object SocialBackend {
                         insertedNew = true
                     }
                 }
-                if (insertedNew && sender != userId && effectivePresenceMode != SocialPresenceMode.DND) {
-                    SocialSoundEffects.playMessageReceived()
+                if (insertedNew && sender != userId) {
+                    val viewingPartyOpen = isLauncherInForeground && activeOpenPartyId == partyId
+                    if (viewingPartyOpen) {
+                        if (effectivePresenceMode != SocialPresenceMode.DND) {
+                            SocialSoundEffects.playMessageReceived()
+                        }
+                    } else {
+                        if (isLauncherInForeground && effectivePresenceMode != SocialPresenceMode.DND) {
+                            SocialSoundEffects.playMessageReceived()
+                        }
+                        bgScope.launch {
+                            maybePostPartyNotification(partyId = partyId, message = msg)
+                        }
+                    }
                 }
                 bgScope.launch(Dispatchers.Main) { partyMessageRevision++ }
             }
@@ -571,6 +644,37 @@ object SocialBackend {
         }
     }
 
+    private fun parseDmMessageRow(row: JsonObject, deletedIds: Set<Long>): SocialMessage? {
+        val id = row.longOr("id", 0L)
+        if (id <= 0L || id in deletedIds) return null
+        val rawBody = row.stringOrNull("body") ?: ""
+        if (rawBody.startsWith(SocialEnvelopeCodec.PARTY_CHAT_PREFIX)) return null
+
+        val decodedMeta = SocialEnvelopeCodec.decodeDmBodyWithMeta(rawBody)
+        val displayBody = if (decodedMeta.body.startsWith(SocialEnvelopeCodec.PARTY_INVITE_PREFIX)) {
+            val inv = SocialEnvelopeCodec.decodePartyInvite(decodedMeta.body, id)
+            if (inv != null) {
+                "Invited to party \"${inv.partyTitle}\"" + (inv.mcVersion?.let { " · $it" } ?: "")
+            } else decodedMeta.body
+        } else {
+            decodedMeta.body
+        }
+
+        val sender = row.stringOrNull("sender") ?: return null
+        val recipient = row.stringOrNull("recipient") ?: return null
+        return SocialMessage(
+            id = id,
+            sender = sender,
+            recipient = recipient,
+            body = displayBody,
+            atMs = parseTimestamp(row.stringOrNull("created_at") ?: "").takeIf { it > 0L } ?: System.currentTimeMillis(),
+            readAtMs = parseTimestamp(row.stringOrNull("read_at") ?: ""),
+            editedAtMs = parseTimestamp(row.stringOrNull("edited_at") ?: ""),
+            replyTo = row.get("reply_to")?.takeIf { !it.isJsonNull }?.asLong ?: decodedMeta.replyTo,
+            attachmentUrl = row.stringOrNull("attachment_url")?.takeIf { it.isNotBlank() } ?: decodedMeta.attachmentUrl
+        )
+    }
+
     private fun handleMessageRecordFromPostgres(eventType: String, record: JsonObject?) {
         val me = userId ?: return
         if (record == null) {
@@ -578,47 +682,35 @@ object SocialBackend {
             bgScope.launch(Dispatchers.Main) { messageRevision++ }
             return
         }
-        val sender = record.stringOrNull("sender") ?: return
-        val recipient = record.stringOrNull("recipient") ?: return
+        val msg = parseDmMessageRow(record, deletedForMeSet()) ?: return
+        val sender = msg.sender
+        val recipient = msg.recipient
         if (sender != me && recipient != me) return
         val peerId = if (sender == me) recipient else sender
         if (blockedUsers.any { it.userId == peerId }) return
-        val id = record.longOr("id", 0L)
-        if (id in deletedForMeSet()) return
 
-        val rawBody = record.stringOrNull("body") ?: ""
-        val displayBody = if (rawBody.startsWith(SocialEnvelopeCodec.PARTY_INVITE_PREFIX)) {
-            val inv = SocialEnvelopeCodec.decodePartyInvite(rawBody, id)
-            if (inv != null) "Invited to party \"${inv.partyTitle}\"${inv.mcVersion?.let { " · $it" } ?: ""}"
-            else rawBody
-        } else rawBody
-
-        val readAt = parseTimestamp(record.stringOrNull("read_at") ?: "")
-        val msg = SocialMessage(
-            id = id,
-            sender = sender,
-            recipient = recipient,
-            body = displayBody,
-            atMs = parseTimestamp(record.stringOrNull("created_at") ?: "").takeIf { it > 0L } ?: System.currentTimeMillis(),
-            readAtMs = readAt,
-            editedAtMs = parseTimestamp(record.stringOrNull("edited_at") ?: ""),
-            replyTo = record.get("reply_to")?.takeIf { !it.isJsonNull }?.asLong,
-            attachmentUrl = record.stringOrNull("attachment_url")?.takeIf { it.isNotBlank() }
-        )
-
-        val wasUnreadByPeer = sender == me && readAt > 0L &&
-            (liveDmCache[peerId]?.let { l -> synchronized(l) { l.any { it.id == id && !it.isRead } } } == true)
+        val wasUnreadByPeer = sender == me && msg.readAtMs > 0L &&
+            (liveDmCache[peerId]?.let { l -> synchronized(l) { l.any { it.id == msg.id && !it.isRead } } } == true)
 
         val isBrandNew = upsertIntoDmCache(peerId, msg)
         if (wasUnreadByPeer) {
             SocialSoundEffects.playMessageSeen()
         }
-        if (isBrandNew && sender != me) {
-            if (effectivePresenceMode != SocialPresenceMode.DND) {
-                SocialSoundEffects.playMessageReceived()
-            }
-            if (activeOpenPeerId == sender) {
+        if (sender != me) {
+            advanceLastSeenInboxId(me, msg.id)
+            val viewingOpen = isLauncherInForeground && activeOpenPeerId == sender
+            if (viewingOpen) {
+                if (isBrandNew && effectivePresenceMode != SocialPresenceMode.DND) {
+                    SocialSoundEffects.playMessageReceived()
+                }
                 bgScope.launch { markRead(sender) }
+            } else if (isBrandNew && eventType.equals("INSERT", ignoreCase = true)) {
+                if (isLauncherInForeground && effectivePresenceMode != SocialPresenceMode.DND) {
+                    SocialSoundEffects.playMessageReceived()
+                }
+                bgScope.launch {
+                    maybePostDmNotification(senderId = sender, senderNameHint = null, message = msg)
+                }
             }
         }
         bgScope.launch { unreadCount() }
@@ -679,14 +771,17 @@ object SocialBackend {
         val app = context.applicationContext
         appContext = app
         SocialSoundEffects.init(app)
+        SocialNotificationHelper.ensureChannels(app)
         val prefs = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         chatSoundsEnabled = prefs.getBoolean("chat_sounds_enabled", true)
+        backgroundNotificationsEnabled = prefs.getBoolean("bg_notifications_enabled", true)
         installLifecycleMonitor(app)
         installNetworkMonitor(app)
         startPresenceKeepAliveLoop()
 
         if (signedIn) {
             ensureRealtimeConnectedAsync()
+            SocialMessagingService.ensureRunningIfSignedIn(app)
             return
         }
         refreshToken = prefs.getString("refresh_token", null)
@@ -696,6 +791,17 @@ object SocialBackend {
             signedIn = true
             loadLocalCollections()
             ensureRealtimeConnectedAsync()
+            SocialMessagingService.ensureRunningIfSignedIn(app)
+        }
+    }
+
+    fun onAppTaskSwipedAway() {
+        startedActivities.set(0)
+        activeOpenPeerId = null
+        activeOpenPartyId = null
+        if (isLauncherInForeground) {
+            isLauncherInForeground = false
+            onAutomaticPresenceTriggerChanged()
         }
     }
 
@@ -754,12 +860,13 @@ object SocialBackend {
     }
 
     private fun isAnyAppProcessInForeground(context: Context): Boolean {
+        if (startedActivities.get() > 0) return true
         return runCatching {
             val am = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager ?: return false
             val procs = am.runningAppProcesses ?: return false
-            val pkg = context.packageName
+            val gameProc = "${context.packageName}:game"
             procs.any { info ->
-                (info.processName == pkg || info.processName.startsWith("$pkg:")) &&
+                info.processName == gameProc &&
                     info.importance <= ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND
             }
         }.getOrDefault(false)
@@ -926,6 +1033,10 @@ object SocialBackend {
         observedFriendVersions.clear()
         liveDmCache.clear()
         broadcastPartyMessages.clear()
+        appContext?.let { app ->
+            SocialMessagingService.stop(app)
+            SocialInboxJobService.cancel(app)
+        }
         appContext?.getSharedPreferences(PREFS, Context.MODE_PRIVATE)?.edit()
             ?.remove("refresh_token")
             ?.remove("user_id")
@@ -1023,6 +1134,7 @@ object SocialBackend {
             ?.apply()
         loadLocalCollections()
         ensureRealtimeConnectedAsync()
+        appContext?.let { SocialMessagingService.ensureRunningIfSignedIn(it) }
         return true
     }
 
@@ -1078,6 +1190,7 @@ object SocialBackend {
                 SocialRealtime.connect(PROJECT_URL, PUBLISHABLE_KEY, tok, uid)
             }
         }
+        appContext?.let { SocialMessagingService.ensureRunningIfSignedIn(it) }
     }
 
     private fun applyJwtClaims(token: String?) {
@@ -1660,81 +1773,71 @@ object SocialBackend {
             if (blockedUsers.any { it.userId == otherId }) return@attempt emptyList<SocialMessage>()
             val deletedIds = deletedForMeSet()
 
+            // `select=*` expands to the exact columns present on `public.messages` in 1 round-trip (zero 400s).
             val resp = callRaw(
                 "GET",
-                "$PROJECT_URL/rest/v1/messages?select=id,sender,recipient,body,reply_to,attachment_url,edited_at,read_at,created_at" +
+                "$PROJECT_URL/rest/v1/messages?select=*" +
                     "&or=(and(sender.eq.$me,recipient.eq.$otherId)," +
                     "and(sender.eq.$otherId,recipient.eq.$me))" +
-                    "&order=created_at.asc&limit=250"
+                    "&order=id.asc&limit=250"
             )
-            val json = if (resp.code in 200..299) {
-                resp.json
-            } else {
-                call(
-                    "GET",
-                    "$PROJECT_URL/rest/v1/messages?select=id,sender,recipient,body,created_at" +
-                        "&or=(and(sender.eq.$me,recipient.eq.$otherId)," +
-                        "and(sender.eq.$otherId,recipient.eq.$me))" +
-                        "&order=created_at.asc&limit=200"
-                )
-            } ?: return@attempt getCachedMessages(otherId)
+            val rows = resp.json?.takeIf { resp.code in 200..299 && it.isJsonArray }?.asJsonArray
+                ?: return@attempt getCachedMessages(otherId)
 
-            val rows = json.takeIf { it.isJsonArray }?.asJsonArray ?: return@attempt getCachedMessages(otherId)
             val rawParsed = ArrayList<SocialMessage>(rows.size())
-
             rows.forEach { element ->
                 val row = element as? JsonObject ?: return@forEach
-                val id = row.longOr("id", 0L)
-                if (id in deletedIds) return@forEach
-                val rawBody = row.stringOrNull("body") ?: ""
-                if (rawBody.startsWith(SocialEnvelopeCodec.PARTY_CHAT_PREFIX)) return@forEach
-
-                val displayBody = if (rawBody.startsWith(SocialEnvelopeCodec.PARTY_INVITE_PREFIX)) {
-                    val inv = SocialEnvelopeCodec.decodePartyInvite(rawBody, id)
-                    if (inv != null) {
-                        "Invited to party \"${inv.partyTitle}\"" +
-                            (inv.mcVersion?.let { " · $it" } ?: "")
-                    } else rawBody
-                } else {
-                    rawBody
-                }
-
-                rawParsed.add(
-                    SocialMessage(
-                        id = id,
-                        sender = row.stringOrNull("sender") ?: "",
-                        recipient = row.stringOrNull("recipient") ?: "",
-                        body = displayBody,
-                        atMs = parseTimestamp(row.stringOrNull("created_at") ?: ""),
-                        readAtMs = parseTimestamp(row.stringOrNull("read_at") ?: ""),
-                        editedAtMs = parseTimestamp(row.stringOrNull("edited_at") ?: ""),
-                        replyTo = row.get("reply_to")?.takeIf { !it.isJsonNull }?.asLong,
-                        attachmentUrl = row.stringOrNull("attachment_url")?.takeIf { it.isNotBlank() }
-                    )
-                )
+                val parsedMsg = parseDmMessageRow(row, deletedIds) ?: return@forEach
+                rawParsed.add(parsedMsg)
             }
 
-            val byId = rawParsed.associateBy { it.id }
-            val enriched = rawParsed.map { msg ->
-                val parent = msg.replyTo?.let { byId[it] }
-                if (parent != null) {
-                    msg.copy(replyPreview = parent.body.take(90))
-                } else msg
-            }.toMutableList()
+            val maxFetchedId = rawParsed.maxOfOrNull { it.id } ?: 0L
+            if (maxFetchedId > 0L) {
+                val maxPeerMsgId = rawParsed.filter { it.sender == otherId }.maxOfOrNull { it.id } ?: 0L
+                if (maxPeerMsgId > 0L) advanceLastSeenInboxId(me, maxPeerMsgId)
+            }
 
-            // Preserve any in-flight optimistic messages that haven't finished their POST yet.
+            // Preserve Realtime readAtMs / localTempId / newer Realtime arrivals / in-flight optimistic messages
+            val existingById = HashMap<Long, SocialMessage>()
+            val extraRealtimeOrOptimistic = ArrayList<SocialMessage>()
             liveDmCache[otherId]?.let { existingList ->
                 synchronized(existingList) {
-                    existingList.filter { it.id < 0L && !it.pendingOffline }.forEach { inflight ->
-                        val alreadyPersisted = enriched.any { dbMsg ->
-                            dbMsg.sender == inflight.sender &&
-                                dbMsg.body == inflight.body &&
-                                abs(dbMsg.atMs - inflight.atMs) < 12_000L
+                    existingList.forEach { prev ->
+                        if (prev.id > 0L) {
+                            existingById[prev.id] = prev
+                            if (prev.id > maxFetchedId) {
+                                extraRealtimeOrOptimistic.add(prev)
+                            }
+                        } else if (!prev.pendingOffline) {
+                            val alreadyPersisted = rawParsed.any { dbMsg ->
+                                dbMsg.sender == prev.sender &&
+                                    dbMsg.body == prev.body &&
+                                    abs(dbMsg.atMs - prev.atMs) < 12_000L
+                            }
+                            if (!alreadyPersisted) extraRealtimeOrOptimistic.add(prev)
                         }
-                        if (!alreadyPersisted) enriched.add(inflight)
                     }
                 }
             }
+
+            val mergedBase = rawParsed.map { fetched ->
+                val prev = existingById[fetched.id]
+                if (prev != null) {
+                    fetched.copy(
+                        readAtMs = maxOf(prev.readAtMs, fetched.readAtMs),
+                        editedAtMs = maxOf(prev.editedAtMs, fetched.editedAtMs),
+                        localTempId = prev.localTempId
+                    )
+                } else fetched
+            } + extraRealtimeOrOptimistic
+
+            val byId = mergedBase.associateBy { it.id }
+            val enriched = mergedBase.map { msg ->
+                val parent = msg.replyTo?.let { byId[it] }
+                if (parent != null && msg.replyPreview.isNullOrBlank()) {
+                    msg.copy(replyPreview = parent.body.take(90))
+                } else msg
+            }.toMutableList()
 
             // Append pending offline outbox messages for this conversation.
             val meId = userId ?: ""
@@ -1761,6 +1864,7 @@ object SocialBackend {
                 cacheList.clear()
                 cacheList.addAll(enriched)
             }
+            withContext(Dispatchers.Main) { messageRevision++ }
             enriched.toList()
         }
         return loaded ?: getCachedMessages(otherId)
@@ -1768,17 +1872,15 @@ object SocialBackend {
 
     /**
      * Lightweight incremental delta-sync while a DM chat is open.
-     * Fetches only messages with `id > maxServerId` plus recent read-receipt updates so open
-     * conversations ALWAYS stay live even if a carrier NAT drops a WebSocket broadcast frame.
+     * Uses `select=*&id=gt.$maxServerId` so it works on EVERY schema version with zero 400s,
+     * even when `maxServerId == 0L` (first message in a brand-new conversation)!
      */
     suspend fun syncNewMessages(otherId: String): List<SocialMessage> {
         if (!signedIn || !isNetworkAvailable) return getCachedMessages(otherId)
-        val cached = liveDmCache[otherId]
-        if (cached == null) return loadMessages(otherId)
+        val cached = liveDmCache[otherId] ?: return loadMessages(otherId)
         val maxServerId = synchronized(cached) {
             cached.filter { it.id > 0L }.maxOfOrNull { it.id } ?: 0L
         }
-        if (maxServerId <= 0L) return loadMessages(otherId)
 
         attempt {
             ensureToken()
@@ -1786,47 +1888,31 @@ object SocialBackend {
             if (blockedUsers.any { it.userId == otherId }) return@attempt Unit
             val deletedIds = deletedForMeSet()
 
-            // 1. Pull any brand-new rows (`id > maxServerId`) in one tiny indexed query.
+            // 1. Pull any brand-new rows (`id > maxServerId`) in one tiny indexed query (`select=*` never 400s).
             val newResp = callRaw(
                 "GET",
-                "$PROJECT_URL/rest/v1/messages?select=id,sender,recipient,body,reply_to,attachment_url,edited_at,read_at,created_at" +
+                "$PROJECT_URL/rest/v1/messages?select=*" +
                     "&id=gt.$maxServerId" +
                     "&or=(and(sender.eq.$me,recipient.eq.$otherId),and(sender.eq.$otherId,recipient.eq.$me))" +
                     "&order=id.asc&limit=50"
             )
             var changed = false
             var incomingFromPeer = false
-            newResp.json?.takeIf { it.isJsonArray }?.asJsonArray?.forEach { el ->
-                val row = el as? JsonObject ?: return@forEach
-                val id = row.longOr("id", 0L)
-                if (id <= 0L || id in deletedIds) return@forEach
-                val rawBody = row.stringOrNull("body") ?: ""
-                if (rawBody.startsWith(SocialEnvelopeCodec.PARTY_CHAT_PREFIX)) return@forEach
-                val displayBody = if (rawBody.startsWith(SocialEnvelopeCodec.PARTY_INVITE_PREFIX)) {
-                    val inv = SocialEnvelopeCodec.decodePartyInvite(rawBody, id)
-                    if (inv != null) "Invited to party \"${inv.partyTitle}\"${inv.mcVersion?.let { " · $it" } ?: ""}"
-                    else rawBody
-                } else rawBody
-
-                val sender = row.stringOrNull("sender") ?: ""
-                val msg = SocialMessage(
-                    id = id,
-                    sender = sender,
-                    recipient = row.stringOrNull("recipient") ?: "",
-                    body = displayBody,
-                    atMs = parseTimestamp(row.stringOrNull("created_at") ?: ""),
-                    readAtMs = parseTimestamp(row.stringOrNull("read_at") ?: ""),
-                    editedAtMs = parseTimestamp(row.stringOrNull("edited_at") ?: ""),
-                    replyTo = row.get("reply_to")?.takeIf { !it.isJsonNull }?.asLong,
-                    attachmentUrl = row.stringOrNull("attachment_url")?.takeIf { it.isNotBlank() }
-                )
-                if (upsertIntoDmCache(otherId, msg)) {
-                    changed = true
-                    if (sender == otherId) incomingFromPeer = true
+            if (newResp.code in 200..299) {
+                newResp.json?.takeIf { it.isJsonArray }?.asJsonArray?.forEach { el ->
+                    val row = el as? JsonObject ?: return@forEach
+                    val msg = parseDmMessageRow(row, deletedIds) ?: return@forEach
+                    if (msg.sender == otherId && msg.id > 0L) {
+                        advanceLastSeenInboxId(me, msg.id)
+                    }
+                    if (upsertIntoDmCache(otherId, msg)) {
+                        changed = true
+                        if (msg.sender == otherId) incomingFromPeer = true
+                    }
                 }
             }
 
-            // 2. Check if any of our sent messages that were still unread have now been seen (`read_at != null`).
+            // 2. Check if any of our sent messages that were still unread have now been seen or edited (`select=*`).
             val unreadSentIds = synchronized(cached) {
                 cached.filter { it.id > 0L && it.sender == me && !it.isRead }.takeLast(12).map { it.id }
             }
@@ -1834,20 +1920,22 @@ object SocialBackend {
                 val idList = unreadSentIds.joinToString(",")
                 val seenResp = callRaw(
                     "GET",
-                    "$PROJECT_URL/rest/v1/messages?select=id,read_at,edited_at,body&id=in.($idList)"
+                    "$PROJECT_URL/rest/v1/messages?select=*&id=in.($idList)"
                 )
                 var newlySeen = false
-                seenResp.json?.takeIf { it.isJsonArray }?.asJsonArray?.forEach { el ->
-                    val r = el as? JsonObject ?: return@forEach
-                    val rid = r.longOr("id", 0L)
-                    val rAt = parseTimestamp(r.stringOrNull("read_at") ?: "")
-                    if (rAt > 0L) {
-                        synchronized(cached) {
-                            val pos = cached.indexOfFirst { it.id == rid }
-                            if (pos >= 0 && !cached[pos].isRead) {
-                                cached[pos] = cached[pos].copy(readAtMs = rAt)
-                                newlySeen = true
-                                changed = true
+                if (seenResp.code in 200..299) {
+                    seenResp.json?.takeIf { it.isJsonArray }?.asJsonArray?.forEach { el ->
+                        val r = el as? JsonObject ?: return@forEach
+                        val rid = r.longOr("id", 0L)
+                        val rAt = parseTimestamp(r.stringOrNull("read_at") ?: "")
+                        if (rAt > 0L) {
+                            synchronized(cached) {
+                                val pos = cached.indexOfFirst { it.id == rid }
+                                if (pos >= 0 && !cached[pos].isRead) {
+                                    cached[pos] = cached[pos].copy(readAtMs = rAt)
+                                    newlySeen = true
+                                    changed = true
+                                }
                             }
                         }
                     }
@@ -1900,6 +1988,8 @@ object SocialBackend {
         val tempId = UUID.randomUUID().toString()
         val tempNumericId = optimisticIdGenerator.decrementAndGet()
         val cleanBody = cleanText.take(2000)
+        val wireSenderName = SocialRole.encodeTaggedName(myEffectiveDisplayName(), myRole, myEffectiveDisplayName())
+            ?: myEffectiveDisplayName()
 
         // 1. 0ms Optimistic UI insertion so the sender sees their bubble immediately!
         val optimisticMsg = SocialMessage(
@@ -1910,6 +2000,7 @@ object SocialBackend {
             atMs = nowMs,
             replyTo = replyTo,
             attachmentUrl = attachmentUri?.toString(),
+            senderName = wireSenderName,
             localTempId = tempId
         )
         upsertIntoDmCache(otherId, optimisticMsg)
@@ -1957,6 +2048,7 @@ object SocialBackend {
             return@withContext true
         }
 
+        val hasExtraCols = (replyTo != null && replyTo > 0L) || !remoteAttachmentUrl.isNullOrBlank()
         val payload = JsonArray().apply {
             add(JsonObject().apply {
                 addProperty("sender", me)
@@ -1967,12 +2059,32 @@ object SocialBackend {
             })
         }
 
-        val resp = callRaw(
+        var resp = callRaw(
             "POST",
             "$PROJECT_URL/rest/v1/messages",
             payload.toString(),
             extraHeaders = mapOf("Prefer" to "return=representation")
         )
+
+        // Schema fallback: if `reply_to` or `attachment_url` columns aren't migrated yet, pack in `body`!
+        if (resp.code == 400 && hasExtraCols) {
+            val fallbackPayload = JsonArray().apply {
+                add(JsonObject().apply {
+                    addProperty("sender", me)
+                    addProperty("recipient", otherId)
+                    addProperty(
+                        "body",
+                        SocialEnvelopeCodec.encodeDmBodyWithMeta(cleanBody, replyTo, remoteAttachmentUrl)
+                    )
+                })
+            }
+            resp = callRaw(
+                "POST",
+                "$PROJECT_URL/rest/v1/messages",
+                fallbackPayload.toString(),
+                extraHeaders = mapOf("Prefer" to "return=representation")
+            )
+        }
 
         if (resp.code in 200..299) {
             val row = resp.json?.takeIf { it.isJsonArray }?.asJsonArray?.firstOrNull() as? JsonObject
@@ -2960,8 +3072,7 @@ object SocialBackend {
                 val r = callRaw(
                     "GET",
                     "$PROJECT_URL/rest/v1/party_messages?party_id=eq.$partyId" +
-                        "&select=id,party_id,sender,body,reply_to,attachment_url,edited_at,created_at" +
-                        "&order=created_at.asc&limit=250"
+                        "&select=*&order=id.asc&limit=250"
                 )
                 if (r.code in 200..299) {
                     hasPartyMessagesTable = true
@@ -2988,7 +3099,7 @@ object SocialBackend {
                             )
                         )
                     }
-                } else if (r.code == 404) {
+                } else if (r.code == 404 || r.code == 400) {
                     hasPartyMessagesTable = false
                 }
             }
@@ -4262,11 +4373,12 @@ object SocialBackend {
             val me = userId ?: return@attempt 0
             val blocked = blockedUsers.map { it.userId }.toSet()
             val deleted = deletedForMeSet()
-            val json = call(
+            val resp = callRaw(
                 "GET",
                 "$PROJECT_URL/rest/v1/messages?select=id,sender,body&recipient=eq.$me&read_at=is.null&limit=500"
-            ) ?: return@attempt 0
-            val rows = json.takeIf { it.isJsonArray }?.asJsonArray ?: return@attempt 0
+            )
+            if (resp.code !in 200..299) return@attempt unread
+            val rows = resp.json?.takeIf { it.isJsonArray }?.asJsonArray ?: return@attempt 0
             rows.count { el ->
                 val row = el as? JsonObject ?: return@count false
                 val id = row.longOr("id", 0L)
@@ -4278,12 +4390,17 @@ object SocialBackend {
                     !body.startsWith(SocialEnvelopeCodec.PARTY_CHAT_PREFIX)
             }
         }
-        unread = count ?: 0
+        if (count != null) {
+            withContext(Dispatchers.Main) { unread = count }
+        }
         return unread
     }
 
     suspend fun markRead(otherId: String) {
         val nowMs = System.currentTimeMillis()
+        appContext?.let { app ->
+            SocialNotificationHelper.clearConversationNotification(app, peerId = otherId)
+        }
         var hadUnreadInCache = false
         liveDmCache[otherId]?.let { list ->
             synchronized(list) {
@@ -4308,7 +4425,7 @@ object SocialBackend {
         attempt {
             ensureToken()
             val me = userId ?: return@attempt Unit
-            call(
+            callRaw(
                 "PATCH",
                 "$PROJECT_URL/rest/v1/messages?recipient=eq.$me&sender=eq.$otherId&read_at=is.null",
                 JsonObject().apply { addProperty("read_at", isoAt(nowMs)) }.toString(),
@@ -4317,6 +4434,295 @@ object SocialBackend {
             Unit
         }
         unreadCount()
+    }
+
+    // ---- background message notifications & inline Direct Reply -----------------------------
+
+    private data class SenderDisplayMeta(
+        val displayName: String,
+        val role: SocialRole?,
+        val avatarUrl: String?
+    )
+
+    private val cachedSenderMeta = ConcurrentHashMap<String, SenderDisplayMeta>()
+    private val notifiedDedupeKeys = LinkedHashSet<String>()
+
+    private fun markNotificationDispatchedOnce(
+        senderId: String,
+        msgId: Long,
+        tempId: String?,
+        body: String,
+        atMs: Long
+    ): Boolean {
+        synchronized(notifiedDedupeKeys) {
+            val idKey = if (msgId > 0L) "id:$msgId" else null
+            val tmpKey = tempId?.takeIf { it.isNotBlank() }?.let { "tmp:$it" }
+            val sigKey = "sig:$senderId:${body.hashCode()}:${atMs / 15_000L}"
+            if ((idKey != null && idKey in notifiedDedupeKeys) ||
+                (tmpKey != null && tmpKey in notifiedDedupeKeys) ||
+                sigKey in notifiedDedupeKeys
+            ) {
+                if (idKey != null) notifiedDedupeKeys.add(idKey)
+                return false
+            }
+            if (notifiedDedupeKeys.size > 400) {
+                val it = notifiedDedupeKeys.iterator()
+                repeat(100) { if (it.hasNext()) { it.next(); it.remove() } }
+            }
+            if (idKey != null) notifiedDedupeKeys.add(idKey)
+            if (tmpKey != null) notifiedDedupeKeys.add(tmpKey)
+            notifiedDedupeKeys.add(sigKey)
+            return true
+        }
+    }
+
+    private fun advanceLastSeenInboxId(me: String, msgId: Long) {
+        if (msgId <= 0L) return
+        val p = prefs() ?: return
+        val key = "last_inbox_id_$me"
+        val prev = p.getLong(key, -1L)
+        if (msgId > prev) {
+            p.edit().putLong(key, msgId).apply()
+        }
+    }
+
+    private suspend fun resolveSenderMeta(senderId: String, nameHint: String?): SenderDisplayMeta {
+        friends.firstOrNull { it.id == senderId }?.let { f ->
+            val meta = SenderDisplayMeta(
+                displayName = f.effectiveName,
+                role = f.effectiveRole,
+                avatarUrl = f.avatarUrl
+            )
+            cachedSenderMeta[senderId] = meta
+            return meta
+        }
+        cachedSenderMeta[senderId]?.let { return it }
+
+        val fetched = attempt {
+            ensureToken()
+            val resp = callRaw(
+                "GET",
+                "$PROJECT_URL/rest/v1/profiles?select=*&id=eq.$senderId&limit=1"
+            )
+            val row = resp.json?.takeIf { resp.code in 200..299 && it.isJsonArray }
+                ?.asJsonArray?.firstOrNull() as? JsonObject ?: return@attempt null
+            val rawName = row.stringOrNull("name")
+                ?: row.stringOrNull("display_name")
+                ?: row.stringOrNull("username")
+                ?: row.stringOrNull("mc_username")
+                ?: nameHint
+                ?: "Friend"
+            val (cleanName, role) = SocialRole.extract(rawName, row.stringOrNull("role_badge"))
+            SenderDisplayMeta(
+                displayName = cleanName ?: rawName,
+                role = role,
+                avatarUrl = row.stringOrNull("avatar_url")
+            )
+        }
+        if (fetched != null) {
+            cachedSenderMeta[senderId] = fetched
+            return fetched
+        }
+        val (cleanHint, hintRole) = SocialRole.extract(nameHint)
+        return SenderDisplayMeta(
+            displayName = cleanHint ?: nameHint ?: "Friend",
+            role = hintRole,
+            avatarUrl = null
+        )
+    }
+
+    private suspend fun maybePostDmNotification(
+        senderId: String,
+        senderNameHint: String?,
+        message: SocialMessage
+    ) {
+        val app = appContext ?: return
+        if (!backgroundNotificationsEnabled) return
+        if (effectivePresenceMode == SocialPresenceMode.DND) return
+        if (isLauncherInForeground && activeOpenPeerId == senderId) return
+        if (blockedUsers.any { it.userId == senderId }) return
+
+        if (!markNotificationDispatchedOnce(
+                senderId = senderId,
+                msgId = message.id,
+                tempId = message.localTempId,
+                body = message.body,
+                atMs = message.atMs
+            )
+        ) {
+            return
+        }
+
+        val meta = resolveSenderMeta(senderId, senderNameHint ?: message.senderName)
+        SocialNotificationHelper.postIncomingMessageNotification(
+            context = app,
+            peerId = senderId,
+            partyId = null,
+            partyTitle = null,
+            senderId = senderId,
+            senderDisplayName = meta.displayName,
+            senderRole = meta.role,
+            senderAvatarUrl = meta.avatarUrl,
+            messageBody = message.body,
+            timestampMs = message.atMs
+        )
+    }
+
+    private suspend fun maybePostPartyNotification(
+        partyId: String,
+        message: SocialMessage
+    ) {
+        val app = appContext ?: return
+        if (!backgroundNotificationsEnabled) return
+        if (effectivePresenceMode == SocialPresenceMode.DND) return
+        if (isLauncherInForeground && activeOpenPartyId == partyId) return
+        if (blockedUsers.any { it.userId == message.sender }) return
+
+        if (!markNotificationDispatchedOnce(
+                senderId = "party:$partyId:${message.sender}",
+                msgId = message.id,
+                tempId = message.localTempId,
+                body = message.body,
+                atMs = message.atMs
+            )
+        ) {
+            return
+        }
+
+        val partyTitle = parties.firstOrNull { it.id == partyId }?.title ?: "Party Chat"
+        val meta = resolveSenderMeta(message.sender, message.senderName)
+        SocialNotificationHelper.postIncomingMessageNotification(
+            context = app,
+            peerId = null,
+            partyId = partyId,
+            partyTitle = partyTitle,
+            senderId = message.sender,
+            senderDisplayName = meta.displayName,
+            senderRole = message.senderRole ?: meta.role,
+            senderAvatarUrl = meta.avatarUrl,
+            messageBody = message.body,
+            timestampMs = message.atMs
+        )
+    }
+
+    /**
+     * Invoked periodically by [SocialMessagingService] / [SocialInboxJobService] so even when the
+     * app is completely closed or Doze drops a socket, new messages trigger heads-up notifications.
+     */
+    suspend fun ensureBackgroundRealtimeAndPollInbox() = withContext(Dispatchers.IO) {
+        if (!signedIn || !isNetworkAvailable) return@withContext
+        ensureToken()
+        val tok = accessToken ?: return@withContext
+        val me = userId ?: return@withContext
+
+        if (!SocialRealtime.isConnected) {
+            SocialRealtime.connect(PROJECT_URL, PUBLISHABLE_KEY, tok, me)
+        }
+
+        val p = prefs() ?: return@withContext
+        val key = "last_inbox_id_$me"
+        val lastSeenId = p.getLong(key, -1L)
+
+        // First-ever baseline on this device: record current latest message ID without spamming history.
+        if (lastSeenId < 0L) {
+            val latestResp = callRaw(
+                "GET",
+                "$PROJECT_URL/rest/v1/messages?select=id&recipient=eq.$me&order=id.desc&limit=1"
+            )
+            val maxId = latestResp.json
+                ?.takeIf { latestResp.code in 200..299 && it.isJsonArray }
+                ?.asJsonArray?.firstOrNull()
+                ?.let { (it as? JsonObject)?.longOr("id", 0L) }
+                ?: 0L
+            p.edit().putLong(key, maxId).apply()
+            return@withContext
+        }
+
+        val resp = callRaw(
+            "GET",
+            "$PROJECT_URL/rest/v1/messages?select=*&recipient=eq.$me&id=gt.$lastSeenId&order=id.asc&limit=30"
+        )
+        if (resp.code !in 200..299) return@withContext
+        val rows = resp.json?.takeIf { it.isJsonArray }?.asJsonArray ?: return@withContext
+        if (rows.size() == 0) return@withContext
+
+        val deletedIds = deletedForMeSet()
+        var highestId = lastSeenId
+        var dmChanged = false
+
+        for (el in rows) {
+            val row = el as? JsonObject ?: continue
+            val rowId = row.longOr("id", 0L)
+            if (rowId > highestId) highestId = rowId
+            val rawBody = row.stringOrNull("body") ?: ""
+
+            if (rawBody.startsWith(SocialEnvelopeCodec.PARTY_CHAT_PREFIX)) {
+                val createdMs = parseTimestamp(row.stringOrNull("created_at") ?: "").takeIf { it > 0L }
+                    ?: System.currentTimeMillis()
+                val decodedParty = SocialEnvelopeCodec.decodeFallbackPartyChat(rawBody, rowId, createdMs)
+                if (decodedParty != null && decodedParty.sender != me && !decodedParty.partyId.isNullOrBlank()) {
+                    val pList = broadcastPartyMessages.getOrPut(decodedParty.partyId) { ArrayList() }
+                    synchronized(pList) {
+                        if (pList.none { it.id == rowId || (it.sender == decodedParty.sender && it.body == decodedParty.body && abs(it.atMs - decodedParty.atMs) < 4000L) }) {
+                            pList.add(decodedParty)
+                        }
+                    }
+                    withContext(Dispatchers.Main) { partyMessageRevision++ }
+                    maybePostPartyNotification(partyId = decodedParty.partyId, message = decodedParty)
+                }
+                continue
+            }
+
+            val parsed = parseDmMessageRow(row, deletedIds) ?: continue
+            if (parsed.sender == me) continue
+            if (blockedUsers.any { it.userId == parsed.sender }) continue
+
+            if (upsertIntoDmCache(parsed.sender, parsed)) {
+                dmChanged = true
+            }
+            if (isLauncherInForeground && activeOpenPeerId == parsed.sender) {
+                markRead(parsed.sender)
+            } else {
+                maybePostDmNotification(senderId = parsed.sender, senderNameHint = null, message = parsed)
+            }
+        }
+
+        if (highestId > lastSeenId) {
+            p.edit().putLong(key, highestId).apply()
+        }
+        if (dmChanged) {
+            withContext(Dispatchers.Main) { messageRevision++ }
+            unreadCount()
+        }
+    }
+
+    /**
+     * Sends a reply typed directly inside Android's notification shade (`RemoteInput`) even when
+     * Aerix Launcher's UI is completely closed.
+     */
+    suspend fun sendDirectReplyFromNotification(
+        peerId: String?,
+        partyId: String?,
+        replyText: String
+    ): Boolean = withContext(Dispatchers.IO) {
+        val clean = replyText.trim()
+        if (clean.isEmpty()) return@withContext false
+        ensureToken()
+        val tok = accessToken
+        val me = userId
+        if (!tok.isNullOrBlank() && !me.isNullOrBlank() && !SocialRealtime.isConnected) {
+            SocialRealtime.connect(PROJECT_URL, PUBLISHABLE_KEY, tok, me)
+            delay(180L)
+        }
+        if (!partyId.isNullOrBlank()) {
+            sendPartyMessage(partyId = partyId, text = clean)
+        } else if (!peerId.isNullOrBlank()) {
+            val ok = sendMessage(otherId = peerId, text = clean)
+            markRead(peerId)
+            ok
+        } else {
+            false
+        }
     }
 
     private fun isoNow(): String = isoAt(System.currentTimeMillis())

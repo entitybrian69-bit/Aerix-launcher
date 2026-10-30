@@ -887,7 +887,10 @@ fun SocialStatusDialog(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(
+                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
                         SocialButton(
                             label = if (lookingToPlay) "Looking to play ✓" else "Looking to play",
                             filled = lookingToPlay
@@ -900,6 +903,13 @@ fun SocialStatusDialog(
                         ) {
                             soundsEnabled = !soundsEnabled
                             SocialBackend.toggleChatSounds(soundsEnabled)
+                        }
+                        val bgAlerts = SocialBackend.backgroundNotificationsEnabled
+                        SocialButton(
+                            label = if (bgAlerts) "BG Alerts ✓" else "BG Alerts Off",
+                            filled = bgAlerts
+                        ) {
+                            SocialBackend.toggleBackgroundNotifications(!bgAlerts)
                         }
                     }
                     Text(

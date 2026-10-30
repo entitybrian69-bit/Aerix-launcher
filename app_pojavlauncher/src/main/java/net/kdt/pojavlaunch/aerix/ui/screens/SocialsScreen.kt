@@ -154,6 +154,20 @@ fun SocialsScreen(activity: FragmentActivity, onExit: () -> Unit = {}) {
         SocialStatusDialog(onDismiss = { statusDialogOpen = false })
     }
 
+    LaunchedEffect(SocialBackend.pendingOpenDmPeerId, SocialBackend.pendingOpenPartyId, signedIn) {
+        if (!signedIn) return@LaunchedEffect
+        val (dmPeer, partyId) = SocialBackend.consumePendingOpenConversation()
+        if (!dmPeer.isNullOrBlank()) {
+            profileOpen = false
+            activePartyChatId = null
+            activeDmFriendId = dmPeer
+        } else if (!partyId.isNullOrBlank()) {
+            profileOpen = false
+            activeDmFriendId = null
+            activePartyChatId = partyId
+        }
+    }
+
     LaunchedEffect(Unit) {
         SocialBackend.attach(activity)
         SocialBackend.consumeInvite()?.let { code ->
@@ -285,37 +299,43 @@ fun SocialsScreen(activity: FragmentActivity, onExit: () -> Unit = {}) {
                 ) { dest ->
                     when (dest) {
                         is SocialDestination.DmChat -> {
-                            val friend = SocialBackend.friends.firstOrNull { it.id == dest.friendId }
-                            if (friend != null) {
-                                Box(Modifier.fillMaxSize().padding(AerixSpacing.md)) {
-                                    SocialConversationPanel(
-                                        friend = friend,
-                                        party = null,
-                                        onBack = { activeDmFriendId = null },
-                                        onOpenFriendProfile = { f ->
-                                            val uname = f.username ?: f.mcUsername
-                                            activeDmFriendId = null
-                                            profileUser = uname
-                                            profileOpen = true
-                                        },
-                                        onJoinSession = {
-                                            val friendParty = SocialBackend.parties.firstOrNull { it.hostId == friend.id }
-                                            PojavLaunchBridge.joinSocialSession(
-                                                activity = activity,
-                                                mcVersion = friendParty?.mcVersion ?: friend.mcVersion,
-                                                loaderName = friendParty?.loader,
-                                                instanceHint = friendParty?.instanceName,
-                                                modpackSource = friendParty?.modpackSource,
-                                                modpackId = friendParty?.modpackId,
-                                                modpackIconUrl = friendParty?.modpackIconUrl,
-                                                serverAddress = friendParty?.serverAddress,
-                                                onNavigate = { AerixNav.navigate(it) }
-                                            )
-                                        }
-                                    )
+                            val resolvedFriend = SocialBackend.friends.firstOrNull { it.id == dest.friendId }
+                            LaunchedEffect(dest.friendId, resolvedFriend == null) {
+                                if (resolvedFriend == null) {
+                                    SocialBackend.refreshFriends()
                                 }
-                            } else {
-                                LaunchedEffect(Unit) { activeDmFriendId = null }
+                            }
+                            val friend = resolvedFriend ?: SocialFriend(
+                                id = dest.friendId,
+                                mcUsername = "Friend",
+                                displayName = "Friend"
+                            )
+                            Box(Modifier.fillMaxSize().padding(AerixSpacing.md)) {
+                                SocialConversationPanel(
+                                    friend = friend,
+                                    party = null,
+                                    onBack = { activeDmFriendId = null },
+                                    onOpenFriendProfile = { f ->
+                                        val uname = f.username ?: f.mcUsername
+                                        activeDmFriendId = null
+                                        profileUser = uname
+                                        profileOpen = true
+                                    },
+                                    onJoinSession = {
+                                        val friendParty = SocialBackend.parties.firstOrNull { it.hostId == friend.id }
+                                        PojavLaunchBridge.joinSocialSession(
+                                            activity = activity,
+                                            mcVersion = friendParty?.mcVersion ?: friend.mcVersion,
+                                            loaderName = friendParty?.loader,
+                                            instanceHint = friendParty?.instanceName,
+                                            modpackSource = friendParty?.modpackSource,
+                                            modpackId = friendParty?.modpackId,
+                                            modpackIconUrl = friendParty?.modpackIconUrl,
+                                            serverAddress = friendParty?.serverAddress,
+                                            onNavigate = { AerixNav.navigate(it) }
+                                        )
+                                    }
+                                )
                             }
                         }
                         is SocialDestination.PartyChat -> {
@@ -1972,6 +1992,33 @@ private fun SocialSettingsPage(
                     )
                     Text(
                         "Messenger sound effects (typing, peer typing, sent, received, seen ✓✓)",
+                        fontSize = 12.sp,
+                        color = AerixSurface.textPrimary
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.clickable {
+                        val next = !SocialBackend.backgroundNotificationsEnabled
+                        SocialBackend.toggleBackgroundNotifications(next)
+                        if (next && activity is net.kdt.pojavlaunch.LauncherActivity) {
+                            activity.askForPermission(33, android.Manifest.permission.POST_NOTIFICATIONS)
+                        }
+                    },
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = SocialBackend.backgroundNotificationsEnabled,
+                        onCheckedChange = { next ->
+                            SocialBackend.toggleBackgroundNotifications(next)
+                            if (next && activity is net.kdt.pojavlaunch.LauncherActivity) {
+                                activity.askForPermission(33, android.Manifest.permission.POST_NOTIFICATIONS)
+                            }
+                        },
+                        colors = CheckboxDefaults.colors(checkedColor = accent)
+                    )
+                    Text(
+                        "Background notifications & inline reply (alerts even when app is closed)",
                         fontSize = 12.sp,
                         color = AerixSurface.textPrimary
                     )

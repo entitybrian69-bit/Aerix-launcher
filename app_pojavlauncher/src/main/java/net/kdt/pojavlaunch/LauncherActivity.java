@@ -177,6 +177,23 @@ public class LauncherActivity extends BaseActivity {
     private void handleSocialSignIn(Intent intent) {
         if (intent == null || intent.getData() == null) return;
         String data = intent.getData().toString();
+        // aerix-social://chat/dm/<peerId> or aerix-social://chat/party/<partyId> from notification tap
+        if (data.startsWith("aerix-social://chat/dm/")) {
+            String peerId = android.net.Uri.decode(data.substring("aerix-social://chat/dm/".length()));
+            net.kdt.pojavlaunch.aerix.social.SocialBackend.attach(getApplicationContext());
+            net.kdt.pojavlaunch.aerix.social.SocialBackend.requestOpenConversation(peerId, null);
+            net.kdt.pojavlaunch.aerix.ui.AerixNav.INSTANCE
+                    .navigate(net.kdt.pojavlaunch.aerix.ui.LauncherSection.SOCIALS);
+            return;
+        }
+        if (data.startsWith("aerix-social://chat/party/")) {
+            String partyId = android.net.Uri.decode(data.substring("aerix-social://chat/party/".length()));
+            net.kdt.pojavlaunch.aerix.social.SocialBackend.attach(getApplicationContext());
+            net.kdt.pojavlaunch.aerix.social.SocialBackend.requestOpenConversation(null, partyId);
+            net.kdt.pojavlaunch.aerix.ui.AerixNav.INSTANCE
+                    .navigate(net.kdt.pojavlaunch.aerix.ui.LauncherSection.SOCIALS);
+            return;
+        }
         // aerix-social://friend/CODE opens that player's card inside the social space.
         if (data.startsWith("aerix-social://friend/")) {
             String code = data.substring("aerix-social://friend/".length());

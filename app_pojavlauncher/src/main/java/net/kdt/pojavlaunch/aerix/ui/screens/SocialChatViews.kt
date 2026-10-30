@@ -180,13 +180,34 @@ fun SocialConversationPanel(
         SocialBackend.parties.firstOrNull { it.id == target.id } ?: target
     }
 
-    var messages by remember(convKey) {
+    val dmRev = SocialBackend.messageRevision
+    val partyRev = SocialBackend.partyMessageRevision
+
+    var syncedMessages by remember(convKey) {
         mutableStateOf(
             if (party != null) SocialBackend.getCachedPartyMessages(party.id)
             else if (friend != null) SocialBackend.getCachedMessages(friend.id)
             else emptyList()
         )
     }
+
+    // Recomputes on the EXACT same Compose frame whenever dmRev / partyRev / syncedMessages updates!
+    val messages = remember(convKey, dmRev, partyRev, syncedMessages) {
+        val raw = if (party != null) {
+            val live = SocialBackend.getCachedPartyMessages(party.id)
+            if (live.isEmpty()) syncedMessages
+            else (syncedMessages + live).sortedBy { it.atMs }
+        } else if (friend != null) {
+            val live = SocialBackend.getCachedMessages(friend.id)
+            if (live.isNotEmpty() || syncedMessages.isEmpty()) live else syncedMessages
+        } else {
+            emptyList()
+        }
+        raw.distinctBy { m ->
+            m.localTempId ?: if (m.id != 0L) "id_${m.id}" else "ts_${m.sender}_${m.atMs}_${m.body.hashCode()}"
+        }
+    }
+
     var draft by remember(convKey) { mutableStateOf("") }
     var replyTarget by remember(convKey) { mutableStateOf<SocialMessage?>(null) }
     var editTarget by remember(convKey) { mutableStateOf<SocialMessage?>(null) }
@@ -194,8 +215,6 @@ fun SocialConversationPanel(
     var lightboxUrl by remember { mutableStateOf<String?>(null) }
 
     val listState = rememberLazyListState()
-    val dmRev = SocialBackend.messageRevision
-    val partyRev = SocialBackend.partyMessageRevision
 
     DisposableEffect(convKey) {
         SocialBackend.setOpenConversation(peerId = friend?.id, partyId = party?.id)
@@ -218,19 +237,17 @@ fun SocialConversationPanel(
         } else if (friend != null) {
             SocialBackend.loadMessages(friend.id)
         } else emptyList()
-        messages = loaded
+        syncedMessages = loaded
         if (friend != null && loaded.any { it.sender == friend.id && !it.isRead }) {
             SocialBackend.markRead(friend.id)
         }
     }
 
-    // 0ms instant live updates whenever Realtime WebSocket or optimistic send bumps revision!
+    // Mark incoming unread messages as read immediately while viewing open DM
     LaunchedEffect(convKey, dmRev) {
         if (!isParty && friend != null) {
             val cached = SocialBackend.getCachedMessages(friend.id)
-            if (cached.isNotEmpty() || messages.isNotEmpty()) {
-                messages = cached
-            }
+            syncedMessages = cached
             if (cached.any { it.sender == friend.id && !it.isRead }) {
                 SocialBackend.markRead(friend.id)
             }
@@ -239,26 +256,20 @@ fun SocialConversationPanel(
 
     LaunchedEffect(convKey, partyRev) {
         if (isParty && party != null) {
-            val liveCached = SocialBackend.getCachedPartyMessages(party.id)
-            if (liveCached.isNotEmpty()) {
-                val merged = (messages + liveCached)
-                    .distinctBy { it.localTempId ?: "p_${it.id}_${it.atMs}" }
-                    .sortedBy { it.atMs }
-                messages = merged
-            }
-            messages = SocialBackend.loadPartyMessages(party.id)
+            syncedMessages = SocialBackend.loadPartyMessages(party.id)
         }
     }
 
-    // Lightweight safety delta-poll while chat stays open so replies & Seen receipts never miss even on flaky NATs
+    // Rapid 1.0s open-chat delta-sync (`select=*&id=gt.$maxServerId`) so replies & Seen receipts
+    // ALWAYS appear immediately in-place even on networks that block WebSockets!
     LaunchedEffect(convKey, SocialBackend.isNetworkAvailable) {
         if (!SocialBackend.isNetworkAvailable) return@LaunchedEffect
         while (isActive) {
-            delay(2_200L)
+            delay(1_000L)
             if (party != null) {
-                messages = SocialBackend.loadPartyMessages(party.id)
+                syncedMessages = SocialBackend.loadPartyMessages(party.id)
             } else if (friend != null) {
-                messages = SocialBackend.syncNewMessages(friend.id)
+                syncedMessages = SocialBackend.syncNewMessages(friend.id)
             }
         }
     }
@@ -486,7 +497,9 @@ fun SocialConversationPanel(
                 ) {
                     items(
                         items = messages,
-                        key = { it.localTempId ?: "msg_${it.id}_${it.atMs}" }
+                        key = { m ->
+                            m.localTempId ?: if (m.id != 0L) "id_${m.id}" else "ts_${m.sender}_${m.atMs}_${m.body.hashCode()}"
+                        }
                     ) { msg ->
                         val isMine = msg.sender == myId
                         var menuOpen by remember { mutableStateOf(false) }
@@ -641,7 +654,7 @@ fun SocialConversationPanel(
                                             onClick = {
                                                 menuOpen = false
                                                 SocialBackend.deleteMessageForMe(msg.id)
-                                                messages = messages.filterNot { it.id == msg.id }
+                                                syncedMessages = syncedMessages.filterNot { it.id == msg.id }
                                             }
                                         )
                                     }

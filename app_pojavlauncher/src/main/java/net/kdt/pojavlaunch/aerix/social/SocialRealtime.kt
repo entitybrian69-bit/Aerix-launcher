@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.compose.runtime.mutableStateMapOf
 import com.google.gson.Gson
 import com.google.gson.JsonArray
+import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import kotlinx.coroutines.CoroutineScope
@@ -28,18 +29,30 @@ import java.util.concurrent.atomic.AtomicLong
 /**
  * Supabase Realtime client (Phoenix Channels v1 over OkHttp WebSocket).
  *
- * Designed for the Supabase free tier (2M messages/month) and sub-100ms live chat:
- * - Multiplexes database changes (`postgres_changes`), instant DM & party chat (`broadcast`),
- *   live read receipts (`dm_read`), typing indicators (`typing` start/stop), party signals,
- *   and socket-level Phoenix `presence` (`presence_state` / `presence_diff`) over ONE WebSocket.
- * - Shares an HTTP/2 keep-alive [ConnectionPool] (`restClient`) so REST writes reuse warm TLS sockets.
+ * Splits Realtime into TWO isolated Phoenix topics on the same WebSocket connection:
+ * 1. [TOPIC_LIVE] (`realtime:aerix:live`) — Pure `broadcast` + `presence` (ZERO `postgres_changes`).
+ *    Joins in ~20ms regardless of database schema or publication settings so live DM chat,
+ *    party chat, seen receipts, typing wave indicators, and socket presence NEVER fail to join.
+ * 2. [TOPIC_DB] (`realtime:aerix:db`) — Best-effort `postgres_changes` on core tables
+ *    (`messages`, `friendships`, `profiles`). Any missing publication on [TOPIC_DB] never affects [TOPIC_LIVE].
  */
 object SocialRealtime {
     private const val TAG = "AerixSocialRealtime"
-    private const val TOPIC = "realtime:aerix:sync"
+    private const val TOPIC_LIVE = "realtime:aerix:live"
+    private const val TOPIC_DB = "realtime:aerix:db"
     private const val HEARTBEAT_MS = 22_000L
     private const val TYPING_TTL_MS = 4_200L
     private const val TYPING_SEND_THROTTLE_MS = 1_350L
+
+    private val BROADCAST_EVENTS = setOf(
+        "typing",
+        "dm_chat",
+        "dm_read",
+        "message_edit",
+        "party_chat",
+        "party_signal",
+        "presence_update"
+    )
 
     private val gson = Gson()
     private val refSeq = AtomicInteger(1)
@@ -71,6 +84,9 @@ object SocialRealtime {
     @Volatile private var socket: WebSocket? = null
     @Volatile private var connected: Boolean = false
     @Volatile private var joined: Boolean = false
+    @Volatile private var dbJoined: Boolean = false
+    @Volatile private var liveJoinRef: String? = null
+    @Volatile private var dbJoinRef: String? = null
     @Volatile private var currentUrl: String? = null
     @Volatile private var currentApiKey: String? = null
     @Volatile private var currentAccessToken: String? = null
@@ -135,7 +151,9 @@ object SocialRealtime {
         shouldStayConnected = true
 
         if (socket != null && connected) {
-            if (tokenChanged) {
+            if (!joined) {
+                joinLiveChannel(includeUserJwt = true)
+            } else if (tokenChanged) {
                 pushAccessToken(accessToken)
             }
             return
@@ -163,6 +181,9 @@ object SocialRealtime {
         heartbeatJob?.cancel()
         connected = false
         joined = false
+        dbJoined = false
+        liveJoinRef = null
+        dbJoinRef = null
         onlineSocketPeers.clear()
         try {
             socket?.cancel()
@@ -176,7 +197,11 @@ object SocialRealtime {
     fun updateAccessToken(accessToken: String) {
         currentAccessToken = accessToken
         if (connected) {
-            pushAccessToken(accessToken)
+            if (joined) {
+                pushAccessToken(accessToken)
+            } else {
+                joinLiveChannel(includeUserJwt = true)
+            }
         }
     }
 
@@ -189,6 +214,9 @@ object SocialRealtime {
         untrackPresence()
         connected = false
         joined = false
+        dbJoined = false
+        liveJoinRef = null
+        dbJoinRef = null
         onlineSocketPeers.clear()
         try {
             socket?.close(1000, "Signed out")
@@ -240,13 +268,13 @@ object SocialRealtime {
             addProperty("id", message.id)
             tempId?.let { addProperty("tempId", it) }
             addProperty("sender", message.sender)
-            message.recipient?.let { addProperty("recipient", it) }
+            addProperty("recipient", message.recipient)
             message.senderName?.let { addProperty("senderName", it) }
             addProperty("body", message.body)
             message.replyTo?.let { addProperty("replyTo", it) }
             message.attachmentUrl?.let { addProperty("attachmentUrl", it) }
             addProperty("atMs", message.atMs)
-            message.editedAtMs?.let { addProperty("editedAtMs", it) }
+            if (message.editedAtMs > 0L) addProperty("editedAtMs", message.editedAtMs)
         }
         sendBroadcast("dm_chat", inner)
     }
@@ -329,7 +357,7 @@ object SocialRealtime {
                 addProperty("online_at", System.currentTimeMillis())
             })
         }
-        sendPhoenixFrame(TOPIC, "presence", payload)
+        sendPhoenixFrame(TOPIC_LIVE, "presence", payload, joinRef = liveJoinRef)
     }
 
     fun untrackPresence() {
@@ -338,7 +366,7 @@ object SocialRealtime {
             addProperty("type", "presence")
             addProperty("event", "untrack")
         }
-        sendPhoenixFrame(TOPIC, "presence", payload)
+        sendPhoenixFrame(TOPIC_LIVE, "presence", payload, joinRef = liveJoinRef)
     }
 
     /** Broadcasts an immediate presence / status / role update so online friends see it instantly. */
@@ -372,7 +400,7 @@ object SocialRealtime {
             addProperty("event", eventName)
             add("payload", data)
         }
-        sendPhoenixFrame(TOPIC, "broadcast", payload)
+        sendPhoenixFrame(TOPIC_LIVE, "broadcast", payload, joinRef = liveJoinRef)
     }
 
     private fun openSocket(endpoint: String) {
@@ -382,13 +410,19 @@ object SocialRealtime {
         }
         connected = false
         joined = false
+        dbJoined = false
+        liveJoinRef = null
+        dbJoinRef = null
 
-        val req = Request.Builder().url(endpoint).build()
-        socket = wsClient.newWebSocket(req, object : WebSocketListener() {
+        val reqBuilder = Request.Builder().url(endpoint)
+        currentApiKey?.takeIf { it.isNotBlank() }?.let { reqBuilder.header("apikey", it) }
+
+        socket = wsClient.newWebSocket(reqBuilder.build(), object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
                 connected = true
                 backoffStep = 0
-                joinSyncChannel()
+                joinLiveChannel(includeUserJwt = true)
+                joinDbChannel()
                 startLoops()
             }
 
@@ -399,6 +433,7 @@ object SocialRealtime {
             override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
                 connected = false
                 joined = false
+                dbJoined = false
                 try {
                     webSocket.close(code, reason)
                 } catch (_: Throwable) {
@@ -408,6 +443,7 @@ object SocialRealtime {
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
                 connected = false
                 joined = false
+                dbJoined = false
                 scheduleReconnect()
             }
 
@@ -415,24 +451,19 @@ object SocialRealtime {
                 Log.d(TAG, "Realtime socket disconnected: ${t.message}")
                 connected = false
                 joined = false
+                dbJoined = false
                 scheduleReconnect()
             }
         })
     }
 
-    private fun joinSyncChannel() {
-        val token = currentAccessToken ?: return
+    /**
+     * Pure Broadcast + Presence channel (NO `postgres_changes`).
+     * Guaranteed to join even when optional SQL migrations or publications haven't been run.
+     */
+    private fun joinLiveChannel(includeUserJwt: Boolean) {
         val me = currentUserId ?: ""
-
-        val postgresChanges = JsonArray().apply {
-            listOf("messages", "friendships", "parties", "party_members", "party_messages", "profiles").forEach { tbl ->
-                add(JsonObject().apply {
-                    addProperty("event", "*")
-                    addProperty("schema", "public")
-                    addProperty("table", tbl)
-                })
-            }
-        }
+        val token = currentAccessToken
 
         val config = JsonObject().apply {
             add("broadcast", JsonObject().apply {
@@ -442,22 +473,62 @@ object SocialRealtime {
             add("presence", JsonObject().apply {
                 addProperty("key", me)
             })
-            add("postgres_changes", postgresChanges)
+            addProperty("private", false)
         }
 
         val payload = JsonObject().apply {
             add("config", config)
-            addProperty("access_token", token)
+            if (includeUserJwt && !token.isNullOrBlank()) {
+                addProperty("access_token", token)
+            }
         }
 
-        sendPhoenixFrame(TOPIC, "phx_join", payload)
+        val jRef = refSeq.getAndIncrement().toString()
+        liveJoinRef = jRef
+        sendPhoenixFrame(TOPIC_LIVE, "phx_join", payload, refOverride = jRef, joinRef = jRef)
+    }
+
+    /**
+     * Separate secondary channel for PostgreSQL WAL changes on core v1 tables.
+     * Isolated from [TOPIC_LIVE] so any table/publication mismatch never disrupts live chat.
+     */
+    private fun joinDbChannel() {
+        val token = currentAccessToken ?: return
+        val postgresChanges = JsonArray().apply {
+            listOf("messages", "friendships", "profiles").forEach { tbl ->
+                add(JsonObject().apply {
+                    addProperty("event", "*")
+                    addProperty("schema", "public")
+                    addProperty("table", tbl)
+                })
+            }
+        }
+        val config = JsonObject().apply {
+            add("broadcast", JsonObject().apply {
+                addProperty("ack", false)
+                addProperty("self", false)
+            })
+            add("postgres_changes", postgresChanges)
+        }
+        val payload = JsonObject().apply {
+            add("config", config)
+            addProperty("access_token", token)
+        }
+        val jRef = refSeq.getAndIncrement().toString()
+        dbJoinRef = jRef
+        sendPhoenixFrame(TOPIC_DB, "phx_join", payload, refOverride = jRef, joinRef = jRef)
     }
 
     private fun pushAccessToken(token: String) {
         val payload = JsonObject().apply {
             addProperty("access_token", token)
         }
-        sendPhoenixFrame(TOPIC, "access_token", payload)
+        if (joined) {
+            sendPhoenixFrame(TOPIC_LIVE, "access_token", payload, joinRef = liveJoinRef)
+        }
+        if (dbJoined) {
+            sendPhoenixFrame(TOPIC_DB, "access_token", payload, joinRef = dbJoinRef)
+        }
     }
 
     private fun startLoops() {
@@ -491,11 +562,11 @@ object SocialRealtime {
             val step = backoffStep.coerceAtMost(4)
             backoffStep = (backoffStep + 1).coerceAtMost(5)
             val waitMs = when (step) {
-                0 -> 1_200L
-                1 -> 2_500L
-                2 -> 5_000L
-                3 -> 10_000L
-                else -> 20_000L
+                0 -> 1_000L
+                1 -> 2_200L
+                2 -> 4_500L
+                3 -> 8_000L
+                else -> 15_000L
             }
             delay(waitMs)
             if (shouldStayConnected && !connected) {
@@ -504,13 +575,23 @@ object SocialRealtime {
         }
     }
 
-    private fun sendPhoenixFrame(topic: String, event: String, payload: JsonObject) {
+    private fun sendPhoenixFrame(
+        topic: String,
+        event: String,
+        payload: JsonObject,
+        refOverride: String? = null,
+        joinRef: String? = null
+    ) {
         val ws = socket ?: return
+        val ref = refOverride ?: refSeq.getAndIncrement().toString()
         val frame = JsonObject().apply {
             addProperty("topic", topic)
             addProperty("event", event)
             add("payload", payload)
-            addProperty("ref", refSeq.getAndIncrement().toString())
+            addProperty("ref", ref)
+            if (joinRef != null) {
+                addProperty("join_ref", joinRef)
+            }
         }
         try {
             ws.send(gson.toJson(frame))
@@ -520,63 +601,115 @@ object SocialRealtime {
 
     private fun handleFrame(raw: String) {
         try {
-            val root = JsonParser.parseString(raw).takeIf { it.isJsonObject }?.asJsonObject ?: return
+            val parsed = JsonParser.parseString(raw)
+            if (parsed.isJsonArray) {
+                // Phoenix V2 array serializer fallback: [join_ref, ref, topic, event, payload]
+                val arr = parsed.asJsonArray
+                if (arr.size() >= 5) {
+                    val topic = arr[2].takeIf { !it.isJsonNull }?.asString ?: ""
+                    val event = arr[3].takeIf { !it.isJsonNull }?.asString ?: return
+                    val payload = arr[4].takeIf { it.isJsonObject }?.asJsonObject ?: JsonObject()
+                    dispatchEvent(topic, event, payload)
+                }
+                return
+            }
+            val root = parsed.takeIf { it.isJsonObject }?.asJsonObject ?: return
+            val topic = root.get("topic")?.takeIf { !it.isJsonNull }?.asString ?: ""
             val event = root.get("event")?.takeIf { !it.isJsonNull }?.asString ?: return
             val payload = root.get("payload")?.takeIf { it.isJsonObject }?.asJsonObject ?: JsonObject()
-
-            when (event) {
-                "phx_reply" -> {
-                    val status = payload.get("status")?.takeIf { !it.isJsonNull }?.asString
-                    if (status == "ok" && !joined && root.get("topic")?.asString == TOPIC) {
-                        joined = true
-                        currentAccessToken?.let { pushAccessToken(it) }
-                        listener?.onRealtimeConnected()
-                    }
-                }
-                "presence_state" -> {
-                    handlePresenceState(payload)
-                }
-                "presence_diff" -> {
-                    handlePresenceDiff(payload)
-                }
-                "postgres_changes" -> {
-                    val data = payload.get("data")?.takeIf { it.isJsonObject }?.asJsonObject ?: payload
-                    val table = data.get("table")?.takeIf { !it.isJsonNull }?.asString ?: return
-                    val changeType = data.get("type")?.takeIf { !it.isJsonNull }?.asString
-                        ?: data.get("eventType")?.takeIf { !it.isJsonNull }?.asString
-                        ?: "UPDATE"
-                    val record = data.get("record")?.takeIf { it.isJsonObject }?.asJsonObject
-                        ?: data.get("old_record")?.takeIf { it.isJsonNull.not() && it.isJsonObject }?.asJsonObject
-                    when (table) {
-                        "messages" -> listener?.onMessageTableChanged(changeType, record)
-                        "party_messages" -> listener?.onPartyMessageChanged(changeType, record)
-                        "friendships" -> listener?.onFriendshipTableChanged(changeType, record)
-                        "parties", "party_members" -> listener?.onPartyTableChanged(changeType, record)
-                        "profiles" -> if (record != null) listener?.onProfileUpdated(record)
-                    }
-                }
-                "broadcast" -> {
-                    val bcEvent = payload.get("event")?.takeIf { !it.isJsonNull }?.asString ?: return
-                    val inner = payload.get("payload")?.takeIf { it.isJsonObject }?.asJsonObject ?: return
-                    when (bcEvent) {
-                        "typing" -> handleIncomingTyping(inner)
-                        "dm_chat" -> {
-                            clearTyperOnIncomingMessage(inner)
-                            listener?.onBroadcastDmChat(inner)
-                        }
-                        "dm_read" -> listener?.onBroadcastDmRead(inner)
-                        "message_edit" -> listener?.onBroadcastMessageEdit(inner)
-                        "party_chat" -> {
-                            clearTyperOnIncomingMessage(inner)
-                            listener?.onBroadcastPartyChat(inner)
-                        }
-                        "party_signal" -> listener?.onBroadcastPartySignal(inner)
-                        "presence_update" -> listener?.onBroadcastPresence(inner)
-                    }
-                }
-            }
+            dispatchEvent(topic, event, payload)
         } catch (t: Throwable) {
             Log.d(TAG, "Frame parse error: ${t.message}")
+        }
+    }
+
+    private fun dispatchEvent(topic: String, event: String, payload: JsonObject) {
+        when (event) {
+            "phx_reply" -> {
+                val status = payload.get("status")?.takeIf { !it.isJsonNull }?.asString
+                if (topic == TOPIC_LIVE) {
+                    if (status == "ok") {
+                        val wasJoined = joined
+                        joined = true
+                        if (!wasJoined) {
+                            currentAccessToken?.takeIf { it.isNotBlank() }?.let { pushAccessToken(it) }
+                            listener?.onRealtimeConnected()
+                        }
+                    } else if (status == "error" && !joined) {
+                        val reason = payload.toString()
+                        Log.w(TAG, "Live channel join rejected ($reason), retrying public join")
+                        if (reason.contains("JWT", ignoreCase = true) || reason.contains("token", ignoreCase = true)) {
+                            joinLiveChannel(includeUserJwt = false)
+                        }
+                    }
+                } else if (topic == TOPIC_DB && status == "ok") {
+                    dbJoined = true
+                }
+            }
+            "phx_error", "phx_close" -> {
+                if (topic == TOPIC_LIVE && connected && shouldStayConnected) {
+                    joined = false
+                    scope.launch {
+                        delay(1_200L)
+                        if (connected && shouldStayConnected && !joined) {
+                            joinLiveChannel(includeUserJwt = true)
+                        }
+                    }
+                } else if (topic == TOPIC_DB) {
+                    dbJoined = false
+                }
+            }
+            "presence_state" -> {
+                handlePresenceState(payload)
+            }
+            "presence_diff" -> {
+                handlePresenceDiff(payload)
+            }
+            "postgres_changes" -> {
+                val data = payload.get("data")?.takeIf { it.isJsonObject }?.asJsonObject ?: payload
+                val table = data.get("table")?.takeIf { !it.isJsonNull }?.asString ?: return
+                val changeType = data.get("type")?.takeIf { !it.isJsonNull }?.asString
+                    ?: data.get("eventType")?.takeIf { !it.isJsonNull }?.asString
+                    ?: "UPDATE"
+                val record = data.get("record")?.takeIf { it.isJsonObject }?.asJsonObject
+                    ?: data.get("old_record")?.takeIf { !it.isJsonNull && it.isJsonObject }?.asJsonObject
+                when (table) {
+                    "messages" -> listener?.onMessageTableChanged(changeType, record)
+                    "party_messages" -> listener?.onPartyMessageChanged(changeType, record)
+                    "friendships" -> listener?.onFriendshipTableChanged(changeType, record)
+                    "parties", "party_members" -> listener?.onPartyTableChanged(changeType, record)
+                    "profiles" -> if (record != null) listener?.onProfileUpdated(record)
+                }
+            }
+            "broadcast" -> {
+                val bcEvent = payload.get("event")?.takeIf { !it.isJsonNull }?.asString ?: return
+                val inner = payload.get("payload")?.takeIf { it.isJsonObject }?.asJsonObject ?: payload
+                dispatchBroadcastEvent(bcEvent, inner)
+            }
+            else -> {
+                if (event in BROADCAST_EVENTS) {
+                    val inner = payload.get("payload")?.takeIf { it.isJsonObject }?.asJsonObject ?: payload
+                    dispatchBroadcastEvent(event, inner)
+                }
+            }
+        }
+    }
+
+    private fun dispatchBroadcastEvent(bcEvent: String, inner: JsonObject) {
+        when (bcEvent) {
+            "typing" -> handleIncomingTyping(inner)
+            "dm_chat" -> {
+                clearTyperOnIncomingMessage(inner)
+                listener?.onBroadcastDmChat(inner)
+            }
+            "dm_read" -> listener?.onBroadcastDmRead(inner)
+            "message_edit" -> listener?.onBroadcastMessageEdit(inner)
+            "party_chat" -> {
+                clearTyperOnIncomingMessage(inner)
+                listener?.onBroadcastPartyChat(inner)
+            }
+            "party_signal" -> listener?.onBroadcastPartySignal(inner)
+            "presence_update" -> listener?.onBroadcastPresence(inner)
         }
     }
 
@@ -611,7 +744,7 @@ object SocialRealtime {
         }
     }
 
-    private fun extractModeFromPresenceMeta(entry: com.google.gson.JsonElement?): String? {
+    private fun extractModeFromPresenceMeta(entry: JsonElement?): String? {
         val obj = entry?.takeIf { it.isJsonObject }?.asJsonObject ?: return null
         val metas = obj.get("metas")?.takeIf { it.isJsonArray }?.asJsonArray ?: return null
         val first = metas.firstOrNull()?.takeIf { it.isJsonObject }?.asJsonObject ?: return null

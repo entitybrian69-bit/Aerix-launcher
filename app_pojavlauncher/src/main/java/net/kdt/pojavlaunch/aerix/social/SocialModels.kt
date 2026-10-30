@@ -319,6 +319,13 @@ object SocialEnvelopeCodec {
     const val PARTY_INVITE_PREFIX = "__aerix_party_invite__:"
     const val PARTY_CHAT_PREFIX = "__aerix_party_chat__:"
     const val PARTY_META_DELIM = "||aerix_meta:"
+    const val DM_META_DELIM = "\n||aerix_dm:"
+
+    data class DecodedDmBody(
+        val body: String,
+        val replyTo: Long? = null,
+        val attachmentUrl: String? = null
+    )
 
     private val gson = Gson()
 
@@ -468,6 +475,40 @@ object SocialEnvelopeCodec {
             )
         } catch (_: Throwable) {
             null
+        }
+    }
+
+    fun encodeDmBodyWithMeta(
+        body: String,
+        replyTo: Long? = null,
+        attachmentUrl: String? = null
+    ): String {
+        val hasReply = replyTo != null && replyTo > 0L
+        val hasAtt = !attachmentUrl.isNullOrBlank()
+        if (!hasReply && !hasAtt) return body.take(2000)
+        val obj = JsonObject().apply {
+            if (hasReply) addProperty("r", replyTo)
+            if (hasAtt) addProperty("a", attachmentUrl)
+        }
+        val suffix = "$DM_META_DELIM${gson.toJson(obj)}"
+        val maxBodyLen = (2000 - suffix.length).coerceAtLeast(1)
+        return body.take(maxBodyLen) + suffix
+    }
+
+    fun decodeDmBodyWithMeta(rawBody: String): DecodedDmBody {
+        val idx = rawBody.lastIndexOf(DM_META_DELIM)
+        if (idx < 0) return DecodedDmBody(rawBody)
+        val cleanText = rawBody.substring(0, idx)
+        val jsonPart = rawBody.substring(idx + DM_META_DELIM.length)
+        return try {
+            val obj = JsonParser.parseString(jsonPart).asJsonObject
+            DecodedDmBody(
+                body = cleanText,
+                replyTo = obj.get("r")?.takeIf { !it.isJsonNull }?.asLong,
+                attachmentUrl = obj.optStr("a")
+            )
+        } catch (_: Throwable) {
+            DecodedDmBody(rawBody)
         }
     }
 

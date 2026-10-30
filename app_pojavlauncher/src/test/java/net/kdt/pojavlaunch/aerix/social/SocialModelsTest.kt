@@ -264,5 +264,21 @@ class SocialModelsTest {
 
         assertEquals("dm:peer", SocialRealtime.dmTypingKey("peer"))
         assertEquals("party:p1", SocialRealtime.partyTypingKey("p1"))
+
+        // Verify schema-fallback DM metadata round-trip (replies & attachments on v1 messages table)
+        val encodedDm = SocialEnvelopeCodec.encodeDmBodyWithMeta(
+            body = "Check out this build!",
+            replyTo = 99L,
+            attachmentUrl = "https://example.com/pic.jpg"
+        )
+        val decodedDm = SocialEnvelopeCodec.decodeDmBodyWithMeta(encodedDm)
+        assertEquals("Check out this build!", decodedDm.body)
+        assertEquals(99L, decodedDm.replyTo)
+        assertEquals("https://example.com/pic.jpg", decodedDm.attachmentUrl)
+
+        val plainDm = SocialEnvelopeCodec.decodeDmBodyWithMeta("Normal plain text message")
+        assertEquals("Normal plain text message", plainDm.body)
+        assertNull(plainDm.replyTo)
+        assertNull(plainDm.attachmentUrl)
     }
 }
