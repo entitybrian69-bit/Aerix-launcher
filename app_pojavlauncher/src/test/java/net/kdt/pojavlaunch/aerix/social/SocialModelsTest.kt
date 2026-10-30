@@ -3,6 +3,7 @@ package net.kdt.pojavlaunch.aerix.social
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -93,5 +94,70 @@ class SocialModelsTest {
         assertFalse(active.isExpired(now))
         assertEquals("2h left", active.remainingText(now))
         assertTrue(active.isExpired(now + 2 * 3600_000L + 1L))
+    }
+
+    @Test
+    fun ownerAndCoOwnerEmailBadgesAndAntiSpoof() {
+        assertEquals(SocialRole.OWNER, SocialRole.fromEmail("entitybrian69@gmail.com"))
+        assertEquals(SocialRole.OWNER, SocialRole.fromEmail("  EntityBrian69@Gmail.com "))
+        assertEquals("(OWNER)", SocialRole.OWNER.tag)
+        assertEquals(0xFFEF233CL, SocialRole.OWNER.colorArgb)
+
+        assertEquals(SocialRole.CO_OWNER, SocialRole.fromEmail("kushaladhikari982648@gmail.com"))
+        assertEquals(SocialRole.CO_OWNER, SocialRole.fromEmail("KushalAdhikari982648@gmail.com"))
+        assertEquals("(CO-OWNER)", SocialRole.CO_OWNER.tag)
+        assertEquals(0xFF38BDF8L, SocialRole.CO_OWNER.colorArgb)
+
+        assertNull(SocialRole.fromEmail("someoneelse@gmail.com"))
+
+        // Any custom name chosen by OWNER / CO-OWNER gets tagged cleanly and extracts cleanly for others
+        val ownerWire = SocialRole.encodeTaggedName("ShadowBrian", SocialRole.OWNER, "Brian")
+        assertEquals("ShadowBrian (OWNER)", ownerWire)
+        val (ownerClean, ownerExtracted) = SocialRole.extract(ownerWire)
+        assertEquals("ShadowBrian", ownerClean)
+        assertEquals(SocialRole.OWNER, ownerExtracted)
+
+        val coOwnerWire = SocialRole.encodeTaggedName("KushalX", SocialRole.CO_OWNER, "Kushal")
+        assertEquals("KushalX (CO-OWNER)", coOwnerWire)
+        val (coClean, coExtracted) = SocialRole.extract(coOwnerWire)
+        assertEquals("KushalX", coClean)
+        assertEquals(SocialRole.CO_OWNER, coExtracted)
+
+        // Non-owners trying to type (OWNER) or (CO-OWNER) have the tag stripped on save
+        assertEquals("Impostor", SocialRole.encodeTaggedName("Impostor (OWNER)", null))
+        assertEquals("Impostor", SocialRole.encodeTaggedName("Impostor (CO-OWNER)", null))
+    }
+
+    @Test
+    fun presenceModesAndCustomStatusRoundTrip() {
+        assertEquals("[DND] Studying", SocialPresenceCodec.encodeForWire(SocialPresenceMode.DND, "Studying"))
+        assertEquals("[DND]", SocialPresenceCodec.encodeForWire(SocialPresenceMode.DND, ""))
+        assertEquals("[Idle] AFK / BRB", SocialPresenceCodec.encodeForWire(SocialPresenceMode.IDLE, "AFK / BRB"))
+        assertEquals("Down to play", SocialPresenceCodec.encodeForWire(SocialPresenceMode.ONLINE, "Down to play"))
+        assertNull(SocialPresenceCodec.encodeForWire(SocialPresenceMode.INVISIBLE, "Secret"))
+
+        val parsedDnd = SocialPresenceCodec.parse("[DND] Studying")
+        assertEquals(SocialPresenceMode.DND, parsedDnd.mode)
+        assertEquals("Studying", parsedDnd.customText)
+
+        val parsedIdle = SocialPresenceCodec.parse("[Idle] AFK / BRB")
+        assertEquals(SocialPresenceMode.IDLE, parsedIdle.mode)
+        assertEquals("AFK / BRB", parsedIdle.customText)
+
+        val now = 1_800_000_000_000L
+        val dndFriend = SocialFriend(
+            id = "u2",
+            mcUsername = "Kushal",
+            displayName = "Kushal",
+            lastSeenMs = now - 10_000L,
+            statusLine = parsedDnd.customText,
+            presenceMode = parsedDnd.mode,
+            role = SocialRole.CO_OWNER
+        )
+        assertTrue(dndFriend.isOnlineAt(now))
+        assertEquals("Do Not Disturb · Studying", dndFriend.presenceSummary(now))
+
+        val invisibleFriend = dndFriend.copy(presenceMode = SocialPresenceMode.INVISIBLE)
+        assertFalse(invisibleFriend.isOnlineAt(now))
     }
 }

@@ -18,6 +18,190 @@
 
 package net.kdt.pojavlaunch.aerix.social
 
+import java.util.Locale
+
+/**
+ * Official Aerix Launcher staff/founder role tags bound strictly to verified account emails.
+ *
+ * - `entitybrian69@gmail.com` -> `(OWNER)` in crimson red beside any name they choose.
+ * - `kushaladhikari982648@gmail.com` -> `(CO-OWNER)` in sky blue beside any name they choose.
+ */
+enum class SocialRole(
+    val key: String,
+    val tag: String,
+    val email: String,
+    val colorArgb: Long
+) {
+    OWNER(
+        key = "OWNER",
+        tag = "(OWNER)",
+        email = "entitybrian69@gmail.com",
+        colorArgb = 0xFFEF233CL // Crimson red
+    ),
+    CO_OWNER(
+        key = "CO-OWNER",
+        tag = "(CO-OWNER)",
+        email = "kushaladhikari982648@gmail.com",
+        colorArgb = 0xFF38BDF8L // Sky blue
+    );
+
+    companion object {
+        private val tagCleanupRegex = Regex("""(?i)\s*\((?:CO[-_\s]?OWNER|OWNER)\)\s*""")
+
+        fun fromEmail(email: String?): SocialRole? {
+            val clean = email?.trim()?.lowercase(Locale.US)?.takeIf { it.isNotEmpty() } ?: return null
+            return values().firstOrNull { it.email == clean }
+        }
+
+        fun fromBadgeKey(raw: String?): SocialRole? {
+            val clean = raw?.trim()?.uppercase(Locale.US)?.removeSurrounding("(", ")") ?: return null
+            return when (clean) {
+                "OWNER" -> OWNER
+                "CO-OWNER", "CO_OWNER", "CO OWNER" -> CO_OWNER
+                else -> null
+            }
+        }
+
+        /** Removes any `(OWNER)` or `(CO-OWNER)` tokens from a display string. */
+        fun stripRoleTags(rawName: String?): String? {
+            if (rawName == null) return null
+            val cleaned = rawName.replace(tagCleanupRegex, " ").trim().replace(Regex("""\s{2,}"""), " ")
+            return cleaned.takeIf { it.isNotEmpty() }
+        }
+
+        /**
+         * Extracts `(cleanBaseName, SocialRole?)` from a profile row, wire string, or verified email.
+         * Checking `CO-OWNER` before `OWNER` ensures clean disambiguation.
+         */
+        fun extract(
+            rawName: String?,
+            rawBadge: String? = null,
+            knownEmail: String? = null
+        ): Pair<String?, SocialRole?> {
+            val detected = fromEmail(knownEmail)
+                ?: fromBadgeKey(rawBadge)
+                ?: rawName?.let { text ->
+                    val upper = text.uppercase(Locale.US)
+                    when {
+                        upper.contains("(CO-OWNER)") || upper.contains("(CO_OWNER)") -> CO_OWNER
+                        upper.contains("(OWNER)") -> OWNER
+                        else -> null
+                    }
+                }
+            return stripRoleTags(rawName) to detected
+        }
+
+        /**
+         * Produces the database wire `name` / `display_name` value:
+         * - Non-staff accounts always have any manually typed `(OWNER)` / `(CO-OWNER)` stripped.
+         * - Verified `OWNER` / `CO_OWNER` accounts automatically carry their tag beside any chosen name.
+         */
+        fun encodeTaggedName(
+            baseName: String?,
+            role: SocialRole?,
+            fallbackBase: String = "Player"
+        ): String? {
+            val cleanBase = stripRoleTags(baseName)?.take(40)
+            if (role == null) return cleanBase
+            val effectiveBase = cleanBase
+                ?: stripRoleTags(fallbackBase)?.take(40)
+                ?: "Player"
+            return "$effectiveBase ${role.tag}"
+        }
+    }
+}
+
+/** Player availability mode selectable from the Change Status sheet/panel. */
+enum class SocialPresenceMode(
+    val key: String,
+    val label: String,
+    val description: String,
+    val dotArgb: Long
+) {
+    ONLINE("online", "Online", "Visible to friends and ready to play", 0xFF73E5B0L),
+    IDLE("idle", "Idle", "Away or taking a short break", 0xFFFFC777L),
+    DND("dnd", "Do Not Disturb", "Busy — mutes join nudges", 0xFFFF7189L),
+    INVISIBLE("invisible", "Appear Offline", "Browse and play while appearing offline", 0xFF7D909DL);
+
+    companion object {
+        fun fromKey(raw: String?): SocialPresenceMode? {
+            val clean = raw?.trim()?.lowercase(Locale.US) ?: return null
+            return when (clean) {
+                "online" -> ONLINE
+                "idle", "away" -> IDLE
+                "dnd", "do_not_disturb", "busy" -> DND
+                "invisible", "offline", "appear_offline" -> INVISIBLE
+                else -> null
+            }
+        }
+    }
+}
+
+data class SocialStatusPreset(
+    val label: String,
+    val statusText: String,
+    val mode: SocialPresenceMode = SocialPresenceMode.ONLINE,
+    val lookingToPlay: Boolean? = null
+)
+
+/**
+ * Encodes and parses availability mode + custom status text across `status_text` / `status_line`
+ * so status changes work immediately for all players even before optional SQL migrations run.
+ */
+object SocialPresenceCodec {
+    data class ParsedPresence(
+        val mode: SocialPresenceMode,
+        val customText: String?
+    )
+
+    val presets: List<SocialStatusPreset> = listOf(
+        SocialStatusPreset("Down to play", "Down to play", SocialPresenceMode.ONLINE, lookingToPlay = true),
+        SocialStatusPreset("Survival grind", "Survival grind", SocialPresenceMode.ONLINE),
+        SocialStatusPreset("PvP / Minigames", "PvP / Minigames", SocialPresenceMode.ONLINE),
+        SocialStatusPreset("Modding instances", "Modding instances", SocialPresenceMode.ONLINE),
+        SocialStatusPreset("AFK / BRB", "AFK / BRB", SocialPresenceMode.IDLE),
+        SocialStatusPreset("Studying / Busy", "Studying / Busy", SocialPresenceMode.DND)
+    )
+
+    private val dndPrefix = Regex("""^(?i)\[(?:dnd|do not disturb)\]\s*""")
+    private val idlePrefix = Regex("""^(?i)\[(?:idle|away)\]\s*""")
+    private val invisiblePrefix = Regex("""^(?i)\[(?:offline|invisible)\]\s*""")
+
+    fun stripModePrefix(raw: String?): String? {
+        if (raw == null) return null
+        val stripped = raw
+            .replaceFirst(dndPrefix, "")
+            .replaceFirst(idlePrefix, "")
+            .replaceFirst(invisiblePrefix, "")
+            .trim()
+        return stripped.takeIf { it.isNotEmpty() }
+    }
+
+    fun encodeForWire(mode: SocialPresenceMode, customText: String?): String? {
+        val clean = stripModePrefix(customText)?.take(52)
+        return when (mode) {
+            SocialPresenceMode.INVISIBLE -> null
+            SocialPresenceMode.DND -> if (clean == null) "[DND]" else "[DND] $clean".take(60)
+            SocialPresenceMode.IDLE -> if (clean == null) "[Idle]" else "[Idle] $clean".take(60)
+            SocialPresenceMode.ONLINE -> stripModePrefix(customText)?.take(60)
+        }
+    }
+
+    fun parse(rawStatus: String?, explicitMode: String? = null): ParsedPresence {
+        val trimmed = rawStatus?.trim().orEmpty()
+        val fromPrefix = when {
+            dndPrefix.containsMatchIn(trimmed) -> SocialPresenceMode.DND
+            idlePrefix.containsMatchIn(trimmed) -> SocialPresenceMode.IDLE
+            invisiblePrefix.containsMatchIn(trimmed) -> SocialPresenceMode.INVISIBLE
+            else -> null
+        }
+        val mode = SocialPresenceMode.fromKey(explicitMode)
+            ?: fromPrefix
+            ?: SocialPresenceMode.ONLINE
+        return ParsedPresence(mode = mode, customText = stripModePrefix(trimmed))
+    }
+}
+
 /** Everything the social pages show about one person. */
 data class SocialProfile(
     val id: String,
@@ -41,17 +225,23 @@ data class SocialProfile(
     val messages: Int = 0,
     val ranks: List<String> = emptyList(),
     val isMe: Boolean = false,
-    val iFollow: Boolean = false
+    val iFollow: Boolean = false,
+    val role: SocialRole? = null,
+    val presenceMode: SocialPresenceMode = SocialPresenceMode.ONLINE
 ) {
     val online: Boolean
-        get() = lastSeenMs > 0 && System.currentTimeMillis() - lastSeenMs < 2 * 60 * 1000L
+        get() = presenceMode != SocialPresenceMode.INVISIBLE &&
+            lastSeenMs > 0 &&
+            System.currentTimeMillis() - lastSeenMs < 2 * 60 * 1000L
 
     /** Back in a minute or two, then quiet: shown as a hollow dot rather than green. */
     val away: Boolean
-        get() = lastSeenMs > 0 && System.currentTimeMillis() - lastSeenMs in (2 * 60 * 1000L)..(5 * 60 * 1000L)
+        get() = presenceMode != SocialPresenceMode.INVISIBLE &&
+            lastSeenMs > 0 &&
+            System.currentTimeMillis() - lastSeenMs in (2 * 60 * 1000L)..(5 * 60 * 1000L)
 
     val displayName: String
-        get() = name?.takeIf { it.isNotBlank() }
+        get() = SocialRole.stripRoleTags(name)?.takeIf { it.isNotBlank() }
             ?: username
             ?: mcUsername
             ?: "Player"

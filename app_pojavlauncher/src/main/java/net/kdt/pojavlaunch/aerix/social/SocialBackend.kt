@@ -104,6 +104,36 @@ object SocialBackend {
     var unread by mutableStateOf(0)
         private set
 
+    /** Availability mode & custom status controlled from Change Status across launcher and in-game. */
+    var myPresenceMode by mutableStateOf(SocialPresenceMode.ONLINE)
+        private set
+    var myCustomStatus by mutableStateOf<String?>(null)
+        private set
+    var myLookingToPlay by mutableStateOf(false)
+        private set
+
+    /** Verified role derived strictly from the signed-in account email (`OWNER` or `CO_OWNER`). */
+    val myRole: SocialRole?
+        get() = SocialRole.fromEmail(email) ?: myProfile?.role
+
+    fun myEffectiveDisplayName(): String =
+        myProfile?.displayName?.takeIf { it.isNotBlank() }
+            ?: mcUsername?.takeIf { it.isNotBlank() }
+            ?: email?.substringBefore('@')?.takeIf { it.isNotBlank() }
+            ?: "Player"
+
+    fun myStatusSummary(): String {
+        val clean = myCustomStatus?.trim()?.takeIf { it.isNotEmpty() }
+            ?: myProfile?.statusText?.let { SocialPresenceCodec.stripModePrefix(it) }
+        return when (myPresenceMode) {
+            SocialPresenceMode.INVISIBLE -> if (clean != null) "Appear Offline · $clean" else "Appear Offline"
+            SocialPresenceMode.DND -> if (clean != null) "Do Not Disturb · $clean" else "Do Not Disturb"
+            SocialPresenceMode.IDLE -> if (clean != null) "Idle · $clean" else "Idle"
+            SocialPresenceMode.ONLINE -> clean
+                ?: if (myLookingToPlay) "Online · Looking to play" else "Online"
+        }
+    }
+
     /** Combined badge count (unread DMs + incoming friend requests + pending party invites). */
     val totalActionableBadge: Int
         get() = unread + friends.count { it.pendingIncoming } + partyInvites.size
@@ -194,13 +224,19 @@ object SocialBackend {
                 val idx = currentList.indexOfFirst { it.id == id }
                 if (idx < 0) return
                 val old = currentList[idx]
-                val newLastSeen = parseTimestamp(record.stringOrNull("last_seen") ?: "")
-                    .takeIf { it > 0L } ?: old.lastSeenMs
-                val newStatus = if (record.has("status_line")) {
+                val newLastSeen = if (record.has("last_seen")) {
+                    parseTimestamp(record.stringOrNull("last_seen") ?: "")
+                } else old.lastSeenMs
+                val rawStatus = if (record.has("status_line")) {
                     record.stringOrNull("status_line")
                 } else if (record.has("status_text")) {
                     record.stringOrNull("status_text")
                 } else old.statusLine
+                val parsedPresence = SocialPresenceCodec.parse(rawStatus, record.stringOrNull("presence_mode"))
+                val rawName = record.stringOrNull("name") ?: record.stringOrNull("display_name")
+                val extractedRole = if (rawName != null || record.has("role_badge")) {
+                    SocialRole.extract(rawName, record.stringOrNull("role_badge"))
+                } else old.cleanDisplayName to old.role
                 val newMcVer = if (record.has("mc_version")) {
                     record.stringOrNull("mc_version")
                 } else old.mcVersion
@@ -210,8 +246,11 @@ object SocialBackend {
                     ?: old.lookingToPlay
 
                 val updated = old.copy(
+                    displayName = extractedRole.first ?: old.cleanDisplayName,
+                    role = extractedRole.second ?: old.role,
                     lastSeenMs = newLastSeen,
-                    statusLine = newStatus,
+                    statusLine = parsedPresence.customText,
+                    presenceMode = parsedPresence.mode,
                     mcVersion = newMcVer,
                     joinable = newJoinable,
                     lookingToPlay = newLooking
@@ -229,6 +268,8 @@ object SocialBackend {
 
             override fun onBroadcastPartyChat(payload: JsonObject) {
                 val partyId = payload.stringOrNull("partyId") ?: return
+                val rawSenderName = payload.stringOrNull("senderName")
+                val (cleanSender, senderRole) = SocialRole.extract(rawSenderName)
                 val msg = SocialMessage(
                     id = payload.longOr("id", System.currentTimeMillis()),
                     sender = payload.stringOrNull("sender") ?: return,
@@ -238,7 +279,8 @@ object SocialBackend {
                     replyTo = payload.get("replyTo")?.takeIf { !it.isJsonNull }?.asLong,
                     attachmentUrl = payload.stringOrNull("attachmentUrl"),
                     partyId = partyId,
-                    senderName = payload.stringOrNull("senderName")
+                    senderName = cleanSender ?: rawSenderName,
+                    senderRole = senderRole
                 )
                 val list = broadcastPartyMessages.getOrPut(partyId) { ArrayList() }
                 synchronized(list) {
@@ -253,6 +295,37 @@ object SocialBackend {
                 bgScope.launch {
                     refreshParties()
                     refreshPartyInvites()
+                }
+            }
+
+            override fun onBroadcastPresence(payload: JsonObject) {
+                val uid = payload.stringOrNull("userId") ?: return
+                if (uid == userId) return
+                val appearOffline = payload.get("appearOffline")?.takeIf { it.isJsonPrimitive }?.asBoolean ?: false
+                val modeKey = payload.stringOrNull("mode")
+                val rawStatus = payload.stringOrNull("statusLine")
+                val parsed = SocialPresenceCodec.parse(rawStatus, modeKey)
+                val looking = payload.get("lookingToPlay")?.takeIf { it.isJsonPrimitive }?.asBoolean
+                val rawName = payload.stringOrNull("displayName")
+                val roleKey = payload.stringOrNull("role")
+                val (cleanName, role) = SocialRole.extract(rawName, roleKey)
+
+                bgScope.launch(Dispatchers.Main) {
+                    val idx = friends.indexOfFirst { it.id == uid }
+                    if (idx >= 0) {
+                        val old = friends[idx]
+                        val updated = old.copy(
+                            displayName = cleanName ?: old.cleanDisplayName,
+                            role = role ?: old.role,
+                            lastSeenMs = if (appearOffline) 0L else System.currentTimeMillis(),
+                            statusLine = if (appearOffline) null else parsed.customText,
+                            presenceMode = if (appearOffline) SocialPresenceMode.INVISIBLE else parsed.mode,
+                            lookingToPlay = if (appearOffline) false else (looking ?: old.lookingToPlay)
+                        )
+                        val mutable = friends.toMutableList()
+                        mutable[idx] = updated
+                        friends = sortFriends(mutable)
+                    }
                 }
             }
         }
@@ -319,6 +392,9 @@ object SocialBackend {
         activeJoinToast = null
         offlineQueueSize = 0
         myProfile = null
+        myPresenceMode = SocialPresenceMode.ONLINE
+        myCustomStatus = null
+        myLookingToPlay = false
         onboardingDismissedForSession = false
         unread = 0
         lastError = null
@@ -489,12 +565,19 @@ object SocialBackend {
             JsonParser.parseString(String(decoded, Charsets.UTF_8)) as? JsonObject
         }.getOrNull() ?: return
         payload.stringOrNull("sub")?.takeIf { it.isNotBlank() }?.let { if (userId == null) userId = it }
-        payload.stringOrNull("email")?.takeIf { it.isNotBlank() }?.let { if (email == null) email = it }
+        payload.stringOrNull("email")?.takeIf { it.isNotBlank() }?.let { claimed ->
+            if (email.isNullOrBlank()) {
+                email = claimed
+                appContext?.getSharedPreferences(PREFS, Context.MODE_PRIVATE)?.edit()
+                    ?.putString("email", claimed)
+                    ?.apply()
+            }
+        }
     }
 
     private suspend fun ensureToken() {
         if (accessToken != null && System.currentTimeMillis() < expiresAtMs) {
-            if (userId == null) applyJwtClaims(accessToken)
+            if (userId == null || email.isNullOrBlank()) applyJwtClaims(accessToken)
             return
         }
         val token = refreshToken ?: return
@@ -524,6 +607,22 @@ object SocialBackend {
     private fun loadLocalCollections() {
         recentPlayers = readRecentPlayers()
         offlineQueueSize = readOutbox().size
+        val me = userId ?: return
+        val p = prefs() ?: return
+        myPresenceMode = SocialPresenceMode.fromKey(p.getString("presence_mode_$me", null))
+            ?: SocialPresenceMode.ONLINE
+        myCustomStatus = p.getString("custom_status_$me", null)?.takeIf { it.isNotBlank() }
+        myLookingToPlay = p.getBoolean("looking_$me", false)
+    }
+
+    private fun persistLocalStatus(mode: SocialPresenceMode, customStatus: String?, looking: Boolean) {
+        val me = userId ?: return
+        val editor = prefs()?.edit() ?: return
+        editor.putString("presence_mode_$me", mode.key)
+        if (customStatus.isNullOrBlank()) editor.remove("custom_status_$me")
+        else editor.putString("custom_status_$me", customStatus)
+        editor.putBoolean("looking_$me", looking)
+        editor.apply()
     }
 
     fun getFriendNickname(friendId: String): String? {
@@ -661,28 +760,66 @@ object SocialBackend {
     suspend fun loadProfile() {
         attempt {
             ensureToken()
+            if (email.isNullOrBlank()) {
+                val authUser = callRaw("GET", "$PROJECT_URL/auth/v1/user")
+                (authUser.json as? JsonObject)?.stringOrNull("email")?.takeIf { it.isNotBlank() }?.let { resolved ->
+                    email = resolved
+                    prefs()?.edit()?.putString("email", resolved)?.apply()
+                }
+            }
             val id = userId ?: return@attempt Unit
-            val json = call(
+            val resp = callRaw(
                 "GET",
-                "$PROJECT_URL/rest/v1/profiles?id=eq.$id&select=id,mc_username,display_name"
+                "$PROJECT_URL/rest/v1/profiles?id=eq.$id&select=id,username,name,display_name,mc_username,status_text,looking_to_play"
             )
-            val rows = json?.takeIf { it.isJsonArray }?.asJsonArray
-            if (rows != null && rows.size() > 0) {
-                mcUsername = (rows[0] as? JsonObject)?.stringOrNull("mc_username")
+            val json = if (resp.code in 200..299) {
+                resp.json
+            } else {
+                call("GET", "$PROJECT_URL/rest/v1/profiles?id=eq.$id&select=id,mc_username,display_name")
+            }
+            val row = json?.takeIf { it.isJsonArray }?.asJsonArray
+                ?.takeIf { it.size() > 0 }
+                ?.get(0) as? JsonObject
+            if (row != null) {
+                mcUsername = row.stringOrNull("mc_username")
                     ?.takeIf { it.isNotBlank() } ?: storedMinecraftName()
+                val rawStatus = row.stringOrNull("status_text")
+                if (myPresenceMode != SocialPresenceMode.INVISIBLE && rawStatus != null) {
+                    val parsed = SocialPresenceCodec.parse(rawStatus)
+                    myPresenceMode = parsed.mode
+                    myCustomStatus = parsed.customText
+                    myLookingToPlay = row.get("looking_to_play")?.takeIf { it.isJsonPrimitive }?.asBoolean ?: myLookingToPlay
+                    persistLocalStatus(myPresenceMode, myCustomStatus, myLookingToPlay)
+                }
             } else {
                 mcUsername = storedMinecraftName()
             }
-            upsertProfile()
+            upsertProfile(existingRow = row)
         }
     }
 
-    private suspend fun upsertProfile() {
+    private suspend fun upsertProfile(existingRow: JsonObject? = null) {
         val id = userId ?: return
+        val role = SocialRole.fromEmail(email)
+        val existingRawName = existingRow?.stringOrNull("name")?.takeIf { it.isNotBlank() }
+            ?: existingRow?.stringOrNull("display_name")?.takeIf { it.isNotBlank() }
+        val cleanExisting = SocialRole.stripRoleTags(existingRawName)
+        val existingUsername = existingRow?.stringOrNull("username")?.takeIf { it.isNotBlank() }
+        val fallbackBase = cleanExisting
+            ?: existingUsername
+            ?: mcUsername
+            ?: email?.substringBefore('@')
+            ?: "Player"
+        val encodedName = SocialRole.encodeTaggedName(cleanExisting, role, fallbackBase)
+        val encodedDisplay = SocialRole.encodeTaggedName(cleanExisting ?: fallbackBase, role, fallbackBase)
+
         val body = JsonArray().apply {
             add(JsonObject().apply {
                 addProperty("id", id)
-                addProperty("display_name", mcUsername ?: email ?: "Player")
+                if (encodedName != null) {
+                    addProperty("name", encodedName)
+                }
+                addProperty("display_name", encodedDisplay ?: fallbackBase)
                 addProperty("mc_username", mcUsername)
             })
         }
@@ -706,6 +843,7 @@ object SocialBackend {
         )
 
     private fun maybeEmitJoinToast(previous: SocialFriend?, current: SocialFriend) {
+        if (myPresenceMode == SocialPresenceMode.DND) return
         if (current.pendingIncoming || current.pendingOutgoing) return
         if (blockedUsers.any { it.userId == current.id }) return
         val ver = current.mcVersion?.trim()?.takeIf { it.isNotEmpty() } ?: return
@@ -720,6 +858,7 @@ object SocialBackend {
             id = "${current.id}:$ver:${System.currentTimeMillis()}",
             friendId = current.id,
             friendName = current.effectiveName,
+            friendRole = current.effectiveRole,
             mcUsername = current.mcUsername,
             mcVersion = ver,
             statusLine = current.statusLine,
@@ -791,13 +930,16 @@ object SocialBackend {
                 val row = element as? JsonObject ?: return@forEach
                 val id = row.stringOrNull("id") ?: return@forEach
                 val uname = row.stringOrNull("username")
-                val display = row.stringOrNull("name")
-                    ?: row.stringOrNull("display_name")
+                val rawName = row.stringOrNull("name")?.takeIf { it.isNotBlank() }
+                    ?: row.stringOrNull("display_name")?.takeIf { it.isNotBlank() }
+                val (cleanName, detectedRole) = SocialRole.extract(rawName, row.stringOrNull("role_badge"))
+                val display = cleanName
                     ?: uname
                     ?: row.stringOrNull("mc_username")
                     ?: "Player"
-                val statusLine = row.stringOrNull("status_line")?.takeIf { it.isNotBlank() }
+                val rawStatus = row.stringOrNull("status_line")?.takeIf { it.isNotBlank() }
                     ?: row.stringOrNull("status_text")?.takeIf { it.isNotBlank() }
+                val parsedPresence = SocialPresenceCodec.parse(rawStatus, row.stringOrNull("presence_mode"))
                 val mutualPair = if (id in incoming) fetchMutualFriendsInternal(id, accepted) else (0 to emptyList())
 
                 byId[id] = SocialFriend(
@@ -810,14 +952,16 @@ object SocialBackend {
                     pendingOutgoing = id in outgoing,
                     username = uname,
                     avatarUrl = row.stringOrNull("avatar_url"),
-                    statusLine = statusLine,
+                    statusLine = parsedPresence.customText,
                     mcVersion = row.stringOrNull("mc_version")?.takeIf { it.isNotBlank() },
                     joinable = row.get("joinable")?.takeIf { it.isJsonPrimitive }?.asBoolean ?: false,
                     lookingToPlay = row.get("looking_to_play")?.takeIf { it.isJsonPrimitive }?.asBoolean ?: false,
                     nickname = getFriendNickname(id),
                     pinned = id in pins,
                     mutualCount = mutualPair.first,
-                    mutualNames = mutualPair.second
+                    mutualNames = mutualPair.second,
+                    role = detectedRole,
+                    presenceMode = parsedPresence.mode
                 )
             }
 
@@ -1609,18 +1753,22 @@ object SocialBackend {
                     val prof = profileMap[uid]
                     SocialPartyMember(
                         userId = uid,
-                        username = prof?.displayName ?: "Player",
+                        username = prof?.cleanDisplayName ?: "Player",
                         mcUsername = prof?.mcUsername,
                         avatarUrl = prof?.avatarUrl,
                         isHost = uid == party.hostId,
                         online = prof?.online ?: false,
-                        statusLine = prof?.statusLine
+                        statusLine = prof?.statusLine,
+                        role = if (uid == me) (myRole ?: prof?.effectiveRole) else prof?.effectiveRole,
+                        presenceMode = prof?.presenceMode ?: SocialPresenceMode.ONLINE
                     )
                 }.sortedByDescending { it.isHost }
                 val hostProf = profileMap[party.hostId]
+                val hostRole = if (party.hostId == me) (myRole ?: hostProf?.effectiveRole) else (hostProf?.effectiveRole ?: party.effectiveHostRole)
                 party.copy(
-                    hostName = hostProf?.displayName ?: party.hostName,
+                    hostName = hostProf?.cleanDisplayName ?: party.cleanHostName,
                     hostAvatar = hostProf?.avatarUrl ?: party.hostAvatar,
+                    hostRole = hostRole,
                     memberCount = members.size,
                     members = members
                 )
@@ -1637,12 +1785,15 @@ object SocialBackend {
             ?: parseTimestamp(row.stringOrNull("expires_at") ?: "")
         val createdMs = row.longOr("created_at_ms", 0L).takeIf { it > 0L }
             ?: parseTimestamp(row.stringOrNull("created_at") ?: "")
+        val rawHostName = row.stringOrNull("host_name") ?: "Host"
+        val (cleanHost, hostRole) = SocialRole.extract(rawHostName, row.stringOrNull("host_role"))
 
         return SocialParty(
             id = id,
             hostId = hostId,
-            hostName = row.stringOrNull("host_name") ?: "Host",
+            hostName = cleanHost ?: "Host",
             hostAvatar = row.stringOrNull("host_avatar"),
+            hostRole = if (hostId == userId) (myRole ?: hostRole) else hostRole,
             title = row.stringOrNull("title") ?: "Party",
             instanceName = row.stringOrNull("instance"),
             versionId = unpacked.versionId,
@@ -1682,12 +1833,22 @@ object SocialBackend {
             val r = el as? JsonObject ?: return@forEach
             val uid = r.stringOrNull("id") ?: return@forEach
             val uname = r.stringOrNull("username")
+            val rawName = r.stringOrNull("name")?.takeIf { it.isNotBlank() }
+                ?: r.stringOrNull("display_name")?.takeIf { it.isNotBlank() }
+            val (cleanName, detectedRole) = SocialRole.extract(
+                rawName,
+                r.stringOrNull("role_badge"),
+                if (uid == userId) email else null
+            )
             val display = getFriendNickname(uid)
-                ?: r.stringOrNull("name")
-                ?: r.stringOrNull("display_name")
+                ?: cleanName
                 ?: uname
                 ?: r.stringOrNull("mc_username")
                 ?: "Player"
+            val parsedPresence = SocialPresenceCodec.parse(
+                r.stringOrNull("status_line") ?: r.stringOrNull("status_text"),
+                r.stringOrNull("presence_mode")
+            )
             out[uid] = SocialFriend(
                 id = uid,
                 mcUsername = r.stringOrNull("mc_username") ?: uname ?: display,
@@ -1695,7 +1856,9 @@ object SocialBackend {
                 lastSeenMs = parseTimestamp(r.stringOrNull("last_seen") ?: ""),
                 username = uname,
                 avatarUrl = r.stringOrNull("avatar_url"),
-                statusLine = r.stringOrNull("status_line") ?: r.stringOrNull("status_text")
+                statusLine = parsedPresence.customText,
+                role = detectedRole,
+                presenceMode = parsedPresence.mode
             )
         }
         return out
@@ -1713,7 +1876,8 @@ object SocialBackend {
         return attempt {
             ensureToken()
             val me = userId ?: return@attempt false
-            val myLabel = myProfile?.name ?: myProfile?.username ?: mcUsername ?: "Friend"
+            val myBase = myEffectiveDisplayName()
+            val myLabel = SocialRole.encodeTaggedName(myBase, myRole, myBase) ?: myBase
             val invite = SocialPartyInvite(
                 id = "${party.id}:$friendId:${System.currentTimeMillis() / 60_000L}",
                 partyId = party.id,
@@ -1721,6 +1885,7 @@ object SocialBackend {
                 fromName = myLabel,
                 fromMcUsername = mcUsername,
                 fromAvatar = myProfile?.avatarUrl,
+                fromRole = myRole,
                 partyTitle = party.title,
                 instanceName = party.instanceName,
                 versionId = party.versionId,
@@ -1984,7 +2149,7 @@ object SocialBackend {
             val me = userId ?: return@attempt emptyList<SocialMessage>()
             val deleted = deletedForMeSet()
             val party = parties.firstOrNull { it.id == partyId }
-            val memberNames = party?.members?.associate { it.userId to it.username } ?: emptyMap()
+            val memberById = party?.members?.associateBy { it.userId } ?: emptyMap()
             val collected = ArrayList<SocialMessage>()
 
             if (hasPartyMessagesTable != false) {
@@ -2001,6 +2166,8 @@ object SocialBackend {
                         val id = row.longOr("id", 0L)
                         if (id in deleted) return@forEach
                         val sender = row.stringOrNull("sender") ?: return@forEach
+                        val mem = memberById[sender]
+                        val fr = friends.firstOrNull { it.id == sender }
                         collected.add(
                             SocialMessage(
                                 id = id,
@@ -2012,7 +2179,8 @@ object SocialBackend {
                                 replyTo = row.get("reply_to")?.takeIf { !it.isJsonNull }?.asLong,
                                 attachmentUrl = row.stringOrNull("attachment_url"),
                                 partyId = partyId,
-                                senderName = memberNames[sender] ?: friends.firstOrNull { it.id == sender }?.effectiveName ?: "Member"
+                                senderName = mem?.cleanName ?: fr?.effectiveName ?: "Member",
+                                senderRole = if (sender == me) myRole else (mem?.effectiveRole ?: fr?.effectiveRole)
                             )
                         )
                     }
@@ -2118,7 +2286,8 @@ object SocialBackend {
         localAttachmentPath: String? = null
     ): Boolean {
         val me = userId ?: return false
-        val myName = myProfile?.name ?: myProfile?.username ?: mcUsername ?: "Player"
+        val myBase = myEffectiveDisplayName()
+        val myName = SocialRole.encodeTaggedName(myBase, myRole, myBase) ?: myBase
         val nowMs = System.currentTimeMillis()
 
         if (hasPartyMessagesTable != false) {
@@ -2264,7 +2433,13 @@ object SocialBackend {
                     val p = parsePartyRow(obj) ?: return@let
                     if (!p.isExpired(nowMs) && fallback.none { it.id == p.id }) {
                         val prof = profMap[uid]
-                        fallback.add(p.copy(hostName = prof?.displayName ?: p.hostName, hostAvatar = prof?.avatarUrl))
+                        fallback.add(
+                            p.copy(
+                                hostName = prof?.cleanDisplayName ?: p.cleanHostName,
+                                hostAvatar = prof?.avatarUrl ?: p.hostAvatar,
+                                hostRole = prof?.effectiveRole ?: p.effectiveHostRole
+                            )
+                        )
                     }
                 }
             }
@@ -2295,10 +2470,13 @@ object SocialBackend {
         expiresMs: Long
     ) {
         val me = userId ?: return
+        val myBase = myEffectiveDisplayName()
+        val taggedHost = SocialRole.encodeTaggedName(myBase, myRole, myBase) ?: myBase
         val obj = JsonObject().apply {
             addProperty("id", id)
             addProperty("host", me)
-            addProperty("host_name", myProfile?.name ?: myProfile?.username ?: mcUsername ?: "Host")
+            addProperty("host_name", taggedHost)
+            myRole?.let { addProperty("host_role", it.key) }
             myProfile?.avatarUrl?.let { addProperty("host_avatar", it) }
             addProperty("title", title)
             instanceName?.let { addProperty("instance", it) }
@@ -2341,9 +2519,10 @@ object SocialBackend {
                         SocialSharedServer(
                             id = row.longOr("id", 0L).toString(),
                             ownerId = owner,
-                            ownerName = if (owner == me) "You" else (prof?.displayName ?: "Friend"),
+                            ownerName = if (owner == me) myEffectiveDisplayName() else (prof?.cleanDisplayName ?: "Friend"),
                             ownerMcUsername = prof?.mcUsername,
                             ownerAvatar = prof?.avatarUrl,
+                            ownerRole = if (owner == me) myRole else prof?.effectiveRole,
                             name = row.stringOrNull("name") ?: "Minecraft Server",
                             address = row.stringOrNull("address") ?: return@mapNotNull null,
                             mcVersion = row.stringOrNull("mc_version"),
@@ -2372,9 +2551,10 @@ object SocialBackend {
                         SocialSharedServer(
                             id = obj.stringOrNull("id") ?: addr,
                             ownerId = owner,
-                            ownerName = if (owner == me) "You" else (prof?.displayName ?: "Friend"),
+                            ownerName = if (owner == me) myEffectiveDisplayName() else (prof?.cleanDisplayName ?: "Friend"),
                             ownerMcUsername = prof?.mcUsername,
                             ownerAvatar = prof?.avatarUrl,
+                            ownerRole = if (owner == me) myRole else prof?.effectiveRole,
                             name = obj.stringOrNull("name") ?: addr,
                             address = addr,
                             mcVersion = obj.stringOrNull("mc_version"),
@@ -2506,12 +2686,15 @@ object SocialBackend {
             unreadCount()
             refreshPartyInvites()
             while (isActive && signedIn) {
-                activeGameJoinable = parties.any { it.hostId == userId && !it.isExpired() }
-                pushRichPresence(
-                    statusLine = activeGameStatusLine,
-                    mcVersion = activeGameMcVersion,
-                    joinable = activeGameJoinable
-                )
+                if (myPresenceMode != SocialPresenceMode.INVISIBLE) {
+                    activeGameJoinable = parties.any { it.hostId == userId && !it.isExpired() }
+                    val wire = SocialPresenceCodec.encodeForWire(myPresenceMode, activeGameStatusLine)
+                    pushRichPresence(
+                        statusLine = wire,
+                        mcVersion = activeGameMcVersion,
+                        joinable = activeGameJoinable
+                    )
+                }
                 delay(45_000L)
             }
         }
@@ -2524,9 +2707,9 @@ object SocialBackend {
         activeGameStatusLine = null
         activeGameMcVersion = null
         activeGameJoinable = false
-        if (!signedIn) return
+        if (!signedIn || myPresenceMode == SocialPresenceMode.INVISIBLE) return
         bgScope.launch {
-            pushRichPresence(statusLine = null, mcVersion = null, joinable = false)
+            syncRichPresenceToServer()
         }
     }
 
@@ -2563,13 +2746,16 @@ object SocialBackend {
 
     private suspend fun syncRichPresenceToServer() {
         if (!signedIn) return
+        if (myPresenceMode == SocialPresenceMode.INVISIBLE) return
         val hosting = parties.firstOrNull { it.hostId == userId && !it.isExpired() }
-        val status = activeGameStatusLine
+        val baseStatus = activeGameStatusLine
             ?: hosting?.let { "In party: ${it.title}" }
+            ?: myCustomStatus
             ?: myProfile?.statusText
+        val wireStatus = SocialPresenceCodec.encodeForWire(myPresenceMode, baseStatus)
         val ver = activeGameMcVersion ?: hosting?.mcVersion
         val joinable = hosting != null || activeGameJoinable
-        pushRichPresence(status, ver, joinable)
+        pushRichPresence(wireStatus, ver, joinable)
     }
 
     private suspend fun pushRichPresence(statusLine: String?, mcVersion: String?, joinable: Boolean) {
@@ -2633,11 +2819,26 @@ object SocialBackend {
             parseProfile(json)
         }
         if (card != null) {
-            myProfile = card
-            if (userId == null) userId = card.id
-            mcUsername = card.mcUsername ?: mcUsername
+            val resolvedRole = SocialRole.fromEmail(email) ?: card.role
+            val withLocalState = if (myPresenceMode == SocialPresenceMode.INVISIBLE) {
+                card.copy(
+                    role = resolvedRole,
+                    presenceMode = SocialPresenceMode.INVISIBLE,
+                    statusText = myCustomStatus ?: card.statusText
+                )
+            } else {
+                myPresenceMode = card.presenceMode
+                myCustomStatus = card.statusText
+                myLookingToPlay = card.lookingToPlay
+                persistLocalStatus(myPresenceMode, myCustomStatus, myLookingToPlay)
+                card.copy(role = resolvedRole)
+            }
+            myProfile = withLocalState
+            if (userId == null) userId = withLocalState.id
+            mcUsername = withLocalState.mcUsername ?: mcUsername
+            return withLocalState
         }
-        return card
+        return null
     }
 
     suspend fun loadProfileCard(username: String): SocialProfile? = attempt {
@@ -2657,14 +2858,22 @@ object SocialBackend {
             val body = JsonObject().apply { addProperty("p_username", clean) }
             val json = call("POST", "$PROJECT_URL/rest/v1/rpc/find_player", body.toString())
             val row = json as? JsonObject ?: return@attempt null
+            val id = row.stringOrNull("id") ?: return@attempt null
+            val rawName = row.stringOrNull("name") ?: row.stringOrNull("display_name")
+            val (cleanName, detectedRole) = SocialRole.extract(
+                rawName,
+                row.stringOrNull("role_badge"),
+                if (id == userId) email else null
+            )
             SocialProfile(
-                id = row.stringOrNull("id") ?: return@attempt null,
+                id = id,
                 username = row.stringOrNull("username"),
-                name = row.stringOrNull("name"),
+                name = cleanName,
                 mcUsername = row.stringOrNull("mc_username"),
                 avatarUrl = row.stringOrNull("avatar_url"),
                 country = row.stringOrNull("country"),
-                lastSeenMs = row.longOr("last_seen_ms", 0L)
+                lastSeenMs = row.longOr("last_seen_ms", 0L),
+                role = detectedRole
             )
         }
         if (found == null && lastError == null) lastError = "No one is called @$clean"
@@ -2692,14 +2901,22 @@ object SocialBackend {
         val body = JsonObject().apply { addProperty("p_code", code.trim()) }
         val json = call("POST", "$PROJECT_URL/rest/v1/rpc/find_by_code", body.toString())
         val row = json as? JsonObject ?: return@attempt null
+        val id = row.stringOrNull("id") ?: return@attempt null
+        val rawName = row.stringOrNull("name") ?: row.stringOrNull("display_name")
+        val (cleanName, detectedRole) = SocialRole.extract(
+            rawName,
+            row.stringOrNull("role_badge"),
+            if (id == userId) email else null
+        )
         SocialProfile(
-            id = row.stringOrNull("id") ?: return@attempt null,
+            id = id,
             username = row.stringOrNull("username"),
-            name = row.stringOrNull("name"),
+            name = cleanName,
             mcUsername = row.stringOrNull("mc_username"),
             avatarUrl = row.stringOrNull("avatar_url"),
             country = row.stringOrNull("country"),
-            lastSeenMs = row.longOr("last_seen_ms", 0L)
+            lastSeenMs = row.longOr("last_seen_ms", 0L),
+            role = detectedRole
         )
     }
 
@@ -2730,17 +2947,32 @@ object SocialBackend {
         statusText: String? = null,
         lookingToPlay: Boolean = false
     ): Boolean {
+        val cleanStatus = SocialPresenceCodec.stripModePrefix(statusText)
         val saved = attempt {
             ensureToken()
             val me = userId ?: myProfile?.id ?: return@attempt null
+            val role = SocialRole.fromEmail(email)
+            val fallbackBase = myProfile?.username
+                ?: mcUsername
+                ?: email?.substringBefore('@')
+                ?: "Player"
+            val encodedName = SocialRole.encodeTaggedName(name, role, fallbackBase)
+            val wireStatus = SocialPresenceCodec.encodeForWire(myPresenceMode, cleanStatus)
+
             val row = JsonObject().apply {
                 addProperty("id", me)
-                addProperty("name", name?.trim()?.takeIf { it.isNotBlank() })
-                addProperty("display_name", name?.trim()?.takeIf { it.isNotBlank() })
+                if (encodedName != null) {
+                    addProperty("name", encodedName)
+                    addProperty("display_name", encodedName)
+                } else {
+                    add("name", com.google.gson.JsonNull.INSTANCE)
+                    addProperty("display_name", fallbackBase)
+                }
                 addProperty("country", country?.trim()?.takeIf { it.isNotBlank() })
                 addProperty("bio", bio?.trim()?.takeIf { it.isNotBlank() })
-                addProperty("status_text", statusText?.trim()?.takeIf { it.isNotBlank() })
-                addProperty("looking_to_play", lookingToPlay)
+                if (wireStatus != null) addProperty("status_text", wireStatus)
+                else add("status_text", com.google.gson.JsonNull.INSTANCE)
+                addProperty("looking_to_play", if (myPresenceMode == SocialPresenceMode.INVISIBLE) false else lookingToPlay)
                 addProperty("onboarded", onboarded)
                 if (avatarUrl != null) addProperty("avatar_url", avatarUrl)
                 if (bannerUrl != null) addProperty("banner_url", bannerUrl)
@@ -2755,6 +2987,19 @@ object SocialBackend {
             )
             if (result == null) lastError = lastError ?: "Could not save the profile"
             result
+        }
+        if (saved != null) {
+            myCustomStatus = cleanStatus
+            myLookingToPlay = lookingToPlay
+            persistLocalStatus(myPresenceMode, myCustomStatus, myLookingToPlay)
+            SocialRealtime.sendPresenceBroadcast(
+                modeKey = myPresenceMode.key,
+                wireStatus = SocialPresenceCodec.encodeForWire(myPresenceMode, cleanStatus),
+                lookingToPlay = lookingToPlay,
+                appearOffline = myPresenceMode == SocialPresenceMode.INVISIBLE,
+                displayName = SocialRole.encodeTaggedName(name, myRole, myEffectiveDisplayName()),
+                roleKey = myRole?.key
+            )
         }
         loadMyProfile()
         return saved != null
@@ -2903,14 +3148,22 @@ object SocialBackend {
             )?.takeIf { it.isJsonArray }?.asJsonArray ?: return@attempt emptyList<SocialProfile>()
             rows.mapNotNull { element ->
                 val row = element as? JsonObject ?: return@mapNotNull null
+                val uid = row.stringOrNull("id") ?: return@mapNotNull null
+                val rawName = row.stringOrNull("name") ?: row.stringOrNull("display_name")
+                val (cleanName, detectedRole) = SocialRole.extract(
+                    rawName,
+                    row.stringOrNull("role_badge"),
+                    if (uid == userId) email else null
+                )
                 SocialProfile(
-                    id = row.stringOrNull("id") ?: return@mapNotNull null,
+                    id = uid,
                     username = row.stringOrNull("username"),
-                    name = row.stringOrNull("name") ?: row.stringOrNull("display_name"),
+                    name = cleanName,
                     mcUsername = row.stringOrNull("mc_username"),
                     avatarUrl = row.stringOrNull("avatar_url"),
                     country = row.stringOrNull("country"),
-                    lastSeenMs = parseTimestamp(row.stringOrNull("last_seen") ?: "")
+                    lastSeenMs = parseTimestamp(row.stringOrNull("last_seen") ?: ""),
+                    role = detectedRole
                 )
             }
         }
@@ -2949,10 +3202,11 @@ object SocialBackend {
             val p = profMap[uid]
             SocialBlockedUser(
                 userId = uid,
-                name = p?.displayName ?: "Blocked player",
+                name = p?.cleanDisplayName ?: "Blocked player",
                 username = p?.username,
                 mcUsername = p?.mcUsername,
                 avatarUrl = p?.avatarUrl,
+                role = p?.effectiveRole,
                 createdAtMs = ts
             )
         }
@@ -3014,29 +3268,101 @@ object SocialBackend {
 
     // ---- presence and unread ----------------------------------------------------------------
 
-    suspend fun setPresence(status: String?, looking: Boolean) {
-        if (!signedIn) return
-        attempt {
+    /**
+     * Updates the signed-in player's availability mode (`Online`, `Idle`, `Do Not Disturb`,
+     * `Appear Offline`), custom status message, and Looking-to-Play badge, syncing both to
+     * Supabase and over Realtime WebSocket so other players see the change immediately.
+     */
+    suspend fun updateMyStatus(
+        mode: SocialPresenceMode,
+        customStatus: String?,
+        looking: Boolean
+    ): Boolean {
+        if (!signedIn) return false
+        val cleanStatus = SocialPresenceCodec.stripModePrefix(customStatus)?.take(52)
+        myPresenceMode = mode
+        myCustomStatus = cleanStatus
+        myLookingToPlay = looking
+        persistLocalStatus(mode, cleanStatus, looking)
+        myProfile = myProfile?.copy(
+            presenceMode = mode,
+            statusText = cleanStatus,
+            lookingToPlay = looking,
+            lastSeenMs = if (mode == SocialPresenceMode.INVISIBLE) 0L else System.currentTimeMillis(),
+            role = myRole
+        )
+
+        val done = attempt {
             ensureToken()
-            call(
-                "POST",
-                "$PROJECT_URL/rest/v1/rpc/set_presence",
-                JsonObject().apply {
-                    addProperty("p_status", status?.take(60) ?: "")
-                    addProperty("p_looking", looking)
-                }.toString()
-            )
-            val me = userId ?: return@attempt
-            callRaw(
-                "PATCH",
-                "$PROJECT_URL/rest/v1/profiles?id=eq.$me",
-                JsonObject().apply {
-                    if (!status.isNullOrBlank()) addProperty("status_line", status.take(60))
-                    else add("status_line", com.google.gson.JsonNull.INSTANCE)
-                }.toString(),
-                extraHeaders = mapOf("Prefer" to "return=minimal")
-            )
+            val me = userId ?: return@attempt false
+            if (mode == SocialPresenceMode.INVISIBLE) {
+                callRaw(
+                    "PATCH",
+                    "$PROJECT_URL/rest/v1/profiles?id=eq.$me",
+                    JsonObject().apply {
+                        addProperty("last_seen", "1970-01-01T00:00:00Z")
+                        add("status_text", com.google.gson.JsonNull.INSTANCE)
+                        add("status_line", com.google.gson.JsonNull.INSTANCE)
+                        add("mc_version", com.google.gson.JsonNull.INSTANCE)
+                        addProperty("joinable", false)
+                        addProperty("looking_to_play", false)
+                    }.toString(),
+                    extraHeaders = mapOf("Prefer" to "return=minimal")
+                )
+                SocialRealtime.sendPresenceBroadcast(
+                    modeKey = mode.key,
+                    wireStatus = null,
+                    lookingToPlay = false,
+                    appearOffline = true,
+                    displayName = SocialRole.encodeTaggedName(myEffectiveDisplayName(), myRole, myEffectiveDisplayName()),
+                    roleKey = myRole?.key
+                )
+                true
+            } else {
+                val wireProfileStatus = SocialPresenceCodec.encodeForWire(mode, cleanStatus)
+                val hosting = parties.firstOrNull { it.hostId == me && !it.isExpired() }
+                val activeRichBase = activeGameStatusLine
+                    ?: hosting?.let { "In party: ${it.title}" }
+                    ?: cleanStatus
+                val wireRichStatus = SocialPresenceCodec.encodeForWire(mode, activeRichBase)
+
+                call(
+                    "POST",
+                    "$PROJECT_URL/rest/v1/rpc/set_presence",
+                    JsonObject().apply {
+                        addProperty("p_status", wireProfileStatus ?: "")
+                        addProperty("p_looking", looking)
+                    }.toString()
+                )
+                callRaw(
+                    "PATCH",
+                    "$PROJECT_URL/rest/v1/profiles?id=eq.$me",
+                    JsonObject().apply {
+                        addProperty("last_seen", isoNow())
+                        if (wireProfileStatus != null) addProperty("status_text", wireProfileStatus)
+                        else add("status_text", com.google.gson.JsonNull.INSTANCE)
+                        if (wireRichStatus != null) addProperty("status_line", wireRichStatus)
+                        else add("status_line", com.google.gson.JsonNull.INSTANCE)
+                        addProperty("looking_to_play", looking)
+                    }.toString(),
+                    extraHeaders = mapOf("Prefer" to "return=minimal")
+                )
+                SocialRealtime.sendPresenceBroadcast(
+                    modeKey = mode.key,
+                    wireStatus = wireRichStatus,
+                    lookingToPlay = looking,
+                    appearOffline = false,
+                    displayName = SocialRole.encodeTaggedName(myEffectiveDisplayName(), myRole, myEffectiveDisplayName()),
+                    roleKey = myRole?.key
+                )
+                true
+            }
         }
+        return done == true
+    }
+
+    suspend fun setPresence(status: String?, looking: Boolean) {
+        updateMyStatus(myPresenceMode, status, looking)
     }
 
     suspend fun unreadCount(): Int {
@@ -3092,13 +3418,24 @@ object SocialBackend {
     private fun parseProfile(json: JsonElement?): SocialProfile? {
         val row = json as? JsonObject ?: return null
         val id = row.stringOrNull("id") ?: return null
+        val isMe = row.get("is_me")?.takeIf { it.isJsonPrimitive }?.asBoolean ?: (id == userId)
         val ranks = row.get("ranks")?.takeIf { it.isJsonArray }?.asJsonArray
             ?.mapNotNull { element -> runCatching { element.asString }.getOrNull() }
             ?: emptyList()
+        val rawName = row.stringOrNull("name") ?: row.stringOrNull("display_name")
+        val (cleanName, detectedRole) = SocialRole.extract(
+            rawName,
+            row.stringOrNull("role_badge"),
+            if (isMe) email else null
+        )
+        val parsedPresence = SocialPresenceCodec.parse(
+            row.stringOrNull("status_line") ?: row.stringOrNull("status_text"),
+            row.stringOrNull("presence_mode")
+        )
         return SocialProfile(
             id = id,
             username = row.stringOrNull("username"),
-            name = row.stringOrNull("name") ?: row.stringOrNull("display_name"),
+            name = cleanName,
             mcUsername = row.stringOrNull("mc_username"),
             country = row.stringOrNull("country"),
             bio = row.stringOrNull("bio"),
@@ -3106,7 +3443,7 @@ object SocialBackend {
             bannerUrl = row.stringOrNull("banner_url"),
             skinUrl = row.stringOrNull("skin_url"),
             capeUrl = row.stringOrNull("cape_url"),
-            statusText = row.stringOrNull("status_line") ?: row.stringOrNull("status_text"),
+            statusText = parsedPresence.customText,
             lookingToPlay = row.get("looking_to_play")?.takeIf { it.isJsonPrimitive }?.asBoolean ?: false,
             onboarded = row.get("onboarded")?.takeIf { it.isJsonPrimitive }?.asBoolean ?: false,
             usernameChangedAtMs = parseTimestamp(row.stringOrNull("username_changed_at") ?: ""),
@@ -3116,8 +3453,10 @@ object SocialBackend {
             friends = row.longOr("friends", 0L).toInt(),
             messages = row.longOr("messages", 0L).toInt(),
             ranks = ranks,
-            isMe = row.get("is_me")?.takeIf { it.isJsonPrimitive }?.asBoolean ?: false,
-            iFollow = row.get("i_follow")?.takeIf { it.isJsonPrimitive }?.asBoolean ?: false
+            isMe = isMe,
+            iFollow = row.get("i_follow")?.takeIf { it.isJsonPrimitive }?.asBoolean ?: false,
+            role = detectedRole,
+            presenceMode = parsedPresence.mode
         )
     }
 

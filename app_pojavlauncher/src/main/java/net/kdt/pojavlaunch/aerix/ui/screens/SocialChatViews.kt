@@ -269,27 +269,30 @@ fun SocialConversationPanel(
                         }
                     }
                 } else if (friend != null) {
-                    SocialRemoteImage(
-                        url = friend.avatarUrl,
-                        fallbackIcon = R.drawable.aerix_ic_person_outlined,
-                        modifier = Modifier
-                            .size(if (compact) 32.dp else 38.dp)
-                            .clickable(enabled = onOpenFriendProfile != null) { onOpenFriendProfile?.invoke(friend) },
-                        shape = CircleShape
-                    )
+                    Box(contentAlignment = Alignment.BottomEnd) {
+                        SocialRemoteImage(
+                            url = friend.avatarUrl,
+                            fallbackIcon = R.drawable.aerix_ic_person_outlined,
+                            modifier = Modifier
+                                .size(if (compact) 32.dp else 38.dp)
+                                .clickable(enabled = onOpenFriendProfile != null) { onOpenFriendProfile?.invoke(friend) },
+                            shape = CircleShape
+                        )
+                        SocialStatusDot(mode = friend.activePresenceMode(), size = if (compact) 9.dp else 10.dp)
+                    }
                     Column(
                         modifier = Modifier
                             .weight(1f)
                             .clickable(enabled = onOpenFriendProfile != null) { onOpenFriendProfile?.invoke(friend) }
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text(
-                                friend.effectiveName,
+                            SocialNameWithRole(
+                                name = friend.effectiveName,
+                                role = friend.effectiveRole,
                                 fontSize = if (compact) 13.sp else 15.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = AerixSurface.textPrimary,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
+                                compactBadge = compact,
+                                modifier = Modifier.weight(1f, fill = false)
                             )
                             if (friend.pinned) {
                                 Icon(
@@ -308,8 +311,7 @@ fun SocialConversationPanel(
                             fontSize = 11.sp,
                             color = when {
                                 activeTyper != null -> typingColor
-                                friend.online -> AerixSurface.success
-                                else -> AerixSurface.textMuted
+                                else -> presenceModeColor(friend.activePresenceMode())
                             },
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -381,12 +383,14 @@ fun SocialConversationPanel(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalAlignment = if (isMine) Alignment.End else Alignment.Start
                         ) {
-                            if (isParty && !isMine && !msg.senderName.isNullOrBlank()) {
-                                Text(
-                                    msg.senderName,
+                            if (isParty && !isMine && !msg.cleanSenderName.isNullOrBlank()) {
+                                SocialNameWithRole(
+                                    name = msg.cleanSenderName ?: "",
+                                    role = msg.effectiveSenderRole,
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     color = accent,
+                                    compactBadge = true,
                                     modifier = Modifier.padding(start = 6.dp, bottom = 2.dp)
                                 )
                             }

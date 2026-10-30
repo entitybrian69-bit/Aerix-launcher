@@ -85,6 +85,50 @@ alter table public.profiles add column if not exists onboarded boolean not null 
 
 alter table public.profiles add column if not exists username_changed_at timestamptz;
 
+alter table public.profiles add column if not exists role_badge text;
+
+alter table public.profiles add column if not exists presence_mode text not null default 'online';
+
+-- ---- verified email-bound role badges ((OWNER) & (CO-OWNER)) -----------------------------
+-- Enforced server-side from auth.users.email so non-staff accounts can never spoof tags.
+
+create or replace function public.enforce_profile_role_badge() returns trigger
+language plpgsql security definer set search_path = public as 'declare
+    auth_email text;
+    clean_name text;
+    clean_display text;
+    fallback_base text;
+begin
+    select lower(trim(email)) into auth_email from auth.users where id = new.id;
+    clean_name := nullif(trim(regexp_replace(coalesce(new.name, ''''), ''\s*\((CO[-_\s]?OWNER|OWNER)\)\s*'', '' '', ''gi'')), '''');
+    clean_display := nullif(trim(regexp_replace(coalesce(new.display_name, ''''), ''\s*\((CO[-_\s]?OWNER|OWNER)\)\s*'', '' '', ''gi'')), '''');
+    fallback_base := coalesce(clean_name, clean_display, new.username, new.mc_username, ''Player'');
+
+    if auth_email = ''entitybrian69@gmail.com'' then
+        new.role_badge := ''OWNER'';
+        new.name := fallback_base || '' (OWNER)'';
+        new.display_name := fallback_base || '' (OWNER)'';
+    elsif auth_email = ''kushaladhikari982648@gmail.com'' then
+        new.role_badge := ''CO-OWNER'';
+        new.name := fallback_base || '' (CO-OWNER)'';
+        new.display_name := fallback_base || '' (CO-OWNER)'';
+    else
+        new.role_badge := null;
+        new.name := clean_name;
+        new.display_name := clean_display;
+    end if;
+    return new;
+end ';
+
+drop trigger if exists profiles_enforce_role_badge on public.profiles;
+
+create trigger profiles_enforce_role_badge
+    before insert or update on public.profiles
+    for each row execute function public.enforce_profile_role_badge();
+
+-- Backfill any existing profile rows so verified staff badges take effect immediately on SQL run.
+update public.profiles set display_name = display_name where true;
+
 -- A username is unique regardless of case, and must hold at least one letter and one number.
 create unique index if not exists profiles_username_key on public.profiles (lower(username)) where username is not null;
 
@@ -315,6 +359,7 @@ begin
         ''id'', player.id,
         ''username'', player.username,
         ''name'', player.name,
+        ''role_badge'', player.role_badge,
         ''mc_username'', player.mc_username,
         ''avatar_url'', player.avatar_url,
         ''country'', player.country,
@@ -372,6 +417,8 @@ begin
         ''id'', p.id,
         ''username'', p.username,
         ''name'', p.name,
+        ''role_badge'', p.role_badge,
+        ''presence_mode'', p.presence_mode,
         ''mc_username'', p.mc_username,
         ''country'', p.country,
         ''bio'', p.bio,
@@ -425,6 +472,7 @@ begin
         ''id'', player.id,
         ''username'', player.username,
         ''name'', player.name,
+        ''role_badge'', player.role_badge,
         ''mc_username'', player.mc_username,
         ''avatar_url'', player.avatar_url,
         ''country'', player.country,
@@ -522,7 +570,8 @@ language plpgsql security definer set search_path = public as 'begin
             select
                 pa.id,
                 pa.host,
-                coalesce(pr.username, pr.mc_username, pr.display_name, ''Player'') as host_name,
+                coalesce(pr.name, pr.username, pr.mc_username, pr.display_name, ''Player'') as host_name,
+                pr.role_badge as host_role,
                 pr.avatar_url as host_avatar,
                 pa.title,
                 pa.instance,

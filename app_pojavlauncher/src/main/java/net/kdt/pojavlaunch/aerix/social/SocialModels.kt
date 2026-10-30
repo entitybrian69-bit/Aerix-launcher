@@ -22,25 +22,52 @@ data class SocialFriend(
     val nickname: String? = null,
     val pinned: Boolean = false,
     val mutualCount: Int = 0,
-    val mutualNames: List<String> = emptyList()
+    val mutualNames: List<String> = emptyList(),
+    val role: SocialRole? = null,
+    val presenceMode: SocialPresenceMode = SocialPresenceMode.ONLINE
 ) {
-    /** Online when a heartbeat arrived in the last two minutes. */
+    /** Online when a heartbeat arrived in the last two minutes and not appearing offline. */
     val online: Boolean
-        get() = lastSeenMs > 0L && System.currentTimeMillis() - lastSeenMs < 2 * 60 * 1000L
+        get() = isOnlineAt(System.currentTimeMillis())
+
+    fun isOnlineAt(nowMs: Long = System.currentTimeMillis()): Boolean =
+        presenceMode != SocialPresenceMode.INVISIBLE &&
+            lastSeenMs > 0L &&
+            nowMs - lastSeenMs < 2 * 60 * 1000L
+
+    /** Active availability mode when online (`ONLINE`, `IDLE`, or `DND`), or null when offline. */
+    fun activePresenceMode(nowMs: Long = System.currentTimeMillis()): SocialPresenceMode? =
+        if (isOnlineAt(nowMs)) presenceMode else null
+
+    /** Clean display name stripped of any wire role suffix. */
+    val cleanDisplayName: String
+        get() = SocialRole.stripRoleTags(displayName) ?: displayName
+
+    /** Resolved role from either explicit `role` or wire `displayName`. */
+    val effectiveRole: SocialRole?
+        get() = role ?: SocialRole.extract(displayName).second
 
     /** Primary display label honouring any user-set nickname first. */
     val effectiveName: String
-        get() = nickname?.takeIf { it.isNotBlank() } ?: displayName
+        get() = nickname?.takeIf { it.isNotBlank() } ?: cleanDisplayName
 
-    /** Friendly presence or relative last-seen copy ("Playing 1.21.4 · 34 mods" or "Last seen 2 h ago"). */
+    /** Friendly presence or relative last-seen copy ("Do Not Disturb · Playing 1.21.4" or "Last seen 2 h ago"). */
     fun presenceSummary(nowMs: Long = System.currentTimeMillis()): String {
         if (pendingIncoming) return "Sent you a friend request"
         if (pendingOutgoing) return "Friend request pending"
-        val rich = statusLine?.trim()?.takeIf { it.isNotEmpty() }
-        if (online) {
-            return rich
+        val parsed = SocialPresenceCodec.parse(statusLine, presenceMode.key)
+        val cleanRich = parsed.customText?.takeIf { it.isNotEmpty() }
+        if (isOnlineAt(nowMs)) {
+            val detail = cleanRich
                 ?: mcVersion?.takeIf { it.isNotBlank() }?.let { "Playing $it" }
-                ?: if (lookingToPlay) "Online · Looking to play" else "Online"
+                ?: if (lookingToPlay) "Looking to play" else null
+            return when (parsed.mode) {
+                SocialPresenceMode.DND -> if (detail != null) "Do Not Disturb · $detail" else "Do Not Disturb"
+                SocialPresenceMode.IDLE -> if (detail != null) "Idle · $detail" else "Idle"
+                else -> detail?.let {
+                    if (it == "Looking to play") "Online · Looking to play" else it
+                } ?: "Online"
+            }
         }
         return formatLastSeen(lastSeenMs, nowMs)
     }
@@ -77,11 +104,16 @@ data class SocialMessage(
     val attachmentUrl: String? = null,
     val partyId: String? = null,
     val senderName: String? = null,
+    val senderRole: SocialRole? = null,
     val pendingOffline: Boolean = false,
     val localTempId: String? = null
 ) {
     val isRead: Boolean get() = readAtMs > 0L
     val isEdited: Boolean get() = editedAtMs > 0L
+    val cleanSenderName: String?
+        get() = SocialRole.stripRoleTags(senderName) ?: senderName
+    val effectiveSenderRole: SocialRole?
+        get() = senderRole ?: SocialRole.extract(senderName).second
 }
 
 data class SocialPartyMember(
@@ -91,14 +123,22 @@ data class SocialPartyMember(
     val avatarUrl: String?,
     val isHost: Boolean = false,
     val online: Boolean = false,
-    val statusLine: String? = null
-)
+    val statusLine: String? = null,
+    val role: SocialRole? = null,
+    val presenceMode: SocialPresenceMode = SocialPresenceMode.ONLINE
+) {
+    val cleanName: String
+        get() = SocialRole.stripRoleTags(username) ?: username
+    val effectiveRole: SocialRole?
+        get() = role ?: SocialRole.extract(username).second
+}
 
 data class SocialParty(
     val id: String,
     val hostId: String,
     val hostName: String,
     val hostAvatar: String? = null,
+    val hostRole: SocialRole? = null,
     val title: String,
     val instanceName: String? = null,
     val versionId: String? = null,
@@ -115,6 +155,10 @@ data class SocialParty(
     val createdAtMs: Long = 0L,
     val members: List<SocialPartyMember> = emptyList()
 ) {
+    val cleanHostName: String
+        get() = SocialRole.stripRoleTags(hostName) ?: hostName
+    val effectiveHostRole: SocialRole?
+        get() = hostRole ?: SocialRole.extract(hostName).second
     fun isExpired(nowMs: Long = System.currentTimeMillis()): Boolean =
         expiresAtMs in 1..nowMs
 
@@ -152,6 +196,7 @@ data class SocialPartyInvite(
     val fromName: String,
     val fromMcUsername: String? = null,
     val fromAvatar: String? = null,
+    val fromRole: SocialRole? = null,
     val partyTitle: String,
     val instanceName: String? = null,
     val versionId: String? = null,
@@ -168,6 +213,11 @@ data class SocialPartyInvite(
 ) {
     fun isExpired(nowMs: Long = System.currentTimeMillis()): Boolean =
         expiresAtMs in 1..nowMs
+
+    val cleanFromName: String
+        get() = SocialRole.stripRoleTags(fromName) ?: fromName
+    val effectiveFromRole: SocialRole?
+        get() = fromRole ?: SocialRole.extract(fromName).second
 }
 
 data class SocialSharedServer(
@@ -176,13 +226,19 @@ data class SocialSharedServer(
     val ownerName: String,
     val ownerMcUsername: String? = null,
     val ownerAvatar: String? = null,
+    val ownerRole: SocialRole? = null,
     val name: String,
     val address: String,
     val mcVersion: String? = null,
     val loader: String? = null,
     val description: String? = null,
     val createdAtMs: Long = System.currentTimeMillis()
-)
+) {
+    val cleanOwnerName: String
+        get() = SocialRole.stripRoleTags(ownerName) ?: ownerName
+    val effectiveOwnerRole: SocialRole?
+        get() = ownerRole ?: SocialRole.extract(ownerName).second
+}
 
 data class SocialBlockedUser(
     val userId: String,
@@ -190,8 +246,14 @@ data class SocialBlockedUser(
     val username: String? = null,
     val mcUsername: String? = null,
     val avatarUrl: String? = null,
+    val role: SocialRole? = null,
     val createdAtMs: Long = 0L
-)
+) {
+    val cleanName: String
+        get() = SocialRole.stripRoleTags(name) ?: name
+    val effectiveRole: SocialRole?
+        get() = role ?: SocialRole.extract(name).second
+}
 
 data class SocialRecentPlayer(
     val userId: String,
@@ -200,13 +262,20 @@ data class SocialRecentPlayer(
     val mcUsername: String? = null,
     val avatarUrl: String? = null,
     val contextLabel: String,
-    val seenAtMs: Long
-)
+    val seenAtMs: Long,
+    val role: SocialRole? = null
+) {
+    val cleanName: String
+        get() = SocialRole.stripRoleTags(name) ?: name
+    val effectiveRole: SocialRole?
+        get() = role ?: SocialRole.extract(name).second
+}
 
 data class SocialJoinToast(
     val id: String,
     val friendId: String,
     val friendName: String,
+    val friendRole: SocialRole? = null,
     val mcUsername: String?,
     val mcVersion: String,
     val statusLine: String?,
@@ -214,7 +283,12 @@ data class SocialJoinToast(
     val serverAddress: String? = null,
     val partyId: String? = null,
     val createdAtMs: Long = System.currentTimeMillis()
-)
+) {
+    val cleanFriendName: String
+        get() = SocialRole.stripRoleTags(friendName) ?: friendName
+    val effectiveFriendRole: SocialRole?
+        get() = friendRole ?: SocialRole.extract(friendName).second
+}
 
 data class SocialSearchHit(
     val messageId: Long,

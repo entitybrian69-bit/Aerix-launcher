@@ -242,12 +242,15 @@ private fun PartyCard(
                         if (isHost) SocialTag("Host", accent)
                         if (party.isPublic) SocialTag("LFG", AerixSurface.success)
                     }
-                    Text(
-                        "Hosted by ${party.hostName} · ${party.remainingText()}",
+                    SocialNameWithRole(
+                        name = party.cleanHostName,
+                        role = party.effectiveHostRole,
                         fontSize = 11.5.sp,
+                        fontWeight = FontWeight.Medium,
                         color = AerixSurface.textMuted,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        compactBadge = true,
+                        prefixText = "Hosted by",
+                        suffixText = "· ${party.remainingText()}"
                     )
                 }
                 SocialTag("${party.memberCount}/${party.maxMembers} players", accent)
@@ -599,15 +602,28 @@ fun PartyDetailDialog(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            SocialRemoteImage(
-                                url = member.avatarUrl,
-                                fallbackIcon = R.drawable.aerix_ic_person_outlined,
-                                modifier = Modifier.size(30.dp),
-                                shape = CircleShape
-                            )
+                            Box(contentAlignment = Alignment.BottomEnd) {
+                                SocialRemoteImage(
+                                    url = member.avatarUrl,
+                                    fallbackIcon = R.drawable.aerix_ic_person_outlined,
+                                    modifier = Modifier.size(30.dp),
+                                    shape = CircleShape
+                                )
+                                SocialStatusDot(
+                                    mode = if (member.online) member.presenceMode else null,
+                                    size = 9.dp
+                                )
+                            }
                             Column(modifier = Modifier.weight(1f)) {
                                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    Text(member.username, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold, color = AerixSurface.textPrimary)
+                                    SocialNameWithRole(
+                                        name = member.cleanName,
+                                        role = member.effectiveRole,
+                                        fontSize = 12.5.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        compactBadge = true,
+                                        modifier = Modifier.weight(1f, fill = false)
+                                    )
                                     if (member.isHost) SocialTag("Host", accent)
                                 }
                                 member.statusLine?.takeIf { it.isNotBlank() }?.let {
@@ -652,8 +668,14 @@ fun PartyDetailDialog(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
-                                Text(friend.effectiveName, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = AerixSurface.textPrimary)
-                                Text(friend.presenceSummary(), fontSize = 10.5.sp, color = AerixSurface.textMuted, maxLines = 1)
+                                SocialNameWithRole(
+                                    name = friend.effectiveName,
+                                    role = friend.effectiveRole,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    compactBadge = true
+                                )
+                                Text(friend.presenceSummary(), fontSize = 10.5.sp, color = presenceModeColor(friend.activePresenceMode()), maxLines = 1)
                             }
                             SocialButton(
                                 label = if (alreadySent) "Invited ✓" else "Invite",
@@ -798,7 +820,16 @@ fun SocialLfgBoardSection(
                                 )
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(party.title, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = AerixSurface.textPrimary)
-                                    Text("Host: ${party.hostName} · ${party.remainingText()}", fontSize = 11.sp, color = AerixSurface.textMuted)
+                                    SocialNameWithRole(
+                                        name = party.cleanHostName,
+                                        role = party.effectiveHostRole,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = AerixSurface.textMuted,
+                                        compactBadge = true,
+                                        prefixText = "Host:",
+                                        suffixText = "· ${party.remainingText()}"
+                                    )
                                 }
                                 SocialTag("${party.memberCount}/${party.maxMembers}", AerixThemeManager.currentAccent())
                             }
@@ -935,12 +966,14 @@ fun SocialServerHubSection(
                                     srv.mcVersion?.takeIf { it.isNotBlank() }?.let { SocialTag(it, AerixThemeManager.currentAccent()) }
                                     srv.loader?.takeIf { it.isNotBlank() }?.let { SocialTag(it, AerixSurface.textSecondary) }
                                 }
-                                Text(
-                                    "${srv.address} · shared by ${srv.ownerName}",
+                                SocialNameWithRole(
+                                    name = srv.cleanOwnerName,
+                                    role = srv.effectiveOwnerRole,
                                     fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.Medium,
                                     color = AerixSurface.textSecondary,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
+                                    compactBadge = true,
+                                    prefixText = "${srv.address} · shared by"
                                 )
                                 srv.description?.takeIf { it.isNotBlank() }?.let {
                                     Text(it, fontSize = 11.sp, color = AerixSurface.textMuted, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -1120,13 +1153,13 @@ fun SocialJoinToastBanner(
                 )
             }
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    "${toast.friendName} started ${toast.mcVersion} · Join?",
+                SocialNameWithRole(
+                    name = toast.cleanFriendName,
+                    role = toast.effectiveFriendRole,
                     fontSize = 12.5.sp,
                     fontWeight = FontWeight.Bold,
-                    color = AerixSurface.textPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    compactBadge = true,
+                    suffixText = "started ${toast.mcVersion} · Join?"
                 )
                 toast.statusLine?.takeIf { it.isNotBlank() }?.let {
                     Text(it, fontSize = 10.5.sp, color = AerixSurface.textMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)

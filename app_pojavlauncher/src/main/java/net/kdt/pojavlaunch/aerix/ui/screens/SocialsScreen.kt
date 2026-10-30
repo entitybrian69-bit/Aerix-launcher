@@ -97,6 +97,8 @@ import net.kdt.pojavlaunch.aerix.components.liquidGlass
 import net.kdt.pojavlaunch.aerix.social.SocialBackend
 import net.kdt.pojavlaunch.aerix.social.SocialFriend
 import net.kdt.pojavlaunch.aerix.social.SocialParty
+import net.kdt.pojavlaunch.aerix.social.SocialPresenceCodec
+import net.kdt.pojavlaunch.aerix.social.SocialPresenceMode
 import net.kdt.pojavlaunch.aerix.social.SocialProfile
 import net.kdt.pojavlaunch.aerix.social.SocialRealtime
 import net.kdt.pojavlaunch.aerix.theme.AerixMetrics
@@ -144,8 +146,13 @@ fun SocialsScreen(activity: FragmentActivity, onExit: () -> Unit = {}) {
     var activePartyChatId by remember { mutableStateOf<String?>(null) }
     var profileOpen by remember { mutableStateOf(false) }
     var profileUser by remember { mutableStateOf<String?>(null) }
+    var statusDialogOpen by remember { mutableStateOf(false) }
     val signedIn = SocialBackend.signedIn
     val motion = ThemeMotion.rememberEnabled()
+
+    if (statusDialogOpen && signedIn) {
+        SocialStatusDialog(onDismiss = { statusDialogOpen = false })
+    }
 
     LaunchedEffect(Unit) {
         SocialBackend.attach(activity)
@@ -226,6 +233,7 @@ fun SocialsScreen(activity: FragmentActivity, onExit: () -> Unit = {}) {
                 tab = picked
             },
             onExit = onExit,
+            onChangeStatus = { statusDialogOpen = true },
             onProfile = {
                 SocialBackend.deferOnboardingForSession()
                 activeDmFriendId = null
@@ -360,7 +368,8 @@ fun SocialsScreen(activity: FragmentActivity, onExit: () -> Unit = {}) {
                                 onOpenProfile = { uname ->
                                     profileUser = uname
                                     profileOpen = true
-                                }
+                                },
+                                onOpenChangeStatus = { statusDialogOpen = true }
                             )
                             SocialTab.MESSAGES -> SocialMessagesHubPage(
                                 activity = activity,
@@ -402,6 +411,7 @@ private fun SocialSidebar(
     inSubScreen: Boolean,
     onTab: (SocialTab) -> Unit,
     onExit: () -> Unit,
+    onChangeStatus: () -> Unit,
     onProfile: () -> Unit
 ) {
     val accent = AerixThemeManager.currentAccent()
@@ -490,18 +500,26 @@ private fun SocialSidebar(
         Spacer(Modifier.weight(1f))
 
         if (signedIn) {
+            val myMode = SocialBackend.myPresenceMode
+            val statusColor = presenceModeColor(myMode)
+            Box(
+                modifier = Modifier
+                    .size(28.dp)
+                    .clip(CircleShape)
+                    .background(statusColor.copy(alpha = 0.16f))
+                    .border(BorderStroke(AerixSpacing.hairline, statusColor.copy(alpha = 0.7f)), CircleShape)
+                    .clickable(role = Role.Button, onClick = onChangeStatus)
+                    .semantics { contentDescription = "Change status (${myMode.label})" },
+                contentAlignment = Alignment.Center
+            ) {
+                SocialStatusDot(mode = myMode, size = 10.dp, borderWidth = 1.dp)
+            }
             Box(
                 contentAlignment = Alignment.BottomEnd,
                 modifier = Modifier.clickable(role = Role.Button, onClick = onProfile)
             ) {
                 SocialHead(SocialBackend.mcUsername ?: PojavAccountBridge.current?.username, 32)
-                Box(
-                    modifier = Modifier
-                        .size(10.dp)
-                        .clip(CircleShape)
-                        .background(if (SocialRealtime.isConnected) AerixSurface.success else AerixSurface.warning)
-                        .border(1.5.dp, AerixSurface.canvas, CircleShape)
-                )
+                SocialStatusDot(mode = myMode, size = 10.dp, borderWidth = 1.5.dp)
             }
         }
     }
@@ -755,7 +773,8 @@ private enum class FriendsSubTab(val label: String) {
 private fun SocialFriendsPage(
     activity: FragmentActivity,
     onOpenChat: (SocialFriend) -> Unit,
-    onOpenProfile: (String?) -> Unit
+    onOpenProfile: (String?) -> Unit,
+    onOpenChangeStatus: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
     val accent = AerixThemeManager.currentAccent()
@@ -781,6 +800,56 @@ private fun SocialFriendsPage(
     }
 
     Column(modifier = Modifier.fillMaxSize().padding(AerixSpacing.lg), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        // Signed-in player's own identity + 1-tap Change Status bar
+        val myMode = SocialBackend.myPresenceMode
+        val myName = SocialBackend.myEffectiveDisplayName()
+        val myRole = SocialBackend.myRole
+        SocialPanel(Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onOpenChangeStatus() }
+                    .padding(horizontal = 12.dp, vertical = 9.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Box(
+                    contentAlignment = Alignment.BottomEnd,
+                    modifier = Modifier.clickable { onOpenProfile(null) }
+                ) {
+                    val myAvatar = SocialBackend.myProfile?.avatarUrl
+                    if (!myAvatar.isNullOrBlank()) {
+                        SocialRemoteImage(
+                            url = myAvatar,
+                            fallbackIcon = R.drawable.aerix_ic_person_outlined,
+                            modifier = Modifier.size(36.dp),
+                            shape = CircleShape
+                        )
+                    } else {
+                        SocialHead(SocialBackend.mcUsername ?: PojavAccountBridge.current?.username, 36)
+                    }
+                    SocialStatusDot(mode = myMode, size = 10.dp)
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    SocialNameWithRole(
+                        name = myName,
+                        role = myRole,
+                        fontSize = 13.5.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = SocialBackend.myStatusSummary(),
+                        fontSize = 11.sp,
+                        color = presenceModeColor(myMode),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                SocialSmallButton("Change Status", false, onClick = onOpenChangeStatus)
+                SocialSmallButton("Profile", false) { onOpenProfile(null) }
+            }
+        }
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -899,7 +968,12 @@ private fun SocialFriendsPage(
                                 shape = CircleShape
                             )
                             Column(modifier = Modifier.weight(1f)) {
-                                Text(match.displayName, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = AerixSurface.textPrimary)
+                                SocialNameWithRole(
+                                    name = match.displayName,
+                                    role = match.role,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
                                 match.username?.let { Text("@$it", fontSize = 11.sp, color = AerixSurface.textMuted) }
                             }
                             SocialSmallButton("Add Friend", true) {
@@ -1009,7 +1083,12 @@ private fun SocialFriendsPage(
                                         shape = CircleShape
                                     )
                                     Column(modifier = Modifier.weight(1f)) {
-                                        Text(rp.name, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = AerixSurface.textPrimary)
+                                        SocialNameWithRole(
+                                            name = rp.cleanName,
+                                            role = rp.effectiveRole,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
                                         Text(
                                             "${rp.contextLabel} · ${SocialFriend.formatLastSeen(rp.seenAtMs)}",
                                             fontSize = 11.sp,
@@ -1060,7 +1139,12 @@ private fun SocialFriendsPage(
                                         shape = CircleShape
                                     )
                                     Column(modifier = Modifier.weight(1f)) {
-                                        Text(b.name, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = AerixSurface.textPrimary)
+                                        SocialNameWithRole(
+                                            name = b.cleanName,
+                                            role = b.effectiveRole,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
                                         Text("Messages and requests blocked server-side", fontSize = 11.sp, color = AerixSurface.textMuted)
                                     }
                                     SocialSmallButton("Unblock", false) {
@@ -1210,28 +1294,19 @@ private fun FriendQoLRow(
                 } else {
                     SocialHead(friend.mcUsername, 38)
                 }
-                Box(
-                    modifier = Modifier
-                        .size(11.dp)
-                        .clip(CircleShape)
-                        .background(if (friend.online) AerixSurface.success else AerixSurface.textMuted)
-                        .border(1.5.dp, AerixSurface.canvas, CircleShape)
-                )
+                SocialStatusDot(mode = friend.activePresenceMode(), size = 11.dp, borderWidth = 1.5.dp)
             }
 
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(
-                        friend.effectiveName,
+                    SocialNameWithRole(
+                        name = friend.effectiveName,
+                        role = friend.effectiveRole,
                         fontSize = 13.5.sp,
                         fontWeight = FontWeight.Bold,
-                        color = AerixSurface.textPrimary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        suffixText = if (!friend.nickname.isNullOrBlank()) "(${friend.cleanDisplayName})" else null,
+                        modifier = Modifier.weight(1f, fill = false)
                     )
-                    if (!friend.nickname.isNullOrBlank()) {
-                        Text("(${friend.displayName})", fontSize = 10.5.sp, color = AerixSurface.textMuted, maxLines = 1)
-                    }
                     if (friend.pinned) {
                         Icon(
                             painter = painterResource(R.drawable.aerix_ic_favorite_filled),
@@ -1247,7 +1322,7 @@ private fun FriendQoLRow(
                 Text(
                     friend.presenceSummary(),
                     fontSize = 11.sp,
-                    color = if (friend.online) AerixSurface.success else AerixSurface.textMuted,
+                    color = presenceModeColor(friend.activePresenceMode()),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -1418,19 +1493,28 @@ private fun SocialMessagesHubPage(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            if (!friend.avatarUrl.isNullOrBlank()) {
-                                SocialRemoteImage(
-                                    url = friend.avatarUrl,
-                                    fallbackIcon = R.drawable.aerix_ic_person_outlined,
-                                    modifier = Modifier.size(36.dp),
-                                    shape = CircleShape
-                                )
-                            } else {
-                                SocialHead(friend.mcUsername, 36)
+                            Box(contentAlignment = Alignment.BottomEnd) {
+                                if (!friend.avatarUrl.isNullOrBlank()) {
+                                    SocialRemoteImage(
+                                        url = friend.avatarUrl,
+                                        fallbackIcon = R.drawable.aerix_ic_person_outlined,
+                                        modifier = Modifier.size(36.dp),
+                                        shape = CircleShape
+                                    )
+                                } else {
+                                    SocialHead(friend.mcUsername, 36)
+                                }
+                                SocialStatusDot(mode = friend.activePresenceMode(), size = 10.dp)
                             }
                             Column(modifier = Modifier.weight(1f)) {
                                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    Text(friend.effectiveName, fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = AerixSurface.textPrimary)
+                                    SocialNameWithRole(
+                                        name = friend.effectiveName,
+                                        role = friend.effectiveRole,
+                                        fontSize = 13.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.weight(1f, fill = false)
+                                    )
                                     if (friend.online && friend.joinable) SocialTag("Joinable", AerixSurface.success)
                                 }
                                 Text(
@@ -1438,8 +1522,7 @@ private fun SocialMessagesHubPage(
                                     fontSize = 11.sp,
                                     color = when {
                                         typer != null -> accent
-                                        friend.online -> AerixSurface.success
-                                        else -> AerixSurface.textMuted
+                                        else -> presenceModeColor(friend.activePresenceMode())
                                     },
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
@@ -1564,11 +1647,12 @@ private fun SocialActivityPage(
                                         shape = CircleShape
                                     )
                                     Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            "${inv.fromName} invited you to \"${inv.partyTitle}\"",
+                                        SocialNameWithRole(
+                                            name = inv.cleanFromName,
+                                            role = inv.effectiveFromRole,
                                             fontSize = 13.5.sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = AerixSurface.textPrimary
+                                            suffixText = "invited you to \"${inv.partyTitle}\""
                                         )
                                         Text(
                                             listOfNotNull(inv.mcVersion, inv.loader, inv.instanceName).joinToString(" · ").ifEmpty { "Minecraft session" },
@@ -1611,7 +1695,12 @@ private fun SocialActivityPage(
                             ) {
                                 SocialHead(friend.mcUsername, 36)
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Text(friend.displayName, fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = AerixSurface.textPrimary)
+                                    SocialNameWithRole(
+                                        name = friend.cleanDisplayName,
+                                        role = friend.effectiveRole,
+                                        fontSize = 13.5.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
                                     val mutualLine = if (friend.mutualCount > 0) {
                                         val preview = friend.mutualNames.take(3).joinToString(", ")
                                         if (preview.isNotEmpty()) "${friend.mutualCount} mutual friends: $preview"
@@ -1649,7 +1738,12 @@ private fun SocialActivityPage(
                             ) {
                                 SocialHead(friend.mcUsername, 32)
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Text(friend.displayName, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AerixSurface.textPrimary)
+                                    SocialNameWithRole(
+                                        name = friend.cleanDisplayName,
+                                        role = friend.effectiveRole,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
                                     Text("Waiting for response", fontSize = 11.sp, color = AerixSurface.textMuted)
                                 }
                                 SocialSmallButton("Cancel", false) {
@@ -1675,8 +1769,13 @@ private fun SocialSettingsPage(
     val scope = rememberCoroutineScope()
     val accent = AerixThemeManager.currentAccent()
     val myProf = SocialBackend.myProfile
-    var customStatus by remember(myProf?.statusText) { mutableStateOf(myProf?.statusText.orEmpty()) }
-    var lookingToPlay by remember(myProf?.lookingToPlay) { mutableStateOf(myProf?.lookingToPlay ?: false) }
+    var selectedMode by remember(SocialBackend.myPresenceMode) { mutableStateOf(SocialBackend.myPresenceMode) }
+    var customStatus by remember(SocialBackend.myCustomStatus, myProf?.statusText) {
+        mutableStateOf(SocialBackend.myCustomStatus ?: myProf?.statusText.orEmpty())
+    }
+    var lookingToPlay by remember(SocialBackend.myLookingToPlay, myProf?.lookingToPlay) {
+        mutableStateOf(SocialBackend.myLookingToPlay)
+    }
 
     Column(
         modifier = Modifier
@@ -1693,11 +1792,19 @@ private fun SocialSettingsPage(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                SocialHead(SocialBackend.mcUsername ?: launcherName, 42)
+                Box(contentAlignment = Alignment.BottomEnd) {
+                    SocialHead(SocialBackend.mcUsername ?: launcherName, 42)
+                    SocialStatusDot(mode = SocialBackend.myPresenceMode, size = 12.dp)
+                }
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(SocialBackend.email ?: "Signed in", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = AerixSurface.textPrimary)
+                    SocialNameWithRole(
+                        name = SocialBackend.myEffectiveDisplayName(),
+                        role = SocialBackend.myRole,
+                        fontSize = 14.5.sp,
+                        fontWeight = FontWeight.ExtraBold
+                    )
                     Text(
-                        "Plays as ${SocialBackend.mcUsername ?: launcherName ?: "no account selected"}",
+                        "${SocialBackend.email ?: "Signed in"} · Plays as ${SocialBackend.mcUsername ?: launcherName ?: "no account selected"}",
                         fontSize = 11.5.sp,
                         color = AerixSurface.textSecondary
                     )
@@ -1712,18 +1819,77 @@ private fun SocialSettingsPage(
         }
 
         SocialPanel(Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Custom Status & Presence", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = AerixSurface.textPrimary)
+            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                Text("Change Status & Presence", fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = AerixSurface.textPrimary)
                 Text(
-                    "While Minecraft runs, Rich Presence automatically shows your active version and mod count (e.g. \"Playing 1.21.4 · 34 mods\").",
+                    "Choose your availability mode and custom status line. While Minecraft runs, Rich Presence automatically shares your active version and mod count unless you Appear Offline.",
                     fontSize = 11.sp,
                     color = AerixSurface.textMuted
                 )
-                SocialGlassInput(
-                    value = customStatus,
-                    onValueChange = { customStatus = it.take(60) },
-                    label = "Launcher status line (optional)"
-                )
+
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    SocialPresenceMode.values().forEach { candidate ->
+                        val active = selectedMode == candidate
+                        val tint = presenceModeColor(candidate)
+                        Row(
+                            modifier = Modifier
+                                .clip(CircleShape)
+                                .background(if (active) tint.copy(alpha = 0.2f) else AerixSurface.panelTrack)
+                                .border(
+                                    BorderStroke(AerixSpacing.hairline, if (active) tint else AerixSurface.borderSoft),
+                                    CircleShape
+                                )
+                                .clickable { selectedMode = candidate }
+                                .padding(horizontal = 11.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            SocialStatusDot(mode = candidate, size = 9.dp, borderWidth = 1.dp)
+                            Text(
+                                candidate.label,
+                                fontSize = 11.5.sp,
+                                fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
+                                color = if (active) tint else AerixSurface.textPrimary
+                            )
+                        }
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    SocialGlassInput(
+                        value = customStatus,
+                        onValueChange = { customStatus = it.take(52) },
+                        label = "Custom status message (optional)",
+                        modifier = Modifier.weight(1f)
+                    )
+                    if (customStatus.isNotEmpty()) {
+                        SocialButton("Clear", filled = false) { customStatus = "" }
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    SocialPresenceCodec.presets.forEach { preset ->
+                        FilterChipPill(
+                            label = preset.label,
+                            selected = customStatus.equals(preset.statusText, ignoreCase = true) && selectedMode == preset.mode
+                        ) {
+                            customStatus = preset.statusText
+                            selectedMode = preset.mode
+                            preset.lookingToPlay?.let { lookingToPlay = it }
+                        }
+                    }
+                }
+
                 Row(
                     modifier = Modifier.clickable { lookingToPlay = !lookingToPlay },
                     verticalAlignment = Alignment.CenterVertically
@@ -1735,10 +1901,26 @@ private fun SocialSettingsPage(
                     )
                     Text("Show \"Looking to play\" badge when online", fontSize = 12.sp, color = AerixSurface.textPrimary)
                 }
-                SocialButton("Save Presence", filled = true) {
-                    scope.launch {
-                        SocialBackend.setPresence(customStatus.ifBlank { null }, lookingToPlay)
-                        Toast.makeText(activity, "Presence updated", Toast.LENGTH_SHORT).show()
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SocialButton("Save Status", filled = true) {
+                        scope.launch {
+                            SocialBackend.updateMyStatus(
+                                mode = selectedMode,
+                                customStatus = customStatus.trim().ifEmpty { null },
+                                looking = lookingToPlay
+                            )
+                            Toast.makeText(activity, "Status updated to ${selectedMode.label}", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                    SocialButton("Reset Online", filled = false) {
+                        selectedMode = SocialPresenceMode.ONLINE
+                        customStatus = ""
+                        lookingToPlay = false
+                        scope.launch {
+                            SocialBackend.updateMyStatus(SocialPresenceMode.ONLINE, null, false)
+                            Toast.makeText(activity, "Status reset to Online", Toast.LENGTH_SHORT).show()
+                        }
                     }
                 }
             }

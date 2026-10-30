@@ -68,6 +68,7 @@ import androidx.fragment.app.FragmentActivity
 import kotlinx.coroutines.launch
 import net.kdt.pojavlaunch.R
 import net.kdt.pojavlaunch.aerix.social.SocialBackend
+import net.kdt.pojavlaunch.aerix.social.SocialPresenceMode
 import net.kdt.pojavlaunch.aerix.social.SocialProfile
 import net.kdt.pojavlaunch.aerix.social.SocialRanks
 import net.kdt.pojavlaunch.aerix.theme.AerixRadii
@@ -236,6 +237,15 @@ private fun ProfileCard(
     onReport: () -> Unit
 ) {
     val accent = AerixThemeManager.currentAccent()
+    var statusDialogOpen by remember { mutableStateOf(false) }
+    val effectiveRole = if (isMe) (SocialBackend.myRole ?: profile?.role) else profile?.role
+
+    if (statusDialogOpen && isMe) {
+        SocialStatusDialog(
+            onDismiss = { statusDialogOpen = false }
+        )
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -244,15 +254,23 @@ private fun ProfileCard(
     ) {
         SocialPageBar(
             title = profile?.displayName ?: if (loading) "Profile" else "Profile",
+            role = effectiveRole,
             onBack = onBack,
             trailing = {
                 if (isMe) {
-                    val incomplete = profile?.onboarded != true
-                    SocialButton(
-                        label = if (incomplete) "Finish setup" else "Edit profile",
-                        filled = incomplete,
-                        onClick = onEdit
-                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        SocialButton(
+                            label = "Change status",
+                            filled = false,
+                            onClick = { statusDialogOpen = true }
+                        )
+                        val incomplete = profile?.onboarded != true
+                        SocialButton(
+                            label = if (incomplete) "Finish setup" else "Edit profile",
+                            filled = incomplete,
+                            onClick = onEdit
+                        )
+                    }
                 }
             }
         )
@@ -291,18 +309,28 @@ private fun ProfileCard(
                     modifier = Modifier.fillMaxSize(),
                     shape = CircleShape
                 )
+                val avatarMode = when {
+                    isMe -> SocialBackend.myPresenceMode
+                    profile.online -> profile.presenceMode
+                    else -> null
+                }
+                SocialStatusDot(
+                    mode = avatarMode,
+                    size = 15.dp,
+                    borderWidth = 2.dp,
+                    modifier = Modifier.align(Alignment.BottomEnd)
+                )
             }
         }
         Spacer(Modifier.height(AerixSpacing.lgPlus))
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    profile.displayName,
+                SocialNameWithRole(
+                    name = profile.displayName,
+                    role = effectiveRole,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.ExtraBold,
-                    color = AerixSurface.textPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    color = AerixSurface.textPrimary
                 )
                 Text(
                     profile.handle.ifBlank { "@" + (profile.mcUsername ?: "player") },
@@ -316,15 +344,37 @@ private fun ProfileCard(
         }
 
         Spacer(Modifier.height(6.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(AerixSpacing.xs)) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(AerixSpacing.xs),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             if (!profile.country.isNullOrBlank()) SocialTag(profile.country, AerixSurface.glassBlue)
-            if (profile.lookingToPlay) SocialTag("Looking to play", AerixSurface.success)
-            if (profile.online) SocialTag("Online", AerixSurface.success)
-            else if (profile.away) SocialTag("Away", AerixSurface.warning)
+            val activeLooking = if (isMe) SocialBackend.myLookingToPlay else profile.lookingToPlay
+            if (activeLooking && (!isMe || SocialBackend.myPresenceMode != SocialPresenceMode.INVISIBLE)) {
+                SocialTag("Looking to play", AerixSurface.success)
+            }
+            if (isMe) {
+                val myMode = SocialBackend.myPresenceMode
+                Box(modifier = Modifier.clickable { statusDialogOpen = true }) {
+                    SocialTag(myMode.label, presenceModeColor(myMode))
+                }
+            } else if (profile.online) {
+                SocialTag(profile.presenceMode.label, presenceModeColor(profile.presenceMode))
+            } else if (profile.away) {
+                SocialTag("Away", AerixSurface.warning)
+            } else {
+                SocialTag("Offline", AerixSurface.textMuted)
+            }
         }
-        if (!profile.statusText.isNullOrBlank()) {
+        val shownStatus = if (isMe) (SocialBackend.myCustomStatus ?: profile.statusText) else profile.statusText
+        if (!shownStatus.isNullOrBlank()) {
             Spacer(Modifier.height(6.dp))
-            Text(profile.statusText, fontSize = 11.sp, color = AerixSurface.textSecondary)
+            Text(
+                shownStatus,
+                fontSize = 11.5.sp,
+                color = AerixSurface.textSecondary,
+                modifier = if (isMe) Modifier.clickable { statusDialogOpen = true } else Modifier
+            )
         }
 
         Spacer(Modifier.height(AerixSpacing.sm))
@@ -612,7 +662,9 @@ private fun SocialPeoplePage(
                     name = friend.effectiveName,
                     mcUsername = friend.mcUsername,
                     avatarUrl = friend.avatarUrl,
-                    lastSeenMs = friend.lastSeenMs
+                    lastSeenMs = friend.lastSeenMs,
+                    role = friend.effectiveRole,
+                    presenceMode = friend.presenceMode
                 )
             }
         }
@@ -648,7 +700,8 @@ private fun SocialPeoplePage(
                     avatarUrl = person.avatarUrl,
                     title = person.displayName,
                     subtitle = person.handle.ifBlank { person.mcUsername },
-                    badge = if (person.online) "Online" else null,
+                    badge = if (person.online) person.presenceMode.label else null,
+                    role = person.role,
                     onClick = { person.username?.let { openUser = it } }
                 )
             }

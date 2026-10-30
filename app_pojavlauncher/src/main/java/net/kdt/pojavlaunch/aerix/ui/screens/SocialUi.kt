@@ -33,6 +33,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -41,11 +42,14 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -56,6 +60,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -73,17 +78,25 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import net.kdt.pojavlaunch.R
 import net.kdt.pojavlaunch.aerix.components.liquidGlass
+import net.kdt.pojavlaunch.aerix.social.SocialBackend
+import net.kdt.pojavlaunch.aerix.social.SocialPresenceCodec
+import net.kdt.pojavlaunch.aerix.social.SocialPresenceMode
+import net.kdt.pojavlaunch.aerix.social.SocialRole
 import net.kdt.pojavlaunch.aerix.theme.AerixMetrics
 import net.kdt.pojavlaunch.aerix.theme.AerixRadii
 import net.kdt.pojavlaunch.aerix.theme.AerixSpacing
 import net.kdt.pojavlaunch.aerix.theme.AerixSurface
 import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
+import net.kdt.pojavlaunch.aerix.theme.ThemeMotion
 import java.io.ByteArrayOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
@@ -283,12 +296,406 @@ fun SocialTag(text: String, tint: Color = AerixThemeManager.currentAccent(), mod
     }
 }
 
+/**
+ * Verified account badge:
+ * - `(OWNER)` in crimson red (`entitybrian69@gmail.com`)
+ * - `(CO-OWNER)` in sky blue (`kushaladhikari982648@gmail.com`)
+ */
+@Composable
+fun SocialRoleBadge(
+    role: SocialRole,
+    compact: Boolean = false,
+    modifier: Modifier = Modifier
+) {
+    val baseColor = Color(role.colorArgb)
+    val motion = ThemeMotion.rememberEnabled()
+    val liveColor = ThemeMotion.rememberPulse(baseColor, active = true, enabled = motion)
+    Box(
+        modifier = modifier
+            .clip(CircleShape)
+            .background(baseColor.copy(alpha = 0.18f))
+            .border(BorderStroke(1.dp, liveColor.copy(alpha = 0.72f)), CircleShape)
+            .padding(
+                horizontal = if (compact) 6.dp else 8.dp,
+                vertical = if (compact) 1.5.dp else 2.5.dp
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = role.tag,
+            fontSize = if (compact) 9.5.sp else 10.5.sp,
+            fontWeight = FontWeight.ExtraBold,
+            color = baseColor,
+            maxLines = 1
+        )
+    }
+}
+
+/**
+ * Renders any player's chosen name with `(OWNER)` (crimson red) or `(CO-OWNER)` (sky blue)
+ * automatically placed right beside it. Also auto-extracts wire role suffixes as a fallback.
+ */
+@Composable
+fun SocialNameWithRole(
+    name: String,
+    role: SocialRole? = null,
+    fontSize: TextUnit = 13.5.sp,
+    fontWeight: FontWeight = FontWeight.Bold,
+    color: Color = AerixSurface.textPrimary,
+    compactBadge: Boolean = false,
+    prefixText: String? = null,
+    prefixColor: Color = AerixSurface.textMuted,
+    suffixText: String? = null,
+    suffixColor: Color = AerixSurface.textMuted,
+    modifier: Modifier = Modifier
+) {
+    val (extractedClean, extractedRole) = remember(name, role) {
+        val pair = SocialRole.extract(name)
+        (pair.first ?: name) to (role ?: pair.second)
+    }
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(5.dp)
+    ) {
+        if (!prefixText.isNullOrEmpty()) {
+            Text(
+                text = prefixText,
+                fontSize = fontSize,
+                fontWeight = FontWeight.Normal,
+                color = prefixColor,
+                maxLines = 1
+            )
+        }
+        Text(
+            text = extractedClean,
+            fontSize = fontSize,
+            fontWeight = fontWeight,
+            color = color,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false)
+        )
+        if (extractedRole != null) {
+            SocialRoleBadge(role = extractedRole, compact = compactBadge)
+        }
+        if (!suffixText.isNullOrBlank()) {
+            Text(
+                text = suffixText,
+                fontSize = (fontSize.value - 2f).coerceAtLeast(9.5f).sp,
+                color = suffixColor,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+fun presenceModeColor(mode: SocialPresenceMode?): Color = when (mode) {
+    SocialPresenceMode.ONLINE -> AerixSurface.success
+    SocialPresenceMode.IDLE -> AerixSurface.warning
+    SocialPresenceMode.DND -> AerixSurface.danger
+    SocialPresenceMode.INVISIBLE, null -> AerixSurface.textMuted
+}
+
+@Composable
+fun SocialStatusDot(
+    mode: SocialPresenceMode?,
+    size: Dp = 10.dp,
+    borderWidth: Dp = 1.5.dp,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .size(size)
+            .clip(CircleShape)
+            .background(presenceModeColor(mode))
+            .border(borderWidth, AerixSurface.canvas, CircleShape)
+    )
+}
+
+/**
+ * Full AerixSurface liquid-glass Change Status dialog:
+ * lets players switch between Online / Idle / Do Not Disturb / Appear Offline, set or clear
+ * a custom status message, pick one-tap gaming presets, and toggle Looking to Play.
+ */
+@Composable
+fun SocialStatusDialog(
+    onDismiss: () -> Unit,
+    onSaved: (() -> Unit)? = null
+) {
+    val scope = rememberCoroutineScope()
+    val accent = AerixThemeManager.currentAccent()
+    var mode by remember { mutableStateOf(SocialBackend.myPresenceMode) }
+    var customText by remember { mutableStateOf(SocialBackend.myCustomStatus.orEmpty()) }
+    var lookingToPlay by remember { mutableStateOf(SocialBackend.myLookingToPlay) }
+    var saving by remember { mutableStateOf(false) }
+
+    val myName = SocialBackend.myEffectiveDisplayName()
+    val myRole = SocialBackend.myRole
+    val previewSummary = remember(mode, customText, lookingToPlay) {
+        val clean = customText.trim().takeIf { it.isNotEmpty() }
+        when (mode) {
+            SocialPresenceMode.INVISIBLE -> if (clean != null) "Appear Offline · $clean (hidden from others)" else "Appear Offline (others see Offline)"
+            SocialPresenceMode.DND -> if (clean != null) "Do Not Disturb · $clean" else "Do Not Disturb"
+            SocialPresenceMode.IDLE -> if (clean != null) "Idle · $clean" else "Idle"
+            SocialPresenceMode.ONLINE -> clean ?: if (lookingToPlay) "Online · Looking to play" else "Online"
+        }
+    }
+
+    Dialog(onDismissRequest = onDismiss) {
+        SocialPanel(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 560.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(16.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "Change Status",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = AerixSurface.textPrimary
+                        )
+                        Text(
+                            "Synced live across friends, parties and in-game socials",
+                            fontSize = 11.sp,
+                            color = AerixSurface.textMuted
+                        )
+                    }
+                    SocialIconBubble(R.drawable.aerix_ic_close, "Close", onDismiss)
+                }
+
+                // Live self preview card
+                Surface(
+                    shape = RoundedCornerShape(AerixRadii.control),
+                    color = AerixSurface.panelTrack,
+                    border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.BottomEnd) {
+                            SocialRemoteImage(
+                                url = SocialBackend.myProfile?.avatarUrl,
+                                fallbackIcon = R.drawable.aerix_ic_person_outlined,
+                                modifier = Modifier.size(38.dp),
+                                shape = CircleShape
+                            )
+                            SocialStatusDot(mode = mode, size = 11.dp)
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            SocialNameWithRole(
+                                name = myName,
+                                role = myRole,
+                                fontSize = 13.5.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = previewSummary,
+                                fontSize = 11.sp,
+                                color = presenceModeColor(mode),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+
+                // Availability mode grid/list
+                Text(
+                    "Availability",
+                    fontSize = 11.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = AerixSurface.textSecondary
+                )
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    SocialPresenceMode.values().forEach { candidate ->
+                        val active = mode == candidate
+                        val tint = presenceModeColor(candidate)
+                        val rowShape = RoundedCornerShape(AerixRadii.controlSmall)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(rowShape)
+                                .background(
+                                    if (active) tint.copy(alpha = 0.16f)
+                                    else AerixSurface.panelTrack.copy(alpha = 0.65f)
+                                )
+                                .border(
+                                    BorderStroke(
+                                        if (active) 1.2.dp else AerixSpacing.hairline,
+                                        if (active) tint.copy(alpha = 0.8f) else AerixSurface.borderSoft
+                                    ),
+                                    rowShape
+                                )
+                                .clickable { mode = candidate }
+                                .padding(horizontal = 11.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            SocialStatusDot(mode = candidate, size = 11.dp)
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    candidate.label,
+                                    fontSize = 12.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (active) tint else AerixSurface.textPrimary
+                                )
+                                Text(
+                                    candidate.description,
+                                    fontSize = 10.5.sp,
+                                    color = AerixSurface.textMuted,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            if (active) {
+                                SocialTag("Active", tint)
+                            }
+                        }
+                    }
+                }
+
+                // Custom status text + Clear
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    SocialGlassInput(
+                        value = customText,
+                        onValueChange = { customText = it.take(52) },
+                        label = "Custom status message (optional)",
+                        modifier = Modifier.weight(1f)
+                    )
+                    if (customText.isNotEmpty()) {
+                        SocialButton("Clear", filled = false) { customText = "" }
+                    }
+                }
+
+                // Quick presets
+                Text(
+                    "Quick Presets",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = AerixSurface.textMuted
+                )
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    SocialPresenceCodec.presets.forEach { preset ->
+                        val selected = customText.equals(preset.statusText, ignoreCase = true) && mode == preset.mode
+                        Box(
+                            modifier = Modifier
+                                .clip(CircleShape)
+                                .background(if (selected) accent.copy(alpha = 0.22f) else AerixSurface.panelTrack)
+                                .border(
+                                    BorderStroke(AerixSpacing.hairline, if (selected) accent else AerixSurface.borderSoft),
+                                    CircleShape
+                                )
+                                .clickable {
+                                    customText = preset.statusText
+                                    mode = preset.mode
+                                    preset.lookingToPlay?.let { lookingToPlay = it }
+                                }
+                                .padding(horizontal = 10.dp, vertical = 5.dp)
+                        ) {
+                            Text(
+                                preset.label,
+                                fontSize = 11.sp,
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                color = if (selected) accent else AerixSurface.textSecondary
+                            )
+                        }
+                    }
+                }
+
+                // Looking to play pill
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    SocialButton(
+                        label = if (lookingToPlay) "Looking to play ✓" else "Looking to play",
+                        filled = lookingToPlay
+                    ) {
+                        lookingToPlay = !lookingToPlay
+                    }
+                    Text(
+                        "${customText.length}/52 chars",
+                        fontSize = 10.5.sp,
+                        color = AerixSurface.textMuted
+                    )
+                }
+
+                // Actions
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    SocialButton(
+                        label = "Reset Online",
+                        filled = false,
+                        enabled = !saving && (mode != SocialPresenceMode.ONLINE || customText.isNotEmpty() || lookingToPlay)
+                    ) {
+                        saving = true
+                        scope.launch {
+                            SocialBackend.updateMyStatus(SocialPresenceMode.ONLINE, null, false)
+                            saving = false
+                            onSaved?.invoke()
+                            onDismiss()
+                        }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        SocialButton("Cancel", filled = false, enabled = !saving, onClick = onDismiss)
+                        SocialButton(
+                            label = if (saving) "Saving…" else "Save Status",
+                            filled = true,
+                            enabled = !saving
+                        ) {
+                            saving = true
+                            scope.launch {
+                                SocialBackend.updateMyStatus(
+                                    mode = mode,
+                                    customStatus = customText.trim().ifEmpty { null },
+                                    looking = lookingToPlay
+                                )
+                                saving = false
+                                onSaved?.invoke()
+                                onDismiss()
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 /** The bar at the top of a profile page: back arrow, title, optional action on the right. */
 @Composable
 fun SocialPageBar(
     title: String,
     onBack: (() -> Unit)?,
     modifier: Modifier = Modifier,
+    role: SocialRole? = null,
     trailing: @Composable () -> Unit = {}
 ) {
     Row(
@@ -299,13 +706,12 @@ fun SocialPageBar(
         if (onBack != null) {
             SocialIconBubble(R.drawable.aerix_ic_arrow_back, "Back", onBack)
         }
-        Text(
-            title,
+        SocialNameWithRole(
+            name = title,
+            role = role,
             fontSize = 18.sp,
             fontWeight = FontWeight.ExtraBold,
             color = AerixSurface.textPrimary,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f)
         )
         trailing()
@@ -347,6 +753,7 @@ fun SocialPersonRow(
     title: String,
     subtitle: String?,
     badge: String? = null,
+    role: SocialRole? = null,
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null
 ) {
@@ -382,13 +789,13 @@ fun SocialPersonRow(
             )
             Spacer(Modifier.width(10.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    title,
+                SocialNameWithRole(
+                    name = title,
+                    role = role,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = AerixSurface.textPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    compactBadge = true
                 )
                 if (!subtitle.isNullOrBlank()) {
                     Text(

@@ -69,10 +69,15 @@ import net.kdt.pojavlaunch.aerix.ui.screens.PartyDetailDialog
 import net.kdt.pojavlaunch.aerix.ui.screens.SocialButton
 import net.kdt.pojavlaunch.aerix.ui.screens.SocialConversationPanel
 import net.kdt.pojavlaunch.aerix.ui.screens.SocialIconBubble
+import net.kdt.pojavlaunch.aerix.ui.screens.SocialNameWithRole
 import net.kdt.pojavlaunch.aerix.ui.screens.SocialPanel
 import net.kdt.pojavlaunch.aerix.ui.screens.SocialPartiesSection
 import net.kdt.pojavlaunch.aerix.ui.screens.SocialRemoteImage
+import net.kdt.pojavlaunch.aerix.ui.screens.SocialRoleBadge
+import net.kdt.pojavlaunch.aerix.ui.screens.SocialStatusDialog
+import net.kdt.pojavlaunch.aerix.ui.screens.SocialStatusDot
 import net.kdt.pojavlaunch.aerix.ui.screens.SocialTag
+import net.kdt.pojavlaunch.aerix.ui.screens.presenceModeColor
 
 private enum class InGameSocialTab(val label: String) {
     CHATS("Chats"),
@@ -92,6 +97,11 @@ fun GameSocialsScreen(accent: Color, onBack: () -> Unit) {
     var tab by remember { mutableStateOf(InGameSocialTab.CHATS) }
     var selectedFriendId by remember { mutableStateOf<String?>(null) }
     var selectedPartyId by remember { mutableStateOf<String?>(null) }
+    var statusDialogOpen by remember { mutableStateOf(false) }
+
+    if (statusDialogOpen && ready) {
+        SocialStatusDialog(onDismiss = { statusDialogOpen = false })
+    }
 
     val friends = SocialBackend.friends
     val acceptedFriends = friends.filter { !it.pendingIncoming && !it.pendingOutgoing }
@@ -106,6 +116,7 @@ fun GameSocialsScreen(accent: Color, onBack: () -> Unit) {
         if (ready) {
             SocialBackend.rememberMinecraftName(PojavAccountBridge.current?.username)
             SocialBackend.loadProfile()
+            SocialBackend.loadMyProfile()
             SocialBackend.refreshFriends()
             SocialBackend.refreshParties()
             SocialBackend.refreshPartyInvites()
@@ -155,6 +166,9 @@ fun GameSocialsScreen(accent: Color, onBack: () -> Unit) {
                             fontWeight = FontWeight.ExtraBold,
                             color = AerixSurface.textPrimary
                         )
+                        SocialBackend.myRole?.let { role ->
+                            SocialRoleBadge(role = role, compact = true)
+                        }
                         if (SocialRealtime.isConnected) {
                             SocialTag("Live", AerixSurface.success)
                         }
@@ -171,8 +185,32 @@ fun GameSocialsScreen(accent: Color, onBack: () -> Unit) {
                     )
                 }
 
-                // Segmented glass tabs
+                // Segmented glass tabs + 1-tap Status pill
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    if (ready) {
+                        val myMode = SocialBackend.myPresenceMode
+                        val modeTint = presenceModeColor(myMode)
+                        val statusPillShape = RoundedCornerShape(AerixRadii.pill)
+                        Row(
+                            modifier = Modifier
+                                .clip(statusPillShape)
+                                .background(modeTint.copy(alpha = 0.16f))
+                                .border(BorderStroke(AerixSpacing.hairline, modeTint.copy(alpha = 0.7f)), statusPillShape)
+                                .clickable(role = Role.Button) { statusDialogOpen = true }
+                                .padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            SocialStatusDot(mode = myMode, size = 8.dp, borderWidth = 1.dp)
+                            Text(
+                                myMode.label,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = modeTint,
+                                maxLines = 1
+                            )
+                        }
+                    }
                     InGameSocialTab.values().forEach { item ->
                         val selected = tab == item
                         val label = when (item) {
@@ -347,20 +385,24 @@ fun GameSocialsScreen(accent: Color, onBack: () -> Unit) {
                                                     modifier = Modifier.size(28.dp),
                                                     shape = CircleShape
                                                 )
-                                                Box(
-                                                    modifier = Modifier
-                                                        .size(8.dp)
-                                                        .clip(CircleShape)
-                                                        .background(if (friend.online) AerixSurface.success else AerixSurface.textMuted)
-                                                        .border(1.dp, AerixSurface.canvas, CircleShape)
+                                                SocialStatusDot(
+                                                    mode = friend.activePresenceMode(),
+                                                    size = 8.dp,
+                                                    borderWidth = 1.dp
                                                 )
                                             }
                                             Column(modifier = Modifier.weight(1f)) {
-                                                Text(friend.effectiveName, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = AerixSurface.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                                SocialNameWithRole(
+                                                    name = friend.effectiveName,
+                                                    role = friend.effectiveRole,
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    compactBadge = true
+                                                )
                                                 Text(
                                                     friend.presenceSummary(),
                                                     fontSize = 10.sp,
-                                                    color = if (friend.online) AerixSurface.success else AerixSurface.textMuted,
+                                                    color = presenceModeColor(friend.activePresenceMode()),
                                                     maxLines = 1,
                                                     overflow = TextOverflow.Ellipsis
                                                 )
@@ -465,7 +507,14 @@ fun GameSocialsScreen(accent: Color, onBack: () -> Unit) {
                                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                                     ) {
                                         Column(modifier = Modifier.weight(1f)) {
-                                            Text("${inv.fromName} invited you to \"${inv.partyTitle}\"", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                            SocialNameWithRole(
+                                                name = inv.cleanFromName,
+                                                role = inv.effectiveFromRole,
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                compactBadge = true,
+                                                suffixText = "invited you to \"${inv.partyTitle}\""
+                                            )
                                             Text(listOfNotNull(inv.mcVersion, inv.loader).joinToString(" · "), fontSize = 11.sp, color = AerixSurface.textMuted)
                                         }
                                         SocialButton("Accept", filled = true) {
@@ -493,7 +542,14 @@ fun GameSocialsScreen(accent: Color, onBack: () -> Unit) {
                                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                                     ) {
                                         Column(modifier = Modifier.weight(1f)) {
-                                            Text("${req.displayName} sent a friend request", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                            SocialNameWithRole(
+                                                name = req.cleanDisplayName,
+                                                role = req.effectiveRole,
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                compactBadge = true,
+                                                suffixText = "sent a friend request"
+                                            )
                                             if (req.mutualCount > 0) {
                                                 Text("${req.mutualCount} mutual friends", fontSize = 11.sp, color = accent)
                                             }

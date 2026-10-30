@@ -69,7 +69,9 @@ import kotlinx.coroutines.launch
 import net.kdt.pojavlaunch.R
 import net.kdt.pojavlaunch.aerix.social.SocialBackend
 import net.kdt.pojavlaunch.aerix.social.SocialCountries
+import net.kdt.pojavlaunch.aerix.social.SocialPresenceCodec
 import net.kdt.pojavlaunch.aerix.social.SocialProfile
+import net.kdt.pojavlaunch.aerix.social.SocialRole
 import net.kdt.pojavlaunch.aerix.theme.AerixRadii
 import net.kdt.pojavlaunch.aerix.theme.AerixSpacing
 import net.kdt.pojavlaunch.aerix.theme.AerixSurface
@@ -77,14 +79,14 @@ import net.kdt.pojavlaunch.aerix.theme.AerixSurface
 /** Fields the form owns while it is open, so a half-filled profile is never written by accident. */
 private class ProfileDraft(profile: SocialProfile?) {
     var username by mutableStateOf(profile?.username.orEmpty())
-    var name by mutableStateOf(profile?.name.orEmpty())
+    var name by mutableStateOf(SocialRole.stripRoleTags(profile?.name).orEmpty())
     var country by mutableStateOf(profile?.country.orEmpty())
     var bio by mutableStateOf(profile?.bio.orEmpty())
     var avatarUrl by mutableStateOf(profile?.avatarUrl)
     var bannerUrl by mutableStateOf(profile?.bannerUrl)
     var skinUrl by mutableStateOf(profile?.skinUrl)
     var capeUrl by mutableStateOf(profile?.capeUrl)
-    var statusText by mutableStateOf(profile?.statusText.orEmpty())
+    var statusText by mutableStateOf(SocialPresenceCodec.stripModePrefix(profile?.statusText).orEmpty())
     var lookingToPlay by mutableStateOf(profile?.lookingToPlay ?: false)
 }
 
@@ -344,10 +346,38 @@ private fun IdentityStep(draft: ProfileDraft, usernameLocked: Boolean, profile: 
     )
     SocialGlassInput(
         value = draft.name,
-        onValueChange = { draft.name = it.take(40) },
+        onValueChange = { draft.name = (SocialRole.stripRoleTags(it) ?: it.trimStart()).take(40) },
         label = "Name",
         supporting = "Shown above your username"
     )
+    val myRole = SocialBackend.myRole
+    if (myRole != null) {
+        val previewName = draft.name.trim().ifEmpty {
+            draft.username.trim().ifEmpty {
+                SocialBackend.mcUsername ?: "Your Name"
+            }
+        }
+        SocialPanel(Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    "Live tag:",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = AerixSurface.textMuted
+                )
+                SocialNameWithRole(
+                    name = previewName,
+                    role = myRole,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    }
     SocialGlassInput(
         value = draft.country,
         onValueChange = { draft.country = it.take(40) },

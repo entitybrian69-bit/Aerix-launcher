@@ -80,6 +80,7 @@ object SocialRealtime {
         fun onProfileUpdated(record: JsonObject)
         fun onBroadcastPartyChat(payload: JsonObject)
         fun onBroadcastPartySignal(payload: JsonObject)
+        fun onBroadcastPresence(payload: JsonObject)
     }
 
     @Volatile var listener: Listener? = null
@@ -189,6 +190,30 @@ object SocialRealtime {
             addProperty("ts", System.currentTimeMillis())
         }
         sendBroadcast("party_signal", inner)
+    }
+
+    /** Broadcasts an immediate presence / status / role update so online friends see it instantly. */
+    fun sendPresenceBroadcast(
+        modeKey: String,
+        wireStatus: String?,
+        lookingToPlay: Boolean,
+        appearOffline: Boolean,
+        displayName: String? = null,
+        roleKey: String? = null
+    ) {
+        val me = currentUserId ?: return
+        if (!isConnected) return
+        val inner = JsonObject().apply {
+            addProperty("userId", me)
+            addProperty("mode", modeKey)
+            if (wireStatus != null) addProperty("statusLine", wireStatus)
+            addProperty("lookingToPlay", lookingToPlay)
+            addProperty("appearOffline", appearOffline)
+            displayName?.let { addProperty("displayName", it) }
+            roleKey?.let { addProperty("role", it) }
+            addProperty("ts", System.currentTimeMillis())
+        }
+        sendBroadcast("presence_update", inner)
     }
 
     private fun sendBroadcast(eventName: String, data: JsonObject) {
@@ -381,6 +406,7 @@ object SocialRealtime {
                         "typing" -> handleIncomingTyping(inner)
                         "party_chat" -> listener?.onBroadcastPartyChat(inner)
                         "party_signal" -> listener?.onBroadcastPartySignal(inner)
+                        "presence_update" -> listener?.onBroadcastPresence(inner)
                     }
                 }
             }
