@@ -375,7 +375,7 @@ object SocialBackend {
                 val atMs = payload.longOr("atMs", System.currentTimeMillis())
                 val replyTo = payload.get("replyTo")?.takeIf { !it.isJsonNull }?.asLong
                 val attachmentUrl = payload.stringOrNull("attachmentUrl")
-                val editedAtMs = payload.get("editedAtMs")?.takeIf { !it.isJsonNull }?.asLong
+                val editedAtMs = payload.longOr("editedAtMs", 0L)
 
                 val incoming = SocialMessage(
                     id = msgId,
@@ -649,8 +649,8 @@ object SocialBackend {
                 val prev = list[matchIdx]
                 list[matchIdx] = enriched.copy(
                     id = if (enriched.id > 0L) enriched.id else prev.id,
-                    readAtMs = maxOf(prev.readAtMs ?: 0L, enriched.readAtMs ?: 0L).takeIf { it > 0L },
-                    editedAtMs = maxOf(prev.editedAtMs ?: 0L, enriched.editedAtMs ?: 0L).takeIf { it > 0L },
+                    readAtMs = maxOf(prev.readAtMs, enriched.readAtMs),
+                    editedAtMs = maxOf(prev.editedAtMs, enriched.editedAtMs),
                     localTempId = enriched.localTempId ?: prev.localTempId,
                     pendingOffline = false
                 )
