@@ -15,6 +15,7 @@ import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 
 import net.kdt.pojavlaunch.aerix.bridge.PojavPluginBridge;
+import net.kdt.pojavlaunch.aerix.social.SocialBackend;
 import net.kdt.pojavlaunch.lifecycle.ContextExecutor;
 import net.kdt.pojavlaunch.mobileglues.MGApplication;
 import net.kdt.pojavlaunch.prefs.LauncherPreferences;
@@ -105,6 +106,11 @@ public class PojavApplication extends MGApplication {
 			startActivity(ferrorIntent);
 		}
 		initRendererPlugins();
+		try {
+			SocialBackend.attach(this);
+		} catch (Throwable t) {
+			Log.w("PojavApplication", "SocialBackend attach failed", t);
+		}
 	}
 
 	/**

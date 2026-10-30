@@ -25,8 +25,14 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -90,6 +96,7 @@ import net.kdt.pojavlaunch.aerix.components.liquidGlass
 import net.kdt.pojavlaunch.aerix.social.SocialBackend
 import net.kdt.pojavlaunch.aerix.social.SocialPresenceCodec
 import net.kdt.pojavlaunch.aerix.social.SocialPresenceMode
+import net.kdt.pojavlaunch.aerix.social.SocialRealtime
 import net.kdt.pojavlaunch.aerix.social.SocialRole
 import net.kdt.pojavlaunch.aerix.theme.AerixMetrics
 import net.kdt.pojavlaunch.aerix.theme.AerixRadii
@@ -97,9 +104,10 @@ import net.kdt.pojavlaunch.aerix.theme.AerixSpacing
 import net.kdt.pojavlaunch.aerix.theme.AerixSurface
 import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
 import net.kdt.pojavlaunch.aerix.theme.ThemeMotion
+import okhttp3.Request
 import java.io.ByteArrayOutputStream
-import java.net.HttpURLConnection
-import java.net.URL
+import kotlin.math.PI
+import kotlin.math.sin
 
 /** Pictures downloaded once per session: avatars and banners are asked for on every screen. */
 private val remoteImageCache = HashMap<String, ImageBitmap?>()
@@ -120,6 +128,7 @@ fun SocialRemoteImage(
     shape: Shape = CircleShape,
     contentScale: ContentScale = ContentScale.Crop
 ) {
+    val ctx = LocalContext.current
     var bitmap by remember(url) { mutableStateOf(remoteImageCache[url]) }
     LaunchedEffect(url) {
         if (url.isNullOrBlank()) {
@@ -133,14 +142,22 @@ fun SocialRemoteImage(
         }
         val loaded = withContext(Dispatchers.IO) {
             runCatching {
-                val connection = (URL(url).openConnection() as HttpURLConnection).apply {
-                    connectTimeout = 12000
-                    readTimeout = 15000
-                    instanceFollowRedirects = true
+                val bytes: ByteArray? = when {
+                    url.startsWith("content://") -> {
+                        ctx.contentResolver.openInputStream(Uri.parse(url))?.use { it.readBytes() }
+                    }
+                    url.startsWith("/") -> {
+                        java.io.File(url).takeIf { it.isFile }?.readBytes()
+                    }
+                    else -> {
+                        val req = Request.Builder().url(url).get().build()
+                        SocialRealtime.restClient.newCall(req).execute().use { resp ->
+                            if (!resp.isSuccessful) null else resp.body?.bytes()
+                        }
+                    }
                 }
-                val bytes = connection.inputStream.use { it.readBytes() }
-                connection.disconnect()
-                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+                if (bytes != null) BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+                else null
             }.getOrNull()
         }
         if (loaded != null) {
@@ -415,9 +432,178 @@ fun SocialStatusDot(
 }
 
 /**
+ * Messenger-style 3-dot staggered bouncing wave animation.
+ */
+@Composable
+fun SocialTypingDots(
+    color: Color = AerixThemeManager.currentAccent(),
+    dotSize: Dp = 5.5.dp,
+    bounceDp: Dp = 4.dp,
+    spacing: Dp = 3.5.dp,
+    modifier: Modifier = Modifier
+) {
+    val transition = rememberInfiniteTransition(label = "messengerTypingWave")
+    val phase by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1050, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "typingPhase"
+    )
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(spacing)
+    ) {
+        for (idx in 0..2) {
+            val shifted = ((phase - idx * 0.17f) % 1f + 1f) % 1f
+            val wave = if (shifted < 0.55f) {
+                sin((shifted / 0.55f) * PI).toFloat().coerceIn(0f, 1f)
+            } else {
+                0f
+            }
+            val scale = 0.80f + wave * 0.34f
+            val alpha = 0.42f + wave * 0.58f
+            Box(
+                modifier = Modifier
+                    .size(dotSize)
+                    .graphicsLayer {
+                        translationY = -wave * bounceDp.toPx()
+                        scaleX = scale
+                        scaleY = scale
+                        this.alpha = alpha
+                    }
+                    .clip(CircleShape)
+                    .background(color)
+            )
+        }
+    }
+}
+
+/**
+ * Compact rich-presence typing indicator row (`[• • •] sahilll is typing`) for headers and friend rows.
+ */
+@Composable
+fun SocialTypingIndicatorRow(
+    text: String,
+    tint: Color = AerixThemeManager.currentAccent(),
+    fontSize: TextUnit = 10.5.sp,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .clip(CircleShape)
+                .background(tint.copy(alpha = 0.16f))
+                .border(BorderStroke(AerixSpacing.hairline, tint.copy(alpha = 0.45f)), CircleShape)
+                .padding(horizontal = 6.dp, vertical = 4.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            SocialTypingDots(
+                color = tint,
+                dotSize = 4.5.dp,
+                bounceDp = 3.dp,
+                spacing = 2.8.dp
+            )
+        }
+        Text(
+            text = text,
+            fontSize = fontSize,
+            fontWeight = FontWeight.SemiBold,
+            color = tint,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+/**
+ * Full Messenger-style animated chat bubble shown at the bottom of the open conversation stream
+ * whenever the other player (or party member) is actively typing.
+ */
+@Composable
+fun SocialTypingChatBubble(
+    typerName: String,
+    avatarUrl: String? = null,
+    showNameCaption: Boolean = false,
+    modifier: Modifier = Modifier
+) {
+    val accent = AerixThemeManager.currentAccent()
+    val bubbleShape = RoundedCornerShape(
+        topStart = 16.dp,
+        topEnd = 16.dp,
+        bottomEnd = 16.dp,
+        bottomStart = 4.dp
+    )
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp),
+        verticalAlignment = Alignment.Bottom,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Box(contentAlignment = Alignment.BottomEnd) {
+            SocialRemoteImage(
+                url = avatarUrl,
+                fallbackIcon = R.drawable.aerix_ic_person_outlined,
+                modifier = Modifier.size(28.dp),
+                shape = CircleShape
+            )
+            SocialStatusDot(
+                mode = SocialPresenceMode.ONLINE,
+                size = 8.5.dp,
+                borderWidth = 1.dp
+            )
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            if (showNameCaption) {
+                Text(
+                    text = "$typerName is typing…",
+                    fontSize = 9.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = accent,
+                    modifier = Modifier.padding(start = 4.dp)
+                )
+            }
+            Surface(
+                shape = bubbleShape,
+                color = AerixSurface.panelRaised,
+                border = BorderStroke(AerixSpacing.hairline, accent.copy(alpha = 0.45f)),
+                modifier = Modifier.liquidGlass(
+                    shape = bubbleShape,
+                    tint = AerixSurface.panelGlassTint,
+                    strength = 0.85f,
+                    elevation = AerixMetrics.glassSubtleElevation
+                )
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    SocialTypingDots(
+                        color = accent,
+                        dotSize = 6.5.dp,
+                        bounceDp = 4.8.dp,
+                        spacing = 4.5.dp
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
  * Full AerixSurface liquid-glass Change Status dialog:
- * lets players switch between Online / Idle / Do Not Disturb / Appear Offline, set or clear
- * a custom status message, pick one-tap gaming presets, and toggle Looking to Play.
+ * supports BOTH **Auto (Smart)** status (Green in Launcher, Yellow in background, Offline without Wi-Fi)
+ * AND Manual availability override (`Online` / `Idle` / `Do Not Disturb` / `Appear Offline`),
+ * custom status message, quick gaming presets, Looking to Play, and Messenger Chat Sounds.
  */
 @Composable
 fun SocialStatusDialog(
@@ -426,20 +612,36 @@ fun SocialStatusDialog(
 ) {
     val scope = rememberCoroutineScope()
     val accent = AerixThemeManager.currentAccent()
+    var autoSelected by remember { mutableStateOf(SocialBackend.isAutoPresence) }
     var mode by remember { mutableStateOf(SocialBackend.myPresenceMode) }
     var customText by remember { mutableStateOf(SocialBackend.myCustomStatus.orEmpty()) }
     var lookingToPlay by remember { mutableStateOf(SocialBackend.myLookingToPlay) }
+    var soundsEnabled by remember { mutableStateOf(SocialBackend.chatSoundsEnabled) }
     var saving by remember { mutableStateOf(false) }
+
+    val networkOnline = SocialBackend.isNetworkAvailable
+    val inForeground = SocialBackend.isLauncherInForeground
+    val previewEffectiveMode: SocialPresenceMode? = when {
+        !networkOnline -> null
+        autoSelected -> if (inForeground) SocialPresenceMode.ONLINE else SocialPresenceMode.IDLE
+        else -> mode
+    }
 
     val myName = SocialBackend.myEffectiveDisplayName()
     val myRole = SocialBackend.myRole
-    val previewSummary = remember(mode, customText, lookingToPlay) {
-        val clean = customText.trim().takeIf { it.isNotEmpty() }
-        when (mode) {
-            SocialPresenceMode.INVISIBLE -> if (clean != null) "Appear Offline · $clean (hidden from others)" else "Appear Offline (others see Offline)"
-            SocialPresenceMode.DND -> if (clean != null) "Do Not Disturb · $clean" else "Do Not Disturb"
-            SocialPresenceMode.IDLE -> if (clean != null) "Idle · $clean" else "Idle"
-            SocialPresenceMode.ONLINE -> clean ?: if (lookingToPlay) "Online · Looking to play" else "Online"
+    val previewSummary = remember(autoSelected, mode, customText, lookingToPlay, networkOnline, inForeground) {
+        if (!networkOnline) {
+            "Offline · Wi-Fi disconnected"
+        } else {
+            val clean = customText.trim().takeIf { it.isNotEmpty() }
+            val activeMode = previewEffectiveMode ?: SocialPresenceMode.ONLINE
+            val suffix = if (autoSelected) " (Auto)" else ""
+            when (activeMode) {
+                SocialPresenceMode.INVISIBLE -> if (clean != null) "Appear Offline · $clean (hidden)" else "Appear Offline (others see Offline)"
+                SocialPresenceMode.DND -> if (clean != null) "Do Not Disturb · $clean" else "Do Not Disturb"
+                SocialPresenceMode.IDLE -> if (clean != null) "Idle$suffix · $clean" else "Idle$suffix"
+                SocialPresenceMode.ONLINE -> clean ?: if (lookingToPlay) "Online$suffix · Looking to play" else "Online$suffix"
+            }
         }
     }
 
@@ -447,7 +649,7 @@ fun SocialStatusDialog(
         SocialPanel(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(max = 560.dp)
+                .heightIn(max = 580.dp)
         ) {
             Column(
                 modifier = Modifier
@@ -468,7 +670,7 @@ fun SocialStatusDialog(
                             color = AerixSurface.textPrimary
                         )
                         Text(
-                            "Synced live across friends, parties and in-game socials",
+                            "Smart Auto presence or manual override — synced live",
                             fontSize = 11.sp,
                             color = AerixSurface.textMuted
                         )
@@ -495,7 +697,7 @@ fun SocialStatusDialog(
                                 modifier = Modifier.size(38.dp),
                                 shape = CircleShape
                             )
-                            SocialStatusDot(mode = mode, size = 11.dp)
+                            SocialStatusDot(mode = previewEffectiveMode, size = 11.dp)
                         }
                         Column(modifier = Modifier.weight(1f)) {
                             SocialNameWithRole(
@@ -507,7 +709,7 @@ fun SocialStatusDialog(
                             Text(
                                 text = previewSummary,
                                 fontSize = 11.sp,
-                                color = presenceModeColor(mode),
+                                color = presenceModeColor(previewEffectiveMode),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -515,16 +717,64 @@ fun SocialStatusDialog(
                     }
                 }
 
-                // Availability mode grid/list
+                // Availability mode: Auto (Smart) + Manual modes
                 Text(
-                    "Availability",
+                    "Availability Mode",
                     fontSize = 11.5.sp,
                     fontWeight = FontWeight.Bold,
                     color = AerixSurface.textSecondary
                 )
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    // 1. Smart Automatic mode
+                    val autoRowShape = RoundedCornerShape(AerixRadii.controlSmall)
+                    val autoTint = AerixSurface.success
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(autoRowShape)
+                            .background(
+                                if (autoSelected) autoTint.copy(alpha = 0.16f)
+                                else AerixSurface.panelTrack.copy(alpha = 0.65f)
+                            )
+                            .border(
+                                BorderStroke(
+                                    if (autoSelected) 1.2.dp else AerixSpacing.hairline,
+                                    if (autoSelected) autoTint.copy(alpha = 0.85f) else AerixSurface.borderSoft
+                                ),
+                                autoRowShape
+                            )
+                            .clickable { autoSelected = true }
+                            .padding(horizontal = 11.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        SocialStatusDot(
+                            mode = if (!networkOnline) null else if (inForeground) SocialPresenceMode.ONLINE else SocialPresenceMode.IDLE,
+                            size = 11.dp
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "Auto (Smart)",
+                                fontSize = 12.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (autoSelected) autoTint else AerixSurface.textPrimary
+                            )
+                            Text(
+                                "Green in Launcher · Yellow in background · Offline when Wi-Fi is off",
+                                fontSize = 10.5.sp,
+                                color = AerixSurface.textMuted,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        if (autoSelected) {
+                            SocialTag("Auto", autoTint)
+                        }
+                    }
+
+                    // 2. Manual override modes
                     SocialPresenceMode.values().forEach { candidate ->
-                        val active = mode == candidate
+                        val active = !autoSelected && mode == candidate
                         val tint = presenceModeColor(candidate)
                         val rowShape = RoundedCornerShape(AerixRadii.controlSmall)
                         Row(
@@ -542,7 +792,10 @@ fun SocialStatusDialog(
                                     ),
                                     rowShape
                                 )
-                                .clickable { mode = candidate }
+                                .clickable {
+                                    autoSelected = false
+                                    mode = candidate
+                                }
                                 .padding(horizontal = 11.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -550,7 +803,7 @@ fun SocialStatusDialog(
                             SocialStatusDot(mode = candidate, size = 11.dp)
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    candidate.label,
+                                    "${candidate.label} (Manual)",
                                     fontSize = 12.5.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = if (active) tint else AerixSurface.textPrimary
@@ -564,7 +817,7 @@ fun SocialStatusDialog(
                                 )
                             }
                             if (active) {
-                                SocialTag("Active", tint)
+                                SocialTag("Manual", tint)
                             }
                         }
                     }
@@ -599,7 +852,9 @@ fun SocialStatusDialog(
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     SocialPresenceCodec.presets.forEach { preset ->
-                        val selected = customText.equals(preset.statusText, ignoreCase = true) && mode == preset.mode
+                        val selected = !autoSelected &&
+                            customText.equals(preset.statusText, ignoreCase = true) &&
+                            mode == preset.mode
                         Box(
                             modifier = Modifier
                                 .clip(CircleShape)
@@ -610,6 +865,7 @@ fun SocialStatusDialog(
                                 )
                                 .clickable {
                                     customText = preset.statusText
+                                    autoSelected = false
                                     mode = preset.mode
                                     preset.lookingToPlay?.let { lookingToPlay = it }
                                 }
@@ -625,20 +881,29 @@ fun SocialStatusDialog(
                     }
                 }
 
-                // Looking to play pill
+                // Looking to play + Messenger sounds pills
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    SocialButton(
-                        label = if (lookingToPlay) "Looking to play ✓" else "Looking to play",
-                        filled = lookingToPlay
-                    ) {
-                        lookingToPlay = !lookingToPlay
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        SocialButton(
+                            label = if (lookingToPlay) "Looking to play ✓" else "Looking to play",
+                            filled = lookingToPlay
+                        ) {
+                            lookingToPlay = !lookingToPlay
+                        }
+                        SocialButton(
+                            label = if (soundsEnabled) "Chat Sounds ✓" else "Sounds Off",
+                            filled = soundsEnabled
+                        ) {
+                            soundsEnabled = !soundsEnabled
+                            SocialBackend.toggleChatSounds(soundsEnabled)
+                        }
                     }
                     Text(
-                        "${customText.length}/52 chars",
+                        "${customText.length}/52",
                         fontSize = 10.5.sp,
                         color = AerixSurface.textMuted
                     )
@@ -651,13 +916,13 @@ fun SocialStatusDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     SocialButton(
-                        label = "Reset Online",
+                        label = "Reset Auto",
                         filled = false,
-                        enabled = !saving && (mode != SocialPresenceMode.ONLINE || customText.isNotEmpty() || lookingToPlay)
+                        enabled = !saving && (!autoSelected || customText.isNotEmpty() || lookingToPlay)
                     ) {
                         saving = true
                         scope.launch {
-                            SocialBackend.updateMyStatus(SocialPresenceMode.ONLINE, null, false)
+                            SocialBackend.enableAutoStatus(null, false)
                             saving = false
                             onSaved?.invoke()
                             onDismiss()
@@ -672,11 +937,20 @@ fun SocialStatusDialog(
                         ) {
                             saving = true
                             scope.launch {
-                                SocialBackend.updateMyStatus(
-                                    mode = mode,
-                                    customStatus = customText.trim().ifEmpty { null },
-                                    looking = lookingToPlay
-                                )
+                                val cleanMsg = customText.trim().ifEmpty { null }
+                                if (autoSelected) {
+                                    SocialBackend.enableAutoStatus(
+                                        customStatus = cleanMsg,
+                                        looking = lookingToPlay
+                                    )
+                                } else {
+                                    SocialBackend.updateMyStatus(
+                                        mode = mode,
+                                        customStatus = cleanMsg,
+                                        looking = lookingToPlay,
+                                        manualOverride = true
+                                    )
+                                }
                                 saving = false
                                 onSaved?.invoke()
                                 onDismiss()

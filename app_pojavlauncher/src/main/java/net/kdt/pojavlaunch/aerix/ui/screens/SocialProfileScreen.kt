@@ -310,7 +310,7 @@ private fun ProfileCard(
                     shape = CircleShape
                 )
                 val avatarMode = when {
-                    isMe -> SocialBackend.myPresenceMode
+                    isMe -> SocialBackend.effectivePresenceMode
                     profile.online -> profile.presenceMode
                     else -> null
                 }
@@ -349,14 +349,19 @@ private fun ProfileCard(
             verticalAlignment = Alignment.CenterVertically
         ) {
             if (!profile.country.isNullOrBlank()) SocialTag(profile.country, AerixSurface.glassBlue)
+            val myEffMode = SocialBackend.effectivePresenceMode
             val activeLooking = if (isMe) SocialBackend.myLookingToPlay else profile.lookingToPlay
-            if (activeLooking && (!isMe || SocialBackend.myPresenceMode != SocialPresenceMode.INVISIBLE)) {
+            if (activeLooking && (!isMe || (myEffMode != null && myEffMode != SocialPresenceMode.INVISIBLE))) {
                 SocialTag("Looking to play", AerixSurface.success)
             }
             if (isMe) {
-                val myMode = SocialBackend.myPresenceMode
+                val tagLabel = when {
+                    myEffMode == null -> "Offline"
+                    SocialBackend.isAutoPresence -> "${myEffMode.label} (Auto)"
+                    else -> myEffMode.label
+                }
                 Box(modifier = Modifier.clickable { statusDialogOpen = true }) {
-                    SocialTag(myMode.label, presenceModeColor(myMode))
+                    SocialTag(tagLabel, presenceModeColor(myEffMode))
                 }
             } else if (profile.online) {
                 SocialTag(profile.presenceMode.label, presenceModeColor(profile.presenceMode))

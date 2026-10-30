@@ -9,10 +9,18 @@
 
 package net.kdt.pojavlaunch.aerix.social
 
+import android.app.Activity
+import android.app.ActivityManager
+import android.app.Application
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
 import android.net.Uri
+import android.os.Build
+import android.os.Bundle
 import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -32,10 +40,11 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import net.kdt.pojavlaunch.instances.Instance
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.ByteArrayOutputStream
 import java.io.File
-import java.net.HttpURLConnection
-import java.net.URL
 import java.net.URLEncoder
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -43,6 +52,10 @@ import java.util.Locale
 import java.util.TimeZone
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
+import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.roundToInt
 
@@ -112,6 +125,50 @@ object SocialBackend {
     var myLookingToPlay by mutableStateOf(false)
         private set
 
+    /**
+     * When `true` (default), status updates automatically:
+     * - **Green (`Online`)** while actively using the Launcher or playing Minecraft.
+     * - **Yellow (`Idle`)** when the Launcher moves to the background.
+     * - **Offline** immediately when Wi-Fi / internet connectivity turns off.
+     * Players can also switch to Manual mode anytime via Change Status.
+     */
+    var isAutoPresence by mutableStateOf(true)
+        private set
+
+    /** Live network state driven by [ConnectivityManager.NetworkCallback]. */
+    var isNetworkAvailable by mutableStateOf(true)
+        private set
+
+    /** Live foreground/background state driven by [Application.ActivityLifecycleCallbacks]. */
+    var isLauncherInForeground by mutableStateOf(true)
+        private set
+
+    /** Messenger-style sound effects preference (typing, peer typing, sent, received, seen). */
+    var chatSoundsEnabled by mutableStateOf(true)
+        private set
+
+    /**
+     * Effective availability mode right now:
+     * - `null` when Wi-Fi / internet is off (renders Offline immediately).
+     * - `ONLINE` (Green) in Auto mode when foreground/in-game, `IDLE` (Yellow) in Auto mode when backgrounded.
+     * - [myPresenceMode] when the player selected a Manual override.
+     */
+    val effectivePresenceMode: SocialPresenceMode?
+        get() = SocialPresenceCodec.resolveEffectiveMode(
+            isNetworkAvailable = isNetworkAvailable,
+            isAutoPresence = isAutoPresence,
+            isInForeground = isLauncherInForeground,
+            isPlayingGame = activeGameStatusLine != null,
+            manualMode = myPresenceMode
+        )
+
+    /** Whether our own status dot should render as visibly online (non-grey). */
+    val isSelfVisiblyOnline: Boolean
+        get() {
+            val eff = effectivePresenceMode ?: return false
+            return eff != SocialPresenceMode.INVISIBLE
+        }
+
     /** Verified role derived strictly from the signed-in account email (`OWNER` or `CO_OWNER`). */
     val myRole: SocialRole?
         get() = SocialRole.fromEmail(email) ?: myProfile?.role
@@ -123,15 +180,37 @@ object SocialBackend {
             ?: "Player"
 
     fun myStatusSummary(): String {
+        if (!isNetworkAvailable) return "Offline · Wi-Fi disconnected"
         val clean = myCustomStatus?.trim()?.takeIf { it.isNotEmpty() }
             ?: myProfile?.statusText?.let { SocialPresenceCodec.stripModePrefix(it) }
-        return when (myPresenceMode) {
+        val eff = effectivePresenceMode ?: return "Offline"
+        val autoSuffix = if (isAutoPresence) " (Auto)" else ""
+        return when (eff) {
             SocialPresenceMode.INVISIBLE -> if (clean != null) "Appear Offline · $clean" else "Appear Offline"
             SocialPresenceMode.DND -> if (clean != null) "Do Not Disturb · $clean" else "Do Not Disturb"
-            SocialPresenceMode.IDLE -> if (clean != null) "Idle · $clean" else "Idle"
+            SocialPresenceMode.IDLE -> if (clean != null) "Idle$autoSuffix · $clean" else "Idle$autoSuffix"
             SocialPresenceMode.ONLINE -> clean
-                ?: if (myLookingToPlay) "Online · Looking to play" else "Online"
+                ?: if (myLookingToPlay) "Online$autoSuffix · Looking to play" else "Online$autoSuffix"
         }
+    }
+
+    fun toggleChatSounds(enabled: Boolean) {
+        chatSoundsEnabled = enabled
+        prefs()?.edit()?.putBoolean("chat_sounds_enabled", enabled)?.apply()
+        if (enabled) {
+            SocialSoundEffects.playStatusChanged()
+        }
+    }
+
+    /** Tracks which conversation is currently visible on screen for instant read-receipts & sound routing. */
+    @Volatile var activeOpenPeerId: String? = null
+        private set
+    @Volatile var activeOpenPartyId: String? = null
+        private set
+
+    fun setOpenConversation(peerId: String? = null, partyId: String? = null) {
+        activeOpenPeerId = peerId
+        activeOpenPartyId = partyId
     }
 
     /** Combined badge count (unread DMs + incoming friend requests + pending party invites). */
@@ -163,12 +242,23 @@ object SocialBackend {
     @Volatile private var hasMutualFriendsRpc: Boolean? = null
     @Volatile private var hasLfgRpc: Boolean? = null
 
+    /** Live in-memory DM cache per peer userId for 0ms optimistic sends & instant open-chat delivery. */
+    private val liveDmCache = ConcurrentHashMap<String, MutableList<SocialMessage>>()
+    private val optimisticIdGenerator = AtomicLong(-1_000_000L)
+
     /** Ephemeral buffer of Realtime broadcast party messages (augments persisted messages). */
     private val broadcastPartyMessages = ConcurrentHashMap<String, MutableList<SocialMessage>>()
 
     /** Tracks each friend's previously observed mcVersion so join toasts fire only on fresh launches. */
     private val observedFriendVersions = ConcurrentHashMap<String, String>()
     private var initialFriendsSnapshotLoaded = false
+
+    /** Lifecycle & network monitors for smart automatic status. */
+    private val lifecycleHooked = AtomicBoolean(false)
+    private val networkHooked = AtomicBoolean(false)
+    private val startedActivities = AtomicInteger(0)
+    private var backgroundTransitionJob: Job? = null
+    private var presenceKeepAliveJob: Job? = null
 
     /** Active in-game rich presence state when running inside the `:game` process. */
     @Volatile private var activeGameStatusLine: String? = null
@@ -180,6 +270,12 @@ object SocialBackend {
         SocialRealtime.listener = object : SocialRealtime.Listener {
             override fun onRealtimeConnected() {
                 bgScope.launch {
+                    val eff = effectivePresenceMode
+                    SocialRealtime.trackPresence(
+                        modeKey = eff?.key ?: SocialPresenceMode.INVISIBLE.key,
+                        appearOffline = eff == null || eff == SocialPresenceMode.INVISIBLE
+                    )
+                    syncRichPresenceToServer()
                     flushOfflineOutbox()
                     unreadCount()
                     refreshFriends()
@@ -196,8 +292,7 @@ object SocialBackend {
                     } else if (body.startsWith(SocialEnvelopeCodec.PARTY_CHAT_PREFIX)) {
                         bgScope.launch(Dispatchers.Main) { partyMessageRevision++ }
                     } else {
-                        unreadCount()
-                        bgScope.launch(Dispatchers.Main) { messageRevision++ }
+                        handleMessageRecordFromPostgres(eventType, record)
                     }
                 }
             }
@@ -266,13 +361,119 @@ object SocialBackend {
                 }
             }
 
+            override fun onBroadcastDmChat(payload: JsonObject) {
+                val me = userId ?: return
+                val sender = payload.stringOrNull("sender") ?: return
+                val recipient = payload.stringOrNull("recipient") ?: return
+                if (sender != me && recipient != me) return
+                val peerId = if (sender == me) recipient else sender
+                if (blockedUsers.any { it.userId == peerId }) return
+
+                val msgId = payload.longOr("id", System.currentTimeMillis())
+                val tempId = payload.stringOrNull("tempId")
+                val body = payload.stringOrNull("body") ?: return
+                val atMs = payload.longOr("atMs", System.currentTimeMillis())
+                val replyTo = payload.get("replyTo")?.takeIf { !it.isJsonNull }?.asLong
+                val attachmentUrl = payload.stringOrNull("attachmentUrl")
+                val editedAtMs = payload.get("editedAtMs")?.takeIf { !it.isJsonNull }?.asLong
+
+                val incoming = SocialMessage(
+                    id = msgId,
+                    sender = sender,
+                    recipient = recipient,
+                    body = body,
+                    atMs = atMs,
+                    editedAtMs = editedAtMs,
+                    replyTo = replyTo,
+                    attachmentUrl = attachmentUrl,
+                    localTempId = tempId
+                )
+
+                val isBrandNew = upsertIntoDmCache(peerId, incoming)
+                bgScope.launch(Dispatchers.Main) {
+                    messageRevision++
+                }
+                if (sender != me && isBrandNew) {
+                    if (effectivePresenceMode != SocialPresenceMode.DND) {
+                        SocialSoundEffects.playMessageReceived()
+                    }
+                    if (activeOpenPeerId == sender) {
+                        bgScope.launch { markRead(sender) }
+                    } else {
+                        bgScope.launch(Dispatchers.Main) { unread += 1 }
+                        bgScope.launch { unreadCount() }
+                    }
+                }
+            }
+
+            override fun onBroadcastDmRead(payload: JsonObject) {
+                val me = userId ?: return
+                val readerId = payload.stringOrNull("readerId") ?: return
+                val senderId = payload.stringOrNull("senderId") ?: return
+                if (senderId != me) return
+                val readAtMs = payload.longOr("readAtMs", System.currentTimeMillis()).coerceAtLeast(1L)
+
+                var newlySeen = false
+                liveDmCache[readerId]?.let { list ->
+                    synchronized(list) {
+                        for (i in list.indices) {
+                            val m = list[i]
+                            if (m.sender == me && !m.isRead) {
+                                list[i] = m.copy(readAtMs = readAtMs)
+                                newlySeen = true
+                            }
+                        }
+                    }
+                }
+                if (newlySeen) {
+                    SocialSoundEffects.playMessageSeen()
+                }
+                bgScope.launch(Dispatchers.Main) {
+                    messageRevision++
+                }
+            }
+
+            override fun onBroadcastMessageEdit(payload: JsonObject) {
+                val me = userId ?: return
+                val id = payload.longOr("id", 0L)
+                if (id <= 0L) return
+                val sender = payload.stringOrNull("sender") ?: return
+                val newBody = payload.stringOrNull("body") ?: return
+                val editedAtMs = payload.longOr("editedAtMs", System.currentTimeMillis())
+                val partyId = payload.stringOrNull("partyId")
+                val recipient = payload.stringOrNull("recipient")
+
+                if (!partyId.isNullOrBlank()) {
+                    broadcastPartyMessages[partyId]?.let { list ->
+                        synchronized(list) {
+                            for (i in list.indices) {
+                                if (list[i].id == id) list[i] = list[i].copy(body = newBody, editedAtMs = editedAtMs)
+                            }
+                        }
+                    }
+                    bgScope.launch(Dispatchers.Main) { partyMessageRevision++ }
+                } else if (!recipient.isNullOrBlank()) {
+                    val peerId = if (sender == me) recipient else sender
+                    liveDmCache[peerId]?.let { list ->
+                        synchronized(list) {
+                            for (i in list.indices) {
+                                if (list[i].id == id) list[i] = list[i].copy(body = newBody, editedAtMs = editedAtMs)
+                            }
+                        }
+                    }
+                    bgScope.launch(Dispatchers.Main) { messageRevision++ }
+                }
+            }
+
             override fun onBroadcastPartyChat(payload: JsonObject) {
                 val partyId = payload.stringOrNull("partyId") ?: return
+                val sender = payload.stringOrNull("sender") ?: return
+                val tempId = payload.stringOrNull("tempId")
                 val rawSenderName = payload.stringOrNull("senderName")
                 val (cleanSender, senderRole) = SocialRole.extract(rawSenderName)
                 val msg = SocialMessage(
                     id = payload.longOr("id", System.currentTimeMillis()),
-                    sender = payload.stringOrNull("sender") ?: return,
+                    sender = sender,
                     recipient = "",
                     body = payload.stringOrNull("body") ?: return,
                     atMs = payload.longOr("atMs", System.currentTimeMillis()),
@@ -280,13 +481,26 @@ object SocialBackend {
                     attachmentUrl = payload.stringOrNull("attachmentUrl"),
                     partyId = partyId,
                     senderName = cleanSender ?: rawSenderName,
-                    senderRole = senderRole
+                    senderRole = senderRole,
+                    localTempId = tempId
                 )
                 val list = broadcastPartyMessages.getOrPut(partyId) { ArrayList() }
+                var insertedNew = false
                 synchronized(list) {
-                    if (list.none { it.id == msg.id && it.sender == msg.sender && it.body == msg.body }) {
-                        list.add(msg)
+                    val existingIdx = list.indexOfFirst {
+                        (!tempId.isNullOrBlank() && it.localTempId == tempId) ||
+                            (it.id > 0L && msg.id > 0L && it.id == msg.id) ||
+                            (it.sender == msg.sender && it.body == msg.body && abs(it.atMs - msg.atMs) < 3_500L)
                     }
+                    if (existingIdx >= 0) {
+                        list[existingIdx] = msg
+                    } else {
+                        list.add(msg)
+                        insertedNew = true
+                    }
+                }
+                if (insertedNew && sender != userId && effectivePresenceMode != SocialPresenceMode.DND) {
+                    SocialSoundEffects.playMessageReceived()
                 }
                 bgScope.launch(Dispatchers.Main) { partyMessageRevision++ }
             }
@@ -328,20 +542,153 @@ object SocialBackend {
                     }
                 }
             }
+
+            override fun onPeerSocketPresenceChanged(userId: String, connected: Boolean, modeKey: String?) {
+                if (userId == this@SocialBackend.userId) return
+                bgScope.launch(Dispatchers.Main) {
+                    val idx = friends.indexOfFirst { it.id == userId }
+                    if (idx >= 0) {
+                        val old = friends[idx]
+                        val nextMode = if (connected && modeKey != null) {
+                            SocialPresenceMode.fromKey(modeKey) ?: old.presenceMode
+                        } else old.presenceMode
+                        val updated = if (connected) {
+                            if (old.presenceMode == SocialPresenceMode.INVISIBLE) old
+                            else old.copy(
+                                lastSeenMs = System.currentTimeMillis(),
+                                presenceMode = nextMode
+                            )
+                        } else {
+                            // Peer's Wi-Fi dropped or app closed -> immediately mark offline!
+                            old.copy(lastSeenMs = 1L)
+                        }
+                        val mutable = friends.toMutableList()
+                        mutable[idx] = updated
+                        friends = sortFriends(mutable)
+                    }
+                }
+            }
         }
     }
 
-    // ---- session ---------------------------------------------------------------------------
+    private fun handleMessageRecordFromPostgres(eventType: String, record: JsonObject?) {
+        val me = userId ?: return
+        if (record == null) {
+            bgScope.launch { unreadCount() }
+            bgScope.launch(Dispatchers.Main) { messageRevision++ }
+            return
+        }
+        val sender = record.stringOrNull("sender") ?: return
+        val recipient = record.stringOrNull("recipient") ?: return
+        if (sender != me && recipient != me) return
+        val peerId = if (sender == me) recipient else sender
+        if (blockedUsers.any { it.userId == peerId }) return
+        val id = record.longOr("id", 0L)
+        if (id in deletedForMeSet()) return
+
+        val rawBody = record.stringOrNull("body") ?: ""
+        val displayBody = if (rawBody.startsWith(SocialEnvelopeCodec.PARTY_INVITE_PREFIX)) {
+            val inv = SocialEnvelopeCodec.decodePartyInvite(rawBody, id)
+            if (inv != null) "Invited to party \"${inv.partyTitle}\"${inv.mcVersion?.let { " · $it" } ?: ""}"
+            else rawBody
+        } else rawBody
+
+        val readAt = parseTimestamp(record.stringOrNull("read_at") ?: "")
+        val msg = SocialMessage(
+            id = id,
+            sender = sender,
+            recipient = recipient,
+            body = displayBody,
+            atMs = parseTimestamp(record.stringOrNull("created_at") ?: "").takeIf { it > 0L } ?: System.currentTimeMillis(),
+            readAtMs = readAt,
+            editedAtMs = parseTimestamp(record.stringOrNull("edited_at") ?: ""),
+            replyTo = record.get("reply_to")?.takeIf { !it.isJsonNull }?.asLong,
+            attachmentUrl = record.stringOrNull("attachment_url")?.takeIf { it.isNotBlank() }
+        )
+
+        val wasUnreadByPeer = sender == me && readAt > 0L &&
+            (liveDmCache[peerId]?.let { l -> synchronized(l) { l.any { it.id == id && !it.isRead } } } == true)
+
+        val isBrandNew = upsertIntoDmCache(peerId, msg)
+        if (wasUnreadByPeer) {
+            SocialSoundEffects.playMessageSeen()
+        }
+        if (isBrandNew && sender != me) {
+            if (effectivePresenceMode != SocialPresenceMode.DND) {
+                SocialSoundEffects.playMessageReceived()
+            }
+            if (activeOpenPeerId == sender) {
+                bgScope.launch { markRead(sender) }
+            }
+        }
+        bgScope.launch { unreadCount() }
+        bgScope.launch(Dispatchers.Main) { messageRevision++ }
+    }
+
+    /**
+     * Thread-safe merge into [liveDmCache] deduplicating optimistic sends (`tempId` or matching
+     * recent body) and enriching `replyPreview`. Returns `true` if a brand-new message was added.
+     */
+    private fun upsertIntoDmCache(peerId: String, incoming: SocialMessage): Boolean {
+        val list = liveDmCache.getOrPut(peerId) { ArrayList() }
+        var addedNew = false
+        synchronized(list) {
+            val matchIdx = list.indexOfFirst { existing ->
+                (incoming.id > 0L && existing.id == incoming.id) ||
+                    (!incoming.localTempId.isNullOrBlank() && existing.localTempId == incoming.localTempId) ||
+                    (existing.id < 0L && !existing.pendingOffline &&
+                        existing.sender == incoming.sender &&
+                        existing.body == incoming.body &&
+                        abs(existing.atMs - incoming.atMs) < 12_000L)
+            }
+            val parentPreview = incoming.replyPreview ?: incoming.replyTo?.let { pid ->
+                list.firstOrNull { it.id == pid }?.body?.take(90)
+            }
+            val enriched = if (parentPreview != null) incoming.copy(replyPreview = parentPreview) else incoming
+            if (matchIdx >= 0) {
+                val prev = list[matchIdx]
+                list[matchIdx] = enriched.copy(
+                    id = if (enriched.id > 0L) enriched.id else prev.id,
+                    readAtMs = maxOf(prev.readAtMs ?: 0L, enriched.readAtMs ?: 0L).takeIf { it > 0L },
+                    editedAtMs = maxOf(prev.editedAtMs ?: 0L, enriched.editedAtMs ?: 0L).takeIf { it > 0L },
+                    localTempId = enriched.localTempId ?: prev.localTempId,
+                    pendingOffline = false
+                )
+            } else {
+                list.add(enriched)
+                list.sortWith(compareBy<SocialMessage> { it.atMs }.thenBy { if (it.id > 0L) it.id else Long.MAX_VALUE })
+                addedNew = true
+            }
+        }
+        return addedNew
+    }
+
+    /** Returns the live cached DM stream for [otherId] in 0ms so chats render immediately. */
+    fun getCachedMessages(otherId: String): List<SocialMessage> {
+        val list = liveDmCache[otherId] ?: return emptyList()
+        val deleted = deletedForMeSet()
+        return synchronized(list) {
+            list.filter { it.id !in deleted }.toList()
+        }
+    }
+
+    // ---- session, lifecycle & Wi-Fi monitors ------------------------------------------------
 
     @JvmStatic
     fun attach(context: Context) {
         val app = context.applicationContext
         appContext = app
+        SocialSoundEffects.init(app)
+        val prefs = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        chatSoundsEnabled = prefs.getBoolean("chat_sounds_enabled", true)
+        installLifecycleMonitor(app)
+        installNetworkMonitor(app)
+        startPresenceKeepAliveLoop()
+
         if (signedIn) {
             ensureRealtimeConnectedAsync()
             return
         }
-        val prefs = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         refreshToken = prefs.getString("refresh_token", null)
         userId = prefs.getString("user_id", null)
         email = prefs.getString("email", null)
@@ -349,6 +696,182 @@ object SocialBackend {
             signedIn = true
             loadLocalCollections()
             ensureRealtimeConnectedAsync()
+        }
+    }
+
+    private fun installLifecycleMonitor(app: Context) {
+        val application = app as? Application ?: return
+        if (!lifecycleHooked.compareAndSet(false, true)) return
+
+        isLauncherInForeground = isAnyAppProcessInForeground(app)
+        application.registerActivityLifecycleCallbacks(object : Application.ActivityLifecycleCallbacks {
+            override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {}
+
+            override fun onActivityStarted(activity: Activity) {
+                val count = startedActivities.incrementAndGet()
+                backgroundTransitionJob?.cancel()
+                if (count >= 1 && !isLauncherInForeground) {
+                    isLauncherInForeground = true
+                    onAutomaticPresenceTriggerChanged()
+                } else if (count == 1) {
+                    isLauncherInForeground = true
+                    onAutomaticPresenceTriggerChanged()
+                }
+            }
+
+            override fun onActivityResumed(activity: Activity) {
+                backgroundTransitionJob?.cancel()
+                if (!isLauncherInForeground) {
+                    isLauncherInForeground = true
+                    onAutomaticPresenceTriggerChanged()
+                }
+            }
+
+            override fun onActivityPaused(activity: Activity) {}
+
+            override fun onActivityStopped(activity: Activity) {
+                val remaining = startedActivities.decrementAndGet().coerceAtLeast(0)
+                startedActivities.set(remaining)
+                if (remaining == 0 && !activity.isChangingConfigurations) {
+                    backgroundTransitionJob?.cancel()
+                    backgroundTransitionJob = bgScope.launch {
+                        // Brief debounce avoids yellow flicker during activity transitions or launching Minecraft (:game).
+                        delay(650L)
+                        val anyForeground = isAnyAppProcessInForeground(app) || activeGameStatusLine != null
+                        withContext(Dispatchers.Main) {
+                            if (startedActivities.get() == 0 && !anyForeground && isLauncherInForeground) {
+                                isLauncherInForeground = false
+                                onAutomaticPresenceTriggerChanged()
+                            }
+                        }
+                    }
+                }
+            }
+
+            override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {}
+            override fun onActivityDestroyed(activity: Activity) {}
+        })
+    }
+
+    private fun isAnyAppProcessInForeground(context: Context): Boolean {
+        return runCatching {
+            val am = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager ?: return false
+            val procs = am.runningAppProcesses ?: return false
+            val pkg = context.packageName
+            procs.any { info ->
+                (info.processName == pkg || info.processName.startsWith("$pkg:")) &&
+                    info.importance <= ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND
+            }
+        }.getOrDefault(false)
+    }
+
+    private fun installNetworkMonitor(app: Context) {
+        if (!networkHooked.compareAndSet(false, true)) return
+        val cm = app.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return
+        isNetworkAvailable = checkActiveInternet(cm)
+
+        val callback = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) {
+                val online = checkActiveInternet(cm)
+                bgScope.launch(Dispatchers.Main) {
+                    val changed = !isNetworkAvailable && online
+                    isNetworkAvailable = online
+                    if (changed && signedIn) {
+                        SocialRealtime.reconnectImmediately()
+                        bgScope.launch {
+                            syncRichPresenceToServer()
+                            flushOfflineOutbox()
+                            refreshFriends()
+                        }
+                    }
+                }
+            }
+
+            override fun onCapabilitiesChanged(network: Network, capabilities: NetworkCapabilities) {
+                val online = hasInternetCapability(capabilities) || checkActiveInternet(cm)
+                bgScope.launch(Dispatchers.Main) {
+                    val wasOnline = isNetworkAvailable
+                    isNetworkAvailable = online
+                    if (!wasOnline && online && signedIn) {
+                        SocialRealtime.reconnectImmediately()
+                        bgScope.launch {
+                            syncRichPresenceToServer()
+                            flushOfflineOutbox()
+                            refreshFriends()
+                        }
+                    } else if (wasOnline && !online) {
+                        SocialRealtime.suspendForNetworkLoss()
+                    }
+                }
+            }
+
+            override fun onLost(network: Network) {
+                val stillOnline = checkActiveInternet(cm)
+                bgScope.launch(Dispatchers.Main) {
+                    isNetworkAvailable = stillOnline
+                    if (!stillOnline) {
+                        SocialRealtime.suspendForNetworkLoss()
+                    }
+                }
+            }
+        }
+
+        runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                cm.registerDefaultNetworkCallback(callback)
+            }
+        }
+    }
+
+    private fun checkActiveInternet(cm: ConnectivityManager): Boolean {
+        return runCatching {
+            val active = cm.activeNetwork ?: return false
+            val caps = cm.getNetworkCapabilities(active) ?: return false
+            hasInternetCapability(caps)
+        }.getOrDefault(true)
+    }
+
+    private fun hasInternetCapability(caps: NetworkCapabilities): Boolean {
+        if (!caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) return false
+        return caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ||
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) ||
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)
+    }
+
+    private fun onAutomaticPresenceTriggerChanged() {
+        if (!signedIn || !isNetworkAvailable) return
+        if (!isAutoPresence) return
+        val eff = effectivePresenceMode ?: return
+        myProfile = myProfile?.copy(presenceMode = eff, role = myRole)
+        bgScope.launch {
+            syncRichPresenceToServer()
+            val clean = myCustomStatus
+            val hosting = parties.firstOrNull { it.hostId == userId && !it.isExpired() }
+            val richBase = activeGameStatusLine
+                ?: hosting?.let { "In party: ${it.title}" }
+                ?: clean
+            SocialRealtime.sendPresenceBroadcast(
+                modeKey = eff.key,
+                wireStatus = SocialPresenceCodec.encodeForWire(eff, richBase),
+                lookingToPlay = myLookingToPlay,
+                appearOffline = false,
+                displayName = SocialRole.encodeTaggedName(myEffectiveDisplayName(), myRole, myEffectiveDisplayName()),
+                roleKey = myRole?.key
+            )
+        }
+    }
+
+    /** Keeps presence fresh even when the Launcher is in the background (`Idle` yellow) while Wi-Fi is on. */
+    private fun startPresenceKeepAliveLoop() {
+        if (presenceKeepAliveJob?.isActive == true) return
+        presenceKeepAliveJob = bgScope.launch {
+            while (isActive) {
+                delay(50_000L)
+                if (signedIn && isNetworkAvailable) {
+                    runCatching { syncRichPresenceToServer() }
+                }
+            }
         }
     }
 
@@ -393,6 +916,7 @@ object SocialBackend {
         offlineQueueSize = 0
         myProfile = null
         myPresenceMode = SocialPresenceMode.ONLINE
+        isAutoPresence = true
         myCustomStatus = null
         myLookingToPlay = false
         onboardingDismissedForSession = false
@@ -400,6 +924,8 @@ object SocialBackend {
         lastError = null
         initialFriendsSnapshotLoaded = false
         observedFriendVersions.clear()
+        liveDmCache.clear()
+        broadcastPartyMessages.clear()
         appContext?.getSharedPreferences(PREFS, Context.MODE_PRIVATE)?.edit()
             ?.remove("refresh_token")
             ?.remove("user_id")
@@ -607,17 +1133,25 @@ object SocialBackend {
     private fun loadLocalCollections() {
         recentPlayers = readRecentPlayers()
         offlineQueueSize = readOutbox().size
-        val me = userId ?: return
         val p = prefs() ?: return
+        chatSoundsEnabled = p.getBoolean("chat_sounds_enabled", true)
+        val me = userId ?: return
+        isAutoPresence = p.getBoolean("status_auto_$me", true)
         myPresenceMode = SocialPresenceMode.fromKey(p.getString("presence_mode_$me", null))
             ?: SocialPresenceMode.ONLINE
         myCustomStatus = p.getString("custom_status_$me", null)?.takeIf { it.isNotBlank() }
         myLookingToPlay = p.getBoolean("looking_$me", false)
     }
 
-    private fun persistLocalStatus(mode: SocialPresenceMode, customStatus: String?, looking: Boolean) {
+    private fun persistLocalStatus(
+        mode: SocialPresenceMode,
+        customStatus: String?,
+        looking: Boolean,
+        autoMode: Boolean = isAutoPresence
+    ) {
         val me = userId ?: return
         val editor = prefs()?.edit() ?: return
+        editor.putBoolean("status_auto_$me", autoMode)
         editor.putString("presence_mode_$me", mode.key)
         if (customStatus.isNullOrBlank()) editor.remove("custom_status_$me")
         else editor.putString("custom_status_$me", customStatus)
@@ -784,10 +1318,12 @@ object SocialBackend {
                 mcUsername = row.stringOrNull("mc_username")
                     ?.takeIf { it.isNotBlank() } ?: storedMinecraftName()
                 val rawStatus = row.stringOrNull("status_text")
-                if (myPresenceMode != SocialPresenceMode.INVISIBLE && rawStatus != null) {
+                if (rawStatus != null) {
                     val parsed = SocialPresenceCodec.parse(rawStatus)
-                    myPresenceMode = parsed.mode
-                    myCustomStatus = parsed.customText
+                    if (!isAutoPresence && myPresenceMode != SocialPresenceMode.INVISIBLE) {
+                        myPresenceMode = parsed.mode
+                    }
+                    if (myCustomStatus == null) myCustomStatus = parsed.customText
                     myLookingToPlay = row.get("looking_to_play")?.takeIf { it.isJsonPrimitive }?.asBoolean ?: myLookingToPlay
                     persistLocalStatus(myPresenceMode, myCustomStatus, myLookingToPlay)
                 }
@@ -795,6 +1331,7 @@ object SocialBackend {
                 mcUsername = storedMinecraftName()
             }
             upsertProfile(existingRow = row)
+            syncRichPresenceToServer()
         }
     }
 
@@ -843,7 +1380,7 @@ object SocialBackend {
         )
 
     private fun maybeEmitJoinToast(previous: SocialFriend?, current: SocialFriend) {
-        if (myPresenceMode == SocialPresenceMode.DND) return
+        if (effectivePresenceMode == SocialPresenceMode.DND) return
         if (current.pendingIncoming || current.pendingOutgoing) return
         if (blockedUsers.any { it.userId == current.id }) return
         val ver = current.mcVersion?.trim()?.takeIf { it.isNotEmpty() } ?: return
@@ -1107,17 +1644,19 @@ object SocialBackend {
     // ---- messages (Realtime, replies, edits, delete-for-me, attachments, offline queue, search)
 
     fun notifyTyping(peerId: String? = null, partyId: String? = null) {
-        val label = myProfile?.name?.takeIf { it.isNotBlank() }
-            ?: myProfile?.username?.takeIf { it.isNotBlank() }
-            ?: mcUsername
-            ?: "Player"
-        SocialRealtime.sendTyping(peerId, partyId, label)
+        val label = myEffectiveDisplayName()
+        SocialRealtime.sendTyping(peerId, partyId, label, active = true)
+    }
+
+    fun notifyStopTyping(peerId: String? = null, partyId: String? = null) {
+        val label = myEffectiveDisplayName()
+        SocialRealtime.sendTyping(peerId, partyId, label, active = false)
     }
 
     suspend fun loadMessages(otherId: String): List<SocialMessage> {
         val loaded = attempt {
             ensureToken()
-            val me = userId ?: return@attempt emptyList<SocialMessage>()
+            val me = userId ?: return@attempt getCachedMessages(otherId)
             if (blockedUsers.any { it.userId == otherId }) return@attempt emptyList<SocialMessage>()
             val deletedIds = deletedForMeSet()
 
@@ -1138,9 +1677,9 @@ object SocialBackend {
                         "and(sender.eq.$otherId,recipient.eq.$me))" +
                         "&order=created_at.asc&limit=200"
                 )
-            } ?: return@attempt emptyList<SocialMessage>()
+            } ?: return@attempt getCachedMessages(otherId)
 
-            val rows = json.takeIf { it.isJsonArray }?.asJsonArray ?: return@attempt emptyList<SocialMessage>()
+            val rows = json.takeIf { it.isJsonArray }?.asJsonArray ?: return@attempt getCachedMessages(otherId)
             val rawParsed = ArrayList<SocialMessage>(rows.size())
 
             rows.forEach { element ->
@@ -1183,6 +1722,20 @@ object SocialBackend {
                 } else msg
             }.toMutableList()
 
+            // Preserve any in-flight optimistic messages that haven't finished their POST yet.
+            liveDmCache[otherId]?.let { existingList ->
+                synchronized(existingList) {
+                    existingList.filter { it.id < 0L && !it.pendingOffline }.forEach { inflight ->
+                        val alreadyPersisted = enriched.any { dbMsg ->
+                            dbMsg.sender == inflight.sender &&
+                                dbMsg.body == inflight.body &&
+                                abs(dbMsg.atMs - inflight.atMs) < 12_000L
+                        }
+                        if (!alreadyPersisted) enriched.add(inflight)
+                    }
+                }
+            }
+
             // Append pending offline outbox messages for this conversation.
             val meId = userId ?: ""
             readOutbox().filter { it.recipientId == otherId }.forEachIndexed { index, queued ->
@@ -1201,9 +1754,122 @@ object SocialBackend {
                     )
                 )
             }
-            enriched
+
+            enriched.sortWith(compareBy<SocialMessage> { it.atMs }.thenBy { if (it.id > 0L) it.id else Long.MAX_VALUE })
+            val cacheList = liveDmCache.getOrPut(otherId) { ArrayList() }
+            synchronized(cacheList) {
+                cacheList.clear()
+                cacheList.addAll(enriched)
+            }
+            enriched.toList()
         }
-        return loaded ?: emptyList()
+        return loaded ?: getCachedMessages(otherId)
+    }
+
+    /**
+     * Lightweight incremental delta-sync while a DM chat is open.
+     * Fetches only messages with `id > maxServerId` plus recent read-receipt updates so open
+     * conversations ALWAYS stay live even if a carrier NAT drops a WebSocket broadcast frame.
+     */
+    suspend fun syncNewMessages(otherId: String): List<SocialMessage> {
+        if (!signedIn || !isNetworkAvailable) return getCachedMessages(otherId)
+        val cached = liveDmCache[otherId]
+        if (cached == null) return loadMessages(otherId)
+        val maxServerId = synchronized(cached) {
+            cached.filter { it.id > 0L }.maxOfOrNull { it.id } ?: 0L
+        }
+        if (maxServerId <= 0L) return loadMessages(otherId)
+
+        attempt {
+            ensureToken()
+            val me = userId ?: return@attempt Unit
+            if (blockedUsers.any { it.userId == otherId }) return@attempt Unit
+            val deletedIds = deletedForMeSet()
+
+            // 1. Pull any brand-new rows (`id > maxServerId`) in one tiny indexed query.
+            val newResp = callRaw(
+                "GET",
+                "$PROJECT_URL/rest/v1/messages?select=id,sender,recipient,body,reply_to,attachment_url,edited_at,read_at,created_at" +
+                    "&id=gt.$maxServerId" +
+                    "&or=(and(sender.eq.$me,recipient.eq.$otherId),and(sender.eq.$otherId,recipient.eq.$me))" +
+                    "&order=id.asc&limit=50"
+            )
+            var changed = false
+            var incomingFromPeer = false
+            newResp.json?.takeIf { it.isJsonArray }?.asJsonArray?.forEach { el ->
+                val row = el as? JsonObject ?: return@forEach
+                val id = row.longOr("id", 0L)
+                if (id <= 0L || id in deletedIds) return@forEach
+                val rawBody = row.stringOrNull("body") ?: ""
+                if (rawBody.startsWith(SocialEnvelopeCodec.PARTY_CHAT_PREFIX)) return@forEach
+                val displayBody = if (rawBody.startsWith(SocialEnvelopeCodec.PARTY_INVITE_PREFIX)) {
+                    val inv = SocialEnvelopeCodec.decodePartyInvite(rawBody, id)
+                    if (inv != null) "Invited to party \"${inv.partyTitle}\"${inv.mcVersion?.let { " · $it" } ?: ""}"
+                    else rawBody
+                } else rawBody
+
+                val sender = row.stringOrNull("sender") ?: ""
+                val msg = SocialMessage(
+                    id = id,
+                    sender = sender,
+                    recipient = row.stringOrNull("recipient") ?: "",
+                    body = displayBody,
+                    atMs = parseTimestamp(row.stringOrNull("created_at") ?: ""),
+                    readAtMs = parseTimestamp(row.stringOrNull("read_at") ?: ""),
+                    editedAtMs = parseTimestamp(row.stringOrNull("edited_at") ?: ""),
+                    replyTo = row.get("reply_to")?.takeIf { !it.isJsonNull }?.asLong,
+                    attachmentUrl = row.stringOrNull("attachment_url")?.takeIf { it.isNotBlank() }
+                )
+                if (upsertIntoDmCache(otherId, msg)) {
+                    changed = true
+                    if (sender == otherId) incomingFromPeer = true
+                }
+            }
+
+            // 2. Check if any of our sent messages that were still unread have now been seen (`read_at != null`).
+            val unreadSentIds = synchronized(cached) {
+                cached.filter { it.id > 0L && it.sender == me && !it.isRead }.takeLast(12).map { it.id }
+            }
+            if (unreadSentIds.isNotEmpty()) {
+                val idList = unreadSentIds.joinToString(",")
+                val seenResp = callRaw(
+                    "GET",
+                    "$PROJECT_URL/rest/v1/messages?select=id,read_at,edited_at,body&id=in.($idList)"
+                )
+                var newlySeen = false
+                seenResp.json?.takeIf { it.isJsonArray }?.asJsonArray?.forEach { el ->
+                    val r = el as? JsonObject ?: return@forEach
+                    val rid = r.longOr("id", 0L)
+                    val rAt = parseTimestamp(r.stringOrNull("read_at") ?: "")
+                    if (rAt > 0L) {
+                        synchronized(cached) {
+                            val pos = cached.indexOfFirst { it.id == rid }
+                            if (pos >= 0 && !cached[pos].isRead) {
+                                cached[pos] = cached[pos].copy(readAtMs = rAt)
+                                newlySeen = true
+                                changed = true
+                            }
+                        }
+                    }
+                }
+                if (newlySeen) {
+                    SocialSoundEffects.playMessageSeen()
+                }
+            }
+
+            if (incomingFromPeer) {
+                if (effectivePresenceMode != SocialPresenceMode.DND) {
+                    SocialSoundEffects.playMessageReceived()
+                }
+                if (activeOpenPeerId == otherId) {
+                    markRead(otherId)
+                }
+            }
+            if (changed) {
+                withContext(Dispatchers.Main) { messageRevision++ }
+            }
+        }
+        return getCachedMessages(otherId)
     }
 
     suspend fun sendMessage(otherId: String, text: String): Boolean =
@@ -1222,32 +1888,80 @@ object SocialBackend {
         val cleanText = text.trim().ifEmpty { if (attachmentUri != null) "📷 Image" else "" }
         if (cleanText.isEmpty()) return@withContext false
 
-        ensureToken()
-        val me = userId ?: run {
+        val meQuick = userId ?: run {
+            ensureToken()
+            userId
+        } ?: run {
             lastError = "Sign in first"
             return@withContext false
         }
+
+        val nowMs = System.currentTimeMillis()
+        val tempId = UUID.randomUUID().toString()
+        val tempNumericId = optimisticIdGenerator.decrementAndGet()
+        val cleanBody = cleanText.take(2000)
+
+        // 1. 0ms Optimistic UI insertion so the sender sees their bubble immediately!
+        val optimisticMsg = SocialMessage(
+            id = tempNumericId,
+            sender = meQuick,
+            recipient = otherId,
+            body = cleanBody,
+            atMs = nowMs,
+            replyTo = replyTo,
+            attachmentUrl = attachmentUri?.toString(),
+            localTempId = tempId
+        )
+        upsertIntoDmCache(otherId, optimisticMsg)
+        notifyStopTyping(peerId = otherId)
+        withContext(Dispatchers.Main) { messageRevision++ }
+
+        // If pure text, broadcast immediately over WebSocket (~40ms) before waiting on PostgreSQL!
+        if (attachmentUri == null && isNetworkAvailable) {
+            SocialRealtime.sendDmChatBroadcast(optimisticMsg, tempId = tempId)
+        }
+
+        ensureToken()
+        val me = userId ?: meQuick
 
         var localAttachmentPath: String? = null
         var remoteAttachmentUrl: String? = null
         if (attachmentUri != null) {
             val downscaled = downscaleAttachmentToJpeg(attachmentUri)
             if (downscaled == null) {
+                removeOptimisticFromDmCache(otherId, tempId)
+                withContext(Dispatchers.Main) { messageRevision++ }
                 lastError = "Could not read that image"
                 return@withContext false
             }
-            remoteAttachmentUrl = uploadImage("chat-att", downscaled, "jpg")
+            remoteAttachmentUrl = if (isNetworkAvailable) uploadImage("chat-att", downscaled, "jpg") else null
             if (remoteAttachmentUrl == null) {
-                // Save locally for offline outbox retry when connectivity returns.
                 localAttachmentPath = saveOutboxAttachmentLocally(downscaled)
             }
+        }
+
+        if (!isNetworkAvailable || (attachmentUri != null && remoteAttachmentUrl == null)) {
+            markOptimisticPendingOffline(otherId, tempId, localAttachmentPath)
+            enqueueOfflineItem(
+                SocialOutboxItem(
+                    localId = tempId,
+                    recipientId = otherId,
+                    body = cleanBody,
+                    replyTo = replyTo,
+                    attachmentLocalPath = localAttachmentPath,
+                    attachmentRemoteUrl = remoteAttachmentUrl
+                )
+            )
+            lastError = null
+            withContext(Dispatchers.Main) { messageRevision++ }
+            return@withContext true
         }
 
         val payload = JsonArray().apply {
             add(JsonObject().apply {
                 addProperty("sender", me)
                 addProperty("recipient", otherId)
-                addProperty("body", cleanText.take(2000))
+                addProperty("body", cleanBody)
                 if (replyTo != null && replyTo > 0L) addProperty("reply_to", replyTo)
                 if (!remoteAttachmentUrl.isNullOrBlank()) addProperty("attachment_url", remoteAttachmentUrl)
             })
@@ -1257,37 +1971,73 @@ object SocialBackend {
             "POST",
             "$PROJECT_URL/rest/v1/messages",
             payload.toString(),
-            extraHeaders = mapOf("Prefer" to "return=minimal")
+            extraHeaders = mapOf("Prefer" to "return=representation")
         )
 
         if (resp.code in 200..299) {
+            val row = resp.json?.takeIf { it.isJsonArray }?.asJsonArray?.firstOrNull() as? JsonObject
+            val confirmedId = row?.longOr("id", 0L)?.takeIf { it > 0L } ?: nowMs
+            val confirmedAtMs = row?.stringOrNull("created_at")?.let { parseTimestamp(it) }?.takeIf { it > 0L } ?: nowMs
+            val confirmedMsg = optimisticMsg.copy(
+                id = confirmedId,
+                atMs = confirmedAtMs,
+                attachmentUrl = remoteAttachmentUrl ?: optimisticMsg.attachmentUrl,
+                pendingOffline = false
+            )
+            upsertIntoDmCache(otherId, confirmedMsg)
+            SocialRealtime.sendDmChatBroadcast(confirmedMsg, tempId = tempId)
             friends.firstOrNull { it.id == otherId }?.let { f ->
                 recordRecentPlayer(f.id, f.effectiveName, f.username, f.mcUsername, f.avatarUrl, "Direct message")
             }
-            bgScope.launch(Dispatchers.Main) { messageRevision++ }
+            withContext(Dispatchers.Main) { messageRevision++ }
             return@withContext true
         }
 
-        // If blocked server-side by RLS (HTTP 403 / 42501), surface clearly and do NOT queue offline.
+        // If blocked server-side by RLS (HTTP 403 / 42501), remove optimistic bubble and surface clearly.
         if (resp.code == 401 || resp.code == 403 || resp.body.contains("row-level security", ignoreCase = true)) {
+            removeOptimisticFromDmCache(otherId, tempId)
+            withContext(Dispatchers.Main) { messageRevision++ }
             lastError = "Message could not be delivered (blocked or restricted)"
             return@withContext false
         }
 
-        // Network failure / offline -> enqueue in persistent offline outbox!
+        // Network failure -> mark bubble queued in persistent offline outbox!
+        markOptimisticPendingOffline(otherId, tempId, remoteAttachmentUrl ?: localAttachmentPath)
         enqueueOfflineItem(
             SocialOutboxItem(
-                localId = UUID.randomUUID().toString(),
+                localId = tempId,
                 recipientId = otherId,
-                body = cleanText.take(2000),
+                body = cleanBody,
                 replyTo = replyTo,
                 attachmentLocalPath = localAttachmentPath,
                 attachmentRemoteUrl = remoteAttachmentUrl
             )
         )
         lastError = null
-        bgScope.launch(Dispatchers.Main) { messageRevision++ }
+        withContext(Dispatchers.Main) { messageRevision++ }
         true
+    }
+
+    private fun removeOptimisticFromDmCache(peerId: String, tempId: String) {
+        liveDmCache[peerId]?.let { list ->
+            synchronized(list) {
+                list.removeAll { it.localTempId == tempId }
+            }
+        }
+    }
+
+    private fun markOptimisticPendingOffline(peerId: String, tempId: String, attachmentPath: String?) {
+        liveDmCache[peerId]?.let { list ->
+            synchronized(list) {
+                val idx = list.indexOfFirst { it.localTempId == tempId }
+                if (idx >= 0) {
+                    list[idx] = list[idx].copy(
+                        pendingOffline = true,
+                        attachmentUrl = attachmentPath ?: list[idx].attachmentUrl
+                    )
+                }
+            }
+        }
     }
 
     private fun enqueueOfflineItem(item: SocialOutboxItem) {
@@ -1297,6 +2047,7 @@ object SocialBackend {
     }
 
     suspend fun flushOfflineOutbox() = withContext(Dispatchers.IO) {
+        if (!isNetworkAvailable) return@withContext
         val pending = readOutbox()
         if (pending.isEmpty()) return@withContext
         ensureToken()
@@ -1326,8 +2077,24 @@ object SocialBackend {
                     "POST",
                     "$PROJECT_URL/rest/v1/messages",
                     payload.toString(),
-                    extraHeaders = mapOf("Prefer" to "return=minimal")
+                    extraHeaders = mapOf("Prefer" to "return=representation")
                 )
+                if (r.code in 200..299) {
+                    val row = r.json?.takeIf { it.isJsonArray }?.asJsonArray?.firstOrNull() as? JsonObject
+                    val realId = row?.longOr("id", System.currentTimeMillis()) ?: System.currentTimeMillis()
+                    val msg = SocialMessage(
+                        id = realId,
+                        sender = me,
+                        recipient = item.recipientId,
+                        body = item.body,
+                        atMs = System.currentTimeMillis(),
+                        replyTo = item.replyTo,
+                        attachmentUrl = remoteUrl,
+                        localTempId = item.localId
+                    )
+                    upsertIntoDmCache(item.recipientId, msg)
+                    SocialRealtime.sendDmChatBroadcast(msg, tempId = item.localId)
+                }
                 r.code in 200..299 || r.code == 403
             } else if (!item.partyId.isNullOrBlank()) {
                 sendPartyMessageInternal(item.partyId, item.body, item.replyTo, remoteUrl, queueOnFail = false)
@@ -1347,6 +2114,36 @@ object SocialBackend {
     suspend fun editMessage(messageId: Long, newBody: String, isParty: Boolean = false): Boolean {
         val trimmed = newBody.trim().take(2000)
         if (trimmed.isEmpty() || messageId <= 0L) return false
+        val nowMs = System.currentTimeMillis()
+        var targetPeerId: String? = null
+        var targetPartyId: String? = null
+
+        if (isParty) {
+            broadcastPartyMessages.forEach { (pid, list) ->
+                synchronized(list) {
+                    for (i in list.indices) {
+                        if (list[i].id == messageId) {
+                            list[i] = list[i].copy(body = trimmed, editedAtMs = nowMs)
+                            targetPartyId = pid
+                        }
+                    }
+                }
+            }
+            partyMessageRevision++
+        } else {
+            liveDmCache.forEach { (peerId, list) ->
+                synchronized(list) {
+                    for (i in list.indices) {
+                        if (list[i].id == messageId) {
+                            list[i] = list[i].copy(body = trimmed, editedAtMs = nowMs)
+                            targetPeerId = peerId
+                        }
+                    }
+                }
+            }
+            messageRevision++
+        }
+
         val ok = attempt {
             ensureToken()
             val me = userId ?: return@attempt null
@@ -1356,12 +2153,19 @@ object SocialBackend {
                 "$PROJECT_URL/rest/v1/$table?id=eq.$messageId&sender=eq.$me",
                 JsonObject().apply {
                     addProperty("body", trimmed)
-                    addProperty("edited_at", isoNow())
+                    addProperty("edited_at", isoAt(nowMs))
                 }.toString(),
                 extraHeaders = mapOf("Prefer" to "return=minimal")
             )
         } != null
         if (ok) {
+            SocialRealtime.sendMessageEditBroadcast(
+                messageId = messageId,
+                newBody = trimmed,
+                editedAtMs = nowMs,
+                recipientId = targetPeerId,
+                partyId = targetPartyId ?: activeOpenPartyId
+            )
             if (isParty) partyMessageRevision++ else messageRevision++
         }
         return ok
@@ -2251,6 +3055,14 @@ object SocialBackend {
         } ?: emptyList()
     }
 
+    fun getCachedPartyMessages(partyId: String): List<SocialMessage> {
+        val list = broadcastPartyMessages[partyId] ?: return emptyList()
+        val deleted = deletedForMeSet()
+        return synchronized(list) {
+            list.filter { it.id !in deleted }.sortedBy { it.atMs }
+        }
+    }
+
     suspend fun sendPartyMessage(
         partyId: String,
         text: String,
@@ -2259,21 +3071,57 @@ object SocialBackend {
     ): Boolean = withContext(Dispatchers.IO) {
         val clean = text.trim().ifEmpty { if (attachmentUri != null) "📷 Image" else "" }
         if (clean.isEmpty()) return@withContext false
+        val meQuick = userId ?: run {
+            ensureToken()
+            userId
+        } ?: return@withContext false
+
+        val tempId = UUID.randomUUID().toString()
+        val nowMs = System.currentTimeMillis()
+        val cleanBody = clean.take(2000)
+        val optimisticMsg = SocialMessage(
+            id = optimisticIdGenerator.decrementAndGet(),
+            sender = meQuick,
+            recipient = "",
+            body = cleanBody,
+            atMs = nowMs,
+            replyTo = replyTo,
+            attachmentUrl = attachmentUri?.toString(),
+            partyId = partyId,
+            senderName = myEffectiveDisplayName(),
+            senderRole = myRole,
+            localTempId = tempId
+        )
+        val liveList = broadcastPartyMessages.getOrPut(partyId) { ArrayList() }
+        synchronized(liveList) { liveList.add(optimisticMsg) }
+        notifyStopTyping(partyId = partyId)
+        withContext(Dispatchers.Main) { partyMessageRevision++ }
+
         ensureToken()
 
         var localPath: String? = null
         var remoteUrl: String? = null
         if (attachmentUri != null) {
             val bytes = downscaleAttachmentToJpeg(attachmentUri) ?: run {
+                synchronized(liveList) { liveList.removeAll { it.localTempId == tempId } }
+                withContext(Dispatchers.Main) { partyMessageRevision++ }
                 lastError = "Could not process image"
                 return@withContext false
             }
-            remoteUrl = uploadImage("chat-att", bytes, "jpg")
+            remoteUrl = if (isNetworkAvailable) uploadImage("chat-att", bytes, "jpg") else null
             if (remoteUrl == null) localPath = saveOutboxAttachmentLocally(bytes)
         }
 
-        val sent = sendPartyMessageInternal(partyId, clean.take(2000), replyTo, remoteUrl, queueOnFail = true, localAttachmentPath = localPath)
-        bgScope.launch(Dispatchers.Main) { partyMessageRevision++ }
+        val sent = sendPartyMessageInternal(
+            partyId = partyId,
+            cleanText = cleanBody,
+            replyTo = replyTo,
+            remoteAttachmentUrl = remoteUrl,
+            queueOnFail = true,
+            localAttachmentPath = localPath,
+            tempId = tempId
+        )
+        withContext(Dispatchers.Main) { partyMessageRevision++ }
         sent
     }
 
@@ -2283,14 +3131,15 @@ object SocialBackend {
         replyTo: Long?,
         remoteAttachmentUrl: String?,
         queueOnFail: Boolean,
-        localAttachmentPath: String? = null
+        localAttachmentPath: String? = null,
+        tempId: String? = null
     ): Boolean {
         val me = userId ?: return false
         val myBase = myEffectiveDisplayName()
         val myName = SocialRole.encodeTaggedName(myBase, myRole, myBase) ?: myBase
         val nowMs = System.currentTimeMillis()
 
-        if (hasPartyMessagesTable != false) {
+        if (isNetworkAvailable && hasPartyMessagesTable != false) {
             val payload = JsonArray().apply {
                 add(JsonObject().apply {
                     addProperty("party_id", partyId)
@@ -2310,26 +3159,32 @@ object SocialBackend {
                 hasPartyMessagesTable = true
                 val insertedId = (r.json?.takeIf { it.isJsonArray }?.asJsonArray?.firstOrNull() as? JsonObject)
                     ?.longOr("id", nowMs) ?: nowMs
-                SocialRealtime.sendPartyChatBroadcast(
-                    SocialMessage(
-                        id = insertedId,
-                        sender = me,
-                        recipient = "",
-                        body = cleanText,
-                        atMs = nowMs,
-                        replyTo = replyTo,
-                        attachmentUrl = remoteAttachmentUrl,
-                        partyId = partyId,
-                        senderName = myName
-                    )
+                val wireMsg = SocialMessage(
+                    id = insertedId,
+                    sender = me,
+                    recipient = "",
+                    body = cleanText,
+                    atMs = nowMs,
+                    replyTo = replyTo,
+                    attachmentUrl = remoteAttachmentUrl,
+                    partyId = partyId,
+                    senderName = myName,
+                    localTempId = tempId
                 )
+                broadcastPartyMessages[partyId]?.let { list ->
+                    synchronized(list) {
+                        val idx = list.indexOfFirst { !tempId.isNullOrBlank() && it.localTempId == tempId }
+                        if (idx >= 0) list[idx] = wireMsg.copy(senderName = myBase, senderRole = myRole)
+                    }
+                }
+                SocialRealtime.sendPartyChatBroadcast(wireMsg, tempId = tempId)
                 return true
             } else if (r.code == 404) {
                 hasPartyMessagesTable = false
             }
         }
 
-        if (hasPartyMessagesTable == false) {
+        if (isNetworkAvailable && hasPartyMessagesTable == false) {
             val party = parties.firstOrNull { it.id == partyId }
             val targets = (party?.members?.map { it.userId }?.filter { it != me } ?: emptyList())
                 .ifEmpty { listOf(me) }
@@ -2352,19 +3207,19 @@ object SocialBackend {
                 extraHeaders = mapOf("Prefer" to "return=minimal")
             )
             if (r.code in 200..299) {
-                SocialRealtime.sendPartyChatBroadcast(
-                    SocialMessage(
-                        id = nowMs,
-                        sender = me,
-                        recipient = "",
-                        body = cleanText,
-                        atMs = nowMs,
-                        replyTo = replyTo,
-                        attachmentUrl = remoteAttachmentUrl,
-                        partyId = partyId,
-                        senderName = myName
-                    )
+                val wireMsg = SocialMessage(
+                    id = nowMs,
+                    sender = me,
+                    recipient = "",
+                    body = cleanText,
+                    atMs = nowMs,
+                    replyTo = replyTo,
+                    attachmentUrl = remoteAttachmentUrl,
+                    partyId = partyId,
+                    senderName = myName,
+                    localTempId = tempId
                 )
+                SocialRealtime.sendPartyChatBroadcast(wireMsg, tempId = tempId)
                 return true
             }
         }
@@ -2686,9 +3541,10 @@ object SocialBackend {
             unreadCount()
             refreshPartyInvites()
             while (isActive && signedIn) {
-                if (myPresenceMode != SocialPresenceMode.INVISIBLE) {
+                val eff = effectivePresenceMode
+                if (eff != null && eff != SocialPresenceMode.INVISIBLE) {
                     activeGameJoinable = parties.any { it.hostId == userId && !it.isExpired() }
-                    val wire = SocialPresenceCodec.encodeForWire(myPresenceMode, activeGameStatusLine)
+                    val wire = SocialPresenceCodec.encodeForWire(eff, activeGameStatusLine)
                     pushRichPresence(
                         statusLine = wire,
                         mcVersion = activeGameMcVersion,
@@ -2707,7 +3563,7 @@ object SocialBackend {
         activeGameStatusLine = null
         activeGameMcVersion = null
         activeGameJoinable = false
-        if (!signedIn || myPresenceMode == SocialPresenceMode.INVISIBLE) return
+        if (!signedIn || effectivePresenceMode == SocialPresenceMode.INVISIBLE) return
         bgScope.launch {
             syncRichPresenceToServer()
         }
@@ -2745,14 +3601,15 @@ object SocialBackend {
     }
 
     private suspend fun syncRichPresenceToServer() {
-        if (!signedIn) return
-        if (myPresenceMode == SocialPresenceMode.INVISIBLE) return
+        if (!signedIn || !isNetworkAvailable) return
+        val eff = effectivePresenceMode ?: return
+        if (eff == SocialPresenceMode.INVISIBLE) return
         val hosting = parties.firstOrNull { it.hostId == userId && !it.isExpired() }
         val baseStatus = activeGameStatusLine
             ?: hosting?.let { "In party: ${it.title}" }
             ?: myCustomStatus
             ?: myProfile?.statusText
-        val wireStatus = SocialPresenceCodec.encodeForWire(myPresenceMode, baseStatus)
+        val wireStatus = SocialPresenceCodec.encodeForWire(eff, baseStatus)
         val ver = activeGameMcVersion ?: hosting?.mcVersion
         val joinable = hosting != null || activeGameJoinable
         pushRichPresence(wireStatus, ver, joinable)
@@ -2820,7 +3677,17 @@ object SocialBackend {
         }
         if (card != null) {
             val resolvedRole = SocialRole.fromEmail(email) ?: card.role
-            val withLocalState = if (myPresenceMode == SocialPresenceMode.INVISIBLE) {
+            val withLocalState = if (isAutoPresence) {
+                val eff = effectivePresenceMode ?: SocialPresenceMode.ONLINE
+                myCustomStatus = myCustomStatus ?: card.statusText
+                myLookingToPlay = card.lookingToPlay
+                persistLocalStatus(myPresenceMode, myCustomStatus, myLookingToPlay, autoMode = true)
+                card.copy(
+                    role = resolvedRole,
+                    presenceMode = eff,
+                    statusText = myCustomStatus
+                )
+            } else if (myPresenceMode == SocialPresenceMode.INVISIBLE) {
                 card.copy(
                     role = resolvedRole,
                     presenceMode = SocialPresenceMode.INVISIBLE,
@@ -2830,7 +3697,7 @@ object SocialBackend {
                 myPresenceMode = card.presenceMode
                 myCustomStatus = card.statusText
                 myLookingToPlay = card.lookingToPlay
-                persistLocalStatus(myPresenceMode, myCustomStatus, myLookingToPlay)
+                persistLocalStatus(myPresenceMode, myCustomStatus, myLookingToPlay, autoMode = false)
                 card.copy(role = resolvedRole)
             }
             myProfile = withLocalState
@@ -2948,6 +3815,7 @@ object SocialBackend {
         lookingToPlay: Boolean = false
     ): Boolean {
         val cleanStatus = SocialPresenceCodec.stripModePrefix(statusText)
+        val effMode = effectivePresenceMode ?: myPresenceMode
         val saved = attempt {
             ensureToken()
             val me = userId ?: myProfile?.id ?: return@attempt null
@@ -2957,7 +3825,7 @@ object SocialBackend {
                 ?: email?.substringBefore('@')
                 ?: "Player"
             val encodedName = SocialRole.encodeTaggedName(name, role, fallbackBase)
-            val wireStatus = SocialPresenceCodec.encodeForWire(myPresenceMode, cleanStatus)
+            val wireStatus = SocialPresenceCodec.encodeForWire(effMode, cleanStatus)
 
             val row = JsonObject().apply {
                 addProperty("id", me)
@@ -2972,7 +3840,7 @@ object SocialBackend {
                 addProperty("bio", bio?.trim()?.takeIf { it.isNotBlank() })
                 if (wireStatus != null) addProperty("status_text", wireStatus)
                 else add("status_text", com.google.gson.JsonNull.INSTANCE)
-                addProperty("looking_to_play", if (myPresenceMode == SocialPresenceMode.INVISIBLE) false else lookingToPlay)
+                addProperty("looking_to_play", if (effMode == SocialPresenceMode.INVISIBLE) false else lookingToPlay)
                 addProperty("onboarded", onboarded)
                 if (avatarUrl != null) addProperty("avatar_url", avatarUrl)
                 if (bannerUrl != null) addProperty("banner_url", bannerUrl)
@@ -2993,10 +3861,10 @@ object SocialBackend {
             myLookingToPlay = lookingToPlay
             persistLocalStatus(myPresenceMode, myCustomStatus, myLookingToPlay)
             SocialRealtime.sendPresenceBroadcast(
-                modeKey = myPresenceMode.key,
-                wireStatus = SocialPresenceCodec.encodeForWire(myPresenceMode, cleanStatus),
+                modeKey = effMode.key,
+                wireStatus = SocialPresenceCodec.encodeForWire(effMode, cleanStatus),
                 lookingToPlay = lookingToPlay,
-                appearOffline = myPresenceMode == SocialPresenceMode.INVISIBLE,
+                appearOffline = effMode == SocialPresenceMode.INVISIBLE,
                 displayName = SocialRole.encodeTaggedName(name, myRole, myEffectiveDisplayName()),
                 roleKey = myRole?.key
             )
@@ -3022,28 +3890,22 @@ object SocialBackend {
                 else -> "image/png"
             }
             try {
-                val connection = (URL("$PROJECT_URL/storage/v1/object/social-media/$path")
-                    .openConnection() as HttpURLConnection).apply {
-                    requestMethod = "POST"
-                    doOutput = true
-                    setFixedLengthStreamingMode(bytes.size)
-                    connectTimeout = 20000
-                    readTimeout = 30000
-                    setRequestProperty("apikey", PUBLISHABLE_KEY)
-                    setRequestProperty("Authorization", "Bearer $token")
-                    setRequestProperty("Content-Type", mime)
-                    setRequestProperty("x-upsert", "true")
-                    outputStream.use { it.write(bytes) }
-                }
-                val code = connection.responseCode
-                val text = (if (code in 200..299) connection.inputStream else connection.errorStream)
-                    ?.bufferedReader()?.use { it.readText() } ?: ""
-                connection.disconnect()
-                if (code !in 200..299) {
-                    val detail = serverMessage(text)?.takeIf { it.isNotBlank() }
-                        ?: text.trim().take(140).takeIf { it.isNotBlank() }
-                    lastError = if (detail != null) "$detail (HTTP $code)" else "Upload failed (HTTP $code)"
-                    return@withContext null
+                val req = Request.Builder()
+                    .url("$PROJECT_URL/storage/v1/object/social-media/$path")
+                    .post(bytes.toRequestBody(mime.toMediaType()))
+                    .header("apikey", PUBLISHABLE_KEY)
+                    .header("Authorization", "Bearer $token")
+                    .header("x-upsert", "true")
+                    .build()
+                SocialRealtime.restClient.newCall(req).execute().use { resp ->
+                    val code = resp.code
+                    val text = resp.body?.string() ?: ""
+                    if (code !in 200..299) {
+                        val detail = serverMessage(text)?.takeIf { it.isNotBlank() }
+                            ?: text.trim().take(140).takeIf { it.isNotBlank() }
+                        lastError = if (detail != null) "$detail (HTTP $code)" else "Upload failed (HTTP $code)"
+                        return@withContext null
+                    }
                 }
                 lastError = null
                 "$PROJECT_URL/storage/v1/object/public/social-media/$path"
@@ -3057,24 +3919,15 @@ object SocialBackend {
     private fun writeOwnStorageJson(fileName: String, jsonContent: String): Boolean {
         val me = userId ?: return false
         val token = accessToken ?: return false
-        val bytes = jsonContent.toByteArray(Charsets.UTF_8)
         return try {
-            val conn = (URL("$PROJECT_URL/storage/v1/object/social-media/$me/$fileName")
-                .openConnection() as HttpURLConnection).apply {
-                requestMethod = "POST"
-                doOutput = true
-                setFixedLengthStreamingMode(bytes.size)
-                connectTimeout = 12000
-                readTimeout = 15000
-                setRequestProperty("apikey", PUBLISHABLE_KEY)
-                setRequestProperty("Authorization", "Bearer $token")
-                setRequestProperty("Content-Type", "application/json")
-                setRequestProperty("x-upsert", "true")
-                outputStream.use { it.write(bytes) }
-            }
-            val code = conn.responseCode
-            conn.disconnect()
-            code in 200..299
+            val req = Request.Builder()
+                .url("$PROJECT_URL/storage/v1/object/social-media/$me/$fileName")
+                .post(jsonContent.toRequestBody("application/json; charset=utf-8".toMediaType()))
+                .header("apikey", PUBLISHABLE_KEY)
+                .header("Authorization", "Bearer $token")
+                .header("x-upsert", "true")
+                .build()
+            SocialRealtime.restClient.newCall(req).execute().use { it.code in 200..299 }
         } catch (_: Throwable) {
             false
         }
@@ -3082,20 +3935,15 @@ object SocialBackend {
 
     private fun readPublicStorageJson(path: String): JsonElement? {
         return try {
-            val conn = (URL("$PROJECT_URL/storage/v1/object/public/social-media/$path")
-                .openConnection() as HttpURLConnection).apply {
-                requestMethod = "GET"
-                connectTimeout = 8000
-                readTimeout = 10000
+            val req = Request.Builder()
+                .url("$PROJECT_URL/storage/v1/object/public/social-media/$path")
+                .get()
+                .build()
+            SocialRealtime.restClient.newCall(req).execute().use { resp ->
+                if (resp.code !in 200..299) return null
+                val text = resp.body?.string() ?: return null
+                if (text.isBlank()) null else JsonParser.parseString(text)
             }
-            val code = conn.responseCode
-            if (code !in 200..299) {
-                conn.disconnect()
-                return null
-            }
-            val text = conn.inputStream.bufferedReader().use { it.readText() }
-            conn.disconnect()
-            if (text.isBlank()) null else JsonParser.parseString(text)
         } catch (_: Throwable) {
             null
         }
@@ -3269,6 +4117,29 @@ object SocialBackend {
     // ---- presence and unread ----------------------------------------------------------------
 
     /**
+     * Switches back to Smart Automatic Presence:
+     * Green (`Online`) while in Launcher/Game, Yellow (`Idle`) in background, Offline without Wi-Fi.
+     */
+    suspend fun enableAutoStatus(
+        customStatus: String? = myCustomStatus,
+        looking: Boolean = myLookingToPlay
+    ): Boolean {
+        if (!signedIn) return false
+        val cleanStatus = SocialPresenceCodec.stripModePrefix(customStatus)?.take(52)
+        isAutoPresence = true
+        myCustomStatus = cleanStatus
+        myLookingToPlay = looking
+        val autoMode = if (isLauncherInForeground || activeGameStatusLine != null) {
+            SocialPresenceMode.ONLINE
+        } else {
+            SocialPresenceMode.IDLE
+        }
+        persistLocalStatus(myPresenceMode, cleanStatus, looking, autoMode = true)
+        SocialSoundEffects.playStatusChanged()
+        return syncStatusInternal(autoMode, cleanStatus, looking)
+    }
+
+    /**
      * Updates the signed-in player's availability mode (`Online`, `Idle`, `Do Not Disturb`,
      * `Appear Offline`), custom status message, and Looking-to-Play badge, syncing both to
      * Supabase and over Realtime WebSocket so other players see the change immediately.
@@ -3276,21 +4147,36 @@ object SocialBackend {
     suspend fun updateMyStatus(
         mode: SocialPresenceMode,
         customStatus: String?,
-        looking: Boolean
+        looking: Boolean,
+        manualOverride: Boolean = true
     ): Boolean {
         if (!signedIn) return false
         val cleanStatus = SocialPresenceCodec.stripModePrefix(customStatus)?.take(52)
-        myPresenceMode = mode
+        if (manualOverride) {
+            isAutoPresence = false
+            myPresenceMode = mode
+        }
         myCustomStatus = cleanStatus
         myLookingToPlay = looking
-        persistLocalStatus(mode, cleanStatus, looking)
+        persistLocalStatus(myPresenceMode, cleanStatus, looking, autoMode = isAutoPresence)
+        SocialSoundEffects.playStatusChanged()
+        val effective = effectivePresenceMode ?: mode
+        return syncStatusInternal(effective, cleanStatus, looking)
+    }
+
+    private suspend fun syncStatusInternal(
+        mode: SocialPresenceMode,
+        cleanStatus: String?,
+        looking: Boolean
+    ): Boolean {
         myProfile = myProfile?.copy(
             presenceMode = mode,
             statusText = cleanStatus,
             lookingToPlay = looking,
-            lastSeenMs = if (mode == SocialPresenceMode.INVISIBLE) 0L else System.currentTimeMillis(),
+            lastSeenMs = if (mode == SocialPresenceMode.INVISIBLE || !isNetworkAvailable) 0L else System.currentTimeMillis(),
             role = myRole
         )
+        if (!isNetworkAvailable) return true
 
         val done = attempt {
             ensureToken()
@@ -3362,10 +4248,15 @@ object SocialBackend {
     }
 
     suspend fun setPresence(status: String?, looking: Boolean) {
-        updateMyStatus(myPresenceMode, status, looking)
+        if (isAutoPresence) {
+            enableAutoStatus(status, looking)
+        } else {
+            updateMyStatus(myPresenceMode, status, looking, manualOverride = false)
+        }
     }
 
     suspend fun unreadCount(): Int {
+        if (!isNetworkAvailable) return unread
         val count = attempt {
             ensureToken()
             val me = userId ?: return@attempt 0
@@ -3392,19 +4283,40 @@ object SocialBackend {
     }
 
     suspend fun markRead(otherId: String) {
+        val nowMs = System.currentTimeMillis()
+        var hadUnreadInCache = false
+        liveDmCache[otherId]?.let { list ->
+            synchronized(list) {
+                for (i in list.indices) {
+                    val m = list[i]
+                    if (m.sender == otherId && !m.isRead) {
+                        list[i] = m.copy(readAtMs = nowMs)
+                        hadUnreadInCache = true
+                    }
+                }
+            }
+        }
+        // Broadcast instant read receipt (`✓✓ Seen`) over WebSocket so peer sees it in ~50ms!
+        SocialRealtime.sendDmReadBroadcast(otherId, nowMs)
+        if (hadUnreadInCache) {
+            withContext(Dispatchers.Main) {
+                unread = (unread - 1).coerceAtLeast(0)
+                messageRevision++
+            }
+        }
+        if (!isNetworkAvailable) return
         attempt {
             ensureToken()
             val me = userId ?: return@attempt Unit
             call(
                 "PATCH",
                 "$PROJECT_URL/rest/v1/messages?recipient=eq.$me&sender=eq.$otherId&read_at=is.null",
-                JsonObject().apply { addProperty("read_at", isoNow()) }.toString(),
+                JsonObject().apply { addProperty("read_at", isoAt(nowMs)) }.toString(),
                 extraHeaders = mapOf("Prefer" to "return=minimal")
             )
             Unit
         }
         unreadCount()
-        messageRevision++
     }
 
     private fun isoNow(): String = isoAt(System.currentTimeMillis())
@@ -3483,29 +4395,35 @@ object SocialBackend {
         extraHeaders: Map<String, String> = emptyMap()
     ): RawHttpResult {
         return try {
-            val connection = (URL(url).openConnection() as HttpURLConnection).apply {
-                requestMethod = method
-                connectTimeout = 12000
-                readTimeout = 15000
-                setRequestProperty("apikey", PUBLISHABLE_KEY)
-                setRequestProperty("Content-Type", "application/json")
-                if (authenticated) accessToken?.let { setRequestProperty("Authorization", "Bearer $it") }
-                extraHeaders.forEach { (key, value) -> setRequestProperty(key, value) }
-                if (body != null) {
-                    doOutput = true
-                    outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
-                }
+            val upper = method.uppercase(Locale.US)
+            val jsonMedia = "application/json; charset=utf-8".toMediaType()
+            val reqBody = when {
+                body != null -> body.toRequestBody(jsonMedia)
+                upper == "POST" || upper == "PUT" || upper == "PATCH" -> "".toRequestBody(jsonMedia)
+                else -> null
             }
-            val code = connection.responseCode
-            val stream = if (code in 200..299) connection.inputStream else connection.errorStream
-            val text = stream?.bufferedReader()?.use { it.readText() } ?: ""
-            connection.disconnect()
-            val parsed = if (code in 200..299) {
-                runCatching {
-                    if (text.isBlank()) JsonParser.parseString("{}") else JsonParser.parseString(text)
-                }.getOrNull()
-            } else null
-            RawHttpResult(code, text, parsed)
+            val builder = Request.Builder()
+                .url(url)
+                .method(upper, reqBody)
+                .header("apikey", PUBLISHABLE_KEY)
+            if (reqBody != null) {
+                builder.header("Content-Type", "application/json")
+            }
+            if (authenticated) {
+                accessToken?.let { builder.header("Authorization", "Bearer $it") }
+            }
+            extraHeaders.forEach { (key, value) -> builder.header(key, value) }
+
+            SocialRealtime.restClient.newCall(builder.build()).execute().use { resp ->
+                val code = resp.code
+                val text = resp.body?.string() ?: ""
+                val parsed = if (code in 200..299) {
+                    runCatching {
+                        if (text.isBlank()) JsonParser.parseString("{}") else JsonParser.parseString(text)
+                    }.getOrNull()
+                } else null
+                RawHttpResult(code, text, parsed)
+            }
         } catch (t: Throwable) {
             RawHttpResult(-1, t.message ?: "Network error", null)
         }

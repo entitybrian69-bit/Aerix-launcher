@@ -160,4 +160,109 @@ class SocialModelsTest {
         val invisibleFriend = dndFriend.copy(presenceMode = SocialPresenceMode.INVISIBLE)
         assertFalse(invisibleFriend.isOnlineAt(now))
     }
+
+    @Test
+    fun smartAutomaticPresenceAndManualOverride() {
+        // 1. Auto mode + Launcher in foreground + Wi-Fi on -> Green (ONLINE)
+        assertEquals(
+            SocialPresenceMode.ONLINE,
+            SocialPresenceCodec.resolveEffectiveMode(
+                isNetworkAvailable = true,
+                isAutoPresence = true,
+                isInForeground = true,
+                isPlayingGame = false,
+                manualMode = SocialPresenceMode.DND
+            )
+        )
+
+        // 2. Auto mode + Launcher in background + Wi-Fi on -> Yellow (IDLE)
+        assertEquals(
+            SocialPresenceMode.IDLE,
+            SocialPresenceCodec.resolveEffectiveMode(
+                isNetworkAvailable = true,
+                isAutoPresence = true,
+                isInForeground = false,
+                isPlayingGame = false,
+                manualMode = SocialPresenceMode.ONLINE
+            )
+        )
+
+        // 3. Auto mode + Launcher in background while actively playing Minecraft (:game) -> Green (ONLINE)
+        assertEquals(
+            SocialPresenceMode.ONLINE,
+            SocialPresenceCodec.resolveEffectiveMode(
+                isNetworkAvailable = true,
+                isAutoPresence = true,
+                isInForeground = false,
+                isPlayingGame = true,
+                manualMode = SocialPresenceMode.IDLE
+            )
+        )
+
+        // 4. Wi-Fi turned off -> Offline immediately (null) in both Auto and Manual modes
+        assertNull(
+            SocialPresenceCodec.resolveEffectiveMode(
+                isNetworkAvailable = false,
+                isAutoPresence = true,
+                isInForeground = true,
+                isPlayingGame = false,
+                manualMode = SocialPresenceMode.ONLINE
+            )
+        )
+        assertNull(
+            SocialPresenceCodec.resolveEffectiveMode(
+                isNetworkAvailable = false,
+                isAutoPresence = false,
+                isInForeground = true,
+                isPlayingGame = false,
+                manualMode = SocialPresenceMode.DND
+            )
+        )
+
+        // 5. Manual mode with Wi-Fi on -> respects user's chosen manual status
+        assertEquals(
+            SocialPresenceMode.DND,
+            SocialPresenceCodec.resolveEffectiveMode(
+                isNetworkAvailable = true,
+                isAutoPresence = false,
+                isInForeground = true,
+                isPlayingGame = false,
+                manualMode = SocialPresenceMode.DND
+            )
+        )
+        assertEquals(
+            SocialPresenceMode.INVISIBLE,
+            SocialPresenceCodec.resolveEffectiveMode(
+                isNetworkAvailable = true,
+                isAutoPresence = false,
+                isInForeground = true,
+                isPlayingGame = false,
+                manualMode = SocialPresenceMode.INVISIBLE
+            )
+        )
+    }
+
+    @Test
+    fun optimisticMessageAndSeenReceiptTransitions() {
+        val optimistic = SocialMessage(
+            id = -1_000_001L,
+            sender = "me",
+            recipient = "peer",
+            body = "yo hop on",
+            atMs = 1_800_000_000_000L,
+            localTempId = "tmp-1"
+        )
+        assertFalse(optimistic.isRead)
+        assertFalse(optimistic.pendingOffline)
+
+        val confirmed = optimistic.copy(id = 42L)
+        assertEquals("tmp-1", confirmed.localTempId)
+        assertFalse(confirmed.isRead)
+
+        val seen = confirmed.copy(readAtMs = 1_800_000_001_500L)
+        assertTrue(seen.isRead)
+
+        assertEquals("dm:peer", SocialRealtime.dmTypingKey("peer"))
+        assertEquals("party:p1", SocialRealtime.partyTypingKey("p1"))
+    }
 }

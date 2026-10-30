@@ -500,7 +500,7 @@ private fun SocialSidebar(
         Spacer(Modifier.weight(1f))
 
         if (signedIn) {
-            val myMode = SocialBackend.myPresenceMode
+            val myMode = SocialBackend.effectivePresenceMode
             val statusColor = presenceModeColor(myMode)
             Box(
                 modifier = Modifier
@@ -509,7 +509,7 @@ private fun SocialSidebar(
                     .background(statusColor.copy(alpha = 0.16f))
                     .border(BorderStroke(AerixSpacing.hairline, statusColor.copy(alpha = 0.7f)), CircleShape)
                     .clickable(role = Role.Button, onClick = onChangeStatus)
-                    .semantics { contentDescription = "Change status (${myMode.label})" },
+                    .semantics { contentDescription = "Change status (${myMode?.label ?: "Offline"})" },
                 contentAlignment = Alignment.Center
             ) {
                 SocialStatusDot(mode = myMode, size = 10.dp, borderWidth = 1.dp)
@@ -801,7 +801,7 @@ private fun SocialFriendsPage(
 
     Column(modifier = Modifier.fillMaxSize().padding(AerixSpacing.lg), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         // Signed-in player's own identity + 1-tap Change Status bar
-        val myMode = SocialBackend.myPresenceMode
+        val myMode = SocialBackend.effectivePresenceMode
         val myName = SocialBackend.myEffectiveDisplayName()
         val myRole = SocialBackend.myRole
         SocialPanel(Modifier.fillMaxWidth()) {
@@ -1273,6 +1273,7 @@ private fun FriendQoLRow(
 ) {
     val accent = AerixThemeManager.currentAccent()
     var menuOpen by remember { mutableStateOf(false) }
+    val activeTyper = SocialRealtime.activeTypers[SocialRealtime.dmTypingKey(friend.id)]?.first
 
     SocialPanel(modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -1319,13 +1320,21 @@ private fun FriendQoLRow(
                         SocialTag("Joinable", AerixSurface.success)
                     }
                 }
-                Text(
-                    friend.presenceSummary(),
-                    fontSize = 11.sp,
-                    color = presenceModeColor(friend.activePresenceMode()),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                if (activeTyper != null) {
+                    SocialTypingIndicatorRow(
+                        text = "typing…",
+                        tint = accent,
+                        fontSize = 11.sp
+                    )
+                } else {
+                    Text(
+                        friend.presenceSummary(),
+                        fontSize = 11.sp,
+                        color = presenceModeColor(friend.activePresenceMode()),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
 
             if (friend.online && (friend.joinable || !friend.mcVersion.isNullOrBlank())) {
@@ -1448,13 +1457,21 @@ private fun SocialMessagesHubPage(
                                     Text(party.title, fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = AerixSurface.textPrimary)
                                     SocialTag("${party.memberCount}/${party.maxMembers}", accent)
                                 }
-                                Text(
-                                    typer?.let { "$it is typing..." } ?: "${party.summaryTag()} · ${party.remainingText()}",
-                                    fontSize = 11.sp,
-                                    color = if (typer != null) accent else AerixSurface.textMuted,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
+                                if (typer != null) {
+                                    SocialTypingIndicatorRow(
+                                        text = "$typer is typing",
+                                        tint = accent,
+                                        fontSize = 11.sp
+                                    )
+                                } else {
+                                    Text(
+                                        "${party.summaryTag()} · ${party.remainingText()}",
+                                        fontSize = 11.sp,
+                                        color = AerixSurface.textMuted,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
                             }
                             SocialSmallButton("Open", true) { onOpenPartyChat(party.id) }
                         }
@@ -1517,16 +1534,21 @@ private fun SocialMessagesHubPage(
                                     )
                                     if (friend.online && friend.joinable) SocialTag("Joinable", AerixSurface.success)
                                 }
-                                Text(
-                                    typer?.let { "$it is typing..." } ?: friend.presenceSummary(),
-                                    fontSize = 11.sp,
-                                    color = when {
-                                        typer != null -> accent
-                                        else -> presenceModeColor(friend.activePresenceMode())
-                                    },
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
+                                if (typer != null) {
+                                    SocialTypingIndicatorRow(
+                                        text = "$typer is typing",
+                                        tint = accent,
+                                        fontSize = 11.sp
+                                    )
+                                } else {
+                                    Text(
+                                        friend.presenceSummary(),
+                                        fontSize = 11.sp,
+                                        color = presenceModeColor(friend.activePresenceMode()),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
                             }
                             Icon(
                                 painter = painterResource(R.drawable.aerix_ic_chevron_right),
@@ -1769,6 +1791,7 @@ private fun SocialSettingsPage(
     val scope = rememberCoroutineScope()
     val accent = AerixThemeManager.currentAccent()
     val myProf = SocialBackend.myProfile
+    var autoSelected by remember(SocialBackend.isAutoPresence) { mutableStateOf(SocialBackend.isAutoPresence) }
     var selectedMode by remember(SocialBackend.myPresenceMode) { mutableStateOf(SocialBackend.myPresenceMode) }
     var customStatus by remember(SocialBackend.myCustomStatus, myProf?.statusText) {
         mutableStateOf(SocialBackend.myCustomStatus ?: myProf?.statusText.orEmpty())
@@ -1794,7 +1817,7 @@ private fun SocialSettingsPage(
             ) {
                 Box(contentAlignment = Alignment.BottomEnd) {
                     SocialHead(SocialBackend.mcUsername ?: launcherName, 42)
-                    SocialStatusDot(mode = SocialBackend.myPresenceMode, size = 12.dp)
+                    SocialStatusDot(mode = SocialBackend.effectivePresenceMode, size = 12.dp)
                 }
                 Column(modifier = Modifier.weight(1f)) {
                     SocialNameWithRole(
@@ -1809,10 +1832,13 @@ private fun SocialSettingsPage(
                         color = AerixSurface.textSecondary
                     )
                     Text(
-                        if (SocialRealtime.isConnected) "Supabase Realtime connected (low-overhead WebSocket)"
-                        else "Realtime reconnecting — messages queue offline automatically",
+                        when {
+                            !SocialBackend.isNetworkAvailable -> "Wi-Fi / Internet offline — status is Offline"
+                            SocialRealtime.isConnected -> "Supabase Realtime connected (instant WebSocket delivery)"
+                            else -> "Realtime reconnecting — messages queue offline automatically"
+                        },
                         fontSize = 10.5.sp,
-                        color = if (SocialRealtime.isConnected) AerixSurface.success else AerixSurface.warning
+                        color = if (SocialBackend.isNetworkAvailable && SocialRealtime.isConnected) AerixSurface.success else AerixSurface.warning
                     )
                 }
             }
@@ -1820,9 +1846,9 @@ private fun SocialSettingsPage(
 
         SocialPanel(Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                Text("Change Status & Presence", fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = AerixSurface.textPrimary)
+                Text("Change Status & Smart Presence", fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = AerixSurface.textPrimary)
                 Text(
-                    "Choose your availability mode and custom status line. While Minecraft runs, Rich Presence automatically shares your active version and mod count unless you Appear Offline.",
+                    "Auto (Smart) sets Green while using the Launcher, Yellow in the background, and Offline when Wi-Fi is off — or choose any Manual status override below.",
                     fontSize = 11.sp,
                     color = AerixSurface.textMuted
                 )
@@ -1831,8 +1857,37 @@ private fun SocialSettingsPage(
                     modifier = Modifier.horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
+                    val autoTint = AerixSurface.success
+                    Row(
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .background(if (autoSelected) autoTint.copy(alpha = 0.2f) else AerixSurface.panelTrack)
+                            .border(
+                                BorderStroke(AerixSpacing.hairline, if (autoSelected) autoTint else AerixSurface.borderSoft),
+                                CircleShape
+                            )
+                            .clickable { autoSelected = true }
+                            .padding(horizontal = 11.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        SocialStatusDot(
+                            mode = if (!SocialBackend.isNetworkAvailable) null
+                            else if (SocialBackend.isLauncherInForeground) SocialPresenceMode.ONLINE
+                            else SocialPresenceMode.IDLE,
+                            size = 9.dp,
+                            borderWidth = 1.dp
+                        )
+                        Text(
+                            "Auto (Smart)",
+                            fontSize = 11.5.sp,
+                            fontWeight = if (autoSelected) FontWeight.Bold else FontWeight.Medium,
+                            color = if (autoSelected) autoTint else AerixSurface.textPrimary
+                        )
+                    }
+
                     SocialPresenceMode.values().forEach { candidate ->
-                        val active = selectedMode == candidate
+                        val active = !autoSelected && selectedMode == candidate
                         val tint = presenceModeColor(candidate)
                         Row(
                             modifier = Modifier
@@ -1842,7 +1897,10 @@ private fun SocialSettingsPage(
                                     BorderStroke(AerixSpacing.hairline, if (active) tint else AerixSurface.borderSoft),
                                     CircleShape
                                 )
-                                .clickable { selectedMode = candidate }
+                                .clickable {
+                                    autoSelected = false
+                                    selectedMode = candidate
+                                }
                                 .padding(horizontal = 11.dp, vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -1881,9 +1939,10 @@ private fun SocialSettingsPage(
                     SocialPresenceCodec.presets.forEach { preset ->
                         FilterChipPill(
                             label = preset.label,
-                            selected = customStatus.equals(preset.statusText, ignoreCase = true) && selectedMode == preset.mode
+                            selected = !autoSelected && customStatus.equals(preset.statusText, ignoreCase = true) && selectedMode == preset.mode
                         ) {
                             customStatus = preset.statusText
+                            autoSelected = false
                             selectedMode = preset.mode
                             preset.lookingToPlay?.let { lookingToPlay = it }
                         }
@@ -1902,24 +1961,47 @@ private fun SocialSettingsPage(
                     Text("Show \"Looking to play\" badge when online", fontSize = 12.sp, color = AerixSurface.textPrimary)
                 }
 
+                Row(
+                    modifier = Modifier.clickable { SocialBackend.toggleChatSounds(!SocialBackend.chatSoundsEnabled) },
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = SocialBackend.chatSoundsEnabled,
+                        onCheckedChange = { SocialBackend.toggleChatSounds(it) },
+                        colors = CheckboxDefaults.colors(checkedColor = accent)
+                    )
+                    Text(
+                        "Messenger sound effects (typing, peer typing, sent, received, seen ✓✓)",
+                        fontSize = 12.sp,
+                        color = AerixSurface.textPrimary
+                    )
+                }
+
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     SocialButton("Save Status", filled = true) {
                         scope.launch {
-                            SocialBackend.updateMyStatus(
-                                mode = selectedMode,
-                                customStatus = customStatus.trim().ifEmpty { null },
-                                looking = lookingToPlay
-                            )
-                            Toast.makeText(activity, "Status updated to ${selectedMode.label}", Toast.LENGTH_SHORT).show()
+                            val cleanMsg = customStatus.trim().ifEmpty { null }
+                            if (autoSelected) {
+                                SocialBackend.enableAutoStatus(cleanMsg, lookingToPlay)
+                                Toast.makeText(activity, "Smart Auto Status enabled", Toast.LENGTH_SHORT).show()
+                            } else {
+                                SocialBackend.updateMyStatus(
+                                    mode = selectedMode,
+                                    customStatus = cleanMsg,
+                                    looking = lookingToPlay,
+                                    manualOverride = true
+                                )
+                                Toast.makeText(activity, "Manual status set to ${selectedMode.label}", Toast.LENGTH_SHORT).show()
+                            }
                         }
                     }
-                    SocialButton("Reset Online", filled = false) {
-                        selectedMode = SocialPresenceMode.ONLINE
+                    SocialButton("Reset Auto", filled = false) {
+                        autoSelected = true
                         customStatus = ""
                         lookingToPlay = false
                         scope.launch {
-                            SocialBackend.updateMyStatus(SocialPresenceMode.ONLINE, null, false)
-                            Toast.makeText(activity, "Status reset to Online", Toast.LENGTH_SHORT).show()
+                            SocialBackend.enableAutoStatus(null, false)
+                            Toast.makeText(activity, "Reset to Smart Auto Status", Toast.LENGTH_SHORT).show()
                         }
                     }
                 }

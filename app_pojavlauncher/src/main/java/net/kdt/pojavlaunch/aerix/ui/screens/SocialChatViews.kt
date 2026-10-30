@@ -4,6 +4,11 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
@@ -34,10 +39,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -48,6 +55,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
@@ -61,6 +69,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import net.kdt.pojavlaunch.R
@@ -70,6 +80,7 @@ import net.kdt.pojavlaunch.aerix.social.SocialMessage
 import net.kdt.pojavlaunch.aerix.social.SocialParty
 import net.kdt.pojavlaunch.aerix.social.SocialRealtime
 import net.kdt.pojavlaunch.aerix.social.SocialSearchHit
+import net.kdt.pojavlaunch.aerix.social.SocialSoundEffects
 import net.kdt.pojavlaunch.aerix.theme.AerixRadii
 import net.kdt.pojavlaunch.aerix.theme.AerixSpacing
 import net.kdt.pojavlaunch.aerix.theme.AerixSurface
@@ -162,23 +173,46 @@ fun SocialConversationPanel(
     val scope = rememberCoroutineScope()
     val myId = SocialBackend.myUserId()
 
-    var messages by remember(convKey) { mutableStateOf<List<SocialMessage>>(emptyList()) }
+    val liveFriend = friend?.let { target ->
+        SocialBackend.friends.firstOrNull { it.id == target.id } ?: target
+    }
+    val liveParty = party?.let { target ->
+        SocialBackend.parties.firstOrNull { it.id == target.id } ?: target
+    }
+
+    var messages by remember(convKey) {
+        mutableStateOf(
+            if (party != null) SocialBackend.getCachedPartyMessages(party.id)
+            else if (friend != null) SocialBackend.getCachedMessages(friend.id)
+            else emptyList()
+        )
+    }
     var draft by remember(convKey) { mutableStateOf("") }
     var replyTarget by remember(convKey) { mutableStateOf<SocialMessage?>(null) }
     var editTarget by remember(convKey) { mutableStateOf<SocialMessage?>(null) }
     var pendingAttachmentUri by remember(convKey) { mutableStateOf<Uri?>(null) }
-    var sending by remember(convKey) { mutableStateOf(false) }
     var lightboxUrl by remember { mutableStateOf<String?>(null) }
 
     val listState = rememberLazyListState()
     val dmRev = SocialBackend.messageRevision
     val partyRev = SocialBackend.partyMessageRevision
 
+    DisposableEffect(convKey) {
+        SocialBackend.setOpenConversation(peerId = friend?.id, partyId = party?.id)
+        onDispose {
+            SocialBackend.notifyStopTyping(peerId = friend?.id, partyId = party?.id)
+            if (SocialBackend.activeOpenPeerId == friend?.id && SocialBackend.activeOpenPartyId == party?.id) {
+                SocialBackend.setOpenConversation(null, null)
+            }
+        }
+    }
+
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) pendingAttachmentUri = uri
     }
 
-    suspend fun reloadMessages() {
+    // Initial full load on conversation open
+    LaunchedEffect(convKey) {
         val loaded = if (party != null) {
             SocialBackend.loadPartyMessages(party.id)
         } else if (friend != null) {
@@ -190,13 +224,42 @@ fun SocialConversationPanel(
         }
     }
 
-    LaunchedEffect(convKey, if (isParty) partyRev else dmRev) {
-        reloadMessages()
+    // 0ms instant live updates whenever Realtime WebSocket or optimistic send bumps revision!
+    LaunchedEffect(convKey, dmRev) {
+        if (!isParty && friend != null) {
+            val cached = SocialBackend.getCachedMessages(friend.id)
+            if (cached.isNotEmpty() || messages.isNotEmpty()) {
+                messages = cached
+            }
+            if (cached.any { it.sender == friend.id && !it.isRead }) {
+                SocialBackend.markRead(friend.id)
+            }
+        }
     }
 
-    LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) {
-            runCatching { listState.animateScrollToItem(messages.lastIndex) }
+    LaunchedEffect(convKey, partyRev) {
+        if (isParty && party != null) {
+            val liveCached = SocialBackend.getCachedPartyMessages(party.id)
+            if (liveCached.isNotEmpty()) {
+                val merged = (messages + liveCached)
+                    .distinctBy { it.localTempId ?: "p_${it.id}_${it.atMs}" }
+                    .sortedBy { it.atMs }
+                messages = merged
+            }
+            messages = SocialBackend.loadPartyMessages(party.id)
+        }
+    }
+
+    // Lightweight safety delta-poll while chat stays open so replies & Seen receipts never miss even on flaky NATs
+    LaunchedEffect(convKey, SocialBackend.isNetworkAvailable) {
+        if (!SocialBackend.isNetworkAvailable) return@LaunchedEffect
+        while (isActive) {
+            delay(2_200L)
+            if (party != null) {
+                messages = SocialBackend.loadPartyMessages(party.id)
+            } else if (friend != null) {
+                messages = SocialBackend.syncNewMessages(friend.id)
+            }
         }
     }
 
@@ -206,7 +269,31 @@ fun SocialConversationPanel(
         SocialRealtime.dmTypingKey(friend!!.id)
     }
     val activeTyper = SocialRealtime.activeTypers[typingKey]?.first
-    val typingColor = ThemeMotion.rememberPulse(accent, active = activeTyper != null)
+
+    // Gentle Messenger typing bubble pulse sound if peer keeps typing a long message
+    LaunchedEffect(activeTyper != null) {
+        if (activeTyper != null) {
+            SocialSoundEffects.playPeerTyping()
+            while (isActive && SocialRealtime.activeTypers.containsKey(typingKey)) {
+                delay(3_000L)
+                if (SocialRealtime.activeTypers.containsKey(typingKey)) {
+                    SocialSoundEffects.playPeerTyping()
+                }
+            }
+        }
+    }
+
+    val lastMsgKey = messages.lastOrNull()?.let { "${it.id}_${it.isRead}" }
+    LaunchedEffect(messages.size, lastMsgKey, activeTyper != null) {
+        val totalItems = messages.size + (if (activeTyper != null) 1 else 0)
+        if (totalItems > 0) {
+            runCatching { listState.animateScrollToItem(totalItems - 1) }
+        }
+    }
+
+    val latestReadSentId = remember(messages, myId) {
+        messages.lastOrNull { it.sender == myId && it.isRead && !it.pendingOffline }?.id
+    }
 
     SocialPanel(modifier = modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize().padding(if (compact) 10.dp else 14.dp)) {
@@ -219,7 +306,7 @@ fun SocialConversationPanel(
                 if (onBack != null) {
                     SocialIconBubble(R.drawable.aerix_ic_arrow_back, "Back", onBack)
                 }
-                if (party != null) {
+                if (liveParty != null) {
                     Box(
                         modifier = Modifier
                             .size(if (compact) 32.dp else 38.dp)
@@ -238,63 +325,70 @@ fun SocialConversationPanel(
                     Column(
                         modifier = Modifier
                             .weight(1f)
-                            .clickable(enabled = onOpenPartyDetails != null) { onOpenPartyDetails?.invoke(party) }
+                            .clickable(enabled = onOpenPartyDetails != null) { onOpenPartyDetails?.invoke(liveParty) }
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text(
-                                party.title,
+                                liveParty.title,
                                 fontSize = if (compact) 13.sp else 15.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = AerixSurface.textPrimary,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
-                            SocialTag("${party.memberCount}/${party.maxMembers}", accent)
+                            SocialTag("${liveParty.memberCount}/${liveParty.maxMembers}", accent)
                         }
-                        Text(
-                            activeTyper?.let { "$it is typing..." }
-                                ?: "${party.summaryTag()} · ${party.remainingText()}",
-                            fontSize = 11.sp,
-                            color = if (activeTyper != null) typingColor else AerixSurface.textMuted,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                        if (activeTyper != null) {
+                            SocialTypingIndicatorRow(
+                                text = "$activeTyper is typing",
+                                tint = accent,
+                                fontSize = 11.sp
+                            )
+                        } else {
+                            Text(
+                                "${liveParty.summaryTag()} · ${liveParty.remainingText()}",
+                                fontSize = 11.sp,
+                                color = AerixSurface.textMuted,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                     }
                     if (onJoinSession != null) {
                         SocialButton("Join", filled = true, onClick = onJoinSession)
                     }
                     if (onOpenPartyDetails != null) {
                         SocialIconBubble(R.drawable.aerix_ic_settings_filled, "Party settings") {
-                            onOpenPartyDetails(party)
+                            onOpenPartyDetails(liveParty)
                         }
                     }
-                } else if (friend != null) {
+                } else if (liveFriend != null) {
                     Box(contentAlignment = Alignment.BottomEnd) {
                         SocialRemoteImage(
-                            url = friend.avatarUrl,
+                            url = liveFriend.avatarUrl,
                             fallbackIcon = R.drawable.aerix_ic_person_outlined,
                             modifier = Modifier
                                 .size(if (compact) 32.dp else 38.dp)
-                                .clickable(enabled = onOpenFriendProfile != null) { onOpenFriendProfile?.invoke(friend) },
+                                .clickable(enabled = onOpenFriendProfile != null) { onOpenFriendProfile?.invoke(liveFriend) },
                             shape = CircleShape
                         )
-                        SocialStatusDot(mode = friend.activePresenceMode(), size = if (compact) 9.dp else 10.dp)
+                        SocialStatusDot(mode = liveFriend.activePresenceMode(), size = if (compact) 9.dp else 10.dp)
                     }
                     Column(
                         modifier = Modifier
                             .weight(1f)
-                            .clickable(enabled = onOpenFriendProfile != null) { onOpenFriendProfile?.invoke(friend) }
+                            .clickable(enabled = onOpenFriendProfile != null) { onOpenFriendProfile?.invoke(liveFriend) }
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             SocialNameWithRole(
-                                name = friend.effectiveName,
-                                role = friend.effectiveRole,
+                                name = liveFriend.effectiveName,
+                                role = liveFriend.effectiveRole,
                                 fontSize = if (compact) 13.sp else 15.sp,
                                 fontWeight = FontWeight.Bold,
                                 compactBadge = compact,
                                 modifier = Modifier.weight(1f, fill = false)
                             )
-                            if (friend.pinned) {
+                            if (liveFriend.pinned) {
                                 Icon(
                                     painter = painterResource(R.drawable.aerix_ic_favorite_filled),
                                     contentDescription = "Pinned",
@@ -302,29 +396,37 @@ fun SocialConversationPanel(
                                     modifier = Modifier.size(12.dp)
                                 )
                             }
-                            if (friend.online && friend.joinable) {
+                            if (liveFriend.online && liveFriend.joinable) {
                                 SocialTag("Joinable", AerixSurface.success)
                             }
                         }
-                        Text(
-                            activeTyper?.let { "$it is typing..." } ?: friend.presenceSummary(),
-                            fontSize = 11.sp,
-                            color = when {
-                                activeTyper != null -> typingColor
-                                else -> presenceModeColor(friend.activePresenceMode())
-                            },
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                        if (activeTyper != null) {
+                            SocialTypingIndicatorRow(
+                                text = "$activeTyper is typing",
+                                tint = accent,
+                                fontSize = 11.sp
+                            )
+                        } else {
+                            Text(
+                                liveFriend.presenceSummary(),
+                                fontSize = 11.sp,
+                                color = presenceModeColor(liveFriend.activePresenceMode()),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                     }
-                    if (onJoinSession != null && friend.online && (friend.joinable || !friend.mcVersion.isNullOrBlank())) {
+                    if (onJoinSession != null && liveFriend.online && (liveFriend.joinable || !liveFriend.mcVersion.isNullOrBlank())) {
                         SocialButton("Join", filled = true, onClick = onJoinSession)
                     }
                 }
             }
 
-            // Offline send queue notice when messages are waiting for connectivity
-            if (SocialBackend.offlineQueueSize > 0) {
+            Spacer(Modifier.height(6.dp))
+            HorizontalDivider(color = AerixSurface.borderSoft.copy(alpha = 0.65f), thickness = AerixSpacing.hairline)
+
+            // Offline send queue or disconnected Wi-Fi notice
+            if (!SocialBackend.isNetworkAvailable || SocialBackend.offlineQueueSize > 0) {
                 Spacer(Modifier.height(6.dp))
                 Row(
                     modifier = Modifier
@@ -343,7 +445,11 @@ fun SocialConversationPanel(
                         modifier = Modifier.size(13.dp)
                     )
                     Text(
-                        "${SocialBackend.offlineQueueSize} queued offline · will send automatically on reconnect",
+                        if (!SocialBackend.isNetworkAvailable) {
+                            "Offline (Wi-Fi off) · messages will queue and send on reconnect"
+                        } else {
+                            "${SocialBackend.offlineQueueSize} queued offline · sending on reconnect"
+                        },
                         fontSize = 10.5.sp,
                         color = AerixSurface.textPrimary,
                         modifier = Modifier.weight(1f),
@@ -353,10 +459,10 @@ fun SocialConversationPanel(
                 }
             }
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(6.dp))
 
             // Message stream
-            if (messages.isEmpty()) {
+            if (messages.isEmpty() && activeTyper == null) {
                 Box(
                     modifier = Modifier.weight(1f).fillMaxWidth(),
                     contentAlignment = Alignment.Center
@@ -371,11 +477,17 @@ fun SocialConversationPanel(
             } else {
                 LazyColumn(
                     state = listState,
-                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .clipToBounds(),
                     contentPadding = PaddingValues(vertical = 4.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    items(messages, key = { "${it.id}_${it.localTempId ?: ""}" }) { msg ->
+                    items(
+                        items = messages,
+                        key = { it.localTempId ?: "msg_${it.id}_${it.atMs}" }
+                    ) { msg ->
                         val isMine = msg.sender == myId
                         var menuOpen by remember { mutableStateOf(false) }
 
@@ -535,6 +647,45 @@ fun SocialConversationPanel(
                                     }
                                 }
                             }
+
+                            // Messenger-style "Seen" badge with mini avatar right under the latest read DM!
+                            if (!isParty && isMine && msg.id == latestReadSentId && liveFriend != null) {
+                                Row(
+                                    modifier = Modifier.padding(top = 2.dp, end = 2.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Text(
+                                        text = "Seen",
+                                        fontSize = 9.5.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = accent
+                                    )
+                                    SocialRemoteImage(
+                                        url = liveFriend.avatarUrl,
+                                        fallbackIcon = R.drawable.aerix_ic_person_outlined,
+                                        modifier = Modifier.size(13.dp),
+                                        shape = CircleShape
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Live Messenger-style animated 3-dot typing bubble right inside the open chat stream!
+                    item(key = "live_typing_bubble") {
+                        AnimatedVisibility(
+                            visible = activeTyper != null,
+                            enter = fadeIn() + expandVertically(expandFrom = Alignment.Bottom),
+                            exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Bottom)
+                        ) {
+                            val typerLabel = activeTyper ?: liveFriend?.effectiveName ?: "Player"
+                            SocialTypingChatBubble(
+                                typerName = typerLabel,
+                                avatarUrl = liveFriend?.avatarUrl,
+                                showNameCaption = isParty,
+                                modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)
+                            )
                         }
                     }
                 }
@@ -614,12 +765,23 @@ fun SocialConversationPanel(
                     BasicTextField(
                         value = draft,
                         onValueChange = { next ->
+                            val wasNonEmpty = draft.isNotEmpty()
+                            if (next.length > draft.length) {
+                                SocialSoundEffects.playTypingTick()
+                            }
                             draft = next
-                            if (next.isNotBlank() && editTarget == null) {
-                                SocialBackend.notifyTyping(
-                                    peerId = friend?.id,
-                                    partyId = party?.id
-                                )
+                            if (editTarget == null) {
+                                if (next.isNotBlank()) {
+                                    SocialBackend.notifyTyping(
+                                        peerId = friend?.id,
+                                        partyId = party?.id
+                                    )
+                                } else if (wasNonEmpty) {
+                                    SocialBackend.notifyStopTyping(
+                                        peerId = friend?.id,
+                                        partyId = party?.id
+                                    )
+                                }
                             }
                         },
                         singleLine = false,
@@ -630,7 +792,7 @@ fun SocialConversationPanel(
                     )
                 }
 
-                val canSend = !sending && (draft.isNotBlank() || pendingAttachmentUri != null)
+                val canSend = draft.isNotBlank() || pendingAttachmentUri != null
                 Box(
                     modifier = Modifier
                         .size(36.dp)
@@ -642,24 +804,22 @@ fun SocialConversationPanel(
                             val attUri = pendingAttachmentUri
                             val replying = replyTarget
                             val editing = editTarget
-                            sending = true
+
+                            // 0ms Messenger UX: clear composer immediately + play Send pop!
+                            draft = ""
+                            replyTarget = null
+                            editTarget = null
+                            pendingAttachmentUri = null
+                            SocialSoundEffects.playMessageSent()
+
                             scope.launch {
-                                val ok = if (editing != null) {
+                                if (editing != null) {
                                     SocialBackend.editMessage(editing.id, textToSend, isParty = isParty)
                                 } else if (party != null) {
                                     SocialBackend.sendPartyMessage(party.id, textToSend, replying?.id, attUri)
                                 } else if (friend != null) {
                                     SocialBackend.sendMessage(friend.id, textToSend, replying?.id, attUri)
-                                } else false
-
-                                if (ok) {
-                                    draft = ""
-                                    replyTarget = null
-                                    editTarget = null
-                                    pendingAttachmentUri = null
-                                    reloadMessages()
                                 }
-                                sending = false
                             }
                         },
                     contentAlignment = Alignment.Center

@@ -200,6 +200,29 @@ object SocialPresenceCodec {
             ?: SocialPresenceMode.ONLINE
         return ParsedPresence(mode = mode, customText = stripModePrefix(trimmed))
     }
+
+    /**
+     * Resolves the active presence mode from network + lifecycle + manual/auto preference:
+     * - Wi-Fi / internet OFF -> `null` (Offline immediately)
+     * - Auto ON + Foreground (or active Minecraft session) -> [SocialPresenceMode.ONLINE] (Green)
+     * - Auto ON + Background -> [SocialPresenceMode.IDLE] (Yellow)
+     * - Auto OFF -> [manualMode]
+     */
+    fun resolveEffectiveMode(
+        isNetworkAvailable: Boolean,
+        isAutoPresence: Boolean,
+        isInForeground: Boolean,
+        isPlayingGame: Boolean,
+        manualMode: SocialPresenceMode
+    ): SocialPresenceMode? {
+        if (!isNetworkAvailable) return null
+        if (!isAutoPresence) return manualMode
+        return if (isInForeground || isPlayingGame) {
+            SocialPresenceMode.ONLINE
+        } else {
+            SocialPresenceMode.IDLE
+        }
+    }
 }
 
 /** Everything the social pages show about one person. */

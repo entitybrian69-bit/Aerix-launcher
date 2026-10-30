@@ -77,6 +77,7 @@ import net.kdt.pojavlaunch.aerix.ui.screens.SocialRoleBadge
 import net.kdt.pojavlaunch.aerix.ui.screens.SocialStatusDialog
 import net.kdt.pojavlaunch.aerix.ui.screens.SocialStatusDot
 import net.kdt.pojavlaunch.aerix.ui.screens.SocialTag
+import net.kdt.pojavlaunch.aerix.ui.screens.SocialTypingIndicatorRow
 import net.kdt.pojavlaunch.aerix.ui.screens.presenceModeColor
 
 private enum class InGameSocialTab(val label: String) {
@@ -188,8 +189,13 @@ fun GameSocialsScreen(accent: Color, onBack: () -> Unit) {
                 // Segmented glass tabs + 1-tap Status pill
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                     if (ready) {
-                        val myMode = SocialBackend.myPresenceMode
+                        val myMode = SocialBackend.effectivePresenceMode
                         val modeTint = presenceModeColor(myMode)
+                        val modeLabel = when {
+                            myMode == null -> "Offline"
+                            SocialBackend.isAutoPresence -> "${myMode.label} · Auto"
+                            else -> myMode.label
+                        }
                         val statusPillShape = RoundedCornerShape(AerixRadii.pill)
                         Row(
                             modifier = Modifier
@@ -203,7 +209,7 @@ fun GameSocialsScreen(accent: Color, onBack: () -> Unit) {
                         ) {
                             SocialStatusDot(mode = myMode, size = 8.dp, borderWidth = 1.dp)
                             Text(
-                                myMode.label,
+                                modeLabel,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = modeTint,
@@ -306,6 +312,7 @@ fun GameSocialsScreen(accent: Color, onBack: () -> Unit) {
                                     }
                                     items(parties, key = { "ig_party_${it.id}" }) { p ->
                                         val isPicked = selectedPartyId == p.id
+                                        val pTyper = SocialRealtime.activeTypers[SocialRealtime.partyTypingKey(p.id)]?.first
                                         val rowShape = RoundedCornerShape(AerixRadii.controlSmall)
                                         Row(
                                             modifier = Modifier
@@ -332,7 +339,11 @@ fun GameSocialsScreen(accent: Color, onBack: () -> Unit) {
                                             )
                                             Column(modifier = Modifier.weight(1f)) {
                                                 Text(p.title, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = AerixSurface.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                                Text("${p.memberCount}/${p.maxMembers} · ${p.remainingText()}", fontSize = 10.sp, color = AerixSurface.textMuted, maxLines = 1)
+                                                if (pTyper != null) {
+                                                    SocialTypingIndicatorRow(text = "$pTyper typing", tint = accent, fontSize = 10.sp)
+                                                } else {
+                                                    Text("${p.memberCount}/${p.maxMembers} · ${p.remainingText()}", fontSize = 10.sp, color = AerixSurface.textMuted, maxLines = 1)
+                                                }
                                             }
                                         }
                                     }
@@ -360,6 +371,7 @@ fun GameSocialsScreen(accent: Color, onBack: () -> Unit) {
                                 } else {
                                     items(acceptedFriends, key = { "ig_dm_${it.id}" }) { friend ->
                                         val isPicked = selectedPartyId == null && selectedFriendId == friend.id
+                                        val fTyper = SocialRealtime.activeTypers[SocialRealtime.dmTypingKey(friend.id)]?.first
                                         val rowShape = RoundedCornerShape(AerixRadii.controlSmall)
                                         Row(
                                             modifier = Modifier
@@ -399,13 +411,17 @@ fun GameSocialsScreen(accent: Color, onBack: () -> Unit) {
                                                     fontWeight = FontWeight.Bold,
                                                     compactBadge = true
                                                 )
-                                                Text(
-                                                    friend.presenceSummary(),
-                                                    fontSize = 10.sp,
-                                                    color = presenceModeColor(friend.activePresenceMode()),
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis
-                                                )
+                                                if (fTyper != null) {
+                                                    SocialTypingIndicatorRow(text = "typing…", tint = accent, fontSize = 10.sp)
+                                                } else {
+                                                    Text(
+                                                        friend.presenceSummary(),
+                                                        fontSize = 10.sp,
+                                                        color = presenceModeColor(friend.activePresenceMode()),
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis
+                                                    )
+                                                }
                                             }
                                         }
                                     }

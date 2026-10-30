@@ -13,11 +13,14 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import okhttp3.ConnectionPool
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
+import java.util.Collections
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
@@ -25,28 +28,43 @@ import java.util.concurrent.atomic.AtomicLong
 /**
  * Supabase Realtime client (Phoenix Channels v1 over OkHttp WebSocket).
  *
- * Designed for the Supabase free tier (2M messages/month):
- * - Multiplexes database changes (`postgres_changes`), typing indicators (`broadcast`),
- *   party signals (`broadcast`) and live presence over a single WebSocket channel.
- * - Throttles outbound typing events to >= 2.5s intervals and auto-expires remote typing after 4.5s.
- * - Reconnects with exponential backoff and triggers offline outbox flush on connect.
+ * Designed for the Supabase free tier (2M messages/month) and sub-100ms live chat:
+ * - Multiplexes database changes (`postgres_changes`), instant DM & party chat (`broadcast`),
+ *   live read receipts (`dm_read`), typing indicators (`typing` start/stop), party signals,
+ *   and socket-level Phoenix `presence` (`presence_state` / `presence_diff`) over ONE WebSocket.
+ * - Shares an HTTP/2 keep-alive [ConnectionPool] (`restClient`) so REST writes reuse warm TLS sockets.
  */
 object SocialRealtime {
     private const val TAG = "AerixSocialRealtime"
     private const val TOPIC = "realtime:aerix:sync"
-    private const val HEARTBEAT_MS = 25_000L
-    private const val TYPING_TTL_MS = 4_500L
-    private const val TYPING_SEND_THROTTLE_MS = 2_500L
+    private const val HEARTBEAT_MS = 22_000L
+    private const val TYPING_TTL_MS = 4_200L
+    private const val TYPING_SEND_THROTTLE_MS = 1_350L
 
     private val gson = Gson()
     private val refSeq = AtomicInteger(1)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    private val client: OkHttpClient by lazy {
+    private val sharedPool = ConnectionPool(8, 2, TimeUnit.MINUTES)
+
+    /** Shared warm HTTP/2 client for fast Supabase REST & Storage calls. */
+    val restClient: OkHttpClient by lazy {
         OkHttpClient.Builder()
-            .connectTimeout(12, TimeUnit.SECONDS)
+            .connectionPool(sharedPool)
+            .connectTimeout(8, TimeUnit.SECONDS)
+            .readTimeout(12, TimeUnit.SECONDS)
+            .writeTimeout(15, TimeUnit.SECONDS)
+            .retryOnConnectionFailure(true)
+            .build()
+    }
+
+    private val wsClient: OkHttpClient by lazy {
+        OkHttpClient.Builder()
+            .connectionPool(sharedPool)
+            .connectTimeout(10, TimeUnit.SECONDS)
             .readTimeout(0, TimeUnit.MILLISECONDS)
-            .pingInterval(25, TimeUnit.SECONDS)
+            .pingInterval(20, TimeUnit.SECONDS)
+            .retryOnConnectionFailure(true)
             .build()
     }
 
@@ -65,9 +83,13 @@ object SocialRealtime {
     private var backoffStep: Int = 0
     private val lastTypingSentMs = AtomicLong(0L)
 
+    /** Peers currently tracked on Phoenix Presence over live WebSockets. */
+    val onlineSocketPeers: MutableSet<String> =
+        Collections.newSetFromMap(ConcurrentHashMap<String, Boolean>())
+
     /**
      * Map of conversation key (`dm:<peerUserId>` or `party:<partyId>`) ->
-     * Pair(typerDisplayName, expiresAtEpochMs). Observed directly by Compose chat headers.
+     * Pair(typerDisplayName, expiresAtEpochMs). Observed directly by Compose chat headers & bubbles.
      */
     val activeTypers = mutableStateMapOf<String, Pair<String, Long>>()
 
@@ -78,9 +100,13 @@ object SocialRealtime {
         fun onFriendshipTableChanged(eventType: String, record: JsonObject?)
         fun onPartyTableChanged(eventType: String, record: JsonObject?)
         fun onProfileUpdated(record: JsonObject)
+        fun onBroadcastDmChat(payload: JsonObject)
+        fun onBroadcastDmRead(payload: JsonObject)
+        fun onBroadcastMessageEdit(payload: JsonObject)
         fun onBroadcastPartyChat(payload: JsonObject)
         fun onBroadcastPartySignal(payload: JsonObject)
         fun onBroadcastPresence(payload: JsonObject)
+        fun onPeerSocketPresenceChanged(userId: String, connected: Boolean, modeKey: String?)
     }
 
     @Volatile var listener: Listener? = null
@@ -115,8 +141,35 @@ object SocialRealtime {
             return
         }
 
+        backoffStep = 0
         reconnectJob?.cancel()
         openSocket(endpoint)
+    }
+
+    @Synchronized
+    fun reconnectImmediately() {
+        val endpoint = currentUrl ?: return
+        if (!shouldStayConnected) return
+        if (connected && joined) return
+        backoffStep = 0
+        reconnectJob?.cancel()
+        openSocket(endpoint)
+    }
+
+    /** Immediately tears down active socket when local Wi-Fi/network drops, keeping auto-reconnect armed. */
+    @Synchronized
+    fun suspendForNetworkLoss() {
+        reconnectJob?.cancel()
+        heartbeatJob?.cancel()
+        connected = false
+        joined = false
+        onlineSocketPeers.clear()
+        try {
+            socket?.cancel()
+        } catch (_: Throwable) {
+        }
+        socket = null
+        scope.launch(Dispatchers.Main) { activeTypers.clear() }
     }
 
     @Synchronized
@@ -133,8 +186,10 @@ object SocialRealtime {
         reconnectJob?.cancel()
         heartbeatJob?.cancel()
         typingCleanupJob?.cancel()
+        untrackPresence()
         connected = false
         joined = false
+        onlineSocketPeers.clear()
         try {
             socket?.close(1000, "Signed out")
         } catch (_: Throwable) {
@@ -146,29 +201,94 @@ object SocialRealtime {
     fun dmTypingKey(peerId: String): String = "dm:$peerId"
     fun partyTypingKey(partyId: String): String = "party:$partyId"
 
-    /** Broadcasts a lightweight typing ping without touching PostgreSQL. */
-    fun sendTyping(targetPeerId: String?, partyId: String?, myDisplayName: String) {
+    /**
+     * Broadcasts a lightweight typing state without touching PostgreSQL.
+     * `active = false` bypasses the throttle so typing bubbles vanish immediately on send/clear.
+     */
+    fun sendTyping(
+        targetPeerId: String?,
+        partyId: String?,
+        myDisplayName: String,
+        active: Boolean = true
+    ) {
         val me = currentUserId ?: return
         if (!isConnected) return
         val now = System.currentTimeMillis()
-        val prev = lastTypingSentMs.get()
-        if (now - prev < TYPING_SEND_THROTTLE_MS) return
-        lastTypingSentMs.set(now)
+        if (active) {
+            val prev = lastTypingSentMs.get()
+            if (now - prev < TYPING_SEND_THROTTLE_MS) return
+            lastTypingSentMs.set(now)
+        } else {
+            lastTypingSentMs.set(0L)
+        }
 
         val inner = JsonObject().apply {
             addProperty("senderId", me)
             addProperty("senderName", myDisplayName)
             targetPeerId?.let { addProperty("recipientId", it) }
             partyId?.let { addProperty("partyId", it) }
+            addProperty("active", active)
             addProperty("ts", now)
         }
         sendBroadcast("typing", inner)
     }
 
-    fun sendPartyChatBroadcast(message: SocialMessage) {
+    /** Instant WebSocket DM delivery so open chats update in ~50ms even without DB replication. */
+    fun sendDmChatBroadcast(message: SocialMessage, tempId: String? = null) {
         if (!isConnected) return
         val inner = JsonObject().apply {
             addProperty("id", message.id)
+            tempId?.let { addProperty("tempId", it) }
+            addProperty("sender", message.sender)
+            message.recipient?.let { addProperty("recipient", it) }
+            message.senderName?.let { addProperty("senderName", it) }
+            addProperty("body", message.body)
+            message.replyTo?.let { addProperty("replyTo", it) }
+            message.attachmentUrl?.let { addProperty("attachmentUrl", it) }
+            addProperty("atMs", message.atMs)
+            message.editedAtMs?.let { addProperty("editedAtMs", it) }
+        }
+        sendBroadcast("dm_chat", inner)
+    }
+
+    /** Instant WebSocket read-receipt (`✓✓ Seen`) delivery when recipient views open chat. */
+    fun sendDmReadBroadcast(peerId: String, readAtMs: Long) {
+        val me = currentUserId ?: return
+        if (!isConnected) return
+        val inner = JsonObject().apply {
+            addProperty("readerId", me)
+            addProperty("senderId", peerId)
+            addProperty("readAtMs", readAtMs)
+        }
+        sendBroadcast("dm_read", inner)
+    }
+
+    /** Instant WebSocket message edit broadcast for both DMs and party chat. */
+    fun sendMessageEditBroadcast(
+        messageId: Long,
+        newBody: String,
+        editedAtMs: Long,
+        recipientId: String? = null,
+        partyId: String? = null
+    ) {
+        val me = currentUserId ?: return
+        if (!isConnected) return
+        val inner = JsonObject().apply {
+            addProperty("id", messageId)
+            addProperty("sender", me)
+            recipientId?.let { addProperty("recipient", it) }
+            partyId?.let { addProperty("partyId", it) }
+            addProperty("body", newBody)
+            addProperty("editedAtMs", editedAtMs)
+        }
+        sendBroadcast("message_edit", inner)
+    }
+
+    fun sendPartyChatBroadcast(message: SocialMessage, tempId: String? = null) {
+        if (!isConnected) return
+        val inner = JsonObject().apply {
+            addProperty("id", message.id)
+            tempId?.let { addProperty("tempId", it) }
             addProperty("partyId", message.partyId)
             addProperty("sender", message.sender)
             addProperty("senderName", message.senderName ?: "Player")
@@ -192,6 +312,35 @@ object SocialRealtime {
         sendBroadcast("party_signal", inner)
     }
 
+    /** Tracks or untracks socket-level Phoenix Presence so peers detect Wi-Fi drops automatically. */
+    fun trackPresence(modeKey: String, appearOffline: Boolean) {
+        val me = currentUserId ?: return
+        if (!isConnected) return
+        if (appearOffline) {
+            untrackPresence()
+            return
+        }
+        val payload = JsonObject().apply {
+            addProperty("type", "presence")
+            addProperty("event", "track")
+            add("payload", JsonObject().apply {
+                addProperty("user_id", me)
+                addProperty("mode", modeKey)
+                addProperty("online_at", System.currentTimeMillis())
+            })
+        }
+        sendPhoenixFrame(TOPIC, "presence", payload)
+    }
+
+    fun untrackPresence() {
+        if (!connected || !joined) return
+        val payload = JsonObject().apply {
+            addProperty("type", "presence")
+            addProperty("event", "untrack")
+        }
+        sendPhoenixFrame(TOPIC, "presence", payload)
+    }
+
     /** Broadcasts an immediate presence / status / role update so online friends see it instantly. */
     fun sendPresenceBroadcast(
         modeKey: String,
@@ -203,6 +352,7 @@ object SocialRealtime {
     ) {
         val me = currentUserId ?: return
         if (!isConnected) return
+        trackPresence(modeKey, appearOffline)
         val inner = JsonObject().apply {
             addProperty("userId", me)
             addProperty("mode", modeKey)
@@ -234,7 +384,7 @@ object SocialRealtime {
         joined = false
 
         val req = Request.Builder().url(endpoint).build()
-        socket = client.newWebSocket(req, object : WebSocketListener() {
+        socket = wsClient.newWebSocket(req, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
                 connected = true
                 backoffStep = 0
@@ -323,7 +473,7 @@ object SocialRealtime {
         typingCleanupJob?.cancel()
         typingCleanupJob = scope.launch {
             while (isActive && connected) {
-                delay(1_500L)
+                delay(900L)
                 val now = System.currentTimeMillis()
                 scope.launch(Dispatchers.Main) {
                     val expired = activeTypers.entries.filter { it.value.second <= now }.map { it.key }
@@ -341,11 +491,11 @@ object SocialRealtime {
             val step = backoffStep.coerceAtMost(4)
             backoffStep = (backoffStep + 1).coerceAtMost(5)
             val waitMs = when (step) {
-                0 -> 2_000L
-                1 -> 4_000L
-                2 -> 8_000L
-                3 -> 15_000L
-                else -> 30_000L
+                0 -> 1_200L
+                1 -> 2_500L
+                2 -> 5_000L
+                3 -> 10_000L
+                else -> 20_000L
             }
             delay(waitMs)
             if (shouldStayConnected && !connected) {
@@ -383,6 +533,12 @@ object SocialRealtime {
                         listener?.onRealtimeConnected()
                     }
                 }
+                "presence_state" -> {
+                    handlePresenceState(payload)
+                }
+                "presence_diff" -> {
+                    handlePresenceDiff(payload)
+                }
                 "postgres_changes" -> {
                     val data = payload.get("data")?.takeIf { it.isJsonObject }?.asJsonObject ?: payload
                     val table = data.get("table")?.takeIf { !it.isJsonNull }?.asString ?: return
@@ -390,7 +546,7 @@ object SocialRealtime {
                         ?: data.get("eventType")?.takeIf { !it.isJsonNull }?.asString
                         ?: "UPDATE"
                     val record = data.get("record")?.takeIf { it.isJsonObject }?.asJsonObject
-                        ?: data.get("old_record")?.takeIf { it.isJsonObject }?.asJsonObject
+                        ?: data.get("old_record")?.takeIf { it.isJsonNull.not() && it.isJsonObject }?.asJsonObject
                     when (table) {
                         "messages" -> listener?.onMessageTableChanged(changeType, record)
                         "party_messages" -> listener?.onPartyMessageChanged(changeType, record)
@@ -404,7 +560,16 @@ object SocialRealtime {
                     val inner = payload.get("payload")?.takeIf { it.isJsonObject }?.asJsonObject ?: return
                     when (bcEvent) {
                         "typing" -> handleIncomingTyping(inner)
-                        "party_chat" -> listener?.onBroadcastPartyChat(inner)
+                        "dm_chat" -> {
+                            clearTyperOnIncomingMessage(inner)
+                            listener?.onBroadcastDmChat(inner)
+                        }
+                        "dm_read" -> listener?.onBroadcastDmRead(inner)
+                        "message_edit" -> listener?.onBroadcastMessageEdit(inner)
+                        "party_chat" -> {
+                            clearTyperOnIncomingMessage(inner)
+                            listener?.onBroadcastPartyChat(inner)
+                        }
                         "party_signal" -> listener?.onBroadcastPartySignal(inner)
                         "presence_update" -> listener?.onBroadcastPresence(inner)
                     }
@@ -415,6 +580,53 @@ object SocialRealtime {
         }
     }
 
+    private fun handlePresenceState(state: JsonObject) {
+        val me = currentUserId
+        onlineSocketPeers.clear()
+        for ((key, value) in state.entrySet()) {
+            if (key.isBlank() || key == me) continue
+            onlineSocketPeers.add(key)
+            val modeKey = extractModeFromPresenceMeta(value)
+            listener?.onPeerSocketPresenceChanged(key, connected = true, modeKey = modeKey)
+        }
+    }
+
+    private fun handlePresenceDiff(diff: JsonObject) {
+        val me = currentUserId
+        val joins = diff.get("joins")?.takeIf { it.isJsonObject }?.asJsonObject
+        val leaves = diff.get("leaves")?.takeIf { it.isJsonObject }?.asJsonObject
+
+        joins?.entrySet()?.forEach { (key, value) ->
+            if (key.isNotBlank() && key != me) {
+                onlineSocketPeers.add(key)
+                val modeKey = extractModeFromPresenceMeta(value)
+                listener?.onPeerSocketPresenceChanged(key, connected = true, modeKey = modeKey)
+            }
+        }
+        leaves?.entrySet()?.forEach { (key, _) ->
+            if (key.isNotBlank() && key != me && joins?.has(key) != true) {
+                onlineSocketPeers.remove(key)
+                listener?.onPeerSocketPresenceChanged(key, connected = false, modeKey = null)
+            }
+        }
+    }
+
+    private fun extractModeFromPresenceMeta(entry: com.google.gson.JsonElement?): String? {
+        val obj = entry?.takeIf { it.isJsonObject }?.asJsonObject ?: return null
+        val metas = obj.get("metas")?.takeIf { it.isJsonArray }?.asJsonArray ?: return null
+        val first = metas.firstOrNull()?.takeIf { it.isJsonObject }?.asJsonObject ?: return null
+        return first.get("mode")?.takeIf { !it.isJsonNull }?.asString
+    }
+
+    private fun clearTyperOnIncomingMessage(inner: JsonObject) {
+        val sender = inner.get("sender")?.takeIf { !it.isJsonNull }?.asString ?: return
+        val partyId = inner.get("partyId")?.takeIf { !it.isJsonNull }?.asString
+        val key = if (!partyId.isNullOrBlank()) partyTypingKey(partyId) else dmTypingKey(sender)
+        scope.launch(Dispatchers.Main) {
+            activeTypers.remove(key)
+        }
+    }
+
     private fun handleIncomingTyping(inner: JsonObject) {
         val me = currentUserId ?: return
         val senderId = inner.get("senderId")?.takeIf { !it.isJsonNull }?.asString ?: return
@@ -422,15 +634,23 @@ object SocialRealtime {
         val senderName = inner.get("senderName")?.takeIf { !it.isJsonNull }?.asString ?: "Player"
         val recipientId = inner.get("recipientId")?.takeIf { !it.isJsonNull }?.asString
         val partyId = inner.get("partyId")?.takeIf { !it.isJsonNull }?.asString
+        val active = inner.get("active")?.takeIf { !it.isJsonNull }?.asBoolean ?: true
 
         val key = when {
             !partyId.isNullOrBlank() -> partyTypingKey(partyId)
             recipientId == me -> dmTypingKey(senderId)
             else -> return
         }
-        val expires = System.currentTimeMillis() + TYPING_TTL_MS
         scope.launch(Dispatchers.Main) {
-            activeTypers[key] = senderName to expires
+            if (!active) {
+                activeTypers.remove(key)
+            } else {
+                val wasAlreadyTyping = activeTypers.containsKey(key)
+                activeTypers[key] = senderName to (System.currentTimeMillis() + TYPING_TTL_MS)
+                if (!wasAlreadyTyping) {
+                    SocialSoundEffects.playPeerTyping()
+                }
+            }
         }
     }
 }
