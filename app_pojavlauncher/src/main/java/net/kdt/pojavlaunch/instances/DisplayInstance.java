@@ -7,6 +7,8 @@ public class DisplayInstance {
     public String name;
     public String versionId;
     public String icon;
+    /** True when created by the dedicated Aerix Client installer (enables Client HUD & cosmetics). */
+    public boolean isAerixClient;
 
     /** Stable directory identity, independent of whichever profile is currently selected. */
     public String getInstanceId() { return mInstanceRoot.getName(); }

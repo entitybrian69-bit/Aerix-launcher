@@ -65,6 +65,14 @@
 
 		</net.kdt.pojavlaunch.customcontrols.ControlLayout>
 
+		<!-- Dedicated Aerix Client 1.16.5 Liquid Crystal HUD, Boot Plaque, HUD Studio & OLED AFK
+		     (visibility = gone on non-Client instances so zero overhead is added elsewhere). -->
+		<net.kdt.pojavlaunch.aerix.client.AerixClientOverlayView
+			android:id="@+id/aerix_client_overlay"
+			android:layout_width="match_parent"
+			android:layout_height="match_parent"
+			android:visibility="gone" />
+
 		<!-- The in game menu: a full screen Compose overlay, hidden until the button opens it.
 		     It is composed once and stays out of the way (and out of the frame budget) while the
 		     game runs. -->

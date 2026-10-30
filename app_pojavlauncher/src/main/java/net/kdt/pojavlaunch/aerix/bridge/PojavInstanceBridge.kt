@@ -62,6 +62,7 @@ class AerixInstance(
 ) {
     /** Folder identity stays unique across copies and stable across renames/loader updates. */
     val id: String = source.instanceId
+    val isAerixClient: Boolean = source.isAerixClient
 }
 
 /** Defensive boundary: repeated records cannot become duplicate Compose keys.

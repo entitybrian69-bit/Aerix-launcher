@@ -131,11 +131,30 @@ object AerixSkinServer {
         val authType = account.authType ?: AuthType.LOCAL
         if (authType.injectorUrl != null) return emptyList()
 
+        val isSlim = PojavAccountBridge.isSlimModelFor(context, account)
+        val isClientSession = runCatching {
+            net.kdt.pojavlaunch.instances.Instances.loadSelectedInstance()?.isAerixClient == true
+        }.getOrDefault(false)
+
         val skinFile = PojavAccountBridge.customSkinFile(account)
         val capeFile = PojavAccountBridge.customCapeFile(account)
         val rawSkinBytes = if (skinFile.isFile && skinFile.length() > 0) skinFile.readBytes() else null
-        val skinBytes = rawSkinBytes?.let { PojavAccountBridge.normalizeSkinBytesForGame(it) }
-        val capeBytes = if (capeFile.isFile && capeFile.length() > 0) capeFile.readBytes() else null
+        val normalizedSkin = rawSkinBytes?.let { PojavAccountBridge.normalizeSkinBytesForGame(it) }
+        val skinBytes = if (isClientSession) {
+            net.kdt.pojavlaunch.aerix.client.AerixClientCosmetics.applyHatAccessoryToSkin(
+                context,
+                normalizedSkin,
+                isSlim
+            )
+        } else {
+            normalizedSkin
+        }
+        val capeBytes = if (isClientSession) {
+            net.kdt.pojavlaunch.aerix.client.AerixClientCosmetics.resolveInGameCapeBytes(context)
+                ?: (if (capeFile.isFile && capeFile.length() > 0) capeFile.readBytes() else null)
+        } else {
+            if (capeFile.isFile && capeFile.length() > 0) capeFile.readBytes() else null
+        }
         if (skinBytes == null && capeBytes == null) return emptyList()
 
         val jar = File(Tools.DIR_DATA, "$AUTHLIB_FOLDER/$AUTHLIB_JAR")
@@ -161,7 +180,7 @@ object AerixSkinServer {
             skinBytes = skinBytes,
             capeHash = capeBytes?.let { remember(it) },
             capeBytes = capeBytes,
-            slim = PojavAccountBridge.isSlimModelFor(context, account)
+            slim = isSlim
         )
         primaryCharacter = character
         characters[character.uuid.lowercase()] = character
