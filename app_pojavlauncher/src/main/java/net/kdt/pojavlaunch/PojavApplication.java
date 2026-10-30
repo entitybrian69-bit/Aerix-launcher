@@ -107,6 +107,7 @@ public class PojavApplication extends MGApplication {
 		}
 		initRendererPlugins();
 		try {
+			net.kdt.pojavlaunch.aerix.discord.AerixDiscordPresence.captureApplicationContext(this);
 			SocialBackend.attach(this);
 		} catch (Throwable t) {
 			Log.w("PojavApplication", "SocialBackend attach failed", t);

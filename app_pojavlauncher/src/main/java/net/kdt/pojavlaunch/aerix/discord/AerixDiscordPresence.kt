@@ -35,7 +35,6 @@ import com.discord.socialsdk.rpc.IDiscordRpcConnection
 import com.discord.socialsdk.rpc.IDiscordRpcService
 import net.kdt.pojavlaunch.aerix.bridge.AerixPreferences
 import net.kdt.pojavlaunch.aerix.social.SocialNotificationReceiver
-import net.kdt.pojavlaunch.lifecycle.ContextExecutor
 import org.json.JSONObject
 import java.io.File
 import java.util.UUID
@@ -188,6 +187,14 @@ object AerixDiscordPresence {
     }
 
     /* ── cross-process lifecycle hooks ─────────────────────────────────────── */
+
+    /** Captures application Context early in every process (`:launcher` and `:game`). */
+    @JvmStatic
+    fun captureApplicationContext(context: Context?) {
+        if (context != null) {
+            appContext = context.applicationContext
+        }
+    }
 
     /** Called from LauncherActivity.onStart() in `:launcher`. */
     @JvmStatic
@@ -648,8 +655,7 @@ object AerixDiscordPresence {
         )
     }.getOrNull()
 
-    private fun resolveAnyContext(): Context? =
-        runCatching { ContextExecutor.getApplication() }.getOrNull()
+    private fun resolveAnyContext(): Context? = appContext
 
     private fun finishPendingClearCallbacks() {
         val copy = ArrayList(pendingClearCallbacks)
