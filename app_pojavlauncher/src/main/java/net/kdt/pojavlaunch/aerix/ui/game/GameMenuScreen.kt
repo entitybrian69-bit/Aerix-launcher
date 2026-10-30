@@ -134,7 +134,7 @@ interface GameMenuCallbacks {
 /** Colours of the menu, all derived from the accent of the current launcher theme. */
 private class GameMenuPalette(val accent: Color, val tiles: List<Color>) {
     val resume: Color get() = accent
-    val scrim: Color get() = AerixSurface.canvas.copy(alpha = 0.93f)
+    val scrim: Color get() = AerixSurface.canvas.copy(alpha = 0.97f)
 }
 
 @Composable
@@ -200,20 +200,45 @@ fun GameMenuScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(palette.scrim)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                role = Role.Button,
-                onClick = {}
-            )
+            .pointerInput(Unit) {
+                // Consume background touches without creating a focusable clickable node that
+                // could steal IME focus from native EditText / Compose inputs inside sub-pages.
+                awaitPointerEventScope {
+                    while (true) {
+                        awaitPointerEvent()
+                    }
+                }
+            }
     ) {
-        AnimatedVisibility(
-            visible = shown,
-            enter = fadeIn(tween(160)) + scaleIn(tween(200), initialScale = 0.97f),
-            exit = fadeOut(tween(120))
-        ) {
-            when (page) {
-                GameMenuPage.MAIN -> GameMenuMainPage(
+        when (page) {
+            GameMenuPage.SOCIALS -> Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = AerixSpacing.mdPlus, vertical = AerixSpacing.sm)
+            ) {
+                GameSocialsScreen(
+                    accent = palette.accent,
+                    onBack = { page = GameMenuPage.MAIN }
+                )
+            }
+            GameMenuPage.DOWNLOADS -> Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = AerixSpacing.mdPlus, vertical = AerixSpacing.smPlus)
+            ) {
+                GameDownloadsScreen(
+                    target = target,
+                    accent = palette.accent,
+                    onBack = { page = GameMenuPage.MAIN },
+                    onStorageProblem = { callbacks.onRequestStoragePermission() }
+                )
+            }
+            GameMenuPage.MAIN -> AnimatedVisibility(
+                visible = shown,
+                enter = fadeIn(tween(140)) + scaleIn(tween(180), initialScale = 0.97f),
+                exit = fadeOut(tween(100))
+            ) {
+                GameMenuMainPage(
                     callbacks = callbacks,
                     palette = palette,
                     account = account,
@@ -222,28 +247,6 @@ fun GameMenuScreen(
                     onOpenDownloads = { page = GameMenuPage.DOWNLOADS },
                     onOpenSocials = { page = GameMenuPage.SOCIALS }
                 )
-                GameMenuPage.SOCIALS -> Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = AerixSpacing.mdPlus, vertical = AerixSpacing.smPlus)
-                ) {
-                    GameSocialsScreen(
-                        accent = palette.accent,
-                        onBack = { page = GameMenuPage.MAIN }
-                    )
-                }
-                GameMenuPage.DOWNLOADS -> Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = AerixSpacing.mdPlus, vertical = AerixSpacing.smPlus)
-                ) {
-                    GameDownloadsScreen(
-                        target = target,
-                        accent = palette.accent,
-                        onBack = { page = GameMenuPage.MAIN },
-                        onStorageProblem = { callbacks.onRequestStoragePermission() }
-                    )
-                }
             }
         }
     }

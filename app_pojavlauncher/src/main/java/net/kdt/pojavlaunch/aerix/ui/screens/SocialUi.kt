@@ -196,21 +196,35 @@ fun SocialRemoteImage(
 fun SocialPanel(
     modifier: Modifier = Modifier,
     shape: Shape = RoundedCornerShape(AerixRadii.cardLarge),
+    inGame: Boolean = false,
     content: @Composable () -> Unit
 ) {
-    Surface(
-        shape = shape,
-        color = AerixSurface.panelRaised,
-        contentColor = AerixSurface.textPrimary,
-        border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft),
-        modifier = modifier.liquidGlass(
+    if (inGame) {
+        // Lightweight single-pass surface over the live GL/Vulkan game view: avoids nested
+        // RenderNode shadow elevation passes so in-game chatting stays locked at full FPS.
+        Box(
+            modifier = modifier
+                .clip(shape)
+                .background(AerixSurface.panelRaised)
+                .border(BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft), shape)
+        ) {
+            content()
+        }
+    } else {
+        Surface(
             shape = shape,
-            tint = AerixSurface.panelGlassTint,
-            strength = 0.9f,
-            elevation = AerixMetrics.glassSubtleElevation
-        )
-    ) {
-        content()
+            color = AerixSurface.panelRaised,
+            contentColor = AerixSurface.textPrimary,
+            border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft),
+            modifier = modifier.liquidGlass(
+                shape = shape,
+                tint = AerixSurface.panelGlassTint,
+                strength = 0.9f,
+                elevation = AerixMetrics.glassSubtleElevation
+            )
+        ) {
+            content()
+        }
     }
 }
 

@@ -25,10 +25,17 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.util.AttributeSet
 import android.view.View
+import android.view.ViewGroup
+import android.view.inputmethod.InputMethodManager
 import android.widget.FrameLayout
+import androidx.activity.OnBackPressedDispatcherOwner
+import androidx.activity.findViewTreeOnBackPressedDispatcherOwner
+import androidx.activity.setViewTreeOnBackPressedDispatcherOwner
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.ComposeView
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.findViewTreeLifecycleOwner
@@ -44,7 +51,6 @@ import net.kdt.pojavlaunch.aerix.bridge.PojavAccountBridge
 import net.kdt.pojavlaunch.aerix.bridge.PojavGameDownloadsBridge
 import net.kdt.pojavlaunch.aerix.theme.AerixLauncherTheme
 
-
 /**
  * Full screen in-game menu.
  *
@@ -56,11 +62,15 @@ class GameMenuOverlayView @JvmOverloads constructor(
     attrs: AttributeSet? = null
 ) : FrameLayout(context, attrs) {
 
-    private val composeView = ComposeView(context)
+    private val composeView = ComposeView(context).apply {
+        isFocusable = true
+        isFocusableInTouchMode = true
+    }
     private val callbacksState = mutableStateOf<GameMenuCallbacks?>(null)
     private val revisionState = mutableIntStateOf(0)
     private val targetState = mutableStateOf(GameDownloadTarget.of(null))
     private var contentInstalled = false
+    private var imeBottomPx = 0
 
     /** Handler of the back button, published by the composition while the menu is on screen. */
     private var backHandler: (() -> Unit)? = null
@@ -76,6 +86,9 @@ class GameMenuOverlayView @JvmOverloads constructor(
     init {
         visibility = GONE
         isClickable = true
+        isFocusable = true
+        isFocusableInTouchMode = true
+        descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
         setWillNotDraw(true)
         addView(
             composeView,
@@ -94,6 +107,41 @@ class GameMenuOverlayView @JvmOverloads constructor(
 
     fun isMenuShown(): Boolean = visibility == View.VISIBLE
 
+    /**
+     * Driven directly from GameActivity's decorView OnApplyWindowInsetsListener so the overlay
+     * lifts cleanly above the soft keyboard in landscape without resizing the OpenGL game surface.
+     */
+    fun onImeInsetsChanged(bottomPx: Int) {
+        val clamped = bottomPx.coerceAtLeast(0)
+        if (imeBottomPx == clamped && composeView.paddingBottom == clamped) return
+        imeBottomPx = clamped
+        if (visibility == View.VISIBLE) {
+            composeView.setPadding(0, 0, 0, clamped)
+        }
+    }
+
+    /**
+     * Hides the Android soft keyboard if currently visible while inside the overlay.
+     * @return true if the keyboard was visible and dismissed.
+     */
+    fun dismissKeyboardIfShown(): Boolean {
+        val rootInsets = ViewCompat.getRootWindowInsets(this)
+        val imeShown = imeBottomPx > 0 ||
+            (rootInsets != null && rootInsets.isVisible(WindowInsetsCompat.Type.ime()))
+        val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+        val focusedChild = findFocus()
+        if (imeShown) {
+            val token = focusedChild?.windowToken ?: windowToken
+            if (token != null) {
+                imm?.hideSoftInputFromWindow(token, 0)
+            }
+            imeBottomPx = 0
+            composeView.setPadding(0, 0, 0, 0)
+            return true
+        }
+        return false
+    }
+
     /** Open the menu, refreshing the instance it downloads into. */
     fun showMenu() {
         if (isMenuShown()) return
@@ -101,12 +149,22 @@ class GameMenuOverlayView @JvmOverloads constructor(
         // Who the game is running as, for the character panel. Loaded once, no network.
         PojavAccountBridge.ensureLoaded()
         installContent()
+        composeView.setPadding(0, 0, 0, imeBottomPx)
         visibility = VISIBLE
         revisionState.intValue++
+        post { composeView.requestFocus() }
     }
 
     fun hideMenu() {
         if (visibility != View.VISIBLE) return
+        val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+        val token = findFocus()?.windowToken ?: windowToken
+        if (token != null) {
+            imm?.hideSoftInputFromWindow(token, 0)
+        }
+        clearFocus()
+        imeBottomPx = 0
+        composeView.setPadding(0, 0, 0, 0)
         visibility = GONE
         backHandler = null
     }
@@ -142,6 +200,11 @@ class GameMenuOverlayView @JvmOverloads constructor(
         }
         findOwnerIn<ViewModelStoreOwner>(context)?.let { owner ->
             if (host.findViewTreeViewModelStoreOwner() == null) host.setViewTreeViewModelStoreOwner(owner)
+        }
+        findOwnerIn<OnBackPressedDispatcherOwner>(context)?.let { owner ->
+            if (host.findViewTreeOnBackPressedDispatcherOwner() == null) {
+                host.setViewTreeOnBackPressedDispatcherOwner(owner)
+            }
         }
         composeView.setContent {
             AerixLauncherTheme {

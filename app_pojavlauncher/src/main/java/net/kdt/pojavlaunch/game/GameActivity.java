@@ -188,13 +188,29 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
             getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         // Make keyboard pan the activity so the user sees what they're typing
         ViewCompat.setOnApplyWindowInsetsListener(getWindow().getDecorView(), (view, insets) -> {
+            boolean imeVisible = insets.isVisible(WindowInsetsCompat.Type.ime());
+            int imeBottom = imeVisible ? insets.getInsets(WindowInsetsCompat.Type.ime()).bottom : 0;
+            if (mGameMenuOverlay != null) {
+                mGameMenuOverlay.onImeInsetsChanged(imeBottom);
+            }
             if(launcherGLView.mSurface == null)
                 return insets;
+            if (mGameMenuOverlay != null && mGameMenuOverlay.isMenuShown()) {
+                launcherGLView.mSurface.setTranslationY(0);
+                launcherGLView.mCursorView.setTranslationY(0);
+                mImeHeight = 0;
+                if (!imeVisible && androidCompat) {
+                    view.postDelayed(() -> {
+                        view.setSystemUiVisibility(View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY | View.SYSTEM_UI_FLAG_FULLSCREEN);
+                    }, 150);
+                }
+                return insets;
+            }
             ViewPropertyAnimator animSurface = launcherGLView.mSurface.animate()
                     .setDuration(100);
             ViewPropertyAnimator animCursor = launcherGLView.mCursorView.animate()
                     .setDuration(100);
-            if(!insets.isVisible(WindowInsetsCompat.Type.ime())){
+            if(!imeVisible){
                 animSurface.translationY(0).start();
                 animCursor.translationY(0).start();
                 mImeHeight = 0;
@@ -328,6 +344,11 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
 
             GameRunner.setPendingServerAddress(launchServer);
             net.kdt.pojavlaunch.aerix.social.SocialBackend.onGameStarted(this, instance, version);
+            net.kdt.pojavlaunch.aerix.discord.AerixDiscordPresence.onGameStarted(
+                    this,
+                    instance != null ? instance.name : null,
+                    version
+            );
 
             setTitle("MojoLauncher (" + version + ")");
 
@@ -424,10 +445,12 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         updateFpsViewVisibility();
     }
 
-    /** Show the frame rate readout only when the player asked for it. */
+    /** Show the frame rate readout only when the player asked for it and the Aerix menu is hidden. */
     private void updateFpsViewVisibility() {
         if (mFpsView == null) return;
-        mFpsView.setVisibility(LauncherPreferences.PREF_SHOW_FPS ? View.VISIBLE : View.GONE);
+        boolean show = LauncherPreferences.PREF_SHOW_FPS
+                && (mGameMenuOverlay == null || !mGameMenuOverlay.isMenuShown());
+        mFpsView.setVisibility(show ? View.VISIBLE : View.GONE);
     }
 
     @Override
@@ -451,18 +474,21 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     protected void onStart() {
         super.onStart();
         PLATFORM.setVisible(true);
+        net.kdt.pojavlaunch.aerix.discord.AerixDiscordPresence.onGameResumed(this);
     }
 
     @Override
     protected void onStop() {
         if (mRecorder != null) mRecorder.onGameStopped();
         PLATFORM.setVisible(false);
+        net.kdt.pojavlaunch.aerix.discord.AerixDiscordPresence.onGameStopped(this);
         super.onStop();
     }
 
     @Override
     protected void onDestroy() {
         net.kdt.pojavlaunch.aerix.social.SocialBackend.onGameStopped();
+        net.kdt.pojavlaunch.aerix.discord.AerixDiscordPresence.onGameStopped(this);
         // Nothing of ours outlives the activity: if the player backs out during the boot, the
         // wallpaper goes with the screen.
         net.kdt.pojavlaunch.aerix.loading.AerixLoadingWallpaper.detach();
@@ -644,8 +670,8 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
-        // The menu is on top of the game and takes the back button: it returns from the
-        // downloader to the entries first, and closes the menu when it is already there.
+        // The menu is on top of the game and takes the back button: if the soft keyboard is up
+        // inside In-Game Socials / Downloads it dismisses the keyboard first, then navigates back.
         if (mGameMenuOverlay != null && mGameMenuOverlay.isMenuShown()) {
             int keyCode = event.getKeyCode();
             if (keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN
@@ -653,10 +679,16 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
                 return super.dispatchKeyEvent(event);
             }
             if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_ESCAPE) {
-                if (event.getAction() == KeyEvent.ACTION_UP) mGameMenuOverlay.handleBackPress();
+                if (event.getAction() == KeyEvent.ACTION_UP) {
+                    if (!mGameMenuOverlay.dismissKeyboardIfShown()) {
+                        mGameMenuOverlay.handleBackPress();
+                    }
+                }
                 return true;
             }
-            // Everything else belongs to the menu, not to the game behind it.
+            // Deliver all other key events (Backspace, Enter, soft keyboard keys, physical keyboard)
+            // to the focused editor inside GameMenuOverlayView, and never pass through to GameView.
+            super.dispatchKeyEvent(event);
             return true;
         }
         if(isInEditor) {
@@ -724,6 +756,13 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     private void showGameMenu() {
         if (mGameMenuOverlay == null) return;
         drawerLayout.closeDrawers();
+        if (touchCharInput != null) touchCharInput.disable();
+        if (launcherGLView != null) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                launcherGLView.releasePointerCapture();
+            }
+            launcherGLView.clearFocus();
+        }
         // The readout belongs to the game, not to the menu: it would sit on top of the buttons.
         if (mFpsView != null) mFpsView.setVisibility(View.GONE);
         mGameMenuOverlay.showMenu();
@@ -732,6 +771,9 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     private void hideGameMenu() {
         if (mGameMenuOverlay == null) return;
         mGameMenuOverlay.hideMenu();
+        if (launcherGLView != null) {
+            launcherGLView.requestFocus();
+        }
         updateFpsViewVisibility();
     }
 

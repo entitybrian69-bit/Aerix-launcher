@@ -57,6 +57,8 @@ object AerixPreferences {
     const val KEY_THEME_MOTION = "launcherThemeMotion"
     /** True once the first-run guide has been completed or skipped. */
     const val KEY_GUIDE_PLAYED = "launcherGuidePlayed"
+    /** True once the first-run Notification ON/OFF popup window has been answered. */
+    const val KEY_NOTIFICATION_PROMPT_SHOWN = "aerixFirstRunNotificationPromptShown"
     /** True when the launcher's wallpaper is drawn behind the controls while the game starts. */
     const val KEY_LOADING_WALLPAPER = "loadingScreenWallpaper"
     const val KEY_LOG_TEXT_SIZE = "logTextSize"
@@ -121,6 +123,9 @@ object AerixPreferences {
     /** Set once the first-run tour has been shown, so it never appears again on its own. */
     var guidePlayed by mutableStateOf(false)
         private set
+    /** Set once the first-time app open Notification ON/OFF popup has been answered. */
+    var notificationPromptShown by mutableStateOf(false)
+        private set
 
     /** Draw the launcher's wallpaper behind the controls while the game starts. */
     var loadingWallpaper by mutableStateOf(false)
@@ -181,6 +186,7 @@ object AerixPreferences {
         festivalEffects = p.getBoolean(KEY_FESTIVAL_EFFECTS, false)
         themeMotion = p.getBoolean(KEY_THEME_MOTION, true)
         guidePlayed = p.getBoolean(KEY_GUIDE_PLAYED, false)
+        notificationPromptShown = p.getBoolean(KEY_NOTIFICATION_PROMPT_SHOWN, false)
         loadingWallpaper = p.getBoolean(KEY_LOADING_WALLPAPER, false)
         logTextSize = p.getInt(KEY_LOG_TEXT_SIZE, 15).coerceIn(5, 20)
         logBufferFlushInterval = p.getInt(KEY_LOG_BUFFER_FLUSH_INTERVAL, DEFAULT_LOG_BUFFER_FLUSH_INTERVAL).coerceIn(100, 1000)
@@ -291,6 +297,11 @@ object AerixPreferences {
     fun saveGuidePlayed(value: Boolean) {
         guidePlayed = value
         edit { putBoolean(KEY_GUIDE_PLAYED, value) }
+    }
+
+    fun saveNotificationPromptShown(value: Boolean) {
+        notificationPromptShown = value
+        edit { putBoolean(KEY_NOTIFICATION_PROMPT_SHOWN, value) }
     }
 
     fun saveLoadingWallpaper(value: Boolean) {

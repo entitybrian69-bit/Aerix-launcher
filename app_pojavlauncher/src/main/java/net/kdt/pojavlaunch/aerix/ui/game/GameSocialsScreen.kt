@@ -1,7 +1,7 @@
 /*
  * Aerix Launcher UI layer for PojavLauncher.
- * The in-game social panel: sits inside the Aerix game menu with full AerixSurface liquid glass
- * and ThemeMotion while Minecraft keeps rendering behind it.
+ * The in-game social panel: sits inside the Aerix game menu with lightweight single-pass
+ * AerixSurface styling so chatting stays 100% smooth while Minecraft keeps rendering behind it.
  */
 
 package net.kdt.pojavlaunch.aerix.ui.game
@@ -17,11 +17,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -30,7 +28,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -54,16 +51,11 @@ import kotlinx.coroutines.launch
 import net.kdt.pojavlaunch.R
 import net.kdt.pojavlaunch.aerix.bridge.PojavAccountBridge
 import net.kdt.pojavlaunch.aerix.bridge.PojavLaunchBridge
-import net.kdt.pojavlaunch.aerix.components.liquidGlass
 import net.kdt.pojavlaunch.aerix.social.SocialBackend
 import net.kdt.pojavlaunch.aerix.social.SocialRealtime
-import net.kdt.pojavlaunch.aerix.theme.AerixMetrics
 import net.kdt.pojavlaunch.aerix.theme.AerixRadii
 import net.kdt.pojavlaunch.aerix.theme.AerixSpacing
 import net.kdt.pojavlaunch.aerix.theme.AerixSurface
-import net.kdt.pojavlaunch.aerix.theme.ThemeMotion
-import net.kdt.pojavlaunch.aerix.theme.accentGlow
-import net.kdt.pojavlaunch.aerix.theme.accentRing
 import net.kdt.pojavlaunch.aerix.ui.screens.FilterChipPill
 import net.kdt.pojavlaunch.aerix.ui.screens.PartyDetailDialog
 import net.kdt.pojavlaunch.aerix.ui.screens.SocialButton
@@ -91,13 +83,16 @@ fun GameSocialsScreen(accent: Color, onBack: () -> Unit) {
     val context = LocalContext.current
     val activity = context as? Activity
     val scope = rememberCoroutineScope()
-    val motion = ThemeMotion.rememberEnabled()
-    val liveAccent = ThemeMotion.rememberPulse(accent, active = true, enabled = motion)
 
     var ready by remember { mutableStateOf(SocialBackend.signedIn) }
     var tab by remember { mutableStateOf(InGameSocialTab.CHATS) }
-    var selectedFriendId by remember { mutableStateOf<String?>(null) }
-    var selectedPartyId by remember { mutableStateOf<String?>(null) }
+    var selectedFriendId by remember {
+        mutableStateOf(
+            SocialBackend.parties.firstOrNull()?.let { null }
+                ?: SocialBackend.friends.firstOrNull { !it.pendingIncoming && !it.pendingOutgoing }?.id
+        )
+    }
+    var selectedPartyId by remember { mutableStateOf(SocialBackend.parties.firstOrNull()?.id) }
     var statusDialogOpen by remember { mutableStateOf(false) }
 
     if (statusDialogOpen && ready) {
@@ -105,8 +100,15 @@ fun GameSocialsScreen(accent: Color, onBack: () -> Unit) {
     }
 
     val friends = SocialBackend.friends
-    val acceptedFriends = friends.filter { !it.pendingIncoming && !it.pendingOutgoing }
-    val incomingFriends = friends.filter { it.pendingIncoming }
+    val acceptedFriends = remember(friends) {
+        friends.filter { !it.pendingIncoming && !it.pendingOutgoing }
+    }
+    val incomingFriends = remember(friends) {
+        friends.filter { it.pendingIncoming }
+    }
+    val onlineCount = remember(acceptedFriends) {
+        acceptedFriends.count { it.online }
+    }
     val parties = SocialBackend.parties
     val partyInvites = SocialBackend.partyInvites
     val activityCount = incomingFriends.size + partyInvites.size
@@ -116,35 +118,44 @@ fun GameSocialsScreen(accent: Color, onBack: () -> Unit) {
         ready = SocialBackend.signedIn
         if (ready) {
             SocialBackend.rememberMinecraftName(PojavAccountBridge.current?.username)
-            SocialBackend.loadProfile()
-            SocialBackend.loadMyProfile()
-            SocialBackend.refreshFriends()
-            SocialBackend.refreshParties()
-            SocialBackend.refreshPartyInvites()
-            SocialBackend.unreadCount()
             if (selectedPartyId == null && selectedFriendId == null) {
                 selectedPartyId = SocialBackend.parties.firstOrNull()?.id
                 if (selectedPartyId == null) {
-                    selectedFriendId = SocialBackend.friends.firstOrNull { !it.pendingIncoming && !it.pendingOutgoing }?.id
+                    selectedFriendId = SocialBackend.friends
+                        .firstOrNull { !it.pendingIncoming && !it.pendingOutgoing }?.id
                 }
+            }
+            // Refresh concurrently so opening In-Game Socials never stalls on serial round-trips
+            launch { SocialBackend.refreshFriends() }
+            launch { SocialBackend.refreshParties() }
+            launch {
+                SocialBackend.refreshPartyInvites()
+                SocialBackend.unreadCount()
+            }
+            launch {
+                SocialBackend.loadProfile()
+                SocialBackend.loadMyProfile()
+            }
+        }
+    }
+
+    // Auto-select first friend/party as soon as background refresh populates an initially empty cache
+    LaunchedEffect(acceptedFriends, parties) {
+        if (selectedPartyId == null && selectedFriendId == null) {
+            selectedPartyId = parties.firstOrNull()?.id
+            if (selectedPartyId == null) {
+                selectedFriendId = acceptedFriends.firstOrNull()?.id
             }
         }
     }
 
     val panelShape = RoundedCornerShape(AerixRadii.panel)
-    Surface(
-        shape = panelShape,
-        color = AerixSurface.panel,
-        contentColor = AerixSurface.textPrimary,
-        border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft),
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .liquidGlass(
-                shape = panelShape,
-                tint = AerixSurface.panelGlassTint,
-                strength = 1f,
-                elevation = AerixMetrics.glassFloatingElevation
-            )
+            .clip(panelShape)
+            .background(AerixSurface.panel)
+            .border(BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft), panelShape)
     ) {
         Column(
             modifier = Modifier
@@ -152,7 +163,7 @@ fun GameSocialsScreen(accent: Color, onBack: () -> Unit) {
                 .padding(AerixSpacing.md),
             verticalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus)
         ) {
-            // Glass top header
+            // Single-pass top header (zero infinite pulse animations or shadow layers over GL surface)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -160,7 +171,10 @@ fun GameSocialsScreen(accent: Color, onBack: () -> Unit) {
             ) {
                 SocialIconBubble(R.drawable.aerix_ic_arrow_back, "Back to game menu", onBack)
                 Column(modifier = Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
                         Text(
                             "In-Game Socials",
                             fontSize = 16.sp,
@@ -178,7 +192,7 @@ fun GameSocialsScreen(accent: Color, onBack: () -> Unit) {
                         }
                     }
                     Text(
-                        "${acceptedFriends.count { it.online }} friends online · ${parties.size} active ${if (parties.size == 1) "party" else "parties"}",
+                        "$onlineCount friends online · ${parties.size} active ${if (parties.size == 1) "party" else "parties"}",
                         fontSize = 11.sp,
                         color = AerixSurface.textMuted,
                         maxLines = 1,
@@ -186,8 +200,11 @@ fun GameSocialsScreen(accent: Color, onBack: () -> Unit) {
                     )
                 }
 
-                // Segmented glass tabs + 1-tap Status pill
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                // Segmented tabs + 1-tap Status pill
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     if (ready) {
                         val myMode = SocialBackend.effectivePresenceMode
                         val modeTint = presenceModeColor(myMode)
@@ -228,11 +245,9 @@ fun GameSocialsScreen(accent: Color, onBack: () -> Unit) {
                         Box(
                             modifier = Modifier
                                 .clip(pillShape)
-                                .background(if (selected) liveAccent else AerixSurface.panelTrack)
-                                .accentGlow(liveAccent, selected, motion)
-                                .accentRing(liveAccent, pillShape, selected, motion, AerixSpacing.hairline)
+                                .background(if (selected) accent else AerixSurface.panelTrack)
                                 .border(
-                                    BorderStroke(AerixSpacing.hairline, if (selected) liveAccent else AerixSurface.borderSoft),
+                                    BorderStroke(AerixSpacing.hairline, if (selected) accent else AerixSurface.borderSoft),
                                     pillShape
                                 )
                                 .clickable(role = Role.Tab) { tab = item }
@@ -248,10 +263,12 @@ fun GameSocialsScreen(accent: Color, onBack: () -> Unit) {
                     }
                     SocialIconBubble(R.drawable.aerix_ic_refresh, "Refresh") {
                         scope.launch {
-                            SocialBackend.refreshFriends()
-                            SocialBackend.refreshParties()
-                            SocialBackend.refreshPartyInvites()
-                            SocialBackend.unreadCount()
+                            launch { SocialBackend.refreshFriends() }
+                            launch { SocialBackend.refreshParties() }
+                            launch {
+                                SocialBackend.refreshPartyInvites()
+                                SocialBackend.unreadCount()
+                            }
                         }
                     }
                 }
@@ -259,7 +276,7 @@ fun GameSocialsScreen(accent: Color, onBack: () -> Unit) {
 
             if (!ready) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    SocialPanel {
+                    SocialPanel(inGame = true) {
                         Column(
                             modifier = Modifier.padding(22.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
@@ -271,7 +288,12 @@ fun GameSocialsScreen(accent: Color, onBack: () -> Unit) {
                                 tint = accent,
                                 modifier = Modifier.size(28.dp)
                             )
-                            Text("Sign in to Socials from the launcher", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = AerixSurface.textPrimary)
+                            Text(
+                                "Sign in to Socials from the launcher",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = AerixSurface.textPrimary
+                            )
                             Text(
                                 "Once signed in on the main launcher screen, your friends, parties and Realtime chat stay live here in-game.",
                                 fontSize = 11.5.sp,
@@ -291,6 +313,7 @@ fun GameSocialsScreen(accent: Color, onBack: () -> Unit) {
                     ) {
                         // Left conversation rail (Party channels + DMs)
                         SocialPanel(
+                            inGame = true,
                             modifier = Modifier
                                 .width(220.dp)
                                 .fillMaxHeight()
@@ -301,7 +324,7 @@ fun GameSocialsScreen(accent: Color, onBack: () -> Unit) {
                                 verticalArrangement = Arrangement.spacedBy(5.dp)
                             ) {
                                 if (parties.isNotEmpty()) {
-                                    item {
+                                    item(key = "ig_hdr_parties") {
                                         Text(
                                             "PARTIES",
                                             fontSize = 9.5.sp,
@@ -338,18 +361,30 @@ fun GameSocialsScreen(accent: Color, onBack: () -> Unit) {
                                                 modifier = Modifier.size(16.dp)
                                             )
                                             Column(modifier = Modifier.weight(1f)) {
-                                                Text(p.title, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = AerixSurface.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                                Text(
+                                                    p.title,
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = AerixSurface.textPrimary,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
                                                 if (pTyper != null) {
                                                     SocialTypingIndicatorRow(text = "$pTyper typing", tint = accent, fontSize = 10.sp)
                                                 } else {
-                                                    Text("${p.memberCount}/${p.maxMembers} · ${p.remainingText()}", fontSize = 10.sp, color = AerixSurface.textMuted, maxLines = 1)
+                                                    Text(
+                                                        "${p.memberCount}/${p.maxMembers} · ${p.remainingText()}",
+                                                        fontSize = 10.sp,
+                                                        color = AerixSurface.textMuted,
+                                                        maxLines = 1
+                                                    )
                                                 }
                                             }
                                         }
                                     }
                                 }
 
-                                item {
+                                item(key = "ig_hdr_friends") {
                                     Text(
                                         "FRIENDS",
                                         fontSize = 9.5.sp,
@@ -360,7 +395,7 @@ fun GameSocialsScreen(accent: Color, onBack: () -> Unit) {
                                 }
 
                                 if (acceptedFriends.isEmpty()) {
-                                    item {
+                                    item(key = "ig_empty_friends") {
                                         Text(
                                             "No friends added yet",
                                             fontSize = 11.sp,
@@ -430,8 +465,12 @@ fun GameSocialsScreen(accent: Color, onBack: () -> Unit) {
                         }
 
                         // Right live conversation pane
-                        val activeParty = parties.firstOrNull { it.id == selectedPartyId }
-                        val activeFriend = if (activeParty == null) acceptedFriends.firstOrNull { it.id == selectedFriendId } else null
+                        val activeParty = remember(parties, selectedPartyId) {
+                            parties.firstOrNull { it.id == selectedPartyId }
+                        }
+                        val activeFriend = remember(acceptedFriends, selectedFriendId, activeParty) {
+                            if (activeParty == null) acceptedFriends.firstOrNull { it.id == selectedFriendId } else null
+                        }
                         var managePartyOpen by remember { mutableStateOf(false) }
 
                         if (activeParty != null || activeFriend != null) {
@@ -439,6 +478,7 @@ fun GameSocialsScreen(accent: Color, onBack: () -> Unit) {
                                 friend = activeFriend,
                                 party = activeParty,
                                 compact = true,
+                                inGame = true,
                                 onOpenPartyDetails = if (activeParty != null) { { managePartyOpen = true } } else null,
                                 onJoinSession = if (activity != null) {
                                     {
@@ -480,9 +520,16 @@ fun GameSocialsScreen(accent: Color, onBack: () -> Unit) {
                                 )
                             }
                         } else {
-                            SocialPanel(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                            SocialPanel(
+                                inGame = true,
+                                modifier = Modifier.weight(1f).fillMaxHeight()
+                            ) {
                                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                    Text("Pick a party or friend on the left to chat live.", fontSize = 12.sp, color = AerixSurface.textMuted)
+                                    Text(
+                                        "Pick a party or friend on the left to chat live.",
+                                        fontSize = 12.sp,
+                                        color = AerixSurface.textMuted
+                                    )
                                 }
                             }
                         }
@@ -505,9 +552,16 @@ fun GameSocialsScreen(accent: Color, onBack: () -> Unit) {
 
                 InGameSocialTab.ACTIVITY -> {
                     if (partyInvites.isEmpty() && incomingFriends.isEmpty()) {
-                        SocialPanel(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                        SocialPanel(
+                            inGame = true,
+                            modifier = Modifier.weight(1f).fillMaxWidth()
+                        ) {
                             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text("No pending party invites or friend requests.", fontSize = 12.sp, color = AerixSurface.textMuted)
+                                Text(
+                                    "No pending party invites or friend requests.",
+                                    fontSize = 12.sp,
+                                    color = AerixSurface.textMuted
+                                )
                             }
                         }
                     } else {
@@ -516,7 +570,7 @@ fun GameSocialsScreen(accent: Color, onBack: () -> Unit) {
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             items(partyInvites, key = { "ig_pinv_${it.id}" }) { inv ->
-                                SocialPanel(Modifier.fillMaxWidth()) {
+                                SocialPanel(Modifier.fillMaxWidth(), inGame = true) {
                                     Row(
                                         modifier = Modifier.padding(12.dp),
                                         verticalAlignment = Alignment.CenterVertically,
@@ -531,7 +585,11 @@ fun GameSocialsScreen(accent: Color, onBack: () -> Unit) {
                                                 compactBadge = true,
                                                 suffixText = "invited you to \"${inv.partyTitle}\""
                                             )
-                                            Text(listOfNotNull(inv.mcVersion, inv.loader).joinToString(" · "), fontSize = 11.sp, color = AerixSurface.textMuted)
+                                            Text(
+                                                listOfNotNull(inv.mcVersion, inv.loader).joinToString(" · "),
+                                                fontSize = 11.sp,
+                                                color = AerixSurface.textMuted
+                                            )
                                         }
                                         SocialButton("Accept", filled = true) {
                                             scope.launch {
@@ -540,7 +598,11 @@ fun GameSocialsScreen(accent: Color, onBack: () -> Unit) {
                                                     selectedPartyId = inv.partyId
                                                     tab = InGameSocialTab.CHATS
                                                 } else {
-                                                    Toast.makeText(context, SocialBackend.lastError ?: "Could not join", Toast.LENGTH_SHORT).show()
+                                                    Toast.makeText(
+                                                        context,
+                                                        SocialBackend.lastError ?: "Could not join",
+                                                        Toast.LENGTH_SHORT
+                                                    ).show()
                                                 }
                                             }
                                         }
@@ -551,7 +613,7 @@ fun GameSocialsScreen(accent: Color, onBack: () -> Unit) {
                                 }
                             }
                             items(incomingFriends, key = { "ig_freq_${it.id}" }) { req ->
-                                SocialPanel(Modifier.fillMaxWidth()) {
+                                SocialPanel(Modifier.fillMaxWidth(), inGame = true) {
                                     Row(
                                         modifier = Modifier.padding(12.dp),
                                         verticalAlignment = Alignment.CenterVertically,
@@ -567,11 +629,19 @@ fun GameSocialsScreen(accent: Color, onBack: () -> Unit) {
                                                 suffixText = "sent a friend request"
                                             )
                                             if (req.mutualCount > 0) {
-                                                Text("${req.mutualCount} mutual friends", fontSize = 11.sp, color = accent)
+                                                Text(
+                                                    "${req.mutualCount} mutual friends",
+                                                    fontSize = 11.sp,
+                                                    color = accent
+                                                )
                                             }
                                         }
-                                        FilterChipPill("Accept", true) { scope.launch { SocialBackend.answerRequest(req.id, true) } }
-                                        FilterChipPill("Decline", false) { scope.launch { SocialBackend.answerRequest(req.id, false) } }
+                                        FilterChipPill("Accept", true) {
+                                            scope.launch { SocialBackend.answerRequest(req.id, true) }
+                                        }
+                                        FilterChipPill("Decline", false) {
+                                            scope.launch { SocialBackend.answerRequest(req.id, false) }
+                                        }
                                     }
                                 }
                             }

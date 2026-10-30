@@ -546,6 +546,9 @@ public final class Tools {
     }
 
     public static void fullyExit() {
+        try {
+            net.kdt.pojavlaunch.aerix.discord.AerixDiscordPresence.onProcessExiting(null);
+        } catch (Throwable ignored) {}
         android.os.Process.killProcess(android.os.Process.myPid());
     }
 

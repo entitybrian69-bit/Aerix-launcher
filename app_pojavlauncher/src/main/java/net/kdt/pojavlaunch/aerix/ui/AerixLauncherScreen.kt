@@ -98,6 +98,7 @@ import net.kdt.pojavlaunch.aerix.ui.screens.WallpapersScreen
 @Composable
 fun AerixLauncherScreen(activity: FragmentActivity) {
     AerixNav.init()
+    net.kdt.pojavlaunch.aerix.ui.screens.FirstRunNotificationPopupHost(activity)
     net.kdt.pojavlaunch.aerix.ui.screens.LauncherUpdateNoticeHost(activity)
     val section = AerixNav.section
     val navigate: (LauncherSection) -> Unit = { target ->
@@ -130,9 +131,12 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
     val extent = AerixPreferences.extentScale()
     val festivals = rememberTodayFestivals()
     // The first-run tour: components register where they are, the overlay highlights them.
+    // Wait until the first-time Notification ON/OFF popup has been answered so they never overlap.
     val guideRegistry = remember { GuideRegistry() }
     val guideSteps = rememberGuideSteps()
-    LaunchedEffect(Unit) {
+    val notificationPromptAnswered = AerixPreferences.notificationPromptShown
+    LaunchedEffect(notificationPromptAnswered) {
+        if (!notificationPromptAnswered) return@LaunchedEffect
         AerixGuideState.startOnFirstRun()
         // The steps highlight things on the home page, so the tour brings you there rather than
         // starting on whichever section the launcher was left on.
@@ -142,10 +146,9 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
     }
 
     // Discord Rich Presence: the launcher is on screen, and it says which page you are on.
-    // attach() is a no-op when the setting is off, no application id is set, or Discord is absent.
-    DisposableEffect(Unit) {
+    // Lifecycle clear-after-1-minute on leaving the app is driven by LauncherActivity.onStart/onStop.
+    LaunchedEffect(Unit) {
         AerixDiscordPresence.attach(activity)
-        onDispose { AerixDiscordPresence.detach() }
     }
     LaunchedEffect(section) {
         AerixDiscordPresence.inLauncher(section.name)

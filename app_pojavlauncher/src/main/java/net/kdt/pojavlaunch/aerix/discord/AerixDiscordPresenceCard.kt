@@ -68,8 +68,7 @@ fun DiscordPresenceSettingsCard() {
                 if (on) {
                     AerixDiscordPresence.refresh(context)
                 } else {
-                    AerixDiscordPresence.clear()
-                    AerixDiscordPresence.detach()
+                    AerixDiscordPresence.clearAndDetach(context)
                 }
             }
         )

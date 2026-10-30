@@ -50,6 +50,13 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import android.content.Context
+import android.text.Editable
+import android.text.InputType
+import android.text.TextWatcher
+import android.util.TypedValue
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
+import androidx.appcompat.widget.AppCompatEditText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -57,12 +64,15 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -383,12 +393,36 @@ private fun SegmentedRow(
 @Composable
 private fun SearchField(query: String, accent: Color, hint: String, onQueryChange: (String) -> Unit) {
     val shape = RoundedCornerShape(AerixRadii.control)
+    val editTextRef = remember { arrayOfNulls<AppCompatEditText>(1) }
+    val latestOnQueryChange by rememberUpdatedState(onQueryChange)
+    val textArgb = AerixSurface.textPrimary.toArgb()
+    val hintArgb = AerixSurface.textMuted.toArgb()
+
+    val showIme: (AppCompatEditText?) -> Unit = { target ->
+        if (target != null) {
+            if (!target.hasFocus()) target.requestFocus()
+            val imm = target.context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+            if (imm?.showSoftInput(target, 0) != true) {
+                target.post {
+                    if (target.isAttachedToWindow) {
+                        if (!target.hasFocus()) target.requestFocus()
+                        imm?.showSoftInput(target, 0)
+                    }
+                }
+            }
+        }
+    }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(shape)
             .background(Color.White.copy(alpha = 0.06f))
             .border(1.dp, if (query.isEmpty()) AerixSurface.borderSoft else accent.copy(alpha = 0.6f), shape)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null
+            ) { showIme(editTextRef[0]) }
             .padding(horizontal = AerixSpacing.smPlus, vertical = AerixSpacing.smCompact),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -399,18 +433,58 @@ private fun SearchField(query: String, accent: Color, hint: String, onQueryChang
             modifier = Modifier.size(15.dp)
         )
         Spacer(Modifier.width(AerixSpacing.sm))
-        androidx.compose.foundation.text.BasicTextField(
-            value = query,
-            onValueChange = onQueryChange,
-            singleLine = true,
-            textStyle = MaterialTheme.typography.bodyMedium.copy(color = AerixSurface.textPrimary, fontSize = 13.sp),
-            cursorBrush = androidx.compose.ui.graphics.SolidColor(accent),
+        AndroidView(
             modifier = Modifier.weight(1f),
-            decorationBox = { inner ->
-                if (query.isEmpty()) {
-                    Text(text = hint, color = AerixSurface.textMuted, fontSize = 12.sp, maxLines = 1)
+            factory = { ctx ->
+                var internalSync = false
+                AppCompatEditText(ctx).apply {
+                    editTextRef[0] = this
+                    background = null
+                    setPadding(0, 0, 0, 0)
+                    minHeight = 0
+                    minimumHeight = 0
+                    isSingleLine = true
+                    maxLines = 1
+                    isFocusable = true
+                    isFocusableInTouchMode = true
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+                    setTextColor(textArgb)
+                    setHintTextColor(hintArgb)
+                    this.hint = hint
+                    setText(query)
+                    inputType = InputType.TYPE_CLASS_TEXT
+                    imeOptions = EditorInfo.IME_ACTION_SEARCH or
+                        EditorInfo.IME_FLAG_NO_EXTRACT_UI or
+                        EditorInfo.IME_FLAG_NO_FULLSCREEN
+                    setOnClickListener { showIme(this) }
+                    setOnFocusChangeListener { _, focused -> if (focused) showIme(this) }
+                    addTextChangedListener(object : TextWatcher {
+                        override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+                        override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
+                        override fun afterTextChanged(s: Editable?) {
+                            if (internalSync) return
+                            latestOnQueryChange(s?.toString().orEmpty())
+                        }
+                    })
+                    tag = Runnable {
+                        internalSync = true
+                        setText("")
+                        internalSync = false
+                    }
                 }
-                inner()
+            },
+            update = { et ->
+                editTextRef[0] = et
+                if (et.hint?.toString() != hint) et.hint = hint
+                val cur = et.text?.toString().orEmpty()
+                if (cur != query) {
+                    if (query.isEmpty() && et.tag is Runnable) {
+                        (et.tag as Runnable).run()
+                    } else {
+                        et.setText(query)
+                        et.setSelection(query.length)
+                    }
+                }
             }
         )
         if (query.isNotEmpty()) {

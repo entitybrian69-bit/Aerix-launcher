@@ -54,6 +54,7 @@ public class ContextAwareDoneListener implements MoJsonExtras.DoneListener, Cont
     @Override
     public void executeWithActivity(Activity activity) {
         try {
+            net.kdt.pojavlaunch.aerix.discord.AerixDiscordPresence.prepareHandoffToGame(activity);
             Intent gameStartIntent = createGameStartIntent(activity);
             activity.startActivity(gameStartIntent);
             activity.finish();

@@ -257,7 +257,7 @@ public class LauncherActivity extends BaseActivity {
                     if(!isAllowed) Tools.runOnUiThread(() -> Toast.makeText(this, R.string.notification_permission_toast, Toast.LENGTH_LONG).show());
                 }
         );
-        checkNotificationPermission();
+        // First-time notification ON/OFF choice is handled by Aerix FirstRunNotificationPopupHost.
         if(LauncherPreferences.PREF_MIGRATION_NOTICE)
             PojavApplication.sExecutorService.submit(this::checkPreviousInstalls);
 
@@ -358,6 +358,18 @@ public class LauncherActivity extends BaseActivity {
             }
             Tools.runOnUiThread(() -> root.post(() -> ExtraCore.setValue(ExtraConstants.LAUNCH_GAME, true)));
         });
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        net.kdt.pojavlaunch.aerix.discord.AerixDiscordPresence.onLauncherStarted(this);
+    }
+
+    @Override
+    protected void onStop() {
+        net.kdt.pojavlaunch.aerix.discord.AerixDiscordPresence.onLauncherStopped(this);
+        super.onStop();
     }
 
     @Override
@@ -467,6 +479,10 @@ public class LauncherActivity extends BaseActivity {
                         askForPermission(33, Manifest.permission.POST_NOTIFICATIONS))
                 .setNegativeButton(android.R.string.cancel, (d, w)-> handleNoNotificationPermission())
                 .show();
+    }
+
+    public void markNotificationPromptHandled() {
+        handleNoNotificationPermission();
     }
 
     private void handleNoNotificationPermission() {

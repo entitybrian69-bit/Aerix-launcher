@@ -221,6 +221,9 @@
                 <action android:name="net.kdt.pojavlaunch.aerix.ACTION_SOCIAL_DIRECT_REPLY" />
                 <action android:name="net.kdt.pojavlaunch.aerix.ACTION_SOCIAL_MARK_READ" />
                 <action android:name="net.kdt.pojavlaunch.aerix.ACTION_SOCIAL_RESTART_SYNC" />
+                <action android:name="net.kdt.pojavlaunch.aerix.ACTION_DISCORD_GAME_STARTED" />
+                <action android:name="net.kdt.pojavlaunch.aerix.ACTION_DISCORD_SCHEDULE_CLEAR" />
+                <action android:name="net.kdt.pojavlaunch.aerix.ACTION_DISCORD_CLEAR_NOW" />
             </intent-filter>
         </receiver>
     </application>

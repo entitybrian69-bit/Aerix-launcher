@@ -1,9 +1,19 @@
 package net.kdt.pojavlaunch.aerix.ui.screens
 
+import android.content.Context
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.os.SystemClock
+import android.text.Editable
+import android.text.InputType
+import android.text.TextWatcher
+import android.util.TypedValue
+import android.view.KeyEvent
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.widget.AppCompatEditText
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -16,6 +26,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -50,6 +61,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -59,6 +71,7 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -67,7 +80,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -90,6 +106,7 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 
 @Composable
 fun SocialChatImage(
@@ -161,6 +178,7 @@ fun SocialConversationPanel(
     friend: SocialFriend?,
     party: SocialParty?,
     compact: Boolean = false,
+    inGame: Boolean = false,
     onBack: (() -> Unit)? = null,
     onOpenFriendProfile: ((SocialFriend) -> Unit)? = null,
     onOpenPartyDetails: ((SocialParty) -> Unit)? = null,
@@ -208,13 +226,35 @@ fun SocialConversationPanel(
         }
     }
 
-    var draft by remember(convKey) { mutableStateOf("") }
+    val editTextHolder = remember { arrayOfNulls<AppCompatEditText>(1) }
+    var hasDraftText by remember(convKey) { mutableStateOf(false) }
     var replyTarget by remember(convKey) { mutableStateOf<SocialMessage?>(null) }
     var editTarget by remember(convKey) { mutableStateOf<SocialMessage?>(null) }
     var pendingAttachmentUri by remember(convKey) { mutableStateOf<Uri?>(null) }
     var lightboxUrl by remember { mutableStateOf<String?>(null) }
+    var initialScrollDone by remember(convKey) { mutableStateOf(false) }
 
     val listState = rememberLazyListState()
+
+    val setComposerText: (String, Boolean) -> Unit = { newText, requestKeyboard ->
+        val et = editTextHolder[0]
+        if (et != null) {
+            et.setText(newText)
+            et.setSelection(newText.length)
+            if (requestKeyboard) {
+                focusAndShowSoftKeyboard(et)
+            }
+        }
+        hasDraftText = newText.isNotBlank()
+    }
+
+    LaunchedEffect(convKey) {
+        val et = editTextHolder[0]
+        if (et != null && !et.text.isNullOrEmpty()) {
+            et.setText("")
+        }
+        hasDraftText = false
+    }
 
     DisposableEffect(convKey) {
         SocialBackend.setOpenConversation(peerId = friend?.id, partyId = party?.id)
@@ -237,7 +277,9 @@ fun SocialConversationPanel(
         } else if (friend != null) {
             SocialBackend.loadMessages(friend.id)
         } else emptyList()
-        syncedMessages = loaded
+        if (!sameMessageSnapshot(syncedMessages, loaded)) {
+            syncedMessages = loaded
+        }
         if (friend != null && loaded.any { it.sender == friend.id && !it.isRead }) {
             SocialBackend.markRead(friend.id)
         }
@@ -247,7 +289,9 @@ fun SocialConversationPanel(
     LaunchedEffect(convKey, dmRev) {
         if (!isParty && friend != null) {
             val cached = SocialBackend.getCachedMessages(friend.id)
-            syncedMessages = cached
+            if (!sameMessageSnapshot(syncedMessages, cached)) {
+                syncedMessages = cached
+            }
             if (cached.any { it.sender == friend.id && !it.isRead }) {
                 SocialBackend.markRead(friend.id)
             }
@@ -256,20 +300,30 @@ fun SocialConversationPanel(
 
     LaunchedEffect(convKey, partyRev) {
         if (isParty && party != null) {
-            syncedMessages = SocialBackend.loadPartyMessages(party.id)
+            val next = SocialBackend.loadPartyMessages(party.id)
+            if (!sameMessageSnapshot(syncedMessages, next)) {
+                syncedMessages = next
+            }
         }
     }
 
-    // Rapid 1.0s open-chat delta-sync (`select=*&id=gt.$maxServerId`) so replies & Seen receipts
-    // ALWAYS appear immediately in-place even on networks that block WebSockets!
-    LaunchedEffect(convKey, SocialBackend.isNetworkAvailable) {
+    // Open-chat delta-sync (`select=*&id=gt.$maxServerId`) with zero-idle-recomposition snapshot
+    // guard so replies & Seen receipts appear immediately while causing 0 UI work when idle!
+    LaunchedEffect(convKey, SocialBackend.isNetworkAvailable, inGame) {
         if (!SocialBackend.isNetworkAvailable) return@LaunchedEffect
         while (isActive) {
-            delay(1_000L)
+            val pollInterval = if (inGame && SocialRealtime.isConnected) 2_000L else 1_200L
+            delay(pollInterval)
             if (party != null) {
-                syncedMessages = SocialBackend.loadPartyMessages(party.id)
+                val next = SocialBackend.loadPartyMessages(party.id)
+                if (!sameMessageSnapshot(syncedMessages, next)) {
+                    syncedMessages = next
+                }
             } else if (friend != null) {
-                syncedMessages = SocialBackend.syncNewMessages(friend.id)
+                val next = SocialBackend.syncNewMessages(friend.id)
+                if (!sameMessageSnapshot(syncedMessages, next)) {
+                    syncedMessages = next
+                }
             }
         }
     }
@@ -298,7 +352,14 @@ fun SocialConversationPanel(
     LaunchedEffect(messages.size, lastMsgKey, activeTyper != null) {
         val totalItems = messages.size + (if (activeTyper != null) 1 else 0)
         if (totalItems > 0) {
-            runCatching { listState.animateScrollToItem(totalItems - 1) }
+            runCatching {
+                if (!initialScrollDone || inGame) {
+                    listState.scrollToItem(totalItems - 1)
+                    if (messages.isNotEmpty()) initialScrollDone = true
+                } else {
+                    listState.animateScrollToItem(totalItems - 1)
+                }
+            }
         }
     }
 
@@ -306,7 +367,7 @@ fun SocialConversationPanel(
         messages.lastOrNull { it.sender == myId && it.isRead && !it.pendingOffline }?.id
     }
 
-    SocialPanel(modifier = modifier.fillMaxSize()) {
+    SocialPanel(modifier = modifier.fillMaxSize(), inGame = inGame) {
         Column(modifier = Modifier.fillMaxSize().padding(if (compact) 10.dp else 14.dp)) {
             // Conversation header
             Row(
@@ -644,7 +705,7 @@ fun SocialConversationPanel(
                                                 menuOpen = false
                                                 replyTarget = null
                                                 editTarget = msg
-                                                draft = msg.body
+                                                setComposerText(msg.body, true)
                                             }
                                         )
                                     }
@@ -738,7 +799,7 @@ fun SocialConversationPanel(
                     }
                     SocialIconBubble(R.drawable.aerix_ic_close, "Cancel") {
                         replyTarget = null
-                        if (editTarget != null) draft = ""
+                        if (editTarget != null) setComposerText("", false)
                         editTarget = null
                         pendingAttachmentUri = null
                     }
@@ -747,7 +808,46 @@ fun SocialConversationPanel(
 
             Spacer(Modifier.height(8.dp))
 
-            // Composer bar
+            val triggerSend: () -> Unit = send@{
+                val textToSend = editTextHolder[0]?.text?.toString().orEmpty()
+                val attUri = pendingAttachmentUri
+                if (textToSend.isBlank() && attUri == null) return@send
+                val replying = replyTarget
+                val editing = editTarget
+
+                // 0ms Messenger UX: clear native composer immediately + play Send pop!
+                editTextHolder[0]?.setText("")
+                hasDraftText = false
+                replyTarget = null
+                editTarget = null
+                pendingAttachmentUri = null
+                SocialSoundEffects.playMessageSent()
+
+                scope.launch {
+                    if (editing != null) {
+                        SocialBackend.editMessage(editing.id, textToSend, isParty = isParty)
+                    } else if (party != null) {
+                        SocialBackend.sendPartyMessage(party.id, textToSend, replying?.id, attUri)
+                    } else if (friend != null) {
+                        SocialBackend.sendMessage(friend.id, textToSend, replying?.id, attUri)
+                    }
+                }
+            }
+
+            val latestTriggerSend by rememberUpdatedState(triggerSend)
+            val latestFriendId by rememberUpdatedState(friend?.id)
+            val latestPartyId by rememberUpdatedState(party?.id)
+            val latestIsEditing by rememberUpdatedState(editTarget != null)
+            val composerHint = when {
+                editTarget != null -> "Update message..."
+                isParty -> "Message ${party?.title}..."
+                else -> "Message ${friend?.effectiveName}..."
+            }
+            val textPrimaryArgb = AerixSurface.textPrimary.toArgb()
+            val textMutedArgb = AerixSurface.textMuted.toArgb()
+
+            // Composer bar (native AppCompatEditText for 0-recomposition 120 FPS typing +
+            // guaranteed soft-keyboard open in landscape GameActivity without fullscreen extract UI)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -764,77 +864,123 @@ fun SocialConversationPanel(
                         .clip(RoundedCornerShape(AerixRadii.control))
                         .background(AerixSurface.panelTrack)
                         .border(BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft), RoundedCornerShape(AerixRadii.control))
-                        .padding(horizontal = 12.dp, vertical = 9.dp)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) {
+                            focusAndShowSoftKeyboard(editTextHolder[0])
+                        }
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    contentAlignment = Alignment.CenterStart
                 ) {
-                    if (draft.isEmpty()) {
-                        Text(
-                            if (editTarget != null) "Update message..."
-                            else if (isParty) "Message ${party?.title}..."
-                            else "Message ${friend?.effectiveName}...",
-                            color = AerixSurface.textMuted,
-                            fontSize = 12.5.sp
-                        )
-                    }
-                    BasicTextField(
-                        value = draft,
-                        onValueChange = { next ->
-                            val wasNonEmpty = draft.isNotEmpty()
-                            if (next.length > draft.length) {
-                                SocialSoundEffects.playTypingTick()
-                            }
-                            draft = next
-                            if (editTarget == null) {
-                                if (next.isNotBlank()) {
-                                    SocialBackend.notifyTyping(
-                                        peerId = friend?.id,
-                                        partyId = party?.id
-                                    )
-                                } else if (wasNonEmpty) {
-                                    SocialBackend.notifyStopTyping(
-                                        peerId = friend?.id,
-                                        partyId = party?.id
-                                    )
+                    AndroidView(
+                        modifier = Modifier.fillMaxWidth(),
+                        factory = { ctx ->
+                            AppCompatEditText(ctx).apply {
+                                editTextHolder[0] = this
+                                background = null
+                                setPadding(0, 0, 0, 0)
+                                minHeight = 0
+                                minimumHeight = 0
+                                isFocusable = true
+                                isFocusableInTouchMode = true
+                                isClickable = true
+                                isLongClickable = true
+                                setTextSize(TypedValue.COMPLEX_UNIT_SP, 12.5f)
+                                setTextColor(textPrimaryArgb)
+                                setHintTextColor(textMutedArgb)
+                                hint = composerHint
+                                inputType = InputType.TYPE_CLASS_TEXT or
+                                    InputType.TYPE_TEXT_FLAG_CAP_SENTENCES or
+                                    InputType.TYPE_TEXT_FLAG_MULTI_LINE
+                                setHorizontallyScrolling(false)
+                                maxLines = if (compact) 2 else 4
+                                imeOptions = EditorInfo.IME_ACTION_SEND or
+                                    EditorInfo.IME_FLAG_NO_EXTRACT_UI or
+                                    EditorInfo.IME_FLAG_NO_FULLSCREEN or
+                                    EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING
+
+                                setOnClickListener {
+                                    focusAndShowSoftKeyboard(this)
                                 }
+                                setOnFocusChangeListener { _, focused ->
+                                    if (focused) {
+                                        focusAndShowSoftKeyboard(this)
+                                    }
+                                }
+                                setOnEditorActionListener { _, actionId, event ->
+                                    val isEnter = event != null &&
+                                        event.keyCode == KeyEvent.KEYCODE_ENTER &&
+                                        event.action == KeyEvent.ACTION_DOWN &&
+                                        !event.isShiftPressed
+                                    if (actionId == EditorInfo.IME_ACTION_SEND ||
+                                        actionId == EditorInfo.IME_ACTION_DONE ||
+                                        isEnter
+                                    ) {
+                                        latestTriggerSend()
+                                        true
+                                    } else {
+                                        false
+                                    }
+                                }
+
+                                var prevLen = 0
+                                var wasNonBlank = false
+                                var lastTickAt = 0L
+                                addTextChangedListener(object : TextWatcher {
+                                    override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+                                    override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
+                                    override fun afterTextChanged(s: Editable?) {
+                                        val curLen = s?.length ?: 0
+                                        val nonBlank = !s.isNullOrBlank()
+                                        if (hasDraftText != nonBlank) {
+                                            hasDraftText = nonBlank
+                                        }
+                                        if (curLen > prevLen) {
+                                            val now = SystemClock.uptimeMillis()
+                                            if (now - lastTickAt >= 60L) {
+                                                lastTickAt = now
+                                                SocialSoundEffects.playTypingTick()
+                                            }
+                                        }
+                                        if (!latestIsEditing) {
+                                            if (nonBlank) {
+                                                SocialBackend.notifyTyping(
+                                                    peerId = latestFriendId,
+                                                    partyId = latestPartyId
+                                                )
+                                            } else if (wasNonBlank) {
+                                                SocialBackend.notifyStopTyping(
+                                                    peerId = latestFriendId,
+                                                    partyId = latestPartyId
+                                                )
+                                            }
+                                        }
+                                        prevLen = curLen
+                                        wasNonBlank = nonBlank
+                                    }
+                                })
                             }
                         },
-                        singleLine = false,
-                        maxLines = 4,
-                        textStyle = TextStyle(color = AerixSurface.textPrimary, fontSize = 12.5.sp),
-                        cursorBrush = SolidColor(accent),
-                        modifier = Modifier.fillMaxWidth()
+                        update = { et ->
+                            editTextHolder[0] = et
+                            if (et.hint?.toString() != composerHint) {
+                                et.hint = composerHint
+                            }
+                            et.setTextColor(textPrimaryArgb)
+                            et.setHintTextColor(textMutedArgb)
+                        }
                     )
                 }
 
-                val canSend = draft.isNotBlank() || pendingAttachmentUri != null
+                val canSend = hasDraftText || pendingAttachmentUri != null
                 Box(
                     modifier = Modifier
                         .size(36.dp)
                         .clip(CircleShape)
                         .background(if (canSend) accent else AerixSurface.panelTrack)
                         .border(BorderStroke(AerixSpacing.hairline, if (canSend) accent else AerixSurface.borderSoft), CircleShape)
-                        .clickable(enabled = canSend) {
-                            val textToSend = draft
-                            val attUri = pendingAttachmentUri
-                            val replying = replyTarget
-                            val editing = editTarget
-
-                            // 0ms Messenger UX: clear composer immediately + play Send pop!
-                            draft = ""
-                            replyTarget = null
-                            editTarget = null
-                            pendingAttachmentUri = null
-                            SocialSoundEffects.playMessageSent()
-
-                            scope.launch {
-                                if (editing != null) {
-                                    SocialBackend.editMessage(editing.id, textToSend, isParty = isParty)
-                                } else if (party != null) {
-                                    SocialBackend.sendPartyMessage(party.id, textToSend, replying?.id, attUri)
-                                } else if (friend != null) {
-                                    SocialBackend.sendMessage(friend.id, textToSend, replying?.id, attUri)
-                                }
-                            }
-                        },
+                        .clickable(enabled = canSend) { triggerSend() },
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -976,10 +1122,74 @@ fun SocialMessageSearchSection(
     }
 }
 
+private fun focusAndShowSoftKeyboard(editText: AppCompatEditText?) {
+    val target = editText ?: return
+    target.isEnabled = true
+    target.isFocusable = true
+    target.isFocusableInTouchMode = true
+    if (!target.hasFocus()) {
+        target.requestFocus()
+    }
+    val imm = target.context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+    val shown = imm?.showSoftInput(target, 0) == true
+    if (!shown) {
+        target.post {
+            if (!target.isAttachedToWindow) return@post
+            if (!target.hasFocus()) target.requestFocus()
+            imm?.showSoftInput(target, 0)
+            ViewCompat.getWindowInsetsController(target)?.show(WindowInsetsCompat.Type.ime())
+        }
+    }
+}
+
+private fun sameMessageSnapshot(a: List<SocialMessage>, b: List<SocialMessage>): Boolean {
+    if (a === b) return true
+    if (a.size != b.size) return false
+    if (a.isEmpty()) return true
+    val aLast = a.last()
+    val bLast = b.last()
+    if (aLast.id != bLast.id ||
+        aLast.readAtMs != bLast.readAtMs ||
+        aLast.editedAtMs != bLast.editedAtMs ||
+        aLast.pendingOffline != bLast.pendingOffline ||
+        aLast.body != bLast.body
+    ) {
+        return false
+    }
+    if (a.first().id != b.first().id) return false
+    var aRead = 0
+    var bRead = 0
+    for (i in a.indices) {
+        if (a[i].readAtMs > 0L) aRead++
+        if (b[i].readAtMs > 0L) bRead++
+        if (a[i].editedAtMs != b[i].editedAtMs) return false
+    }
+    return aRead == bRead
+}
+
+private val chatTimestampCache = ConcurrentHashMap<Long, String>(256)
+@Volatile
+private var chatTimestampDayBucket: Long = -1L
+private val sameDayFormatHolder = object : ThreadLocal<SimpleDateFormat>() {
+    override fun initialValue(): SimpleDateFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
+}
+private val multiDayFormatHolder = object : ThreadLocal<SimpleDateFormat>() {
+    override fun initialValue(): SimpleDateFormat = SimpleDateFormat("MMM d, HH:mm", Locale.getDefault())
+}
+
 private fun formatChatTimestamp(epochMs: Long): String {
     if (epochMs <= 0L) return ""
-    val now = System.currentTimeMillis()
-    val sameDay = (now / 86_400_000L) == (epochMs / 86_400_000L)
-    val pattern = if (sameDay) "HH:mm" else "MMM d, HH:mm"
-    return SimpleDateFormat(pattern, Locale.getDefault()).format(Date(epochMs))
+    val todayBucket = System.currentTimeMillis() / 86_400_000L
+    if (todayBucket != chatTimestampDayBucket) {
+        chatTimestampDayBucket = todayBucket
+        chatTimestampCache.clear()
+    }
+    chatTimestampCache[epochMs]?.let { return it }
+    val sameDay = todayBucket == (epochMs / 86_400_000L)
+    val formatter = (if (sameDay) sameDayFormatHolder.get() else multiDayFormatHolder.get())
+        ?: SimpleDateFormat(if (sameDay) "HH:mm" else "MMM d, HH:mm", Locale.getDefault())
+    val formatted = formatter.format(Date(epochMs))
+    if (chatTimestampCache.size > 1024) chatTimestampCache.clear()
+    chatTimestampCache[epochMs] = formatted
+    return formatted
 }
