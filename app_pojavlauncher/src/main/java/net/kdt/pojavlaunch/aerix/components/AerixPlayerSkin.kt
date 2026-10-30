@@ -67,14 +67,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
-import net.kdt.pojavlaunch.Tools
 import net.kdt.pojavlaunch.aerix.bridge.AerixAccount
 import net.kdt.pojavlaunch.aerix.bridge.PojavAccountBridge
 import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
-import org.apache.commons.io.IOUtils
 import java.io.ByteArrayInputStream
-import java.io.File
-import java.net.URL
 import java.util.concurrent.atomic.AtomicInteger
 
 @SuppressLint("SetJavaScriptEnabled")
@@ -343,7 +339,18 @@ fun AerixSkinPreview3D(
             }
         }
 
-        val ready = pageFinished || viewerReady
+        // If the page finished loading but JS/WebGL never initialized within 1.8s, keep the crisp 2D body preview.
+        LaunchedEffect(pageFinished, viewerReady) {
+            if (pageFinished && !viewerReady && !webglFailed) {
+                delay(1800)
+                if (!viewerReady) {
+                    webglFailed = true
+                    webglPainted = false
+                }
+            }
+        }
+
+        val ready = viewerReady
         LaunchedEffect(ready, isVisible) {
             if (!ready) return@LaunchedEffect
             playerSkin.setRenderPaused(true)
@@ -367,7 +374,7 @@ fun AerixSkinPreview3D(
             if (!ready || webglFailed) return@LaunchedEffect
             val (skinBytes, capeBytes, model) = withContext(Dispatchers.IO) {
                 Triple(
-                    resolveSkinBytes(account),
+                    PojavAccountBridge.resolveAccountSkinBytes(account),
                     PojavAccountBridge.resolveCapeBytes(account),
                     if (PojavAccountBridge.isSlimModel(account)) "slim" else "default"
                 )
@@ -378,24 +385,6 @@ fun AerixSkinPreview3D(
             playerSkin.requestResize()
         }
     }
-}
-
-private fun resolveSkinBytes(account: AerixAccount?): ByteArray? {
-    if (account == null) return null
-    PojavAccountBridge.resolveCustomSkinBytes(account)?.let { return it }
-    val template = account.authType.skinUrl ?: return null
-    val cacheFile = File(Tools.DIR_CACHE, "aerix-skin-${account.source.profileId}-${account.authType.name}.png")
-    if (cacheFile.isFile && cacheFile.length() > 0) {
-        runCatching { return cacheFile.readBytes() }
-    }
-    return runCatching {
-        val url = String.format(template, account.username)
-        val bytes = IOUtils.toByteArray(URL(url))
-        if (bytes.isNotEmpty()) {
-            runCatching { cacheFile.writeBytes(bytes) }
-            bytes
-        } else null
-    }.getOrNull()
 }
 
 private class TouchGateLayout(context: Context) : FrameLayout(context) {

@@ -63,6 +63,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -164,6 +165,9 @@ private class HomeActions(
 
 @Composable
 fun HomeScreen(activity: FragmentActivity, navigate: (LauncherSection) -> Unit) {
+    LaunchedEffect(Unit) {
+        PojavAccountBridge.ensureLoaded()
+    }
     val instances = PojavInstanceBridge.instances
     val selected = PojavInstanceBridge.selected
     val taskCount = PojavTaskBridge.taskCount
@@ -552,10 +556,6 @@ private fun CompactHomeDashboard(
                 HomeSectionLabel(stringResource(R.string.aerix_home_your_space), null)
                 QuickTiles(count, accent, actions, Modifier.fillMaxWidth(), scrollable = true)
             }
-        }
-        // Compact skin stage so narrow/portrait phones also display newly equipped skins on Home.
-        item {
-            CompactSkinStageCard(accent = accent, actions = actions)
         }
         // On a phone the side action panel is collapsed, so the play step points at the world card here.
         item {
@@ -973,86 +973,3 @@ private fun SameVersionNudgeStrip(
     }
 }
 
-@Composable
-private fun CompactSkinStageCard(
-    accent: Color,
-    actions: HomeActions
-) {
-    val account = PojavAccountBridge.current
-    var azimuth by remember(account?.username) { mutableFloatStateOf(28f) }
-    val shape = RoundedCornerShape(AerixRadii.card)
-
-    Surface(
-        shape = shape,
-        color = AerixSurface.panel,
-        border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft),
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(148.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(AerixSpacing.smPlus),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(AerixSpacing.md)
-        ) {
-            Box(
-                modifier = Modifier
-                    .width(104.dp)
-                    .fillMaxHeight()
-                    .clip(RoundedCornerShape(AerixRadii.control))
-                    .background(AerixSurface.panelTrack.copy(alpha = 0.45f))
-                    .pointerInput(account?.username) {
-                        detectHorizontalDragGestures { _, dragAmount ->
-                            azimuth = (azimuth + dragAmount * DOLL_DRAG_DEG_PER_PX).mod(360f)
-                        }
-                    }
-                    .clickable(role = Role.Button) { actions.accounts() },
-                contentAlignment = Alignment.Center
-            ) {
-                AerixSkinPreview3D(
-                    account = account,
-                    azimuth = azimuth.roundToInt(),
-                    interactionEnabled = false,
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(AerixSpacing.xs)
-            ) {
-                Text(
-                    text = account?.username ?: "No account selected",
-                    color = AerixSurface.textPrimary,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = if (account != null) "Active skin & cape · drag character to rotate" else "Tap to add an account or equip skins",
-                    color = AerixSurface.textMuted,
-                    fontSize = 11.sp,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(Modifier.height(AerixSpacing.xxs))
-                Surface(
-                    shape = RoundedCornerShape(AerixRadii.controlSmall),
-                    color = accent.copy(alpha = 0.18f),
-                    border = BorderStroke(AerixSpacing.hairline, accent.copy(alpha = 0.5f)),
-                    modifier = Modifier.clickable(role = Role.Button) { actions.accounts() }
-                ) {
-                    Text(
-                        text = "Wardrobe & Skins",
-                        color = accent,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
-                    )
-                }
-            }
-        }
-    }
-}

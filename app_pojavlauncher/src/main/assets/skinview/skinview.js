@@ -175,18 +175,46 @@ function resize() {
     }
 }
 
+function isWebGlAlive() {
+    if (!skinViewer || !skinViewer.renderer) return false;
+    try {
+        const gl = typeof skinViewer.renderer.getContext === "function"
+            ? skinViewer.renderer.getContext()
+            : null;
+        if (gl && typeof gl.isContextLost === "function" && gl.isContextLost()) {
+            return false;
+        }
+    } catch (_) {
+        return false;
+    }
+    return true;
+}
+
 function loadSkin(skinUrl, model = "auto-detect") {
-    if (!skinViewer) {
+    if (!skinViewer || !isWebGlAlive()) {
         notifyReady(false, "no_viewer");
         return;
     }
     Promise.resolve(skinViewer.loadSkin(skinUrl, { model: model }))
         .then(() => {
-            resize();
-            skinViewer.render();
-            try {
-                if (window.AndroidSkinBridge) window.AndroidSkinBridge.onSkinPainted(true);
-            } catch (_) {}
+            const finishPaint = () => {
+                if (!isWebGlAlive()) {
+                    try {
+                        if (window.AndroidSkinBridge) window.AndroidSkinBridge.onSkinPainted(false);
+                    } catch (_) {}
+                    return;
+                }
+                resize();
+                skinViewer.render();
+                try {
+                    if (window.AndroidSkinBridge) window.AndroidSkinBridge.onSkinPainted(true);
+                } catch (_) {}
+            };
+            if (container.clientWidth > 8 && container.clientHeight > 8) {
+                finishPaint();
+            } else {
+                setTimeout(finishPaint, 80);
+            }
         })
         .catch(error => {
             console.warn("Unable to render skin preview", error);
@@ -310,6 +338,13 @@ if (skinViewer) {
             cancelAnimationFrame(resetAnimationId);
             resetAnimationId = null;
         }
+    });
+
+    skinViewer.canvas.addEventListener("webglcontextlost", (e) => {
+        if (e && typeof e.preventDefault === "function") e.preventDefault();
+        try {
+            if (window.AndroidSkinBridge) window.AndroidSkinBridge.onViewerError("webgl_context_lost");
+        } catch (_) {}
     });
 
     window.addEventListener("resize", resize);

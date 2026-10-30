@@ -11,7 +11,9 @@
  * account's equipped skin, cape and Wide/Slim model, and the game is started with the
  * authlib-injector jar this launcher already ships pointed at it. The game then reads its profile
  * - and its texture - from here, exactly as it would from an authentication server.
- * The same design as Zalith Launcher 2 (game/account/offline/OfflineYggdrasilServer.kt) and HMCL.
+ * Supports legacy Yggdrasil (1.7.10 - 1.20.1) as well as authlib 5.x/6.x/7.x (1.20.2 - 1.21+ / 26.x)
+ * including minecraftservices profile lookups, prefetched Yggdrasil metadata, 64x64 texture
+ * normalization for SkinTextureDownloader, and non-nil offline player UUIDs.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -38,6 +40,7 @@ import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
 import java.net.URL
+import java.net.URLDecoder
 import java.security.KeyPair
 import java.security.KeyPairGenerator
 import java.security.MessageDigest
@@ -56,9 +59,10 @@ object AerixSkinServer {
     private const val TAG = "AerixSkinServer"
     private const val AUTHLIB_FOLDER = "authlib-injector"
     private const val AUTHLIB_JAR = "authlib-injector.jar"
-    private const val MOJANG_SESSIONS = "https://sessionserver.mojang.com"
-    private const val MOJANG_AUTH = "https://authserver.mojang.com"
-    private const val MOJANG_API = "https://api.mojang.com"
+    internal const val MOJANG_SESSIONS = "https://sessionserver.mojang.com"
+    internal const val MOJANG_AUTH = "https://authserver.mojang.com"
+    internal const val MOJANG_API = "https://api.mojang.com"
+    internal const val MOJANG_SERVICES = "https://api.minecraftservices.com"
 
     /** One player: the profile the game is launched as, plus the textures equipped for it. */
     private class Character(
@@ -71,18 +75,20 @@ object AerixSkinServer {
         val slim: Boolean
     )
 
+    @Volatile
     private var serverSocket: ServerSocket? = null
+    @Volatile
     private var workers: ExecutorService? = null
+    @Volatile
     private var port: Int = 0
     private val characters = ConcurrentHashMap<String, Character>()
     private val textures = ConcurrentHashMap<String, ByteArray>()
-    /** True for accounts whose own session service still has to work (Microsoft, Ely.by). */
+    @Volatile
+    private var primaryCharacter: Character? = null
+    /** True for accounts whose own session service still has to work (Microsoft). */
+    @Volatile
     private var passThrough = false
-    /**
-     * Generated on the first request, never on the launch thread: RSA keygen is slow. Null when the
-     * device cannot generate one, in which case the profile is served unsigned - the game accepts
-     * that for the player's own profile.
-     */
+
     private val keyPair: KeyPair? by lazy {
         runCatching { KeyPairGenerator.getInstance("RSA").apply { initialize(2048) }.genKeyPair() }
             .onFailure { Log.w(TAG, "No RSA key pair: " + it.message) }
@@ -93,9 +99,6 @@ object AerixSkinServer {
      * Arguments that make the game read its skin from here, or an empty list when there is nothing
      * to serve (no skin equipped, no authlib-injector jar, or an account that brings its own
      * authentication server).
-     *
-     * @param context used to read the Wide/Slim choice, which is stored per account
-     * @param account the account the game is about to be launched as
      */
     @JvmStatic
     fun launchArguments(context: Context, account: Account): List<String> {
@@ -115,6 +118,7 @@ object AerixSkinServer {
     fun stop() {
         characters.clear()
         textures.clear()
+        primaryCharacter = null
         passThrough = false
         runCatching { serverSocket?.close() }
         serverSocket = null
@@ -125,14 +129,12 @@ object AerixSkinServer {
 
     private fun prepare(context: Context, account: Account): List<String> {
         val authType = account.authType ?: AuthType.LOCAL
-        // An account that logs in through its own Yggdrasil (Ely.by) is already launched with an
-        // authlib-injector agent; a second one for the same jar would conflict, and its own
-        // service knows the account better than this endpoint can.
         if (authType.injectorUrl != null) return emptyList()
 
         val skinFile = PojavAccountBridge.customSkinFile(account)
         val capeFile = PojavAccountBridge.customCapeFile(account)
-        val skinBytes = if (skinFile.isFile && skinFile.length() > 0) skinFile.readBytes() else null
+        val rawSkinBytes = if (skinFile.isFile && skinFile.length() > 0) skinFile.readBytes() else null
+        val skinBytes = rawSkinBytes?.let { PojavAccountBridge.normalizeSkinBytesForGame(it) }
         val capeBytes = if (capeFile.isFile && capeFile.length() > 0) capeFile.readBytes() else null
         if (skinBytes == null && capeBytes == null) return emptyList()
 
@@ -141,31 +143,39 @@ object AerixSkinServer {
             Logger.appendToLog("Skin server: $jar is missing, the equipped skin cannot reach the game")
             return emptyList()
         }
-        // A jar the JVM cannot read as an agent stops the launch before Minecraft starts, so it is
-        // checked here, where doing nothing is still a working game.
         val readableJar = runCatching { java.util.zip.ZipFile(jar).use { } }.isSuccess
         if (!readableJar) {
             Logger.appendToLog("Skin server: $jar is not a readable jar; launching without it")
             return emptyList()
         }
 
-        val uuid = account.profileId.orEmpty().replace("-", "").ifBlank { ZERO_UUID }
+        val playerName = account.username?.takeIf { it.isNotBlank() } ?: "Steve"
+        val effectiveUuid = PojavAccountBridge.effectiveProfileId(account).replace("-", "").lowercase()
+        val offlineUuid = PojavAccountBridge.offlineUuid(playerName).toString().replace("-", "").lowercase()
+        val rawAccountUuid = account.profileId.orEmpty().replace("-", "").lowercase()
+
         val character = Character(
-            uuid = uuid,
-            name = account.username ?: "Steve",
+            uuid = effectiveUuid.ifBlank { offlineUuid },
+            name = playerName,
             skinHash = skinBytes?.let { remember(it) },
             skinBytes = skinBytes,
             capeHash = capeBytes?.let { remember(it) },
             capeBytes = capeBytes,
             slim = PojavAccountBridge.isSlimModelFor(context, account)
         )
+        primaryCharacter = character
         characters[character.uuid.lowercase()] = character
-        characters[character.name.lowercase()] = character
-        // The Microsoft profile still has to be reachable for multiplayer: those requests are
-        // passed on to Mojang, only the local player's own textures are answered here.
+        characters[offlineUuid] = character
+        if (rawAccountUuid.length == 32) {
+            characters[rawAccountUuid] = character
+        }
         passThrough = authType == AuthType.MICROSOFT
+        if (!passThrough) {
+            characters[ZERO_UUID] = character
+        }
+        characters[character.name.lowercase()] = character
 
-        val socket = ServerSocket(0, 16, InetAddress.getByName("127.0.0.1"))
+        val socket = ServerSocket(0, 32, InetAddress.getByName("127.0.0.1"))
         serverSocket = socket
         port = socket.localPort
         val pool = Executors.newFixedThreadPool(4) { runnable ->
@@ -174,16 +184,18 @@ object AerixSkinServer {
         workers = pool
         pool.execute { acceptLoop(socket) }
 
+        val metadataJson = metadata()
+        val prefetched = Base64.encodeToString(metadataJson.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
+
         Logger.appendToLog(
-            "Skin server on 127.0.0.1:$port for ${character.name}: skin=${character.skinHash != null} " +
+            "Skin server on 127.0.0.1:$port for ${character.name} (${character.uuid.take(8)}…): " +
+                "skin=${character.skinHash != null} (${skinBytes?.size ?: 0}B) " +
                 "cape=${character.capeHash != null} slim=${character.slim} " +
                 "account=${authType.name} passThrough=$passThrough"
         )
         return listOf(
             "-javaagent:${jar.absolutePath}=http://127.0.0.1:$port",
-            // Client side only: the account was authenticated by the launcher, and the game must
-            // not try to log in against this endpoint.
-            "-Dauthlibinjector.side=client"
+            "-Dauthlibinjector.yggdrasil.prefetched=$prefetched"
         )
     }
 
@@ -213,6 +225,7 @@ object AerixSkinServer {
         val method: String,
         val path: String,
         val query: Map<String, String>,
+        val headers: Map<String, String>,
         val body: String
     )
 
@@ -231,14 +244,17 @@ object AerixSkinServer {
                 if (colon > 0) headers[line.substring(0, colon).trim().lowercase()] =
                     line.substring(colon + 1).trim()
             }
+            val method = parts[0].uppercase()
             val target = parts[1]
-            val path = target.substringBefore('?')
+            val path = decodeUrlComponent(target.substringBefore('?'))
             val query = target.substringAfter('?', "")
                 .split('&')
                 .filter { it.contains('=') }
-                .associate { it.substringBefore('=') to it.substringAfter('=') }
-            val body = if (parts[0].equals("POST", true)) {
-                val length = headers["content-length"]?.toIntOrNull() ?: 0
+                .associate {
+                    decodeUrlComponent(it.substringBefore('=')) to decodeUrlComponent(it.substringAfter('='))
+                }
+            val body = if (method == "POST" || method == "PUT") {
+                val length = headers["content-length"]?.toIntOrNull()?.coerceIn(0, 1_048_576) ?: 0
                 val buffer = ByteArray(length)
                 var read = 0
                 while (read < length) {
@@ -248,13 +264,16 @@ object AerixSkinServer {
                 }
                 String(buffer, 0, read, Charsets.UTF_8)
             } else ""
-            route(Request(parts[0].uppercase(), path, query, body), client.getOutputStream())
+            route(Request(method, path, query, headers, body), client.getOutputStream())
         } catch (error: Throwable) {
             Log.w(TAG, "Request failed: ${error.javaClass.simpleName}: ${error.message}")
         } finally {
             runCatching { client.close() }
         }
     }
+
+    private fun decodeUrlComponent(raw: String): String =
+        runCatching { URLDecoder.decode(raw, "UTF-8") }.getOrDefault(raw)
 
     private fun readLine(input: BufferedInputStream): String? {
         val builder = StringBuilder()
@@ -270,82 +289,178 @@ object AerixSkinServer {
 
     private fun route(request: Request, output: OutputStream) {
         val path = request.path
+        val sendBody = request.method != "HEAD"
         when {
-            path == "/" || path.isEmpty() -> respond(output, 200, "application/json", metadata().toByteArray())
-            path == "/api/profiles/minecraft" -> respond(
-                output, 200, "application/json", profiles(request.body).toByteArray()
-            )
-            path == "/sessionserver/session/minecraft/join" -> respond(output, 204, null, ByteArray(0))
+            path == "/" || path.isEmpty() ->
+                respond(output, 200, "application/json; charset=utf-8", metadata().toByteArray(), sendBody)
+
+            path == "/api/profiles/minecraft" ||
+                path == "/minecraftservices/minecraft/profile/lookup/bulk/byname" ->
+                respond(output, 200, "application/json; charset=utf-8", profiles(request.body).toByteArray(), sendBody)
+
+            path.startsWith("/api/users/profiles/minecraft/") ||
+                path.startsWith("/minecraftservices/minecraft/profile/lookup/name/") -> {
+                val lookupName = path.substringAfterLast('/').lowercase()
+                val character = characters[lookupName]
+                if (character != null) {
+                    val json = JsonObject().apply {
+                        addProperty("id", character.uuid)
+                        addProperty("name", character.name)
+                    }.toString()
+                    respond(output, 200, "application/json; charset=utf-8", json.toByteArray(), sendBody)
+                } else {
+                    forgeOrProxy(request, output)
+                }
+            }
+
+            path.startsWith("/minecraftservices/minecraft/profile/lookup/") -> {
+                val lookupUuid = path.substringAfterLast('/').lowercase().replace("-", "")
+                val character = characters[lookupUuid]
+                if (character != null) {
+                    val effectiveId = lookupUuid.takeIf { it.length == 32 } ?: character.uuid
+                    val json = JsonObject().apply {
+                        addProperty("id", effectiveId)
+                        addProperty("name", character.name)
+                    }.toString()
+                    respond(output, 200, "application/json; charset=utf-8", json.toByteArray(), sendBody)
+                } else {
+                    forgeOrProxy(request, output)
+                }
+            }
+
+            path == "/minecraftservices/minecraft/profile" -> {
+                val character = primaryCharacter
+                if (character != null && !passThrough) {
+                    respond(
+                        output,
+                        200,
+                        "application/json; charset=utf-8",
+                        servicesProfile(character).toByteArray(),
+                        sendBody
+                    )
+                } else {
+                    forgeOrProxy(request, output)
+                }
+            }
+
+            path == "/authserver/validate" -> {
+                if (!passThrough) respond(output, 204, null, ByteArray(0), sendBody)
+                else forgeOrProxy(request, output)
+            }
+
+            path == "/sessionserver/session/minecraft/join" -> {
+                if (!passThrough) respond(output, 204, null, ByteArray(0), sendBody)
+                else forgeOrProxy(request, output)
+            }
+
             path == "/sessionserver/session/minecraft/hasJoined" -> {
-                val profile = characters[request.query["username"].orEmpty().lowercase()]?.let { complete(it) }
-                if (profile != null) respond(output, 200, "application/json", profile.toByteArray())
-                else forgeOrProxy(request, output, MOJANG_SESSIONS)
+                val username = request.query["username"].orEmpty().lowercase()
+                val character = characters[username]
+                if (!passThrough && character != null) {
+                    respond(output, 200, "application/json; charset=utf-8", complete(character).toByteArray(), sendBody)
+                } else {
+                    forgeOrProxy(request, output)
+                }
             }
+
             path.startsWith("/sessionserver/session/minecraft/profile/") -> {
-                // The session service asks by UUID, and it writes it with dashes while the profile
-                // the game was launched with has none: both forms have to find the player.
                 val uuid = path.substringAfterLast('/').lowercase().replace("-", "")
-                val profile = characters[uuid]?.let { complete(it) }
-                Logger.appendToLog("Skin server: profile request ${uuid.take(8)}… served=${profile != null}")
-                if (profile != null) respond(output, 200, "application/json", profile.toByteArray())
-                else forgeOrProxy(request, output, MOJANG_SESSIONS)
+                val character = characters[uuid]
+                Logger.appendToLog("Skin server: profile request ${uuid.take(8)}… served=${character != null}")
+                if (character != null) {
+                    val profile = complete(character, requestedUuid = uuid)
+                    respond(output, 200, "application/json; charset=utf-8", profile.toByteArray(), sendBody)
+                } else {
+                    forgeOrProxy(request, output)
+                }
             }
+
             path.startsWith("/textures/") -> {
-                val bytes = textures[path.substringAfter("/textures/")]
+                val hash = path.substringAfter("/textures/").substringBefore('.')
+                val bytes = textures[hash]
                 Logger.appendToLog("Skin server: texture request served=${bytes != null} (${bytes?.size ?: 0} bytes)")
-                if (bytes != null) respond(output, 200, "image/png", bytes)
-                else respond(output, 404, "text/plain", "not found".toByteArray())
+                if (bytes != null) respond(output, 200, "image/png", bytes, sendBody)
+                else respond(output, 404, "text/plain; charset=utf-8", "not found".toByteArray(), sendBody)
             }
-            else -> forgeOrProxy(request, output, null)
+
+            path.startsWith("/skins/MinecraftSkins/") -> {
+                val name = path.substringAfterLast('/').removeSuffix(".png").lowercase()
+                val bytes = characters[name]?.skinBytes
+                if (bytes != null) respond(output, 200, "image/png", bytes, sendBody)
+                else respond(output, 404, "text/plain; charset=utf-8", "not found".toByteArray(), sendBody)
+            }
+
+            else -> forgeOrProxy(request, output)
         }
     }
 
+    /** Resolves `(upstreamHost, strippedPath)` for authlib-injector redirected paths. */
+    internal fun resolveUpstreamTarget(path: String): Pair<String, String> = when {
+        path.startsWith("/minecraftservices/") -> MOJANG_SERVICES to path.removePrefix("/minecraftservices")
+        path == "/minecraftservices" -> MOJANG_SERVICES to "/"
+        path.startsWith("/sessionserver/") -> MOJANG_SESSIONS to path.removePrefix("/sessionserver")
+        path == "/sessionserver" -> MOJANG_SESSIONS to "/"
+        path.startsWith("/authserver/") -> MOJANG_AUTH to path.removePrefix("/authserver")
+        path == "/authserver" -> MOJANG_AUTH to "/"
+        path.startsWith("/api/") -> MOJANG_API to path.removePrefix("/api")
+        path == "/api" -> MOJANG_API to "/"
+        else -> MOJANG_SESSIONS to path
+    }
+
     /** Answers from Mojang when this launcher is not the one that knows the answer. */
-    private fun forgeOrProxy(request: Request, output: OutputStream, base: String?) {
+    private fun forgeOrProxy(request: Request, output: OutputStream) {
+        val sendBody = request.method != "HEAD"
         if (!passThrough) {
-            respond(output, if (request.method == "POST") 204 else 404, null, ByteArray(0))
+            // Return 204 No Content on unknown session/profile lookups so authlib treats them cleanly as absent.
+            val status = if (request.method == "POST" || request.path.contains("/profile/")) 204 else 404
+            respond(output, status, null, ByteArray(0), sendBody)
             return
         }
-        val host = base ?: when {
-            request.path.startsWith("/authserver") -> MOJANG_AUTH
-            request.path.startsWith("/api") -> MOJANG_API
-            else -> MOJANG_SESSIONS
-        }
+        val (host, upstreamPath) = resolveUpstreamTarget(request.path)
         val query = if (request.query.isEmpty()) ""
         else request.query.entries.joinToString("&", prefix = "?") { "${it.key}=${it.value}" }
         try {
-            val connection = (URL(host + request.path + query).openConnection() as HttpURLConnection).apply {
+            val connection = (URL(host + upstreamPath + query).openConnection() as HttpURLConnection).apply {
                 requestMethod = request.method
                 connectTimeout = 10000
                 readTimeout = 15000
                 instanceFollowRedirects = true
-                setRequestProperty("Content-Type", "application/json")
+                setRequestProperty("Accept", "application/json")
+                request.headers["content-type"]?.let { setRequestProperty("Content-Type", it) }
+                    ?: setRequestProperty("Content-Type", "application/json")
+                request.headers["authorization"]?.let { setRequestProperty("Authorization", it) }
             }
-            if (request.method == "POST") {
+            if (request.method == "POST" || request.method == "PUT") {
                 connection.doOutput = true
-                connection.outputStream.use { it.write(request.body.toByteArray()) }
+                connection.outputStream.use { it.write(request.body.toByteArray(Charsets.UTF_8)) }
             }
             val code = connection.responseCode
             val stream = if (code in 200..299) connection.inputStream else connection.errorStream
             val bytes = stream?.use { it.readBytes() } ?: ByteArray(0)
-            val type = connection.contentType ?: "application/json"
+            val type = connection.contentType ?: if (bytes.isNotEmpty()) "application/json" else null
             connection.disconnect()
-            respond(output, code, type, bytes)
+            respond(output, code, type, bytes, sendBody)
         } catch (error: Throwable) {
-            Log.w(TAG, "Pass-through to $host failed: ${error.message}")
-            respond(output, 503, "application/json", "{\"error\":\"upstream unreachable\"}".toByteArray())
+            Log.w(TAG, "Pass-through to $host$upstreamPath failed: ${error.message}")
+            respond(output, 503, "application/json", "{\"error\":\"upstream unreachable\"}".toByteArray(), sendBody)
         }
     }
 
-    private fun respond(output: OutputStream, code: Int, type: String?, body: ByteArray) {
+    private fun respond(
+        output: OutputStream,
+        code: Int,
+        type: String?,
+        body: ByteArray,
+        sendBody: Boolean = true
+    ) {
         val header = StringBuilder("HTTP/1.1 $code ${reason(code)}\r\n")
         if (type != null) header.append("Content-Type: ").append(type).append("\r\n")
-        header.append("Content-Length: ").append(body.size).append("\r\n")
+        header.append("Content-Length: ").append(if (code == 204) 0 else body.size).append("\r\n")
         header.append("Cache-Control: no-store\r\n")
         header.append("Connection: close\r\n\r\n")
         output.use {
-            it.write(header.toString().toByteArray())
-            if (body.isNotEmpty()) it.write(body)
+            it.write(header.toString().toByteArray(Charsets.UTF_8))
+            if (sendBody && code != 204 && body.isNotEmpty()) it.write(body)
             it.flush()
         }
     }
@@ -362,14 +477,22 @@ object AerixSkinServer {
 
     private fun metadata(): String {
         val root = JsonObject()
-        val domains = JsonArray()
-        domains.add("127.0.0.1")
-        domains.add("localhost")
+        val domains = JsonArray().apply {
+            add("127.0.0.1")
+            add("localhost")
+            add(".minecraft.net")
+            add(".mojang.com")
+        }
         root.add("skinDomains", domains)
-        val meta = JsonObject()
-        meta.addProperty("serverName", "Aerix Launcher (local)")
-        meta.addProperty("implementationName", "Aerix Launcher")
-        meta.addProperty("implementationVersion", "1.0")
+        val meta = JsonObject().apply {
+            addProperty("serverName", "Aerix Launcher (local)")
+            addProperty("implementationName", "Aerix Launcher")
+            addProperty("implementationVersion", "1.6")
+            addProperty("feature.no_mojang_namespace", !passThrough)
+            addProperty("feature.enable_profile_key", true)
+            addProperty("feature.legacy_skin_api", true)
+            addProperty("feature.enable_mojang_anti_features", false)
+        }
         root.add("meta", meta)
         val key = keyPair
         if (key != null) {
@@ -394,17 +517,45 @@ object AerixSkinServer {
         return array.toString()
     }
 
+    private fun servicesProfile(character: Character): String {
+        val skins = JsonArray()
+        character.skinHash?.let { hash ->
+            skins.add(JsonObject().apply {
+                addProperty("id", hash.take(32))
+                addProperty("state", "ACTIVE")
+                addProperty("url", "http://127.0.0.1:$port/textures/$hash")
+                addProperty("variant", if (character.slim) "SLIM" else "CLASSIC")
+            })
+        }
+        val capes = JsonArray()
+        character.capeHash?.let { hash ->
+            capes.add(JsonObject().apply {
+                addProperty("id", hash.take(32))
+                addProperty("state", "ACTIVE")
+                addProperty("url", "http://127.0.0.1:$port/textures/$hash")
+                addProperty("alias", "Aerix")
+            })
+        }
+        return JsonObject().apply {
+            addProperty("id", character.uuid)
+            addProperty("name", character.name)
+            add("skins", skins)
+            add("capes", capes)
+        }.toString()
+    }
+
     /** The session-service answer the game reads the player's skin from. */
-    private fun complete(character: Character): String {
-        val texturesObject = JsonObject()
-        texturesObject.addProperty("timestamp", System.currentTimeMillis())
-        texturesObject.addProperty("profileId", character.uuid)
-        texturesObject.addProperty("profileName", character.name)
+    private fun complete(character: Character, requestedUuid: String? = null): String {
+        val effectiveId = requestedUuid?.takeIf { it.length == 32 } ?: character.uuid
+        val texturesObject = JsonObject().apply {
+            addProperty("timestamp", System.currentTimeMillis())
+            addProperty("profileId", effectiveId)
+            addProperty("profileName", character.name)
+        }
         val texturesNode = JsonObject()
         character.skinHash?.let { hash ->
             texturesNode.add("SKIN", JsonObject().apply {
                 addProperty("url", "http://127.0.0.1:$port/textures/$hash")
-                // Only a slim skin carries a model; without it the game draws the wide arms.
                 if (character.slim) {
                     add("metadata", JsonObject().apply { addProperty("model", "slim") })
                 }
@@ -417,15 +568,18 @@ object AerixSkinServer {
         }
         texturesObject.add("textures", texturesNode)
 
-        val encoded = Base64.encodeToString(texturesObject.toString().toByteArray(), Base64.NO_WRAP)
-        val property = JsonObject()
-        property.addProperty("name", "textures")
-        property.addProperty("value", encoded)
-        property.addProperty("signature", sign(encoded))
-        val properties = JsonArray()
-        properties.add(property)
+        val encoded = Base64.encodeToString(texturesObject.toString().toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
+        val signature = sign(encoded)
+        val property = JsonObject().apply {
+            addProperty("name", "textures")
+            addProperty("value", encoded)
+            if (signature.isNotEmpty()) {
+                addProperty("signature", signature)
+            }
+        }
+        val properties = JsonArray().apply { add(property) }
         return JsonObject().apply {
-            addProperty("id", character.uuid)
+            addProperty("id", effectiveId)
             addProperty("name", character.name)
             add("properties", properties)
         }.toString()

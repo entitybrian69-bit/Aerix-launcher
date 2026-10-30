@@ -69,11 +69,7 @@ class AerixAccount(
         get() = PojavAccountBridge.accountKey(source)
 
     val displayUuid: String
-        get() {
-            val raw = source.profileId
-            if (!raw.isNullOrBlank() && raw != "00000000-0000-0000-0000-000000000000") return raw
-            return UUID.nameUUIDFromBytes("OfflinePlayer:$username".toByteArray(Charsets.UTF_8)).toString()
-        }
+        get() = PojavAccountBridge.effectiveProfileId(source)
 }
 
 /** One entry in the Saved Skins & Presets grid of the Account Details & Skin Wardrobe page. */
@@ -125,12 +121,63 @@ object PojavAccountBridge : LoginListener {
     private val elyByLoginListener = LoginExtraListener(AuthType.ELY_BY)
     private val localLoginListener = ExtraListener<Array<String>> { _, value ->
         try {
-            val account = Accounts.create { acc -> acc.username = value[0] }
+            val account = Accounts.create { acc ->
+                val name = value[0].trim().ifEmpty { "Steve" }
+                acc.username = name
+                acc.authType = AuthType.LOCAL
+                acc.profileId = offlineUuid(name).toString()
+                acc.accessToken = offlineAccessToken(name)
+            }
             onLoginDone(account)
         } catch (e: IOException) {
             onLoginError(e)
         }
         false
+    }
+
+    /** Standard Minecraft v3 offline UUID (`UUIDUtil.createOfflinePlayerUUID`). */
+    @JvmStatic
+    fun offlineUuid(username: String): UUID {
+        val clean = username.trim().ifEmpty { "Steve" }
+        return UUID.nameUUIDFromBytes("OfflinePlayer:$clean".toByteArray(Charsets.UTF_8))
+    }
+
+    /** Deterministic non-zero 32-hex session token so MC 1.20.4+ does not enter `"0"` offline dev mode. */
+    @JvmStatic
+    fun offlineAccessToken(username: String): String =
+        UUID.nameUUIDFromBytes("AerixOfflineToken:${username.trim().ifEmpty { "Steve" }}".toByteArray(Charsets.UTF_8))
+            .toString()
+            .replace("-", "")
+
+    /**
+     * Resolves a valid non-nil UUID for [account]. Existing offline accounts created before this
+     * fix carry `00000000-0000-0000-0000-000000000000` (`Util.NIL_UUID`), which Minecraft 1.20.2+
+     * and 1.21+ treat as an absent profile and replace with `OfflinePlayer:<username>` in worlds.
+     */
+    @JvmStatic
+    fun effectiveProfileId(account: Account): String {
+        val raw = account.profileId?.trim().orEmpty()
+        val stripped = raw.replace("-", "")
+        val isNilOrInvalid = stripped.length != 32 || stripped.all { it == '0' }
+        return if (account.authType == AuthType.LOCAL || isNilOrInvalid) {
+            offlineUuid(account.username ?: "Steve").toString()
+        } else {
+            raw
+        }
+    }
+
+    /**
+     * Resolves a non-`"0"` access token for [account] so Minecraft 1.20.4+ / 1.21+ does not
+     * short-circuit session/skin loading via `"0".equals(accessToken)`.
+     */
+    @JvmStatic
+    fun effectiveAccessToken(account: Account): String {
+        val raw = account.accessToken?.trim().orEmpty()
+        return if (account.authType == AuthType.LOCAL || raw.isEmpty() || raw == "0") {
+            offlineAccessToken(account.username ?: "Steve")
+        } else {
+            raw
+        }
     }
     private val refreshAccountsListener = ExtraListener<Boolean> { _, _ ->
         reload()
@@ -261,6 +308,7 @@ object PojavAccountBridge : LoginListener {
         customSkinFile(account.source).delete()
         customCapeFile(account.source).delete()
         customFaceFile(account.source).delete()
+        File(Tools.DIR_CACHE, "aerix-skin-${safeAccountTag(account.source)}.png").delete()
         Accounts.delete(account.source)
         reload()
     }
@@ -376,11 +424,9 @@ object PojavAccountBridge : LoginListener {
         return null
     }
 
-    private fun resolveMojangSkinUrl(username: String): Pair<String, Boolean>? = runCatching {
-        val profileBytes = downloadBytesFollowingRedirects("https://api.mojang.com/users/profiles/minecraft/$username")
-            ?: return null
-        val uuid = com.google.gson.JsonParser.parseString(String(profileBytes, Charsets.UTF_8))
-            .asJsonObject.get("id")?.asString ?: return null
+    private fun resolveMojangSkinByUuid(uuidRaw: String): Pair<String, Boolean>? = runCatching {
+        val uuid = uuidRaw.replace("-", "").trim()
+        if (uuid.length != 32 || uuid.all { it == '0' }) return null
         val sessionBytes = downloadBytesFollowingRedirects("https://sessionserver.mojang.com/session/minecraft/profile/$uuid")
             ?: return null
         val props = com.google.gson.JsonParser.parseString(String(sessionBytes, Charsets.UTF_8))
@@ -400,9 +446,19 @@ object PojavAccountBridge : LoginListener {
         null
     }.getOrNull()
 
+    private fun resolveMojangSkinUrl(username: String): Pair<String, Boolean>? = runCatching {
+        val profileBytes = downloadBytesFollowingRedirects("https://api.mojang.com/users/profiles/minecraft/$username")
+            ?: return null
+        val uuid = com.google.gson.JsonParser.parseString(String(profileBytes, Charsets.UTF_8))
+            .asJsonObject.get("id")?.asString ?: return null
+        resolveMojangSkinByUuid(uuid)
+    }.getOrNull()
+
     /**
-     * Validates and normalizes any decoded skin bitmap into a clean ARGB_8888 PNG whose dimensions
-     * satisfy both skinview3d and Minecraft (width in {64, 128, 256, 512} and height in {w, w/2}).
+     * Validates and normalizes any decoded skin bitmap into a clean 64x64 (or legacy 64x32)
+     * ARGB_8888 PNG. Vanilla Minecraft 1.20.2+ / 1.21+ (`SkinTextureDownloader.processLegacySkin`)
+     * strictly enforces `width == 64 && (height == 32 || height == 64)` and discards 128x128+
+     * textures completely.
      */
     private fun normalizeSkinPng(source: Bitmap): Pair<ByteArray, Bitmap>? {
         val w = source.width
@@ -413,13 +469,8 @@ object PojavAccountBridge : LoginListener {
         val isLegacyHalf = w == h * 2
         if (!isSquare && !isLegacyHalf) return null
 
-        val targetW = when {
-            w <= 64 -> 64
-            w <= 128 -> 128
-            w <= 256 -> 256
-            else -> 512
-        }
-        val targetH = if (isLegacyHalf) targetW / 2 else targetW
+        val targetW = 64
+        val targetH = if (isLegacyHalf) 32 else 64
         val clean = Bitmap.createBitmap(targetW, targetH, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(clean)
         val paint = Paint().apply { isFilterBitmap = false; isAntiAlias = false }
@@ -430,6 +481,30 @@ object PojavAccountBridge : LoginListener {
             return null
         }
         return out.toByteArray() to clean
+    }
+
+    /**
+     * Ensures already-saved skin files on disk (including HD 128x128/256x256 skins equipped in
+     * earlier builds) are converted to 64x64 / 64x32 PNGs before [AerixSkinServer] serves them to
+     * Minecraft 1.20.2+ / 1.21+.
+     */
+    @JvmStatic
+    fun normalizeSkinBytesForGame(rawBytes: ByteArray): ByteArray {
+        return runCatching {
+            val decoded = BitmapFactory.decodeByteArray(rawBytes, 0, rawBytes.size) ?: return rawBytes
+            if (decoded.width == 64 && (decoded.height == 64 || decoded.height == 32)) {
+                decoded.recycle()
+                return rawBytes
+            }
+            val normalized = normalizeSkinPng(decoded)
+            decoded.recycle()
+            if (normalized != null) {
+                normalized.second.recycle()
+                normalized.first
+            } else {
+                rawBytes
+            }
+        }.getOrDefault(rawBytes)
     }
 
     /** Loads or downloads a 2D pixel face preview for a SkinLibrary entry. */
@@ -758,26 +833,75 @@ object PojavAccountBridge : LoginListener {
         }
     }
 
+    /**
+     * Resolves the PNG skin texture bytes for [account]:
+     * 1. Equipped wardrobe skin (`Tools.DIR_DATA/aerix/wardrobe/skin-<tag>.png`)
+     * 2. Per-account remote cache (`Tools.DIR_CACHE/aerix-skin-<tag>.png`)
+     * 3. Official Mojang sessionserver texture (for Microsoft accounts) or Ely.by / mirror URLs
+     */
+    fun resolveAccountSkinBytes(account: AerixAccount?): ByteArray? {
+        if (account == null) return null
+        resolveCustomSkinBytes(account)?.let { return normalizeSkinBytesForGame(it) }
+
+        val tagCache = File(Tools.DIR_CACHE, "aerix-skin-${safeAccountTag(account.source)}.png")
+        if (tagCache.isFile && tagCache.length() > 0) {
+            runCatching { return normalizeSkinBytesForGame(tagCache.readBytes()) }
+        }
+
+        val rawPid = account.source.profileId?.trim().orEmpty()
+        val strippedPid = rawPid.replace("-", "")
+        if (strippedPid.length == 32 && !strippedPid.all { it == '0' }) {
+            val legacyCache = File(Tools.DIR_CACHE, "aerix-skin-$rawPid-${account.authType.name}.png")
+            if (legacyCache.isFile && legacyCache.length() > 0) {
+                runCatching { return normalizeSkinBytesForGame(legacyCache.readBytes()) }
+            }
+        }
+
+        if (account.authType == AuthType.LOCAL) return null
+
+        val candidateUrls = ArrayList<String>()
+        if (account.authType == AuthType.MICROSOFT) {
+            resolveMojangSkinByUuid(rawPid)?.let { (url, _) -> candidateUrls.add(url) }
+            if (candidateUrls.isEmpty() && account.username.isNotBlank()) {
+                resolveMojangSkinUrl(account.username)?.let { (url, _) -> candidateUrls.add(url) }
+            }
+            if (strippedPid.length == 32 && !strippedPid.all { it == '0' }) {
+                candidateUrls.add("https://mc-heads.net/skin/$strippedPid")
+            }
+            if (account.username.isNotBlank()) {
+                candidateUrls.add("https://minotar.net/skin/${account.username}")
+            }
+        }
+        account.authType.skinUrl?.let { template ->
+            if (account.username.isNotBlank()) {
+                candidateUrls.add(String.format(template, account.username))
+            }
+        }
+
+        for (url in candidateUrls.distinct()) {
+            val raw = downloadBytesFollowingRedirects(url) ?: continue
+            val decoded = BitmapFactory.decodeByteArray(raw, 0, raw.size) ?: continue
+            val normalized = normalizeSkinPng(decoded)
+            decoded.recycle()
+            if (normalized != null) {
+                val (cleanBytes, cleanBmp) = normalized
+                cleanBmp.recycle()
+                runCatching { tagCache.writeBytes(cleanBytes) }
+                return cleanBytes
+            }
+        }
+        return null
+    }
+
     /** Crisp 2D full-body preview of [account]'s equipped skin (or default Steve), used while 3D WebGL loads or on non-WebGL devices. */
     fun loadAccountBodyPreview(context: Context, account: AerixAccount?): ImageBitmap? {
-        val customBytes = resolveCustomSkinBytes(account)
-        if (customBytes != null) {
-            val bmp = BitmapFactory.decodeByteArray(customBytes, 0, customBytes.size)
+        val skinBytes = resolveAccountSkinBytes(account)
+        if (skinBytes != null) {
+            val bmp = BitmapFactory.decodeByteArray(skinBytes, 0, skinBytes.size)
             if (bmp != null) {
                 val body = renderSkinBodyPreview(bmp).asImageBitmap()
                 bmp.recycle()
                 return body
-            }
-        }
-        if (account != null) {
-            val cacheFile = File(Tools.DIR_CACHE, "aerix-skin-${account.source.profileId}-${account.authType.name}.png")
-            if (cacheFile.isFile && cacheFile.length() > 0) {
-                val bmp = BitmapFactory.decodeFile(cacheFile.absolutePath)
-                if (bmp != null) {
-                    val body = renderSkinBodyPreview(bmp).asImageBitmap()
-                    bmp.recycle()
-                    return body
-                }
             }
         }
         return runCatching {
@@ -831,6 +955,7 @@ object PojavAccountBridge : LoginListener {
             customSkinFile(account.source).delete()
             customCapeFile(account.source).delete()
             customFaceFile(account.source).delete()
+            File(Tools.DIR_CACHE, "aerix-skin-${safeAccountTag(account.source)}.png").delete()
             saveActivePresetId(appCtx, account.source, "default")
             setSlimModel(appCtx, account, false)
             Tools.runOnUiThread {
@@ -852,7 +977,7 @@ object PojavAccountBridge : LoginListener {
         skinTarget.parentFile?.mkdirs()
         skinTarget.writeBytes(bytes)
 
-        val sharedCache = File(Tools.DIR_CACHE, "aerix-skin-${account.profileId}-${account.authType?.name ?: "LOCAL"}.png")
+        val sharedCache = File(Tools.DIR_CACHE, "aerix-skin-${safeAccountTag(account)}.png")
         runCatching { sharedCache.writeBytes(bytes) }
 
         val face = renderSkinFace(decoded)
@@ -861,7 +986,8 @@ object PojavAccountBridge : LoginListener {
             FileOutputStream(faceTarget).use { out ->
                 face.compress(Bitmap.CompressFormat.PNG, 100, out)
             }
-            val pojavFace = File(Tools.DIR_CACHE, "skin-face-${account.profileId}-${account.authType?.name ?: "LOCAL"}.webp")
+            val effectivePid = effectiveProfileId(account)
+            val pojavFace = File(Tools.DIR_CACHE, "skin-face-$effectivePid-${account.authType?.name ?: "LOCAL"}.webp")
             runCatching {
                 FileOutputStream(pojavFace).use { out ->
                     face.compress(Bitmap.CompressFormat.WEBP, 90, out)
