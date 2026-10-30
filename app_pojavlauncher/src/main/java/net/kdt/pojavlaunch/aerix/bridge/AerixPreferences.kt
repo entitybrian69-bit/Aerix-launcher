@@ -74,6 +74,10 @@ object AerixPreferences {
     const val KEY_DISCORD_PRESENCE = "aerixDiscordPresence"
     /** The Discord application id the presence is published under (Developer Portal). */
     const val KEY_DISCORD_APP_ID = "aerixDiscordAppId"
+    /** Switch in-game Rich Presence to Minecraft's verified catalog ID so clicking opens its Game Profile. */
+    const val KEY_DISCORD_GAME_PROFILE_MODE = "aerixDiscordGameProfileMode"
+    /** Attach cover art, clickable info URLs, and action buttons to Discord Rich Presence cards. */
+    const val KEY_DISCORD_CLICKABLE_LINKS = "aerixDiscordClickableLinks"
 
     const val DEFAULT_CUSTOM_COLOR = 0xFF8DEFE0.toInt()
     const val DEFAULT_BACKGROUND_OPACITY = 60
@@ -166,6 +170,14 @@ object AerixPreferences {
     var discordAppId by mutableStateOf("")
         private set
 
+    /** True to switch in-game Rich Presence to Minecraft's verified Discord Game Profile ID. */
+    var discordGameProfileMode by mutableStateOf(true)
+        private set
+
+    /** True to attach cover art, clickable info URLs, and action buttons to Rich Presence cards. */
+    var discordClickableLinks by mutableStateOf(true)
+        private set
+
     fun init(context: Context) {
         val p = context.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
         prefs = p
@@ -199,6 +211,8 @@ object AerixPreferences {
         pinnedJson = p.getString(KEY_PINNED_INSTANCES, "[]") ?: "[]"
         discordPresenceEnabled = p.getBoolean(KEY_DISCORD_PRESENCE, true)
         discordAppId = p.getString(KEY_DISCORD_APP_ID, "") ?: ""
+        discordGameProfileMode = p.getBoolean(KEY_DISCORD_GAME_PROFILE_MODE, true)
+        discordClickableLinks = p.getBoolean(KEY_DISCORD_CLICKABLE_LINKS, true)
     }
 
     fun saveFavoritesJson(value: String) {
@@ -214,6 +228,16 @@ object AerixPreferences {
     fun saveDiscordAppId(value: String) {
         discordAppId = value.trim().filter { it.isDigit() }
         edit { putString(KEY_DISCORD_APP_ID, discordAppId) }
+    }
+
+    fun saveDiscordGameProfileMode(value: Boolean) {
+        discordGameProfileMode = value
+        edit { putBoolean(KEY_DISCORD_GAME_PROFILE_MODE, value) }
+    }
+
+    fun saveDiscordClickableLinks(value: Boolean) {
+        discordClickableLinks = value
+        edit { putBoolean(KEY_DISCORD_CLICKABLE_LINKS, value) }
     }
 
     fun savePinnedJson(value: String) {

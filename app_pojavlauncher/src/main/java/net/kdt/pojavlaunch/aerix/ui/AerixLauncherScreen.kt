@@ -63,6 +63,7 @@ import net.kdt.pojavlaunch.aerix.bridge.PojavAccountBridge
 import net.kdt.pojavlaunch.aerix.bridge.PojavInstanceEditorBridge
 import net.kdt.pojavlaunch.aerix.components.AerixBackground
 import net.kdt.pojavlaunch.aerix.discord.AerixDiscordPresence
+import net.kdt.pojavlaunch.aerix.social.SocialBackend
 import net.kdt.pojavlaunch.aerix.festivals.FestivalEffectsHost
 import net.kdt.pojavlaunch.aerix.festivals.FestivalTitleText
 import net.kdt.pojavlaunch.aerix.festivals.rememberTodayFestivals
@@ -150,7 +151,10 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
     LaunchedEffect(Unit) {
         AerixDiscordPresence.attach(activity)
     }
-    LaunchedEffect(section) {
+    val activePartySnapshot = SocialBackend.parties
+        .firstOrNull { !it.isExpired() }
+        ?.let { "${it.id}:${it.memberCount}:${it.maxMembers}" }
+    LaunchedEffect(section, activePartySnapshot) {
         AerixDiscordPresence.inLauncher(section.name)
     }
 

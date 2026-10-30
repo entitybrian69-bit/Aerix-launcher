@@ -347,7 +347,8 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
             net.kdt.pojavlaunch.aerix.discord.AerixDiscordPresence.onGameStarted(
                     this,
                     instance != null ? instance.name : null,
-                    version
+                    version,
+                    instance != null ? instance.modpackIconUrl : null
             );
 
             setTitle("MojoLauncher (" + version + ")");

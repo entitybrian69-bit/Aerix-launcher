@@ -90,8 +90,15 @@ class SocialNotificationReceiver : BroadcastReceiver() {
             AerixDiscordPresence.ACTION_DISCORD_GAME_STARTED -> {
                 val instanceName = intent.getStringExtra(AerixDiscordPresence.EXTRA_INSTANCE_NAME)
                 val mcVersion = intent.getStringExtra(AerixDiscordPresence.EXTRA_MC_VERSION)
+                val modpackIconUrl = intent.getStringExtra(AerixDiscordPresence.EXTRA_MODPACK_ICON_URL)
                 val startedAt = intent.getLongExtra(AerixDiscordPresence.EXTRA_STARTED_AT, 0L)
-                AerixDiscordPresence.handleGameStartedBroadcast(app, instanceName, mcVersion, startedAt)
+                AerixDiscordPresence.handleGameStartedBroadcast(
+                    app,
+                    instanceName,
+                    mcVersion,
+                    startedAt,
+                    modpackIconUrl
+                )
             }
 
             AerixDiscordPresence.ACTION_DISCORD_SCHEDULE_CLEAR -> {
