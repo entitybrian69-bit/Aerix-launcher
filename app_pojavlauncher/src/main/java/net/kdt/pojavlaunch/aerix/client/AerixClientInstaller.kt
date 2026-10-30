@@ -25,6 +25,12 @@ import java.io.File
 import java.io.FileOutputStream
 import java.net.URLEncoder
 
+data class ClientVersionSpec(
+    val mcVersion: String,
+    val label: String,
+    val summary: String
+)
+
 data class ClientModEntry(
     val slug: String,
     val title: String,
@@ -33,179 +39,175 @@ data class ClientModEntry(
 
 object AerixClientInstaller {
 
-    const val TARGET_MC_VERSION = "1.16.5"
     private const val USER_AGENT =
-        "entitybrian69-bit/Aerix-launcher/1.16.5-client (https://github.com/entitybrian69-bit/Aerix-launcher)"
+        "entitybrian69-bit/Aerix-launcher/aerix-client (https://github.com/entitybrian69-bit/Aerix-launcher)"
+
+    val availableVersions: List<ClientVersionSpec> = listOf(
+        ClientVersionSpec("1.21.4", "Aerix Client 1.21.4", "Minecraft 1.21.4 · Fabric + FPS Engine"),
+        ClientVersionSpec("1.21.1", "Aerix Client 1.21.1", "Minecraft 1.21.1 · Fabric + FPS Engine"),
+        ClientVersionSpec("1.20.4", "Aerix Client 1.20.4", "Minecraft 1.20.4 · Fabric + FPS Engine"),
+        ClientVersionSpec("1.20.1", "Aerix Client 1.20.1", "Minecraft 1.20.1 · Fabric + FPS Engine"),
+        ClientVersionSpec("1.19.4", "Aerix Client 1.19.4", "Minecraft 1.19.4 · Fabric + FPS Engine"),
+        ClientVersionSpec("1.18.2", "Aerix Client 1.18.2", "Minecraft 1.18.2 · Fabric + FPS Engine"),
+        ClientVersionSpec("1.16.5", "Aerix Client 1.16.5", "Minecraft 1.16.5 · Fabric + FPS Engine")
+    )
 
     var isInstalling by mutableStateOf(false)
         private set
+    var installingVersion by mutableStateOf<String?>(null)
+        private set
     var progressFraction by mutableFloatStateOf(0f)
         private set
-    var statusHeadline by mutableStateOf("Ready to deploy Aerix Client 1.16.5")
+    var statusHeadline by mutableStateOf("")
         private set
-    var statusDetail by mutableStateOf("Fabric 1.16.5 + FPS Mod Stack + Liquid Crystal Pack")
+    var statusDetail by mutableStateOf("")
         private set
     var lastError by mutableStateOf<String?>(null)
         private set
 
-    fun findInstalledClientInstance(): Instance? = runCatching {
+    fun instanceNameFor(mcVersion: String): String = "Aerix Client $mcVersion"
+
+    fun findInstalledClientInstance(mcVersion: String? = null): Instance? = runCatching {
         val list = Instances.loadAllInstances()
-        list.firstOrNull { it.isAerixClient }
-            ?: list.firstOrNull { it.name?.equals(AerixClientStore.CLIENT_INSTANCE_NAME, ignoreCase = true) == true }
+        if (mcVersion.isNullOrBlank()) {
+            list.firstOrNull { it.isAerixClient }
+                ?: list.firstOrNull { it.name?.startsWith("Aerix Client", ignoreCase = true) == true }
+        } else {
+            val expectedName = instanceNameFor(mcVersion)
+            list.firstOrNull { inst ->
+                inst.isAerixClient && (
+                    inst.name.equals(expectedName, ignoreCase = true) ||
+                        inst.versionId?.contains(mcVersion) == true
+                )
+            } ?: list.firstOrNull { inst ->
+                inst.name.equals(expectedName, ignoreCase = true)
+            }
+        }
     }.getOrNull()
 
-    fun buildDesiredModList(): List<ClientModEntry> {
+    fun buildModListForVersion(mcVersion: String): List<ClientModEntry> {
         val out = ArrayList<ClientModEntry>()
-        if (AerixClientStore.installFpsStack) {
-            out += ClientModEntry("fabric-api", "Fabric API", "Core")
-            out += ClientModEntry("sodium", "Sodium", "FPS Engine")
-            out += ClientModEntry("lithium", "Lithium", "Physics Tick")
-            out += ClientModEntry("ferrite-core", "FerriteCore", "-45% RAM")
-            out += ClientModEntry("lazydfu", "LazyDFU", "2x Faster Boot")
-            out += ClientModEntry("starlight", "Starlight", "Chunk Lighting")
-            out += ClientModEntry("entityculling", "EntityCulling", "Entity FPS")
-            out += ClientModEntry("modmenu", "Mod Menu", "Client UI")
+        out += ClientModEntry("fabric-api", "Fabric API", "Core")
+        out += ClientModEntry("sodium", "Sodium", "FPS Engine")
+        out += ClientModEntry("lithium", "Lithium", "Physics Tick")
+        out += ClientModEntry("ferrite-core", "FerriteCore", "RAM Saver")
+        if (mcVersion == "1.16.5" || mcVersion == "1.18.2" || mcVersion == "1.19.4") {
+            out += ClientModEntry("lazydfu", "LazyDFU", "Fast Boot")
+            out += ClientModEntry("starlight", "Starlight", "Lighting")
         }
-        if (AerixClientStore.installShadersAddon) {
-            out += ClientModEntry("iris", "Iris Shaders", "Shaders")
-        }
-        if (AerixClientStore.installSurvivalPolishAddon) {
-            out += ClientModEntry("appleskin", "AppleSkin", "Saturation HUD")
-            out += ClientModEntry("lambdynamiclights", "LambDynamicLights", "Dynamic Torch")
-        }
-        if (AerixClientStore.installZoomAddon) {
-            out += ClientModEntry("logical-zoom", "Logical Zoom", "OptiFine Zoom")
-        }
+        out += ClientModEntry("entityculling", "EntityCulling", "Entity FPS")
+        out += ClientModEntry("modmenu", "Mod Menu", "Client UI")
+        out += ClientModEntry("iris", "Iris Shaders", "Shaders")
+        out += ClientModEntry("appleskin", "AppleSkin", "HUD")
+        out += ClientModEntry("logical-zoom", "Logical Zoom", "Zoom")
         return out
     }
 
-    /**
-     * Full 1-Click Automated Installer / Syncer for **Aerix Client 1.16.5** ONLY:
-     * 1. Resolves latest stable Fabric Loader for `1.16.5` and writes the Fabric version profile JSON.
-     * 2. Creates (or updates) an isolated `Aerix Client 1.16.5` instance (`isAerixClient = true`, `sharedData = false`).
-     * 3. Writes the custom Liquid Crystal emblem icon to `instance.ownIconLocation`.
-     * 4. Queries Modrinth v2 for exact `1.16.5` Fabric `.jar` releases and downloads missing jars into `mods/`.
-     * 5. Generates `Aerix-Client-Pack.zip` (`pack_format: 6`) + pre-configures `options.txt` (`monochromeLogo:true`, Fullbright, pack active).
-     * 6. Selects `Aerix Client 1.16.5` as the active launcher instance!
-     */
-    suspend fun installOrSyncClient1165(context: Context): Result<Instance> = withContext(Dispatchers.IO) {
-        if (isInstalling) {
-            return@withContext Result.failure(IllegalStateException("Install already in progress"))
-        }
-        isInstalling = true
-        lastError = null
-        progressFraction = 0.04f
-        statusHeadline = "Connecting to Fabric Meta (1.16.5)..."
-        statusDetail = "Resolving stable Fabric Loader for Minecraft $TARGET_MC_VERSION"
-
-        runCatching {
-            AerixClientStore.init(context)
-
-            // Step 1: Download & install Fabric 1.16.5 profile
-            val loaders = FabriclikeUtils.FABRIC_UTILS.downloadLoaderVersions(TARGET_MC_VERSION)
-                ?: error("Could not reach Fabric Meta server. Check your internet connection.")
-            if (loaders.isEmpty()) error("No Fabric loaders returned for $TARGET_MC_VERSION")
-            val pickedLoader = loaders.firstOrNull { it.stable } ?: loaders.first()
-
-            progressFraction = 0.14f
-            statusHeadline = "Installing Fabric ${pickedLoader.version} for $TARGET_MC_VERSION..."
-            statusDetail = "Writing version JSON into versions/ directory"
-            val fabricVersionId = FabriclikeUtils.FABRIC_UTILS.install(TARGET_MC_VERSION, pickedLoader.version)
-                ?: error("Failed to download Fabric $TARGET_MC_VERSION profile metadata.")
-
-            // Step 2: Create or reuse isolated Aerix Client 1.16.5 Instance
-            progressFraction = 0.24f
-            statusHeadline = "Configuring isolated Aerix Client 1.16.5 workspace..."
-            statusDetail = "Setting isAerixClient = true, G1GC flags & crystal emblem"
-
-            val existing = findInstalledClientInstance()
-            val clientInstance: Instance = if (existing != null) {
-                existing.versionId = fabricVersionId
-                existing.isAerixClient = true
-                existing.sharedData = false
-                if (existing.name.isNullOrBlank()) {
-                    existing.name = AerixClientStore.CLIENT_INSTANCE_NAME
-                }
-                if (existing.jvmArgs.isNullOrBlank()) {
-                    existing.argsMode = Instance.ARGS_MODE_MERGE_DEFAULT_FIRST
-                    existing.jvmArgs = "-XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:MaxGCPauseMillis=50"
-                }
-                existing.write()
-                existing
-            } else {
-                Instances.createInstance(
-                    { inst ->
-                        inst.name = AerixClientStore.CLIENT_INSTANCE_NAME
-                        inst.versionId = fabricVersionId
-                        inst.icon = "fabric"
-                        inst.sharedData = false
-                        inst.isAerixClient = true
-                        inst.argsMode = Instance.ARGS_MODE_MERGE_DEFAULT_FIRST
-                        inst.jvmArgs = "-XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:MaxGCPauseMillis=50"
-                    },
-                    "aerix_client_1165"
-                )
+    suspend fun installClientVersion(context: Context, mcVersion: String): Result<Instance> =
+        withContext(Dispatchers.IO) {
+            if (isInstalling) {
+                return@withContext Result.failure(IllegalStateException("Download already in progress"))
             }
+            isInstalling = true
+            installingVersion = mcVersion
+            lastError = null
+            progressFraction = 0.05f
+            statusHeadline = "Resolving Fabric Loader ($mcVersion)..."
+            statusDetail = "Connecting to Fabric Meta"
 
-            // Stamp custom Liquid Crystal Client icon onto the instance
-            writeCustomClientInstanceIcon(context, clientInstance)
-            val gameDir = clientInstance.gameDirectory.apply { mkdirs() }
-            val modsDir = File(gameDir, "mods").apply { mkdirs() }
+            runCatching {
+                AerixClientStore.init(context)
+                AerixClientStore.selectedClientVersion = mcVersion
+                AerixClientStore.persist()
 
-            // Step 3: Download 1.16.5 Fabric Performance & Client Mods from Modrinth v2
-            val modPlan = buildDesiredModList()
-            modPlan.forEachIndexed { idx, mod ->
-                val stepBase = 0.28f + (0.54f * (idx.toFloat() / modPlan.size.coerceAtLeast(1)))
-                progressFraction = stepBase
-                statusHeadline = "Fetching ${mod.title} (${idx + 1}/${modPlan.size})..."
-                statusDetail = "Modrinth 1.16.5 Fabric · ${mod.category}"
-                runCatching {
-                    ensureModrinthJar1165(modsDir, mod.slug)
+                val loaders = FabriclikeUtils.FABRIC_UTILS.downloadLoaderVersions(mcVersion)
+                    ?: error("Could not reach Fabric Meta server. Check your internet connection.")
+                if (loaders.isEmpty()) error("No Fabric loaders returned for $mcVersion")
+                val pickedLoader = loaders.firstOrNull { it.stable } ?: loaders.first()
+
+                progressFraction = 0.16f
+                statusHeadline = "Downloading Fabric ${pickedLoader.version} ($mcVersion)..."
+                statusDetail = "Writing version profile"
+                val fabricVersionId = FabriclikeUtils.FABRIC_UTILS.install(mcVersion, pickedLoader.version)
+                    ?: error("Failed to download Fabric $mcVersion profile.")
+
+                progressFraction = 0.26f
+                statusHeadline = "Preparing ${instanceNameFor(mcVersion)}..."
+                statusDetail = "Configuring isolated client directory"
+
+                val existing = findInstalledClientInstance(mcVersion)
+                val targetName = instanceNameFor(mcVersion)
+                val folderSlug = "aerix_client_${mcVersion.replace('.', '_')}"
+                val clientInstance: Instance = if (existing != null) {
+                    existing.versionId = fabricVersionId
+                    existing.isAerixClient = true
+                    existing.sharedData = false
+                    if (existing.name.isNullOrBlank()) {
+                        existing.name = targetName
+                    }
+                    if (existing.jvmArgs.isNullOrBlank()) {
+                        existing.argsMode = Instance.ARGS_MODE_MERGE_DEFAULT_FIRST
+                        existing.jvmArgs = "-XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:MaxGCPauseMillis=50"
+                    }
+                    existing.write()
+                    existing
+                } else {
+                    Instances.createInstance(
+                        { inst ->
+                            inst.name = targetName
+                            inst.versionId = fabricVersionId
+                            inst.icon = "fabric"
+                            inst.sharedData = false
+                            inst.isAerixClient = true
+                            inst.argsMode = Instance.ARGS_MODE_MERGE_DEFAULT_FIRST
+                            inst.jvmArgs = "-XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:MaxGCPauseMillis=50"
+                        },
+                        folderSlug
+                    )
                 }
-            }
 
-            // Step 4: Generate Aerix-Client-Pack.zip (pack_format: 6) + options.txt
-            progressFraction = 0.88f
-            statusHeadline = "Synthesizing Liquid Crystal 1.16.5 Resource Pack..."
-            statusDetail = "Building transparent GUI, skybox, PvP tweaks & options.txt"
-            if (AerixClientStore.installClientResourcePack) {
-                AerixClientPackGenerator.buildAndApplyToInstance(context, gameDir)
-            } else {
+                writeCustomClientInstanceIcon(context, clientInstance)
+                val gameDir = clientInstance.gameDirectory.apply { mkdirs() }
+                val modsDir = File(gameDir, "mods").apply { mkdirs() }
+
+                val modPlan = buildModListForVersion(mcVersion)
+                modPlan.forEachIndexed { idx, mod ->
+                    progressFraction = 0.30f + (0.55f * (idx.toFloat() / modPlan.size.coerceAtLeast(1)))
+                    statusHeadline = "Downloading ${mod.title} (${idx + 1}/${modPlan.size})..."
+                    statusDetail = "Minecraft $mcVersion · ${mod.category}"
+                    runCatching {
+                        ensureModrinthJar(modsDir, mod.slug, mcVersion)
+                    }
+                }
+
+                progressFraction = 0.90f
+                statusHeadline = "Applying Aerix Client Pack..."
+                statusDetail = "Configuring resource pack & options"
+                AerixClientPackGenerator.buildAndApplyToInstance(context, gameDir, mcVersion)
                 AerixClientPackGenerator.applyClientOptionsTxt(gameDir)
+
+                Instances.setSelectedInstance(clientInstance)
+                AerixClientStore.installsCompleted += 1
+                AerixClientStore.persist()
+
+                progressFraction = 1.0f
+                statusHeadline = "$targetName downloaded!"
+                statusDetail = "Ready to launch"
+                clientInstance
+            }.onFailure { err ->
+                lastError = err.message ?: "Download failed"
+                statusHeadline = "Download failed"
+                statusDetail = lastError.orEmpty()
+            }.also {
+                isInstalling = false
+                installingVersion = null
             }
-
-            // Step 5: Select instance & award Client XP
-            Instances.setSelectedInstance(clientInstance)
-            AerixClientStore.installsCompleted += 1
-            AerixClientStore.awardXp(80)
-
-            progressFraction = 1.0f
-            statusHeadline = "Aerix Client 1.16.5 Ready to Launch!"
-            statusDetail = "Fabric ${pickedLoader.version} · ${modsDir.listFiles()?.count { it.extension == "jar" } ?: 0} Client Mods · Crystal Pack Active"
-            clientInstance
-        }.onFailure { err ->
-            lastError = err.message ?: "Installation failed"
-            statusHeadline = "Setup paused"
-            statusDetail = lastError.orEmpty()
-        }.also {
-            isInstalling = false
         }
-    }
 
-    /**
-     * Rebuilds `Aerix-Client-Pack.zip` & `options.txt` in <300ms whenever the user toggles
-     * Resource Pack Studio tweaks on an already-installed Client instance!
-     */
-    suspend fun rebuildPackOnlyIfInstalled(context: Context): Boolean = withContext(Dispatchers.IO) {
-        val inst = findInstalledClientInstance() ?: return@withContext false
-        runCatching {
-            AerixClientPackGenerator.buildAndApplyToInstance(context, inst.gameDirectory)
-            true
-        }.getOrDefault(false)
-    }
+    suspend fun installOrSyncClient1165(context: Context): Result<Instance> =
+        installClientVersion(context, "1.16.5")
 
-    private fun ensureModrinthJar1165(modsDir: File, slug: String) {
-        // Skip re-downloading if a jar matching this slug prefix is already present
+    private fun ensureModrinthJar(modsDir: File, slug: String, mcVersion: String) {
         val normalizedKey = slug.replace("-", "").lowercase()
         val alreadyExists = modsDir.listFiles()?.any { f ->
             f.isFile && f.extension.equals("jar", true) &&
@@ -214,7 +216,7 @@ object AerixClientInstaller {
         if (alreadyExists) return
 
         val loadersParam = URLEncoder.encode("[\"fabric\"]", "UTF-8")
-        val gvParam = URLEncoder.encode("[\"$TARGET_MC_VERSION\"]", "UTF-8")
+        val gvParam = URLEncoder.encode("[\"$mcVersion\"]", "UTF-8")
         val url = "https://api.modrinth.com/v2/project/$slug/version?loaders=$loadersParam&game_versions=$gvParam"
 
         val req = Request.Builder()
@@ -274,7 +276,7 @@ object AerixClientInstaller {
             val bg = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 shader = LinearGradient(
                     0f, 0f, 128f, 128f,
-                    intArrayOf(0xFF1A475E.toInt(), 0xFF091A26.toInt()),
+                    intArrayOf(0xFF2B151B.toInt(), 0xFF141519.toInt()),
                     null,
                     Shader.TileMode.CLAMP
                 )
@@ -287,7 +289,7 @@ object AerixClientInstaller {
             val rim = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 style = Paint.Style.STROKE
                 strokeWidth = 3.5f
-                color = 0xFFC8FAFF.toInt()
+                color = 0xFFDC1E3A.toInt()
             }
             c.drawRoundRect(5.5f, 5.5f, 122.5f, 122.5f, 28f, 28f, rim)
             instance.encodeNewIcon(bmp)

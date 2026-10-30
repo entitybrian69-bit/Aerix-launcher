@@ -130,6 +130,9 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        try {
+            net.kdt.pojavlaunch.aerix.social.SocialBackend.attach(getApplicationContext());
+        } catch (Throwable ignored) {}
         // Explicit process policy before Minecraft creates its native audio tracks.
         // Per-track/backend restrictions and OEM privacy controls can still disallow capture.
         if (android.os.Build.VERSION.SDK_INT >= 29) {
@@ -495,6 +498,7 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     @Override
     protected void onDestroy() {
         net.kdt.pojavlaunch.aerix.social.SocialBackend.onGameStopped();
+        net.kdt.pojavlaunch.aerix.social.SocialBackend.shutdownBackgroundActivity(getApplicationContext());
         net.kdt.pojavlaunch.aerix.discord.AerixDiscordPresence.onGameStopped(this);
         // Nothing of ours outlives the activity: if the player backs out during the boot, the
         // wallpaper goes with the screen.

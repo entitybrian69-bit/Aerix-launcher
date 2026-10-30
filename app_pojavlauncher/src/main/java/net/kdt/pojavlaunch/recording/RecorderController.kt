@@ -1,205 +1,314 @@
 package net.kdt.pojavlaunch.recording
 
 import android.Manifest
-import android.content.pm.PackageManager
-import androidx.core.app.ActivityCompat
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
 import android.media.projection.MediaProjectionManager
 import android.os.Build
-import android.util.DisplayMetrics
 import android.view.Gravity
 import android.view.View
+import android.view.ViewGroup
 import android.widget.ArrayAdapter
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import java.util.concurrent.Executors
+import net.kdt.pojavlaunch.PojavApplication
+import net.kdt.pojavlaunch.Tools
 
-/** Activity-owned permission/settings UI; no capture without a fresh system consent result. */
+/** Keeps the game menu, floating REC pill, permissions, and `:recorder` service lifecycle together. */
 class RecorderController(private val activity: Activity) {
-    private val executor = Executors.newSingleThreadExecutor()
     private val prefs = activity.getSharedPreferences("aerix_recorder", 0)
-    private var dialog: AlertDialog? = null
     private var pending: RecordingOptions.Config? = null
-    private var disposed = false
+    private var dialog: AlertDialog? = null
     private var startRequested = false
+    private var awaitingConsentSheet = false
+
     private val indicator = TextView(activity).apply {
-        text = "● REC · Stop"
+        val density = activity.resources.displayMetrics.density
+        text = "● REC"
+        textSize = 11f
         setTextColor(Color.WHITE)
-        setBackgroundColor(0xCC8B1820.toInt())
-        val padding = (8 * resources.displayMetrics.density).toInt()
-        setPadding(padding, padding / 2, padding, padding / 2)
-        contentDescription = "Recording in progress. Tap to stop and save."
+        setPadding((10 * density).toInt(), (5 * density).toInt(), (10 * density).toInt(), (5 * density).toInt())
+        background = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = 999f
+            setColor(0xDD8E1125.toInt())
+            setStroke((1 * density).toInt().coerceAtLeast(1), 0xFFFF2E4C.toInt())
+        }
         visibility = View.GONE
-        setOnClickListener { show() }
+        setOnClickListener { stop() }
     }
+
     private val stateListener = Runnable {
         indicator.visibility = if (RecordingState.isActive()) View.VISIBLE else View.GONE
         indicator.text = when (RecordingState.phase) {
             RecordingState.Phase.RECORDING -> "● REC · Stop"
             RecordingState.Phase.STARTING -> "● Starting…"
             RecordingState.Phase.STOPPING -> "● Saving…"
-            else -> ""
+            RecordingState.Phase.IDLE -> "● REC"
         }
-        if (!RecordingState.isActive()) startRequested = false
+        if (RecordingState.phase == RecordingState.Phase.RECORDING) {
+            startRequested = false
+        } else if (!RecordingState.isActive()) {
+            startRequested = false
+        }
     }
+
     init {
-        activity.findViewById<FrameLayout>(android.R.id.content).addView(indicator,
-            FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.END).apply {
-                topMargin = (8 * activity.resources.displayMetrics.density).toInt()
-                rightMargin = topMargin
-            })
+        RecordingState.registerSyncReceiver(activity)
+        val density = activity.resources.displayMetrics.density
+        // Place ● REC pill cleanly in safe zone (below top Pojav buttons, never overlapping A or MOUSE)
+        val params = FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            Gravity.TOP or Gravity.END
+        ).apply {
+            topMargin = (46 * density).toInt()
+            marginEnd = (12 * density).toInt()
+        }
+        activity.findViewById<ViewGroup>(android.R.id.content).addView(indicator, params)
         RecordingState.addListener(stateListener)
     }
 
     fun show() {
+        dialog?.dismiss()
         if (Build.VERSION.SDK_INT < 29) {
-            toast("Screen recording with audio requires Android 10 or newer")
+            Toast.makeText(activity, "Screen recording requires Android 10 or newer.", Toast.LENGTH_LONG).show()
             return
         }
-        if (disposed || dialog?.isShowing == true) return
         if (RecordingState.isActive() || startRequested) {
-            dialog = AlertDialog.Builder(activity).setTitle("Screen recorder")
-                .setMessage("${RecordingState.detail}\nStop recording and save the MP4?")
-                .setPositiveButton("Stop & save") { _, _ -> stop() }
-                .setNegativeButton("Keep recording", null).show()
+            dialog = AlertDialog.Builder(activity)
+                .setTitle("Screen Recorder")
+                .setMessage("${RecordingState.detail.ifBlank { "Recording in progress" }}\nStop recording and save the MP4?")
+                .setPositiveButton("Stop & Save") { _, _ -> stop() }
+                .setNegativeButton("Keep recording", null)
+                .show()
             return
         }
-        if (pending != null) { toast("Finish the Android screen-capture permission prompt first"); return }
-        dialog = AlertDialog.Builder(activity).setTitle("Performance Recorder")
-            .setMessage("Checking hardware encoder support…").setNegativeButton("Cancel", null).show()
-        val loading = dialog
-        val metrics = DisplayMetrics()
-        @Suppress("DEPRECATION")
-        activity.windowManager.defaultDisplay.getRealMetrics(metrics)
-        executor.execute {
-            val result = runCatching { RecordingOptions.supported(metrics.widthPixels, metrics.heightPixels) }
-            activity.runOnUiThread {
-                if (disposed || activity.isFinishing || activity.isDestroyed || loading?.isShowing != true) return@runOnUiThread
-                loading.dismiss()
-                result.onSuccess { showOptions(it) }.onFailure { toast("Cannot query recording encoders: ${it.message}") }
+        val screen = screenSize()
+        PojavApplication.sExecutorService.execute {
+            val configs = runCatching { RecordingOptions.supported(screen.first, screen.second) }
+                .getOrDefault(emptyList())
+            Tools.runOnUiThread {
+                if (!activity.isFinishing && !activity.isDestroyed) showOptions(configs)
             }
         }
     }
 
-    internal fun showOptions(configs: List<RecordingOptions.Config>) {
-        if (configs.isEmpty()) { toast("No supported hardware H.264 recording combinations on this device"); return }
+    private fun showOptions(configs: List<RecordingOptions.Config>) {
+        if (configs.isEmpty()) {
+            Toast.makeText(activity, "No compatible H.264 video encoder found on this device.", Toast.LENGTH_LONG).show()
+            return
+        }
         val density = activity.resources.displayMetrics.density
+        val pad = (18 * density).toInt()
         val body = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            val p = (20 * density).toInt(); setPadding(p, p / 2, p, p / 2)
+            setPadding(pad, (10 * density).toInt(), pad, 0)
         }
-        fun label(text: String) = TextView(activity).apply { this.text = text; body.addView(this) }
-        label("Resolution (short edge)")
-        val quality = Spinner(activity).also { body.addView(it) }
-        quality.adapter = ArrayAdapter(activity, android.R.layout.simple_spinner_dropdown_item,
-            RecordingOptions.qualities.map { "${it}p" })
-        label("Frame rate target")
-        val fps = Spinner(activity).also { body.addView(it) }
-        // Every requested value is shown; unsupported choices cannot enable Start.
-        fps.adapter = ArrayAdapter(activity, android.R.layout.simple_spinner_dropdown_item,
-            RecordingOptions.frameRates.map { "$it FPS" })
-        label("Audio source")
-        val audioSource = Spinner(activity).also { body.addView(it) }
-        audioSource.adapter = ArrayAdapter(activity, android.R.layout.simple_spinner_dropdown_item,
-            RecordingOptions.AudioSource.entries.map { it.label })
-        audioSource.setSelection(RecordingOptions.AudioSource.saved(prefs.getString("audio_source", null)).ordinal)
-        val info = label("")
-        val saveLocation = if (Build.VERSION.SDK_INT >= 29) "Movies/Aerix" else "this app's Movies/Aerix folder (removed on uninstall)"
-        label("Choose game audio, microphone, or both. Android audio permission is required for every mode, including internal game audio. Game-only never opens the microphone. For both, use headphones to avoid echo. If game sound is missing, check Minecraft volume; device or audio-backend restrictions can block internal capture. If game-only stays silent, try Settings → Game → Forcefully use OpenSL for audio, then restart Minecraft. This can help on devices with Oboe capture issues.\nSaves to $saveLocation.\nHigher settings add load and heat. FPS is a target, not a guarantee; 120 FPS cannot add frames the game/capture never produces.\nAndroid may capture notifications or other content: choose app-only capture if offered. Recording stops when you leave the game.")
-        val preferred = configs.firstOrNull { it.quality == prefs.getInt("quality", 480) && it.fps == prefs.getInt("fps", 24) }
-            ?: configs.firstOrNull { it.quality == 480 && it.fps == 24 } ?: configs.first()
-        quality.setSelection(RecordingOptions.qualities.indexOf(preferred.quality))
-        fps.setSelection(RecordingOptions.frameRates.indexOf(preferred.fps))
-        fun selected() = configs.firstOrNull {
-            it.quality == RecordingOptions.qualities[quality.selectedItemPosition] &&
-                it.fps == RecordingOptions.frameRates[fps.selectedItemPosition]
+        fun label(text: String) = TextView(activity).apply {
+            this.text = text
+            body.addView(this)
         }
-        val created = AlertDialog.Builder(activity).setTitle("Performance Recorder").setView(
-            android.widget.ScrollView(activity).apply { addView(body) })
-            .setPositiveButton("Start recording", null).setNegativeButton("Cancel", null).create()
-        dialog = created
-        created.setOnShowListener {
-            fun refresh() {
-                val option = selected()
-                info.text = option?.let { "${it.width} × ${it.height} · ${it.bitrate / 1_000_000.0} Mbps\nHardware encoder: ${it.encoder}" }
-                    ?: "Unsupported resolution/FPS combination — choose another setting."
-                created.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled = option != null
-            }
-            val listener = object : android.widget.AdapterView.OnItemSelectedListener {
-                override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) = refresh()
-                override fun onNothingSelected(parent: android.widget.AdapterView<*>?) = refresh()
-            }
-            quality.onItemSelectedListener = listener; fps.onItemSelectedListener = listener
-            refresh()
-            created.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                val option = selected() ?: return@setOnClickListener
-                val source = RecordingOptions.AudioSource.entries[audioSource.selectedItemPosition]
-                prefs.edit().putInt("quality", option.quality).putInt("fps", option.fps)
-                    .putString("audio_source", source.name).apply()
-                pending = option.copy(audioSource = source)
-                created.dismiss()
-                if (ContextCompat.checkSelfPermission(activity, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-                    ActivityCompat.requestPermissions(activity, arrayOf(Manifest.permission.RECORD_AUDIO), REQUEST_AUDIO)
-                } else requestCaptureConsent()
 
-            }
+        val availableQualities = configs.map { it.quality }.distinct().sorted()
+        val availableFps = configs.map { it.fps }.distinct().sorted()
+        val audioSources = RecordingOptions.AudioSource.values().toList()
+
+        label("Quality")
+        val quality = Spinner(activity).also { body.addView(it) }
+        quality.adapter = ArrayAdapter(
+            activity,
+            android.R.layout.simple_spinner_dropdown_item,
+            availableQualities.map { "${it}p" }
+        )
+
+        label("Frame rate")
+        val fps = Spinner(activity).also { body.addView(it) }
+        fps.adapter = ArrayAdapter(
+            activity,
+            android.R.layout.simple_spinner_dropdown_item,
+            availableFps.map { "$it FPS" }
+        )
+
+        label("Audio")
+        val audio = Spinner(activity).also { body.addView(it) }
+        audio.adapter = ArrayAdapter(
+            activity,
+            android.R.layout.simple_spinner_dropdown_item,
+            audioSources.map { it.label }
+        )
+
+        val savedQ = prefs.getInt("quality", RecordingOptions.DEFAULT_QUALITY)
+        val savedF = prefs.getInt("fps", RecordingOptions.DEFAULT_FPS)
+        val preferred = configs.firstOrNull { it.quality == savedQ && it.fps == savedF }
+            ?: configs.firstOrNull { it.quality == 720 && it.fps == 30 }
+            ?: configs.firstOrNull { it.quality == 480 && it.fps == 30 }
+            ?: configs.first()
+
+        quality.setSelection(availableQualities.indexOf(preferred.quality).coerceAtLeast(0))
+        fps.setSelection(availableFps.indexOf(preferred.fps).coerceAtLeast(0))
+        val savedAudio = RecordingOptions.AudioSource.saved(prefs.getString("audio_source", null))
+        audio.setSelection(audioSources.indexOf(savedAudio).coerceAtLeast(0))
+
+        TextView(activity).apply {
+            text = "Isolated hardware H.264 MP4 recorder · Saves to Movies/Aerix."
+            textSize = 12f
+            setPadding(0, (10 * density).toInt(), 0, 0)
+            body.addView(this)
         }
-        created.show()
+
+        dialog = AlertDialog.Builder(activity)
+            .setTitle("Screen Recorder")
+            .setView(body)
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Start recording") { _, _ ->
+                val chosenQuality = availableQualities.getOrElse(quality.selectedItemPosition) { preferred.quality }
+                val chosenFps = availableFps.getOrElse(fps.selectedItemPosition) { preferred.fps }
+                val chosenAudio = audioSources.getOrElse(audio.selectedItemPosition) { RecordingOptions.AudioSource.GAME }
+                val match = configs.firstOrNull { it.quality == chosenQuality && it.fps == chosenFps }
+                    ?: configs.firstOrNull { it.quality == chosenQuality }
+                    ?: preferred
+                start(match.copy(audioSource = chosenAudio))
+            }
+            .show()
+    }
+
+    private fun start(config: RecordingOptions.Config) {
+        prefs.edit()
+            .putInt("quality", config.quality)
+            .putInt("fps", config.fps)
+            .putString("audio_source", config.audioSource.name)
+            .apply()
+        pending = config
+        if (config.audioSource.hasAudio &&
+            ContextCompat.checkSelfPermission(activity, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED
+        ) {
+            awaitingConsentSheet = true
+            ActivityCompat.requestPermissions(activity, arrayOf(Manifest.permission.RECORD_AUDIO), REQUEST_AUDIO)
+            return
+        }
+        requestCaptureConsent()
     }
 
     private fun requestCaptureConsent() {
-        try {
-            val manager = activity.getSystemService(MediaProjectionManager::class.java)
+        val manager = activity.getSystemService(MediaProjectionManager::class.java)
+        if (manager == null) {
+            Toast.makeText(activity, "Screen capture is unavailable on this device.", Toast.LENGTH_LONG).show()
+            return
+        }
+        awaitingConsentSheet = true
+        runCatching {
             activity.startActivityForResult(manager.createScreenCaptureIntent(), REQUEST_CAPTURE)
-        } catch (error: Exception) { pending = null; toast("Cannot request screen capture: ${error.message}") }
+        }.onFailure { err ->
+            awaitingConsentSheet = false
+            pending = null
+            Toast.makeText(activity, err.message ?: "Unable to open screen capture prompt", Toast.LENGTH_LONG).show()
+        }
     }
 
-    fun onRequestPermissionsResult(requestCode: Int, grants: IntArray): Boolean {
-        if (requestCode != REQUEST_AUDIO) return false
-        if (!disposed && pending != null && grants.isNotEmpty() && grants[0] == PackageManager.PERMISSION_GRANTED) requestCaptureConsent()
-        else { pending = null; if (!disposed) toast("Audio recording permission is required; recording cancelled") }
-        return true
+    fun onRequestPermissionsResult(requestCode: Int, grantResults: IntArray) {
+        if (requestCode != REQUEST_AUDIO) return
+        val current = pending ?: run {
+            awaitingConsentSheet = false
+            return
+        }
+        if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
+            requestCaptureConsent()
+        } else {
+            // Gracefully degrade to Video-Only rather than blocking screen recording!
+            pending = current.copy(audioSource = RecordingOptions.AudioSource.NONE)
+            Toast.makeText(activity, "Audio permission skipped — recording video only.", Toast.LENGTH_SHORT).show()
+            requestCaptureConsent()
+        }
     }
 
     fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean {
         if (requestCode != REQUEST_CAPTURE) return false
-        val option = pending
+        val config = pending
         pending = null
-        if (resultCode != Activity.RESULT_OK || data == null || option == null || disposed) {
-            if (!disposed) toast("Screen recording cancelled")
+        if (resultCode != Activity.RESULT_OK || data == null || config == null) {
+            awaitingConsentSheet = false
+            Toast.makeText(activity, "Screen recording cancelled.", Toast.LENGTH_SHORT).show()
             return true
         }
-        val intent = Intent(activity, ScreenRecordingService::class.java).setAction(ScreenRecordingService.START)
-            .putExtra("consent", data).putExtra("quality", option.quality).putExtra("fps", option.fps)
-            .putExtra("width", option.width).putExtra("height", option.height).putExtra("bitrate", option.bitrate)
-            .putExtra("encoder", option.encoder).putExtra("audio_source", option.audioSource.name)
-        try { startRequested = true; ContextCompat.startForegroundService(activity, intent) }
-        catch (error: Exception) { startRequested = false; toast("Cannot start recorder: ${error.message}") }
+        startRequested = true
+        // Wait 220ms so GameActivity finishes onStart()/onResume() after returning from Android's
+        // MediaProjectionPermissionActivity (required for Android 14+ TOP-state FGS validation &
+        // prevents ColorOS/OneUI transition pause from cancelling the recorder).
+        val consentCopy = Intent(data)
+        Tools.MAIN_HANDLER.postDelayed({
+            awaitingConsentSheet = false
+            if (activity.isFinishing || activity.isDestroyed) {
+                startRequested = false
+                return@postDelayed
+            }
+            val intent = Intent(activity, ScreenRecordingService::class.java)
+                .setAction(ScreenRecordingService.START)
+                .putExtra("consent", consentCopy)
+                .putExtra("quality", config.quality)
+                .putExtra("fps", config.fps)
+                .putExtra("width", config.width)
+                .putExtra("height", config.height)
+                .putExtra("bitrate", config.bitrate)
+                .putExtra("encoder", config.encoder)
+                .putExtra("audioSource", config.audioSource.name)
+            runCatching {
+                ContextCompat.startForegroundService(activity, intent)
+            }.onFailure { err ->
+                startRequested = false
+                Toast.makeText(activity, err.message ?: "Cannot start screen recorder", Toast.LENGTH_LONG).show()
+            }
+        }, 220L)
         return true
     }
 
     fun stop() {
-        if (startRequested || RecordingState.isActive()) {
-            runCatching { activity.startService(Intent(activity, ScreenRecordingService::class.java).setAction(ScreenRecordingService.STOP)) }
-                .onFailure { toast("Could not request stop; use Android's recording notification to stop") }
-            startRequested = false
+        startRequested = false
+        awaitingConsentSheet = false
+        runCatching {
+            activity.startService(
+                Intent(activity, ScreenRecordingService::class.java)
+                    .setAction(ScreenRecordingService.STOP)
+            )
         }
     }
-    fun onGameStopped() { stop() }
-    fun destroy() {
-        disposed = true
-        dialog?.dismiss()
-        RecordingState.removeListener(stateListener)
-        (indicator.parent as? android.view.ViewGroup)?.removeView(indicator)
-        executor.shutdownNow()
+
+    fun onGameStopped() {
+        // Ignore transient stops while the Android permission / screen-capture consent sheet is open!
+        if (awaitingConsentSheet) return
+        if (activity.isFinishing || activity.isChangingConfigurations) {
+            if (!activity.isChangingConfigurations && (startRequested || RecordingState.isActive())) {
+                stop()
+            }
+        }
     }
-    private fun toast(message: String) { Toast.makeText(activity, message, Toast.LENGTH_LONG).show() }
-    companion object { const val REQUEST_CAPTURE = 7143; const val REQUEST_AUDIO = 7144 }
+
+    fun destroy() {
+        dialog?.dismiss()
+        dialog = null
+        RecordingState.removeListener(stateListener)
+        if (startRequested || RecordingState.isActive()) stop()
+    }
+
+    private fun screenSize(): Pair<Int, Int> {
+        val bounds = if (Build.VERSION.SDK_INT >= 30) activity.windowManager.currentWindowMetrics.bounds else null
+        val dm = activity.resources.displayMetrics
+        val width = bounds?.width() ?: dm.widthPixels
+        val height = bounds?.height() ?: dm.heightPixels
+        return maxOf(width, height) to minOf(width, height)
+    }
+
+    companion object {
+        private const val REQUEST_AUDIO = 0x52C1
+        private const val REQUEST_CAPTURE = 0x52C2
+    }
 }

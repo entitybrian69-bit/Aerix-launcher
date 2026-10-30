@@ -766,15 +766,35 @@ object SocialBackend {
 
     // ---- session, lifecycle & Wi-Fi monitors ------------------------------------------------
 
+    /**
+     * Passive context + saved credentials loader invoked from `PojavApplication.onCreate()` without
+     * opening WebSockets, starting background heartbeat loops, or launching services.
+     */
     @JvmStatic
-    fun attach(context: Context) {
+    fun initPassive(context: Context) {
         val app = context.applicationContext
         appContext = app
-        SocialSoundEffects.init(app)
-        SocialNotificationHelper.ensureChannels(app)
+        SocialInboxJobService.cancel(app)
         val prefs = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         chatSoundsEnabled = prefs.getBoolean("chat_sounds_enabled", true)
         backgroundNotificationsEnabled = prefs.getBoolean("bg_notifications_enabled", true)
+        if (!signedIn) {
+            refreshToken = prefs.getString("refresh_token", null)
+            userId = prefs.getString("user_id", null)
+            email = prefs.getString("email", null)
+            if (refreshToken != null && userId != null) {
+                signedIn = true
+                loadLocalCollections()
+            }
+        }
+    }
+
+    @JvmStatic
+    fun attach(context: Context) {
+        val app = context.applicationContext
+        initPassive(app)
+        SocialSoundEffects.init(app)
+        SocialNotificationHelper.ensureChannels(app)
         installLifecycleMonitor(app)
         installNetworkMonitor(app)
         startPresenceKeepAliveLoop()
@@ -782,27 +802,35 @@ object SocialBackend {
         if (signedIn) {
             ensureRealtimeConnectedAsync()
             SocialMessagingService.ensureRunningIfSignedIn(app)
-            return
         }
-        refreshToken = prefs.getString("refresh_token", null)
-        userId = prefs.getString("user_id", null)
-        email = prefs.getString("email", null)
-        if (refreshToken != null && userId != null) {
-            signedIn = true
-            loadLocalCollections()
-            ensureRealtimeConnectedAsync()
-            SocialMessagingService.ensureRunningIfSignedIn(app)
+    }
+
+    fun hasStartedActivities(): Boolean = startedActivities.get() > 0
+
+    /**
+     * Called when the user swipes/removes Aerix from Recent Apps so all background WebSockets,
+     * presence loops, and pending background activity shut down cleanly.
+     */
+    @JvmStatic
+    fun shutdownBackgroundActivity(context: Context) {
+        val app = context.applicationContext
+        startedActivities.set(0)
+        activeOpenPeerId = null
+        activeOpenPartyId = null
+        isLauncherInForeground = false
+        backgroundTransitionJob?.cancel()
+        backgroundTransitionJob = null
+        presenceKeepAliveJob?.cancel()
+        presenceKeepAliveJob = null
+        SocialInboxJobService.cancel(app)
+        runCatching {
+            SocialRealtime.untrackPresence()
+            SocialRealtime.disconnect()
         }
     }
 
     fun onAppTaskSwipedAway() {
-        startedActivities.set(0)
-        activeOpenPeerId = null
-        activeOpenPartyId = null
-        if (isLauncherInForeground) {
-            isLauncherInForeground = false
-            onAutomaticPresenceTriggerChanged()
-        }
+        appContext?.let { shutdownBackgroundActivity(it) }
     }
 
     private fun installLifecycleMonitor(app: Context) {

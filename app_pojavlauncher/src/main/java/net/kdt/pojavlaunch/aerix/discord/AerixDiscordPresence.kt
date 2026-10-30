@@ -628,6 +628,31 @@ object AerixDiscordPresence {
         onGameStopped(app)
     }
 
+    /**
+     * Invoked when the user explicitly swipes/removes Aerix from Recent Apps so Discord Rich
+     * Presence clears immediately and no delayed wakeup alarm brings the process back later.
+     */
+    @JvmStatic
+    fun onAppSwipedFromRecents(context: Context?) {
+        val app = context?.applicationContext ?: appContext ?: resolveAnyContext() ?: return
+        appContext = app
+        main.removeCallbacks(postExitClearRunnable)
+        cancelClearAlarm(app)
+        writeDiskState(
+            app,
+            PresenceDiskState(
+                owner = "none",
+                exitedAtElapsedMs = 0L,
+                details = InLauncher.DETAILS,
+                state = InLauncher.HOME,
+                startedAt = 0L,
+                activeAppId = 0L,
+                modpackIconUrl = null
+            )
+        )
+        clearAndDetach(app, null)
+    }
+
     /** Invoked in `:launcher` when SocialNotificationReceiver receives ACTION_DISCORD_GAME_STARTED. */
     @JvmStatic
     @JvmOverloads

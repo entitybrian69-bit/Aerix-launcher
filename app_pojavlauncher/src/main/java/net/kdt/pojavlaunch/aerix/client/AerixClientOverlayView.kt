@@ -12,13 +12,18 @@ import android.hardware.SensorManager
 import android.os.BatteryManager
 import android.util.AttributeSet
 import android.view.MotionEvent
-import android.view.View
 import android.widget.FrameLayout
 import android.widget.Toast
 import androidx.activity.OnBackPressedDispatcherOwner
 import androidx.activity.findViewTreeOnBackPressedDispatcherOwner
 import androidx.activity.setViewTreeOnBackPressedDispatcherOwner
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Canvas
@@ -29,7 +34,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -50,13 +54,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -64,21 +67,29 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -92,24 +103,53 @@ import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.findViewTreeSavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import net.kdt.pojavlaunch.R
 import net.kdt.pojavlaunch.aerix.bridge.AerixPreferences
 import net.kdt.pojavlaunch.aerix.bridge.PojavAccountBridge
-import net.kdt.pojavlaunch.aerix.social.SocialBackend
 import net.kdt.pojavlaunch.aerix.theme.AerixLauncherTheme
 import net.kdt.pojavlaunch.game.NativeFrameCounter
 import net.kdt.pojavlaunch.game.platform.Platform
 import net.kdt.pojavlaunch.game.platform.input.PlatformGrabListener
 import net.kdt.pojavlaunch.instances.Instance
+import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.cos
 import kotlin.math.roundToInt
-import kotlin.math.sqrt
+import kotlin.math.sin
 
 enum class InGameClientModal {
     NONE,
     MODULES,
     HUD_EDITOR,
+    OLED_AFK
+}
+
+private enum class ClientMenuSubPage {
+    GRID,
+    CAPES,
+    CROSSHAIRS
+}
+
+private enum class FeatureIconKind {
+    CAPE,
+    CROSSHAIR,
+    FPS,
+    CPS,
+    KEYSTROKES,
+    SPRINT,
+    SNEAK,
+    AUTOWALK,
+    FULLBRIGHT,
+    HITMARKER,
+    COOLDOWN,
+    COMPASS,
+    CLOCK,
+    SPEEDRUN,
+    CLAW_PVP,
+    HOTBAR,
+    GYRO,
+    AUTOGG,
+    THERMAL,
     OLED_AFK
 }
 
@@ -128,9 +168,9 @@ class AerixClientOverlayView @JvmOverloads constructor(
 
     private var bootOverlayVisible by mutableStateOf(true)
     private var activeModal by mutableStateOf(InGameClientModal.NONE)
+    private var menuSubPage by mutableStateOf(ClientMenuSubPage.GRID)
     private var isGrabbingState by mutableStateOf(false)
 
-    // Gyroscope sensor for Bow/Crossbow micro-aim
     private val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as? SensorManager
     private val gyroSensor: Sensor? = sensorManager?.getDefaultSensor(Sensor.TYPE_GYROSCOPE)
     private var gyroListening = false
@@ -150,10 +190,6 @@ class AerixClientOverlayView @JvmOverloads constructor(
         PojavAccountBridge.attach(context.applicationContext)
     }
 
-    /**
-     * Activates the Aerix Client overlay ONLY when `instance.isAerixClient == true`.
-     * Non-client instances leave this view `GONE` with zero overhead.
-     */
     fun attachForInstance(instance: Instance?) {
         if (instance == null || !instance.isAerixClient) {
             visibility = GONE
@@ -165,6 +201,7 @@ class AerixClientOverlayView @JvmOverloads constructor(
         AerixClientInputBridge.clientSessionActive = true
         bootOverlayVisible = true
         activeModal = InGameClientModal.NONE
+        menuSubPage = ClientMenuSubPage.GRID
         isGrabbingState = Platform.isGrabbing()
         Platform.addGrabListener(grabListener)
         installComposeContent()
@@ -172,15 +209,20 @@ class AerixClientOverlayView @JvmOverloads constructor(
         syncGyroRegistration()
     }
 
-    /**
-     * Called from `GameActivity.hideLoadingScreen()` once the LWJGL/GLFW window is ready.
-     * Holds the Liquid Crystal Mojang/Boot transition briefly for a silky fade into the 1.16.5 Title Dashboard.
-     */
+    fun isClientActive(): Boolean = visibility == VISIBLE
+
+    fun openClientMenu() {
+        if (visibility != VISIBLE) return
+        bootOverlayVisible = false
+        menuSubPage = ClientMenuSubPage.GRID
+        activeModal = InGameClientModal.MODULES
+    }
+
     fun onGlWindowReady() {
         if (visibility != VISIBLE) return
         postDelayed({
             bootOverlayVisible = false
-        }, 900L)
+        }, 700L)
     }
 
     fun onHostDestroy() {
@@ -190,6 +232,10 @@ class AerixClientOverlayView @JvmOverloads constructor(
 
     fun handleBackPress(): Boolean {
         if (visibility != VISIBLE) return false
+        if (activeModal == InGameClientModal.MODULES && menuSubPage != ClientMenuSubPage.GRID) {
+            menuSubPage = ClientMenuSubPage.GRID
+            return true
+        }
         if (activeModal != InGameClientModal.NONE) {
             if (activeModal == InGameClientModal.OLED_AFK) {
                 AerixClientInputBridge.setRightClickHold(false)
@@ -209,15 +255,12 @@ class AerixClientOverlayView @JvmOverloads constructor(
             super.dispatchTouchEvent(ev)
             return true
         }
-        // Optional Palm-Rejection Edge Shield in bottom corners during 3D camera grab
         if (AerixClientStore.palmShieldEnabled && isGrabbingState && width > 0 && height > 0) {
             val edgePx = 18f * resources.displayMetrics.density
             val inBottomCorner = ev.y > (height - edgePx * 2.2f) &&
                 (ev.x < edgePx || ev.x > (width - edgePx))
             if (inBottomCorner) return true
         }
-        // Only consume if a tactile HUD pill inside Compose explicitly handled the touch;
-        // otherwise return false so ControlLayout & GameView receive 100% raw touch events!
         return super.dispatchTouchEvent(ev)
     }
 
@@ -241,7 +284,6 @@ class AerixClientOverlayView @JvmOverloads constructor(
     override fun onSensorChanged(event: SensorEvent?) {
         if (event == null || !AerixClientStore.gyroAdsEnabled || !isGrabbingState) return
         if (event.sensor.type == Sensor.TYPE_GYROSCOPE) {
-            // Landscape orientation gyro mapping: axis Y -> horizontal pan, axis X -> vertical pitch
             val dyaw = -event.values[0]
             val dpitch = event.values[1]
             if (abs(dyaw) > 0.015f || abs(dpitch) > 0.015f) {
@@ -273,12 +315,18 @@ class AerixClientOverlayView @JvmOverloads constructor(
         composeView.setContent {
             AerixLauncherTheme {
                 AerixClientRootOverlay(
+                    instanceLabel = activeClientInstance?.name ?: "Aerix Client",
                     bootVisible = bootOverlayVisible,
                     isGrabbing = isGrabbingState,
                     modal = activeModal,
+                    subPage = menuSubPage,
+                    onChangeSubPage = { menuSubPage = it },
                     onChangeModal = { next ->
                         if (activeModal == InGameClientModal.OLED_AFK && next != InGameClientModal.OLED_AFK) {
                             AerixClientInputBridge.setRightClickHold(false)
+                        }
+                        if (next == InGameClientModal.MODULES) {
+                            menuSubPage = ClientMenuSubPage.GRID
                         }
                         activeModal = next
                         syncGyroRegistration()
@@ -305,19 +353,21 @@ class AerixClientOverlayView @JvmOverloads constructor(
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
- * ROOT IN-GAME COMPOSE OVERLAY (BOOT -> TITLE BAR -> LIVE HUD -> MODALS -> AFK)
+ * ROOT IN-GAME CLIENT OVERLAY (LOCKED CRIMSON RED + DARK GRAY THEME)
  * ═══════════════════════════════════════════════════════════════════════════ */
 @Composable
 private fun AerixClientRootOverlay(
+    instanceLabel: String,
     bootVisible: Boolean,
     isGrabbing: Boolean,
     modal: InGameClientModal,
+    subPage: ClientMenuSubPage,
+    onChangeSubPage: (ClientMenuSubPage) -> Unit,
     onChangeModal: (InGameClientModal) -> Unit,
     onSyncOptionsTxt: () -> Unit
 ) {
-    val context = androidx.compose.ui.platform.LocalContext.current
+    val context = LocalContext.current
 
-    // Live Telemetry State (Native C OpenGL FPS + 1% Low + RAM + Battery + Temp + Session Clock)
     var currentFps by remember { mutableIntStateOf(0) }
     var onePercentLowFps by remember { mutableIntStateOf(0) }
     var usedRamMb by remember { mutableIntStateOf(0) }
@@ -326,13 +376,11 @@ private fun AerixClientRootOverlay(
     var sessionElapsedSec by remember { mutableLongStateOf(0L) }
     var frameTickMs by remember { mutableLongStateOf(System.currentTimeMillis()) }
 
-    // Speedrun Split Stopwatch State
     var speedrunRunning by remember { mutableStateOf(false) }
     var speedrunAccumMs by remember { mutableLongStateOf(0L) }
     var speedrunStartedAtMs by remember { mutableLongStateOf(0L) }
-    var speedrunLastSplitText by remember { mutableStateOf("No split yet") }
+    var speedrunLastSplitText by remember { mutableStateOf("Ready") }
 
-    // Fast 50ms UI tick for CPS decay, Sword Cooldown bar & Chroma animation
     LaunchedEffect(Unit) {
         val startWall = System.currentTimeMillis()
         var lastNativeFrames = -1L
@@ -347,7 +395,6 @@ private fun AerixClientRootOverlay(
             sessionElapsedSec = (nowMs - startWall) / 1000L
 
             slowTick++
-            // Every 500ms: sample NativeFrameCounter.read() + poll latestlog.txt
             if (slowTick % 10 == 0) {
                 val totalFrames = NativeFrameCounter.read()
                 val nowNanos = System.nanoTime()
@@ -367,7 +414,6 @@ private fun AerixClientRootOverlay(
                 AerixClientInputBridge.pollLatestLog(context)
             }
 
-            // Every 2.5s: sample device memory & battery thermal sensor
             if (slowTick % 50 == 1) {
                 runCatching {
                     val am = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
@@ -390,7 +436,6 @@ private fun AerixClientRootOverlay(
         }
     }
 
-    // AFK Farm Automation Loop while OLED Blackout Mode is active
     LaunchedEffect(modal, AerixClientStore.afkAction, AerixClientStore.afkSwingIntervalMs) {
         if (modal != InGameClientModal.OLED_AFK) return@LaunchedEffect
         when (AerixClientStore.afkAction) {
@@ -416,21 +461,47 @@ private fun AerixClientRootOverlay(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        // 0. Zero-Cost GPU Visual Filter Tint Layer during gameplay
-        val filterTint = AerixClientStore.visualFilter.tintArgb
-        if (!bootVisible && filterTint != 0L && modal != InGameClientModal.OLED_AFK) {
-            Box(
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val wPx = constraints.maxWidth.toFloat().coerceAtLeast(1f)
+        val hPx = constraints.maxHeight.toFloat().coerceAtLeast(1f)
+
+        // Compact non-overlapping `[✦ Client]` button in safe gap (x=0.57, y=0.018 — clear of TAB at 0.46 & A at 0.77)
+        if (!bootVisible && modal == InGameClientModal.NONE) {
+            val btnPos = AerixClientStore.hudPositions["client_btn"]
+            val bx = ((btnPos?.xNorm ?: 0.57f) * wPx).roundToInt()
+            val by = ((btnPos?.yNorm ?: 0.018f) * hPx).roundToInt()
+            Row(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color(filterTint))
-            )
+                    .offset { IntOffset(bx, by) }
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color(0xE016181F))
+                    .border(1.1.dp, LiquidCrystalPalette.CrimsonPrimary, RoundedCornerShape(8.dp))
+                    .clickable { onChangeModal(InGameClientModal.MODULES) }
+                    .padding(horizontal = 10.dp, vertical = 5.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(6.dp)
+                        .clip(CircleShape)
+                        .background(LiquidCrystalPalette.CrimsonGlow)
+                )
+                Text(
+                    text = "Client",
+                    color = Color.White,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+            }
         }
 
-        // 1. Live Gameplay HUD (active when cursor is grabbed in-world & no fullscreen modal)
+        // Optional In-Game HUD (ALL items OFF by default; rendered only when explicitly toggled ON)
         if (!bootVisible && isGrabbing && modal == InGameClientModal.NONE) {
-            InGameLiquidCrystalHud(
+            InGameCrimsonHud(
                 nowMs = frameTickMs,
+                wPx = wPx,
+                hPx = hPx,
                 fps = currentFps,
                 low1Pct = onePercentLowFps,
                 ramMb = usedRamMb,
@@ -444,7 +515,7 @@ private fun AerixClientRootOverlay(
                     if (speedrunRunning) {
                         val elapsed = speedrunAccumMs + (System.currentTimeMillis() - speedrunStartedAtMs)
                         speedrunAccumMs = elapsed
-                        speedrunLastSplitText = "Split ${formatMsStopwatch(elapsed)}"
+                        speedrunLastSplitText = "Split ${formatStopwatch(elapsed)}"
                         speedrunRunning = false
                     } else {
                         speedrunStartedAtMs = System.currentTimeMillis()
@@ -455,239 +526,1181 @@ private fun AerixClientRootOverlay(
                     speedrunRunning = false
                     speedrunAccumMs = 0L
                     speedrunLastSplitText = "Reset"
-                },
-                onOpenClientModal = { onChangeModal(InGameClientModal.MODULES) }
+                }
             )
         }
 
-        // 2. Custom 1.16.5 Title Dashboard / Pause Menu Top Crystal Quick-Access Ribbon
-        if (!bootVisible && !isGrabbing && modal == InGameClientModal.NONE) {
-            TitleDashboardQuickRibbon(
-                fps = currentFps,
-                onOpenModules = { onChangeModal(InGameClientModal.MODULES) },
-                onOpenHudStudio = { onChangeModal(InGameClientModal.HUD_EDITOR) },
-                onOpenAfk = { onChangeModal(InGameClientModal.OLED_AFK) }
-            )
-        }
-
-        // 3. In-Game ✦ Aerix Client Modules, Cosmetics, LAN Invite & Macros Modal
+        // Famous-Client Style Big Dark Gray & Crimson Red Rectangle Menu
         if (!bootVisible && modal == InGameClientModal.MODULES) {
-            InGameModulesModal(
+            FamousClientRectangleMenu(
+                subPage = subPage,
+                onChangeSubPage = onChangeSubPage,
                 onClose = { onChangeModal(InGameClientModal.NONE) },
-                onOpenHudStudio = { onChangeModal(InGameClientModal.HUD_EDITOR) },
+                onOpenHudEditor = { onChangeModal(InGameClientModal.HUD_EDITOR) },
                 onOpenOledAfk = { onChangeModal(InGameClientModal.OLED_AFK) },
                 onSyncOptionsTxt = onSyncOptionsTxt
             )
         }
 
-        // 4. Magnetic Drag-and-Snap HUD Layout Studio
+        // Drag-and-Place HUD Layout Editor
         if (!bootVisible && modal == InGameClientModal.HUD_EDITOR) {
-            MagneticHudEditorScreen(
-                onDone = { onChangeModal(InGameClientModal.NONE) }
+            HudPositionEditorModal(
+                onDone = { onChangeModal(InGameClientModal.MODULES) }
             )
         }
 
-        // 5. True #000000 OLED Blackout AFK Farm Power Saver
+        // True #000000 OLED AFK Blackout Screen
         if (!bootVisible && modal == InGameClientModal.OLED_AFK) {
-            OledBlackoutAfkScreen(
+            OledAfkScreen(
                 fps = currentFps,
                 batteryPct = batteryPct,
                 tempC = batteryTempC,
-                nowMs = frameTickMs,
                 onWake = { onChangeModal(InGameClientModal.NONE) }
             )
         }
 
-        // 6. Custom Pre-GL Aerix Client 1.16.5 Startup & Mojang Splash Screen
+        // Pre-GL Crimson & Dark Gray Boot Splash
         AnimatedVisibility(
             visible = bootVisible,
             enter = fadeIn(),
             exit = fadeOut()
         ) {
-            PreGlLiquidCrystalBootScreen()
+            CrimsonBootSplash(instanceLabel = instanceLabel)
         }
     }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
- * 1. CUSTOM PRE-GL AERIX CLIENT 1.16.5 LOADING & MOJANG SPLASH SCREEN
+ * FAMOUS-CLIENT BIG RECTANGLE MENU (SCROLLABLE SMALL SQUARES + CAPES + CROSSHAIRS)
  * ═══════════════════════════════════════════════════════════════════════════ */
+private class ClientSquareModule(
+    val id: String,
+    val title: String,
+    val icon: FeatureIconKind,
+    val isActive: () -> Boolean,
+    val statusText: () -> String,
+    val onClick: () -> Unit
+)
+
 @Composable
-private fun PreGlLiquidCrystalBootScreen() {
-    val activeCape = AerixClientCosmetics.effectiveCapeSpec()
+private fun FamousClientRectangleMenu(
+    subPage: ClientMenuSubPage,
+    onChangeSubPage: (ClientMenuSubPage) -> Unit,
+    onClose: () -> Unit,
+    onOpenHudEditor: () -> Unit,
+    onOpenOledAfk: () -> Unit,
+    onSyncOptionsTxt: () -> Unit
+) {
+    val context = LocalContext.current
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF040C14)),
+            .background(Color(0x990A0B0E))
+            .pointerInput(Unit) {
+                detectTapGestures(onTap = { onClose() })
+            },
         contentAlignment = Alignment.Center
     ) {
-        Image(
-            painter = painterResource(R.drawable.aerix_clip_poster_northern_light),
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            alpha = 0.42f,
-            modifier = Modifier.fillMaxSize()
-        )
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.radialGradient(
-                        listOf(Color(0x228DEFE0), Color(0xCC040B12))
-                    )
-                )
-        )
+        val rectShape = RoundedCornerShape(14.dp)
 
-        LiquidCrystalCard(
-            modifier = Modifier.width(460.dp),
-            cornerRadius = 26.dp,
-            strong = true,
-            contentPadding = PaddingValues(24.dp)
+        // Big Dark Gray & Crimson Red Client Rectangle
+        Column(
+            modifier = Modifier
+                .fillMaxWidth(0.86f)
+                .fillMaxHeight(0.86f)
+                .drawBehind {
+                    // Subtle outer Crimson ambient glow around the big rectangle
+                    drawRoundRect(
+                        color = LiquidCrystalPalette.CrimsonPrimary.copy(alpha = 0.16f),
+                        topLeft = Offset(-4.dp.toPx(), -4.dp.toPx()),
+                        size = Size(size.width + 8.dp.toPx(), size.height + 8.dp.toPx()),
+                        cornerRadius = CornerRadius(18.dp.toPx(), 18.dp.toPx())
+                    )
+                }
+                .clip(rectShape)
+                .background(LiquidCrystalPalette.DarkPanel, rectShape)
+                .border(1.6.dp, LiquidCrystalPalette.CrimsonPrimary, rectShape)
+                .pointerInput(Unit) {
+                    detectTapGestures(onTap = { /* consume inside rectangle */ })
+                }
         ) {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
+            // Top Bar of the Big Rectangle
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(LiquidCrystalPalette.DarkHeader)
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Image(
-                        painter = painterResource(R.drawable.aerix_logo),
-                        contentDescription = null,
-                        modifier = Modifier.size(46.dp).clip(RoundedCornerShape(12.dp))
-                    )
-                    Column {
-                        Text(
-                            text = "MOJANG STUDIOS  ×  AERIX CLIENT",
-                            color = LiquidCrystalPalette.PrismCyan,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.ExtraBold
-                        )
-                        Text(
-                            text = "AERIX CLIENT 1.16.5",
-                            color = LiquidCrystalPalette.IceWhite,
-                            fontSize = 22.sp,
-                            fontWeight = FontWeight.Black
+                    if (subPage != ClientMenuSubPage.GRID) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(7.dp))
+                                .background(LiquidCrystalPalette.DarkTile)
+                                .border(1.dp, LiquidCrystalPalette.CrimsonPrimary, RoundedCornerShape(7.dp))
+                                .clickable { onChangeSubPage(ClientMenuSubPage.GRID) }
+                                .padding(horizontal = 10.dp, vertical = 5.dp)
+                        ) {
+                            Text(
+                                text = "← Back",
+                                color = Color.White,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    } else {
+                        Image(
+                            painter = painterResource(R.drawable.aerix_logo),
+                            contentDescription = null,
+                            modifier = Modifier
+                                .size(24.dp)
+                                .clip(RoundedCornerShape(6.dp))
                         )
                     }
-                }
-                Spacer(Modifier.height(14.dp))
-                LinearProgressIndicator(
-                    progress = { AerixClientInputBridge.bootProgress },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(8.dp)
-                        .clip(CircleShape),
-                    color = LiquidCrystalPalette.PrismCyan,
-                    trackColor = Color.White.copy(alpha = 0.15f)
-                )
-                Spacer(Modifier.height(10.dp))
-                Text(
-                    text = AerixClientInputBridge.bootStageTitle,
-                    color = LiquidCrystalPalette.IceWhite,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = AerixClientInputBridge.bootStageDetail,
-                    color = LiquidCrystalPalette.IceSub,
-                    fontSize = 11.sp
-                )
-                Spacer(Modifier.height(12.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    LiquidCrystalPill("Fabric 1.16.5", selected = true)
-                    LiquidCrystalPill("Crystal Pack v6")
-                    LiquidCrystalPill("Cape: ${activeCape.title}")
-                }
-            }
-        }
-    }
-}
 
-/* ═══════════════════════════════════════════════════════════════════════════
- * 2. CUSTOM 1.16.5 TITLE DASHBOARD / GUI TOP QUICK-ACCESS RIBBON
- * ═══════════════════════════════════════════════════════════════════════════ */
-@Composable
-private fun TitleDashboardQuickRibbon(
-    fps: Int,
-    onOpenModules: () -> Unit,
-    onOpenHudStudio: () -> Unit,
-    onOpenAfk: () -> Unit
-) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val scope = rememberCoroutineScope()
-    val onlineFriends = SocialBackend.friends.count { it.online }
-    val lanPort = AerixClientInputBridge.hostedLanPort
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 6.dp),
-        contentAlignment = Alignment.TopCenter
-    ) {
-        Row(
-            modifier = Modifier
-                .clip(RoundedCornerShape(50))
-                .background(
-                    Brush.linearGradient(
-                        listOf(Color.White.copy(alpha = 0.24f), Color(0x44091B28), LiquidCrystalPalette.PrismMint.copy(alpha = 0.20f))
+                    Text(
+                        text = when (subPage) {
+                            ClientMenuSubPage.GRID -> "AERIX CLIENT"
+                            ClientMenuSubPage.CAPES -> "AERIX CLIENT  ·  CAPES"
+                            ClientMenuSubPage.CROSSHAIRS -> "AERIX CLIENT  ·  CROSSHAIR"
+                        },
+                        color = Color.White,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Black
                     )
-                )
-                .border(1.dp, Color.White.copy(alpha = 0.72f), RoundedCornerShape(50))
-                .padding(horizontal = 10.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            LiquidCrystalPill(
-                label = "✦ Aerix Client 1.16.5",
-                selected = true,
-                badge = if (fps > 0) "${fps}fps" else null,
-                onClick = onOpenModules
-            )
-            LiquidCrystalPill("HUD Studio", onClick = onOpenHudStudio)
-            LiquidCrystalPill("OLED AFK", onClick = onOpenAfk)
-            if (onlineFriends > 0) {
-                LiquidCrystalPill("● $onlineFriends Friends", accent = LiquidCrystalPalette.PrismMint, onClick = onOpenModules)
-            }
-            if (lanPort > 0) {
-                LiquidCrystalPill(
-                    label = "📡 Invite to LAN :$lanPort",
-                    selected = true,
-                    accent = LiquidCrystalPalette.PrismMint,
-                    onClick = {
-                        scope.launch {
-                            val party = SocialBackend.createParty(
-                                title = "Aerix Client 1.16.5 LAN",
-                                instanceName = AerixClientStore.CLIENT_INSTANCE_NAME,
-                                versionId = "1.16.5",
-                                mcVersion = "1.16.5",
-                                loader = "Fabric",
-                                serverAddress = AerixClientInputBridge.hostedLanAddress,
-                                isPublic = true
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (subPage == ClientMenuSubPage.GRID) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(7.dp))
+                                .background(LiquidCrystalPalette.DarkTile)
+                                .border(1.dp, LiquidCrystalPalette.DarkTileBorder, RoundedCornerShape(7.dp))
+                                .clickable { onOpenHudEditor() }
+                                .padding(horizontal = 10.dp, vertical = 5.dp)
+                        ) {
+                            Text(
+                                text = "Edit HUD",
+                                color = LiquidCrystalPalette.TextSecondary,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
                             )
-                            if (party != null) {
-                                SocialBackend.friends.filter { it.online }.forEach { f ->
-                                    SocialBackend.inviteFriendToParty(party, f.id)
-                                }
-                                Toast.makeText(context, "Sent 1.16.5 Join Invite (${AerixClientInputBridge.hostedLanAddress})!", Toast.LENGTH_SHORT).show()
-                            } else {
-                                Toast.makeText(context, "LAN Active on ${AerixClientInputBridge.hostedLanAddress}", Toast.LENGTH_SHORT).show()
-                            }
                         }
                     }
+
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(RoundedCornerShape(7.dp))
+                            .background(LiquidCrystalPalette.CrimsonTintFill)
+                            .border(1.dp, LiquidCrystalPalette.CrimsonPrimary, RoundedCornerShape(7.dp))
+                            .clickable { onClose() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("✕", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Black)
+                    }
+                }
+            }
+
+            // Crimson divider line under header
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.5.dp)
+                    .background(
+                        Brush.horizontalGradient(
+                            listOf(
+                                LiquidCrystalPalette.CrimsonPrimary,
+                                LiquidCrystalPalette.CrimsonGlow,
+                                LiquidCrystalPalette.CrimsonDeep
+                            )
+                        )
+                    )
+            )
+
+            // Body Content of the Big Rectangle
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(14.dp)
+            ) {
+                when (subPage) {
+                    ClientMenuSubPage.GRID -> ClientSquaresGridPage(
+                        context = context,
+                        onOpenCapes = { onChangeSubPage(ClientMenuSubPage.CAPES) },
+                        onOpenCrosshairs = { onChangeSubPage(ClientMenuSubPage.CROSSHAIRS) },
+                        onOpenOledAfk = onOpenOledAfk,
+                        onSyncOptionsTxt = onSyncOptionsTxt
+                    )
+                    ClientMenuSubPage.CAPES -> ClientCapesSubPage()
+                    ClientMenuSubPage.CROSSHAIRS -> ClientCrosshairsSubPage()
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ClientSquaresGridPage(
+    context: Context,
+    onOpenCapes: () -> Unit,
+    onOpenCrosshairs: () -> Unit,
+    onOpenOledAfk: () -> Unit,
+    onSyncOptionsTxt: () -> Unit
+) {
+    val modules = listOf(
+        ClientSquareModule(
+            id = "capes",
+            title = "Capes",
+            icon = FeatureIconKind.CAPE,
+            isActive = { true },
+            statusText = { "15 CAPES ›" },
+            onClick = onOpenCapes
+        ),
+        ClientSquareModule(
+            id = "crosshair",
+            title = "Crosshair",
+            icon = FeatureIconKind.CROSSHAIR,
+            isActive = { AerixClientStore.crosshairEnabled },
+            statusText = { if (AerixClientStore.crosshairEnabled) "ON · EDIT" else "SELECT ›" },
+            onClick = onOpenCrosshairs
+        ),
+        ClientSquareModule(
+            id = "fps",
+            title = "FPS Display",
+            icon = FeatureIconKind.FPS,
+            isActive = { AerixClientStore.perfPillEnabled },
+            statusText = { if (AerixClientStore.perfPillEnabled) "ENABLED" else "DISABLED" },
+            onClick = {
+                AerixClientStore.perfPillEnabled = !AerixClientStore.perfPillEnabled
+                AerixClientStore.persist()
+            }
+        ),
+        ClientSquareModule(
+            id = "cps",
+            title = "CPS Counter",
+            icon = FeatureIconKind.CPS,
+            isActive = { AerixClientStore.cpsPillEnabled },
+            statusText = { if (AerixClientStore.cpsPillEnabled) "ENABLED" else "DISABLED" },
+            onClick = {
+                AerixClientStore.cpsPillEnabled = !AerixClientStore.cpsPillEnabled
+                AerixClientStore.persist()
+            }
+        ),
+        ClientSquareModule(
+            id = "keystrokes",
+            title = "Keystrokes",
+            icon = FeatureIconKind.KEYSTROKES,
+            isActive = { AerixClientStore.keystrokesEnabled },
+            statusText = { if (AerixClientStore.keystrokesEnabled) "ENABLED" else "DISABLED" },
+            onClick = {
+                AerixClientStore.keystrokesEnabled = !AerixClientStore.keystrokesEnabled
+                AerixClientStore.persist()
+            }
+        ),
+        ClientSquareModule(
+            id = "toggle_sprint",
+            title = "Toggle Sprint",
+            icon = FeatureIconKind.SPRINT,
+            isActive = { AerixClientStore.toggleSprintEnabled },
+            statusText = { if (AerixClientStore.toggleSprintEnabled) "ENABLED" else "DISABLED" },
+            onClick = {
+                val next = !AerixClientStore.toggleSprintEnabled
+                AerixClientStore.toggleSprintEnabled = next
+                AerixClientInputBridge.setSprintLatch(next)
+                AerixClientStore.persist()
+            }
+        ),
+        ClientSquareModule(
+            id = "toggle_sneak",
+            title = "Toggle Sneak",
+            icon = FeatureIconKind.SNEAK,
+            isActive = { AerixClientStore.toggleSneakEnabled },
+            statusText = { if (AerixClientStore.toggleSneakEnabled) "ENABLED" else "DISABLED" },
+            onClick = {
+                val next = !AerixClientStore.toggleSneakEnabled
+                AerixClientStore.toggleSneakEnabled = next
+                AerixClientInputBridge.setSneakLatch(next)
+                AerixClientStore.persist()
+            }
+        ),
+        ClientSquareModule(
+            id = "fullbright",
+            title = "Fullbright",
+            icon = FeatureIconKind.FULLBRIGHT,
+            isActive = { AerixClientStore.fullbrightEnabled },
+            statusText = { if (AerixClientStore.fullbrightEnabled) "ENABLED" else "DISABLED" },
+            onClick = {
+                AerixClientStore.fullbrightEnabled = !AerixClientStore.fullbrightEnabled
+                AerixClientStore.persist()
+                onSyncOptionsTxt()
+                Toast.makeText(
+                    context,
+                    if (AerixClientStore.fullbrightEnabled) "Fullbright ON" else "Fullbright OFF",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        ),
+        ClientSquareModule(
+            id = "hitmarker",
+            title = "Hitmarker",
+            icon = FeatureIconKind.HITMARKER,
+            isActive = { AerixClientStore.hitmarkerEnabled },
+            statusText = { if (AerixClientStore.hitmarkerEnabled) "ENABLED" else "DISABLED" },
+            onClick = {
+                AerixClientStore.hitmarkerEnabled = !AerixClientStore.hitmarkerEnabled
+                AerixClientStore.persist()
+            }
+        ),
+        ClientSquareModule(
+            id = "cooldown",
+            title = "Hit Cooldown",
+            icon = FeatureIconKind.COOLDOWN,
+            isActive = { AerixClientStore.swordCooldownBarEnabled },
+            statusText = { if (AerixClientStore.swordCooldownBarEnabled) "ENABLED" else "DISABLED" },
+            onClick = {
+                AerixClientStore.swordCooldownBarEnabled = !AerixClientStore.swordCooldownBarEnabled
+                AerixClientStore.persist()
+            }
+        ),
+        ClientSquareModule(
+            id = "compass",
+            title = "Direction HUD",
+            icon = FeatureIconKind.COMPASS,
+            isActive = { AerixClientStore.compassEnabled },
+            statusText = { if (AerixClientStore.compassEnabled) "ENABLED" else "DISABLED" },
+            onClick = {
+                AerixClientStore.compassEnabled = !AerixClientStore.compassEnabled
+                AerixClientStore.persist()
+            }
+        ),
+        ClientSquareModule(
+            id = "session_clock",
+            title = "Session Timer",
+            icon = FeatureIconKind.CLOCK,
+            isActive = { AerixClientStore.matchStatsEnabled },
+            statusText = { if (AerixClientStore.matchStatsEnabled) "ENABLED" else "DISABLED" },
+            onClick = {
+                AerixClientStore.matchStatsEnabled = !AerixClientStore.matchStatsEnabled
+                AerixClientStore.persist()
+            }
+        ),
+        ClientSquareModule(
+            id = "speedrun",
+            title = "Speedrun RTA",
+            icon = FeatureIconKind.SPEEDRUN,
+            isActive = { AerixClientStore.speedrunTimerEnabled },
+            statusText = { if (AerixClientStore.speedrunTimerEnabled) "ENABLED" else "DISABLED" },
+            onClick = {
+                AerixClientStore.speedrunTimerEnabled = !AerixClientStore.speedrunTimerEnabled
+                AerixClientStore.persist()
+            }
+        ),
+        ClientSquareModule(
+            id = "claw_pvp",
+            title = "Zoom & 180°",
+            icon = FeatureIconKind.CLAW_PVP,
+            isActive = { AerixClientStore.quickPvpButtonsEnabled },
+            statusText = { if (AerixClientStore.quickPvpButtonsEnabled) "ENABLED" else "DISABLED" },
+            onClick = {
+                AerixClientStore.quickPvpButtonsEnabled = !AerixClientStore.quickPvpButtonsEnabled
+                AerixClientStore.persist()
+            }
+        ),
+        ClientSquareModule(
+            id = "hotbar_strip",
+            title = "Touch Hotbar",
+            icon = FeatureIconKind.HOTBAR,
+            isActive = { AerixClientStore.hotbarSwipeEnabled },
+            statusText = { if (AerixClientStore.hotbarSwipeEnabled) "ENABLED" else "DISABLED" },
+            onClick = {
+                AerixClientStore.hotbarSwipeEnabled = !AerixClientStore.hotbarSwipeEnabled
+                AerixClientStore.persist()
+            }
+        ),
+        ClientSquareModule(
+            id = "autowalk",
+            title = "Auto Walk",
+            icon = FeatureIconKind.AUTOWALK,
+            isActive = { AerixClientStore.autoWalkEnabled },
+            statusText = { if (AerixClientStore.autoWalkEnabled) "ENABLED" else "DISABLED" },
+            onClick = {
+                val next = !AerixClientStore.autoWalkEnabled
+                AerixClientStore.autoWalkEnabled = next
+                AerixClientInputBridge.setAutoWalkLatch(next)
+                AerixClientStore.persist()
+            }
+        ),
+        ClientSquareModule(
+            id = "gyro",
+            title = "Gyro Aim",
+            icon = FeatureIconKind.GYRO,
+            isActive = { AerixClientStore.gyroAdsEnabled },
+            statusText = { if (AerixClientStore.gyroAdsEnabled) "ENABLED" else "DISABLED" },
+            onClick = {
+                AerixClientStore.gyroAdsEnabled = !AerixClientStore.gyroAdsEnabled
+                AerixClientStore.persist()
+                onSyncOptionsTxt()
+            }
+        ),
+        ClientSquareModule(
+            id = "autogg",
+            title = "Auto GG",
+            icon = FeatureIconKind.AUTOGG,
+            isActive = { AerixClientStore.autoGgEnabled },
+            statusText = { if (AerixClientStore.autoGgEnabled) "ENABLED" else "DISABLED" },
+            onClick = {
+                AerixClientStore.autoGgEnabled = !AerixClientStore.autoGgEnabled
+                AerixClientStore.persist()
+            }
+        ),
+        ClientSquareModule(
+            id = "thermal",
+            title = "Thermal Guard",
+            icon = FeatureIconKind.THERMAL,
+            isActive = { AerixClientStore.thermalGuardEnabled },
+            statusText = { if (AerixClientStore.thermalGuardEnabled) "ENABLED" else "DISABLED" },
+            onClick = {
+                AerixClientStore.thermalGuardEnabled = !AerixClientStore.thermalGuardEnabled
+                AerixClientStore.persist()
+            }
+        ),
+        ClientSquareModule(
+            id = "oled_afk",
+            title = "OLED AFK",
+            icon = FeatureIconKind.OLED_AFK,
+            isActive = { false },
+            statusText = { "ENTER ›" },
+            onClick = onOpenOledAfk
+        )
+    )
+
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val cols = when {
+            maxWidth >= 560.dp -> 5
+            maxWidth >= 430.dp -> 4
+            else -> 3
+        }
+        val rows = modules.chunked(cols)
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            rows.forEach { rowItems ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    rowItems.forEach { mod ->
+                        GlowingFeatureSquareTile(
+                            module = mod,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    repeat(cols - rowItems.size) {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun GlowingFeatureSquareTile(
+    module: ClientSquareModule,
+    modifier: Modifier = Modifier
+) {
+    val active = module.isActive()
+    val tileShape = RoundedCornerShape(10.dp)
+
+    Column(
+        modifier = modifier
+            .height(92.dp)
+            .drawBehind {
+                // Soft slight Crimson glow when active
+                if (active) {
+                    drawRoundRect(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                LiquidCrystalPalette.CrimsonGlow.copy(alpha = 0.28f),
+                                Color.Transparent
+                            ),
+                            center = Offset(size.width * 0.5f, size.height * 0.5f),
+                            radius = size.maxDimension * 0.72f
+                        ),
+                        topLeft = Offset(-3.dp.toPx(), -3.dp.toPx()),
+                        size = Size(size.width + 6.dp.toPx(), size.height + 6.dp.toPx()),
+                        cornerRadius = CornerRadius(12.dp.toPx(), 12.dp.toPx())
+                    )
+                }
+            }
+            .clip(tileShape)
+            .background(
+                brush = if (active) {
+                    Brush.verticalGradient(
+                        listOf(
+                            Color(0xFF331820),
+                            Color(0xFF21161B)
+                        )
+                    )
+                } else {
+                    Brush.verticalGradient(
+                        listOf(
+                            LiquidCrystalPalette.DarkTile,
+                            Color(0xFF1F222A)
+                        )
+                    )
+                },
+                shape = tileShape
+            )
+            .border(
+                width = if (active) 1.4.dp else 1.dp,
+                color = if (active) LiquidCrystalPalette.CrimsonGlow else LiquidCrystalPalette.DarkTileBorder,
+                shape = tileShape
+            )
+            .clickable { module.onClick() }
+            .padding(horizontal = 8.dp, vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.SpaceBetween
+    ) {
+        // Custom Vector Feature Symbol
+        Canvas(modifier = Modifier.size(28.dp)) {
+            drawFeatureSymbol(
+                kind = module.icon,
+                color = if (active) LiquidCrystalPalette.CrimsonGlow else LiquidCrystalPalette.TextSecondary
+            )
+        }
+
+        Text(
+            text = module.title,
+            color = Color.White,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center
+        )
+
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(4.dp))
+                .background(
+                    if (active) LiquidCrystalPalette.CrimsonPrimary.copy(alpha = 0.30f)
+                    else Color(0xFF181A20)
                 )
+                .padding(horizontal = 7.dp, vertical = 2.dp)
+        ) {
+            Text(
+                text = module.statusText(),
+                color = if (active) LiquidCrystalPalette.CrimsonGlow else LiquidCrystalPalette.TextMuted,
+                fontSize = 8.5.sp,
+                fontWeight = FontWeight.ExtraBold
+            )
+        }
+    }
+}
+
+private fun DrawScope.drawFeatureSymbol(kind: FeatureIconKind, color: Color) {
+    val cx = size.width * 0.5f
+    val cy = size.height * 0.5f
+    val sw = 2.1.dp.toPx()
+
+    when (kind) {
+        FeatureIconKind.CAPE -> {
+            val p = Path().apply {
+                moveTo(cx - 7.dp.toPx(), cy - 10.dp.toPx())
+                lineTo(cx + 7.dp.toPx(), cy - 10.dp.toPx())
+                lineTo(cx + 9.dp.toPx(), cy + 10.dp.toPx())
+                lineTo(cx - 5.dp.toPx(), cy + 8.dp.toPx())
+                close()
+            }
+            drawPath(p, color, style = Stroke(width = sw))
+            drawCircle(color, radius = 2.2.dp.toPx(), center = Offset(cx + 1.dp.toPx(), cy))
+        }
+        FeatureIconKind.CROSSHAIR -> {
+            val r = 8.dp.toPx()
+            val g = 3.dp.toPx()
+            drawCircle(color, radius = 6.dp.toPx(), center = Offset(cx, cy), style = Stroke(width = sw * 0.85f))
+            drawLine(color, Offset(cx - r - 2.dp.toPx(), cy), Offset(cx - g, cy), sw, StrokeCap.Round)
+            drawLine(color, Offset(cx + g, cy), Offset(cx + r + 2.dp.toPx(), cy), sw, StrokeCap.Round)
+            drawLine(color, Offset(cx, cy - r - 2.dp.toPx()), Offset(cx, cy - g), sw, StrokeCap.Round)
+            drawLine(color, Offset(cx, cy + g), Offset(cx, cy + r + 2.dp.toPx()), sw, StrokeCap.Round)
+        }
+        FeatureIconKind.FPS -> {
+            drawArc(
+                color = color,
+                startAngle = 160f,
+                sweepAngle = 220f,
+                useCenter = false,
+                topLeft = Offset(cx - 9.dp.toPx(), cy - 7.dp.toPx()),
+                size = Size(18.dp.toPx(), 18.dp.toPx()),
+                style = Stroke(width = sw, cap = StrokeCap.Round)
+            )
+            drawLine(color, Offset(cx, cy + 2.dp.toPx()), Offset(cx + 5.dp.toPx(), cy - 4.dp.toPx()), sw, StrokeCap.Round)
+        }
+        FeatureIconKind.CPS -> {
+            drawRoundRect(
+                color = color,
+                topLeft = Offset(cx - 6.dp.toPx(), cy - 9.dp.toPx()),
+                size = Size(12.dp.toPx(), 18.dp.toPx()),
+                cornerRadius = CornerRadius(6.dp.toPx(), 6.dp.toPx()),
+                style = Stroke(width = sw)
+            )
+            drawLine(color, Offset(cx, cy - 8.dp.toPx()), Offset(cx, cy - 2.dp.toPx()), sw, StrokeCap.Round)
+        }
+        FeatureIconKind.KEYSTROKES -> {
+            val s = 6.dp.toPx()
+            drawRoundRect(color, Offset(cx - s * 0.5f, cy - s - 1.dp.toPx()), Size(s, s), CornerRadius(2f, 2f), Stroke(sw * 0.85f))
+            drawRoundRect(color, Offset(cx - s * 1.65f, cy + 1.dp.toPx()), Size(s, s), CornerRadius(2f, 2f), Stroke(sw * 0.85f))
+            drawRoundRect(color, Offset(cx - s * 0.5f, cy + 1.dp.toPx()), Size(s, s), CornerRadius(2f, 2f), Stroke(sw * 0.85f))
+            drawRoundRect(color, Offset(cx + s * 0.65f, cy + 1.dp.toPx()), Size(s, s), CornerRadius(2f, 2f), Stroke(sw * 0.85f))
+        }
+        FeatureIconKind.SPRINT -> {
+            val bolt = Path().apply {
+                moveTo(cx + 2.dp.toPx(), cy - 10.dp.toPx())
+                lineTo(cx - 6.dp.toPx(), cy + 1.dp.toPx())
+                lineTo(cx, cy + 1.dp.toPx())
+                lineTo(cx - 2.dp.toPx(), cy + 10.dp.toPx())
+                lineTo(cx + 6.dp.toPx(), cy - 1.dp.toPx())
+                lineTo(cx, cy - 1.dp.toPx())
+                close()
+            }
+            drawPath(bolt, color, style = Stroke(width = sw * 0.9f))
+        }
+        FeatureIconKind.SNEAK -> {
+            drawLine(color, Offset(cx - 7.dp.toPx(), cy - 3.dp.toPx()), Offset(cx, cy + 4.dp.toPx()), sw, StrokeCap.Round)
+            drawLine(color, Offset(cx, cy + 4.dp.toPx()), Offset(cx + 7.dp.toPx(), cy - 3.dp.toPx()), sw, StrokeCap.Round)
+            drawLine(color, Offset(cx - 7.dp.toPx(), cy + 3.dp.toPx()), Offset(cx, cy + 9.dp.toPx()), sw, StrokeCap.Round)
+            drawLine(color, Offset(cx, cy + 9.dp.toPx()), Offset(cx + 7.dp.toPx(), cy + 3.dp.toPx()), sw, StrokeCap.Round)
+        }
+        FeatureIconKind.AUTOWALK -> {
+            drawLine(color, Offset(cx, cy + 8.dp.toPx()), Offset(cx, cy - 8.dp.toPx()), sw, StrokeCap.Round)
+            drawLine(color, Offset(cx - 5.dp.toPx(), cy - 3.dp.toPx()), Offset(cx, cy - 8.dp.toPx()), sw, StrokeCap.Round)
+            drawLine(color, Offset(cx + 5.dp.toPx(), cy - 3.dp.toPx()), Offset(cx, cy - 8.dp.toPx()), sw, StrokeCap.Round)
+        }
+        FeatureIconKind.FULLBRIGHT -> {
+            drawCircle(color, radius = 4.2.dp.toPx(), center = Offset(cx, cy), style = Stroke(width = sw))
+            for (i in 0 until 8) {
+                val a = i * (PI / 4.0)
+                val x0 = cx + cos(a).toFloat() * 6.8.dp.toPx()
+                val y0 = cy + sin(a).toFloat() * 6.8.dp.toPx()
+                val x1 = cx + cos(a).toFloat() * 9.8.dp.toPx()
+                val y1 = cy + sin(a).toFloat() * 9.8.dp.toPx()
+                drawLine(color, Offset(x0, y0), Offset(x1, y1), sw * 0.85f, StrokeCap.Round)
+            }
+        }
+        FeatureIconKind.HITMARKER -> {
+            val d0 = 3.dp.toPx()
+            val d1 = 8.5.dp.toPx()
+            drawLine(color, Offset(cx - d1, cy - d1), Offset(cx - d0, cy - d0), sw, StrokeCap.Round)
+            drawLine(color, Offset(cx + d0, cy - d0), Offset(cx + d1, cy - d1), sw, StrokeCap.Round)
+            drawLine(color, Offset(cx - d1, cy + d1), Offset(cx - d0, cy + d0), sw, StrokeCap.Round)
+            drawLine(color, Offset(cx + d0, cy + d0), Offset(cx + d1, cy + d1), sw, StrokeCap.Round)
+        }
+        FeatureIconKind.COOLDOWN -> {
+            drawLine(color, Offset(cx - 7.dp.toPx(), cy + 7.dp.toPx()), Offset(cx + 7.dp.toPx(), cy - 7.dp.toPx()), sw, StrokeCap.Round)
+            drawLine(color, Offset(cx - 6.dp.toPx(), cy + 2.dp.toPx()), Offset(cx - 2.dp.toPx(), cy + 6.dp.toPx()), sw, StrokeCap.Round)
+            drawLine(color, Offset(cx - 8.dp.toPx(), cy + 10.dp.toPx()), Offset(cx + 8.dp.toPx(), cy + 10.dp.toPx()), sw * 0.85f, StrokeCap.Round)
+        }
+        FeatureIconKind.COMPASS -> {
+            drawCircle(color, radius = 9.dp.toPx(), center = Offset(cx, cy), style = Stroke(width = sw * 0.9f))
+            val needle = Path().apply {
+                moveTo(cx, cy - 6.dp.toPx())
+                lineTo(cx + 3.dp.toPx(), cy)
+                lineTo(cx, cy + 6.dp.toPx())
+                lineTo(cx - 3.dp.toPx(), cy)
+                close()
+            }
+            drawPath(needle, color)
+        }
+        FeatureIconKind.CLOCK, FeatureIconKind.SPEEDRUN -> {
+            drawCircle(color, radius = 8.5.dp.toPx(), center = Offset(cx, cy + 1.dp.toPx()), style = Stroke(width = sw * 0.9f))
+            drawLine(color, Offset(cx, cy + 1.dp.toPx()), Offset(cx, cy - 4.dp.toPx()), sw, StrokeCap.Round)
+            drawLine(color, Offset(cx, cy + 1.dp.toPx()), Offset(cx + 4.dp.toPx(), cy + 2.dp.toPx()), sw, StrokeCap.Round)
+            if (kind == FeatureIconKind.SPEEDRUN) {
+                drawLine(color, Offset(cx - 3.dp.toPx(), cy - 9.5.dp.toPx()), Offset(cx + 3.dp.toPx(), cy - 9.5.dp.toPx()), sw, StrokeCap.Round)
+            }
+        }
+        FeatureIconKind.CLAW_PVP -> {
+            drawCircle(color, radius = 7.dp.toPx(), center = Offset(cx - 1.dp.toPx(), cy - 1.dp.toPx()), style = Stroke(width = sw))
+            drawLine(color, Offset(cx + 4.dp.toPx(), cy + 4.dp.toPx()), Offset(cx + 9.dp.toPx(), cy + 9.dp.toPx()), sw, StrokeCap.Round)
+        }
+        FeatureIconKind.HOTBAR -> {
+            drawRoundRect(
+                color = color,
+                topLeft = Offset(cx - 10.dp.toPx(), cy - 4.dp.toPx()),
+                size = Size(20.dp.toPx(), 8.dp.toPx()),
+                cornerRadius = CornerRadius(2.dp.toPx(), 2.dp.toPx()),
+                style = Stroke(width = sw * 0.9f)
+            )
+            drawLine(color, Offset(cx - 3.3.dp.toPx(), cy - 4.dp.toPx()), Offset(cx - 3.3.dp.toPx(), cy + 4.dp.toPx()), sw * 0.8f)
+            drawLine(color, Offset(cx + 3.3.dp.toPx(), cy - 4.dp.toPx()), Offset(cx + 3.3.dp.toPx(), cy + 4.dp.toPx()), sw * 0.8f)
+        }
+        FeatureIconKind.GYRO -> {
+            drawOval(color, Offset(cx - 9.dp.toPx(), cy - 4.dp.toPx()), Size(18.dp.toPx(), 8.dp.toPx()), style = Stroke(sw * 0.85f))
+            drawOval(color, Offset(cx - 4.dp.toPx(), cy - 9.dp.toPx()), Size(8.dp.toPx(), 18.dp.toPx()), style = Stroke(sw * 0.85f))
+        }
+        FeatureIconKind.AUTOGG -> {
+            drawRoundRect(
+                color = color,
+                topLeft = Offset(cx - 9.dp.toPx(), cy - 7.dp.toPx()),
+                size = Size(18.dp.toPx(), 13.dp.toPx()),
+                cornerRadius = CornerRadius(4.dp.toPx(), 4.dp.toPx()),
+                style = Stroke(width = sw * 0.9f)
+            )
+            drawCircle(color, 1.3.dp.toPx(), Offset(cx - 3.5.dp.toPx(), cy - 0.5.dp.toPx()))
+            drawCircle(color, 1.3.dp.toPx(), Offset(cx + 3.5.dp.toPx(), cy - 0.5.dp.toPx()))
+        }
+        FeatureIconKind.THERMAL -> {
+            val sh = Path().apply {
+                moveTo(cx, cy - 9.dp.toPx())
+                lineTo(cx + 7.5.dp.toPx(), cy - 5.5.dp.toPx())
+                lineTo(cx + 6.dp.toPx(), cy + 3.dp.toPx())
+                lineTo(cx, cy + 9.5.dp.toPx())
+                lineTo(cx - 6.dp.toPx(), cy + 3.dp.toPx())
+                lineTo(cx - 7.5.dp.toPx(), cy - 5.5.dp.toPx())
+                close()
+            }
+            drawPath(sh, color, style = Stroke(width = sw * 0.9f))
+        }
+        FeatureIconKind.OLED_AFK -> {
+            drawCircle(color, radius = 7.5.dp.toPx(), center = Offset(cx, cy), style = Stroke(width = sw * 0.9f))
+            drawCircle(color, radius = 3.dp.toPx(), center = Offset(cx + 2.dp.toPx(), cy - 2.dp.toPx()))
+        }
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * CAPES SUB-PAGE: LEFT = 3D ROTATABLE CHARACTER + WAVING TOGGLE | RIGHT = 15 ANIMATED CAPES
+ * ═══════════════════════════════════════════════════════════════════════════ */
+@Composable
+private fun ClientCapesSubPage() {
+    val context = LocalContext.current
+    val activeCape = AerixClientCosmetics.effectiveCapeSpec()
+    val playerName = PojavAccountBridge.current?.username?.takeIf { it.isNotBlank() } ?: "Player"
+
+    val inf = rememberInfiniteTransition(label = "capeGridPhase")
+    val phase by inf.animateFloat(
+        initialValue = 0f,
+        targetValue = (2.0 * PI).toFloat(),
+        animationSpec = infiniteRepeatable(tween(2200, easing = LinearEasing), RepeatMode.Restart),
+        label = "capeSwatchPhase"
+    )
+
+    Row(
+        modifier = Modifier.fillMaxSize(),
+        horizontalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        // LEFT: 3D Rotatable Character + Waving Cape ON/OFF Toggle
+        Column(
+            modifier = Modifier
+                .weight(0.38f)
+                .fillMaxHeight()
+                .clip(RoundedCornerShape(11.dp))
+                .background(LiquidCrystalPalette.DarkHeader)
+                .border(1.dp, LiquidCrystalPalette.DarkTileBorder, RoundedCornerShape(11.dp))
+                .padding(10.dp),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Interactive3DCosmeticStage(
+                capeSpec = activeCape,
+                wavingCape = AerixClientStore.wavingCapeEnabled,
+                playerName = playerName,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+            )
+
+            Spacer(Modifier.height(8.dp))
+
+            // Waving Cape ON/OFF Toggle Row
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(9.dp))
+                    .background(
+                        if (AerixClientStore.wavingCapeEnabled) LiquidCrystalPalette.CrimsonTintFill
+                        else LiquidCrystalPalette.DarkTile
+                    )
+                    .border(
+                        1.dp,
+                        if (AerixClientStore.wavingCapeEnabled) LiquidCrystalPalette.CrimsonPrimary
+                        else LiquidCrystalPalette.DarkTileBorder,
+                        RoundedCornerShape(9.dp)
+                    )
+                    .clickable {
+                        AerixClientStore.wavingCapeEnabled = !AerixClientStore.wavingCapeEnabled
+                        AerixClientStore.persist()
+                    }
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column {
+                    Text(
+                        text = "Waving Cape",
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = if (AerixClientStore.wavingCapeEnabled) "ON · Flowing physics" else "OFF · Classic straight",
+                        color = LiquidCrystalPalette.TextSecondary,
+                        fontSize = 10.sp
+                    )
+                }
+                Switch(
+                    checked = AerixClientStore.wavingCapeEnabled,
+                    onCheckedChange = {
+                        AerixClientStore.wavingCapeEnabled = it
+                        AerixClientStore.persist()
+                    },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color.White,
+                        checkedTrackColor = LiquidCrystalPalette.CrimsonPrimary,
+                        uncheckedThumbColor = LiquidCrystalPalette.TextSecondary,
+                        uncheckedTrackColor = LiquidCrystalPalette.DarkOuter
+                    )
+                )
+            }
+        }
+
+        // RIGHT: 15 Animated Capes Grid
+        Column(
+            modifier = Modifier
+                .weight(0.62f)
+                .fillMaxHeight()
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "15 Animated Capes",
+                    color = Color.White,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+                Text(
+                    text = "Equipped: ${activeCape.title}",
+                    color = LiquidCrystalPalette.CrimsonGlow,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            val capeRows = AerixClientCosmetics.capes.chunked(3)
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                capeRows.forEach { rowCapes ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        rowCapes.forEach { spec ->
+                            val selected = activeCape.id == spec.id
+                            val unlocked = AerixClientCosmetics.canEquipCape(spec)
+                            val cardShape = RoundedCornerShape(10.dp)
+
+                            Row(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(68.dp)
+                                    .drawBehind {
+                                        if (selected) {
+                                            drawRoundRect(
+                                                brush = Brush.radialGradient(
+                                                    listOf(
+                                                        LiquidCrystalPalette.CrimsonGlow.copy(alpha = 0.28f),
+                                                        Color.Transparent
+                                                    )
+                                                ),
+                                                topLeft = Offset(-3.dp.toPx(), -3.dp.toPx()),
+                                                size = Size(size.width + 6.dp.toPx(), size.height + 6.dp.toPx()),
+                                                cornerRadius = CornerRadius(12.dp.toPx(), 12.dp.toPx())
+                                            )
+                                        }
+                                    }
+                                    .clip(cardShape)
+                                    .background(
+                                        if (selected) LiquidCrystalPalette.CrimsonTintFill
+                                        else LiquidCrystalPalette.DarkTile,
+                                        cardShape
+                                    )
+                                    .border(
+                                        width = if (selected) 1.4.dp else 1.dp,
+                                        color = if (selected) LiquidCrystalPalette.CrimsonGlow else LiquidCrystalPalette.DarkTileBorder,
+                                        shape = cardShape
+                                    )
+                                    .clickable {
+                                        if (unlocked) {
+                                            AerixClientStore.equippedCapeId = spec.id
+                                            AerixClientStore.persist()
+                                        } else {
+                                            Toast.makeText(
+                                                context,
+                                                "Exclusive ${spec.badgeText ?: "Staff"} cape",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                        }
+                                    }
+                                    .padding(8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                AnimatedCapePreviewSwatch(
+                                    spec = spec,
+                                    phase = phase,
+                                    modifier = Modifier
+                                        .width(30.dp)
+                                        .height(48.dp)
+                                        .clip(RoundedCornerShape(4.dp))
+                                )
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = spec.title,
+                                        color = if (unlocked) Color.White else LiquidCrystalPalette.TextMuted,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = when {
+                                            !unlocked -> "Locked ${spec.badgeText.orEmpty()}"
+                                            selected -> "EQUIPPED"
+                                            else -> "Animated"
+                                        },
+                                        color = when {
+                                            selected -> LiquidCrystalPalette.CrimsonGlow
+                                            !unlocked -> LiquidCrystalPalette.TextMuted
+                                            else -> LiquidCrystalPalette.TextSecondary
+                                        },
+                                        fontSize = 9.5.sp,
+                                        fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.Medium,
+                                        maxLines = 1
+                                    )
+                                }
+                            }
+                        }
+                        repeat(3 - rowCapes.size) {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
             }
         }
     }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
- * 3. LIVE IN-GAME LIQUID CRYSTAL HUD
+ * CROSSHAIR SUB-PAGE: GRID OF 12 SELECTABLE CROSSHAIR TYPES + SIZE/GAP CONTROLS
  * ═══════════════════════════════════════════════════════════════════════════ */
 @Composable
-private fun InGameLiquidCrystalHud(
+private fun ClientCrosshairsSubPage() {
+    val shapes = CrosshairShape.values().toList()
+    val density = LocalDensity.current
+
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        // Top Toggle + Quick Sliders Bar
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .background(LiquidCrystalPalette.DarkHeader)
+                .border(1.dp, LiquidCrystalPalette.DarkTileBorder, RoundedCornerShape(10.dp))
+                .padding(horizontal = 14.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "Custom Crosshair",
+                    color = Color.White,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Switch(
+                    checked = AerixClientStore.crosshairEnabled,
+                    onCheckedChange = {
+                        AerixClientStore.crosshairEnabled = it
+                        AerixClientStore.persist()
+                    },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color.White,
+                        checkedTrackColor = LiquidCrystalPalette.CrimsonPrimary,
+                        uncheckedThumbColor = LiquidCrystalPalette.TextSecondary,
+                        uncheckedTrackColor = LiquidCrystalPalette.DarkOuter
+                    )
+                )
+            }
+
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text("Size", color = LiquidCrystalPalette.TextSecondary, fontSize = 11.sp)
+                Slider(
+                    value = AerixClientStore.crosshairSize,
+                    onValueChange = {
+                        AerixClientStore.crosshairSize = it
+                        AerixClientStore.persist()
+                    },
+                    valueRange = 4f..18f,
+                    modifier = Modifier.weight(1f),
+                    colors = SliderDefaults.colors(
+                        thumbColor = Color.White,
+                        activeTrackColor = LiquidCrystalPalette.CrimsonPrimary,
+                        inactiveTrackColor = LiquidCrystalPalette.DarkTile
+                    )
+                )
+                Text("Gap", color = LiquidCrystalPalette.TextSecondary, fontSize = 11.sp)
+                Slider(
+                    value = AerixClientStore.crosshairGap,
+                    onValueChange = {
+                        AerixClientStore.crosshairGap = it
+                        AerixClientStore.persist()
+                    },
+                    valueRange = 0f..10f,
+                    modifier = Modifier.weight(1f),
+                    colors = SliderDefaults.colors(
+                        thumbColor = Color.White,
+                        activeTrackColor = LiquidCrystalPalette.CrimsonPrimary,
+                        inactiveTrackColor = LiquidCrystalPalette.DarkTile
+                    )
+                )
+            }
+        }
+
+        // 4x3 Grid of Crosshair Types
+        val rows = shapes.chunked(4)
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            rows.forEach { rowShapes ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    rowShapes.forEach { shape ->
+                        val selected = AerixClientStore.crosshairEnabled && AerixClientStore.crosshairShape == shape
+                        val tileShape = RoundedCornerShape(10.dp)
+
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(88.dp)
+                                .drawBehind {
+                                    if (selected) {
+                                        drawRoundRect(
+                                            brush = Brush.radialGradient(
+                                                listOf(
+                                                    LiquidCrystalPalette.CrimsonGlow.copy(alpha = 0.28f),
+                                                    Color.Transparent
+                                                )
+                                            ),
+                                            topLeft = Offset(-3.dp.toPx(), -3.dp.toPx()),
+                                            size = Size(size.width + 6.dp.toPx(), size.height + 6.dp.toPx()),
+                                            cornerRadius = CornerRadius(12.dp.toPx(), 12.dp.toPx())
+                                        )
+                                    }
+                                }
+                                .clip(tileShape)
+                                .background(
+                                    if (selected) LiquidCrystalPalette.CrimsonTintFill
+                                    else LiquidCrystalPalette.DarkTile,
+                                    tileShape
+                                )
+                                .border(
+                                    width = if (selected) 1.4.dp else 1.dp,
+                                    color = if (selected) LiquidCrystalPalette.CrimsonGlow else LiquidCrystalPalette.DarkTileBorder,
+                                    shape = tileShape
+                                )
+                                .clickable {
+                                    AerixClientStore.crosshairShape = shape
+                                    AerixClientStore.crosshairEnabled = true
+                                    AerixClientStore.persist()
+                                }
+                                .padding(8.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Canvas(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f)
+                            ) {
+                                val d = density.density
+                                drawAerixCrosshair(
+                                    center = Offset(size.width * 0.5f, size.height * 0.5f),
+                                    shape = shape,
+                                    armSizePx = AerixClientStore.crosshairSize * d * 0.9f,
+                                    gapPx = AerixClientStore.crosshairGap * d * 0.9f,
+                                    thickPx = AerixClientStore.crosshairThickness * d,
+                                    outlinePx = 1.2f * d,
+                                    mainColor = if (selected) LiquidCrystalPalette.CrimsonGlow else Color.White
+                                )
+                            }
+
+                            Text(
+                                text = shape.label,
+                                color = if (selected) LiquidCrystalPalette.CrimsonGlow else Color.White,
+                                fontSize = 10.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                    repeat(4 - rowShapes.size) {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
+                }
+            }
+        }
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * OPTIONAL IN-GAME HUD (ZERO OVERLAPS, ALL OFF BY DEFAULT)
+ * ═══════════════════════════════════════════════════════════════════════════ */
+@Composable
+private fun InGameCrimsonHud(
     nowMs: Long,
+    wPx: Float,
+    hPx: Float,
     fps: Int,
     low1Pct: Int,
     ramMb: Int,
@@ -698,35 +1711,28 @@ private fun InGameLiquidCrystalHud(
     speedrunRunning: Boolean,
     speedrunLastSplit: String,
     onToggleSpeedrun: () -> Unit,
-    onResetSpeedrun: () -> Unit,
-    onOpenClientModal: () -> Unit
+    onResetSpeedrun: () -> Unit
 ) {
-    val accent = AerixClientStore.activeThemeColor(nowMs)
     val positions = AerixClientStore.hudPositions
+    val crimson = LiquidCrystalPalette.CrimsonPrimary
 
-    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-        val wPx = constraints.maxWidth.toFloat().coerceAtLeast(1f)
-        val hPx = constraints.maxHeight.toFloat().coerceAtLeast(1f)
+    fun Modifier.atHudSlot(id: String): Modifier {
+        val slot = positions[id] ?: return this
+        return this
+            .offset {
+                IntOffset(
+                    (slot.xNorm * wPx).roundToInt(),
+                    (slot.yNorm * hPx).roundToInt()
+                )
+            }
+            .scale(slot.scale)
+    }
 
-        fun Modifier.atHudSlot(id: String): Modifier {
-            val slot = positions[id] ?: return this
-            return this
-                .offset {
-                    IntOffset(
-                        (slot.xNorm * wPx).roundToInt(),
-                        (slot.yNorm * hPx).roundToInt()
-                    )
-                }
-                .scale(slot.scale)
-        }
-
-        // A. Center Tactical Crosshair + Hitmarker + 1.16.5 Sword Cooldown Bar
-        if (AerixClientStore.crosshairEnabled) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        // 1. Center Custom Crosshair / Hitmarker / Sword Cooldown
+        if (AerixClientStore.crosshairEnabled || AerixClientStore.hitmarkerEnabled || AerixClientStore.swordCooldownBarEnabled) {
             val density = LocalDensity.current
             val sinceHitMs = (nowMs - AerixClientInputBridge.lastAttackWallMs).coerceAtLeast(0L)
-            val pulseBoost = if (AerixClientStore.crosshairAttackPulse && sinceHitMs < 140L) {
-                (1f - sinceHitMs / 140f) * 4f
-            } else 0f
             val hitAlpha = if (AerixClientStore.hitmarkerEnabled && sinceHitMs < 180L) {
                 1f - (sinceHitMs / 180f)
             } else 0f
@@ -736,41 +1742,52 @@ private fun InGameLiquidCrystalHud(
 
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val d = density.density
-                val xhairCol = if (AerixClientStore.crosshairChroma) {
-                    Color.hsv(((nowMs / 18L) % 360L).toFloat(), 0.65f, 1f)
-                } else accent
-                drawAerixCrosshair(
-                    center = Offset(size.width * 0.5f, size.height * 0.5f),
-                    shape = AerixClientStore.crosshairShape,
-                    armSizePx = AerixClientStore.crosshairSize * d,
-                    gapPx = (AerixClientStore.crosshairGap + pulseBoost) * d,
-                    thickPx = AerixClientStore.crosshairThickness * d,
-                    outlinePx = AerixClientStore.crosshairOutline * d,
-                    mainColor = xhairCol.copy(alpha = AerixClientStore.crosshairOpacity),
-                    cooldownProgress = cd,
-                    hitmarkerAlpha = hitAlpha
-                )
+                val center = Offset(size.width * 0.5f, size.height * 0.5f)
+                if (AerixClientStore.crosshairEnabled) {
+                    drawAerixCrosshair(
+                        center = center,
+                        shape = AerixClientStore.crosshairShape,
+                        armSizePx = AerixClientStore.crosshairSize * d,
+                        gapPx = AerixClientStore.crosshairGap * d,
+                        thickPx = AerixClientStore.crosshairThickness * d,
+                        outlinePx = AerixClientStore.crosshairOutline * d,
+                        mainColor = crimson.copy(alpha = AerixClientStore.crosshairOpacity),
+                        cooldownProgress = cd,
+                        hitmarkerAlpha = hitAlpha
+                    )
+                } else {
+                    drawAerixCrosshair(
+                        center = center,
+                        shape = CrosshairShape.PRECISION_DOT,
+                        armSizePx = 0f,
+                        gapPx = 4f * d,
+                        thickPx = 0.01f,
+                        outlinePx = 0f,
+                        mainColor = Color.Transparent,
+                        cooldownProgress = cd,
+                        hitmarkerAlpha = hitAlpha
+                    )
+                }
             }
         }
 
-        // B. Top-Left Performance Pill (Real Native FPS + 1% Low + RAM + Battery + Temp °C)
+        // 2. FPS & Telemetry Pill (Safe slot x=0.02, y=0.21 — below 3RD, above D-pad)
         if (AerixClientStore.perfPillEnabled) {
             val hotWarning = AerixClientStore.thermalGuardEnabled && tempC >= 42.0f
-            HudCrystalBox(
+            CrimsonHudBox(
                 modifier = Modifier.atHudSlot("perf"),
-                borderAccent = if (hotWarning) LiquidCrystalPalette.GoldStar else null
+                highlight = hotWarning
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(7.dp)
                 ) {
-                    Text("✦", color = accent, fontSize = 11.sp, fontWeight = FontWeight.Black)
                     Text("$fps FPS", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
-                    Text("1% $low1Pct", color = LiquidCrystalPalette.IceSub, fontSize = 10.sp)
-                    Text("${ramMb}MB", color = LiquidCrystalPalette.IceSub, fontSize = 10.sp)
+                    Text("1% $low1Pct", color = LiquidCrystalPalette.TextSecondary, fontSize = 10.sp)
+                    Text("${ramMb}MB", color = LiquidCrystalPalette.TextSecondary, fontSize = 10.sp)
                     Text(
                         "$batteryPct% · ${"%.0f".format(tempC)}°C",
-                        color = if (hotWarning) LiquidCrystalPalette.GoldStar else LiquidCrystalPalette.PrismMint,
+                        color = if (hotWarning) LiquidCrystalPalette.GoldStar else LiquidCrystalPalette.CrimsonGlow,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -778,149 +1795,108 @@ private fun InGameLiquidCrystalHud(
             }
         }
 
-        // C. Top-Center 360° Direction Compass + Pinned Waypoint Distance
+        // 3. Dedicated CPS Pill (Safe slot x=0.22, y=0.21)
+        if (AerixClientStore.cpsPillEnabled) {
+            CrimsonHudBox(modifier = Modifier.atHudSlot("cps")) {
+                Text(
+                    text = "${AerixClientInputBridge.lmbCps} | ${AerixClientInputBridge.rmbCps} CPS",
+                    color = Color.White,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+            }
+        }
+
+        // 4. Direction Compass (Safe slot x=0.39, y=0.11 — cleanly below TAB row)
         if (AerixClientStore.compassEnabled) {
             val yaw = AerixClientInputBridge.headingYawDeg
             val dirText = cardinalLabel(yaw)
-            val pinnedWp = AerixClientStore.waypoints.firstOrNull { it.pinned }
-            HudCrystalBox(modifier = Modifier.atHudSlot("compass")) {
+            CrimsonHudBox(modifier = Modifier.atHudSlot("compass")) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text(cardinalLabel((yaw - 45f + 360f) % 360f), color = LiquidCrystalPalette.IceMuted, fontSize = 10.sp)
+                    Text(cardinalLabel((yaw - 45f + 360f) % 360f), color = LiquidCrystalPalette.TextMuted, fontSize = 10.sp)
                     Text("‹ $dirText ${yaw.roundToInt()}° ›", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
-                    Text(cardinalLabel((yaw + 45f) % 360f), color = LiquidCrystalPalette.IceMuted, fontSize = 10.sp)
-                    if (pinnedWp != null) {
-                        val dx = pinnedWp.x - AerixClientInputBridge.playerX
-                        val dz = pinnedWp.z - AerixClientInputBridge.playerZ
-                        val dist = sqrt((dx * dx + dz * dz).toDouble()).roundToInt()
-                        Text(
-                            text = if (AerixClientInputBridge.hasExactCoords) "📌 ${pinnedWp.name} ${dist}m"
-                            else "📌 ${pinnedWp.name} (${pinnedWp.x}, ${pinnedWp.z})",
-                            color = LiquidCrystalPalette.PrismMint,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
+                    Text(cardinalLabel((yaw + 45f) % 360f), color = LiquidCrystalPalette.TextMuted, fontSize = 10.sp)
                 }
             }
         }
 
-        // D. Top-Right Session / Match Pill + Tactile `✦ Client` Open Pill
+        // 5. Session Timer Pill (Safe slot x=0.83, y=0.13 — cleanly below A & MOUSE)
         if (AerixClientStore.matchStatsEnabled) {
-            Row(
-                modifier = Modifier.atHudSlot("match"),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                HudCrystalBox {
-                    Row(horizontalArrangement = Arrangement.spacedBy(7.dp), verticalAlignment = Alignment.CenterVertically) {
-                        val mm = sessionSec / 60L
-                        val ss = sessionSec % 60L
-                        Text("%02d:%02d".format(mm, ss), color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                        if (AerixClientInputBridge.comboHits >= 2 && AerixClientStore.comboCounterEnabled) {
-                            Text("${AerixClientInputBridge.comboHits}x Hit", color = LiquidCrystalPalette.PrismMint, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold)
-                        }
-                        if (AerixClientStore.streamerPrivacyEnabled) {
-                            Text("STREAM SAFE", color = LiquidCrystalPalette.PrismCyan, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                        } else if (AerixClientInputBridge.hostedLanPort > 0) {
-                            Text("LAN:${AerixClientInputBridge.hostedLanPort}", color = LiquidCrystalPalette.PrismMint, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
-                LiquidCrystalPill("✦ Client", selected = true, onClick = onOpenClientModal)
+            CrimsonHudBox(modifier = Modifier.atHudSlot("match")) {
+                val mm = sessionSec / 60L
+                val ss = sessionSec % 60L
+                Text(
+                    text = "%02d:%02d".format(mm, ss),
+                    color = Color.White,
+                    fontSize = 10.5.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
 
-        // E. Animated WASD + Space + Dual LMB/RMB CPS Keystrokes
+        // 6. Keystrokes + LMB/RMB (Safe slot x=0.02, y=0.29 — left middle lane)
         if (AerixClientStore.keystrokesEnabled) {
             Column(
                 modifier = Modifier.atHudSlot("keystrokes"),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(3.dp)
             ) {
-                if (AerixClientStore.keystrokesStyle != KeystrokesStyle.CPS_PILL_ONLY) {
-                    KeycapCell("W", AerixClientInputBridge.keyW || AerixClientInputBridge.autoWalkLatched, accent)
-                    Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                        KeycapCell("A", AerixClientInputBridge.keyA, accent)
-                        KeycapCell("S", AerixClientInputBridge.keyS, accent)
-                        KeycapCell("D", AerixClientInputBridge.keyD, accent)
-                    }
+                KeycapCell("W", AerixClientInputBridge.keyW || AerixClientInputBridge.autoWalkLatched)
+                Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                    KeycapCell("A", AerixClientInputBridge.keyA)
+                    KeycapCell("S", AerixClientInputBridge.keyS)
+                    KeycapCell("D", AerixClientInputBridge.keyD)
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                    KeycapCell(
-                        label = "LMB ${AerixClientInputBridge.lmbCps}",
-                        pressed = AerixClientInputBridge.mouseLmbDown,
-                        accent = accent,
-                        wide = true
-                    )
-                    KeycapCell(
-                        label = "RMB ${AerixClientInputBridge.rmbCps}",
-                        pressed = AerixClientInputBridge.mouseRmbDown,
-                        accent = accent,
-                        wide = true
-                    )
+                    KeycapCell("LMB ${AerixClientInputBridge.lmbCps}", AerixClientInputBridge.mouseLmbDown, wide = true)
+                    KeycapCell("RMB ${AerixClientInputBridge.rmbCps}", AerixClientInputBridge.mouseRmbDown, wide = true)
                 }
             }
         }
 
-        // F. Speedrun Split Stopwatch (1.16.5 RTA)
+        // 7. Speedrun Stopwatch (Safe slot x=0.79, y=0.21)
         if (AerixClientStore.speedrunTimerEnabled) {
-            HudCrystalBox(modifier = Modifier.atHudSlot("speedrun")) {
+            CrimsonHudBox(modifier = Modifier.atHudSlot("speedrun")) {
                 Column {
                     Text(
-                        text = formatMsStopwatch(speedrunDisplayMs),
-                        color = if (speedrunRunning) LiquidCrystalPalette.PrismMint else Color.White,
-                        fontSize = 15.sp,
+                        text = formatStopwatch(speedrunDisplayMs),
+                        color = if (speedrunRunning) LiquidCrystalPalette.CrimsonGlow else Color.White,
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.Black
                     )
-                    Text(speedrunLastSplit, color = LiquidCrystalPalette.IceSub, fontSize = 9.sp)
+                    Text(speedrunLastSplit, color = LiquidCrystalPalette.TextSecondary, fontSize = 9.sp)
                     Spacer(Modifier.height(3.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                        LiquidCrystalPill(if (speedrunRunning) "Split/Pause" else "Start", selected = speedrunRunning, onClick = onToggleSpeedrun)
+                        LiquidCrystalPill(
+                            label = if (speedrunRunning) "Split" else "Start",
+                            selected = speedrunRunning,
+                            onClick = onToggleSpeedrun
+                        )
                         LiquidCrystalPill("Reset", onClick = onResetSpeedrun)
                     }
                 }
             }
         }
 
-        // G. Pinned Build Checklist
-        if (AerixClientStore.checklistPinEnabled && AerixClientStore.checklist.isNotEmpty()) {
-            HudCrystalBox(modifier = Modifier.atHudSlot("checklist")) {
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text("Checklist", color = LiquidCrystalPalette.PrismCyan, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                    AerixClientStore.checklist.take(4).forEach { item ->
-                        Text(
-                            text = "${if (item.done) "✓" else "○"} ${item.label} (${item.amount})",
-                            color = if (item.done) LiquidCrystalPalette.PrismMint else Color.White,
-                            fontSize = 10.sp
-                        )
-                    }
-                }
-            }
-        }
-
-        // H. Mobile Claw Tactile PvP Quick-Action Pills (Right Edge)
+        // 8. PvP Quick Action Pills (Safe slot x=0.88, y=0.33)
         if (AerixClientStore.quickPvpButtonsEnabled) {
             Column(
                 modifier = Modifier.atHudSlot("quick_pvp"),
                 horizontalAlignment = Alignment.End,
                 verticalArrangement = Arrangement.spacedBy(5.dp)
             ) {
-                if (!AerixClientStore.matchStatsEnabled) {
-                    LiquidCrystalPill("✦", selected = true, onClick = onOpenClientModal)
-                }
                 LiquidCrystalPill("180°") { AerixClientInputBridge.trigger180Flick() }
-                // Hold-to-Zoom pill (`C` key)
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(50))
+                        .clip(RoundedCornerShape(8.dp))
                         .background(
-                            if (AerixClientInputBridge.zoomHolding) accent.copy(alpha = 0.38f)
-                            else Color(0x360C1E2C)
+                            if (AerixClientInputBridge.zoomHolding) LiquidCrystalPalette.CrimsonTintFill
+                            else LiquidCrystalPalette.DarkTile
                         )
-                        .border(1.dp, Color.White.copy(alpha = 0.65f), RoundedCornerShape(50))
+                        .border(1.dp, LiquidCrystalPalette.CrimsonPrimary, RoundedCornerShape(8.dp))
                         .pointerInput(Unit) {
                             detectTapGestures(
                                 onPress = {
@@ -935,32 +1911,18 @@ private fun InGameLiquidCrystalHud(
                     Text("ZOOM", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold)
                 }
                 LiquidCrystalPill("F · Offhand") { AerixClientInputBridge.triggerSwapOffhand() }
-                if (AerixClientStore.toggleSprintEnabled) {
-                    LiquidCrystalPill(
-                        label = if (AerixClientInputBridge.sprintLatched) "SPR ON" else "SPR",
-                        selected = AerixClientInputBridge.sprintLatched,
-                        onClick = { AerixClientInputBridge.setSprintLatch(!AerixClientInputBridge.sprintLatched) }
-                    )
-                }
-                if (AerixClientStore.toggleSneakEnabled) {
-                    LiquidCrystalPill(
-                        label = if (AerixClientInputBridge.sneakLatched) "SNK ON" else "SNK",
-                        selected = AerixClientInputBridge.sneakLatched,
-                        onClick = { AerixClientInputBridge.setSneakLatch(!AerixClientInputBridge.sneakLatched) }
-                    )
-                }
             }
         }
 
-        // I. Bottom Interactive 1–9 Hotbar Swipe & Tap Strip
+        // 9. Touch Hotbar Strip (Safe slot x=0.35, y=0.70 — cleanly ABOVE vanilla hotbar & hearts!)
         if (AerixClientStore.hotbarSwipeEnabled) {
             var swipeAccum by remember { mutableFloatStateOf(0f) }
             Row(
                 modifier = Modifier
                     .atHudSlot("hotbar_swipe")
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0x380A1C2A))
-                    .border(0.9.dp, Color.White.copy(alpha = 0.52f), RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color(0xD816181F))
+                    .border(1.dp, LiquidCrystalPalette.CrimsonPrimary, RoundedCornerShape(10.dp))
                     .pointerInput(Unit) {
                         detectHorizontalDragGestures { _, dragAmount ->
                             swipeAccum += dragAmount
@@ -978,13 +1940,16 @@ private fun InGameLiquidCrystalHud(
                     val active = AerixClientInputBridge.activeHotbarSlot == slot
                     Box(
                         modifier = Modifier
-                            .size(22.dp)
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(if (active) accent.copy(alpha = 0.42f) else Color.White.copy(alpha = 0.08f))
+                            .size(21.dp)
+                            .clip(RoundedCornerShape(5.dp))
+                            .background(
+                                if (active) LiquidCrystalPalette.CrimsonPrimary.copy(alpha = 0.55f)
+                                else LiquidCrystalPalette.DarkTile
+                            )
                             .border(
-                                width = if (active) 1.1.dp else 0.5.dp,
-                                color = if (active) Color.White else Color.White.copy(alpha = 0.25f),
-                                shape = RoundedCornerShape(6.dp)
+                                width = if (active) 1.1.dp else 0.6.dp,
+                                color = if (active) LiquidCrystalPalette.CrimsonGlow else LiquidCrystalPalette.DarkTileBorder,
+                                shape = RoundedCornerShape(5.dp)
                             )
                             .clickable { AerixClientInputBridge.selectHotbarSlot(slot) },
                         contentAlignment = Alignment.Center
@@ -998,41 +1963,41 @@ private fun InGameLiquidCrystalHud(
 }
 
 @Composable
-private fun HudCrystalBox(
+private fun CrimsonHudBox(
     modifier: Modifier = Modifier,
-    borderAccent: Color? = null,
+    highlight: Boolean = false,
     content: @Composable () -> Unit
 ) {
-    val shape = RoundedCornerShape(12.dp)
+    val shape = RoundedCornerShape(8.dp)
     Box(
         modifier = modifier
             .clip(shape)
-            .background(
-                Brush.linearGradient(
-                    listOf(Color.White.copy(alpha = 0.20f), Color(0x34091926), LiquidCrystalPalette.PrismMint.copy(alpha = 0.14f))
-                )
+            .background(Color(0xDD171920), shape)
+            .border(
+                1.dp,
+                if (highlight) LiquidCrystalPalette.GoldStar else LiquidCrystalPalette.CrimsonPrimary,
+                shape
             )
-            .border(0.9.dp, borderAccent ?: Color.White.copy(alpha = 0.58f), shape)
-            .padding(horizontal = 10.dp, vertical = 5.dp)
+            .padding(horizontal = 9.dp, vertical = 4.dp)
     ) {
         content()
     }
 }
 
 @Composable
-private fun KeycapCell(label: String, pressed: Boolean, accent: Color, wide: Boolean = false) {
-    val shape = RoundedCornerShape(7.dp)
+private fun KeycapCell(label: String, pressed: Boolean, wide: Boolean = false) {
+    val shape = RoundedCornerShape(6.dp)
     Box(
         modifier = Modifier
-            .size(width = if (wide) 45.dp else 29.dp, height = 25.dp)
+            .size(width = if (wide) 45.dp else 29.dp, height = 24.dp)
             .clip(shape)
             .background(
-                if (pressed) accent.copy(alpha = 0.48f)
-                else Color(0x32091A28)
+                if (pressed) LiquidCrystalPalette.CrimsonPrimary.copy(alpha = 0.65f)
+                else Color(0xDD171920)
             )
             .border(
-                width = if (pressed) 1.2.dp else 0.8.dp,
-                color = if (pressed) Color.White else Color.White.copy(alpha = 0.45f),
+                width = if (pressed) 1.2.dp else 0.9.dp,
+                color = if (pressed) LiquidCrystalPalette.CrimsonGlow else LiquidCrystalPalette.DarkTileBorder,
                 shape = shape
             ),
         contentAlignment = Alignment.Center
@@ -1042,501 +2007,200 @@ private fun KeycapCell(label: String, pressed: Boolean, accent: Color, wide: Boo
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
- * 4. IN-GAME `✦ AERIX CLIENT` MODULES, COSMETICS, MACROS & CO-OP MODAL
+ * DRAG-AND-PLACE HUD LAYOUT EDITOR (ZERO-OVERLAP SAFE RESET INCLUDED)
  * ═══════════════════════════════════════════════════════════════════════════ */
 @Composable
-private fun InGameModulesModal(
-    onClose: () -> Unit,
-    onOpenHudStudio: () -> Unit,
-    onOpenOledAfk: () -> Unit,
-    onSyncOptionsTxt: () -> Unit
-) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val scope = rememberCoroutineScope()
-    var page by remember { mutableIntStateOf(0) } // 0=Modules, 1=Crosshair, 2=Macros & Pings, 3=Tools & LAN
-    var searchQuery by remember { mutableStateOf("") }
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0x55040E17))
-            .clickable(onClick = onClose),
-        contentAlignment = Alignment.Center
-    ) {
-        LiquidCrystalCard(
-            modifier = Modifier
-                .fillMaxWidth(0.86f)
-                .fillMaxHeight(0.86f)
-                .clickable(enabled = false) {},
-            cornerRadius = 24.dp,
-            strong = true,
-            contentPadding = PaddingValues(16.dp)
-        ) {
-            // Modal Header
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text("✦ AERIX CLIENT 1.16.5", color = LiquidCrystalPalette.IceWhite, fontSize = 16.sp, fontWeight = FontWeight.Black)
-                    LiquidCrystalPill("Modules", selected = page == 0) { page = 0 }
-                    LiquidCrystalPill("Crosshair", selected = page == 1) { page = 1 }
-                    LiquidCrystalPill("Macros & Squad", selected = page == 2) { page = 2 }
-                    LiquidCrystalPill("Stronghold & LAN", selected = page == 3) { page = 3 }
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    LiquidCrystalPill("⊞ Edit HUD", accent = LiquidCrystalPalette.PrismMint, onClick = onOpenHudStudio)
-                    LiquidCrystalPill("☾ OLED AFK", onClick = onOpenOledAfk)
-                    LiquidCrystalPill("✕ Resume", selected = true, onClick = onClose)
-                }
-            }
-
-            Spacer(Modifier.height(10.dp))
-
-            when (page) {
-                0 -> {
-                    OutlinedTextField(
-                        value = searchQuery,
-                        onValueChange = { searchQuery = it },
-                        placeholder = { Text("Search modules (FPS, Keystrokes, Sprint, Gyro, Fullbright...)", fontSize = 11.sp, color = LiquidCrystalPalette.IceSub) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White,
-                            focusedBorderColor = LiquidCrystalPalette.PrismCyan,
-                            unfocusedBorderColor = Color.White.copy(alpha = 0.35f)
-                        )
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    Column(
-                        modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        // Loadout quick bar
-                        Row(
-                            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            ClientLoadoutPreset.values().forEach { preset ->
-                                LiquidCrystalPill("Loadout: ${preset.label}") {
-                                    AerixClientStore.applyLoadout(preset)
-                                    onSyncOptionsTxt()
-                                }
-                            }
-                        }
-                        val q = searchQuery.trim().lowercase()
-                        if (q.isEmpty() || "fps performance pill ram temp".contains(q)) {
-                            LiquidCrystalModuleToggleCard(
-                                "Performance Pill (FPS + 1% Low + RAM + °C)",
-                                "Native C swap-frame counter & thermal guard",
-                                AerixClientStore.perfPillEnabled,
-                                { AerixClientStore.perfPillEnabled = it; AerixClientStore.persist() }
-                            )
-                        }
-                        if (q.isEmpty() || "keystrokes cps wasd".contains(q)) {
-                            LiquidCrystalModuleToggleCard(
-                                "Animated WASD + Dual CPS Keystrokes",
-                                "Live keyboard & mouse click counter",
-                                AerixClientStore.keystrokesEnabled,
-                                { AerixClientStore.keystrokesEnabled = it; AerixClientStore.persist() }
-                            )
-                        }
-                        if (q.isEmpty() || "compass waypoint direction".contains(q)) {
-                            LiquidCrystalModuleToggleCard(
-                                "360° Direction Compass + Waypoint Beacon",
-                                "Live camera heading & pinned coordinate distance",
-                                AerixClientStore.compassEnabled,
-                                { AerixClientStore.compassEnabled = it; AerixClientStore.persist() }
-                            )
-                        }
-                        if (q.isEmpty() || "sprint sneak walk movement".contains(q)) {
-                            LiquidCrystalModuleToggleCard(
-                                "Toggle Sprint + Safe-Walk Sneak Pills",
-                                "Hands-free sprint & bridge-safe crouch latches",
-                                AerixClientStore.toggleSprintEnabled,
-                                {
-                                    AerixClientStore.toggleSprintEnabled = it
-                                    AerixClientStore.toggleSneakEnabled = it
-                                    AerixClientStore.persist()
-                                }
-                            )
-                        }
-                        if (q.isEmpty() || "gyro bow aim".contains(q)) {
-                            LiquidCrystalModuleToggleCard(
-                                "Gyroscope Bow & Crossbow Micro-Aim",
-                                "Tilt phone subtly for pixel-accurate 1.16.5 bow shots",
-                                AerixClientStore.gyroAdsEnabled,
-                                {
-                                    AerixClientStore.gyroAdsEnabled = it
-                                    AerixClientStore.persist()
-                                    onSyncOptionsTxt()
-                                }
-                            )
-                        }
-                        if (q.isEmpty() || "fullbright gamma cave".contains(q)) {
-                            LiquidCrystalModuleToggleCard(
-                                "Fullbright Vision + GPU Filter",
-                                "Instant bright caves & zero-cost shaders-lite tint",
-                                AerixClientStore.fullbrightEnabled,
-                                {
-                                    AerixClientStore.fullbrightEnabled = it
-                                    AerixClientStore.persist()
-                                    onSyncOptionsTxt()
-                                }
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    VisualFilterPreset.values().forEach { vf ->
-                                        LiquidCrystalPill(vf.label, selected = AerixClientStore.visualFilter == vf) {
-                                            AerixClientStore.visualFilter = vf
-                                            AerixClientStore.persist()
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        if (q.isEmpty() || "speedrun timer split".contains(q)) {
-                            LiquidCrystalModuleToggleCard(
-                                "1.16.5 Speedrun Split Stopwatch",
-                                "RTA timer with 1-tap Split & Reset on HUD",
-                                AerixClientStore.speedrunTimerEnabled,
-                                { AerixClientStore.speedrunTimerEnabled = it; AerixClientStore.persist() }
-                            )
-                        }
-                    }
-                }
-                1 -> {
-                    Column(
-                        modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        LiquidCrystalModuleToggleCard(
-                            "Custom Tactical Crosshair",
-                            "Crisp procedural reticle + hitmarker + 625ms 1.16.5 sword cooldown bar",
-                            AerixClientStore.crosshairEnabled,
-                            { AerixClientStore.crosshairEnabled = it; AerixClientStore.persist() }
-                        )
-                        Row(
-                            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            CrosshairShape.values().forEach { s ->
-                                LiquidCrystalPill(s.label, selected = AerixClientStore.crosshairShape == s) {
-                                    AerixClientStore.crosshairShape = s
-                                    AerixClientStore.persist()
-                                }
-                            }
-                        }
-                        Text("Size: ${AerixClientStore.crosshairSize.toInt()}  ·  Gap: ${AerixClientStore.crosshairGap.toInt()}", color = LiquidCrystalPalette.IceWhite, fontSize = 12.sp)
-                        Slider(
-                            value = AerixClientStore.crosshairSize,
-                            onValueChange = { AerixClientStore.crosshairSize = it; AerixClientStore.persist() },
-                            valueRange = 3f..22f,
-                            colors = SliderDefaults.colors(thumbColor = Color.White, activeTrackColor = LiquidCrystalPalette.PrismCyan)
-                        )
-                        Slider(
-                            value = AerixClientStore.crosshairGap,
-                            onValueChange = { AerixClientStore.crosshairGap = it; AerixClientStore.persist() },
-                            valueRange = 0f..14f,
-                            colors = SliderDefaults.colors(thumbColor = Color.White, activeTrackColor = LiquidCrystalPalette.PrismMint)
-                        )
-                        Row(
-                            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            ClientChromaTheme.values().forEach { ct ->
-                                LiquidCrystalPill(ct.label, selected = AerixClientStore.chromaTheme == ct, accent = Color(ct.primaryHex)) {
-                                    AerixClientStore.chromaTheme = ct
-                                    AerixClientStore.persist()
-                                }
-                            }
-                        }
-                    }
-                }
-                2 -> {
-                    Column(
-                        modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Text("8-Slot Instant Command Macros (Tap to Execute In-Game)", color = LiquidCrystalPalette.IceWhite, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                        Row(
-                            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            AerixClientStore.quickMacros.forEach { cmd ->
-                                LiquidCrystalPill(cmd, selected = true) {
-                                    onClose()
-                                    AerixClientInputBridge.sendInGameChatMessage(cmd)
-                                }
-                            }
-                        }
-                        Text("Squad Tactical Quick-Pings (Sends to Chat & Party)", color = LiquidCrystalPalette.IceWhite, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            listOf("⚠ Enemy Spotted!", "🛡 Need Backup!", "💎 Loot / Bastion Here!", "🔥 Entering Portal!").forEach { ping ->
-                                LiquidCrystalPill(ping) {
-                                    onClose()
-                                    AerixClientInputBridge.sendInGameChatMessage(ping)
-                                }
-                            }
-                        }
-                        Text("AFK OLED Mode Preset Action", color = LiquidCrystalPalette.IceWhite, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                        Row(
-                            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            AfkFarmAction.values().forEach { act ->
-                                LiquidCrystalPill(act.label, selected = AerixClientStore.afkAction == act) {
-                                    AerixClientStore.afkAction = act
-                                    AerixClientStore.persist()
-                                }
-                            }
-                        }
-                    }
-                }
-                else -> {
-                    Column(
-                        modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        LiquidCrystalCard {
-                            val lanAddr = AerixClientInputBridge.hostedLanAddress.ifEmpty { "Press Esc → Open to LAN in 1.16.5 first" }
-                            Text("1-Tap LAN World Host & Squad Join Invite", color = LiquidCrystalPalette.IceWhite, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                            Text("Detected LAN Endpoint: $lanAddr", color = LiquidCrystalPalette.PrismMint, fontSize = 12.sp)
-                            Spacer(Modifier.height(6.dp))
-                            LiquidCrystalPill("📡 Broadcast Join Card to Online Friends", selected = true) {
-                                scope.launch {
-                                    val addr = AerixClientInputBridge.hostedLanAddress.ifEmpty { "LAN-1.16.5" }
-                                    val party = SocialBackend.createParty(
-                                        title = "Aerix Client 1.16.5 Co-Op",
-                                        instanceName = AerixClientStore.CLIENT_INSTANCE_NAME,
-                                        versionId = "1.16.5",
-                                        mcVersion = "1.16.5",
-                                        loader = "Fabric",
-                                        serverAddress = addr,
-                                        isPublic = true
-                                    )
-                                    if (party != null) {
-                                        SocialBackend.friends.filter { it.online }.forEach { f ->
-                                            SocialBackend.inviteFriendToParty(party, f.id)
-                                        }
-                                        Toast.makeText(context, "Invited online friends to $addr!", Toast.LENGTH_SHORT).show()
-                                    } else {
-                                        Toast.makeText(context, "Sign into Socials in Launcher to broadcast invites", Toast.LENGTH_SHORT).show()
-                                    }
-                                }
-                            }
-                        }
-
-                        LiquidCrystalCard {
-                            Text("Quick F3+C Waypoint Capture (Auto Nether ÷8)", color = LiquidCrystalPalette.IceWhite, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                            Spacer(Modifier.height(6.dp))
-                            LiquidCrystalPill("📌 Save Current F3+C Clipboard as Pinned Waypoint", selected = true) {
-                                val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
-                                val clip = cm?.primaryClip?.getItemAt(0)?.coerceToText(context)?.toString()
-                                val parsed = AerixClientStore.parseF3CClipboard(clip)
-                                if (parsed != null) {
-                                    val c = parsed.first
-                                    AerixClientInputBridge.playerX = c.first.roundToInt()
-                                    AerixClientInputBridge.playerY = c.second.roundToInt()
-                                    AerixClientInputBridge.playerZ = c.third.roundToInt()
-                                    AerixClientInputBridge.hasExactCoords = true
-                                    AerixClientStore.addWaypoint(
-                                        name = "Pin ${AerixClientStore.waypoints.size + 1}",
-                                        x = c.first.roundToInt(),
-                                        y = c.second.roundToInt(),
-                                        z = c.third.roundToInt(),
-                                        dimension = parsed.third,
-                                        pin = true
-                                    )
-                                    Toast.makeText(context, "Pinned F3+C waypoint + Nether ÷8 match!", Toast.LENGTH_SHORT).show()
-                                } else {
-                                    Toast.makeText(context, "Press F3+C in-game first, then tap here!", Toast.LENGTH_SHORT).show()
-                                }
-                            }
-                            Spacer(Modifier.height(6.dp))
-                            AerixClientStore.waypoints.forEach { w ->
-                                Text(
-                                    "${if (w.pinned) "📌 " else "• "}${w.name}: (${w.x}, ${w.y}, ${w.z}) → ${w.netherMatchText()}",
-                                    color = LiquidCrystalPalette.IceWhite,
-                                    fontSize = 11.sp
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
- * 5. MAGNETIC DRAG-AND-SNAP HUD LAYOUT STUDIO
- * ═══════════════════════════════════════════════════════════════════════════ */
-@Composable
-private fun MagneticHudEditorScreen(onDone: () -> Unit) {
-    var selectedWidgetId by remember { mutableStateOf("perf") }
-
+private fun HudPositionEditorModal(onDone: () -> Unit) {
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0x5005111B))
+            .background(Color(0xAA0C0D11))
     ) {
         val wPx = constraints.maxWidth.toFloat().coerceAtLeast(1f)
         val hPx = constraints.maxHeight.toFloat().coerceAtLeast(1f)
 
-        // Magnetic Center Snap Guide Lines
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val guideCol = LiquidCrystalPalette.PrismCyan.copy(alpha = 0.35f)
-            drawLine(guideCol, Offset(size.width * 0.5f, 0f), Offset(size.width * 0.5f, size.height), strokeWidth = 1.2f)
-            drawLine(guideCol, Offset(0f, size.height * 0.5f), Offset(size.width, size.height * 0.5f), strokeWidth = 1.2f)
-        }
+        AerixClientStore.hudPositions.values.forEach { widget ->
+            var dragX by remember(widget.id, widget.xNorm) { mutableFloatStateOf(widget.xNorm) }
+            var dragY by remember(widget.id, widget.yNorm) { mutableFloatStateOf(widget.yNorm) }
 
-        // Draggable Widget Handles
-        AerixClientStore.hudPositions.values.forEach { slot ->
-            val isSelected = selectedWidgetId == slot.id
             Box(
                 modifier = Modifier
                     .offset {
-                        IntOffset(
-                            (slot.xNorm * wPx).roundToInt(),
-                            (slot.yNorm * hPx).roundToInt()
-                        )
+                        IntOffset((dragX * wPx).roundToInt(), (dragY * hPx).roundToInt())
                     }
-                    .scale(slot.scale)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(
-                        if (isSelected) LiquidCrystalPalette.PrismCyan.copy(alpha = 0.32f)
-                        else Color(0x660B1E2D)
-                    )
-                    .border(
-                        width = if (isSelected) 1.5.dp else 1.dp,
-                        color = if (isSelected) Color.White else LiquidCrystalPalette.PrismCyan.copy(alpha = 0.7f),
-                        shape = RoundedCornerShape(12.dp)
-                    )
-                    .pointerInput(slot.id) {
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(LiquidCrystalPalette.CrimsonTintFill)
+                    .border(1.2.dp, LiquidCrystalPalette.CrimsonGlow, RoundedCornerShape(8.dp))
+                    .pointerInput(widget.id) {
                         detectDragGestures(
-                            onDragStart = { selectedWidgetId = slot.id },
-                            onDrag = { change, dragAmount ->
-                                change.consume()
-                                val cur = AerixClientStore.hudPositions[slot.id] ?: return@detectDragGestures
-                                var nx = cur.xNorm + (dragAmount.x / wPx)
-                                var ny = cur.yNorm + (dragAmount.y / hPx)
-                                // Magnetic snap to center axes within 1.8%
-                                if (abs(nx - 0.44f) < 0.018f) nx = 0.44f
-                                if (abs(ny - 0.48f) < 0.018f) ny = 0.48f
-                                AerixClientStore.updateWidgetPos(slot.id, nx, ny)
+                            onDragEnd = {
+                                AerixClientStore.updateWidgetPos(widget.id, dragX, dragY)
                             }
-                        )
+                        ) { change, dragAmount ->
+                            change.consume()
+                            dragX = (dragX + dragAmount.x / wPx).coerceIn(0.01f, 0.90f)
+                            dragY = (dragY + dragAmount.y / hPx).coerceIn(0.015f, 0.88f)
+                        }
                     }
-                    .clickable { selectedWidgetId = slot.id }
-                    .padding(horizontal = 12.dp, vertical = 7.dp)
+                    .padding(horizontal = 10.dp, vertical = 6.dp)
             ) {
                 Text(
-                    text = "✥ ${slot.label} (${(slot.scale * 100).roundToInt()}%)",
+                    text = "✥ ${widget.label}",
                     color = Color.White,
-                    fontSize = 11.sp,
+                    fontSize = 10.5.sp,
                     fontWeight = FontWeight.Bold
                 )
             }
         }
 
-        // Bottom Center Control Dock
-        LiquidCrystalCard(
+        Row(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 14.dp),
-            cornerRadius = 18.dp,
-            strong = true,
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)
+                .padding(bottom = 16.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(LiquidCrystalPalette.DarkHeader)
+                .border(1.2.dp, LiquidCrystalPalette.CrimsonPrimary, RoundedCornerShape(10.dp))
+                .padding(horizontal = 14.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                val sel = AerixClientStore.hudPositions[selectedWidgetId]
-                Text("Selected: ${sel?.label.orEmpty()}", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                LiquidCrystalPill("Scale -") {
-                    sel?.let { AerixClientStore.updateWidgetPos(it.id, it.xNorm, it.yNorm, it.scale - 0.1f) }
-                }
-                LiquidCrystalPill("Scale +") {
-                    sel?.let { AerixClientStore.updateWidgetPos(it.id, it.xNorm, it.yNorm, it.scale + 0.1f) }
-                }
-                LiquidCrystalPill("Reset All") { AerixClientStore.resetHudPositions() }
-                LiquidCrystalPill("✓ Save HUD", selected = true, onClick = onDone)
-            }
+            Text(
+                text = "Drag any HUD item to reposition",
+                color = LiquidCrystalPalette.TextSecondary,
+                fontSize = 11.sp
+            )
+            LiquidCrystalPill(
+                label = "Reset Safe Positions",
+                onClick = { AerixClientStore.resetHudPositions() }
+            )
+            LiquidCrystalPill(
+                label = "Done",
+                selected = true,
+                onClick = onDone
+            )
         }
     }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
- * 6. TRUE #000000 OLED BLACKOUT AFK FARM POWER SAVER
+ * OLED AFK SCREEN & PRE-GL CRIMSON BOOT SPLASH
  * ═══════════════════════════════════════════════════════════════════════════ */
 @Composable
-private fun OledBlackoutAfkScreen(
+private fun OledAfkScreen(
     fps: Int,
     batteryPct: Int,
     tempC: Float,
-    nowMs: Long,
     onWake: () -> Unit
 ) {
-    // Slowly drift position every 8s to guarantee zero OLED burn-in
-    val driftPhase = ((nowMs / 8000L) % 5L).toInt()
-    val align = when (driftPhase) {
-        0 -> Alignment.Center
-        1 -> Alignment.TopStart
-        2 -> Alignment.BottomEnd
-        3 -> Alignment.TopEnd
-        else -> Alignment.BottomStart
-    }
-
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
             .pointerInput(Unit) {
                 detectTapGestures(onDoubleTap = { onWake() })
-            }
-            .padding(36.dp),
-        contentAlignment = align
+            },
+        contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                text = "✦ AERIX OLED AFK ACTIVE · ${AerixClientStore.afkAction.label}",
-                color = Color.White.copy(alpha = 0.36f),
-                fontSize = 12.sp,
+                text = "AERIX CLIENT · OLED AFK",
+                color = LiquidCrystalPalette.CrimsonPrimary.copy(alpha = 0.65f),
+                fontSize = 13.sp,
                 fontWeight = FontWeight.Bold
             )
             Spacer(Modifier.height(4.dp))
             Text(
-                text = "$fps FPS · Battery $batteryPct% · ${"%.1f".format(tempC)}°C · Double-Tap Anywhere to Wake",
-                color = LiquidCrystalPalette.PrismCyan.copy(alpha = 0.34f),
+                text = "$fps FPS · $batteryPct% · ${"%.0f".format(tempC)}°C · Double-tap to wake",
+                color = Color.White.copy(alpha = 0.42f),
                 fontSize = 11.sp
             )
         }
     }
 }
 
-/* ── Formatting Helpers ───────────────────────────────────────────────────── */
-
-private fun cardinalLabel(yawDeg: Float): String {
-    // Minecraft yaw: 0=S, 45=SW, 90=W, 135=NW, 180=N, 225=NE, 270=E, 315=SE
-    val norm = ((yawDeg % 360f) + 360f) % 360f
-    val dirs = arrayOf("S", "SW", "W", "NW", "N", "NE", "E", "SE")
-    return dirs[((norm + 22.5f) / 45f).toInt() % 8]
+@Composable
+private fun CrimsonBootSplash(instanceLabel: String) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(LiquidCrystalPalette.DarkOuter),
+        contentAlignment = Alignment.Center
+    ) {
+        LiquidCrystalCard(
+            modifier = Modifier.width(420.dp),
+            cornerRadius = 16.dp,
+            strong = true,
+            contentPadding = PaddingValues(22.dp)
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Image(
+                        painter = painterResource(R.drawable.aerix_logo),
+                        contentDescription = null,
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                    )
+                    Column {
+                        Text(
+                            text = "AERIX CLIENT",
+                            color = LiquidCrystalPalette.CrimsonGlow,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                        Text(
+                            text = instanceLabel,
+                            color = Color.White,
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Black
+                        )
+                    }
+                }
+                Spacer(Modifier.height(14.dp))
+                LinearProgressIndicator(
+                    progress = { AerixClientInputBridge.bootProgress },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(6.dp)
+                        .clip(CircleShape),
+                    color = LiquidCrystalPalette.CrimsonPrimary,
+                    trackColor = LiquidCrystalPalette.DarkTile
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = AerixClientInputBridge.bootStageTitle,
+                    color = LiquidCrystalPalette.TextSecondary,
+                    fontSize = 11.sp
+                )
+            }
+        }
+    }
 }
 
-private fun formatMsStopwatch(ms: Long): String {
-    val totalCs = (ms.coerceAtLeast(0L)) / 10L
-    val cs = totalCs % 100L
-    val totalSec = totalCs / 100L
-    val sec = totalSec % 60L
-    val min = totalSec / 60L
-    return "%02d:%02d.%02d".format(min, sec, cs)
+private fun cardinalLabel(yawDeg: Float): String {
+    val norm = ((yawDeg % 360f) + 360f) % 360f
+    return when {
+        norm >= 337.5f || norm < 22.5f -> "S"
+        norm < 67.5f -> "SW"
+        norm < 112.5f -> "W"
+        norm < 157.5f -> "NW"
+        norm < 202.5f -> "N"
+        norm < 247.5f -> "NE"
+        norm < 292.5f -> "E"
+        else -> "SE"
+    }
+}
+
+private fun formatStopwatch(ms: Long): String {
+    val totalSec = (ms / 1000L).coerceAtLeast(0L)
+    val mins = totalSec / 60L
+    val secs = totalSec % 60L
+    val tenths = ((ms % 1000L) / 100L).coerceIn(0L, 9L)
+    return "%02d:%02d.%d".format(mins, secs, tenths)
 }

@@ -182,7 +182,8 @@
             android:theme="@style/MojoLauncher.AppTheme" />
 
         <service android:name="net.kdt.pojavlaunch.recording.ScreenRecordingService"
-            android:exported="false" android:process=":game"
+            android:exported="false" android:process=":recorder"
+            android:stopWithTask="true"
             android:foregroundServiceType="mediaProjection|microphone" />
 
         <service
@@ -191,8 +192,10 @@
             android:process=":mgquery" />
 
         <service android:name="net.kdt.pojavlaunch.services.ProgressService"
+            android:stopWithTask="true"
             android:foregroundServiceType="dataSync"/>
         <service android:name="net.kdt.pojavlaunch.services.GameService" android:process=":game"
+            android:stopWithTask="true"
             android:foregroundServiceType="specialUse">
             <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="This application is intended to run a 3rd-party piece of software which cannot be managed using the activity's saved instance state. This service is used for background persistence of this piece of software."/>
@@ -201,10 +204,11 @@
         <service
             android:name="net.kdt.pojavlaunch.aerix.social.SocialMessagingService"
             android:exported="false"
+            android:stopWithTask="true"
             android:foregroundServiceType="specialUse">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Maintains a low-bandwidth Realtime listener so players receive direct and party message notifications with inline reply when the launcher UI is closed." />
+                android:value="Maintains a low-bandwidth Realtime listener while the launcher session is open and shuts down immediately when removed from Recent Apps." />
         </service>
 
         <service
@@ -216,11 +220,8 @@
             android:name="net.kdt.pojavlaunch.aerix.social.SocialNotificationReceiver"
             android:exported="false">
             <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED" />
-                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
                 <action android:name="net.kdt.pojavlaunch.aerix.ACTION_SOCIAL_DIRECT_REPLY" />
                 <action android:name="net.kdt.pojavlaunch.aerix.ACTION_SOCIAL_MARK_READ" />
-                <action android:name="net.kdt.pojavlaunch.aerix.ACTION_SOCIAL_RESTART_SYNC" />
                 <action android:name="net.kdt.pojavlaunch.aerix.ACTION_DISCORD_GAME_STARTED" />
                 <action android:name="net.kdt.pojavlaunch.aerix.ACTION_DISCORD_SCHEDULE_CLEAR" />
                 <action android:name="net.kdt.pojavlaunch.aerix.ACTION_DISCORD_CLEAR_NOW" />

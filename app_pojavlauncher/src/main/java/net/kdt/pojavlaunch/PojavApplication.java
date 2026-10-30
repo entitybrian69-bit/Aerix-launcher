@@ -71,9 +71,34 @@ public class PojavApplication extends MGApplication {
 		});
 	}
 
+	private static String resolveCurrentProcessName(Context context) {
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+			return android.app.Application.getProcessName();
+		}
+		try {
+			android.app.ActivityManager am = (android.app.ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
+			if (am != null && am.getRunningAppProcesses() != null) {
+				int myPid = android.os.Process.myPid();
+				for (android.app.ActivityManager.RunningAppProcessInfo info : am.getRunningAppProcesses()) {
+					if (info.pid == myPid) return info.processName;
+				}
+			}
+		} catch (Throwable ignored) {}
+		return null;
+	}
+
 	@Override
 	public void onCreate() {
 		ContextExecutor.setApplication(this);
+		String procName = resolveCurrentProcessName(this);
+		if (procName != null && (procName.endsWith(":recorder") || procName.endsWith(":mgquery"))) {
+			super.onCreate();
+			try {
+				Tools.initEarlyConstants(this);
+			} catch (Throwable ignored) {}
+			return;
+		}
+
 		// Disable fatal errors on gplay. This is necessary so that google can collect crash report data and send it to me
 		// (where i can find the cause and fix it)
         //noinspection ConstantValue
@@ -108,9 +133,10 @@ public class PojavApplication extends MGApplication {
 		initRendererPlugins();
 		try {
 			net.kdt.pojavlaunch.aerix.discord.AerixDiscordPresence.captureApplicationContext(this);
-			SocialBackend.attach(this);
+			// Passive load ONLY: never auto-open WebSockets or background services until an Activity opens.
+			SocialBackend.initPassive(this);
 		} catch (Throwable t) {
-			Log.w("PojavApplication", "SocialBackend attach failed", t);
+			Log.w("PojavApplication", "SocialBackend passive init failed", t);
 		}
 	}
 

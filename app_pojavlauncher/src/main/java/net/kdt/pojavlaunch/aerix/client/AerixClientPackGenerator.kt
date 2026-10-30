@@ -23,18 +23,35 @@ object AerixClientPackGenerator {
 
     const val PACK_FILE_NAME = "Aerix-Client-Pack.zip"
 
-    fun buildAndApplyToInstance(context: Context, instanceGameDir: File): File {
+    fun packFormatForVersion(mcVersion: String): Int = when {
+        mcVersion.startsWith("1.21.4") -> 46
+        mcVersion.startsWith("1.21") -> 34
+        mcVersion.startsWith("1.20.4") || mcVersion.startsWith("1.20.3") -> 22
+        mcVersion.startsWith("1.20.2") -> 18
+        mcVersion.startsWith("1.20") -> 15
+        mcVersion.startsWith("1.19.4") -> 13
+        mcVersion.startsWith("1.19") -> 9
+        mcVersion.startsWith("1.18") -> 8
+        mcVersion.startsWith("1.17") -> 7
+        else -> 6
+    }
+
+    fun buildAndApplyToInstance(
+        context: Context,
+        instanceGameDir: File,
+        mcVersion: String = "1.16.5"
+    ): File {
         AerixClientStore.init(context)
         val rpDir = File(instanceGameDir, "resourcepacks").apply { mkdirs() }
         val zipFile = File(rpDir, PACK_FILE_NAME)
+        val packFmt = packFormatForVersion(mcVersion)
 
         ZipOutputStream(FileOutputStream(zipFile)).use { zos ->
-            // 1. pack.mcmeta (pack_format 6 = Minecraft 1.16.2 - 1.16.5)
             val mcmeta = """
                 {
                   "pack": {
-                    "pack_format": 6,
-                    "description": "\u00a7b\u2726 Aerix Client 1.16.5 \u00a77\u00b7 Liquid Crystal Edition"
+                    "pack_format": $packFmt,
+                    "description": "\u00a7c\u2726 Aerix Client $mcVersion \u00a78\u00b7 Crimson Edition"
                   }
                 }
             """.trimIndent()
@@ -230,7 +247,7 @@ object AerixClientPackGenerator {
         val p = Paint(Paint.ANTI_ALIAS_FLAG)
         p.shader = LinearGradient(
             0f, 0f, 128f, 128f,
-            intArrayOf(0xFF15384B.toInt(), 0xFF07131D.toInt()),
+            intArrayOf(0xFF28151B.toInt(), 0xFF141519.toInt()),
             null,
             Shader.TileMode.CLAMP
         )
@@ -245,15 +262,14 @@ object AerixClientPackGenerator {
         val border = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
             strokeWidth = 3f
-            color = 0xFFC8FAFF.toInt()
+            color = 0xFFDC1E3A.toInt()
         }
         c.drawRoundRect(5f, 5f, 123f, 123f, 26f, 26f, border)
         return bmp
     }
 
     /**
-     * Exact 256×256 `widgets.png` for Minecraft 1.16.5:
-     * Renders transparent Liquid-Crystal Main Menu buttons, hover glow buttons, and crystal 9-slot hotbar!
+     * Exact 256×256 `widgets.png` in locked Crimson Red & Dark Gray theme.
      */
     private fun buildLiquidCrystalWidgets(): Bitmap {
         val bmp = Bitmap.createBitmap(256, 256, Bitmap.Config.ARGB_8888)
@@ -262,42 +278,42 @@ object AerixClientPackGenerator {
         val borderPaint = Paint().apply { style = Paint.Style.STROKE; strokeWidth = 1f }
 
         // 1. 9-Slot Hotbar (0, 0, w=182, h=22)
-        fillPaint.color = Color.argb(92, 12, 28, 42)
+        fillPaint.color = Color.argb(175, 22, 24, 30)
         c.drawRect(0f, 0f, 182f, 22f, fillPaint)
-        borderPaint.color = Color.argb(190, 200, 250, 255)
+        borderPaint.color = Color.argb(210, 220, 30, 58)
         c.drawRect(0.5f, 0.5f, 181.5f, 21.5f, borderPaint)
-        borderPaint.color = Color.argb(85, 200, 250, 255)
+        borderPaint.color = Color.argb(95, 90, 96, 112)
         for (i in 1..8) {
             val sx = 1f + i * 20f
             c.drawLine(sx, 2f, sx, 20f, borderPaint)
         }
 
         // 2. Selected Hotbar Slot Selector (0, 22, w=24, h=24)
-        fillPaint.color = Color.argb(55, 141, 239, 224)
+        fillPaint.color = Color.argb(75, 220, 30, 58)
         c.drawRect(1f, 23f, 23f, 45f, fillPaint)
-        borderPaint.color = Color.argb(255, 200, 250, 255)
+        borderPaint.color = Color.argb(255, 255, 46, 76)
         c.drawRect(0.5f, 22.5f, 23.5f, 45.5f, borderPaint)
-        borderPaint.color = Color.argb(220, 141, 239, 224)
+        borderPaint.color = Color.argb(220, 220, 30, 58)
         c.drawRect(1.5f, 23.5f, 22.5f, 44.5f, borderPaint)
 
         // 3. Offhand Left/Right Slots (24, 22, 29x24) & (53, 22, 29x24)
-        fillPaint.color = Color.argb(92, 12, 28, 42)
+        fillPaint.color = Color.argb(175, 22, 24, 30)
         c.drawRect(24f, 23f, 46f, 45f, fillPaint)
         c.drawRect(60f, 23f, 82f, 45f, fillPaint)
-        borderPaint.color = Color.argb(185, 200, 250, 255)
+        borderPaint.color = Color.argb(195, 220, 30, 58)
         c.drawRect(24.5f, 23.5f, 45.5f, 44.5f, borderPaint)
         c.drawRect(60.5f, 23.5f, 81.5f, 44.5f, borderPaint)
 
         // 4. Disabled Button (0, 46, w=200, h=20)
-        drawCrystalButton(c, 0f, 46f, 200f, 20f, Color.argb(58, 15, 28, 38), Color.argb(90, 180, 210, 220))
-        // 5. Normal Button (0, 66, w=200, h=20) — Liquid Crystal Clear Transparent!
-        drawCrystalButton(c, 0f, 66f, 200f, 20f, Color.argb(104, 18, 42, 58), Color.argb(215, 210, 252, 255))
-        // 6. Hovered / Focused Button (0, 86, w=200, h=20) — Luminous Prism Cyan!
-        drawCrystalButton(c, 0f, 86f, 200f, 20f, Color.argb(150, 42, 118, 132), Color.argb(255, 255, 255, 255))
+        drawCrystalButton(c, 0f, 46f, 200f, 20f, Color.argb(145, 20, 22, 27), Color.argb(110, 72, 76, 90))
+        // 5. Normal Button (0, 66, w=200, h=20) — Dark Gray + Crimson Trim
+        drawCrystalButton(c, 0f, 66f, 200f, 20f, Color.argb(205, 28, 30, 38), Color.argb(220, 220, 30, 58))
+        // 6. Hovered / Focused Button (0, 86, w=200, h=20) — Glowing Crimson Red
+        drawCrystalButton(c, 0f, 86f, 200f, 20f, Color.argb(225, 68, 18, 28), Color.argb(255, 255, 58, 86))
 
-        // 7. Language Button (0, 106, 20x20 normal; 0, 126, 20x20 hover) & Accessibility (20, 106)
-        drawCrystalButton(c, 0f, 106f, 20f, 20f, Color.argb(104, 18, 42, 58), Color.argb(210, 210, 252, 255))
-        drawCrystalButton(c, 0f, 126f, 20f, 20f, Color.argb(150, 42, 118, 132), Color.argb(255, 255, 255, 255))
+        // 7. Language & Accessibility Buttons
+        drawCrystalButton(c, 0f, 106f, 20f, 20f, Color.argb(205, 28, 30, 38), Color.argb(220, 220, 30, 58))
+        drawCrystalButton(c, 0f, 126f, 20f, 20f, Color.argb(225, 68, 18, 28), Color.argb(255, 255, 58, 86))
         borderPaint.color = Color.WHITE
         c.drawCircle(10f, 116f, 5f, borderPaint)
         c.drawCircle(10f, 136f, 5f, borderPaint)

@@ -11,8 +11,8 @@ import kotlinx.coroutines.launch
 import net.kdt.pojavlaunch.aerix.discord.AerixDiscordPresence
 
 /**
- * Handles Direct Inline Replies (`RemoteInput`), `Mark as Read` taps, and boot/task-removal
- * background listener wakeups even when Aerix Launcher is completely closed.
+ * Handles explicit notification actions (`Direct Reply` and `Mark as Read`) and Discord Rich
+ * Presence post-exit clear alarms without ever auto-starting background services.
  */
 class SocialNotificationReceiver : BroadcastReceiver() {
     companion object {
@@ -40,7 +40,7 @@ class SocialNotificationReceiver : BroadcastReceiver() {
                 val pending = goAsync()
                 receiverScope.launch {
                     try {
-                        SocialBackend.attach(app)
+                        SocialBackend.initPassive(app)
                         val sent = SocialBackend.sendDirectReplyFromNotification(
                             peerId = peerId,
                             partyId = partyId,
@@ -69,7 +69,7 @@ class SocialNotificationReceiver : BroadcastReceiver() {
                 val pending = goAsync()
                 receiverScope.launch {
                     try {
-                        SocialBackend.attach(app)
+                        SocialBackend.initPassive(app)
                         if (!peerId.isNullOrBlank()) {
                             SocialBackend.markRead(peerId)
                         }
@@ -77,14 +77,6 @@ class SocialNotificationReceiver : BroadcastReceiver() {
                         pending.finish()
                     }
                 }
-            }
-
-            SocialNotificationHelper.ACTION_RESTART_SYNC,
-            Intent.ACTION_BOOT_COMPLETED,
-            Intent.ACTION_MY_PACKAGE_REPLACED -> {
-                SocialBackend.attach(app)
-                SocialMessagingService.ensureRunningIfSignedIn(app)
-                SocialInboxJobService.schedule(app)
             }
 
             AerixDiscordPresence.ACTION_DISCORD_GAME_STARTED -> {

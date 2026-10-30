@@ -9,28 +9,47 @@ import kotlin.math.roundToInt
 object RecordingOptions {
     val qualities = listOf(240, 360, 480, 720, 1080)
     val frameRates = listOf(15, 24, 30, 48, 60, 90, 120)
-    const val DEFAULT_QUALITY = 480
-    const val DEFAULT_FPS = 24
+    const val DEFAULT_QUALITY = 720
+    const val DEFAULT_FPS = 30
 
     enum class AudioSource(val label: String, val game: Boolean, val microphone: Boolean) {
         GAME("Game audio", true, false),
         MICROPHONE("Microphone", false, true),
-        BOTH("Game audio + microphone", true, true);
+        BOTH("Game audio + microphone", true, true),
+        NONE("Video only (no audio)", false, false);
+
+        val hasAudio: Boolean get() = game || microphone
+
         companion object {
-            fun saved(value: String?): AudioSource = entries.firstOrNull { it.name == value } ?: BOTH
+            fun saved(value: String?): AudioSource =
+                values().firstOrNull { it.name == value } ?: GAME
         }
     }
 
     data class Size(val width: Int, val height: Int)
-    data class Config(val quality: Int, val fps: Int, val width: Int, val height: Int,
-                      val bitrate: Int, val encoder: String, val audioSource: AudioSource = AudioSource.BOTH)
+    data class Config(
+        val quality: Int,
+        val fps: Int,
+        val width: Int,
+        val height: Int,
+        val bitrate: Int,
+        val encoder: String,
+        val audioSource: AudioSource = AudioSource.GAME
+    )
 
-    fun size(screenWidth: Int, screenHeight: Int, quality: Int, widthAlignment: Int, heightAlignment: Int): Size {
+    fun size(
+        screenWidth: Int,
+        screenHeight: Int,
+        quality: Int,
+        widthAlignment: Int,
+        heightAlignment: Int
+    ): Size {
         require(screenWidth > 0 && screenHeight > 0 && quality in qualities)
-        require(widthAlignment > 0 && heightAlignment > 0)
+        val wAlign = maxOf(2, widthAlignment)
+        val hAlign = maxOf(2, heightAlignment)
         val scale = quality.toDouble() / minOf(screenWidth, screenHeight)
         fun align(value: Double, alignment: Int) = maxOf(alignment, (value.toInt() / alignment) * alignment)
-        return Size(align(screenWidth * scale, widthAlignment), align(screenHeight * scale, heightAlignment))
+        return Size(align(screenWidth * scale, wAlign), align(screenHeight * scale, hAlign))
     }
 
     fun bitrate(width: Int, height: Int, fps: Int): Int =
@@ -40,26 +59,47 @@ object RecordingOptions {
         if (reportedSoftware == true || reportedHardware == false) return false
         val lower = name.lowercase(java.util.Locale.ROOT)
         return !lower.startsWith("omx.google.") && !lower.startsWith("c2.android.") &&
-            !lower.contains("software") && !lower.contains(".sw.") && !lower.startsWith("omx.ffmpeg.") && (reportedHardware == true || lower.startsWith("omx.") || lower.startsWith("c2."))
+            !lower.contains("software") && !lower.contains(".sw.") && !lower.startsWith("omx.ffmpeg.") &&
+            (reportedHardware == true || lower.startsWith("omx.") || lower.startsWith("c2."))
     }
 
-    /** Query off the UI thread. No software fallback that could steal CPU from Minecraft. */
+    /** Query off the UI thread. Hardware AVC first, with standard AVC fallback if vendor flags misreport. */
     fun supported(screenWidth: Int, screenHeight: Int): List<Config> {
-        val codecs = MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos.filter { codec ->
-            codec.isEncoder && codec.supportedTypes.any { it.equals("video/avc", true) } &&
-                hardware(codec.name, if (Build.VERSION.SDK_INT >= 29) codec.isHardwareAccelerated else null,
-                    if (Build.VERSION.SDK_INT >= 29) codec.isSoftwareOnly else null)
+        val allAvc = MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos.filter { codec ->
+            codec.isEncoder && codec.supportedTypes.any { it.equals("video/avc", true) }
         }
-        return qualities.flatMap { quality -> frameRates.mapNotNull { fps ->
-            codecs.firstNotNullOfOrNull { codec -> runCatching {
-                val caps = codec.getCapabilitiesForType("video/avc")
-                if (MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface !in caps.colorFormats) return@runCatching null
-                val video = caps.videoCapabilities ?: return@runCatching null
-                val size = size(screenWidth, screenHeight, quality, video.widthAlignment, video.heightAlignment)
-                if (!video.areSizeAndRateSupported(size.width, size.height, fps.toDouble())) return@runCatching null
-                Config(quality, fps, size.width, size.height,
-                    video.bitrateRange.clamp(bitrate(size.width, size.height, fps)), codec.name)
-            }.getOrNull() }
-        } }
+        val hwCodecs = allAvc.filter { codec ->
+            hardware(
+                codec.name,
+                if (Build.VERSION.SDK_INT >= 29) codec.isHardwareAccelerated else null,
+                if (Build.VERSION.SDK_INT >= 29) codec.isSoftwareOnly else null
+            )
+        }
+        val codecs = hwCodecs.ifEmpty { allAvc }
+        return qualities.flatMap { quality ->
+            frameRates.mapNotNull { fps ->
+                codecs.firstNotNullOfOrNull { codec ->
+                    runCatching {
+                        val caps = codec.getCapabilitiesForType("video/avc")
+                        if (MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface !in caps.colorFormats) {
+                            return@runCatching null
+                        }
+                        val video = caps.videoCapabilities ?: return@runCatching null
+                        val size = size(screenWidth, screenHeight, quality, video.widthAlignment, video.heightAlignment)
+                        if (!video.areSizeAndRateSupported(size.width, size.height, fps.toDouble())) {
+                            return@runCatching null
+                        }
+                        Config(
+                            quality = quality,
+                            fps = fps,
+                            width = size.width,
+                            height = size.height,
+                            bitrate = video.bitrateRange.clamp(bitrate(size.width, size.height, fps)),
+                            encoder = codec.name
+                        )
+                    }.getOrNull()
+                }
+            }
+        }
     }
 }

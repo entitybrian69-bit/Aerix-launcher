@@ -6,12 +6,30 @@ import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color as AndroidColor
 import android.graphics.Paint
-import android.net.Uri
-import androidx.compose.ui.graphics.Color
 import net.kdt.pojavlaunch.aerix.social.SocialBackend
-import org.json.JSONArray
 import java.io.ByteArrayOutputStream
-import java.io.File
+import kotlin.math.abs
+import kotlin.math.cos
+import kotlin.math.sin
+import kotlin.math.sqrt
+
+enum class CapeAnimStyle {
+    EMBERS,
+    LASER_SCAN,
+    ECLIPSE,
+    FLAMES,
+    LIGHTNING,
+    VORTEX,
+    AURORA,
+    MATRIX,
+    STARFIELD,
+    FROST,
+    PETALS,
+    GOLD_SHEEN,
+    SONIC_RINGS,
+    ROYAL_CREST,
+    CELESTIAL_WINGS
+}
 
 data class ClientCapeSpec(
     val id: String,
@@ -20,6 +38,7 @@ data class ClientCapeSpec(
     val topHex: Long,
     val bottomHex: Long,
     val emblemHex: Long,
+    val animStyle: CapeAnimStyle,
     val requiredEmail: String? = null,
     val badgeText: String? = null
 ) {
@@ -29,125 +48,153 @@ data class ClientCapeSpec(
     }
 }
 
-data class ClientHatSpec(
-    val id: String,
-    val title: String,
-    val subtitle: String,
-    val accentHex: Long
-)
-
 object AerixClientCosmetics {
 
     const val OWNER_EMAIL = "entitybrian69@gmail.com"
     const val CO_OWNER_EMAIL = "kushaladhikari982648@gmail.com"
 
+    /** Exact 15 Animated Capes displayed in the Aerix Client Capes menu. */
     val capes: List<ClientCapeSpec> = listOf(
         ClientCapeSpec(
-            id = "owner_crimson",
-            title = "(OWNER) Sovereign Cape",
-            subtitle = "Crimson Royal Mantle + Dragon-Gold Crest",
-            topHex = 0xFFDC1E45L,
-            bottomHex = 0xFF4A0718L,
+            id = "crimson_sovereign",
+            title = "Crimson Sovereign",
+            subtitle = "Pulsing crimson emblem + rising embers",
+            topHex = 0xFFDC1E3AL,
+            bottomHex = 0xFF1A0E12L,
+            emblemHex = 0xFFFF4D6AL,
+            animStyle = CapeAnimStyle.EMBERS,
+            badgeText = "DEFAULT"
+        ),
+        ClientCapeSpec(
+            id = "phantom_obsidian",
+            title = "Phantom Obsidian",
+            subtitle = "Dark gray carbon weave + crimson scan",
+            topHex = 0xFF282B34L,
+            bottomHex = 0xFF111216L,
+            emblemHex = 0xFFDC1E3AL,
+            animStyle = CapeAnimStyle.LASER_SCAN
+        ),
+        ClientCapeSpec(
+            id = "blood_moon",
+            title = "Blood Moon",
+            subtitle = "Crimson lunar eclipse + night mist",
+            topHex = 0xFF5A0D1BL,
+            bottomHex = 0xFF120B10L,
+            emblemHex = 0xFFFF2E4CL,
+            animStyle = CapeAnimStyle.ECLIPSE
+        ),
+        ClientCapeSpec(
+            id = "inferno_dragon",
+            title = "Inferno Blaze",
+            subtitle = "Molten lava veins + rising fire",
+            topHex = 0xFFB5192BL,
+            bottomHex = 0xFF2B0B0EL,
+            emblemHex = 0xFFFF9F1CL,
+            animStyle = CapeAnimStyle.FLAMES
+        ),
+        ClientCapeSpec(
+            id = "crimson_storm",
+            title = "Crimson Storm",
+            subtitle = "Forked red lightning on dark slate",
+            topHex = 0xFF22252EL,
+            bottomHex = 0xFF0E1015L,
+            emblemHex = 0xFFFF3355L,
+            animStyle = CapeAnimStyle.LIGHTNING
+        ),
+        ClientCapeSpec(
+            id = "ender_vortex",
+            title = "Ender Vortex",
+            subtitle = "Swirling void portal + rift sparks",
+            topHex = 0xFF3A1C6EL,
+            bottomHex = 0xFF0E091AL,
+            emblemHex = 0xFFC77DFFL,
+            animStyle = CapeAnimStyle.VORTEX
+        ),
+        ClientCapeSpec(
+            id = "aurora_drift",
+            title = "Aurora Borealis",
+            subtitle = "Flowing northern-lights ribbons",
+            topHex = 0xFF154E56L,
+            bottomHex = 0xFF121829L,
+            emblemHex = 0xFF5CE1E6L,
+            animStyle = CapeAnimStyle.AURORA
+        ),
+        ClientCapeSpec(
+            id = "cyber_matrix",
+            title = "Cyber Matrix",
+            subtitle = "Digital rain over dark steel",
+            topHex = 0xFF123524L,
+            bottomHex = 0xFF0B1410L,
+            emblemHex = 0xFF2CEAA3L,
+            animStyle = CapeAnimStyle.MATRIX
+        ),
+        ClientCapeSpec(
+            id = "cosmic_nebula",
+            title = "Cosmic Nebula",
+            subtitle = "Twinkling stars + shooting comet",
+            topHex = 0xFF241B4BL,
+            bottomHex = 0xFF0B0A16L,
+            emblemHex = 0xFF9BF6FFL,
+            animStyle = CapeAnimStyle.STARFIELD
+        ),
+        ClientCapeSpec(
+            id = "glacier_shards",
+            title = "Glacier Frost",
+            subtitle = "Drifting ice shards + crystal pulse",
+            topHex = 0xFF25688AL,
+            bottomHex = 0xFF102332L,
+            emblemHex = 0xFFD8F8FFL,
+            animStyle = CapeAnimStyle.FROST
+        ),
+        ClientCapeSpec(
+            id = "sakura_wind",
+            title = "Sakura Tempest",
+            subtitle = "Drifting blossom petals at dusk",
+            topHex = 0xFF6B2446L,
+            bottomHex = 0xFF1B121CL,
+            emblemHex = 0xFFFFB3D9L,
+            animStyle = CapeAnimStyle.PETALS
+        ),
+        ClientCapeSpec(
+            id = "golden_monarch",
+            title = "Golden Monarch",
+            subtitle = "Sweeping royal gold sheen",
+            topHex = 0xFF7D5310L,
+            bottomHex = 0xFF1F160AL,
             emblemHex = 0xFFFFD166L,
+            animStyle = CapeAnimStyle.GOLD_SHEEN
+        ),
+        ClientCapeSpec(
+            id = "sculk_pulse",
+            title = "Sculk Warden",
+            subtitle = "Sonic soul rings in deep dark",
+            topHex = 0xFF0B3942L,
+            bottomHex = 0xFF071318L,
+            emblemHex = 0xFF2EC4B6L,
+            animStyle = CapeAnimStyle.SONIC_RINGS
+        ),
+        ClientCapeSpec(
+            id = "owner_crimson",
+            title = "Owner Sovereign",
+            subtitle = "Exclusive Royal Crimson & Gold Crest",
+            topHex = 0xFFDC1E3AL,
+            bottomHex = 0xFF3B0611L,
+            emblemHex = 0xFFFFD166L,
+            animStyle = CapeAnimStyle.ROYAL_CREST,
             requiredEmail = OWNER_EMAIL,
             badgeText = "(OWNER)"
         ),
         ClientCapeSpec(
             id = "coowner_celestial",
-            title = "(CO-OWNER) Celestial Cape",
-            subtitle = "Sky-Blue Starlight + Ice Prism Wings",
-            topHex = 0xFF38CFFF,
-            bottomHex = 0xFF0A3958L,
+            title = "Co-Owner Celestial",
+            subtitle = "Exclusive Sky-Blue Starlight Mantle",
+            topHex = 0xFF2EB8E6L,
+            bottomHex = 0xFF0A283DL,
             emblemHex = 0xFFE6FCFFL,
+            animStyle = CapeAnimStyle.CELESTIAL_WINGS,
             requiredEmail = CO_OWNER_EMAIL,
             badgeText = "(CO-OWNER)"
-        ),
-        ClientCapeSpec(
-            id = "liquid_crystal",
-            title = "Aerix Liquid Crystal",
-            subtitle = "Signature Transparent Ice-Prism Shimmer",
-            topHex = 0xFFC8FAFFL,
-            bottomHex = 0xFF288B9EL,
-            emblemHex = 0xFFFFFFFFL,
-            badgeText = "SIGNATURE"
-        ),
-        ClientCapeSpec(
-            id = "aurora_prism",
-            title = "Aurora Borealis",
-            subtitle = "Northern Lights Mint-to-Violet Flow",
-            topHex = 0xFF73F5DC,
-            bottomHex = 0xFF5344B8L,
-            emblemHex = 0xFFE8FFFFL
-        ),
-        ClientCapeSpec(
-            id = "nebula_supernova",
-            title = "Nebula Supernova",
-            subtitle = "Deep Cosmos + Starburst Elytra",
-            topHex = 0xFF8A5CFFL,
-            bottomHex = 0xFF1A103CL,
-            emblemHex = 0xFF8DEFE0L
-        ),
-        ClientCapeSpec(
-            id = "sakura_blossom",
-            title = "Sakura Crystal",
-            subtitle = "Soft Petal Drift + Pearl Trim",
-            topHex = 0xFFF9B4DC,
-            bottomHex = 0xFF6B2D5CL,
-            emblemHex = 0xFFFFF5FAL
-        ),
-        ClientCapeSpec(
-            id = "void_dragon",
-            title = "Void Ender Wings",
-            subtitle = "Obsidian Weave + Ender Violet Spine",
-            topHex = 0xFF2D1E4AL,
-            bottomHex = 0xFF090612L,
-            emblemHex = 0xFFC77DFFL
-        ),
-        ClientCapeSpec(
-            id = "emerald_matrix",
-            title = "Emerald Cyber Grid",
-            subtitle = "Digital Neon Pulse + Tech Elytra",
-            topHex = 0xFF2CEAA3L,
-            bottomHex = 0xFF073B2AL,
-            emblemHex = 0xFFD8FFF0L
-        ),
-        ClientCapeSpec(
-            id = "golden_champion",
-            title = "Golden Champion",
-            subtitle = "1.16.5 Mastery Gold + Ivory Trim",
-            topHex = 0xFFFFD166L,
-            bottomHex = 0xFF6E470BL,
-            emblemHex = 0xFFFFFFFFL
-        ),
-        ClientCapeSpec(
-            id = "custom_painted",
-            title = "Custom Painted Cape",
-            subtitle = "Your Pixel-Studio 10×16 Design",
-            topHex = 0xFF8DEFE0L,
-            bottomHex = 0xFF173A4AL,
-            emblemHex = 0xFFFFFFFFL,
-            badgeText = "STUDIO"
-        ),
-        ClientCapeSpec(
-            id = "custom_imported",
-            title = "Imported 64×32 PNG",
-            subtitle = "Loaded from your device storage",
-            topHex = 0xFF91E9FFL,
-            bottomHex = 0xFF1D3557L,
-            emblemHex = 0xFFFFFFFFL,
-            badgeText = "CUSTOM"
         )
-    )
-
-    val hats: List<ClientHatSpec> = listOf(
-        ClientHatSpec("none", "No 3D Headwear", "Keep your raw skin head layer", 0xFF7D909DL),
-        ClientHatSpec("golden_crown", "Royal Golden Crown", "3D pixel crown with cyan gems", 0xFFFFD166L),
-        ClientHatSpec("crystal_halo", "Floating Crystal Halo", "Luminous ice-cyan ring above head", 0xFFC8FAFFL),
-        ClientHatSpec("cyber_visor", "Crystal Cyber Visor", "Wrap-around neon aqua visor", 0xFF5CE1FFL),
-        ClientHatSpec("pro_headset", "Esports Crystal Headset", "3D earcups + headband on outer layer", 0xFF8DEFE0L),
-        ClientHatSpec("pixel_shades", "Deal-With-It Shades", "Crisp dark glasses with white glint", 0xFFF1F6FAL),
-        ClientHatSpec("crimson_bandana", "Sovereign Bandana", "Crimson ninja headband + tails", 0xFFFF4769L),
-        ClientHatSpec("sakura_crown", "Sakura Blossom Wreath", "Pink & mint pixel flower crown", 0xFFF7A8D8L)
     )
 
     fun currentEmail(): String? = SocialBackend.email
@@ -157,57 +204,17 @@ object AerixClientCosmetics {
     fun effectiveCapeSpec(): ClientCapeSpec {
         val wanted = capes.firstOrNull { it.id == AerixClientStore.equippedCapeId }
         if (wanted != null && canEquipCape(wanted)) return wanted
-        // Auto-unlock owner/co-owner if signed into staff email and default not changed yet
-        val email = currentEmail()?.trim()?.lowercase()
-        if (email == OWNER_EMAIL && AerixClientStore.equippedCapeId == "owner_crimson") {
-            return capes.first { it.id == "owner_crimson" }
-        }
-        if (email == CO_OWNER_EMAIL && AerixClientStore.equippedCapeId == "coowner_celestial") {
-            return capes.first { it.id == "coowner_celestial" }
-        }
-        return capes.first { it.id == "liquid_crystal" }
+        return capes.first()
     }
 
-    private fun importedCapeFile(context: Context): File =
-        File(context.applicationContext.filesDir, "aerix_client_imported_cape.png")
-
-    fun importCustomCapeUri(context: Context, uri: Uri): Boolean = runCatching {
-        val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return false
-        val decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return false
-        val normalized = Bitmap.createBitmap(64, 32, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(normalized)
-        val paint = Paint().apply { isFilterBitmap = false }
-        canvas.drawBitmap(
-            Bitmap.createScaledBitmap(
-                decoded,
-                if (decoded.width >= 64) 64 else 64,
-                if (decoded.height >= 32) 32 else 32,
-                false
-            ),
-            0f,
-            0f,
-            paint
-        )
-        importedCapeFile(context).outputStream().use { out ->
-            normalized.compress(Bitmap.CompressFormat.PNG, 100, out)
-        }
-        AerixClientStore.equippedCapeId = "custom_imported"
-        AerixClientStore.persist()
-        true
-    }.getOrDefault(false)
-
     /**
-     * Generates a genuine `64×32` Minecraft Cape + Elytra PNG byte array compatible with 1.16.5:
-     * - Front/Back/Sides Cape UV: `(0..21, 0..16)` (Front face is `1..10, 1..16`, Back is `12..21, 1..16`)
-     * - Elytra Wing UV: `(22..45, 0..21)` so wearing an Elytra in 1.16.5 renders matching custom wings!
+     * Generates a genuine `64×32` Minecraft Cape + Elytra PNG byte array served by `AerixSkinServer`:
+     * - Front/Back/Sides Cape UV: `(0..21, 0..16)` (Front visible face = `1..10, 1..16`)
+     * - Elytra Wing UV: `(22..45, 0..21)` so wearing an Elytra renders matching custom wings too!
      */
     fun resolveInGameCapeBytes(context: Context): ByteArray? = runCatching {
         AerixClientStore.init(context)
         val spec = effectiveCapeSpec()
-        if (spec.id == "custom_imported") {
-            val f = importedCapeFile(context)
-            if (f.isFile && f.length() > 0) return f.readBytes()
-        }
         val bmp = buildCapeAndElytraBitmap(spec)
         ByteArrayOutputStream().use { out ->
             bmp.compress(Bitmap.CompressFormat.PNG, 100, out)
@@ -215,265 +222,172 @@ object AerixClientCosmetics {
         }
     }.getOrNull()
 
-    fun buildCapeAndElytraBitmap(spec: ClientCapeSpec): Bitmap {
-        val bmp = Bitmap.createBitmap(64, 32, Bitmap.Config.ARGB_8888)
-        val customGrid = if (spec.id == "custom_painted") decodePaintedGrid() else null
-
-        val topC = spec.topHex.toInt()
-        val botC = spec.bottomHex.toInt()
-        val embC = spec.emblemHex.toInt()
-
-        // 1. Fill Cape UV box (0..21, 0..16) — visible front (1..10, 1..16) & back (12..21, 1..16)
-        for (y in 0..16) {
-            val t = y / 16f
-            val rowColor = lerpArgb(topC, botC, t)
-            for (x in 0..21) {
-                bmp.setPixel(x, y, rowColor)
-            }
-        }
-
-        // Border trim on visible back face (x: 1..10, y: 1..16 in Mojang cape UV — note: Mojang cape
-        // outer back face is x=1..10, y=1..16; inner face facing player body is x=12..21, y=1..16!)
-        for (y in 1..16) {
-            for (x in 1..10) {
-                if (customGrid != null) {
-                    val customCol = customGrid.getOrNull((y - 1) * 10 + (x - 1))
-                    if (customCol != null) {
-                        bmp.setPixel(x, y, customCol)
-                        bmp.setPixel(x + 11, y, customCol)
-                        continue
-                    }
-                }
-                val isEdge = x == 1 || x == 10 || y == 1 || y == 16
-                if (isEdge) {
-                    bmp.setPixel(x, y, lerpArgb(embC, topC, 0.35f))
-                }
-            }
-        }
-
-        // Center Star / A Crest on outer cape face (x: 1..10, y: 1..16) when not custom painted
-        if (customGrid == null) {
-            val crestPixels = listOf(
-                5 to 4, 6 to 4,
-                5 to 5, 6 to 5,
-                4 to 6, 5 to 6, 6 to 6, 7 to 6,
-                3 to 7, 4 to 7, 7 to 7, 8 to 7,
-                4 to 8, 5 to 8, 6 to 8, 7 to 8,
-                3 to 9, 8 to 9,
-                3 to 10, 8 to 10,
-                5 to 12, 6 to 12
-            )
-            for ((cx, cy) in crestPixels) {
-                bmp.setPixel(cx, cy, embC)
-            }
-        }
-
-        // 2. Matching Elytra Wing UV (x: 22..45, y: 0..21) so 1.16.5 Elytras match the cape!
-        for (y in 0..21) {
-            val t = y / 21f
-            val baseWing = lerpArgb(topC, botC, t)
-            for (x in 22..45) {
-                val featherEdge = x == 22 || x == 45 || y == 0 || y == 21 || (x + y) % 7 == 0
-                bmp.setPixel(x, y, if (featherEdge) lerpArgb(embC, baseWing, 0.55f) else baseWing)
-            }
-        }
-        return bmp
-    }
-
     /**
-     * Non-destructively composites the chosen 3D Hat-Layer Accessory (`x: 32..63, y: 0..15`) onto
-     * the player's `64×64` skin bytes (creating a clean default crystal-accented Steve/Alex skin
-     * if the player has no custom skin file equipped yet, so 3D headwear still renders in-game!).
+     * Preserved hook for `AerixSkinServer.kt`; returns [existingSkinPng] untouched when no hat is equipped.
      */
-    fun applyHatAccessoryToSkin(context: Context, existingSkinPng: ByteArray?, slim: Boolean): ByteArray? {
+    fun applyHatAccessoryToSkin(
+        context: Context,
+        existingSkinPng: ByteArray?,
+        @Suppress("UNUSED_PARAMETER") slim: Boolean
+    ): ByteArray? {
         AerixClientStore.init(context)
-        val hatId = AerixClientStore.equippedHatId
-        if (hatId == "none") return existingSkinPng
-
-        val baseBitmap: Bitmap = if (existingSkinPng != null) {
-            val decoded = BitmapFactory.decodeByteArray(existingSkinPng, 0, existingSkinPng.size)
-                ?: return existingSkinPng
-            val copy = Bitmap.createBitmap(64, 64, Bitmap.Config.ARGB_8888)
-            val src = if (decoded.width == 64 && decoded.height == 64) {
-                decoded
-            } else {
-                Bitmap.createScaledBitmap(decoded, 64, 64, false)
-            }
-            Canvas(copy).drawBitmap(src, 0f, 0f, null)
-            copy
-        } else {
-            buildDefaultBaseSkin64(slim)
-        }
-
-        paintHatLayer(baseBitmap, hatId)
+        if (AerixClientStore.equippedHatId == "none" || existingSkinPng == null) return existingSkinPng
+        val decoded = BitmapFactory.decodeByteArray(existingSkinPng, 0, existingSkinPng.size) ?: return existingSkinPng
+        val copy = Bitmap.createBitmap(64, 64, Bitmap.Config.ARGB_8888)
+        Canvas(copy).drawBitmap(decoded, 0f, 0f, Paint().apply { isFilterBitmap = false })
         return ByteArrayOutputStream().use { out ->
-            baseBitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+            copy.compress(Bitmap.CompressFormat.PNG, 100, out)
             out.toByteArray()
         }
     }
 
-    /**
-     * Minecraft `64×64` Hat Outer Layer UV coordinates:
-     * - Top:    x 40..47, y 0..7
-     * - Bottom: x 48..55, y 0..7
-     * - Right:  x 32..39, y 8..15
-     * - Front:  x 40..47, y 8..15
-     * - Left:   x 48..55, y 8..15
-     * - Back:   x 56..63, y 8..15
-     */
-    private fun paintHatLayer(bmp: Bitmap, hatId: String) {
-        val gold = 0xFFFFD166.toInt()
-        val goldDark = 0xFFD99B26.toInt()
-        val cyan = 0xFF8DEFE0.toInt()
-        val ice = 0xFFE6FCFF.toInt()
-        val crimson = 0xFFFF3B5C.toInt()
-        val dark = 0xFF141C24.toInt()
-        val sakura = 0xFFF7A8D8.toInt()
+    fun buildCapeAndElytraBitmap(spec: ClientCapeSpec): Bitmap {
+        val bmp = Bitmap.createBitmap(64, 32, Bitmap.Config.ARGB_8888)
+        val top = spec.topHex.toInt()
+        val bot = spec.bottomHex.toInt()
+        val emb = spec.emblemHex.toInt()
 
-        when (hatId) {
-            "golden_crown" -> {
-                for (x in 32..63) {
-                    bmp.setPixel(x, 10, goldDark)
-                    bmp.setPixel(x, 11, gold)
-                    if (x % 2 == 0) bmp.setPixel(x, 9, gold)
-                }
-                bmp.setPixel(43, 10, cyan)
-                bmp.setPixel(44, 10, ice)
-                bmp.setPixel(35, 10, crimson)
-                bmp.setPixel(51, 10, crimson)
+        fun blend(c1: Int, c2: Int, t: Float): Int {
+            val f = t.coerceIn(0f, 1f)
+            val r = (AndroidColor.red(c1) + (AndroidColor.red(c2) - AndroidColor.red(c1)) * f).toInt()
+            val g = (AndroidColor.green(c1) + (AndroidColor.green(c2) - AndroidColor.green(c1)) * f).toInt()
+            val b = (AndroidColor.blue(c1) + (AndroidColor.blue(c2) - AndroidColor.blue(c1)) * f).toInt()
+            return AndroidColor.argb(255, r, g, b)
+        }
+
+        // Fill Cape UV box (0..21, 0..16)
+        for (y in 0..16) {
+            val t = y / 16f
+            val rowCol = blend(top, bot, t)
+            for (x in 0..21) {
+                bmp.setPixel(x, y, rowCol)
             }
-            "crystal_halo" -> {
-                for (i in 0..7) {
-                    bmp.setPixel(40 + i, 0, ice)
-                    bmp.setPixel(40 + i, 7, ice)
-                    bmp.setPixel(40, i, cyan)
-                    bmp.setPixel(47, i, cyan)
-                }
-                for (x in 33..62) {
-                    if (x % 2 == 0) bmp.setPixel(x, 8, ice)
-                }
+        }
+
+        // Border & animated-style motif on primary visible cape face (x: 1..10, y: 1..16)
+        for (x in 1..10) {
+            bmp.setPixel(x, 1, emb)
+            bmp.setPixel(x, 16, emb)
+        }
+        for (y in 1..16) {
+            bmp.setPixel(1, y, emb)
+            bmp.setPixel(10, y, emb)
+        }
+
+        when (spec.animStyle) {
+            CapeAnimStyle.LIGHTNING -> {
+                val bolt = listOf(6 to 2, 5 to 4, 4 to 6, 6 to 7, 5 to 9, 4 to 11, 6 to 13, 5 to 15)
+                bolt.forEach { (bx, by) -> bmp.setPixel(bx, by, emb) }
             }
-            "cyber_visor" -> {
-                for (x in 36..51) {
-                    bmp.setPixel(x, 11, ice)
-                    bmp.setPixel(x, 12, cyan)
-                }
-                for (x in 32..63) {
-                    if (x < 36 || x > 51) bmp.setPixel(x, 11, dark)
-                }
-            }
-            "pro_headset" -> {
-                // Top headband across x 40..47, y 3..4
-                for (x in 40..47) {
-                    bmp.setPixel(x, 3, dark)
-                    bmp.setPixel(x, 4, cyan)
-                }
-                // Right earcup (x 34..37, y 10..14) & Left earcup (x 50..53, y 10..14)
-                for (y in 10..14) {
-                    for (dx in 0..3) {
-                        val rim = dx == 0 || dx == 3 || y == 10 || y == 14
-                        bmp.setPixel(34 + dx, y, if (rim) cyan else dark)
-                        bmp.setPixel(50 + dx, y, if (rim) cyan else dark)
-                    }
+            CapeAnimStyle.ECLIPSE, CapeAnimStyle.SONIC_RINGS -> {
+                for (y in 5..11) for (x in 3..8) {
+                    val d = sqrt(((x - 5.5f) * (x - 5.5f) + (y - 8f) * (y - 8f)).toDouble())
+                    if (d in 1.8..3.1) bmp.setPixel(x, y, emb)
                 }
             }
-            "pixel_shades" -> {
-                for (x in 32..55) bmp.setPixel(x, 11, dark)
-                for (x in 41..43) {
-                    bmp.setPixel(x, 12, dark)
-                    bmp.setPixel(x + 4, 12, dark)
+            CapeAnimStyle.MATRIX -> {
+                for (y in 2..15 step 2) {
+                    bmp.setPixel(3, y, emb)
+                    bmp.setPixel(6, (y + 1).coerceAtMost(15), emb)
+                    bmp.setPixel(8, y, emb)
                 }
-                bmp.setPixel(41, 11, ice)
-                bmp.setPixel(45, 11, ice)
             }
-            "crimson_bandana" -> {
-                for (x in 32..63) {
-                    bmp.setPixel(x, 10, crimson)
-                    bmp.setPixel(x, 11, 0xFFB81D3A.toInt())
-                }
-                bmp.setPixel(59, 12, crimson)
-                bmp.setPixel(60, 13, crimson)
-                bmp.setPixel(58, 13, crimson)
-            }
-            "sakura_crown" -> {
-                for (x in 32..63) {
-                    bmp.setPixel(x, 10, if (x % 3 == 0) cyan else sakura)
-                    if (x % 2 == 1) bmp.setPixel(x, 9, ice)
+            else -> {
+                // Iconic Aerix diamond-star emblem in center (x: 4..7, y: 6..11)
+                bmp.setPixel(5, 6, emb); bmp.setPixel(6, 6, emb)
+                bmp.setPixel(4, 7, emb); bmp.setPixel(5, 7, AndroidColor.WHITE); bmp.setPixel(6, 7, AndroidColor.WHITE); bmp.setPixel(7, 7, emb)
+                bmp.setPixel(3, 8, emb); bmp.setPixel(4, 8, AndroidColor.WHITE); bmp.setPixel(5, 8, emb); bmp.setPixel(6, 8, emb); bmp.setPixel(7, 8, AndroidColor.WHITE); bmp.setPixel(8, 8, emb)
+                bmp.setPixel(4, 9, emb); bmp.setPixel(5, 9, AndroidColor.WHITE); bmp.setPixel(6, 9, AndroidColor.WHITE); bmp.setPixel(7, 9, emb)
+                bmp.setPixel(5, 10, emb); bmp.setPixel(6, 10, emb)
+                if (spec.animStyle == CapeAnimStyle.FLAMES || spec.animStyle == CapeAnimStyle.EMBERS) {
+                    bmp.setPixel(3, 14, emb); bmp.setPixel(5, 13, emb); bmp.setPixel(8, 14, emb); bmp.setPixel(6, 15, emb)
                 }
             }
         }
-    }
 
-    private fun buildDefaultBaseSkin64(slim: Boolean): Bitmap {
-        val bmp = Bitmap.createBitmap(64, 64, Bitmap.Config.ARGB_8888)
-        val skinTone = 0xFFD9A886.toInt()
-        val hair = 0xFF1F2D3A.toInt()
-        val jacket = 0xFF152C3D.toInt()
-        val trim = 0xFF8DEFE0.toInt()
-        val pants = 0xFF101D29.toInt()
-
-        fun rect(x1: Int, y1: Int, w: Int, h: Int, c: Int) {
-            for (y in y1 until (y1 + h)) for (x in x1 until (x1 + w)) bmp.setPixel(x, y, c)
+        // Fill Elytra Wing UV (x: 22..45, y: 0..21) so Elytras match the equipped cape
+        for (y in 0..21) {
+            val t = y / 21f
+            val baseCol = blend(top, bot, t)
+            for (x in 22..45) {
+                val rim = (x == 22 || x == 45 || y == 0 || y == 21 || abs((x - 22) - y) <= 1)
+                bmp.setPixel(x, y, if (rim) emb else baseCol)
+            }
         }
-        // Head (0..31, 0..15)
-        rect(8, 0, 16, 8, hair)
-        rect(0, 8, 32, 8, skinTone)
-        rect(8, 8, 8, 2, hair)
-        bmp.setPixel(10, 12, 0xFFFFFFFF.toInt())
-        bmp.setPixel(11, 12, trim)
-        bmp.setPixel(14, 12, trim)
-        bmp.setPixel(15, 12, 0xFFFFFFFF.toInt())
-        // Torso (16..39, 16..31)
-        rect(16, 20, 24, 12, jacket)
-        rect(20, 16, 16, 4, jacket)
-        rect(23, 22, 2, 8, trim)
-        // Right/Left legs & arms
-        rect(0, 20, 16, 12, pants)
-        rect(16, 52, 16, 12, pants)
-        val armW = if (slim) 14 else 16
-        rect(40, 20, armW, 12, jacket)
-        rect(32, 52, armW, 12, jacket)
         return bmp
     }
 
-    fun defaultPaintedGrid(): List<Int> {
-        val out = ArrayList<Int>(160)
-        for (y in 0 until 16) {
-            val base = lerpArgb(0xFFC8FAFF.toInt(), 0xFF1D6F82.toInt(), y / 15f)
-            for (x in 0 until 10) {
-                val edge = x == 0 || x == 9 || y == 0 || y == 15
-                out.add(if (edge) 0xFFFFFFFF.toInt() else base)
+    /** Helper computing a live animated color shift / glow intensity at normalized UV `(u, v)` and `phase`. */
+    fun sampleAnimatedHighlight(style: CapeAnimStyle, u: Float, v: Float, phase: Float): Float {
+        return when (style) {
+            CapeAnimStyle.EMBERS -> {
+                val spark = sin(u * 9f + phase * 2.2f) * cos((v + phase * 0.45f) * 10f)
+                if (spark > 0.62f) (spark - 0.62f) * 2.2f else 0f
+            }
+            CapeAnimStyle.LASER_SCAN -> {
+                val scanY = ((phase / (2f * Math.PI.toFloat())) * 1.4f) % 1.0f
+                (1f - (abs(v - scanY) * 7f)).coerceIn(0f, 1f) * 0.85f
+            }
+            CapeAnimStyle.ECLIPSE -> {
+                val dx = u - 0.5f
+                val dy = v - 0.45f
+                val dist = sqrt(dx * dx + dy * dy)
+                val pulse = 0.22f + 0.04f * sin(phase * 1.5f)
+                (1f - abs(dist - pulse) * 14f).coerceIn(0f, 1f)
+            }
+            CapeAnimStyle.FLAMES -> {
+                val flameH = 0.55f + 0.22f * sin(u * 8f + phase * 3f)
+                if (v > flameH) ((v - flameH) / (1f - flameH)).coerceIn(0f, 1f) * 0.9f else 0f
+            }
+            CapeAnimStyle.LIGHTNING -> {
+                val boltX = 0.5f + 0.16f * sin(v * 12f + phase * 4f)
+                val flash = (sin(phase * 3f) + 0.4f).coerceIn(0f, 1f)
+                (1f - abs(u - boltX) * 13f).coerceIn(0f, 1f) * flash
+            }
+            CapeAnimStyle.VORTEX -> {
+                val dx = u - 0.5f
+                val dy = v - 0.5f
+                val r = sqrt(dx * dx + dy * dy)
+                val ang = kotlin.math.atan2(dy, dx)
+                ((sin(ang * 3f + r * 16f - phase * 2.5f) - 0.45f) * 1.6f).coerceIn(0f, 1f)
+            }
+            CapeAnimStyle.AURORA -> {
+                val band = sin(u * 5f + v * 4f - phase * 1.8f)
+                ((band - 0.25f) * 1.1f).coerceIn(0f, 0.85f)
+            }
+            CapeAnimStyle.MATRIX -> {
+                val colDrop = ((v * 3f - phase * 0.8f + (u * 7f).toInt() * 0.37f) % 1f + 1f) % 1f
+                if (colDrop < 0.28f) (1f - colDrop / 0.28f) * 0.85f else 0f
+            }
+            CapeAnimStyle.STARFIELD -> {
+                val twinkle = sin(u * 17f + phase * 2f) * cos(v * 19f - phase * 1.5f)
+                if (twinkle > 0.68f) (twinkle - 0.68f) * 2.6f else 0f
+            }
+            CapeAnimStyle.FROST -> {
+                val shard = cos((u + v) * 9f - phase * 1.7f)
+                ((shard - 0.45f) * 1.5f).coerceIn(0f, 0.9f)
+            }
+            CapeAnimStyle.PETALS -> {
+                val p = sin((u * 8f + phase * 1.3f)) * cos((v * 8f - phase * 1.6f))
+                if (p > 0.58f) (p - 0.58f) * 2.0f else 0f
+            }
+            CapeAnimStyle.GOLD_SHEEN -> {
+                val diag = ((u + v) * 0.5f - (phase / (2f * Math.PI.toFloat()))) % 1f
+                val norm = (diag + 1f) % 1f
+                (1f - abs(norm - 0.5f) * 8f).coerceIn(0f, 0.95f)
+            }
+            CapeAnimStyle.SONIC_RINGS -> {
+                val dx = u - 0.5f
+                val dy = v - 0.5f
+                val dist = sqrt(dx * dx + dy * dy)
+                val ring = ((dist * 3.5f - phase * 0.6f) % 1f + 1f) % 1f
+                (1f - abs(ring - 0.5f) * 7f).coerceIn(0f, 0.95f)
+            }
+            CapeAnimStyle.ROYAL_CREST, CapeAnimStyle.CELESTIAL_WINGS -> {
+                val crest = 1f - (abs(u - 0.5f) * 5f + abs(v - 0.45f) * 4f)
+                val shimmer = 0.5f + 0.5f * sin(phase * 2.2f - v * 5f)
+                (crest.coerceIn(0f, 1f) * 0.75f + shimmer * 0.25f).coerceIn(0f, 1f)
             }
         }
-        return out
     }
-
-    fun decodePaintedGrid(): List<Int> {
-        val raw = AerixClientStore.customCapePixelsJson
-        if (raw.isBlank()) return defaultPaintedGrid()
-        return runCatching {
-            val arr = JSONArray(raw)
-            if (arr.length() < 160) return defaultPaintedGrid()
-            List(160) { idx -> arr.getInt(idx) }
-        }.getOrDefault(defaultPaintedGrid())
-    }
-
-    fun savePaintedGrid(pixels: List<Int>) {
-        val arr = JSONArray()
-        pixels.take(160).forEach { arr.put(it) }
-        AerixClientStore.customCapePixelsJson = arr.toString()
-        AerixClientStore.equippedCapeId = "custom_painted"
-        AerixClientStore.persist()
-    }
-
-    private fun lerpArgb(a: Int, b: Int, t: Float): Int {
-        val f = t.coerceIn(0f, 1f)
-        val aa = AndroidColor.alpha(a) + ((AndroidColor.alpha(b) - AndroidColor.alpha(a)) * f).toInt()
-        val rr = AndroidColor.red(a) + ((AndroidColor.red(b) - AndroidColor.red(a)) * f).toInt()
-        val gg = AndroidColor.green(a) + ((AndroidColor.green(b) - AndroidColor.green(a)) * f).toInt()
-        val bb = AndroidColor.blue(a) + ((AndroidColor.blue(b) - AndroidColor.blue(a)) * f).toInt()
-        return AndroidColor.argb(aa, rr, gg, bb)
-    }
-
-    fun colorForHex(hex: Long): Color = Color(hex)
 }

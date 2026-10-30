@@ -222,6 +222,8 @@ public class LauncherActivity extends BaseActivity {
         // Must run before BaseActivity.onCreate, which reads setFullscreen()
         AerixPreferences.INSTANCE.init(getApplicationContext());
         super.onCreate(savedInstanceState);
+        net.kdt.pojavlaunch.aerix.social.SocialBackend.attach(getApplicationContext());
+        net.kdt.pojavlaunch.aerix.social.SocialMessagingService.markLauncherSessionOpened(getApplicationContext());
         handleSocialSignIn(getIntent());
         // The decor receives the insets before the content view consumes them for its padding.
         // Publishing them lets the Compose shell keep the rail and the pages on the safe area

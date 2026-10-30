@@ -3,250 +3,186 @@ package net.kdt.pojavlaunch.aerix.social
 import android.app.AlarmManager
 import android.app.PendingIntent
 import android.app.Service
-import android.app.job.JobInfo
 import android.app.job.JobParameters
 import android.app.job.JobScheduler
 import android.app.job.JobService
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
-import android.os.SystemClock
-import android.util.Log
-import androidx.core.content.ContextCompat
+import android.os.Process
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import net.kdt.pojavlaunch.aerix.discord.AerixDiscordPresence
 
 /**
- * Keeps Aerix Socials connected in the background so incoming DMs and party messages trigger
- * instant Messenger-style notifications with inline Direct Reply even after closing the app.
+ * Lightweight session-scoped Social watcher (`android:stopWithTask="true"`, `START_NOT_STICKY`).
+ *
+ * - Runs ONLY while the user has opened Aerix Launcher (`LauncherActivity`).
+ * - NEVER auto-starts on boot, background broadcasts, or `AlarmManager` / `JobScheduler` wakeups.
+ * - Immediately shuts down all background WebSockets, presence loops, and services when the user
+ *   swipes/removes Aerix from Recent Apps (`onTaskRemoved`).
  */
 class SocialMessagingService : Service() {
+
     companion object {
-        private const val TAG = "AerixSocialService"
-        private const val ACTION_STOP = "net.kdt.pojavlaunch.aerix.STOP_SOCIAL_SERVICE"
+        private const val RESTART_ALARM_REQ_CODE = 88421
+
+        @Volatile
+        private var launcherSessionOpen: Boolean = false
+
+        @JvmStatic
+        fun markLauncherSessionOpened(context: Context) {
+            launcherSessionOpen = true
+            val app = context.applicationContext
+            SocialInboxJobService.cancel(app)
+            cancelLegacyRestartAlarm(app)
+            ensureRunningIfSignedIn(app)
+        }
 
         @JvmStatic
         fun ensureRunningIfSignedIn(context: Context) {
             val app = context.applicationContext
-            val prefs = app.getSharedPreferences("aerix_social", Context.MODE_PRIVATE)
-            val hasSession = !prefs.getString("refresh_token", null).isNullOrBlank() &&
-                !prefs.getString("user_id", null).isNullOrBlank()
-            val bgEnabled = prefs.getBoolean("bg_notifications_enabled", true)
-            if (!hasSession || !bgEnabled) {
+            SocialInboxJobService.cancel(app)
+            cancelLegacyRestartAlarm(app)
+            if (!launcherSessionOpen) return
+            if (!SocialBackend.signedIn) {
                 stop(app)
                 return
             }
-            SocialInboxJobService.schedule(app)
-            val intent = Intent(app, SocialMessagingService::class.java)
-            try {
-                ContextCompat.startForegroundService(app, intent)
-            } catch (t: Throwable) {
-                // Android 12+ restricts FGS start from background on some wake paths;
-                // try plain startService + JobScheduler fallback without crashing.
-                Log.d(TAG, "FGS start deferred to JobScheduler/background: ${t.message}")
-                runCatching { app.startService(intent) }
+            // Plain startService while LauncherActivity is active — no persistent FGS notification,
+            // and Android stops it automatically via stopWithTask="true" + onTaskRemoved!
+            runCatching {
+                app.startService(Intent(app, SocialMessagingService::class.java))
             }
         }
 
         @JvmStatic
         fun stop(context: Context) {
             val app = context.applicationContext
+            cancelLegacyRestartAlarm(app)
+            SocialInboxJobService.cancel(app)
             runCatching {
                 app.stopService(Intent(app, SocialMessagingService::class.java))
             }
         }
+
+        private fun cancelLegacyRestartAlarm(context: Context) {
+            runCatching {
+                val am = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
+                val intent = Intent(context, SocialNotificationReceiver::class.java).apply {
+                    action = SocialNotificationHelper.ACTION_RESTART_SYNC
+                }
+                val flags = PendingIntent.FLAG_NO_CREATE or
+                    (if (Build.VERSION.SDK_INT >= 23) PendingIntent.FLAG_IMMUTABLE else 0)
+                val pi = PendingIntent.getBroadcast(context, RESTART_ALARM_REQ_CODE, intent, flags)
+                if (pi != null) {
+                    am.cancel(pi)
+                    pi.cancel()
+                }
+            }
+        }
     }
 
-    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private var watcherJob: Job? = null
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    override fun onCreate() {
-        super.onCreate()
-        SocialBackend.attach(applicationContext)
-        promoteToForegroundSafely()
-        startInboxWatcherLoop()
-    }
-
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_STOP ||
-            !SocialBackend.signedIn ||
-            !SocialBackend.backgroundNotificationsEnabled
-        ) {
-            runCatching { stopForeground(true) }
+        SocialInboxJobService.cancel(applicationContext)
+        cancelLegacyRestartAlarm(applicationContext)
+
+        if (!launcherSessionOpen || !SocialBackend.signedIn) {
             stopSelf()
             return START_NOT_STICKY
         }
 
-        promoteToForegroundSafely()
-        if (watcherJob?.isActive != true) {
-            startInboxWatcherLoop()
-        }
-        return START_STICKY
-    }
-
-    private fun promoteToForegroundSafely() {
-        try {
-            val notif = SocialNotificationHelper.buildBackgroundSyncNotification(applicationContext)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                startForeground(
-                    SocialNotificationHelper.NOTIFICATION_ID_BG_SERVICE,
-                    notif,
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MANIFEST
-                )
-            } else {
-                startForeground(SocialNotificationHelper.NOTIFICATION_ID_BG_SERVICE, notif)
-            }
-        } catch (t: Throwable) {
-            Log.d(TAG, "Foreground promotion skipped: ${t.message}")
-        }
-    }
-
-    private fun startInboxWatcherLoop() {
-        watcherJob?.cancel()
-        watcherJob = serviceScope.launch {
-            // Baseline or fetch immediately on startup
-            runCatching {
-                SocialBackend.ensureBackgroundRealtimeAndPollInbox()
-            }
-            while (isActive) {
-                val intervalMs = when {
-                    !SocialBackend.isNetworkAvailable -> 15_000L
-                    SocialBackend.isLauncherInForeground -> 6_000L
-                    else -> 8_500L
-                }
-                delay(intervalMs)
-                if (SocialBackend.signedIn &&
-                    SocialBackend.backgroundNotificationsEnabled &&
-                    SocialBackend.isNetworkAvailable
-                ) {
-                    runCatching {
-                        SocialBackend.ensureBackgroundRealtimeAndPollInbox()
-                    }
-                }
-            }
-        }
+        startSessionSyncLoop()
+        return START_NOT_STICKY
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         super.onTaskRemoved(rootIntent)
-        SocialBackend.onAppTaskSwipedAway()
-        if (SocialBackend.signedIn && SocialBackend.backgroundNotificationsEnabled) {
-            scheduleRestartPulse(applicationContext)
-            SocialInboxJobService.schedule(applicationContext)
+        launcherSessionOpen = false
+        val app = applicationContext
+        cancelLegacyRestartAlarm(app)
+        SocialInboxJobService.cancel(app)
+        scope.cancel()
+        runCatching { SocialBackend.shutdownBackgroundActivity(app) }
+        runCatching { AerixDiscordPresence.onAppSwipedFromRecents(app) }
+        runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                stopForeground(STOP_FOREGROUND_REMOVE)
+            } else {
+                @Suppress("DEPRECATION")
+                stopForeground(true)
+            }
         }
-    }
-
-    override fun onTimeout(startId: Int) {
-        SocialInboxJobService.schedule(applicationContext)
-        runCatching { stopForeground(true) }
-        stopSelf(startId)
-    }
-
-    override fun onTimeout(startId: Int, fgsType: Int) {
-        // Android 15+ FGS timeout callback safety: hand off cleanly to JobScheduler
-        SocialInboxJobService.schedule(applicationContext)
-        runCatching { stopForeground(true) }
-        stopSelf(startId)
+        stopSelf()
+        // Allow brief 180ms window for offline/clear frames to flush, then exit background process if idle
+        Thread {
+            runCatching { Thread.sleep(180L) }
+            if (!launcherSessionOpen && !SocialBackend.hasStartedActivities()) {
+                Process.killProcess(Process.myPid())
+            }
+        }.start()
     }
 
     override fun onDestroy() {
-        watcherJob?.cancel()
+        scope.cancel()
         super.onDestroy()
     }
 
-    private fun scheduleRestartPulse(context: Context) {
-        try {
-            val alarm = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
-            val restartIntent = Intent(context, SocialNotificationReceiver::class.java).apply {
-                action = SocialNotificationHelper.ACTION_RESTART_SYNC
+    private var loopStarted = false
+
+    private fun startSessionSyncLoop() {
+        if (loopStarted) return
+        loopStarted = true
+        scope.launch {
+            while (isActive && launcherSessionOpen && SocialBackend.signedIn) {
+                if (SocialBackend.backgroundNotificationsEnabled) {
+                    runCatching { SocialBackend.pollBackgroundNotificationsOnce(applicationContext) }
+                }
+                delay(25_000L)
             }
-            val flags = PendingIntent.FLAG_UPDATE_CURRENT or
-                (if (Build.VERSION.SDK_INT >= 23) PendingIntent.FLAG_IMMUTABLE else 0)
-            val pi = PendingIntent.getBroadcast(context, 74099, restartIntent, flags)
-            val triggerAt = SystemClock.elapsedRealtime() + 2_500L
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                alarm.setAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP, triggerAt, pi)
-            } else {
-                alarm.set(AlarmManager.ELAPSED_REALTIME_WAKEUP, triggerAt, pi)
-            }
-        } catch (_: Throwable) {
+            stopSelf()
         }
     }
 }
 
 /**
- * OS-managed `JobScheduler` safety net so even if OEM battery optimization stops the background
- * service after closing the app, Android periodically wakes `:launcher` on network availability
- * to deliver unread message notifications.
+ * Legacy periodic job service kept only as a manifest stub that immediately cancels any previously
+ * persisted OS job so upgrading installs never wake Aerix Launcher in the background.
  */
 class SocialInboxJobService : JobService() {
+
     companion object {
-        private const val JOB_ID = 74020
-        private val jobScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        private const val JOB_ID = 77420
 
         @JvmStatic
         fun schedule(context: Context) {
-            val app = context.applicationContext
-            val prefs = app.getSharedPreferences("aerix_social", Context.MODE_PRIVATE)
-            if (prefs.getString("refresh_token", null).isNullOrBlank()) return
-            if (!prefs.getBoolean("bg_notifications_enabled", true)) return
-
-            try {
-                val scheduler = app.getSystemService(Context.JOB_SCHEDULER_SERVICE) as? JobScheduler ?: return
-                val existing = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                    scheduler.getPendingJob(JOB_ID)
-                } else {
-                    scheduler.allPendingJobs.firstOrNull { it.id == JOB_ID }
-                }
-                if (existing != null) return
-
-                val component = ComponentName(app, SocialInboxJobService::class.java)
-                val info = JobInfo.Builder(JOB_ID, component)
-                    .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
-                    .setPeriodic(15L * 60L * 1000L)
-                    .setPersisted(true)
-                    .build()
-                scheduler.schedule(info)
-            } catch (_: Throwable) {
-            }
+            // Disabled intentionally: never wake the launcher automatically in the background.
+            cancel(context)
         }
 
         @JvmStatic
         fun cancel(context: Context) {
-            try {
-                val scheduler = context.applicationContext
-                    .getSystemService(Context.JOB_SCHEDULER_SERVICE) as? JobScheduler ?: return
-                scheduler.cancel(JOB_ID)
-            } catch (_: Throwable) {
-            }
+            val app = context.applicationContext
+            val js = app.getSystemService(Context.JOB_SCHEDULER_SERVICE) as? JobScheduler ?: return
+            runCatching { js.cancel(JOB_ID) }
         }
     }
 
     override fun onStartJob(params: JobParameters?): Boolean {
-        val app = applicationContext
-        jobScope.launch {
-            try {
-                SocialBackend.attach(app)
-                if (SocialBackend.signedIn && SocialBackend.backgroundNotificationsEnabled) {
-                    SocialBackend.ensureBackgroundRealtimeAndPollInbox()
-                    SocialMessagingService.ensureRunningIfSignedIn(app)
-                }
-            } finally {
-                jobFinished(params, false)
-            }
-        }
-        return true
+        cancel(applicationContext)
+        jobFinished(params, false)
+        return false
     }
 
-    override fun onStopJob(params: JobParameters?): Boolean = true
+    override fun onStopJob(params: JobParameters?): Boolean = false
 }

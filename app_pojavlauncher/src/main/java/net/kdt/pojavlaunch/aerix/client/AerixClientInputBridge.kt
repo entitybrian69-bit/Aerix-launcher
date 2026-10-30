@@ -85,7 +85,7 @@ object AerixClientInputBridge {
         private set
     var bootStageTitle by mutableStateOf("Initializing OpenJDK 17 & LWJGL 3...")
         private set
-    var bootStageDetail by mutableStateOf("Aerix Client 1.16.5 · Liquid Crystal Engine")
+    var bootStageDetail by mutableStateOf("Aerix Client · Crimson Edition")
         private set
 
     var hostedLanPort by mutableIntStateOf(0)
@@ -293,7 +293,7 @@ object AerixClientInputBridge {
         logReadOffset = 0L
         bootProgress = 0.08f
         bootStageTitle = "Initializing OpenJDK 17 & LWJGL 3..."
-        bootStageDetail = "Aerix Client 1.16.5 · Liquid Crystal Engine"
+        bootStageDetail = "Aerix Client · Crimson Edition"
         hostedLanPort = 0
         hostedLanAddress = ""
         queuePosition = -1
@@ -354,7 +354,7 @@ object AerixClientInputBridge {
                 line.contains("Sound engine started", ignoreCase = true) -> {
                 if (bootProgress < 0.80f) {
                     bootProgress = 0.80f
-                    bootStageTitle = "Mounting Liquid Crystal 1.16.5 Pack..."
+                    bootStageTitle = "Mounting Aerix Client Pack..."
                     bootStageDetail = "Applying transparent GUI, custom skybox & 3D capes"
                 }
             }
