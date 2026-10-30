@@ -333,8 +333,8 @@ fun Interactive3DCosmeticStage(
     LaunchedEffect(account?.key, account?.username, wardrobeRev) {
         val loaded = withContext(Dispatchers.IO) {
             runCatching {
-                val acc = PojavAccountBridge.current ?: return@runCatching null
-                val f = PojavAccountBridge.customSkinFile(acc)
+                val rawAcc = net.kdt.pojavlaunch.authenticator.accounts.Accounts.getCurrent() ?: return@runCatching null
+                val f = PojavAccountBridge.customSkinFile(rawAcc)
                 if (f.isFile && f.length() > 0) BitmapFactory.decodeFile(f.absolutePath) else null
             }.getOrNull()
         }

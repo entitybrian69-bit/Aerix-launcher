@@ -146,7 +146,7 @@ class SocialMessagingService : Service() {
         scope.launch {
             while (isActive && launcherSessionOpen && SocialBackend.signedIn) {
                 if (SocialBackend.backgroundNotificationsEnabled) {
-                    runCatching { SocialBackend.pollBackgroundNotificationsOnce(applicationContext) }
+                    runCatching { SocialBackend.ensureBackgroundRealtimeAndPollInbox() }
                 }
                 delay(25_000L)
             }

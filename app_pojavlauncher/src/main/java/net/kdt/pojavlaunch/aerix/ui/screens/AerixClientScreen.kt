@@ -297,7 +297,7 @@ fun AerixClientScreen(activity: FragmentActivity) {
                                         AerixClientStore.persist()
                                         Instances.setSelectedInstance(installed)
                                         PojavInstanceBridge.reload()
-                                        PojavLaunchBridge.launchGame()
+                                        PojavLaunchBridge.play(activity)
                                     }
                                     .padding(horizontal = 18.dp, vertical = 9.dp),
                                 contentAlignment = Alignment.Center
