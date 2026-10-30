@@ -308,7 +308,8 @@ fun SocialsScreen(activity: FragmentActivity, onExit: () -> Unit = {}) {
                             val friend = resolvedFriend ?: SocialFriend(
                                 id = dest.friendId,
                                 mcUsername = "Friend",
-                                displayName = "Friend"
+                                displayName = "Friend",
+                                lastSeenMs = 0L
                             )
                             Box(Modifier.fillMaxSize().padding(AerixSpacing.md)) {
                                 SocialConversationPanel(
