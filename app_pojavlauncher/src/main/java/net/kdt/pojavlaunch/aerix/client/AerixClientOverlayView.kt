@@ -69,6 +69,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -105,6 +106,7 @@ import androidx.lifecycle.setViewTreeViewModelStoreOwner
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.findViewTreeSavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -141,7 +143,9 @@ private enum class ClientMenuSubPage {
     VISUALS,
     GAME_OPTIONS,
     CHAT_SHORTCUTS,
-    AIM
+    AIM,
+    PACKS,
+    KEY_PROFILES
 }
 
 private enum class FeatureIconKind {
@@ -769,6 +773,8 @@ private fun FamousClientRectangleMenu(
                             ClientMenuSubPage.GAME_OPTIONS -> "AERIX CLIENT  ·  GAME OPTIONS"
                             ClientMenuSubPage.CHAT_SHORTCUTS -> "AERIX CLIENT  ·  CHAT SHORTCUTS"
                             ClientMenuSubPage.AIM -> "AERIX CLIENT  ·  AIM"
+                            ClientMenuSubPage.PACKS -> "AERIX CLIENT  ·  RESOURCE PACKS"
+                            ClientMenuSubPage.KEY_PROFILES -> "AERIX CLIENT  ·  KEYBIND PROFILES"
                         },
                         color = Color.White,
                         fontSize = 15.sp,
@@ -847,6 +853,8 @@ private fun FamousClientRectangleMenu(
                         onOpenGameOptions = { onChangeSubPage(ClientMenuSubPage.GAME_OPTIONS) },
                         onOpenChatShortcuts = { onChangeSubPage(ClientMenuSubPage.CHAT_SHORTCUTS) },
                         onOpenAim = { onChangeSubPage(ClientMenuSubPage.AIM) },
+                        onOpenPacks = { onChangeSubPage(ClientMenuSubPage.PACKS) },
+                        onOpenKeyProfiles = { onChangeSubPage(ClientMenuSubPage.KEY_PROFILES) },
                         onOpenOledAfk = onOpenOledAfk,
                         onSyncOptionsTxt = onSyncOptionsTxt
                     )
@@ -860,6 +868,8 @@ private fun FamousClientRectangleMenu(
                     ClientMenuSubPage.GAME_OPTIONS -> ClientGameOptionsPage()
                     ClientMenuSubPage.CHAT_SHORTCUTS -> ClientChatShortcutsPage(onClose)
                     ClientMenuSubPage.AIM -> ClientAimPage()
+                    ClientMenuSubPage.PACKS -> ClientResourcePacksPage(gameDir)
+                    ClientMenuSubPage.KEY_PROFILES -> ClientKeyProfilesPage(gameDir)
                 }
             }
         }
@@ -879,10 +889,16 @@ private fun ClientSquaresGridPage(
     onOpenGameOptions: () -> Unit,
     onOpenChatShortcuts: () -> Unit,
     onOpenAim: () -> Unit,
+    onOpenPacks: () -> Unit,
+    onOpenKeyProfiles: () -> Unit,
     onOpenOledAfk: () -> Unit,
     onSyncOptionsTxt: () -> Unit
 ) {
     val modules = listOf(
+        ClientSquareModule("packs", "Resource Packs", FeatureIconKind.FULLBRIGHT,
+            { false }, { "MANAGE ›" }, onOpenPacks),
+        ClientSquareModule("key_profiles", "Key Profiles", FeatureIconKind.KEYSTROKES,
+            { false }, { "MANAGE ›" }, onOpenKeyProfiles),
         ClientSquareModule("aim_settings", "Aim Profiles", FeatureIconKind.GYRO,
             { AerixClientStore.touchAimEnabled || AerixClientStore.gyroAdsEnabled }, { "SETTINGS ›" }, onOpenAim),
         ClientSquareModule("chat_shortcuts", "Chat Shortcuts", FeatureIconKind.AUTOGG,
@@ -1421,6 +1437,81 @@ private fun DrawScope.drawFeatureSymbol(kind: FeatureIconKind, color: Color) {
         FeatureIconKind.OLED_AFK -> {
             drawCircle(color, radius = 7.5.dp.toPx(), center = Offset(cx, cy), style = Stroke(width = sw * 0.9f))
             drawCircle(color, radius = 3.dp.toPx(), center = Offset(cx + 2.dp.toPx(), cy - 2.dp.toPx()))
+        }
+    }
+}
+
+@Composable
+private fun ClientResourcePacksPage(gameDir: File?) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var revision by remember { mutableIntStateOf(0) }
+    var packs by remember { mutableStateOf<List<ClientInstanceOptions.Pack>>(emptyList()) }
+    var error by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(gameDir, revision) {
+        val result = withContext(Dispatchers.IO) { runCatching { gameDir?.let { ClientInstanceOptions.listPacks(it) } ?: emptyList() } }
+        packs = result.getOrDefault(emptyList())
+        error = result.exceptionOrNull()?.message
+    }
+    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+        Text("Changes are queued for the next launch. Existing packs and their order are preserved; incompatible packs may require Minecraft confirmation.", color = LiquidCrystalPalette.TextSecondary, fontSize = 11.sp)
+        if (error != null) Text("Could not read packs: $error", color = LiquidCrystalPalette.CrimsonGlow, fontSize = 11.sp)
+        if (packs.isEmpty() && error == null) Text("No other packs found in this instance's resourcepacks folder.", color = LiquidCrystalPalette.TextMuted, fontSize = 11.sp)
+        packs.forEach { pack ->
+            val selected = pack.queued ?: pack.active
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(Modifier.weight(1f)) {
+                    Text(pack.name, color = Color.White, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(if (pack.queued != null) "Queued: ${if (selected) "on" else "off"}" else if (pack.active) "Selected" else "Not selected", color = LiquidCrystalPalette.TextMuted, fontSize = 10.sp)
+                }
+                Switch(checked = selected, onCheckedChange = { value ->
+                    if (gameDir != null) scope.launch {
+                        val result = withContext(Dispatchers.IO) { runCatching { ClientInstanceOptions.queuePack(gameDir, pack.name, value) } }
+                        result.exceptionOrNull()?.let { Toast.makeText(context, it.message ?: "Could not queue pack", Toast.LENGTH_LONG).show() }
+                        revision++
+                    }
+                })
+            }
+        }
+    }
+}
+
+@Composable
+private fun ClientKeyProfilesPage(gameDir: File?) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var revision by remember { mutableIntStateOf(0) }
+    var name by remember { mutableStateOf("") }
+    var view by remember { mutableStateOf(ClientInstanceOptions.KeyProfileView(emptyList(), null)) }
+    var error by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(gameDir, revision) {
+        val result = withContext(Dispatchers.IO) { runCatching { gameDir?.let { ClientInstanceOptions.listKeyProfiles(it) } ?: ClientInstanceOptions.KeyProfileView(emptyList(), null) } }
+        view = result.getOrDefault(ClientInstanceOptions.KeyProfileView(emptyList(), null))
+        error = result.exceptionOrNull()?.message
+    }
+    fun action(block: () -> Unit) {
+        scope.launch {
+            val result = withContext(Dispatchers.IO) { runCatching(block) }
+            result.exceptionOrNull()?.let { Toast.makeText(context, it.message ?: "Could not save profile", Toast.LENGTH_LONG).show() }
+            revision++
+        }
+    }
+    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Save keybinds already written to Minecraft's options file. Applying a profile happens next launch and leaves other options untouched.", color = LiquidCrystalPalette.TextSecondary, fontSize = 11.sp)
+        if (error != null) Text("Could not read profiles: $error", color = LiquidCrystalPalette.CrimsonGlow, fontSize = 11.sp)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(value = name, onValueChange = { name = it.take(30) }, singleLine = true, label = { Text("Profile name") }, modifier = Modifier.weight(1f))
+            LiquidCrystalPill("Save current", onClick = {
+                val profileName = name.trim()
+                if (gameDir != null) action { ClientInstanceOptions.saveKeyProfile(gameDir, profileName) }
+            })
+        }
+        view.profiles.forEach { profile ->
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("${profile.name} · ${profile.bindings.size} bindings${if (view.queued == profile.name) " · queued" else ""}", modifier = Modifier.weight(1f), color = Color.White, fontSize = 11.sp)
+                LiquidCrystalPill("Apply next launch", onClick = { if (gameDir != null) action { ClientInstanceOptions.queueKeyProfile(gameDir, profile.name) } })
+                LiquidCrystalPill("Delete", onClick = { if (gameDir != null) action { ClientInstanceOptions.deleteKeyProfile(gameDir, profile.name) } })
+            }
         }
     }
 }

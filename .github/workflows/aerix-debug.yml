@@ -18,7 +18,7 @@ on:
       - "app_pojavlauncher/libs/**"
       - "forge_installer/**"
       - "aerix_client_mod/**"
-      - "tests/InstanceMemorySmokeTest.java"
+      - "tests/**"
       - "glfw/**"
       - "sdl/**"
       - "mojoexec/**"
@@ -69,6 +69,10 @@ jobs:
             app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/utils/jre/InstanceMemory.java \
             tests/InstanceMemorySmokeTest.java
           java -cp "$RUNNER_TEMP/aerix-memory-test" InstanceMemorySmokeTest
+          javac -d "$RUNNER_TEMP/aerix-memory-test" \
+            app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/client/ClientOptionLines.java \
+            tests/ClientOptionLinesSmokeTest.java
+          java -cp "$RUNNER_TEMP/aerix-memory-test" ClientOptionLinesSmokeTest
 
       - name: Get LTW
         uses: dawidd6/action-download-artifact@v6

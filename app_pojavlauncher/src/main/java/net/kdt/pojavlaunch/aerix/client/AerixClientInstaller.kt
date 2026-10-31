@@ -178,6 +178,12 @@ object AerixClientInstaller {
             AerixClientPackGenerator.ensurePackUpToDate(context, gameDir, mcVer)
             ClientPerformanceSettings.init(context)
             ClientPerformanceSettings.applyAtLaunch(gameDir)
+            runCatching { ClientInstanceOptions.applyAtLaunch(gameDir) }.onFailure { error ->
+                android.util.Log.w("AerixClient", "Queued options could not be applied", error)
+                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    android.widget.Toast.makeText(context, "Queued Client options were not applied: ${error.message}", android.widget.Toast.LENGTH_LONG).show()
+                }
+            }
         }
     }
 
