@@ -16,12 +16,7 @@
   <a href="#-the-team"><img src="https://img.shields.io/badge/Maintained%20by-entitybrian-F59E0B?style=for-the-badge" alt="Team"></a>
   <a href="#%EF%B8%8F-private-on-purpose"><img src="https://img.shields.io/badge/Privacy-No%20Trackers-111827?style=for-the-badge" alt="Privacy"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPL--3.0-blue?style=for-the-badge" alt="License"></a>
-  <a href="https://github.com/entitybrian69-bit/Aerix-launcher/releases"><img src="https://img.shields.io/github/downloads/entitybrian69-bit/Aerix-launcher/total?style=for-the-badge&logo=github&color=green" alt="Downloads"></a>
   <a href="https://discord.gg/RS7q9KaCm6"><img src="https://img.shields.io/badge/Discord-Community%20%26%20suggestions-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord"></a>
-</p>
-
-<p align="center">
-  <sub><strong>LIVE FROM GITHUB — updated by GitHub, not by hand</strong></sub>
 </p>
 
 <p align="center">
