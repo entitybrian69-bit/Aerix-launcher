@@ -87,6 +87,7 @@ object AerixClientPackGenerator {
             append("jar=").append(jarReady).append('|')
             append("animGear=").append(AerixClientStore.packVanillaAnimatedGear).append('|')
             append("glint=").append(AerixClientStore.packEnhancedGlint).append('|')
+            append("glintColor=").append(AerixClientStore.packGlintColor).append('|')
             append("fire=").append(AerixClientStore.packLowFire).append('|')
             append("shield=").append(AerixClientStore.packLoweredShield).append('|')
             append("totem=").append(AerixClientStore.packCompactTotem).append('|')
@@ -685,6 +686,14 @@ object AerixClientPackGenerator {
     private fun buildSparkleEnchantGlint128(): Bitmap {
         val sz = 128
         val bmp = Bitmap.createBitmap(sz, sz, Bitmap.Config.ARGB_8888)
+        val tint = when (AerixClientStore.packGlintColor) {
+            "VIOLET" -> Color.rgb(150, 70, 255)
+            "BLUE" -> Color.rgb(48, 130, 255)
+            "GOLD" -> Color.rgb(255, 180, 32)
+            "GREEN" -> Color.rgb(50, 220, 90)
+            "WHITE" -> Color.rgb(220, 220, 220)
+            else -> Color.rgb(208, 48, 96)
+        }
         for (y in 0 until sz) {
             for (x in 0 until sz) {
                 val d1 = (x + y * 2) % 32
@@ -694,9 +703,9 @@ object AerixClientPackGenerator {
                 var b = 0
                 if (d1 in 0..3) {
                     val k = 4 - d1
-                    r += 52 * k
-                    g += 12 * k
-                    b += 24 * k
+                    r += Color.red(tint) * k / 4
+                    g += Color.green(tint) * k / 4
+                    b += Color.blue(tint) * k / 4
                 }
                 if (d2 in 0..2) {
                     val k = 3 - d2

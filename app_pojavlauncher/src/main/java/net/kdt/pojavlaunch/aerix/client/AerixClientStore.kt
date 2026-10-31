@@ -109,6 +109,7 @@ object AerixClientStore {
 
     var packVanillaAnimatedGear by mutableStateOf(true)
     var packEnhancedGlint by mutableStateOf(true)
+    var packGlintColor by mutableStateOf("CRIMSON")
     var packLowFire by mutableStateOf(true)
     var packShortSwords by mutableStateOf(false)
     var packLoweredShield by mutableStateOf(true)
@@ -132,6 +133,8 @@ object AerixClientStore {
 
     /* ── In-Game Client Modules — ALL HUD ITEMS OFF BY DEFAULT ────────────── */
     var crosshairEnabled by mutableStateOf(false)
+    var crosshairColor by mutableStateOf("CRIMSON")
+    var cooldownDurationMs by mutableIntStateOf(625)
     var crosshairShape by mutableStateOf(CrosshairShape.TACTICAL_GAP)
     var crosshairSize by mutableFloatStateOf(9f)
     var crosshairGap by mutableFloatStateOf(3.5f)
@@ -143,6 +146,9 @@ object AerixClientStore {
     var perfPillEnabled by mutableStateOf(false)
     var fpsHistoryEnabled by mutableStateOf(false)
     var frameTimingEnabled by mutableStateOf(false)
+    var adaptiveDistanceEnabled by mutableStateOf(false)
+    var adaptiveFpsTarget by mutableIntStateOf(60)
+    var adaptiveMinDistance by mutableIntStateOf(4)
     var cpsPillEnabled by mutableStateOf(false)
     var keystrokesEnabled by mutableStateOf(false)
     var keystrokesStyle by mutableStateOf(KeystrokesStyle.CRIMSON_DARK)
@@ -166,6 +172,7 @@ object AerixClientStore {
     var waypointHudEnabled by mutableStateOf(false)
     var deathWaypointEnabled by mutableStateOf(false)
     var healthHudEnabled by mutableStateOf(false)
+    var selectedSlotHudEnabled by mutableStateOf(false)
     var compassEnabled by mutableStateOf(false)
     var matchStatsEnabled by mutableStateOf(false)
     var speedrunTimerEnabled by mutableStateOf(false)
@@ -180,6 +187,8 @@ object AerixClientStore {
     var quickPvpButtonsEnabled by mutableStateOf(false)
 
     var fullbrightEnabled by mutableStateOf(false)
+    var visualTimeMode by mutableStateOf("OFF")
+    var visualWeatherMode by mutableStateOf("OFF")
     var visualFilter by mutableStateOf(VisualFilterPreset.NONE)
 
     var autoGgEnabled by mutableStateOf(false)
@@ -210,6 +219,7 @@ object AerixClientStore {
 
         packVanillaAnimatedGear = p.getBoolean("packVanillaAnimatedGear", true)
         packEnhancedGlint = p.getBoolean("packEnhancedGlint", true)
+        packGlintColor = p.getString("packGlintColor", "CRIMSON")?.takeIf { it in setOf("CRIMSON", "VIOLET", "BLUE", "GOLD", "GREEN", "WHITE") } ?: "CRIMSON"
         packLowFire = p.getBoolean("packLowFire", true)
         packLoweredShield = p.getBoolean("packLoweredShield", true)
         packCompactTotem = p.getBoolean("packCompactTotem", true)
@@ -224,6 +234,8 @@ object AerixClientStore {
 
         // Every HUD & gameplay overlay defaults strictly to FALSE unless explicitly enabled by user
         crosshairEnabled = p.getBoolean("crosshairEnabled", false)
+        crosshairColor = p.getString("crosshairColor", "CRIMSON")?.takeIf { it in setOf("CRIMSON", "WHITE", "GREEN", "CYAN", "YELLOW") } ?: "CRIMSON"
+        cooldownDurationMs = p.getInt("cooldownDurationMs", 625).coerceIn(250, 1500)
         crosshairShape = enumOrDefault(p.getString("crosshairShape", null), CrosshairShape.TACTICAL_GAP)
         crosshairSize = p.getFloat("crosshairSize", 9f)
         crosshairGap = p.getFloat("crosshairGap", 3.5f)
@@ -235,6 +247,9 @@ object AerixClientStore {
         perfPillEnabled = p.getBoolean("perfPillEnabled", false)
         fpsHistoryEnabled = p.getBoolean("fpsHistoryEnabled", false)
         frameTimingEnabled = p.getBoolean("frameTimingEnabled", false)
+        adaptiveDistanceEnabled = p.getBoolean("adaptiveDistanceEnabled", false)
+        adaptiveFpsTarget = p.getInt("adaptiveFpsTarget", 60).coerceIn(20, 120)
+        adaptiveMinDistance = p.getInt("adaptiveMinDistance", 4).coerceIn(2, 16)
         cpsPillEnabled = p.getBoolean("cpsPillEnabled", false)
         keystrokesEnabled = p.getBoolean("keystrokesEnabled", false)
         swordCooldownBarEnabled = p.getBoolean("swordCooldownBarEnabled", false)
@@ -257,6 +272,7 @@ object AerixClientStore {
         waypointHudEnabled = p.getBoolean("waypointHudEnabled", false)
         deathWaypointEnabled = p.getBoolean("deathWaypointEnabled", false)
         healthHudEnabled = p.getBoolean("healthHudEnabled", false)
+        selectedSlotHudEnabled = p.getBoolean("selectedSlotHudEnabled", false)
         loadWaypoints(p.getString("clientWaypoints", null))
         chatShortcuts = runCatching {
             val arr = JSONArray(p.getString("clientChatShortcuts", "[\"gg\",\"glhf\",\"/spawn\",\"/hub\"]"))
@@ -275,6 +291,8 @@ object AerixClientStore {
         quickPvpButtonsEnabled = p.getBoolean("quickPvpButtonsEnabled", false)
 
         fullbrightEnabled = p.getBoolean("fullbrightEnabled", false)
+        visualTimeMode = p.getString("visualTimeMode", "OFF")?.takeIf { it in setOf("OFF", "DAY", "SUNSET", "NIGHT") } ?: "OFF"
+        visualWeatherMode = p.getString("visualWeatherMode", "OFF")?.takeIf { it in setOf("OFF", "CLEAR", "RAIN") } ?: "OFF"
         autoGgEnabled = p.getBoolean("autoGgEnabled", false)
         streamerPrivacyEnabled = p.getBoolean("streamerPrivacyEnabled", false)
         thermalGuardEnabled = p.getBoolean("thermalGuardEnabled", false)
@@ -297,6 +315,7 @@ object AerixClientStore {
         p.edit().apply {
             putBoolean("packVanillaAnimatedGear", packVanillaAnimatedGear)
             putBoolean("packEnhancedGlint", packEnhancedGlint)
+            putString("packGlintColor", packGlintColor)
             putBoolean("packLowFire", packLowFire)
             putBoolean("packLoweredShield", packLoweredShield)
             putBoolean("packCompactTotem", packCompactTotem)
@@ -309,6 +328,8 @@ object AerixClientStore {
             putBoolean("wavingCapeEnabled", wavingCapeEnabled)
 
             putBoolean("crosshairEnabled", crosshairEnabled)
+            putString("crosshairColor", crosshairColor)
+            putInt("cooldownDurationMs", cooldownDurationMs)
             putString("crosshairShape", crosshairShape.name)
             putFloat("crosshairSize", crosshairSize)
             putFloat("crosshairGap", crosshairGap)
@@ -320,6 +341,9 @@ object AerixClientStore {
             putBoolean("perfPillEnabled", perfPillEnabled)
             putBoolean("fpsHistoryEnabled", fpsHistoryEnabled)
             putBoolean("frameTimingEnabled", frameTimingEnabled)
+            putBoolean("adaptiveDistanceEnabled", adaptiveDistanceEnabled)
+            putInt("adaptiveFpsTarget", adaptiveFpsTarget)
+            putInt("adaptiveMinDistance", adaptiveMinDistance)
             putBoolean("cpsPillEnabled", cpsPillEnabled)
             putBoolean("keystrokesEnabled", keystrokesEnabled)
             putBoolean("swordCooldownBarEnabled", swordCooldownBarEnabled)
@@ -342,6 +366,7 @@ object AerixClientStore {
             putBoolean("waypointHudEnabled", waypointHudEnabled)
             putBoolean("deathWaypointEnabled", deathWaypointEnabled)
             putBoolean("healthHudEnabled", healthHudEnabled)
+            putBoolean("selectedSlotHudEnabled", selectedSlotHudEnabled)
             putString("clientWaypoints", encodeWaypoints())
             putString("clientChatShortcuts", JSONArray(chatShortcuts).toString())
             putBoolean("compassEnabled", compassEnabled)
@@ -357,6 +382,8 @@ object AerixClientStore {
             putBoolean("quickPvpButtonsEnabled", quickPvpButtonsEnabled)
 
             putBoolean("fullbrightEnabled", fullbrightEnabled)
+            putString("visualTimeMode", visualTimeMode)
+            putString("visualWeatherMode", visualWeatherMode)
             putBoolean("autoGgEnabled", autoGgEnabled)
             putBoolean("streamerPrivacyEnabled", streamerPrivacyEnabled)
             putBoolean("thermalGuardEnabled", thermalGuardEnabled)

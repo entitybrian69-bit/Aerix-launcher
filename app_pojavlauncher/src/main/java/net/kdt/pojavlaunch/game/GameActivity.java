@@ -633,6 +633,9 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         loggerView.setVisibility(View.VISIBLE);
     }
 
+    /** Opens the existing in-game launcher settings (including resolution) from Aerix Client. */
+    public void openAerixQuickSettings() { openQuickSettings(); }
+
     private void openQuickSettings() {
         hideGameMenu();
         if(mQuickSettingSideDialog == null) {

@@ -7,10 +7,10 @@ import org.json.JSONObject
 /** Versioned, local settings export. Never includes accounts or authentication data. */
 object ClientSettingsTransfer {
     private const val PREFS = "aerix_client_v2_prefs"
-    private val boolKeys = setOf("packVanillaAnimatedGear", "packEnhancedGlint", "packLowFire", "packLoweredShield", "packCompactTotem", "packClearWater", "packNoPumpkinBlur", "wavingCapeEnabled", "crosshairEnabled", "crosshairAttackPulse", "perfPillEnabled", "fpsHistoryEnabled", "frameTimingEnabled", "cpsPillEnabled", "keystrokesEnabled", "swordCooldownBarEnabled", "hitmarkerEnabled", "comboCounterEnabled", "toggleSprintEnabled", "toggleSneakEnabled", "autoWalkEnabled", "coordsHudEnabled", "armorHudEnabled", "effectsHudEnabled", "worldTimeHudEnabled", "serverHudEnabled", "pingHudEnabled", "lightHudEnabled", "biomeHudEnabled", "clockHudEnabled", "waypointHudEnabled", "deathWaypointEnabled", "healthHudEnabled", "compassEnabled", "matchStatsEnabled", "speedrunTimerEnabled", "touchAimEnabled", "gyroAdsEnabled", "palmShieldEnabled", "hotbarSwipeEnabled", "quickPvpButtonsEnabled", "fullbrightEnabled", "autoGgEnabled", "streamerPrivacyEnabled", "thermalGuardEnabled", "queueAlarmEnabled")
+    private val boolKeys = setOf("packVanillaAnimatedGear", "packEnhancedGlint", "packLowFire", "packLoweredShield", "packCompactTotem", "packClearWater", "packNoPumpkinBlur", "wavingCapeEnabled", "crosshairEnabled", "crosshairAttackPulse", "perfPillEnabled", "fpsHistoryEnabled", "frameTimingEnabled", "adaptiveDistanceEnabled", "cpsPillEnabled", "keystrokesEnabled", "swordCooldownBarEnabled", "hitmarkerEnabled", "comboCounterEnabled", "toggleSprintEnabled", "toggleSneakEnabled", "autoWalkEnabled", "coordsHudEnabled", "armorHudEnabled", "effectsHudEnabled", "worldTimeHudEnabled", "serverHudEnabled", "pingHudEnabled", "lightHudEnabled", "biomeHudEnabled", "clockHudEnabled", "waypointHudEnabled", "deathWaypointEnabled", "healthHudEnabled", "selectedSlotHudEnabled", "compassEnabled", "matchStatsEnabled", "speedrunTimerEnabled", "touchAimEnabled", "gyroAdsEnabled", "palmShieldEnabled", "hotbarSwipeEnabled", "quickPvpButtonsEnabled", "fullbrightEnabled", "autoGgEnabled", "streamerPrivacyEnabled", "thermalGuardEnabled", "queueAlarmEnabled")
     private val floatKeys = setOf("crosshairSize", "crosshairGap", "crosshairThickness", "crosshairOutline", "crosshairOpacity", "touchAimMultiplier", "gyroSensitivity")
-    private val intKeys = setOf("peakCpsRecord", "installsCompleted")
-    private val stringKeys = setOf("selectedClientVersion", "equippedCapeId", "equippedHatId", "crosshairShape", "clientWaypoints", "clientChatShortcuts", "hudPositionsJson")
+    private val intKeys = setOf("peakCpsRecord", "installsCompleted", "adaptiveFpsTarget", "adaptiveMinDistance", "cooldownDurationMs")
+    private val stringKeys = setOf("selectedClientVersion", "equippedCapeId", "equippedHatId", "crosshairShape", "crosshairColor", "packGlintColor", "visualTimeMode", "visualWeatherMode", "clientWaypoints", "clientChatShortcuts", "hudPositionsJson")
     private val allowedKeys = boolKeys + floatKeys + intKeys + stringKeys
 
     fun export(context: Context): String {
@@ -53,12 +53,17 @@ object ClientSettingsTransfer {
                 }
                 key in intKeys -> {
                     val number = (value as? Number)?.toLong() ?: error("Invalid $key")
-                    require(number in 0..1_000_000) { "Invalid $key" }
+                    val range = when (key) { "adaptiveFpsTarget" -> 20L..120L; "adaptiveMinDistance" -> 2L..16L; "cooldownDurationMs" -> 250L..1500L; else -> 0L..1_000_000L }
+                    require(number in range) { "Invalid $key" }
                     number.toInt()
                 }
                 else -> {
                     val string = value as? String ?: error("Invalid $key")
                     require(string.length <= 64_000) { "Invalid $key" }
+                    if (key == "crosshairColor") require(string in setOf("CRIMSON", "WHITE", "GREEN", "CYAN", "YELLOW")) { "Invalid crosshair color" }
+                    if (key == "packGlintColor") require(string in setOf("CRIMSON", "VIOLET", "BLUE", "GOLD", "GREEN", "WHITE")) { "Invalid glint color" }
+                    if (key == "visualTimeMode") require(string in setOf("OFF", "DAY", "SUNSET", "NIGHT")) { "Invalid visual time" }
+                    if (key == "visualWeatherMode") require(string in setOf("OFF", "CLEAR", "RAIN")) { "Invalid visual weather" }
                     if (key == "clientWaypoints") require(JSONArray(string).length() <= 30) { "Too many waypoints" }
                     if (key == "clientChatShortcuts") {
                         val messages = JSONArray(string)

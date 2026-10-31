@@ -176,6 +176,13 @@ object AerixClientInstaller {
                 }
             }
             AerixClientPackGenerator.ensurePackUpToDate(context, gameDir, mcVer)
+            ClientVisualBridge.sync(gameDir)
+            runCatching { ClientAdaptiveBridge.restoreAtLaunch(gameDir) }.onFailure { error ->
+                android.util.Log.w("AerixClient", "Could not restore adaptive render distance", error)
+                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    android.widget.Toast.makeText(context, "Adaptive distance recovery failed: ${error.message}", android.widget.Toast.LENGTH_LONG).show()
+                }
+            }
             ClientPerformanceSettings.init(context)
             ClientPerformanceSettings.applyAtLaunch(gameDir)
             runCatching { ClientInstanceOptions.applyAtLaunch(gameDir) }.onFailure { error ->

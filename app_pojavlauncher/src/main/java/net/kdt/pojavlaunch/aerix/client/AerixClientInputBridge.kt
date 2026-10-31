@@ -183,7 +183,7 @@ object AerixClientInputBridge {
      */
     fun swordCooldownProgress(now: Long = System.currentTimeMillis()): Float {
         if (lastAttackWallMs == 0L) return 1f
-        return ((now - lastAttackWallMs) / 625f).coerceIn(0f, 1f)
+        return ((now - lastAttackWallMs) / AerixClientStore.cooldownDurationMs.toFloat()).coerceIn(0f, 1f)
     }
 
     /* ── Tactile Action Helpers (Android KeyEvent / MotionEvent) ─────────── */

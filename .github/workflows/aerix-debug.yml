@@ -62,7 +62,7 @@ jobs:
           distribution: temurin
           java-version: "21"
 
-      - name: Verify per-instance memory selection
+      - name: Verify Client smoke tests
         run: |
           mkdir -p "$RUNNER_TEMP/aerix-memory-test"
           javac -d "$RUNNER_TEMP/aerix-memory-test" \
@@ -81,6 +81,17 @@ jobs:
             -I app_pojavlauncher/src/main/jni/fps tests/frame_counter_smoke.c \
             app_pojavlauncher/src/main/jni/fps/frame_counter.c -o "$RUNNER_TEMP/aerix-frame-test"
           "$RUNNER_TEMP/aerix-frame-test"
+          javac -d "$RUNNER_TEMP/aerix-memory-test" \
+            aerix_client_mod/src/main/java/aerix/client/mod/ClientVisualOverrides.java \
+            tests/ClientVisualOverridesSmokeTest.java
+          java -cp "$RUNNER_TEMP/aerix-memory-test" aerix.client.mod.ClientVisualOverridesSmokeTest
+          javac -d "$RUNNER_TEMP/aerix-memory-test" \
+            app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/client/AdaptiveDistanceController.java \
+            tests/AdaptiveDistanceSmokeTest.java \
+            aerix_client_mod/src/main/java/aerix/client/mod/ClientAdaptiveDistance.java \
+            tests/ClientAdaptiveDistanceSmokeTest.java
+          java -cp "$RUNNER_TEMP/aerix-memory-test" AdaptiveDistanceSmokeTest
+          java -cp "$RUNNER_TEMP/aerix-memory-test" aerix.client.mod.ClientAdaptiveDistanceSmokeTest
 
       - name: Get LTW
         uses: dawidd6/action-download-artifact@v6

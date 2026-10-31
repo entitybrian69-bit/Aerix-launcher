@@ -57,6 +57,8 @@ public final class AerixClientMod implements ClientModInitializer {
     private Method mNativeCopyFrom;        // method_4317 (Lclass_1011;)V
 
     private boolean handlesResolved = false;
+    private final ClientVisualOverrides visualOverrides = new ClientVisualOverrides();
+    private final ClientAdaptiveDistance adaptiveDistance = new ClientAdaptiveDistance();
 
     // Cached cape animation frames (kept as raw PNG bytes + decoded NativeImage instances)
     private final List<byte[]> framePngBytes = new ArrayList<byte[]>();
@@ -166,6 +168,8 @@ public final class AerixClientMod implements ClientModInitializer {
 
     private void onRenderThreadTick(Object mc) throws Exception {
         File runDir = resolveRunDir(mc);
+        visualOverrides.tick(mc, runDir);
+        adaptiveDistance.tick(mc, runDir);
         slowCounter++;
         if (slowCounter >= 8) {
             slowCounter = 0;

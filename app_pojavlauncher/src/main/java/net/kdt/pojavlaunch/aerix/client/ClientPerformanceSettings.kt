@@ -35,6 +35,9 @@ object ClientPerformanceSettings {
         val values = when (name) {
             "Maximum FPS" -> mapOf("renderDistance" to "6", "simulationDistance" to "5", "graphicsMode" to "0", "renderClouds" to "\"false\"", "entityShadows" to "false", "particles" to "1", "biomeBlendRadius" to "0", "mipmapLevels" to "0", "enableVsync" to "false", "maxFps" to "120")
             "Balanced" -> mapOf("renderDistance" to "8", "simulationDistance" to "6", "graphicsMode" to "0", "renderClouds" to "\"fast\"", "entityShadows" to "false", "particles" to "1", "biomeBlendRadius" to "2", "mipmapLevels" to "2", "enableVsync" to "false", "maxFps" to "120")
+            "Charging" -> mapOf("renderDistance" to "12", "simulationDistance" to "8", "graphicsMode" to "0", "renderClouds" to "\"fast\"", "entityShadows" to "false", "particles" to "1", "biomeBlendRadius" to "2", "mipmapLevels" to "2", "enableVsync" to "false", "maxFps" to "120")
+            "Cool Down" -> mapOf("renderDistance" to "4", "simulationDistance" to "5", "graphicsMode" to "0", "renderClouds" to "\"false\"", "entityShadows" to "false", "particles" to "2", "biomeBlendRadius" to "0", "mipmapLevels" to "0", "enableVsync" to "false", "maxFps" to "30")
+            "PvP" -> mapOf("renderDistance" to "8", "simulationDistance" to "5", "graphicsMode" to "0", "renderClouds" to "\"false\"", "entityShadows" to "false", "particles" to "1", "biomeBlendRadius" to "0", "mipmapLevels" to "0", "enableVsync" to "false", "maxFps" to "120")
             "Battery Saver" -> mapOf("renderDistance" to "6", "simulationDistance" to "5", "graphicsMode" to "0", "renderClouds" to "\"false\"", "entityShadows" to "false", "particles" to "1", "biomeBlendRadius" to "0", "mipmapLevels" to "2", "enableVsync" to "false", "maxFps" to "30")
             else -> emptyMap()
         }
@@ -60,8 +63,8 @@ object ClientPerformanceSettings {
         context?.getSharedPreferences(PREFS, Context.MODE_PRIVATE)?.edit()?.putString(OPTIONS, json.toString())?.apply()
     }
 
-    private val performanceKeys = setOf("renderDistance", "simulationDistance", "graphicsMode", "renderClouds", "entityShadows", "particles", "biomeBlendRadius", "mipmapLevels", "enableVsync", "maxFps")
-    private val supportedKeys = setOf("renderDistance", "simulationDistance", "graphicsMode", "renderClouds", "entityShadows", "particles", "biomeBlendRadius", "mipmapLevels", "enableVsync", "maxFps", "viewBobbing", "autoJump", "rawMouseInput", "showSubtitles", "fovEffectScale", "screenEffectScale", "guiScale", "fov", "soundCategory_music", "soundCategory_master")
+    private val performanceKeys = setOf("renderDistance", "simulationDistance", "graphicsMode", "renderClouds", "entityShadows", "particles", "biomeBlendRadius", "mipmapLevels", "enableVsync", "maxFps", "entityDistanceScaling")
+    private val supportedKeys = setOf("renderDistance", "simulationDistance", "graphicsMode", "renderClouds", "entityShadows", "particles", "biomeBlendRadius", "mipmapLevels", "enableVsync", "maxFps", "viewBobbing", "autoJump", "rawMouseInput", "showSubtitles", "fovEffectScale", "screenEffectScale", "guiScale", "fov", "soundCategory_music", "soundCategory_master", "entityDistanceScaling", "mouseSensitivity", "damageTiltStrength", "glintStrength", "glintSpeed", "darknessEffectScale")
 
     /** Preserve every unknown line and setting, including third-party settings and resource packs. */
     fun applyAtLaunch(gameDir: File) {

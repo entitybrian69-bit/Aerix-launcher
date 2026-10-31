@@ -72,6 +72,12 @@ final class ClientTelemetry {
         putValue(p, "health", player, "method_6032");
         putValue(p, "maxHealth", player, "method_6063");
         try {
+            Object options = field(mc, "field_1690");
+            Object value = field(options, "field_1870");
+            if (!(value instanceof Number)) value = invoke(value.getClass(), value, "method_41753");
+            if (value instanceof Number) p.setProperty("renderDistance", String.valueOf(((Number) value).intValue()));
+        } catch (Throwable ignored) { }
+        try {
             Object handler = invoke(mc.getClass(), mc, "method_1562");
             Object uuid = invoke(player.getClass(), player, "method_5667");
             if (handler != null && uuid != null) {
@@ -108,6 +114,11 @@ final class ClientTelemetry {
                 int i = 0;
                 for (Object stack : (Iterable<?>) armor) { if (i >= 4) break; writeItem(p, "armor" + i++, stack); }
             }
+        } catch (Throwable ignored) { }
+        try {
+            Object inventory = field(player, "field_7514");
+            Object slot = field(inventory, "field_7545");
+            if (slot instanceof Number) p.setProperty("selectedSlot", Integer.toString(((Number) slot).intValue() + 1));
         } catch (Throwable ignored) { }
         try { writeItem(p, "held", invoke(player.getClass(), player, "method_6047")); } catch (Throwable ignored) { }
         try { writeItem(p, "offhand", invoke(player.getClass(), player, "method_6079")); } catch (Throwable ignored) { }
