@@ -168,6 +168,13 @@ object AerixClientInstaller {
                 AerixClientStore.selectedClientVersion
             )
             deployBundledAnimatorAndPurgeBloat(context, modsDir)
+            // Launches from Home bypass the Client tab's network sync; repair missing cape mod here too.
+            runCatching { ensureWaveyCapes(modsDir, mcVer) }.onFailure { error ->
+                android.util.Log.w("AerixClient", "Waving cape mod unavailable", error)
+                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    android.widget.Toast.makeText(context, "Waving capes unavailable: ${error.message}", android.widget.Toast.LENGTH_LONG).show()
+                }
+            }
             AerixClientPackGenerator.ensurePackUpToDate(context, gameDir, mcVer)
             ClientPerformanceSettings.init(context)
             ClientPerformanceSettings.applyAtLaunch(gameDir)
