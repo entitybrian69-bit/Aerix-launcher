@@ -71,9 +71,22 @@ final class ClientTelemetry {
         catch (Throwable ignored) { putValue(p, "yaw", player, "method_36454"); }
         putValue(p, "health", player, "method_6032");
         putValue(p, "maxHealth", player, "method_6063");
+        try {
+            Object handler = invoke(mc.getClass(), mc, "method_1562");
+            Object uuid = invoke(player.getClass(), player, "method_5667");
+            if (handler != null && uuid != null) {
+                Object entry = invoke(handler.getClass(), handler, "method_2871", java.util.UUID.class, uuid);
+                if (entry != null) putValue(p, "ping", entry, "method_2959");
+            }
+        } catch (Throwable ignored) { }
         Object world = field(mc, "field_1687");
         if (world != null) {
             putValue(p, "dayTime", world, "method_8532");
+            try {
+                Object pos = invoke(player.getClass(), player, "method_24515");
+                Class<?> posClass = Class.forName("net.minecraft.class_2338");
+                p.setProperty("light", String.valueOf(invoke(world.getClass(), world, "method_22339", posClass, pos)));
+            } catch (Throwable ignored) { }
             try {
                 Object key = invoke(world.getClass(), world, "method_27983");
                 Object id = invoke(key.getClass(), key, "method_29177");

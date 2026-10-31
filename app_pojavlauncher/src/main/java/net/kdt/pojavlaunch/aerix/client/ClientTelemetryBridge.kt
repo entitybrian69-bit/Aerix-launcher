@@ -5,8 +5,8 @@ import java.util.Properties
 import kotlin.math.floor
 
 data class ClientTelemetrySnapshot(
-    val x: Double, val y: Double, val z: Double, val yaw: Float?,
-    val dimension: String, val dayTime: Long?, val server: String?,
+    val x: Double, val y: Double, val z: Double, val yaw: Float?, val health: Float?, val maxHealth: Float?,
+    val dimension: String, val dayTime: Long?, val server: String?, val ping: Int?, val light: Int?,
     val armor: List<String>, val held: String?, val offhand: String?, val effects: List<String>
 ) {
     val blockX get() = floor(x).toInt()
@@ -20,7 +20,10 @@ object ClientTelemetryBridge {
         val marker = File(gameDir, "config/aerix_telemetry.enabled")
         if (enabled) {
             marker.parentFile?.mkdirs()
-            if (!marker.exists()) marker.writeText("1")
+            if (!marker.exists()) {
+                File(gameDir, "config/aerix_telemetry.properties").delete()
+                marker.writeText("1")
+            }
         } else {
             marker.delete()
             File(gameDir, "config/aerix_telemetry.properties").delete()
@@ -49,8 +52,8 @@ object ClientTelemetryBridge {
             val level = (p.getProperty("effect${i}Level")?.toIntOrNull() ?: 0) + 1
             "$name $level ${duration / 60}:${(duration % 60).toString().padStart(2, '0')}"
         }
-        ClientTelemetrySnapshot(x, y, z, p.getProperty("yaw")?.toFloatOrNull(),
+        ClientTelemetrySnapshot(x, y, z, p.getProperty("yaw")?.toFloatOrNull(), p.getProperty("health")?.toFloatOrNull(), p.getProperty("maxHealth")?.toFloatOrNull(),
             p.getProperty("dimension", "unknown"), p.getProperty("dayTime")?.toLongOrNull(),
-            p.getProperty("server"), (0..3).mapNotNull { item("armor$it") }, item("held"), item("offhand"), effects)
+            p.getProperty("server"), p.getProperty("ping")?.toIntOrNull(), p.getProperty("light")?.toIntOrNull(), (0..3).mapNotNull { item("armor$it") }, item("held"), item("offhand"), effects)
     }.getOrNull()
 }
