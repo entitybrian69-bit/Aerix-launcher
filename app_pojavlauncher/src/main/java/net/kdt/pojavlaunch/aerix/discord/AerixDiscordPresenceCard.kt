@@ -75,7 +75,7 @@ import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
 
 /**
  * "Discord Rich Presence" settings group:
- * 1. Master Rich Presence toggle (clears 1 minute after exiting the app/game).
+ * 1. Master Rich Presence toggle (clears on exit).
  * 2. Mode toggle between **Hybrid Official Minecraft Game Profile in-game** and **Aerix Launcher
  *    Card everywhere**.
  * 3. Toggle for **Cover Art, Clickable Info Links & Profile Action Buttons**.
@@ -112,7 +112,7 @@ fun DiscordPresenceSettingsCard() {
             position = CardPosition.Top,
             title = "Discord Rich Presence",
             summary = "Show what you are doing in Aerix Launcher on your Discord profile, " +
-                "and automatically clear 1 minute after you leave the app or close the game.",
+                "and clear when you leave the app or close the game.",
             checked = enabled,
             onCheckedChange = { on ->
                 enabled = on

@@ -114,7 +114,6 @@ class SocialMessagingService : Service() {
         SocialInboxJobService.cancel(app)
         scope.cancel()
         runCatching { SocialBackend.shutdownBackgroundActivity(app) }
-        runCatching { AerixDiscordPresence.onAppSwipedFromRecents(app) }
         runCatching {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 stopForeground(STOP_FOREGROUND_REMOVE)
@@ -124,13 +123,14 @@ class SocialMessagingService : Service() {
             }
         }
         stopSelf()
-        // Allow brief 180ms window for offline/clear frames to flush, then exit background process if idle
-        Thread {
-            runCatching { Thread.sleep(180L) }
+        // Complete this one-shot clear before terminating; do not restart a service or timer.
+        val finish = {
             if (!launcherSessionOpen && !SocialBackend.hasStartedActivities()) {
                 Process.killProcess(Process.myPid())
             }
-        }.start()
+        }
+        runCatching { AerixDiscordPresence.onAppSwipedFromRecents(app, finish) }
+            .onFailure { finish() }
     }
 
     override fun onDestroy() {

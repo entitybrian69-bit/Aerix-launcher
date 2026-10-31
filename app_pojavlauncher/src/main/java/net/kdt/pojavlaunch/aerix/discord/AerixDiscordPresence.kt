@@ -56,10 +56,9 @@ import java.util.UUID
  *      Aerix's ID `1563812135744839771` if a mobile client rejects external catalog IDs) so
  *      tapping the card on Discord opens Minecraft's native full-screen Game Profile sheet while
  *      displaying `"via Aerix Launcher"` and the Aerix badge.
- * 3. **1-Minute Post-Exit Clear**:
- *    - Stays visible for 1 minute ([POST_EXIT_TIMEOUT_MS] = 60,000 ms) after leaving the app or
- *      closing the game, then sends an explicit Social SDK clear frame (`SET_ACTIVITY` without
- *      `activity`) on the active application ID before disconnecting so Discord clears it cleanly.
+ * 3. **Exit cleanup**:
+ *    - Send an explicit clear before disconnecting, without a delayed alarm that wakes the app.
+ *      Android may freeze or kill the process before a one-minute timer can fire.
  */
 object AerixDiscordPresence {
 
@@ -80,8 +79,6 @@ object AerixDiscordPresence {
     const val MINECRAFT_PRIMARY_APP_ID = 1402418491272986635L
     const val MINECRAFT_LEGACY_APP_ID = 356875570916753438L
 
-    /** Keep Rich Presence visible for 1 minute after leaving the app / closing the game, then clear. */
-    const val POST_EXIT_TIMEOUT_MS = 60_000L
     private const val CLEAR_FLUSH_DELAY_MS = 400L
     private const val CLEAR_BIND_TIMEOUT_MS = 5_500L
     private const val PENDING_INTENT_REQUEST_CLEAR = 94120
@@ -123,12 +120,14 @@ object AerixDiscordPresence {
     @Volatile
     private var staleAppIdToClearFirst: Long = 0L
 
-    /** True when binding solely at the 1-minute mark to clear the active card and disconnect. */
+    /** True when binding solely to clear the active card and disconnect. */
     @Volatile
     private var clearOnlyMode = false
     @Volatile
     private var pendingClearAppId: Long = 0L
+    private var clearOnlyRequiresExit = false
     private val pendingClearCallbacks = mutableListOf<() -> Unit>()
+    private val clearGeneration = java.util.concurrent.atomic.AtomicLong()
 
     /** Set right before LauncherActivity kills itself to hand off to GameActivity. */
     @Volatile
@@ -156,11 +155,6 @@ object AerixDiscordPresence {
         val activeAppId: Long = 0L,
         val modpackIconUrl: String? = null
     )
-
-    private val postExitClearRunnable = Runnable {
-        val ctx = appContext ?: resolveAnyContext()
-        performScheduledClear(ctx, null)
-    }
 
     private val clearBindTimeoutRunnable = Runnable {
         if (clearOnlyMode) {
@@ -215,7 +209,9 @@ object AerixDiscordPresence {
                     if (staleAppIdToClearFirst > 0L && connectedAppId == staleAppIdToClearFirst && !clearOnlyMode) {
                         // Flush clear on the previous app ID before connecting the new app ID!
                         sendClearFrameImmediate()
+                        val generation = clearGeneration.get()
                         main.postDelayed({
+                            if (generation != clearGeneration.get()) return@postDelayed
                             staleAppIdToClearFirst = 0L
                             ready = false
                             runCatching { connection?.disconnect() }
@@ -231,8 +227,21 @@ object AerixDiscordPresence {
 
                     if (clearOnlyMode) {
                         main.removeCallbacks(clearBindTimeoutRunnable)
+                        if (clearOnlyRequiresExit && appContext?.let { readDiskState(it)?.owner } != "none") {
+                            clearOnlyMode = false
+                            pendingClearAppId = 0L
+                            finishPendingClearCallbacks()
+                            return@post
+                        }
                         sendClearFrameImmediate()
+                        val generation = clearGeneration.get()
                         main.postDelayed({
+                            if (generation != clearGeneration.get()) return@postDelayed
+                            if (clearOnlyRequiresExit && appContext?.let { readDiskState(it)?.owner } != "none") {
+                                clearOnlyMode = false
+                                finishPendingClearCallbacks()
+                                return@postDelayed
+                            }
                             clearOnlyMode = false
                             pendingClearAppId = 0L
                             appContext?.let { app ->
@@ -246,7 +255,7 @@ object AerixDiscordPresence {
                     } else {
                         appContext?.let { app ->
                             val d = readDiskState(app)
-                            if (d != null && d.activeAppId != connectedAppId) {
+                            if (d != null && d.owner != "none" && d.activeAppId != connectedAppId) {
                                 writeDiskState(app, d.copy(activeAppId = connectedAppId))
                             }
                         }
@@ -361,6 +370,7 @@ object AerixDiscordPresence {
         if (!AerixPreferences.discordPresenceEnabled) return
         val desiredId = resolveDesiredAppId() ?: return
         val ctx = appContext ?: return
+        if (readDiskState(ctx)?.owner == "none") return
 
         if (!bound || service == null) {
             attach(ctx)
@@ -377,7 +387,9 @@ object AerixDiscordPresence {
             if (ready) {
                 sendClearFrameImmediate()
                 val targetAfterClear = desiredId
+                val generation = clearGeneration.get()
                 main.postDelayed({
+                    if (generation != clearGeneration.get()) return@postDelayed
                     ready = false
                     runCatching { connection?.disconnect() }
                     connection = null
@@ -427,10 +439,7 @@ object AerixDiscordPresence {
         appContext = app
         handoffToGameInProgress = false
         AerixPreferences.init(app)
-        clearOnlyMode = false
-        pendingClearAppId = 0L
-        main.removeCallbacks(postExitClearRunnable)
-        main.removeCallbacks(clearBindTimeoutRunnable)
+        invalidatePendingClear()
         cancelClearAlarm(app)
 
         val previousDisk = readDiskState(app)
@@ -491,7 +500,8 @@ object AerixDiscordPresence {
                 modpackIconUrl = activeModpackIconUrl
             )
         )
-        schedulePostExitClearInOwnerProcess(app, POST_EXIT_TIMEOUT_MS)
+        // Clear while the process is still alive instead of relying on a delayed background wake.
+        clearAndDetach(app, onlyIfExited = true)
     }
 
     /**
@@ -505,7 +515,6 @@ object AerixDiscordPresence {
         val app = context?.applicationContext ?: appContext
         if (app != null) {
             AerixPreferences.init(app)
-            main.removeCallbacks(postExitClearRunnable)
             cancelClearAlarm(app)
             if (AerixPreferences.discordGameProfileMode && !DiscordAppId.hasCustomOverride() && ready) {
                 sendClearFrameImmediate()
@@ -584,43 +593,19 @@ object AerixDiscordPresence {
         val disk = readDiskState(app)
         if (disk?.owner == "launcher") return
 
-        val nowElapsed = SystemClock.elapsedRealtime()
-        val exitAt = if (disk != null && disk.owner == "none" && disk.exitedAtElapsedMs > 0L) {
-            disk.exitedAtElapsedMs
-        } else {
-            nowElapsed
-        }
-        val remainingMs = (POST_EXIT_TIMEOUT_MS - (nowElapsed - exitAt)).coerceIn(1_000L, POST_EXIT_TIMEOUT_MS)
-
-        writeDiskState(
-            app,
-            PresenceDiskState(
-                owner = "none",
-                exitedAtElapsedMs = exitAt,
-                details = disk?.details ?: details,
-                state = disk?.state ?: state,
-                startedAt = disk?.startedAt ?: gameStartedAtCache,
-                activeAppId = disk?.activeAppId ?: connectedAppId,
-                modpackIconUrl = disk?.modpackIconUrl ?: gameModpackIconCache
-            )
-        )
-
-        // 1. OS-level AlarmManager backup (survives Process.killProcess in `:game` & Recents swipe)
-        scheduleClearAlarm(app, remainingMs)
-
-        // 2. Immediate broadcast to `:launcher` so its live RPC connection runs an exact 1-min timer
+        if (disk?.owner != "game") return
+        writeDiskState(app, disk.copy(owner = "none", exitedAtElapsedMs = SystemClock.elapsedRealtime()))
+        // One-shot game lifecycle message; unlike the former alarm this does not schedule a wakeup.
         runCatching {
-            val intent = Intent(app, SocialNotificationReceiver::class.java).apply {
+            app.sendBroadcast(Intent(app, SocialNotificationReceiver::class.java).apply {
                 action = ACTION_DISCORD_SCHEDULE_CLEAR
-                putExtra(EXTRA_DELAY_MS, remainingMs)
-            }
-            app.sendBroadcast(intent)
+            })
         }
     }
 
     /**
      * Called right before Process.killProcess() in Tools.fullyExit() or GameService exit paths,
-     * ensuring the 1-minute post-exit clear is always scheduled even when onStop/onDestroy are skipped.
+     * attempting exit cleanup even when onStop/onDestroy are skipped.
      */
     @JvmStatic
     fun onProcessExiting(context: Context? = null) {
@@ -633,24 +618,14 @@ object AerixDiscordPresence {
      * Presence clears immediately and no delayed wakeup alarm brings the process back later.
      */
     @JvmStatic
-    fun onAppSwipedFromRecents(context: Context?) {
+    fun onAppSwipedFromRecents(context: Context?, onComplete: (() -> Unit)? = null) {
         val app = context?.applicationContext ?: appContext ?: resolveAnyContext() ?: return
         appContext = app
-        main.removeCallbacks(postExitClearRunnable)
         cancelClearAlarm(app)
-        writeDiskState(
-            app,
-            PresenceDiskState(
-                owner = "none",
-                exitedAtElapsedMs = 0L,
-                details = InLauncher.DETAILS,
-                state = InLauncher.HOME,
-                startedAt = 0L,
-                activeAppId = 0L,
-                modpackIconUrl = null
-            )
-        )
-        clearAndDetach(app, null)
+        // Preserve the ID that actually published the card for a cold Discord bind.
+        val disk = readDiskState(app)
+        if (disk != null) writeDiskState(app, disk.copy(owner = "none", exitedAtElapsedMs = SystemClock.elapsedRealtime()))
+        clearAndDetach(app, onComplete)
     }
 
     /** Invoked in `:launcher` when SocialNotificationReceiver receives ACTION_DISCORD_GAME_STARTED. */
@@ -666,13 +641,11 @@ object AerixDiscordPresence {
         val app = context.applicationContext
         appContext = app
         AerixPreferences.init(app)
-        clearOnlyMode = false
-        pendingClearAppId = 0L
-        main.removeCallbacks(postExitClearRunnable)
-        main.removeCallbacks(clearBindTimeoutRunnable)
+        val prevDisk = readDiskState(app) ?: return
+        // A queued start broadcast must not revive a game that has already exited.
+        if (prevDisk.owner != "game" || prevDisk.startedAt != gameStartedAt) return
+        invalidatePendingClear()
         cancelClearAlarm(app)
-
-        val prevDisk = readDiskState(app)
         inGameMode = true
         activeModpackIconUrl = modpackIconUrl?.takeIf { it.isNotBlank() } ?: prevDisk?.modpackIconUrl
         details = "Playing Minecraft${if (minecraftVersion.isNullOrBlank()) "" else " $minecraftVersion"}"
@@ -702,47 +675,33 @@ object AerixDiscordPresence {
         main.post { switchConnectionIfNeededOrSend() }
     }
 
-    /** Invoked in `:launcher` when SocialNotificationReceiver receives ACTION_DISCORD_SCHEDULE_CLEAR. */
-    fun handleScheduleClearBroadcast(context: Context, delayMs: Long) {
+    /** The game has exited; ignore stale broadcasts if a new session has taken over. */
+    fun handleScheduleClearBroadcast(context: Context, onComplete: () -> Unit) {
         val app = context.applicationContext
         appContext = app
-        AerixPreferences.init(app)
-        val clamped = delayMs.coerceIn(1_000L, POST_EXIT_TIMEOUT_MS)
-        schedulePostExitClearInOwnerProcess(app, clamped)
+        if (readDiskState(app)?.owner != "none") {
+            onComplete()
+            return
+        }
+        clearAndDetach(app, onComplete, onlyIfExited = true)
     }
 
-    /** Invoked at the 1-minute mark (either via Handler or ACTION_DISCORD_CLEAR_NOW alarm). */
+    /** Handles an alarm from an older build without scheduling another background wake. */
     fun performScheduledClear(context: Context?, onComplete: (() -> Unit)?) {
-        val app = context?.applicationContext ?: appContext ?: resolveAnyContext()
-        if (app == null) {
+        val app = context?.applicationContext ?: appContext
+        if (app == null || readDiskState(app)?.owner != "none") {
             onComplete?.invoke()
             return
         }
-        appContext = app
-        AerixPreferences.init(app)
-
-        val disk = readDiskState(app)
-        if (disk != null && disk.owner != "none") {
-            // User returned to the launcher or game within the 1-minute window; keep presence live!
-            onComplete?.invoke()
-            return
-        }
-        if (disk != null && disk.exitedAtElapsedMs > 0L) {
-            val elapsed = SystemClock.elapsedRealtime() - disk.exitedAtElapsedMs
-            val remaining = POST_EXIT_TIMEOUT_MS - elapsed
-            if (remaining > 2_500L) {
-                schedulePostExitClearInOwnerProcess(app, remaining)
-                onComplete?.invoke()
-                return
-            }
-        }
-        clearAndDetach(app, onComplete)
+        clearAndDetach(app, onComplete, onlyIfExited = true)
     }
 
-    private fun schedulePostExitClearInOwnerProcess(app: Context, delayMs: Long) {
-        main.removeCallbacks(postExitClearRunnable)
-        main.postDelayed(postExitClearRunnable, delayMs)
-        scheduleClearAlarm(app, delayMs)
+    private fun invalidatePendingClear() {
+        clearGeneration.incrementAndGet()
+        clearOnlyMode = false
+        pendingClearAppId = 0L
+        main.removeCallbacks(clearBindTimeoutRunnable)
+        main.post { finishPendingClearCallbacks() }
     }
 
     /* ── core RPC lifecycle ────────────────────────────────────────────────── */
@@ -789,22 +748,33 @@ object AerixDiscordPresence {
      * flushes over Binder, and then disconnects and unbinds so Discord removes the Rich Presence
      * card cleanly instead of keeping an orphaned session alive for ~20 minutes.
      */
-    fun clearAndDetach(context: Context? = appContext, onComplete: (() -> Unit)? = null) {
+    fun clearAndDetach(context: Context? = appContext, onComplete: (() -> Unit)? = null, onlyIfExited: Boolean = false) {
         val app = context?.applicationContext ?: appContext
         if (app != null) {
             appContext = app
             cancelClearAlarm(app)
         }
-        main.removeCallbacks(postExitClearRunnable)
         startedAt = 0L
+        val generation = clearGeneration.incrementAndGet()
 
         main.post {
+            if (generation != clearGeneration.get() ||
+                (onlyIfExited && appContext?.let { readDiskState(it)?.owner } != "none")) {
+                finishPendingClearCallbacks()
+                onComplete?.invoke()
+                return@post
+            }
             if (onComplete != null) {
                 pendingClearCallbacks.add(onComplete)
             }
             if (connection != null && ready) {
                 sendClearFrameImmediate()
                 main.postDelayed({
+                    if (generation != clearGeneration.get()) return@postDelayed
+                    if (onlyIfExited && appContext?.let { readDiskState(it)?.owner } != "none") {
+                        finishPendingClearCallbacks()
+                        return@postDelayed
+                    }
                     clearOnlyMode = false
                     pendingClearAppId = 0L
                     appContext?.let { a ->
@@ -818,8 +788,7 @@ object AerixDiscordPresence {
                 return@post
             }
 
-            // Cold wakeup (e.g. from 1-min AlarmManager): bind briefly to the exact activeAppId
-            // that published the card so READY flushes the clear frame on that app ID.
+            // Bind briefly to the app ID that published the card when no connection is ready.
             val ctx = appContext
             val targetId = resolveClearTargetAppId()
             if (ctx == null || targetId == null || targetId <= 0L) {
@@ -835,6 +804,7 @@ object AerixDiscordPresence {
             }
             if (bound) unbind()
             clearOnlyMode = true
+            clearOnlyRequiresExit = onlyIfExited
             pendingClearAppId = targetId
             bound = runCatching {
                 ctx.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
@@ -876,6 +846,9 @@ object AerixDiscordPresence {
 
     /** Launcher pages: the same two lines for every screen, with the section in the second one. */
     fun inLauncher(section: String?) {
+        // Ignore late Compose updates after leaving, which would otherwise republish the card.
+        val diskOwner = appContext?.let { readDiskState(it)?.owner }
+        if (diskOwner != null && diskOwner != "launcher") return
         clearOnlyMode = false
         inGameMode = false
         activeModpackIconUrl = null
@@ -945,6 +918,7 @@ object AerixDiscordPresence {
 
     private fun sendActivity() {
         if (clearOnlyMode || !ready || connection == null) return
+        if (appContext?.let { readDiskState(it)?.owner } == "none") return
         val usingMinecraftProfile = isMinecraftCatalogId(connectedAppId)
         val clickable = AerixPreferences.discordClickableLinks
 
@@ -1041,7 +1015,12 @@ object AerixDiscordPresence {
 
     private fun send(frame: String) {
         val target = connection ?: return
-        main.post { runCatching { target.sendFrame(frame) } }
+        val generation = clearGeneration.get()
+        main.post {
+            if (generation == clearGeneration.get() && target === connection) {
+                runCatching { target.sendFrame(frame) }
+            }
+        }
     }
 
     /* ── alarm & cross-process state helpers ───────────────────────────────── */
@@ -1054,15 +1033,6 @@ object AerixDiscordPresence {
         return runCatching {
             PendingIntent.getBroadcast(app, PENDING_INTENT_REQUEST_CLEAR, intent, baseFlags or flagsExtra)
         }.getOrNull()
-    }
-
-    private fun scheduleClearAlarm(app: Context, delayMs: Long) {
-        val am = app.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
-        val pi = buildClearAlarmPendingIntent(app, PendingIntent.FLAG_UPDATE_CURRENT) ?: return
-        val triggerAt = SystemClock.elapsedRealtime() + delayMs
-        runCatching {
-            am.setWindow(AlarmManager.ELAPSED_REALTIME_WAKEUP, triggerAt, 5_000L, pi)
-        }
     }
 
     private fun cancelClearAlarm(app: Context) {

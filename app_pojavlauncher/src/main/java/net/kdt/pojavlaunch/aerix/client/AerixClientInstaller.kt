@@ -93,6 +93,9 @@ object AerixClientInstaller {
         val out = ArrayList<ClientModEntry>()
         out += ClientModEntry("fabric-api", "Fabric API", "Core")
         out += ClientModEntry("sodium", "Sodium", "Chunk rendering")
+        if (ClientVersions.supportsPodium(mcVersion)) {
+            out += ClientModEntry("podium", "Podium", "Sodium / Pojav compatibility")
+        }
         out += ClientModEntry("lithium", "Lithium", "Tick optimization")
         out += ClientModEntry("ferrite-core", "FerriteCore", "Memory optimization")
         out += ClientModEntry("immediatelyfast", "ImmediatelyFast", "Entity & HUD Batching")
@@ -147,6 +150,14 @@ object AerixClientInstaller {
                 for (slug in listOf("wavey-capes", "immediatelyfast", "entityculling")) {
                     runCatching { ensureModrinthJar(modsDir, slug, mcVersion, depth = 0) }
                 }
+                if (ClientVersions.supportsPodium(mcVersion)) {
+                    runCatching { ensurePodiumAndSodium(modsDir, mcVersion) }.onFailure { error ->
+                        android.util.Log.w("AerixClient", "Podium unavailable", error)
+                        android.os.Handler(android.os.Looper.getMainLooper()).post {
+                            android.widget.Toast.makeText(context, "Podium / Sodium unavailable for $mcVersion: ${error.message}", android.widget.Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }
                 ensureWaveyCapes(modsDir, mcVersion)
                 AerixClientPackGenerator.ensurePackUpToDate(context, gameDir, mcVersion)
             }
@@ -171,6 +182,14 @@ object AerixClientInstaller {
                 android.util.Log.w("AerixClient", "Waving cape mod unavailable", error)
                 android.os.Handler(android.os.Looper.getMainLooper()).post {
                     android.widget.Toast.makeText(context, "Waving capes unavailable: ${error.message}", android.widget.Toast.LENGTH_LONG).show()
+                }
+            }
+            if (ClientVersions.supportsPodium(mcVer)) {
+                runCatching { ensurePodiumAndSodium(modsDir, mcVer) }.onFailure { error ->
+                    android.util.Log.w("AerixClient", "Podium unavailable", error)
+                    android.os.Handler(android.os.Looper.getMainLooper()).post {
+                        android.widget.Toast.makeText(context, "Podium / Sodium unavailable for $mcVer: ${error.message}", android.widget.Toast.LENGTH_LONG).show()
+                    }
                 }
             }
             AerixClientPackGenerator.ensurePackUpToDate(context, gameDir, mcVer)
@@ -268,7 +287,10 @@ object AerixClientInstaller {
                     statusHeadline = "Downloading ${mod.title} (${idx + 1}/${modPlan.size})..."
                     statusDetail = "Minecraft $mcVersion · ${mod.category}"
                     val installed = runCatching {
-                        ensureModrinthJar(modsDir, mod.slug, mcVersion, depth = 0)
+                        if (mod.slug == "podium") {
+                            ensurePodiumAndSodium(modsDir, mcVersion)
+                            true
+                        } else ensureModrinthJar(modsDir, mod.slug, mcVersion, depth = 0)
                     }.getOrDefault(false)
                     if (!installed && mod.slug != "wavey-capes") missingMods += mod.title
                 }
@@ -336,9 +358,52 @@ object AerixClientInstaller {
         }
     }
 
+    /** Read Fabric metadata so renamed jars and unrelated Sodium add-ons do not cause duplicates. */
+    private fun fabricModMetadata(modsDir: File, id: String): org.json.JSONObject? {
+        modsDir.listFiles()?.forEach { file ->
+            if (!file.isFile || !file.extension.equals("jar", true)) return@forEach
+            val metadata = runCatching {
+                java.util.zip.ZipFile(file).use { zip ->
+                    val entry = zip.getEntry("fabric.mod.json") ?: return@use null
+                    if (entry.size < 0 || entry.size > 65536) return@use null
+                    val text = zip.getInputStream(entry).bufferedReader().use { it.readText() }
+                    org.json.JSONObject(text).takeIf { it.optString("id") == id }
+                }
+            }.getOrNull()
+            if (metadata != null) return metadata
+        }
+        return null
+    }
+
+    private fun hasFabricMod(modsDir: File, id: String) = fabricModMetadata(modsDir, id) != null
+
+    /** Podium requires Sodium; do not install a dependency-breaking Podium jar by itself. */
+    private fun ensurePodiumAndSodium(modsDir: File, mcVersion: String) {
+        if (!hasFabricMod(modsDir, "sodium")) {
+            check(ensureModrinthJar(modsDir, "sodium", mcVersion, 0) && hasFabricMod(modsDir, "sodium")) {
+                "compatible Sodium not found"
+            }
+        }
+        val sodiumVersion = fabricModMetadata(modsDir, "sodium")?.optString("version").orEmpty()
+        check(ClientVersions.supportsPodiumSodiumVersion(sodiumVersion)) {
+            "Sodium $sodiumVersion is too old for Podium (requires 0.5.13 or newer)"
+        }
+        if (!hasFabricMod(modsDir, "podium")) {
+            check(ensureModrinthJar(modsDir, "podium", mcVersion, 0) && hasFabricMod(modsDir, "podium")) {
+                "compatible Podium not found"
+            }
+        }
+    }
+
     private fun ensureModrinthJar(modsDir: File, projectSlugOrId: String, mcVersion: String, depth: Int): Boolean {
+        val fabricId = when (projectSlugOrId) {
+            "sodium", "AANobbMI" -> "sodium"
+            "podium", "fW8woQj4" -> "podium"
+            else -> null
+        }
+        if (fabricId != null && hasFabricMod(modsDir, fabricId)) return true
         val normalizedKey = projectSlugOrId.replace("-", "").lowercase()
-        val alreadyExists = modsDir.listFiles()?.any { f ->
+        val alreadyExists = fabricId == null && modsDir.listFiles()?.any { f ->
             f.isFile && f.extension.equals("jar", true) &&
                 f.name.replace("-", "").replace("_", "").lowercase().contains(normalizedKey)
         } == true
@@ -373,7 +438,8 @@ object AerixClientInstaller {
                     val dep = deps.getJSONObject(d)
                     if (dep.optString("dependency_type") == "required") {
                         val depProjId = dep.optString("project_id")
-                        if (depProjId.isNotBlank() && depProjId != "P7dR8mSH") {
+                        if (depProjId.isNotBlank() && depProjId != "P7dR8mSH" &&
+                            !(depProjId == "AANobbMI" && hasFabricMod(modsDir, "sodium"))) {
                             runCatching { ensureModrinthJar(modsDir, depProjId, mcVersion, depth + 1) }
                         }
                     }

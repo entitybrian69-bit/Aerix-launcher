@@ -94,11 +94,10 @@ class SocialNotificationReceiver : BroadcastReceiver() {
             }
 
             AerixDiscordPresence.ACTION_DISCORD_SCHEDULE_CLEAR -> {
-                val delayMs = intent.getLongExtra(
-                    AerixDiscordPresence.EXTRA_DELAY_MS,
-                    AerixDiscordPresence.POST_EXIT_TIMEOUT_MS
-                )
-                AerixDiscordPresence.handleScheduleClearBroadcast(app, delayMs)
+                val pending = goAsync()
+                AerixDiscordPresence.handleScheduleClearBroadcast(app) {
+                    runCatching { pending.finish() }
+                }
             }
 
             AerixDiscordPresence.ACTION_DISCORD_CLEAR_NOW -> {

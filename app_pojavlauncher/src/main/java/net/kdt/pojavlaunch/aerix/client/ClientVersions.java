@@ -44,5 +44,29 @@ public final class ClientVersions {
         return 6;
     }
     public static int formatMinor(String version) { return "26.3".equals(version) ? 1 : 0; }
+    /** Podium is for Minecraft 1.20.1 and newer release profiles, never legacy versions. */
+    public static boolean supportsPodium(String version) {
+        if (version == null || !version.matches("(?:1\\.\\d+(?:\\.\\d+)?|26\\.\\d+(?:\\.\\d+)?)")) return false;
+        String[] parts = version.split("\\.");
+        try {
+            int major = Integer.parseInt(parts[0]);
+            int minor = Integer.parseInt(parts[1]);
+            int patch = parts.length > 2 ? Integer.parseInt(parts[2]) : 0;
+            return major == 26 || (major == 1 && (minor > 20 || (minor == 20 && patch >= 1)));
+        } catch (NumberFormatException ignored) { return false; }
+    }
+    /** Minimum declared by Podium's Fabric metadata; prereleases of 0.5.13 are too old. */
+    public static boolean supportsPodiumSodiumVersion(String version) {
+        if (version == null) return false;
+        Matcher m = Pattern.compile("^(\\d+)\\.(\\d+)\\.(\\d+)(.*)$").matcher(version);
+        if (!m.matches()) return false;
+        try {
+            int major = Integer.parseInt(m.group(1)), minor = Integer.parseInt(m.group(2)), patch = Integer.parseInt(m.group(3));
+            if (major != 0) return major > 0;
+            if (minor != 5) return minor > 5;
+            if (patch != 13) return patch > 13;
+            return !m.group(4).startsWith("-");
+        } catch (NumberFormatException ignored) { return false; }
+    }
     public static boolean modern(String version) { return version != null && version.startsWith("26."); }
 }
