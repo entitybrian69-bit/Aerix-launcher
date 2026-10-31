@@ -40,9 +40,7 @@
 
 ## Android package and existing data
 
-This branch uses `net.kdt.aerixlauncher` for the release app and `net.kdt.aerixlauncher.debug` for debug builds. Android installs these separately from older `net.kdt.pojavlaunch` builds; they cannot update the old app in place. Keep the old app and back up your data before migrating.
-
-To copy instances and control maps, try **Settings → Miscellaneous → Import data** and select the old launcher in the system file picker. Accounts, private settings and runtimes do not transfer automatically; sign in and configure them again. Confirm your data is present before removing the old app.
+To keep existing Aerix installs updatable, the release app retains the Android ID `net.kdt.pojavlaunch`; the debug app retains `net.kdt.pojavlaunch.debug`. Android can install an update over an existing app only when its package ID and signing certificate match and its version code is not lower. Debug and release are separate apps and cannot update each other. Back up your data before installing an update.
 
 ## 🗺️ Quick Links
 <p align="center">

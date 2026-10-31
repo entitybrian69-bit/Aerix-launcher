@@ -1,6 +1,5 @@
 """Checks public branding and package configuration without an Android SDK."""
 from pathlib import Path
-import re
 import struct
 import unittest
 import xml.etree.ElementTree as ET
@@ -13,24 +12,32 @@ RES = APP / "src/main/res"
 class BrandingIdentitySmoke(unittest.TestCase):
     def test_application_ids_and_provider_authorities(self):
         gradle = (APP / "build.gradle").read_text()
-        self.assertIn('applicationId "net.kdt.aerixlauncher"', gradle)
-        for package in ("net.kdt.aerixlauncher", "net.kdt.aerixlauncher.debug", "net.kdt.aerixlauncher.pub"):
+        self.assertIn('applicationId "net.kdt.pojavlaunch"', gradle)
+        for package in ("net.kdt.pojavlaunch", "net.kdt.pojavlaunch.debug", "net.kdt.pojavlaunch.pub"):
             self.assertIn("'application_package', '" + package + "'", gradle)
-        for authority in ("net.kdt.aerixlauncher.scoped.gamefolder",
-                          "net.kdt.aerixlauncher.scoped.gamefolder.debug",
-                          "net.kdt.aerixlauncher.pub.scoped.gamefolder"):
+        for authority in ("net.kdt.pojavlaunch.scoped.gamefolder",
+                          "net.kdt.pojavlaunch.scoped.gamefolder.debug",
+                          "net.kdt.pojavlaunch.pub.scoped.gamefolder"):
             self.assertIn("'storageProviderAuthorities', '" + authority + "'", gradle)
         self.assertIn("namespace 'net.kdt.pojavlaunch'", gradle)
+
+    def test_existing_signing_and_debug_version_configuration(self):
+        gradle = (APP / "build.gradle").read_text()
+        self.assertIn('storeFile file("debug.keystore")', gradle)
+        self.assertIn('storeFile file("aerix_release.p12")', gradle)
+        self.assertIn("signingConfig signingConfigs.customDebug", gradle)
+        self.assertIn("signingConfig signingConfigs.aerixRelease", gradle)
+        self.assertIn('onVariants(selector().withBuildType("debug"))', gradle)
+        self.assertIn("output.versionCode.set(AERIX_DEBUG_VERSION_CODE)", gradle)
 
     def test_previous_apps_can_still_be_discovered(self):
         manifest = ET.parse(APP / "src/main/AndroidManifest.xml").getroot()
         ns = "{http://schemas.android.com/apk/res/android}"
         packages = {p.get(ns + "name") for p in manifest.findall("./queries/package")}
-        self.assertTrue({"net.kdt.pojavlaunch", "net.kdt.pojavlaunch.debug", "net.kdt.pojavlaunch.pub",
-                         "net.kdt.aerixlauncher", "net.kdt.aerixlauncher.debug", "net.kdt.aerixlauncher.pub"} <= packages)
+        self.assertTrue({"net.kdt.pojavlaunch", "net.kdt.pojavlaunch.debug", "net.kdt.pojavlaunch.pub"} <= packages)
         activity = (APP / "src/main/java/net/kdt/pojavlaunch/LauncherActivity.java").read_text()
         self.assertIn("s.equals(getPackageName())", activity)
-        self.assertIn("R.string.aerix_package_migration_notice", activity)
+        self.assertIn("R.string.migration_notice", activity)
 
     def test_localized_app_labels_and_notifications(self):
         count = 0

@@ -580,5 +580,4 @@
     <string name="aerix_ingame_menu_switch_restart">The game is signed in as %1$s. Switching to %2$s restarts it, so the world you are in now is closed.</string>
     <string name="aerix_ingame_menu_switch_restart_confirm">Switch and restart</string>
     <string name="aerix_ingame_menu_switch_restart_cancel">Not now</string>
-    <string name="aerix_package_migration_notice">This Aerix Launcher installs separately from your older launcher. To copy instances and control maps, open Settings → Miscellaneous → Import data and select the old launcher in the system file picker. Accounts and private settings do not transfer automatically; sign in again. Keep the old app until you have checked your data.</string>
 </resources>
