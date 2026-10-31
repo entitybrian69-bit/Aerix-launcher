@@ -6,7 +6,7 @@ import kotlin.math.floor
 
 data class ClientTelemetrySnapshot(
     val x: Double, val y: Double, val z: Double, val yaw: Float?, val health: Float?, val maxHealth: Float?,
-    val dimension: String, val dayTime: Long?, val server: String?, val ping: Int?, val light: Int?,
+    val dimension: String, val dayTime: Long?, val server: String?, val ping: Int?, val light: Int?, val biome: String?,
     val armor: List<String>, val held: String?, val offhand: String?, val effects: List<String>
 ) {
     val blockX get() = floor(x).toInt()
@@ -56,6 +56,6 @@ object ClientTelemetryBridge {
         }
         ClientTelemetrySnapshot(x, y, z, p.getProperty("yaw")?.toFloatOrNull(), p.getProperty("health")?.toFloatOrNull(), p.getProperty("maxHealth")?.toFloatOrNull(),
             p.getProperty("dimension", "unknown"), p.getProperty("dayTime")?.toLongOrNull(),
-            p.getProperty("server"), p.getProperty("ping")?.toIntOrNull(), p.getProperty("light")?.toIntOrNull(), (0..3).mapNotNull { item("armor$it") }, item("held"), item("offhand"), effects)
+            p.getProperty("server"), p.getProperty("ping")?.toIntOrNull(), p.getProperty("light")?.toIntOrNull(), p.getProperty("biome"), (0..3).mapNotNull { item("armor$it") }, item("held"), item("offhand"), effects)
     }.getOrNull()
 }

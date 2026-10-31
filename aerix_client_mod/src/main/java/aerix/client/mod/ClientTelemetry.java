@@ -85,7 +85,11 @@ final class ClientTelemetry {
             try {
                 Object pos = invoke(player.getClass(), player, "method_24515");
                 Class<?> posClass = Class.forName("net.minecraft.class_2338");
-                p.setProperty("light", String.valueOf(invoke(world.getClass(), world, "method_22339", posClass, pos)));
+                try { p.setProperty("light", String.valueOf(invoke(world.getClass(), world, "method_22339", posClass, pos))); }
+                catch (Throwable ignored) { }
+                Object biome = invoke(world.getClass(), world, "method_23753", posClass, pos);
+                String biomeId = biomeIdentifier(mc, biome);
+                if (biomeId != null) p.setProperty("biome", biomeId);
             } catch (Throwable ignored) { }
             try {
                 Object key = invoke(world.getClass(), world, "method_27983");
@@ -122,6 +126,31 @@ final class ClientTelemetry {
             }
         } catch (Throwable ignored) { }
         return p;
+    }
+
+    private static String biomeIdentifier(Object mc, Object biome) {
+        if (biome == null) return null;
+        try {
+            // 1.18+: biome is a registry entry carrying a registry key.
+            Object optional = invoke(biome.getClass(), biome, "method_40230");
+            if (optional instanceof java.util.Optional && ((java.util.Optional<?>) optional).isPresent()) {
+                Object key = ((java.util.Optional<?>) optional).get();
+                Object id = invoke(key.getClass(), key, "method_29177");
+                return id == null ? null : String.valueOf(id);
+            }
+        } catch (Throwable ignored) { }
+        try {
+            // 1.16.5: resolve the biome object through the server's dynamic biome registry.
+            Object handler = invoke(mc.getClass(), mc, "method_1562");
+            if (handler == null) return null;
+            Object manager = invoke(handler.getClass(), handler, "method_29091");
+            Class<?> registryClass = Class.forName("net.minecraft.class_2378");
+            Object biomeKey = registryClass.getField("field_25114").get(null);
+            Class<?> registryKeyClass = Class.forName("net.minecraft.class_5321");
+            Object registry = invoke(manager.getClass(), manager, "method_30530", registryKeyClass, biomeKey);
+            Object id = invoke(registry.getClass(), registry, "method_10221", Object.class, biome);
+            return id == null ? null : String.valueOf(id);
+        } catch (Throwable ignored) { return null; }
     }
 
     private static void writeItem(Properties p, String prefix, Object stack) {

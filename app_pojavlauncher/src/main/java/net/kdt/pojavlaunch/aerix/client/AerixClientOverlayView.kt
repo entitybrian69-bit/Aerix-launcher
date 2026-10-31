@@ -140,7 +140,8 @@ private enum class ClientMenuSubPage {
     WAYPOINTS,
     VISUALS,
     GAME_OPTIONS,
-    CHAT_SHORTCUTS
+    CHAT_SHORTCUTS,
+    AIM
 }
 
 private enum class FeatureIconKind {
@@ -404,7 +405,7 @@ private fun AerixClientRootOverlay(
     var wallClock by remember { mutableStateOf("") }
     val needsTelemetry = AerixClientStore.coordsHudEnabled || AerixClientStore.armorHudEnabled ||
         AerixClientStore.effectsHudEnabled || AerixClientStore.worldTimeHudEnabled ||
-        AerixClientStore.serverHudEnabled || AerixClientStore.pingHudEnabled || AerixClientStore.lightHudEnabled ||
+        AerixClientStore.serverHudEnabled || AerixClientStore.pingHudEnabled || AerixClientStore.lightHudEnabled || AerixClientStore.biomeHudEnabled ||
         AerixClientStore.compassEnabled || AerixClientStore.waypointHudEnabled || AerixClientStore.deathWaypointEnabled || AerixClientStore.healthHudEnabled ||
         (modal == InGameClientModal.MODULES && subPage == ClientMenuSubPage.WAYPOINTS)
     val telemetryRequested by rememberUpdatedState(needsTelemetry)
@@ -625,7 +626,8 @@ private fun AerixClientRootOverlay(
                 onOpenOledAfk = { onChangeModal(InGameClientModal.OLED_AFK) },
                 onSyncOptionsTxt = onSyncOptionsTxt,
                 onSyncCape = onSyncCape,
-                telemetry = telemetry
+                telemetry = telemetry,
+                gameDir = gameDir
             )
         }
 
@@ -678,7 +680,8 @@ private fun FamousClientRectangleMenu(
     onOpenOledAfk: () -> Unit,
     onSyncOptionsTxt: () -> Unit,
     onSyncCape: () -> Unit,
-    telemetry: ClientTelemetrySnapshot?
+    telemetry: ClientTelemetrySnapshot?,
+    gameDir: File?
 ) {
     val context = LocalContext.current
 
@@ -765,6 +768,7 @@ private fun FamousClientRectangleMenu(
                             ClientMenuSubPage.VISUALS -> "AERIX CLIENT  ·  VISUALS"
                             ClientMenuSubPage.GAME_OPTIONS -> "AERIX CLIENT  ·  GAME OPTIONS"
                             ClientMenuSubPage.CHAT_SHORTCUTS -> "AERIX CLIENT  ·  CHAT SHORTCUTS"
+                            ClientMenuSubPage.AIM -> "AERIX CLIENT  ·  AIM"
                         },
                         color = Color.White,
                         fontSize = 15.sp,
@@ -842,18 +846,20 @@ private fun FamousClientRectangleMenu(
                         onOpenVisuals = { onChangeSubPage(ClientMenuSubPage.VISUALS) },
                         onOpenGameOptions = { onChangeSubPage(ClientMenuSubPage.GAME_OPTIONS) },
                         onOpenChatShortcuts = { onChangeSubPage(ClientMenuSubPage.CHAT_SHORTCUTS) },
+                        onOpenAim = { onChangeSubPage(ClientMenuSubPage.AIM) },
                         onOpenOledAfk = onOpenOledAfk,
                         onSyncOptionsTxt = onSyncOptionsTxt
                     )
                     ClientMenuSubPage.CAPES -> ClientCapesSubPage(onSyncCape = onSyncCape)
                     ClientMenuSubPage.CROSSHAIRS -> ClientCrosshairsSubPage()
-                    ClientMenuSubPage.PERFORMANCE -> ClientPerformancePage()
+                    ClientMenuSubPage.PERFORMANCE -> ClientPerformancePage(gameDir)
                     ClientMenuSubPage.UTILITY -> ClientUtilityPage(onClose)
                     ClientMenuSubPage.INFORMATION -> ClientInformationPage()
                     ClientMenuSubPage.WAYPOINTS -> ClientWaypointsPage(telemetry)
                     ClientMenuSubPage.VISUALS -> ClientVisualPage()
                     ClientMenuSubPage.GAME_OPTIONS -> ClientGameOptionsPage()
                     ClientMenuSubPage.CHAT_SHORTCUTS -> ClientChatShortcutsPage(onClose)
+                    ClientMenuSubPage.AIM -> ClientAimPage()
                 }
             }
         }
@@ -872,10 +878,13 @@ private fun ClientSquaresGridPage(
     onOpenVisuals: () -> Unit,
     onOpenGameOptions: () -> Unit,
     onOpenChatShortcuts: () -> Unit,
+    onOpenAim: () -> Unit,
     onOpenOledAfk: () -> Unit,
     onSyncOptionsTxt: () -> Unit
 ) {
     val modules = listOf(
+        ClientSquareModule("aim_settings", "Aim Profiles", FeatureIconKind.GYRO,
+            { AerixClientStore.touchAimEnabled || AerixClientStore.gyroAdsEnabled }, { "SETTINGS ›" }, onOpenAim),
         ClientSquareModule("chat_shortcuts", "Chat Shortcuts", FeatureIconKind.AUTOGG,
             { false }, { "OPEN ›" }, onOpenChatShortcuts),
         ClientSquareModule("game_options", "Game Options", FeatureIconKind.GYRO,
@@ -883,7 +892,7 @@ private fun ClientSquaresGridPage(
         ClientSquareModule("visuals", "Visuals", FeatureIconKind.FULLBRIGHT,
             { false }, { "SETTINGS ›" }, onOpenVisuals),
         ClientSquareModule("info", "Information HUD", FeatureIconKind.COMPASS,
-            { AerixClientStore.coordsHudEnabled || AerixClientStore.armorHudEnabled || AerixClientStore.effectsHudEnabled || AerixClientStore.clockHudEnabled || AerixClientStore.worldTimeHudEnabled || AerixClientStore.serverHudEnabled || AerixClientStore.pingHudEnabled || AerixClientStore.lightHudEnabled },
+            { AerixClientStore.coordsHudEnabled || AerixClientStore.armorHudEnabled || AerixClientStore.effectsHudEnabled || AerixClientStore.clockHudEnabled || AerixClientStore.worldTimeHudEnabled || AerixClientStore.serverHudEnabled || AerixClientStore.pingHudEnabled || AerixClientStore.lightHudEnabled || AerixClientStore.biomeHudEnabled },
             { "SETTINGS ›" }, onOpenInformation),
         ClientSquareModule("waypoints", "Waypoints", FeatureIconKind.COMPASS,
             { AerixClientStore.waypointHudEnabled }, { "MANAGE ›" }, onOpenWaypoints),
@@ -1417,6 +1426,36 @@ private fun DrawScope.drawFeatureSymbol(kind: FeatureIconKind, color: Color) {
 }
 
 @Composable
+private fun ClientAimPage() {
+    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text("Touch multiplier applies only while looking in Aerix Client; your launcher setting is unchanged.",
+            color = LiquidCrystalPalette.TextSecondary, fontSize = 11.sp)
+        ClientInformationToggle("Enable touch aim multiplier", AerixClientStore.touchAimEnabled) { AerixClientStore.touchAimEnabled = it }
+        Text("Touch aim  ${"%.2f".format(AerixClientStore.touchAimMultiplier)}×", color = Color.White, fontSize = 11.sp)
+        Slider(value = AerixClientStore.touchAimMultiplier, onValueChange = {
+            AerixClientStore.touchAimMultiplier = it; AerixClientStore.persist()
+        }, valueRange = 0.25f..2f)
+        ClientInformationToggle("Enable Aerix gyroscope", AerixClientStore.gyroAdsEnabled) { AerixClientStore.gyroAdsEnabled = it }
+        Text("Gyro aim  ${"%.2f".format(AerixClientStore.gyroSensitivity)}×", color = Color.White, fontSize = 11.sp)
+        Slider(value = AerixClientStore.gyroSensitivity.coerceIn(0.25f, 2f), onValueChange = {
+            AerixClientStore.gyroSensitivity = it; AerixClientStore.persist()
+        }, valueRange = 0.25f..2f)
+        Row(modifier = Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            listOf("Precise" to 0.6f, "Balanced" to 1f, "Fast" to 1.5f).forEach { (label, multiplier) ->
+                LiquidCrystalPill(label, onClick = {
+                    AerixClientStore.touchAimMultiplier = multiplier
+                    AerixClientStore.gyroSensitivity = multiplier
+                    AerixClientStore.touchAimEnabled = true
+                    AerixClientStore.persist()
+                })
+            }
+        }
+        Text("Gyro requires a supported sensor. Avoid enabling both Aerix and launcher gyro at once.",
+            color = LiquidCrystalPalette.TextMuted, fontSize = 10.sp)
+    }
+}
+
+@Composable
 private fun ClientChatShortcutsPage(onClose: () -> Unit) {
     var newText by remember { mutableStateOf("") }
     val context = LocalContext.current
@@ -1497,6 +1536,7 @@ private fun ClientInformationPage() {
         ClientInformationToggle("Server address", AerixClientStore.serverHudEnabled) { AerixClientStore.serverHudEnabled = it }
         ClientInformationToggle("Health", AerixClientStore.healthHudEnabled) { AerixClientStore.healthHudEnabled = it }
         ClientInformationToggle("Server ping", AerixClientStore.pingHudEnabled) { AerixClientStore.pingHudEnabled = it }
+        ClientInformationToggle("Biome", AerixClientStore.biomeHudEnabled) { AerixClientStore.biomeHudEnabled = it }
         ClientInformationToggle("Light level", AerixClientStore.lightHudEnabled) { AerixClientStore.lightHudEnabled = it }
         ClientInformationToggle("Phone clock", AerixClientStore.clockHudEnabled) { AerixClientStore.clockHudEnabled = it }
         Text("Use Edit HUD to move the Information HUD. Server addresses are visible on screen when enabled.",
@@ -1556,14 +1596,42 @@ private fun ClientWaypointsPage(telemetry: ClientTelemetrySnapshot?) {
 }
 
 /** Settings are queued and applied before the next Minecraft launch. */
+/** Read the local Fabric metadata; never claim a jar is active merely because it exists. */
+private fun findInstalledOptimizationMods(gameDir: File?): List<String> {
+    if (gameDir == null) return emptyList()
+    val ids = setOf("sodium", "lithium", "ferritecore", "entityculling", "immediatelyfast", "modernfix",
+        "krypton", "starlight", "lazydfu", "c2me", "moreculling", "enhancedblockentities", "dynamic_fps",
+        "exordium", "noisium", "vmp", "memoryleakfix")
+    return File(gameDir, "mods").listFiles().orEmpty().asSequence()
+        .filter { it.isFile && it.extension.equals("jar", ignoreCase = true) }
+        .mapNotNull { file ->
+            runCatching {
+                java.util.zip.ZipFile(file).use { zip ->
+                    val entry = zip.getEntry("fabric.mod.json") ?: return@use null
+                    if (entry.size > 65536) return@use null
+                    val json = zip.getInputStream(entry).bufferedReader().use { it.readText() }
+                    org.json.JSONObject(json).optString("id").takeIf { it.lowercase() in ids }
+                }
+            }.getOrNull()
+        }.distinct().sorted().take(30).toList()
+}
+
 @Composable
-private fun ClientPerformancePage() {
+private fun ClientPerformancePage(gameDir: File?) {
     val options = ClientPerformanceSettings.overrides
+    var installedMods by remember(gameDir) { mutableStateOf<List<String>>(emptyList()) }
+    LaunchedEffect(gameDir) {
+        installedMods = withContext(Dispatchers.IO) { findInstalledOptimizationMods(gameDir) }
+    }
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         ClientInformationToggle("Show FPS history HUD", AerixClientStore.fpsHistoryEnabled) { AerixClientStore.fpsHistoryEnabled = it }
+        Text("Optimization mods installed (loading and compatibility are not guaranteed):",
+            color = LiquidCrystalPalette.TextSecondary, fontSize = 10.sp)
+        Text(if (installedMods.isEmpty()) "None detected" else installedMods.joinToString(" · "),
+            color = Color.White, fontSize = 10.sp)
         Text("Settings apply next time Minecraft starts. Lower settings can improve FPS but reduce visual quality.",
             color = LiquidCrystalPalette.TextSecondary, fontSize = 11.sp)
         Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -2141,18 +2209,21 @@ private fun InGameCrimsonHud(
         // One movable panel keeps enabled information together instead of overlapping separate HUDs.
         val infoEnabled = AerixClientStore.coordsHudEnabled || AerixClientStore.armorHudEnabled ||
             AerixClientStore.effectsHudEnabled || AerixClientStore.worldTimeHudEnabled ||
-            AerixClientStore.serverHudEnabled || AerixClientStore.pingHudEnabled || AerixClientStore.lightHudEnabled || AerixClientStore.healthHudEnabled || AerixClientStore.clockHudEnabled || AerixClientStore.waypointHudEnabled
+            AerixClientStore.serverHudEnabled || AerixClientStore.pingHudEnabled || AerixClientStore.lightHudEnabled || AerixClientStore.biomeHudEnabled || AerixClientStore.healthHudEnabled || AerixClientStore.clockHudEnabled || AerixClientStore.waypointHudEnabled
         if (infoEnabled) {
             CrimsonHudBox(modifier = Modifier.atHudSlot("info")) {
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     if (AerixClientStore.clockHudEnabled) Text("Clock $wallClock", color = Color.White, fontSize = 10.sp)
                     if (telemetry == null && (AerixClientStore.coordsHudEnabled || AerixClientStore.armorHudEnabled ||
                             AerixClientStore.effectsHudEnabled || AerixClientStore.worldTimeHudEnabled ||
-                            AerixClientStore.serverHudEnabled || AerixClientStore.pingHudEnabled || AerixClientStore.lightHudEnabled || AerixClientStore.healthHudEnabled || AerixClientStore.waypointHudEnabled)) {
+                            AerixClientStore.serverHudEnabled || AerixClientStore.pingHudEnabled || AerixClientStore.lightHudEnabled || AerixClientStore.biomeHudEnabled || AerixClientStore.healthHudEnabled || AerixClientStore.waypointHudEnabled)) {
                         Text("Waiting for game data…", color = LiquidCrystalPalette.TextSecondary, fontSize = 10.sp)
                     }
                     if (telemetry != null) {
-                        if (AerixClientStore.coordsHudEnabled) Text("XYZ ${telemetry.blockX} / ${telemetry.blockY} / ${telemetry.blockZ} · ${telemetry.dimension}", color = Color.White, fontSize = 10.sp)
+                        if (AerixClientStore.coordsHudEnabled) {
+                            val direction = telemetry.yaw?.let { " · ${cardinalLabel(((it % 360f) + 360f) % 360f)} ${it.roundToInt()}°" } ?: ""
+                            Text("XYZ ${telemetry.blockX} / ${telemetry.blockY} / ${telemetry.blockZ} · ${telemetry.dimension}$direction", color = Color.White, fontSize = 10.sp)
+                        }
                         if (AerixClientStore.worldTimeHudEnabled && telemetry.dayTime != null) {
                             val ticks = ((telemetry.dayTime % 24000) + 24000) % 24000
                             val minute = ((ticks * 60 / 1000) + 360) % 1440
@@ -2161,6 +2232,7 @@ private fun InGameCrimsonHud(
                         if (AerixClientStore.serverHudEnabled) Text("Server ${telemetry.server ?: "Unavailable"}", color = Color.White, fontSize = 10.sp)
                         if (AerixClientStore.healthHudEnabled) Text("Health ${telemetry.health?.toString() ?: "?"} / ${telemetry.maxHealth?.toString() ?: "?"}", color = Color.White, fontSize = 10.sp)
                         if (AerixClientStore.pingHudEnabled) Text("Ping ${telemetry.ping?.let { "$it ms" } ?: "Unavailable"}", color = Color.White, fontSize = 10.sp)
+                        if (AerixClientStore.biomeHudEnabled) Text("Biome ${telemetry.biome ?: "Unavailable"}", color = Color.White, fontSize = 10.sp)
                         if (AerixClientStore.lightHudEnabled) Text("Light ${telemetry.light?.toString() ?: "Unavailable"}", color = Color.White, fontSize = 10.sp)
                         if (AerixClientStore.armorHudEnabled) {
                             (telemetry.armor + listOfNotNull(telemetry.held, telemetry.offhand)).forEach {

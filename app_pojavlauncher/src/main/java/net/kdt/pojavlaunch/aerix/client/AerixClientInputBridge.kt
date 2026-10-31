@@ -245,6 +245,11 @@ object AerixClientInputBridge {
         Platform.sendCursorPosition()
     }
 
+    /** Per-Client look multiplier; never changes launcher-wide touch settings. */
+    @JvmStatic
+    fun touchAimMultiplier(): Float = if (clientSessionActive && Platform.isGrabbing() && AerixClientStore.touchAimEnabled)
+        AerixClientStore.touchAimMultiplier else 1f
+
     fun applyGyroDelta(deltaX: Float, deltaY: Float) {
         if (!Platform.isGrabbing()) return
         val sens = AerixClientStore.gyroSensitivity * 18.0
