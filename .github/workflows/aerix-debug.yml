@@ -18,6 +18,7 @@ on:
       - "app_pojavlauncher/libs/**"
       - "forge_installer/**"
       - "aerix_client_mod/**"
+      - "tests/InstanceMemorySmokeTest.java"
       - "glfw/**"
       - "sdl/**"
       - "mojoexec/**"
@@ -60,6 +61,14 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
+
+      - name: Verify per-instance memory selection
+        run: |
+          mkdir -p "$RUNNER_TEMP/aerix-memory-test"
+          javac -d "$RUNNER_TEMP/aerix-memory-test" \
+            app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/utils/jre/InstanceMemory.java \
+            tests/InstanceMemorySmokeTest.java
+          java -cp "$RUNNER_TEMP/aerix-memory-test" InstanceMemorySmokeTest
 
       - name: Get LTW
         uses: dawidd6/action-download-artifact@v6

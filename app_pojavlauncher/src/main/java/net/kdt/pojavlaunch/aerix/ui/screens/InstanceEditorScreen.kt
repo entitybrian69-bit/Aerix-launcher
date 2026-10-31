@@ -380,7 +380,7 @@ private fun InstanceSidebarCard(
     val vanilla = stringResource(R.string.aerix_home_vanilla)
     val loader = loaderLabel(draft.versionId, vanilla)
     val mcVer = mcVerRegex.find(draft.versionId)?.value ?: draft.versionId.ifBlank { "Latest" }
-    val ramMb = LauncherPreferences.PREF_RAM_ALLOCATION
+    val ramMb = net.kdt.pojavlaunch.utils.jre.InstanceMemory.effectiveMb(draft.jvmArgs, LauncherPreferences.PREF_RAM_ALLOCATION)
     var showMenu by remember { mutableStateOf(false) }
 
     Surface(
@@ -1220,26 +1220,6 @@ private fun InstanceContentPane(
 // Settings sub-screen (Mirai VersionConfigScreen.kt — Photos 3, 4 & 5)
 // ============================================================================================
 
-private val xmxRegex = Regex("""-Xmx(\d+)([MmGg])""")
-
-private fun extractCustomRamMb(jvmArgs: String): Int {
-    val match = xmxRegex.find(jvmArgs) ?: return -1
-    val num = match.groupValues[1].toIntOrNull() ?: return -1
-    val unit = match.groupValues[2].uppercase()
-    return if (unit == "G") num * 1024 else num
-}
-
-private fun applyCustomRamToJvmArgs(jvmArgs: String, ramMb: Int): String {
-    val stripped = jvmArgs.replace(xmxRegex, "").replace(Regex("""\s+"""), " ").trim()
-    return if (ramMb <= 0) {
-        stripped
-    } else if (stripped.isEmpty()) {
-        "-Xmx${ramMb}M"
-    } else {
-        "-Xmx${ramMb}M $stripped"
-    }
-}
-
 @Composable
 private fun InstanceSettingsPane(
     activity: FragmentActivity,
@@ -1334,7 +1314,7 @@ private fun InstanceSettingsPane(
     val maxRamMb = remember { PojavSettingsBridge.maxRam(activity).coerceAtLeast(1024) }
     val globalRamMb = remember { LauncherPreferences.PREF_RAM_ALLOCATION.coerceIn(256, maxRamMb) }
     var customRamMb by remember(draft.jvmArgs) {
-        mutableIntStateOf(extractCustomRamMb(draft.jvmArgs))
+        mutableIntStateOf(net.kdt.pojavlaunch.utils.jre.InstanceMemory.overrideMb(draft.jvmArgs))
     }
 
     val isolationState = if (!draft.sharedData) MiraiFollowGlobalState.ENABLE else MiraiFollowGlobalState.DISABLE
@@ -1492,7 +1472,7 @@ private fun InstanceSettingsPane(
                 currentValue = customRamMb,
                 defaultValue = globalRamMb,
                 title = "Memory Allocation",
-                summary = "Adjust Minecraft's memory usage",
+                summary = "Set a separate Java heap for this instance, or uncheck to follow the launcher default",
                 valueRange = 256..maxRamMb,
                 suffix = "MB",
                 fineTuningControl = true,
@@ -1501,7 +1481,7 @@ private fun InstanceSettingsPane(
                 },
                 onValueFinished = { ram ->
                     customRamMb = ram
-                    draft.jvmArgs = applyCustomRamToJvmArgs(draft.jvmArgs, ram)
+                    draft.jvmArgs = net.kdt.pojavlaunch.utils.jre.InstanceMemory.withOverride(draft.jvmArgs, ram)
                     PojavInstanceEditorBridge.save(activity)
                 }
             )

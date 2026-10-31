@@ -424,7 +424,10 @@ public class GameRunner {
             }
         }
 
-        activity.runOnUiThread(() -> Toast.makeText(activity, activity.getString(R.string.autoram_info_msg,LauncherPreferences.PREF_RAM_ALLOCATION), Toast.LENGTH_SHORT).show());
+        final int launchMemoryMb = InstanceMemory.effectiveMb(instance.jvmArgs, LauncherPreferences.PREF_RAM_ALLOCATION);
+        Logger.appendToLog("Java heap allocation: " + launchMemoryMb + " MB" +
+                (InstanceMemory.overrideMb(instance.jvmArgs) > 0 ? " (instance override)" : " (launcher default)") + "\n");
+        activity.runOnUiThread(() -> Toast.makeText(activity, activity.getString(R.string.autoram_info_msg, launchMemoryMb), Toast.LENGTH_SHORT).show());
 
         Log.i("GameRunner", "Running with "+ launchArgs.toString());
 
@@ -432,7 +435,7 @@ public class GameRunner {
 
         try {
             JavaRunner.nativeSetupExit(activity);
-            JavaRunner.startJvm(runtime, javaArgList, launchClassPath, mainClass, launchArgs);
+            JavaRunner.startJvm(runtime, javaArgList, launchClassPath, mainClass, launchArgs, launchMemoryMb);
         }catch (VMLoadException e) {
             LifecycleAwareAlertDialog.DialogCreator dialogCreator = (dialog, builder) ->
                 builder.setMessage(e.toString(activity)).setPositiveButton(android.R.string.ok, (d, w)->{});
