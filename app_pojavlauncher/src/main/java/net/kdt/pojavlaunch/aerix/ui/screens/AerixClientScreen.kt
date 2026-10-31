@@ -116,6 +116,10 @@ fun AerixClientScreen(activity: FragmentActivity) {
             }
         }
 
+        // Load the instance list once, rather than scanning disk for every version card.
+        val installedClients = remember(refreshTick, AerixClientInstaller.isInstalling) {
+            runCatching { Instances.loadAllInstances() }.getOrDefault(emptyList())
+        }
         // Liquid Glass Version Download & Launch List (Nothing More)
         Column(
             modifier = Modifier
@@ -125,7 +129,7 @@ fun AerixClientScreen(activity: FragmentActivity) {
         ) {
             AerixClientInstaller.availableVersions.forEach { spec ->
                 val installed = remember(refreshTick, AerixClientInstaller.isInstalling, spec.mcVersion) {
-                    AerixClientInstaller.findInstalledClientInstance(spec.mcVersion)
+                    AerixClientInstaller.findInstalledClientInstance(spec.mcVersion, installedClients)
                 }
                 val isSelected = AerixClientStore.selectedClientVersion == spec.mcVersion
                 val rowShape = RoundedCornerShape(AerixRadii.card)

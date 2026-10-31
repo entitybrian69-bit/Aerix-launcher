@@ -48,7 +48,7 @@ object AerixClientInstaller {
 
     val availableVersions: List<ClientVersionSpec> = ClientVersions.RELEASES.map { version ->
         ClientVersionSpec(version, "Aerix Client $version", if (ClientVersions.modern(version))
-            "Experimental · Java 25 · some Client features unavailable" else "Fabric · version-matched optimization mods")
+            "Experimental · Java 25 · animated capes and time/weather overrides not yet ported" else "Fabric · version-matched optimization mods")
     }
 
     var isInstalling by mutableStateOf(false)
@@ -66,8 +66,10 @@ object AerixClientInstaller {
 
     fun instanceNameFor(mcVersion: String): String = "Aerix Client $mcVersion"
 
-    fun findInstalledClientInstance(mcVersion: String? = null): Instance? = runCatching {
-        val list = Instances.loadAllInstances()
+    fun findInstalledClientInstance(mcVersion: String? = null): Instance? =
+        findInstalledClientInstance(mcVersion, runCatching { Instances.loadAllInstances() }.getOrDefault(emptyList()))
+
+    fun findInstalledClientInstance(mcVersion: String?, list: List<Instance>): Instance? = runCatching {
         if (mcVersion.isNullOrBlank()) {
             list.firstOrNull { it.isAerixClient }
                 ?: list.firstOrNull { it.name?.startsWith("Aerix Client", ignoreCase = true) == true }

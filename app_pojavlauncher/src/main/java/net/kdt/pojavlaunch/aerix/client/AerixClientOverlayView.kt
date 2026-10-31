@@ -703,6 +703,7 @@ private fun AerixClientRootOverlay(
                 fps = currentFps,
                 fpsHistory = fpsHistory,
                 frameTiming = frameTiming,
+                frameTimingSupported = mcVersion != "26.3",
                 low1Pct = onePercentLowFps,
                 ramMb = usedRamMb,
                 batteryPct = batteryPct,
@@ -1837,7 +1838,7 @@ private fun ClientVisualPage(gameDir: File?) {
     }
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text("Visual time and weather affect only this client, not the server. Turning them off restores the captured state until the server updates it.", color = LiquidCrystalPalette.TextSecondary, fontSize = 11.sp)
+        Text("Visual time and weather affect only this client, not the server. Turning them off restores the captured state until the server updates it. Not yet available on 26.x.", color = LiquidCrystalPalette.TextSecondary, fontSize = 11.sp)
         Row(modifier = Modifier.horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("Time", color = Color.White, fontSize = 11.sp)
             listOf("OFF" to "Server", "DAY" to "Day", "SUNSET" to "Sunset", "NIGHT" to "Night").forEach { (mode, label) ->
@@ -1987,7 +1988,7 @@ private fun ClientPerformancePage(gameDir: File?, onClose: () -> Unit) {
             Text("Minimum chunks", color = Color.White, fontSize = 11.sp)
             listOf(2, 4, 6, 8).forEach { value -> LiquidCrystalPill("$value", selected = AerixClientStore.adaptiveMinDistance == value, onClick = { AerixClientStore.adaptiveMinDistance = value; AerixClientStore.persist() }) }
         }
-        Text("Frame timing measures swap-to-swap intervals while enabled; 100 ms and longer are grouped together.", color = LiquidCrystalPalette.TextMuted, fontSize = 10.sp)
+        Text("Frame timing measures GLFW swap intervals (100 ms and longer grouped). On 26.3, FPS comes from the game; frame timing is unavailable.", color = LiquidCrystalPalette.TextMuted, fontSize = 10.sp)
         Text("Optimization mods installed (loading and compatibility are not guaranteed):",
             color = LiquidCrystalPalette.TextSecondary, fontSize = 10.sp)
         Text(if (installedMods.isEmpty()) "None detected" else installedMods.joinToString(" · "),
@@ -2524,6 +2525,7 @@ private fun InGameCrimsonHud(
     fps: Int,
     fpsHistory: List<Int>,
     frameTiming: FrameTimingStats?,
+    frameTimingSupported: Boolean,
     low1Pct: Int,
     ramMb: Int,
     batteryPct: Int,
@@ -2662,7 +2664,7 @@ private fun InGameCrimsonHud(
                 }
                 if (AerixClientStore.frameTimingEnabled) {
                     val stat = frameTiming
-                    val details = if (stat == null) "Frame timing: waiting for frames…" else {
+                    val details = if (!frameTimingSupported) "Frame timing unavailable on Minecraft 26.3" else if (stat == null) "Frame timing: waiting for frames…" else {
                         val p95 = if (stat.p95Ms >= 100) "100+" else stat.p95Ms.toString()
                         "Frame ~${"%.1f".format(stat.meanMsCapped)} ms · P95 ${p95}ms · ≥50ms ${stat.stutters50ms}"
                     }
