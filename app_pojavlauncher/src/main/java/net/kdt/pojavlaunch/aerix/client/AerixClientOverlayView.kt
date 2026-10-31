@@ -863,7 +863,7 @@ private fun FamousClientRectangleMenu(
                         }
                     } else {
                         Image(
-                            painter = painterResource(R.drawable.aerix_logo),
+                            painter = painterResource(R.drawable.ic_aerix_mark),
                             contentDescription = null,
                             modifier = Modifier
                                 .size(24.dp)
@@ -3048,7 +3048,7 @@ private fun CrimsonBootSplash(instanceLabel: String) {
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Image(
-                        painter = painterResource(R.drawable.aerix_logo),
+                        painter = painterResource(R.drawable.ic_aerix_mark),
                         contentDescription = null,
                         modifier = Modifier
                             .size(44.dp)

@@ -87,7 +87,8 @@ jobs:
 
   deploy:
     needs: verify
-    if: needs.verify.outputs.publish == 'true'
+    # Test branches can verify the site, but must never publish debug-build changes.
+    if: needs.verify.outputs.publish == 'true' && github.ref == 'refs/heads/v3_openjdk'
     runs-on: ubuntu-latest
     environment:
       name: github-pages

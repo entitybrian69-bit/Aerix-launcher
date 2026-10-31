@@ -7,6 +7,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.LinearGradient
 import android.graphics.Paint
+import android.graphics.RectF
 import android.graphics.Shader
 import android.graphics.Typeface
 import net.kdt.pojavlaunch.R
@@ -30,7 +31,7 @@ import kotlin.math.hypot
 object AerixClientPackGenerator {
 
     const val PACK_FILE_NAME = "Aerix-Client-Pack.zip"
-    private const val PACK_SCHEMA_REV = "v4_versioned_pack_metadata"
+    private const val PACK_SCHEMA_REV = "v5_aerix_brand_2026"
 
     fun packFormatForVersion(mcVersion: String): Int = ClientVersions.format(mcVersion)
 
@@ -114,11 +115,12 @@ object AerixClientPackGenerator {
             // 1. Title Screen: Replace "MINECRAFT JAVA EDITION" with "AERIX CLIENT" + Misty Forest Background
             if (AerixClientStore.packCustomMainMenu) {
                 val logoBmp = if (packFmt >= 13) {
-                    buildAerixTitleLogoModern()
+                    buildAerixTitleLogoModern(context)
                 } else {
-                    buildAerixTitleLogoLegacySplit()
+                    buildAerixTitleLogoLegacySplit(context)
                 }
                 putBitmap(zos, "assets/minecraft/textures/gui/title/minecraft.png", logoBmp)
+                putBitmap(zos, "assets/minecraft/textures/gui/title/minceraft.png", logoBmp)
 
                 // Transparent edition.png so vanilla "JAVA EDITION" never appears over "AERIX CLIENT"
                 val emptyEdition = Bitmap.createBitmap(128, 16, Bitmap.Config.ARGB_8888)
@@ -277,88 +279,31 @@ object AerixClientPackGenerator {
      * 1. TITLE SCREEN "AERIX CLIENT" LOGO BUILDERS (EXACT LEGACY & MODERN UV)
      * ═══════════════════════════════════════════════════════════════════════ */
 
-    /**
-     * Renders the chiseled metallic-white + crimson-accented `AERIX CLIENT` banner onto a
-     * logical `(width × 44)` canvas scaled `4×` (`scale = 4`) for razor-sharp HD rendering.
-     */
-    private fun renderAerixBanner(logicalWidth: Int, scale: Int = 4): Bitmap {
-        val w = logicalWidth * scale
-        val h = 44 * scale
-        val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-        val c = Canvas(bmp)
-        val cx = w / 2f
-
-        val boldFace = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
-
-        // Subtle dark crimson-obsidian drop shadow behind "AERIX"
-        val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            typeface = boldFace
+    /** Draw the supplied A and handwritten wordmark on the Minecraft title's 44px strip. */
+    private fun renderAerixBanner(context: Context, logicalWidth: Int, scale: Int = 4): Bitmap {
+        val bmp = Bitmap.createBitmap(logicalWidth * scale, 44 * scale, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bmp)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+        val mark = BitmapFactory.decodeResource(context.resources, R.drawable.ic_aerix_mark)
+        val wordmark = BitmapFactory.decodeResource(context.resources, R.drawable.aerix_wordmark)
+        val left = (logicalWidth - 215f) / 2f * scale
+        if (mark != null) {
+            canvas.drawBitmap(mark, null, RectF(left, 1f * scale, left + 42f * scale, 43f * scale), paint)
+        }
+        if (wordmark != null) {
+            val wordLeft = left + 50f * scale
+            val wordWidth = 165f * scale
+            val wordHeight = wordWidth * wordmark.height / wordmark.width
+            canvas.drawBitmap(wordmark, null, RectF(wordLeft, 7f * scale, wordLeft + wordWidth, 7f * scale + wordHeight), paint)
+        }
+        val subtitle = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
             textAlign = Paint.Align.CENTER
-            textSize = 27f * scale
-            color = Color.argb(235, 10, 10, 14)
-            style = Paint.Style.FILL_AND_STROKE
-            strokeWidth = 2.6f * scale
+            textSize = 7f * scale
+            color = Color.WHITE
+            setShadowLayer(1f * scale, 0f, 1f * scale, Color.BLACK)
         }
-        val mainY = 27.5f * scale
-        c.drawText("AERIX", cx, mainY + 1.8f * scale, shadowPaint)
-
-        // Crimson outer bevel stroke
-        val crimsonRimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            typeface = boldFace
-            textAlign = Paint.Align.CENTER
-            textSize = 27f * scale
-            color = Color.argb(235, 220, 30, 58)
-            style = Paint.Style.STROKE
-            strokeWidth = 1.4f * scale
-        }
-        c.drawText("AERIX", cx, mainY + 0.6f * scale, crimsonRimPaint)
-
-        // Chiseled silver-white metallic gradient fill on "AERIX"
-        val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            typeface = boldFace
-            textAlign = Paint.Align.CENTER
-            textSize = 27f * scale
-            shader = LinearGradient(
-                0f, 3f * scale, 0f, mainY,
-                intArrayOf(
-                    0xFFFFFFFF.toInt(),
-                    0xFFF0F3F8.toInt(),
-                    0xFFCFD6E2.toInt()
-                ),
-                floatArrayOf(0f, 0.55f, 1f),
-                Shader.TileMode.CLAMP
-            )
-        }
-        c.drawText("AERIX", cx, mainY, fillPaint)
-
-        // Sleek Crimson accent lines flanking "C L I E N T" subtitle badge
-        val subY = 39.5f * scale
-        val subShadow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            typeface = boldFace
-            textAlign = Paint.Align.CENTER
-            textSize = 8.2f * scale
-            color = Color.argb(230, 8, 9, 12)
-            style = Paint.Style.FILL_AND_STROKE
-            strokeWidth = 1.6f * scale
-        }
-        c.drawText("CLIENT", cx, subY + 0.9f * scale, subShadow)
-
-        val subPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            typeface = boldFace
-            textAlign = Paint.Align.CENTER
-            textSize = 8.2f * scale
-            color = 0xFFFF3858.toInt()
-        }
-        c.drawText("CLIENT", cx, subY, subPaint)
-
-        val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb(215, 220, 30, 58)
-            strokeWidth = 1.1f * scale
-        }
-        val lineY = 36.6f * scale
-        c.drawLine(cx - 64f * scale, lineY, cx - 34f * scale, lineY, linePaint)
-        c.drawLine(cx + 34f * scale, lineY, cx + 64f * scale, lineY, linePaint)
-
+        canvas.drawText("CLIENT", left + 132.5f * scale, 37f * scale, subtitle)
         return bmp
     }
 
@@ -368,10 +313,10 @@ object AerixClientPackGenerator {
      * - Left half drawn at `width/2 - 137` reads UV `(0, 0, w=155, h=44)`
      * - Right half drawn at `width/2 + 18` reads UV `(0, 45, w=155, h=44)` (centered visual span = `274` units: `155 + 119`)
      */
-    private fun buildAerixTitleLogoLegacySplit(): Bitmap {
+    private fun buildAerixTitleLogoLegacySplit(context: Context): Bitmap {
         val scale = 4
         val sheet = Bitmap.createBitmap(256 * scale, 256 * scale, Bitmap.Config.ARGB_8888)
-        val banner = renderAerixBanner(logicalWidth = 274, scale = scale)
+        val banner = renderAerixBanner(context, logicalWidth = 274, scale = scale)
         val c = Canvas(sheet)
 
         val leftW = 155 * scale
@@ -390,10 +335,10 @@ object AerixClientPackGenerator {
      * Exact Minecraft `1.19.4`–`1.21.4` (`packFmt >= 13`) `LogoRenderer` layout:
      * Canvas `256×64` (at `4×` HD = `1024×256`), single centered blit of UV `(0, 0, w=256, h=44)`.
      */
-    private fun buildAerixTitleLogoModern(): Bitmap {
+    private fun buildAerixTitleLogoModern(context: Context): Bitmap {
         val scale = 4
         val sheet = Bitmap.createBitmap(256 * scale, 64 * scale, Bitmap.Config.ARGB_8888)
-        val banner = renderAerixBanner(logicalWidth = 256, scale = scale)
+        val banner = renderAerixBanner(context, logicalWidth = 256, scale = scale)
         Canvas(sheet).drawBitmap(banner, 0f, 0f, null)
         return sheet
     }
@@ -736,7 +681,7 @@ object AerixClientPackGenerator {
         )
         c.drawRoundRect(4f, 4f, 124f, 124f, 28f, 28f, p)
         runCatching {
-            val raw = BitmapFactory.decodeResource(context.resources, R.drawable.aerix_logo)
+            val raw = BitmapFactory.decodeResource(context.resources, R.drawable.ic_aerix_mark)
             if (raw != null) {
                 val scaled = Bitmap.createScaledBitmap(raw, 92, 92, true)
                 c.drawBitmap(scaled, 18f, 18f, null)
