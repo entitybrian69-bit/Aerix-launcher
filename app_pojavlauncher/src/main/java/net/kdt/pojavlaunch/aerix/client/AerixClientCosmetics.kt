@@ -7,7 +7,10 @@ import android.graphics.Canvas
 import android.graphics.Color as AndroidColor
 import android.graphics.Paint
 import net.kdt.pojavlaunch.aerix.social.SocialBackend
+import net.kdt.pojavlaunch.instances.Instances
 import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.FileOutputStream
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
@@ -215,12 +218,184 @@ object AerixClientCosmetics {
     fun resolveInGameCapeBytes(context: Context): ByteArray? = runCatching {
         AerixClientStore.init(context)
         val spec = effectiveCapeSpec()
-        val bmp = buildCapeAndElytraBitmap(spec)
+        val bmp = buildAnimatedCapeFrameBitmap(spec, frameIndex = 0, totalFrames = 12)
         ByteArrayOutputStream().use { out ->
             bmp.compress(Bitmap.CompressFormat.PNG, 100, out)
             out.toByteArray()
         }
     }.getOrNull()
+
+    /**
+     * Writes 12 live-animated `64×32` PNG frames (`frame_00.png`..`frame_11.png`) + `meta.properties`
+     * into `<instanceGameDir>/config/aerix_cape_frames/` and syncs `<instanceGameDir>/config/waveycapes.json`
+     * so `AerixClientMod` + `WaveyCapes` animate AND wave the cape live in-game!
+     */
+    fun syncCapeAssetsToInstance(context: Context, instanceGameDir: File) {
+        runCatching {
+            AerixClientStore.init(context)
+            val spec = effectiveCapeSpec()
+            val configDir = File(instanceGameDir, "config").apply { mkdirs() }
+            val framesDir = File(configDir, "aerix_cape_frames").apply { mkdirs() }
+
+            val total = 12
+            for (i in 0 until total) {
+                val bmp = buildAnimatedCapeFrameBitmap(spec, frameIndex = i, totalFrames = total)
+                val outFile = File(framesDir, String.format("frame_%02d.png", i))
+                FileOutputStream(outFile).use { fos ->
+                    bmp.compress(Bitmap.CompressFormat.PNG, 100, fos)
+                }
+            }
+            val now = System.currentTimeMillis()
+            val metaFile = File(framesDir, "meta.properties")
+            metaFile.writeText(
+                buildString {
+                    appendLine("capeId=${spec.id}")
+                    appendLine("frames=$total")
+                    appendLine("waving=${AerixClientStore.wavingCapeEnabled}")
+                    appendLine("updatedAtMs=$now")
+                }
+            )
+            metaFile.setLastModified(now)
+
+            // Exact WaveyCapes v2 config schema (`dev.tr7zw.waveycapes.versionless.Config`)
+            val waveyOn = AerixClientStore.wavingCapeEnabled
+            val waveyJson = """
+                {
+                  "configVersion": 2,
+                  "windMode": "${if (waveyOn) "WAVES" else "NONE"}",
+                  "capeStyle": "${if (waveyOn) "SMOOTH" else "BLOCKY"}",
+                  "capeMovement": "${if (waveyOn) "BASIC_SIMULATION_3D" else "VANILLA"}",
+                  "gravity": 24,
+                  "heightMultiplier": 7,
+                  "straveMultiplier": 3
+                }
+            """.trimIndent()
+            val waveyFile = File(configDir, "waveycapes.json")
+            waveyFile.writeText(waveyJson)
+            waveyFile.setLastModified(now)
+        }
+    }
+
+    fun syncCapeAssetsToAllClientInstances(context: Context) {
+        runCatching {
+            val all = Instances.loadAllInstances()
+            for (inst in all) {
+                if (inst.isAerixClient || inst.name?.startsWith("Aerix Client", ignoreCase = true) == true) {
+                    inst.gameDirectory?.let { syncCapeAssetsToInstance(context, it) }
+                }
+            }
+        }
+    }
+
+    /**
+     * Generates a single animated frame (`0 .. totalFrames-1`) of the `64×32` Cape + Elytra sheet
+     * with unmistakable pixel-level motion across both the visible back face (`x=1..10, y=1..16`),
+     * inner face (`x=12..21, y=1..16`), and Elytra wing (`x=22..45, y=0..21`).
+     */
+    fun buildAnimatedCapeFrameBitmap(
+        spec: ClientCapeSpec,
+        frameIndex: Int,
+        totalFrames: Int = 12
+    ): Bitmap {
+        val bmp = buildCapeAndElytraBitmap(spec)
+        val phase = ((frameIndex % totalFrames.coerceAtLeast(1)).toFloat() / totalFrames.coerceAtLeast(1)) *
+            (2f * Math.PI.toFloat())
+        val emb = spec.emblemHex.toInt()
+
+        fun glowBlend(base: Int, target: Int, amount: Float): Int {
+            val a = amount.coerceIn(0f, 1f)
+            val r = (AndroidColor.red(base) + (AndroidColor.red(target) - AndroidColor.red(base)) * a).toInt().coerceIn(0, 255)
+            val g = (AndroidColor.green(base) + (AndroidColor.green(target) - AndroidColor.green(base)) * a).toInt().coerceIn(0, 255)
+            val b = (AndroidColor.blue(base) + (AndroidColor.blue(target) - AndroidColor.blue(base)) * a).toInt().coerceIn(0, 255)
+            return AndroidColor.argb(255, r, g, b)
+        }
+
+        // Apply live shader highlight across front/back cape UV (x: 1..10 and 12..21, y: 1..16)
+        for (faceOffset in intArrayOf(1, 12)) {
+            for (ly in 0..15) {
+                val v = ly / 15f
+                for (lx in 0..9) {
+                    val u = lx / 9f
+                    val px = faceOffset + lx
+                    val py = 1 + ly
+                    val h = sampleAnimatedHighlight(spec.animStyle, u, v, phase)
+                    if (h > 0.04f) {
+                        val base = bmp.getPixel(px, py)
+                        val hiTarget = if (h > 0.68f) AndroidColor.WHITE else emb
+                        bmp.setPixel(px, py, glowBlend(base, hiTarget, (h * 0.92f).coerceAtMost(0.95f)))
+                    }
+                }
+            }
+        }
+
+        // Distinct crisp moving pixel particles per frame on visible outer cape face (x=2..9, y=2..15)
+        val f = frameIndex % totalFrames.coerceAtLeast(1)
+        when (spec.animStyle) {
+            CapeAnimStyle.EMBERS, CapeAnimStyle.FLAMES -> {
+                for (k in 0..4) {
+                    val ex = 2 + ((k * 3 + f) % 8)
+                    val ey = 15 - ((f * 2 + k * 3) % 14)
+                    bmp.setPixel(ex, ey, if (k % 2 == 0) AndroidColor.WHITE else emb)
+                }
+            }
+            CapeAnimStyle.LASER_SCAN -> {
+                val scanY = 2 + ((f * 14) / totalFrames.coerceAtLeast(1)).coerceIn(0, 13)
+                for (x in 2..9) {
+                    bmp.setPixel(x, scanY, AndroidColor.WHITE)
+                    if (scanY > 2) bmp.setPixel(x, scanY - 1, emb)
+                }
+            }
+            CapeAnimStyle.LIGHTNING -> {
+                val shift = (f % 3) - 1
+                for (ly in 2..15) {
+                    val lx = (5 + shift + ((ly + f) % 2)).coerceIn(2, 9)
+                    if ((ly + f) % 3 != 0) bmp.setPixel(lx, ly, AndroidColor.WHITE)
+                }
+            }
+            CapeAnimStyle.MATRIX -> {
+                for (col in intArrayOf(2, 4, 7, 9)) {
+                    val headY = 2 + ((f * 2 + col * 3) % 14)
+                    bmp.setPixel(col, headY, AndroidColor.WHITE)
+                    if (headY > 2) bmp.setPixel(col, headY - 1, emb)
+                }
+            }
+            CapeAnimStyle.STARFIELD, CapeAnimStyle.FROST, CapeAnimStyle.PETALS -> {
+                for (k in 0..4) {
+                    val sx = 2 + ((k * 5 + f) % 8)
+                    val sy = 2 + ((f + k * 4) % 14)
+                    bmp.setPixel(sx, sy, if ((f + k) % 2 == 0) AndroidColor.WHITE else emb)
+                }
+            }
+            else -> {
+                // Travelling border sparkle around the cape frame + pulsing emblem core
+                val perim = (f * 3) % 28
+                val (bx, by) = when {
+                    perim < 8 -> (2 + perim) to 2
+                    perim < 20 -> 9 to (2 + (perim - 8))
+                    perim < 28 -> (9 - (perim - 20)).coerceAtLeast(2) to 15
+                    else -> 2 to 8
+                }
+                bmp.setPixel(bx.coerceIn(1, 10), by.coerceIn(1, 16), AndroidColor.WHITE)
+                if (f % 2 == 0) {
+                    bmp.setPixel(5, 8, AndroidColor.WHITE)
+                    bmp.setPixel(6, 8, AndroidColor.WHITE)
+                }
+            }
+        }
+
+        // Also animate Elytra wing surface (x: 23..44, y: 1..20)
+        for (y in 1..20) {
+            val v = y / 20f
+            for (x in 23..44) {
+                val u = (x - 23) / 21f
+                val h = sampleAnimatedHighlight(spec.animStyle, u, v, phase)
+                if (h > 0.08f) {
+                    bmp.setPixel(x, y, glowBlend(bmp.getPixel(x, y), emb, h * 0.8f))
+                }
+            }
+        }
+        return bmp
+    }
 
     /**
      * Preserved hook for `AerixSkinServer.kt`; returns [existingSkinPng] untouched when no hat is equipped.

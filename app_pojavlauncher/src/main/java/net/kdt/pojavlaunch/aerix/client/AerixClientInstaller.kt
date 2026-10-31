@@ -42,14 +42,17 @@ object AerixClientInstaller {
     private const val USER_AGENT =
         "entitybrian69-bit/Aerix-launcher/aerix-client (https://github.com/entitybrian69-bit/Aerix-launcher)"
 
+    private const val TUNED_CLIENT_JVM_ARGS =
+        "-XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=35 -XX:G1HeapRegionSize=16M -XX:+DisableExplicitGC"
+
     val availableVersions: List<ClientVersionSpec> = listOf(
-        ClientVersionSpec("1.21.4", "Aerix Client 1.21.4", "Minecraft 1.21.4 · Fabric + FPS Engine"),
-        ClientVersionSpec("1.21.1", "Aerix Client 1.21.1", "Minecraft 1.21.1 · Fabric + FPS Engine"),
-        ClientVersionSpec("1.20.4", "Aerix Client 1.20.4", "Minecraft 1.20.4 · Fabric + FPS Engine"),
-        ClientVersionSpec("1.20.1", "Aerix Client 1.20.1", "Minecraft 1.20.1 · Fabric + FPS Engine"),
-        ClientVersionSpec("1.19.4", "Aerix Client 1.19.4", "Minecraft 1.19.4 · Fabric + FPS Engine"),
-        ClientVersionSpec("1.18.2", "Aerix Client 1.18.2", "Minecraft 1.18.2 · Fabric + FPS Engine"),
-        ClientVersionSpec("1.16.5", "Aerix Client 1.16.5", "Minecraft 1.16.5 · Fabric + FPS Engine")
+        ClientVersionSpec("1.21.4", "Aerix Client 1.21.4", "Minecraft 1.21.4 · Ultra FPS + 3D Capes"),
+        ClientVersionSpec("1.21.1", "Aerix Client 1.21.1", "Minecraft 1.21.1 · Ultra FPS + 3D Capes"),
+        ClientVersionSpec("1.20.4", "Aerix Client 1.20.4", "Minecraft 1.20.4 · Ultra FPS + 3D Capes"),
+        ClientVersionSpec("1.20.1", "Aerix Client 1.20.1", "Minecraft 1.20.1 · Ultra FPS + 3D Capes"),
+        ClientVersionSpec("1.19.4", "Aerix Client 1.19.4", "Minecraft 1.19.4 · Ultra FPS + 3D Capes"),
+        ClientVersionSpec("1.18.2", "Aerix Client 1.18.2", "Minecraft 1.18.2 · Ultra FPS + 3D Capes"),
+        ClientVersionSpec("1.16.5", "Aerix Client 1.16.5", "Minecraft 1.16.5 · Ultra FPS + 3D Capes")
     )
 
     var isInstalling by mutableStateOf(false)
@@ -85,22 +88,87 @@ object AerixClientInstaller {
         }
     }.getOrNull()
 
+    /**
+     * Pure Competitive FPS + 3D Waving Capes stack (Iris removed so mobile GPUs run at full speed!).
+     */
     fun buildModListForVersion(mcVersion: String): List<ClientModEntry> {
         val out = ArrayList<ClientModEntry>()
         out += ClientModEntry("fabric-api", "Fabric API", "Core")
-        out += ClientModEntry("sodium", "Sodium", "FPS Engine")
-        out += ClientModEntry("lithium", "Lithium", "Physics Tick")
-        out += ClientModEntry("ferrite-core", "FerriteCore", "RAM Saver")
+        out += ClientModEntry("sodium", "Sodium", "GPU Chunk FPS")
+        out += ClientModEntry("lithium", "Lithium", "Physics & Tick FPS")
+        out += ClientModEntry("ferrite-core", "FerriteCore", "45% RAM Saver")
+        out += ClientModEntry("immediatelyfast", "ImmediatelyFast", "Entity & HUD Batching")
+        out += ClientModEntry("entityculling", "EntityCulling", "Wall Occlusion FPS")
+        out += ClientModEntry("modernfix", "ModernFix", "Zero-Stutter Engine")
+        out += ClientModEntry("krypton", "Krypton", "Fast Netty Stack")
         if (mcVersion == "1.16.5" || mcVersion == "1.18.2" || mcVersion == "1.19.4") {
-            out += ClientModEntry("lazydfu", "LazyDFU", "Fast Boot")
-            out += ClientModEntry("starlight", "Starlight", "Lighting")
+            out += ClientModEntry("lazydfu", "LazyDFU", "Instant Boot")
+            out += ClientModEntry("starlight", "Starlight", "Lighting Engine")
         }
-        out += ClientModEntry("entityculling", "EntityCulling", "Entity FPS")
+        out += ClientModEntry("wavey-capes", "WaveyCapes", "3D Waving Capes")
         out += ClientModEntry("modmenu", "Mod Menu", "Client UI")
-        out += ClientModEntry("iris", "Iris Shaders", "Shaders")
-        out += ClientModEntry("appleskin", "AppleSkin", "HUD")
+        out += ClientModEntry("appleskin", "AppleSkin", "Saturation")
         out += ClientModEntry("logical-zoom", "Logical Zoom", "Zoom")
         return out
+    }
+
+    /**
+     * Copies our bundled `aerix_client_mod.jar` (`AerixClientMod`) into `<modsDir>/aerix-client-animator.jar`
+     * and deletes any legacy FPS-heavy shaders/dynamic-light jars (`iris`, `lambdynamiclights`).
+     */
+    fun deployBundledAnimatorAndPurgeBloat(context: Context, modsDir: File) {
+        modsDir.mkdirs()
+        // 2. Extract bundled Java-8 `aerix_client_mod.jar` from APK assets into `mods/aerix-client-animator.jar`
+        runCatching {
+            val target = File(modsDir, "aerix-client-animator.jar")
+            context.assets.open("components/aerix_client/aerix_client_mod.jar").use { input ->
+                FileOutputStream(target).use { out ->
+                    input.copyTo(out)
+                }
+            }
+        }
+    }
+
+    /**
+     * Upgrades an already-installed Client instance right before Launch so users immediately get
+     * `wavey-capes`, `immediatelyfast`, `aerix-client-animator.jar`, `iris` removal, `AERIX CLIENT`
+     * title logo, `images.jpeg` forest background, and genuine vanilla animated gear!
+     */
+    suspend fun syncExistingInstanceForLaunch(context: Context, instance: Instance, mcVersion: String) =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val gameDir = instance.gameDirectory.apply { mkdirs() }
+                val modsDir = File(gameDir, "mods").apply { mkdirs() }
+                if (instance.jvmArgs.isNullOrBlank()) {
+                    instance.argsMode = Instance.ARGS_MODE_MERGE_DEFAULT_FIRST
+                    instance.jvmArgs = TUNED_CLIENT_JVM_ARGS
+                    instance.write()
+                }
+                deployBundledAnimatorAndPurgeBloat(context, modsDir)
+                // Ensure essential new upgrade jars exist even on older installs
+                for (slug in listOf("wavey-capes", "immediatelyfast", "entityculling")) {
+                    runCatching { ensureModrinthJar(modsDir, slug, mcVersion, depth = 0) }
+                }
+                AerixClientPackGenerator.ensurePackUpToDate(context, gameDir, mcVersion)
+            }
+        }
+
+    /**
+     * Fast synchronous local-only sync safe to call inside `GameActivity.onCreate` (`attachForInstance`)
+     * right after Pojav's `MinecraftDownloader` has verified `<mcVersion>.jar` on disk!
+     */
+    @JvmStatic
+    fun syncLocalAssetsAtGameStart(context: Context, instance: Instance) {
+        runCatching {
+            val gameDir = instance.gameDirectory?.apply { mkdirs() } ?: return
+            val modsDir = File(gameDir, "mods").apply { mkdirs() }
+            val mcVer = AerixClientPackGenerator.resolveMcVersionFromInstance(
+                instance.versionId ?: instance.name,
+                AerixClientStore.selectedClientVersion
+            )
+            deployBundledAnimatorAndPurgeBloat(context, modsDir)
+            AerixClientPackGenerator.ensurePackUpToDate(context, gameDir, mcVer)
+        }
     }
 
     suspend fun installClientVersion(context: Context, mcVersion: String): Result<Instance> =
@@ -133,7 +201,7 @@ object AerixClientInstaller {
 
                 progressFraction = 0.26f
                 statusHeadline = "Preparing ${instanceNameFor(mcVersion)}..."
-                statusDetail = "Configuring isolated client directory"
+                statusDetail = "Configuring high-FPS client directory"
 
                 val existing = findInstalledClientInstance(mcVersion)
                 val targetName = instanceNameFor(mcVersion)
@@ -147,7 +215,7 @@ object AerixClientInstaller {
                     }
                     if (existing.jvmArgs.isNullOrBlank()) {
                         existing.argsMode = Instance.ARGS_MODE_MERGE_DEFAULT_FIRST
-                        existing.jvmArgs = "-XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:MaxGCPauseMillis=50"
+                        existing.jvmArgs = TUNED_CLIENT_JVM_ARGS
                     }
                     existing.write()
                     existing
@@ -160,7 +228,7 @@ object AerixClientInstaller {
                             inst.sharedData = false
                             inst.isAerixClient = true
                             inst.argsMode = Instance.ARGS_MODE_MERGE_DEFAULT_FIRST
-                            inst.jvmArgs = "-XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:MaxGCPauseMillis=50"
+                            inst.jvmArgs = TUNED_CLIENT_JVM_ARGS
                         },
                         folderSlug
                     )
@@ -170,28 +238,29 @@ object AerixClientInstaller {
                 val gameDir = clientInstance.gameDirectory.apply { mkdirs() }
                 val modsDir = File(gameDir, "mods").apply { mkdirs() }
 
+                deployBundledAnimatorAndPurgeBloat(context, modsDir)
+
                 val modPlan = buildModListForVersion(mcVersion)
                 modPlan.forEachIndexed { idx, mod ->
                     progressFraction = 0.30f + (0.55f * (idx.toFloat() / modPlan.size.coerceAtLeast(1)))
                     statusHeadline = "Downloading ${mod.title} (${idx + 1}/${modPlan.size})..."
                     statusDetail = "Minecraft $mcVersion · ${mod.category}"
                     runCatching {
-                        ensureModrinthJar(modsDir, mod.slug, mcVersion)
+                        ensureModrinthJar(modsDir, mod.slug, mcVersion, depth = 0)
                     }
                 }
 
                 progressFraction = 0.90f
-                statusHeadline = "Applying Aerix Client Pack..."
-                statusDetail = "Configuring resource pack & options"
+                statusHeadline = "Applying Aerix Client Pack & FPS Engine..."
+                statusDetail = "Syncing AERIX CLIENT title, capes & Sodium"
                 AerixClientPackGenerator.buildAndApplyToInstance(context, gameDir, mcVersion)
-                AerixClientPackGenerator.applyClientOptionsTxt(gameDir)
 
                 Instances.setSelectedInstance(clientInstance)
                 AerixClientStore.installsCompleted += 1
                 AerixClientStore.persist()
 
                 progressFraction = 1.0f
-                statusHeadline = "$targetName downloaded!"
+                statusHeadline = "$targetName ready!"
                 statusDetail = "Ready to launch"
                 clientInstance
             }.onFailure { err ->
@@ -207,8 +276,8 @@ object AerixClientInstaller {
     suspend fun installOrSyncClient1165(context: Context): Result<Instance> =
         installClientVersion(context, "1.16.5")
 
-    private fun ensureModrinthJar(modsDir: File, slug: String, mcVersion: String) {
-        val normalizedKey = slug.replace("-", "").lowercase()
+    private fun ensureModrinthJar(modsDir: File, projectSlugOrId: String, mcVersion: String, depth: Int) {
+        val normalizedKey = projectSlugOrId.replace("-", "").lowercase()
         val alreadyExists = modsDir.listFiles()?.any { f ->
             f.isFile && f.extension.equals("jar", true) &&
                 f.name.replace("-", "").replace("_", "").lowercase().contains(normalizedKey)
@@ -217,7 +286,7 @@ object AerixClientInstaller {
 
         val loadersParam = URLEncoder.encode("[\"fabric\"]", "UTF-8")
         val gvParam = URLEncoder.encode("[\"$mcVersion\"]", "UTF-8")
-        val url = "https://api.modrinth.com/v2/project/$slug/version?loaders=$loadersParam&game_versions=$gvParam"
+        val url = "https://api.modrinth.com/v2/project/$projectSlugOrId/version?loaders=$loadersParam&game_versions=$gvParam"
 
         val req = Request.Builder()
             .url(url)
@@ -234,7 +303,25 @@ object AerixClientInstaller {
         val versions = JSONArray(bodyStr)
         if (versions.length() == 0) return
 
-        val files = versions.getJSONObject(0).optJSONArray("files") ?: return
+        val verObj = versions.getJSONObject(0)
+
+        // Resolve required transitive Modrinth dependencies (max depth 1)
+        if (depth < 1) {
+            val deps = verObj.optJSONArray("dependencies")
+            if (deps != null) {
+                for (d in 0 until deps.length()) {
+                    val dep = deps.getJSONObject(d)
+                    if (dep.optString("dependency_type") == "required") {
+                        val depProjId = dep.optString("project_id")
+                        if (depProjId.isNotBlank() && depProjId != "P7dR8mSH") {
+                            runCatching { ensureModrinthJar(modsDir, depProjId, mcVersion, depth + 1) }
+                        }
+                    }
+                }
+            }
+        }
+
+        val files = verObj.optJSONArray("files") ?: return
         if (files.length() == 0) return
         var chosen = files.getJSONObject(0)
         for (i in 0 until files.length()) {

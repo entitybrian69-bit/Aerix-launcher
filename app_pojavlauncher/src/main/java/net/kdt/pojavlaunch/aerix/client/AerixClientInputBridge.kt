@@ -271,6 +271,23 @@ object AerixClientInputBridge {
     }
 
     /**
+     * Dispatches a genuine Minecraft `F3 + <key>` debug/reload chord (`F3+A` Reload Chunks,
+     * `F3+B` Hitboxes, `F3+G` Chunk Borders, `F3+T` Reload Resource Packs, `F3+D` Clear Chat, `F3+C` Copy Coords).
+     */
+    fun triggerF3Chord(chordKeyCode: Int) {
+        Platform.PLATFORM.sendKeyEvent(KeyEvent.KEYCODE_F3, true, 0)
+        mainHandler.postDelayed({
+            Platform.PLATFORM.sendKeyEvent(chordKeyCode, true, 0)
+            mainHandler.postDelayed({
+                Platform.PLATFORM.sendKeyEvent(chordKeyCode, false, 0)
+                mainHandler.postDelayed({
+                    Platform.PLATFORM.sendKeyEvent(KeyEvent.KEYCODE_F3, false, 0)
+                }, 35L)
+            }, 45L)
+        }, 35L)
+    }
+
+    /**
      * Opens 1.16.5 chat (`T`), sends Unicode text via `sendBulkUnicodeEvent`, and presses `Enter`.
      */
     fun sendInGameChatMessage(message: String) {

@@ -574,6 +574,9 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
             Toast.makeText(this, R.string.angelica_found_sfpew_notice, Toast.LENGTH_LONG).show();
         }
 
+        if (instance.isAerixClient) {
+            net.kdt.pojavlaunch.aerix.client.AerixClientInstaller.syncLocalAssetsAtGameStart(this, instance);
+        }
         GameRunner.launchGame(this, account, instance, versionId, classpath, mGameRenderer);
         //Note that we actually stall in the above function, even if the game crashes. But let's be safe.
         Tools.runOnUiThread(()-> mServiceBinder.isActive = false);

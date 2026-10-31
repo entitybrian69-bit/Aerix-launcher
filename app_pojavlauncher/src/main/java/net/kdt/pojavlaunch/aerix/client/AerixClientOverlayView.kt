@@ -334,6 +334,7 @@ class AerixClientOverlayView @JvmOverloads constructor(
                     onSyncOptionsTxt = {
                         activeClientInstance?.gameDirectory?.let { dir ->
                             AerixClientPackGenerator.applyClientOptionsTxt(dir)
+                            AerixClientCosmetics.syncCapeAssetsToInstance(context, dir)
                         }
                         syncGyroRegistration()
                     }
@@ -432,7 +433,10 @@ private fun AerixClientRootOverlay(
                     }
                 }
             }
-            delay(50L)
+            val needsFastUpdates = AerixClientStore.perfPillEnabled || AerixClientStore.cpsPillEnabled ||
+                AerixClientStore.keystrokesEnabled || AerixClientStore.swordCooldownBarEnabled ||
+                AerixClientStore.hitmarkerEnabled || AerixClientStore.speedrunTimerEnabled
+            delay(if (needsFastUpdates) 100L else 500L)
         }
     }
 
@@ -742,7 +746,7 @@ private fun FamousClientRectangleMenu(
                         onOpenOledAfk = onOpenOledAfk,
                         onSyncOptionsTxt = onSyncOptionsTxt
                     )
-                    ClientMenuSubPage.CAPES -> ClientCapesSubPage()
+                    ClientMenuSubPage.CAPES -> ClientCapesSubPage(onSyncCape = onSyncOptionsTxt)
                     ClientMenuSubPage.CROSSHAIRS -> ClientCrosshairsSubPage()
                 }
             }
@@ -1288,7 +1292,7 @@ private fun DrawScope.drawFeatureSymbol(kind: FeatureIconKind, color: Color) {
  * CAPES SUB-PAGE: LEFT = 3D ROTATABLE CHARACTER + WAVING TOGGLE | RIGHT = 15 ANIMATED CAPES
  * ═══════════════════════════════════════════════════════════════════════════ */
 @Composable
-private fun ClientCapesSubPage() {
+private fun ClientCapesSubPage(onSyncCape: () -> Unit) {
     val context = LocalContext.current
     val activeCape = AerixClientCosmetics.effectiveCapeSpec()
     val playerName = PojavAccountBridge.current?.username?.takeIf { it.isNotBlank() } ?: "Player"
@@ -1345,6 +1349,7 @@ private fun ClientCapesSubPage() {
                     .clickable {
                         AerixClientStore.wavingCapeEnabled = !AerixClientStore.wavingCapeEnabled
                         AerixClientStore.persist()
+                        onSyncCape()
                     }
                     .padding(horizontal = 12.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -1368,6 +1373,7 @@ private fun ClientCapesSubPage() {
                     onCheckedChange = {
                         AerixClientStore.wavingCapeEnabled = it
                         AerixClientStore.persist()
+                        onSyncCape()
                     },
                     colors = SwitchDefaults.colors(
                         checkedThumbColor = Color.White,
@@ -1457,6 +1463,7 @@ private fun ClientCapesSubPage() {
                                         if (unlocked) {
                                             AerixClientStore.equippedCapeId = spec.id
                                             AerixClientStore.persist()
+                                            onSyncCape()
                                         } else {
                                             Toast.makeText(
                                                 context,

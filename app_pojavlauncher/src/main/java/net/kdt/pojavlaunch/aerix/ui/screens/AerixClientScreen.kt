@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -23,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -40,12 +40,17 @@ import net.kdt.pojavlaunch.aerix.bridge.PojavInstanceBridge
 import net.kdt.pojavlaunch.aerix.bridge.PojavLaunchBridge
 import net.kdt.pojavlaunch.aerix.client.AerixClientInstaller
 import net.kdt.pojavlaunch.aerix.client.AerixClientStore
-import net.kdt.pojavlaunch.aerix.client.LiquidCrystalPalette
+import net.kdt.pojavlaunch.aerix.components.GlassPanel
+import net.kdt.pojavlaunch.aerix.components.liquidGlass
+import net.kdt.pojavlaunch.aerix.theme.AerixRadii
+import net.kdt.pojavlaunch.aerix.theme.AerixSpacing
+import net.kdt.pojavlaunch.aerix.theme.AerixSurface
 import net.kdt.pojavlaunch.instances.Instances
 
 /**
- * Minimal Launcher `Aerix Client` Sidebar Screen (Locked Crimson Red & Dark Gray Theme):
- * Shows ONLY `Aerix Client` at the top and client version selection + download options below it.
+ * Minimal Liquid Glass `Aerix Client` Sidebar Tab:
+ * Transparent backdrop over the launcher's live wallpaper, showing ONLY `Aerix Client`
+ * and Liquid Glass client version download / launch cards below it.
  */
 @Composable
 fun AerixClientScreen(activity: FragmentActivity) {
@@ -54,41 +59,21 @@ fun AerixClientScreen(activity: FragmentActivity) {
     }
 
     var refreshTick by remember { mutableIntStateOf(0) }
+    var preparingLaunchVer by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
+    val accent = AerixSurface.accent
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(LiquidCrystalPalette.DarkOuter.copy(alpha = 0.92f))
-            .padding(horizontal = 24.dp, vertical = 20.dp)
+    AerixPage(
+        title = "Aerix Client",
+        subtitle = null
     ) {
-        // Header: ONLY "Aerix Client"
-        Text(
-            text = "Aerix Client",
-            color = Color.White,
-            fontSize = 26.sp,
-            fontWeight = FontWeight.Black
-        )
-
-        Spacer(Modifier.height(6.dp))
-        Box(
-            modifier = Modifier
-                .width(56.dp)
-                .height(3.dp)
-                .clip(RoundedCornerShape(2.dp))
-                .background(LiquidCrystalPalette.CrimsonPrimary)
-        )
-        Spacer(Modifier.height(16.dp))
-
-        // Active download progress banner (shown only while a client version is downloading)
+        // Active download progress banner in Liquid Glass
         if (AerixClientInstaller.isInstalling) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(LiquidCrystalPalette.DarkPanel)
-                    .border(1.dp, LiquidCrystalPalette.CrimsonPrimary, RoundedCornerShape(12.dp))
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
+            GlassPanel(
+                modifier = Modifier.fillMaxWidth(),
+                radius = AerixRadii.card,
+                strength = 1.0f,
+                color = AerixSurface.panelRaised
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -103,65 +88,71 @@ fun AerixClientScreen(activity: FragmentActivity) {
                     )
                     Text(
                         text = "${(AerixClientInstaller.progressFraction * 100).toInt()}%",
-                        color = LiquidCrystalPalette.CrimsonGlow,
+                        color = accent,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.ExtraBold
                     )
                 }
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(4.dp))
                 LinearProgressIndicator(
                     progress = { AerixClientInstaller.progressFraction },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(6.dp)
                         .clip(RoundedCornerShape(4.dp)),
-                    color = LiquidCrystalPalette.CrimsonPrimary,
-                    trackColor = LiquidCrystalPalette.DarkTile
+                    color = accent,
+                    trackColor = Color.White.copy(alpha = 0.16f)
                 )
             }
-            Spacer(Modifier.height(14.dp))
         }
 
         AerixClientInstaller.lastError?.takeIf { it.isNotBlank() && !AerixClientInstaller.isInstalling }?.let { err ->
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(Color(0xFF2A1419))
-                    .border(1.dp, LiquidCrystalPalette.CrimsonGlow, RoundedCornerShape(10.dp))
-                    .padding(horizontal = 14.dp, vertical = 10.dp)
+            GlassPanel(
+                modifier = Modifier.fillMaxWidth(),
+                radius = AerixRadii.card,
+                color = AerixSurface.errorDarkContainer.copy(alpha = 0.55f)
             ) {
                 Text(text = err, color = Color.White, fontSize = 12.sp)
             }
-            Spacer(Modifier.height(12.dp))
         }
 
-        // Client Versions Selection + Download List (Nothing More)
+        // Liquid Glass Version Download & Launch List (Nothing More)
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
         ) {
             AerixClientInstaller.availableVersions.forEach { spec ->
                 val installed = remember(refreshTick, AerixClientInstaller.isInstalling, spec.mcVersion) {
                     AerixClientInstaller.findInstalledClientInstance(spec.mcVersion)
                 }
                 val isSelected = AerixClientStore.selectedClientVersion == spec.mcVersion
-                val rowShape = RoundedCornerShape(12.dp)
+                val rowShape = RoundedCornerShape(AerixRadii.card)
 
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(rowShape)
-                        .background(
-                            if (isSelected) LiquidCrystalPalette.CrimsonTintFill
-                            else LiquidCrystalPalette.DarkPanel,
-                            rowShape
+                        .liquidGlass(
+                            shape = rowShape,
+                            tint = if (isSelected) accent else AerixSurface.glassTint,
+                            strength = if (isSelected) 1.0f else 0.90f
                         )
-                        .border(
-                            width = if (isSelected) 1.4.dp else 1.dp,
-                            color = if (isSelected) LiquidCrystalPalette.CrimsonPrimary else LiquidCrystalPalette.DarkTileBorder,
+                        .background(
+                            brush = Brush.linearGradient(
+                                colors = if (isSelected) {
+                                    listOf(
+                                        Color.White.copy(alpha = 0.20f),
+                                        accent.copy(alpha = 0.14f),
+                                        AerixSurface.panelRaised
+                                    )
+                                } else {
+                                    listOf(
+                                        Color.White.copy(alpha = 0.12f),
+                                        AerixSurface.panel
+                                    )
+                                }
+                            ),
                             shape = rowShape
                         )
                         .clickable {
@@ -172,7 +163,7 @@ fun AerixClientScreen(activity: FragmentActivity) {
                                 PojavInstanceBridge.reload()
                             }
                         }
-                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                        .padding(horizontal = 18.dp, vertical = 14.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
@@ -188,12 +179,13 @@ fun AerixClientScreen(activity: FragmentActivity) {
                                 fontWeight = FontWeight.ExtraBold
                             )
                             if (installed != null) {
+                                val badgeShape = RoundedCornerShape(999.dp)
                                 Box(
                                     modifier = Modifier
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .background(LiquidCrystalPalette.CrimsonPrimary.copy(alpha = 0.25f))
-                                        .border(0.8.dp, LiquidCrystalPalette.CrimsonPrimary, RoundedCornerShape(6.dp))
-                                        .padding(horizontal = 7.dp, vertical = 2.dp)
+                                        .clip(badgeShape)
+                                        .background(accent.copy(alpha = 0.22f))
+                                        .border(0.9.dp, accent.copy(alpha = 0.65f), badgeShape)
+                                        .padding(horizontal = 8.dp, vertical = 2.dp)
                                 ) {
                                     Text(
                                         text = "INSTALLED",
@@ -207,7 +199,7 @@ fun AerixClientScreen(activity: FragmentActivity) {
                         Spacer(Modifier.height(2.dp))
                         Text(
                             text = "Aerix Client ${spec.mcVersion}",
-                            color = LiquidCrystalPalette.TextSecondary,
+                            color = Color.White.copy(alpha = 0.76f),
                             fontSize = 12.sp
                         )
                     }
@@ -216,35 +208,34 @@ fun AerixClientScreen(activity: FragmentActivity) {
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        val busy = AerixClientInstaller.isInstalling
-                        val buttonShape = RoundedCornerShape(9.dp)
+                        val busy = AerixClientInstaller.isInstalling || preparingLaunchVer != null
+                        val pillShape = RoundedCornerShape(999.dp)
 
-                        // Download / Re-download Button
+                        // Liquid Glass Download / Re-download Pill
                         Box(
                             modifier = Modifier
-                                .clip(buttonShape)
+                                .liquidGlass(
+                                    shape = pillShape,
+                                    tint = if (installed == null) accent else AerixSurface.glassTint,
+                                    strength = 0.95f
+                                )
                                 .background(
-                                    if (installed == null) {
+                                    brush = if (installed == null) {
                                         Brush.horizontalGradient(
                                             listOf(
-                                                LiquidCrystalPalette.CrimsonPrimary,
-                                                LiquidCrystalPalette.CrimsonDeep
+                                                accent.copy(alpha = 0.42f),
+                                                AerixSurface.glassBlue.copy(alpha = 0.30f)
                                             )
                                         )
                                     } else {
                                         Brush.horizontalGradient(
                                             listOf(
-                                                LiquidCrystalPalette.DarkTile,
-                                                LiquidCrystalPalette.DarkTile
+                                                Color.White.copy(alpha = 0.14f),
+                                                Color.White.copy(alpha = 0.07f)
                                             )
                                         )
                                     },
-                                    buttonShape
-                                )
-                                .border(
-                                    1.dp,
-                                    if (installed == null) LiquidCrystalPalette.CrimsonGlow else LiquidCrystalPalette.DarkTileBorder,
-                                    buttonShape
+                                    shape = pillShape
                                 )
                                 .clickable(enabled = !busy) {
                                     AerixClientStore.selectedClientVersion = spec.mcVersion
@@ -259,51 +250,71 @@ fun AerixClientScreen(activity: FragmentActivity) {
                                                 "Aerix Client ${spec.mcVersion} ready!",
                                                 Toast.LENGTH_SHORT
                                             ).show()
+                                        }.onFailure { err ->
+                                            Toast.makeText(
+                                                activity,
+                                                err.message ?: "Download failed",
+                                                Toast.LENGTH_LONG
+                                            ).show()
                                         }
                                     }
                                 }
                                 .padding(horizontal = 16.dp, vertical = 9.dp),
                             contentAlignment = Alignment.Center
                         ) {
+                            val isThisDownloading =
+                                AerixClientInstaller.isInstalling && AerixClientInstaller.installingVersion == spec.mcVersion
                             Text(
                                 text = when {
-                                    busy && AerixClientInstaller.installingVersion == spec.mcVersion -> "Downloading..."
-                                    installed != null -> "Re-download"
-                                    else -> "Download"
+                                    isThisDownloading -> "Downloading..."
+                                    installed == null -> "Download"
+                                    else -> "Re-download"
                                 },
                                 color = Color.White,
                                 fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.ExtraBold
                             )
                         }
 
-                        // Launch Button if already downloaded
+                        // Liquid Glass Launch Pill (upgrades existing instance pack + WaveyCapes + FPS before launch!)
                         if (installed != null) {
                             Box(
                                 modifier = Modifier
-                                    .clip(buttonShape)
+                                    .liquidGlass(
+                                        shape = pillShape,
+                                        tint = accent,
+                                        strength = 1.0f
+                                    )
                                     .background(
-                                        Brush.horizontalGradient(
+                                        brush = Brush.horizontalGradient(
                                             listOf(
-                                                LiquidCrystalPalette.CrimsonPrimary,
-                                                LiquidCrystalPalette.CrimsonDeep
+                                                accent.copy(alpha = 0.55f),
+                                                AerixSurface.glassBlue.copy(alpha = 0.38f)
                                             )
                                         ),
-                                        buttonShape
+                                        shape = pillShape
                                     )
-                                    .border(1.dp, LiquidCrystalPalette.CrimsonGlow, buttonShape)
                                     .clickable(enabled = !busy) {
                                         AerixClientStore.selectedClientVersion = spec.mcVersion
                                         AerixClientStore.persist()
-                                        Instances.setSelectedInstance(installed)
-                                        PojavInstanceBridge.reload()
-                                        PojavLaunchBridge.play(activity)
+                                        scope.launch {
+                                            preparingLaunchVer = spec.mcVersion
+                                            AerixClientInstaller.syncExistingInstanceForLaunch(
+                                                activity,
+                                                installed,
+                                                spec.mcVersion
+                                            )
+                                            preparingLaunchVer = null
+                                            Instances.setSelectedInstance(installed)
+                                            PojavInstanceBridge.reload()
+                                            PojavLaunchBridge.play(activity)
+                                        }
                                     }
-                                    .padding(horizontal = 18.dp, vertical = 9.dp),
+                                    .padding(horizontal = 16.dp, vertical = 9.dp),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    text = "Launch",
+                                    text = if (preparingLaunchVer == spec.mcVersion) "Syncing..." else "Launch",
                                     color = Color.White,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.ExtraBold
