@@ -149,6 +149,7 @@ object AerixClientInstaller {
                 for (slug in listOf("wavey-capes", "immediatelyfast", "entityculling")) {
                     runCatching { ensureModrinthJar(modsDir, slug, mcVersion, depth = 0) }
                 }
+                ensureWaveyCapes(modsDir, mcVersion)
                 AerixClientPackGenerator.ensurePackUpToDate(context, gameDir, mcVersion)
             }
         }
@@ -168,6 +169,8 @@ object AerixClientInstaller {
             )
             deployBundledAnimatorAndPurgeBloat(context, modsDir)
             AerixClientPackGenerator.ensurePackUpToDate(context, gameDir, mcVer)
+            ClientPerformanceSettings.init(context)
+            ClientPerformanceSettings.applyAtLaunch(gameDir)
         }
     }
 
@@ -250,6 +253,7 @@ object AerixClientInstaller {
                     }
                 }
 
+                ensureWaveyCapes(modsDir, mcVersion)
                 progressFraction = 0.90f
                 statusHeadline = "Applying Aerix Client Pack & FPS Engine..."
                 statusDetail = "Syncing AERIX CLIENT title, capes & Sodium"
@@ -275,6 +279,38 @@ object AerixClientInstaller {
 
     suspend fun installOrSyncClient1165(context: Context): Result<Instance> =
         installClientVersion(context, "1.16.5")
+
+    /** WaveyCapes is essential to the waving option. Do not silently claim success if absent. */
+    private fun ensureWaveyCapes(modsDir: File, mcVersion: String) {
+        fun present(): Boolean = modsDir.listFiles()?.any {
+            it.isFile && it.extension.equals("jar", true) &&
+                it.name.replace("-", "").replace("_", "").contains("waveycapes", true)
+        } == true
+        if (present()) return
+        runCatching { ensureModrinthJar(modsDir, "wavey-capes", mcVersion, 0) }
+        if (present()) return
+        // Official version-specific release fallback; keep any existing user-installed copy intact.
+        val supported = availableVersions.any { it.mcVersion == mcVersion }
+        if (!supported) error("WaveyCapes is not available for Minecraft $mcVersion")
+        val filename = "waveycapes-fabric-1.11.3-mc$mcVersion.jar"
+        val target = File(modsDir, filename)
+        val temp = File(modsDir, "$filename.part")
+        try {
+            val request = Request.Builder().url("https://github.com/tr7zw/WaveyCapes/releases/download/1.11.3/$filename")
+                .header("User-Agent", USER_AGENT).build()
+            SocialRealtime.restClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) error("WaveyCapes download failed (HTTP ${response.code})")
+                val body = response.body ?: error("WaveyCapes download was empty")
+                FileOutputStream(temp).use { output -> body.byteStream().use { it.copyTo(output) } }
+            }
+            java.util.zip.ZipFile(temp).use { zip ->
+                require(zip.getEntry("fabric.mod.json") != null) { "Invalid WaveyCapes download" }
+            }
+            check(temp.renameTo(target)) { "Could not save WaveyCapes" }
+        } finally {
+            temp.delete()
+        }
+    }
 
     private fun ensureModrinthJar(modsDir: File, projectSlugOrId: String, mcVersion: String, depth: Int) {
         val normalizedKey = projectSlugOrId.replace("-", "").lowercase()

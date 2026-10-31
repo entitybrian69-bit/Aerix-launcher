@@ -299,11 +299,14 @@ fun AerixClientScreen(activity: FragmentActivity) {
                                         AerixClientStore.persist()
                                         scope.launch {
                                             preparingLaunchVer = spec.mcVersion
-                                            AerixClientInstaller.syncExistingInstanceForLaunch(
+                                            val sync = AerixClientInstaller.syncExistingInstanceForLaunch(
                                                 activity,
                                                 installed,
                                                 spec.mcVersion
                                             )
+                                            sync.onFailure { error ->
+                                                Toast.makeText(activity, "Client update failed: ${error.message}", Toast.LENGTH_LONG).show()
+                                            }
                                             preparingLaunchVer = null
                                             Instances.setSelectedInstance(installed)
                                             PojavInstanceBridge.reload()

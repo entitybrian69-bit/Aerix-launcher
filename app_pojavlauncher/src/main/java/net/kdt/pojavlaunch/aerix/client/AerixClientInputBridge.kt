@@ -135,6 +135,11 @@ object AerixClientInputBridge {
     @JvmStatic
     fun onCursorPos(x: Double, y: Double) {
         if (!clientSessionActive) return
+        if (!AerixClientStore.compassEnabled) {
+            lastCursorX = Double.NaN
+            lastCursorY = Double.NaN
+            return
+        }
         if (Platform.isGrabbing()) {
             if (!lastCursorX.isNaN()) {
                 val dx = x - lastCursorX

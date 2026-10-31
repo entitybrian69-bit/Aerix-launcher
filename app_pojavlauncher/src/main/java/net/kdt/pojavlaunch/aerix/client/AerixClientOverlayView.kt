@@ -49,6 +49,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -127,7 +128,9 @@ enum class InGameClientModal {
 private enum class ClientMenuSubPage {
     GRID,
     CAPES,
-    CROSSHAIRS
+    CROSSHAIRS,
+    PERFORMANCE,
+    UTILITY
 }
 
 private enum class FeatureIconKind {
@@ -187,6 +190,7 @@ class AerixClientOverlayView @JvmOverloads constructor(
         addView(composeView, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
         AerixPreferences.init(context.applicationContext)
         AerixClientStore.init(context.applicationContext)
+        ClientPerformanceSettings.init(context.applicationContext)
         PojavAccountBridge.attach(context.applicationContext)
     }
 
@@ -334,9 +338,13 @@ class AerixClientOverlayView @JvmOverloads constructor(
                     onSyncOptionsTxt = {
                         activeClientInstance?.gameDirectory?.let { dir ->
                             AerixClientPackGenerator.applyClientOptionsTxt(dir)
-                            AerixClientCosmetics.syncCapeAssetsToInstance(context, dir)
                         }
                         syncGyroRegistration()
+                    },
+                    onSyncCape = {
+                        activeClientInstance?.gameDirectory?.let { dir ->
+                            AerixClientCosmetics.syncCapeAssetsToInstance(context, dir)
+                        }
                     }
                 )
             }
@@ -365,7 +373,8 @@ private fun AerixClientRootOverlay(
     subPage: ClientMenuSubPage,
     onChangeSubPage: (ClientMenuSubPage) -> Unit,
     onChangeModal: (InGameClientModal) -> Unit,
-    onSyncOptionsTxt: () -> Unit
+    onSyncOptionsTxt: () -> Unit,
+    onSyncCape: () -> Unit
 ) {
     val context = LocalContext.current
 
@@ -391,13 +400,14 @@ private fun AerixClientRootOverlay(
 
         while (true) {
             val nowMs = System.currentTimeMillis()
-            frameTickMs = nowMs
-            AerixClientInputBridge.refreshCps(nowMs)
-            sessionElapsedSec = (nowMs - startWall) / 1000L
+            val combatTimerActive = AerixClientStore.hitmarkerEnabled || AerixClientStore.swordCooldownBarEnabled || AerixClientStore.speedrunTimerEnabled
+            if (combatTimerActive) frameTickMs = nowMs
+            if (AerixClientStore.cpsPillEnabled || AerixClientStore.keystrokesEnabled) AerixClientInputBridge.refreshCps(nowMs)
+            if (AerixClientStore.matchStatsEnabled) sessionElapsedSec = (nowMs - startWall) / 1000L
 
             slowTick++
             if (slowTick % 10 == 0) {
-                val totalFrames = NativeFrameCounter.read()
+                val totalFrames = if (AerixClientStore.perfPillEnabled || modal == InGameClientModal.OLED_AFK) NativeFrameCounter.read() else -1L
                 val nowNanos = System.nanoTime()
                 if (totalFrames >= 0) {
                     if (lastNativeFrames >= 0 && nowNanos > lastSampleNanos) {
@@ -415,13 +425,13 @@ private fun AerixClientRootOverlay(
                 AerixClientInputBridge.pollLatestLog(context)
             }
 
-            if (slowTick % 50 == 1) {
+            if (slowTick % 50 == 1 && (AerixClientStore.perfPillEnabled || AerixClientStore.thermalGuardEnabled || modal == InGameClientModal.OLED_AFK)) {
                 runCatching {
                     val am = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
                     if (am != null) {
                         val mi = ActivityManager.MemoryInfo()
                         am.getMemoryInfo(mi)
-                        usedRamMb = ((mi.totalMem - mi.availMem) / (1024L * 1024L)).toInt()
+                        usedRamMb = (android.os.Debug.getPss() / 1024L).toInt()
                     }
                     val bmIntent = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
                     if (bmIntent != null) {
@@ -542,7 +552,8 @@ private fun AerixClientRootOverlay(
                 onClose = { onChangeModal(InGameClientModal.NONE) },
                 onOpenHudEditor = { onChangeModal(InGameClientModal.HUD_EDITOR) },
                 onOpenOledAfk = { onChangeModal(InGameClientModal.OLED_AFK) },
-                onSyncOptionsTxt = onSyncOptionsTxt
+                onSyncOptionsTxt = onSyncOptionsTxt,
+                onSyncCape = onSyncCape
             )
         }
 
@@ -593,7 +604,8 @@ private fun FamousClientRectangleMenu(
     onClose: () -> Unit,
     onOpenHudEditor: () -> Unit,
     onOpenOledAfk: () -> Unit,
-    onSyncOptionsTxt: () -> Unit
+    onSyncOptionsTxt: () -> Unit,
+    onSyncCape: () -> Unit
 ) {
     val context = LocalContext.current
 
@@ -673,6 +685,8 @@ private fun FamousClientRectangleMenu(
                             ClientMenuSubPage.GRID -> "AERIX CLIENT"
                             ClientMenuSubPage.CAPES -> "AERIX CLIENT  ·  CAPES"
                             ClientMenuSubPage.CROSSHAIRS -> "AERIX CLIENT  ·  CROSSHAIR"
+                            ClientMenuSubPage.PERFORMANCE -> "AERIX CLIENT  ·  PERFORMANCE"
+                            ClientMenuSubPage.UTILITY -> "AERIX CLIENT  ·  UTILITIES"
                         },
                         color = Color.White,
                         fontSize = 15.sp,
@@ -743,11 +757,15 @@ private fun FamousClientRectangleMenu(
                         context = context,
                         onOpenCapes = { onChangeSubPage(ClientMenuSubPage.CAPES) },
                         onOpenCrosshairs = { onChangeSubPage(ClientMenuSubPage.CROSSHAIRS) },
+                        onOpenPerformance = { onChangeSubPage(ClientMenuSubPage.PERFORMANCE) },
+                        onOpenUtility = { onChangeSubPage(ClientMenuSubPage.UTILITY) },
                         onOpenOledAfk = onOpenOledAfk,
                         onSyncOptionsTxt = onSyncOptionsTxt
                     )
-                    ClientMenuSubPage.CAPES -> ClientCapesSubPage(onSyncCape = onSyncOptionsTxt)
+                    ClientMenuSubPage.CAPES -> ClientCapesSubPage(onSyncCape = onSyncCape)
                     ClientMenuSubPage.CROSSHAIRS -> ClientCrosshairsSubPage()
+                    ClientMenuSubPage.PERFORMANCE -> ClientPerformancePage()
+                    ClientMenuSubPage.UTILITY -> ClientUtilityPage(onClose)
                 }
             }
         }
@@ -759,10 +777,16 @@ private fun ClientSquaresGridPage(
     context: Context,
     onOpenCapes: () -> Unit,
     onOpenCrosshairs: () -> Unit,
+    onOpenPerformance: () -> Unit,
+    onOpenUtility: () -> Unit,
     onOpenOledAfk: () -> Unit,
     onSyncOptionsTxt: () -> Unit
 ) {
     val modules = listOf(
+        ClientSquareModule("performance", "Performance", FeatureIconKind.FPS,
+            { false }, { "SETTINGS ›" }, onOpenPerformance),
+        ClientSquareModule("utility", "Utilities", FeatureIconKind.HOTBAR,
+            { false }, { "ACTIONS ›" }, onOpenUtility),
         ClientSquareModule(
             id = "capes",
             title = "Capes",
@@ -1288,6 +1312,82 @@ private fun DrawScope.drawFeatureSymbol(kind: FeatureIconKind, color: Color) {
     }
 }
 
+/** Settings are queued and applied before the next Minecraft launch. */
+@Composable
+private fun ClientPerformancePage() {
+    val options = ClientPerformanceSettings.overrides
+    Column(
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text("Settings apply next time Minecraft starts. Lower settings can improve FPS but reduce visual quality.",
+            color = LiquidCrystalPalette.TextSecondary, fontSize = 11.sp)
+        Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            listOf("Maximum FPS", "Balanced", "Battery Saver").forEach { profile ->
+                LiquidCrystalPill(profile, onClick = { ClientPerformanceSettings.profile(profile) })
+            }
+            LiquidCrystalPill("Stop overriding", onClick = { ClientPerformanceSettings.profile("Custom") })
+        }
+        Text("Stop overriding keeps Minecraft’s current settings; it does not restore earlier values.",
+            color = LiquidCrystalPalette.TextMuted, fontSize = 10.sp)
+        PerformanceChoice("Render distance", "renderDistance", options, listOf("4" to "4 chunks", "6" to "6 chunks", "8" to "8 chunks", "12" to "12 chunks", "16" to "16 chunks"))
+        PerformanceChoice("Simulation distance · 1.18+", "simulationDistance", options, listOf("5" to "5 chunks", "6" to "6 chunks", "8" to "8 chunks", "12" to "12 chunks"))
+        PerformanceChoice("Graphics / leaves", "graphicsMode", options, listOf("0" to "Fast", "1" to "Fancy"))
+        PerformanceChoice("Clouds", "renderClouds", options, listOf("\"false\"" to "Off", "\"fast\"" to "Fast", "\"true\"" to "Fancy"))
+        PerformanceChoice("Entity shadows", "entityShadows", options, listOf("false" to "Off", "true" to "On"))
+        PerformanceChoice("Particles", "particles", options, listOf("2" to "Minimal", "1" to "Decreased", "0" to "All"))
+        PerformanceChoice("Biome blend", "biomeBlendRadius", options, listOf("0" to "Off", "2" to "2 blocks", "5" to "5 blocks"))
+        PerformanceChoice("Mipmap levels", "mipmapLevels", options, listOf("0" to "Off", "2" to "2", "4" to "4"))
+        PerformanceChoice("VSync", "enableVsync", options, listOf("false" to "Off", "true" to "On"))
+        PerformanceChoice("FPS limit", "maxFps", options, listOf("30" to "30", "60" to "60", "120" to "120", "260" to "Unlimited"))
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Animated item textures · next launch", color = Color.White, fontSize = 11.sp)
+            Switch(checked = AerixClientStore.packVanillaAnimatedGear, onCheckedChange = {
+                AerixClientStore.packVanillaAnimatedGear = it
+                AerixClientStore.persist()
+            })
+        }
+        Text("Disabling animated item textures can reduce texture updates. Capes are controlled separately.",
+            color = LiquidCrystalPalette.TextSecondary, fontSize = 10.sp)
+    }
+}
+
+@Composable
+private fun PerformanceChoice(title: String, key: String, options: Map<String, String>, choices: List<Pair<String, String>>) {
+    Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(title, modifier = Modifier.width(150.dp), color = Color.White, fontSize = 11.sp)
+        choices.forEach { (value, label) ->
+            LiquidCrystalPill(label, selected = options[key] == value, onClick = { ClientPerformanceSettings.set(key, value) })
+        }
+    }
+}
+
+/** Uses Minecraft's own default keys; custom key bindings may require the player to use those instead. */
+@Composable
+private fun ClientUtilityPage(onClose: () -> Unit) {
+    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Actions use Minecraft’s default keyboard shortcuts.", color = LiquidCrystalPalette.TextSecondary, fontSize = 11.sp)
+        val actions = listOf(
+            "Screenshot · F2" to { AerixClientInputBridge.tapKey(android.view.KeyEvent.KEYCODE_F2) },
+            "Perspective · F5" to { AerixClientInputBridge.triggerPerspectiveToggle() },
+            "Swap offhand · F" to { AerixClientInputBridge.triggerSwapOffhand() },
+            "Reload chunks · F3+A" to { AerixClientInputBridge.triggerF3Chord(android.view.KeyEvent.KEYCODE_A) },
+            "Hitboxes · F3+B" to { AerixClientInputBridge.triggerF3Chord(android.view.KeyEvent.KEYCODE_B) },
+            "Chunk borders · F3+G" to { AerixClientInputBridge.triggerF3Chord(android.view.KeyEvent.KEYCODE_G) },
+            "Clear chat · F3+D" to { AerixClientInputBridge.triggerF3Chord(android.view.KeyEvent.KEYCODE_D) }
+        )
+        actions.chunked(3).forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                row.forEach { (label, action) ->
+                    LiquidCrystalPill(label, onClick = { onClose(); action() })
+                }
+            }
+        }
+    }
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
  * CAPES SUB-PAGE: LEFT = 3D ROTATABLE CHARACTER + WAVING TOGGLE | RIGHT = 15 ANIMATED CAPES
  * ═══════════════════════════════════════════════════════════════════════════ */
@@ -1790,8 +1890,8 @@ private fun InGameCrimsonHud(
                     horizontalArrangement = Arrangement.spacedBy(7.dp)
                 ) {
                     Text("$fps FPS", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
-                    Text("1% $low1Pct", color = LiquidCrystalPalette.TextSecondary, fontSize = 10.sp)
-                    Text("${ramMb}MB", color = LiquidCrystalPalette.TextSecondary, fontSize = 10.sp)
+                    Text("MIN $low1Pct", color = LiquidCrystalPalette.TextSecondary, fontSize = 10.sp)
+                    Text("${ramMb}MB app", color = LiquidCrystalPalette.TextSecondary, fontSize = 10.sp)
                     Text(
                         "$batteryPct% · ${"%.0f".format(tempC)}°C",
                         color = if (hotWarning) LiquidCrystalPalette.GoldStar else LiquidCrystalPalette.CrimsonGlow,

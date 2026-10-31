@@ -304,8 +304,6 @@ public final class AerixClientMod implements ClientModInitializer {
         if (!cfgFile.isFile()) return;
         long mtime = cfgFile.lastModified();
         if (mtime == lastWaveyMtime) return;
-        lastWaveyMtime = mtime;
-
         try {
             String json = new String(readAllBytes(cfgFile), StandardCharsets.UTF_8);
             boolean wavesOn = json.contains("\"WAVES\"");
@@ -318,6 +316,8 @@ public final class AerixClientMod implements ClientModInitializer {
             setEnumField(cfg, "windMode", wavesOn ? "WAVES" : "NONE");
             setEnumField(cfg, "capeStyle", wavesOn ? "SMOOTH" : "BLOCKY");
             setEnumField(cfg, "capeMovement", wavesOn ? "BASIC_SIMULATION_3D" : "VANILLA");
+            // Retry until the mod has actually initialised; the animator starts on another thread.
+            lastWaveyMtime = mtime;
         } catch (Throwable ignored) {
         }
     }

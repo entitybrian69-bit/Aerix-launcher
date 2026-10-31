@@ -191,6 +191,8 @@ object AerixClientStore {
         val p = context.applicationContext.getSharedPreferences(PREFS_FILE, Context.MODE_PRIVATE)
         prefs = p
 
+        packVanillaAnimatedGear = p.getBoolean("packVanillaAnimatedGear", true)
+        packEnhancedGlint = p.getBoolean("packEnhancedGlint", true)
         selectedClientVersion = p.getString("selectedClientVersion", "1.16.5") ?: "1.16.5"
 
         equippedCapeId = p.getString("equippedCapeId", "crimson_sovereign") ?: "crimson_sovereign"
@@ -244,6 +246,8 @@ object AerixClientStore {
     fun persist() {
         val p = prefs ?: return
         p.edit().apply {
+            putBoolean("packVanillaAnimatedGear", packVanillaAnimatedGear)
+            putBoolean("packEnhancedGlint", packEnhancedGlint)
             putString("selectedClientVersion", selectedClientVersion)
 
             putString("equippedCapeId", equippedCapeId)
