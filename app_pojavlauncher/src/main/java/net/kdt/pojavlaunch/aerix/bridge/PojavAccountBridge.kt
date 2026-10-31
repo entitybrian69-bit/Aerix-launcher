@@ -662,13 +662,45 @@ object PojavAccountBridge : LoginListener {
         return null
     }
 
-    fun resolveCapeBytes(account: AerixAccount?): ByteArray? {
+    /** Resolves a wardrobe cape or the official Microsoft account cape. Call off the main thread. */
+    fun resolveCapeBytes(account: AerixAccount?, includeOfficial: Boolean = false): ByteArray? {
         if (account == null) return null
         val file = customCapeFile(account.source)
-        if (file.isFile && file.length() > 0) {
-            return runCatching { file.readBytes() }.getOrNull()
-        }
-        return null
+        if (file.isFile && file.length() > 0) return runCatching { file.readBytes() }.getOrNull()
+        if (!includeOfficial || account.authType != AuthType.MICROSOFT) return null
+
+        val uuid = account.source.profileId?.replace("-", "")?.trim().orEmpty()
+        if (uuid.length != 32 || uuid.any { it !in '0'..'9' && it.lowercaseChar() !in 'a'..'f' } || uuid.all { it == '0' }) return null
+        val cached = File(Tools.DIR_CACHE, "aerix-cape-${safeAccountTag(account.source)}.png")
+        val cachedBytes = { runCatching { cached.takeIf { it.isFile && it.length() > 0 }?.readBytes() }.getOrNull() }
+        if (cached.isFile && System.currentTimeMillis() - cached.lastModified() < 15 * 60 * 1000L) return cachedBytes()
+        val profile = downloadBytesFollowingRedirects("https://sessionserver.mojang.com/session/minecraft/profile/$uuid")
+            ?: return cachedBytes()
+        return runCatching {
+            val properties = com.google.gson.JsonParser.parseString(String(profile, Charsets.UTF_8))
+                .asJsonObject.getAsJsonArray("properties") ?: return@runCatching cachedBytes()
+            val property = properties.firstOrNull { it.asJsonObject.get("name")?.asString == "textures" }
+                ?: return@runCatching cachedBytes()
+            val encoded = property.asJsonObject.get("value")?.asString ?: return@runCatching cachedBytes()
+            val textures = com.google.gson.JsonParser.parseString(
+                String(android.util.Base64.decode(encoded, android.util.Base64.DEFAULT), Charsets.UTF_8)
+            ).asJsonObject.getAsJsonObject("textures")
+            val url = textures?.getAsJsonObject("CAPE")?.get("url")?.asString
+            if (url.isNullOrBlank()) {
+                cached.delete()
+                return@runCatching null
+            }
+            val parsed = java.net.URI(url)
+            if (parsed.host != "textures.minecraft.net" || parsed.scheme !in listOf("http", "https")) return@runCatching null
+            val secureUrl = if (parsed.scheme == "http") "https://" + url.removePrefix("http://") else url
+            val bytes = downloadBytesFollowingRedirects(secureUrl) ?: return@runCatching cachedBytes()
+            val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return@runCatching cachedBytes()
+            val valid = bitmap.width >= 22 && bitmap.height >= 17 && bitmap.width <= 1024 && bitmap.height <= 1024
+            bitmap.recycle()
+            if (!valid) return@runCatching cachedBytes()
+            runCatching { cached.writeBytes(bytes) }
+            bytes
+        }.getOrElse { cachedBytes() }
     }
 
     fun isSlimModel(account: AerixAccount?): Boolean {
@@ -891,6 +923,21 @@ object PojavAccountBridge : LoginListener {
             }
         }
         return null
+    }
+
+    /** The actual equipped skin's face, including its outer layer. Call off the main thread. */
+    fun loadAccountFacePreview(context: Context, account: AerixAccount?): ImageBitmap? {
+        if (account == null) return null
+        val bytes = resolveAccountSkinBytes(account)
+        if (bytes == null && account.authType != AuthType.LOCAL && account.face != null) return account.face
+        val skin = if (bytes != null) BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+            else runCatching { context.assets.open("steve.png").use { BitmapFactory.decodeStream(it) } }.getOrNull()
+        if (skin == null) return account.face
+        return try {
+            renderSkinFace(skin)?.asImageBitmap() ?: account.face
+        } finally {
+            skin.recycle()
+        }
     }
 
     /** Crisp 2D full-body preview of [account]'s equipped skin (or default Steve), used while 3D WebGL loads or on non-WebGL devices. */

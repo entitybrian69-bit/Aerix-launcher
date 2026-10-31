@@ -65,6 +65,7 @@ jobs:
       - name: Verify Client smoke tests
         run: |
           python3 tests/branding_identity_smoke.py
+          python3 tests/social_profile_cosmetics_smoke.py
           mkdir -p "$RUNNER_TEMP/aerix-memory-test"
           javac -d "$RUNNER_TEMP/aerix-memory-test" \
             app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/utils/jre/InstanceMemory.java \

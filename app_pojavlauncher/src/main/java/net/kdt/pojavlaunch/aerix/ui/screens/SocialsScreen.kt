@@ -539,7 +539,7 @@ private fun SocialSidebar(
                 contentAlignment = Alignment.BottomEnd,
                 modifier = Modifier.clickable(role = Role.Button, onClick = onProfile)
             ) {
-                SocialHead(SocialBackend.mcUsername ?: PojavAccountBridge.current?.username, 32)
+                CurrentAccountHead(size = 32)
                 SocialStatusDot(mode = myMode, size = 10.dp, borderWidth = 1.5.dp)
             }
         }
@@ -2177,6 +2177,35 @@ private fun SocialSmallButton(label: String, filled: Boolean, onClick: () -> Uni
             color = if (filled) AerixSurface.canvas else AerixSurface.textPrimary,
             maxLines = 1
         )
+    }
+}
+
+@Composable
+private fun CurrentAccountHead(size: Int) {
+    val account = PojavAccountBridge.current
+    val revision = PojavAccountBridge.wardrobeRevision
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var face by remember(account?.key, revision) { mutableStateOf(account?.face) }
+    LaunchedEffect(account?.key, revision) {
+        face = withContext(Dispatchers.IO) {
+            PojavAccountBridge.loadAccountFacePreview(context, account)
+        }
+    }
+    val shape = RoundedCornerShape(AerixRadii.compact)
+    Box(
+        modifier = Modifier.size(size.dp).clip(shape).background(AerixSurface.panelTrack)
+            .border(BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft), shape),
+        contentAlignment = Alignment.Center
+    ) {
+        val image = face
+        if (image != null) {
+            Image(bitmap = image, contentDescription = "Current Minecraft skin",
+                filterQuality = FilterQuality.None, modifier = Modifier.fillMaxSize())
+        } else {
+            Icon(painter = painterResource(R.drawable.aerix_ic_person_outlined),
+                contentDescription = "No Minecraft account", tint = AerixSurface.textMuted,
+                modifier = Modifier.size((size * 0.55f).dp))
+        }
     }
 }
 

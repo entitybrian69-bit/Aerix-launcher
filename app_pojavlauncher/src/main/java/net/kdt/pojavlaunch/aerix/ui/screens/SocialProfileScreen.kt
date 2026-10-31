@@ -19,6 +19,9 @@
 package net.kdt.pojavlaunch.aerix.ui.screens
 
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -30,6 +33,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -41,6 +45,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
@@ -54,11 +59,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -66,7 +77,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.fragment.app.FragmentActivity
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 import net.kdt.pojavlaunch.R
+import net.kdt.pojavlaunch.aerix.bridge.PojavAccountBridge
+import net.kdt.pojavlaunch.aerix.bridge.PojavInstanceBridge
+import net.kdt.pojavlaunch.aerix.client.AerixClientCosmetics
+import net.kdt.pojavlaunch.aerix.client.AerixClientStore
+import net.kdt.pojavlaunch.aerix.components.AerixSkinPreview3D
 import net.kdt.pojavlaunch.aerix.social.SocialBackend
 import net.kdt.pojavlaunch.aerix.social.SocialPresenceMode
 import net.kdt.pojavlaunch.aerix.social.SocialProfile
@@ -76,7 +93,7 @@ import net.kdt.pojavlaunch.aerix.theme.AerixSpacing
 import net.kdt.pojavlaunch.aerix.theme.AerixSurface
 import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
 
-private enum class ProfileView { CARD, EDIT, PEOPLE }
+private enum class ProfileView { CARD, EDIT, PEOPLE, COSMETICS }
 
 private enum class Relation(val title: String) {
     FOLLOWING("Following"),
@@ -115,6 +132,7 @@ fun SocialProfilePage(
     }
 
     LaunchedEffect(username) { reload() }
+    BackHandler(enabled = view != ProfileView.CARD) { view = ProfileView.CARD }
 
     AnimatedContent(
         targetState = view,
@@ -138,6 +156,7 @@ fun SocialProfilePage(
                 isMe = isMe,
                 onBack = onBack,
                 onEdit = { view = ProfileView.EDIT },
+                onCosmetics = { view = ProfileView.COSMETICS },
                 onRelation = { picked ->
                     relation = picked
                     view = ProfileView.PEOPLE
@@ -171,6 +190,8 @@ fun SocialProfilePage(
                     scope.launch { reload() }
                 }
             )
+
+            ProfileView.COSMETICS -> ProfileCosmeticsPage(activity = activity) { view = ProfileView.CARD }
 
             ProfileView.PEOPLE -> SocialPeoplePage(
                 activity = activity,
@@ -231,6 +252,7 @@ private fun ProfileCard(
     isMe: Boolean,
     onBack: () -> Unit,
     onEdit: () -> Unit,
+    onCosmetics: () -> Unit,
     onRelation: (Relation) -> Unit,
     onFollow: () -> Unit,
     onAddFriend: () -> Unit,
@@ -323,63 +345,77 @@ private fun ProfileCard(
             }
         }
         Spacer(Modifier.height(AerixSpacing.lgPlus))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(modifier = Modifier.weight(1f)) {
-                SocialNameWithRole(
-                    name = profile.displayName,
-                    role = effectiveRole,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = AerixSurface.textPrimary
-                )
-                Text(
-                    profile.handle.ifBlank { "@" + (profile.mcUsername ?: "player") },
-                    fontSize = 11.sp,
-                    color = AerixSurface.textMuted
-                )
-            }
-            if (!profile.isMe) {
-                SocialButton(if (profile.iFollow) "Following" else "Follow", filled = !profile.iFollow, onClick = onFollow)
-            }
-        }
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+            Column(modifier = Modifier.weight(0.67f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        SocialNameWithRole(
+                            name = profile.displayName,
+                            role = effectiveRole,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = AerixSurface.textPrimary
+                        )
+                        Text(
+                            profile.handle.ifBlank { "@" + (profile.mcUsername ?: "player") },
+                            fontSize = 11.sp,
+                            color = AerixSurface.textMuted
+                        )
+                    }
+                    if (!profile.isMe) {
+                        SocialButton(if (profile.iFollow) "Following" else "Follow", filled = !profile.iFollow, onClick = onFollow)
+                    }
+                }
 
-        Spacer(Modifier.height(6.dp))
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(AerixSpacing.xs),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            if (!profile.country.isNullOrBlank()) SocialTag(profile.country, AerixSurface.glassBlue)
-            val myEffMode = SocialBackend.effectivePresenceMode
-            val activeLooking = if (isMe) SocialBackend.myLookingToPlay else profile.lookingToPlay
-            if (activeLooking && (!isMe || (myEffMode != null && myEffMode != SocialPresenceMode.INVISIBLE))) {
-                SocialTag("Looking to play", AerixSurface.success)
+                Spacer(Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(AerixSpacing.xs),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (!profile.country.isNullOrBlank()) SocialTag(profile.country, AerixSurface.glassBlue)
+                    val myEffMode = SocialBackend.effectivePresenceMode
+                    val activeLooking = if (isMe) SocialBackend.myLookingToPlay else profile.lookingToPlay
+                    if (activeLooking && (!isMe || (myEffMode != null && myEffMode != SocialPresenceMode.INVISIBLE))) {
+                        SocialTag("Looking to play", AerixSurface.success)
+                    }
+                    if (isMe) {
+                        val tagLabel = when {
+                            myEffMode == null -> "Offline"
+                            SocialBackend.isAutoPresence -> "${myEffMode.label} (Auto)"
+                            else -> myEffMode.label
+                        }
+                        Box(modifier = Modifier.clickable { statusDialogOpen = true }) {
+                            SocialTag(tagLabel, presenceModeColor(myEffMode))
+                        }
+                    } else if (profile.online) {
+                        SocialTag(profile.presenceMode.label, presenceModeColor(profile.presenceMode))
+                    } else if (profile.away) {
+                        SocialTag("Away", AerixSurface.warning)
+                    } else {
+                        SocialTag("Offline", AerixSurface.textMuted)
+                    }
+                }
+                val shownStatus = if (isMe) (SocialBackend.myCustomStatus ?: profile.statusText) else profile.statusText
+                if (!shownStatus.isNullOrBlank()) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        shownStatus,
+                        fontSize = 11.5.sp,
+                        color = AerixSurface.textSecondary,
+                        modifier = if (isMe) Modifier.clickable { statusDialogOpen = true } else Modifier
+                    )
+                }
+
             }
             if (isMe) {
-                val tagLabel = when {
-                    myEffMode == null -> "Offline"
-                    SocialBackend.isAutoPresence -> "${myEffMode.label} (Auto)"
-                    else -> myEffMode.label
-                }
-                Box(modifier = Modifier.clickable { statusDialogOpen = true }) {
-                    SocialTag(tagLabel, presenceModeColor(myEffMode))
-                }
-            } else if (profile.online) {
-                SocialTag(profile.presenceMode.label, presenceModeColor(profile.presenceMode))
-            } else if (profile.away) {
-                SocialTag("Away", AerixSurface.warning)
-            } else {
-                SocialTag("Offline", AerixSurface.textMuted)
+                ProfileCharacter(
+                    modifier = Modifier.weight(0.24f, fill = false).widthIn(max = 148.dp)
+                        .fillMaxWidth().height(130.dp),
+                    onClick = onCosmetics
+                )
+                Spacer(Modifier.weight(0.09f))
             }
-        }
-        val shownStatus = if (isMe) (SocialBackend.myCustomStatus ?: profile.statusText) else profile.statusText
-        if (!shownStatus.isNullOrBlank()) {
-            Spacer(Modifier.height(6.dp))
-            Text(
-                shownStatus,
-                fontSize = 11.5.sp,
-                color = AerixSurface.textSecondary,
-                modifier = if (isMe) Modifier.clickable { statusDialogOpen = true } else Modifier
-            )
         }
 
         Spacer(Modifier.height(AerixSpacing.sm))
@@ -628,6 +664,129 @@ private fun ProfileCard(
             fontSize = 9.sp,
             color = AerixSurface.textMuted
         )
+    }
+}
+
+@Composable
+private fun ProfileCharacter(modifier: Modifier, onClick: () -> Unit) {
+    val account = PojavAccountBridge.current
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val clientCape = PojavInstanceBridge.selected?.isAerixClient == true
+    var azimuth by remember(account?.key) { mutableFloatStateOf(25f) }
+    var pitch by remember(account?.key) { mutableFloatStateOf(10f) }
+    var clientReady by remember(clientCape) { mutableStateOf(!clientCape) }
+    LaunchedEffect(clientCape) {
+        if (clientCape) AerixClientStore.init(context)
+        clientReady = true
+    }
+    Box(
+        modifier = modifier.clipToBounds()
+            .clickable(role = Role.Button, onClick = onClick)
+            .semantics { contentDescription = "Rotate character or tap to change skin and cape" }
+            .pointerInput(account?.key) {
+                detectDragGestures { change, amount ->
+                    change.consume()
+                    azimuth = (azimuth + amount.x * 0.55f).mod(360f)
+                    pitch = (pitch - amount.y * 0.35f).coerceIn(-35f, 55f)
+                }
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        if (clientReady) {
+            AerixSkinPreview3D(
+                account = account,
+                azimuth = azimuth.roundToInt(),
+                pitch = pitch.roundToInt(),
+                interactionEnabled = false,
+                useClientCape = clientCape,
+                showOfficialCape = true,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProfileCosmeticsPage(activity: FragmentActivity, onBack: () -> Unit) {
+    val account = PojavAccountBridge.current
+    val selectedClient = PojavInstanceBridge.selected?.isAerixClient == true
+    var skinTarget by remember { mutableStateOf<net.kdt.pojavlaunch.aerix.bridge.AerixAccount?>(null) }
+    var capeTarget by remember { mutableStateOf<net.kdt.pojavlaunch.aerix.bridge.AerixAccount?>(null) }
+    val skinPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        val target = skinTarget
+        skinTarget = null
+        if (uri != null && target != null) PojavAccountBridge.equipSkinFromUri(activity, target, uri)
+    }
+    val capePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        val target = capeTarget
+        capeTarget = null
+        if (uri != null && target != null) PojavAccountBridge.equipCapeFromUri(activity, target, uri)
+    }
+    LaunchedEffect(Unit) { AerixClientStore.init(activity) }
+
+    Column(
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(AerixSpacing.lg),
+        verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
+    ) {
+        SocialPageBar(title = "Skin & Cape", onBack = onBack)
+        if (account == null) {
+            SocialPanel(Modifier.fillMaxWidth()) {
+                Text("Select a Minecraft account to change your skin and cape.",
+                    color = AerixSurface.textSecondary, modifier = Modifier.padding(16.dp))
+            }
+            return@Column
+        }
+        SocialPanel(Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Skin", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = AerixSurface.textPrimary)
+                Text("Choose a Minecraft skin image for ${account.username}.", fontSize = 11.sp, color = AerixSurface.textSecondary)
+                SocialButton("Change skin", filled = false) {
+                    skinTarget = account
+                    runCatching { skinPicker.launch(arrayOf("image/png")) }
+                        .onFailure { skinTarget = null; Toast.makeText(activity, "Unable to open file picker", Toast.LENGTH_SHORT).show() }
+                }
+            }
+        }
+        SocialPanel(Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Cape", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = AerixSurface.textPrimary)
+                Text(
+                    if (selectedClient) "Aerix Client uses the selected Client cape below. An imported cape is used by other instances."
+                    else "Import a cape for this account, or choose an Aerix Client cape below.",
+                    fontSize = 11.sp, color = AerixSurface.textSecondary
+                )
+                SocialButton("Import cape PNG", filled = false) {
+                    capeTarget = account
+                    runCatching { capePicker.launch(arrayOf("image/png")) }
+                        .onFailure { capeTarget = null; Toast.makeText(activity, "Unable to open file picker", Toast.LENGTH_SHORT).show() }
+                }
+                Text("Aerix Client capes", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = AerixSurface.textPrimary)
+                AerixClientCosmetics.capes.chunked(2).forEach { row ->
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        row.forEach { cape ->
+                            val unlocked = AerixClientCosmetics.canEquipCape(cape)
+                            val selected = AerixClientCosmetics.effectiveCapeSpec().id == cape.id
+                            SocialButton(
+                                label = cape.title + if (!unlocked) " (locked)" else if (selected) " ✓" else "",
+                                modifier = Modifier.weight(1f), filled = selected, enabled = unlocked
+                            ) {
+                                if (AerixClientCosmetics.canEquipCape(cape)) {
+                                    AerixClientStore.equippedCapeId = cape.id
+                                    AerixClientStore.persist()
+                                    val context = activity.applicationContext
+                                    net.kdt.pojavlaunch.PojavApplication.sExecutorService.execute {
+                                        synchronized(AerixClientCosmetics) {
+                                            AerixClientCosmetics.syncCapeAssetsToAllClientInstances(context)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        if (row.size == 1) Spacer(Modifier.weight(1f))
+                    }
+                }
+            }
+        }
     }
 }
 

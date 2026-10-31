@@ -247,7 +247,9 @@ fun AerixSkinPreview3D(
     azimuth: Int = 28,
     pitch: Int = 10,
     interactionEnabled: Boolean = false,
-    isVisible: Boolean = true
+    isVisible: Boolean = true,
+    useClientCape: Boolean = false,
+    showOfficialCape: Boolean = false
 ) {
     val context = LocalContext.current
     val playerSkin = remember { AerixPlayerSkin(context.applicationContext) }
@@ -280,6 +282,8 @@ fun AerixSkinPreview3D(
     }
 
     val wardrobeRevision = PojavAccountBridge.wardrobeRevision
+    val clientCapeId = if (useClientCape) net.kdt.pojavlaunch.aerix.client.AerixClientStore.equippedCapeId else null
+    val capeOwner = if (useClientCape) net.kdt.pojavlaunch.aerix.social.SocialBackend.email else null
 
     // Always decode the crisp 2D full-body preview immediately so the skin shows up on the very
     // first frame after returning to Dashboard — and stays visible on devices without WebGL.
@@ -370,12 +374,14 @@ fun AerixSkinPreview3D(
             if (!ready) return@LaunchedEffect
             playerSkin.setInteractionEnabled(interactionEnabled && isVisible)
         }
-        LaunchedEffect(ready, skinLoadTrigger, account?.key, account?.username, account?.authType, wardrobeRevision) {
+        LaunchedEffect(ready, skinLoadTrigger, account?.key, account?.username, account?.authType, wardrobeRevision, useClientCape, clientCapeId, capeOwner, showOfficialCape) {
             if (!ready || webglFailed) return@LaunchedEffect
             val (skinBytes, capeBytes, model) = withContext(Dispatchers.IO) {
                 Triple(
                     PojavAccountBridge.resolveAccountSkinBytes(account),
-                    PojavAccountBridge.resolveCapeBytes(account),
+                    if (useClientCape && account != null)
+                        net.kdt.pojavlaunch.aerix.client.AerixClientCosmetics.resolveInGameCapeBytes(context)
+                    else PojavAccountBridge.resolveCapeBytes(account, includeOfficial = showOfficialCape),
                     if (PojavAccountBridge.isSlimModel(account)) "slim" else "default"
                 )
             }
