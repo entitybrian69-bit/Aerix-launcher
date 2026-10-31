@@ -83,9 +83,11 @@ object AerixClientInputBridge {
     // Pre-GL Startup Progress & LAN / Match / Queue Detection from latestlog.txt
     var bootProgress by mutableFloatStateOf(0.08f)
         private set
-    var bootStageTitle by mutableStateOf("Initializing OpenJDK 17 & LWJGL 3...")
+    var bootStageTitle by mutableStateOf("Initializing Java and game runtime...")
         private set
     var bootStageDetail by mutableStateOf("Aerix Client · Crimson Edition")
+        private set
+    var sessionMinecraftVersion by mutableStateOf<String?>(null)
         private set
 
     var hostedLanPort by mutableIntStateOf(0)
@@ -320,10 +322,11 @@ object AerixClientInputBridge {
 
     private var logReadOffset: Long = 0L
 
-    fun resetSessionState() {
+    fun resetSessionState(profileId: String?) {
+        sessionMinecraftVersion = ClientBootLabels.fromProfile(profileId)
         logReadOffset = 0L
         bootProgress = 0.08f
-        bootStageTitle = "Initializing OpenJDK 17 & LWJGL 3..."
+        bootStageTitle = "Initializing Java and game runtime..."
         bootStageDetail = "Aerix Client · Crimson Edition"
         hostedLanPort = 0
         hostedLanAddress = ""
@@ -365,19 +368,25 @@ object AerixClientInputBridge {
     }
 
     private fun inspectLogLine(context: Context, line: String) {
+        val actualVersion = ClientBootLabels.fromLoadingLog(line)
+        if (actualVersion != null && actualVersion != sessionMinecraftVersion) {
+            sessionMinecraftVersion = actualVersion
+            if (bootProgress >= 0.95f) bootStageTitle = ClientBootLabels.textureAtlases(actualVersion)
+            else if (bootProgress >= 0.28f && bootProgress < 0.56f) bootStageTitle = ClientBootLabels.loadingMods(actualVersion)
+        }
         when {
-            line.contains("Loading Minecraft 1.16.5", ignoreCase = true) ||
-                line.contains("FabricLoader", ignoreCase = true) -> {
+            actualVersion != null || line.contains("FabricLoader", ignoreCase = true) -> {
                 if (bootProgress < 0.28f) {
                     bootProgress = 0.28f
-                    bootStageTitle = "Loading Fabric 1.16.5 & FPS Mods..."
+                    bootStageTitle = ClientBootLabels.loadingMods(sessionMinecraftVersion)
                     bootStageDetail = "Sodium · Lithium · FerriteCore · LazyDFU · Starlight"
                 }
             }
-            line.contains("Backend library: LWJGL", ignoreCase = true) -> {
+            line.contains("Backend library: LWJGL", ignoreCase = true) ||
+                line.contains("Backend library: SDL", ignoreCase = true) -> {
                 if (bootProgress < 0.56f) {
                     bootProgress = 0.56f
-                    bootStageTitle = "Starting LWJGL OpenGL Renderer..."
+                    bootStageTitle = "Starting graphics renderer..."
                     bootStageDetail = "Binding native frame swap counter & GL context"
                 }
             }
@@ -392,7 +401,7 @@ object AerixClientInputBridge {
             line.contains("textures/atlas", ignoreCase = true) -> {
                 if (bootProgress < 0.95f) {
                     bootProgress = 0.95f
-                    bootStageTitle = "Stitching 1.16.5 Texture Atlases..."
+                    bootStageTitle = ClientBootLabels.textureAtlases(sessionMinecraftVersion)
                     bootStageDetail = "Entering Aerix Client Title Dashboard"
                 }
             }

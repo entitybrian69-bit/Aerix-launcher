@@ -26,12 +26,13 @@ import kotlin.math.hypot
  * Generates `Aerix-Client-Pack.zip` inside the Aerix Client instance's `resourcepacks/` folder,
  * preserving 100% authentic Mojang vanilla item/tool/armor artwork while adding live shimmer
  * & floating sparkle particle animations, replacing the Title Screen logo with `AERIX CLIENT`,
- * applying the monochrome misty forest panorama (`aerix_client_title_bg`), and tuning FPS configs.
+ * applying the dark Minecraft-style panorama, and tuning FPS configs.
  */
 object AerixClientPackGenerator {
 
     const val PACK_FILE_NAME = "Aerix-Client-Pack.zip"
-    private const val PACK_SCHEMA_REV = "v5_aerix_brand_2026"
+    private const val PACK_SCHEMA_REV = "v6_aerix_dark_landscape_2026"
+    internal const val CLIENT_BACKGROUND_ASSET = "aerix/client_dark_background.webp"
 
     fun packFormatForVersion(mcVersion: String): Int = ClientVersions.format(mcVersion)
 
@@ -55,7 +56,7 @@ object AerixClientPackGenerator {
 
     /**
      * Fast stamp-checked sync called at launch (`attachForInstance` & Launcher Launch button) so
-     * existing Client installs automatically upgrade to the new `AERIX CLIENT` logo, misty forest
+     * existing Client installs automatically upgrade to the new `AERIX CLIENT` logo, dark landscape
      * background, and genuine vanilla animated gear once `<mcVersion>.jar` is on disk.
      */
     fun ensurePackUpToDate(context: Context, instanceGameDir: File, mcVersion: String) {
@@ -132,8 +133,8 @@ object AerixClientPackGenerator {
                 clearOverlay.eraseColor(Color.TRANSPARENT)
                 putBitmap(zos, "assets/minecraft/textures/gui/title/background/panorama_overlay.png", clearOverlay)
 
-                // Seamless 512x512 cubemap faces projected from the monochrome misty pine forest (`images.jpeg`)
-                val panoFaces = buildMistyForestPanoramaFaces(context)
+                // Cubemap faces projected from the shared Client landscape.
+                val panoFaces = buildClientPanoramaFaces(context)
                 panoFaces.forEachIndexed { idx, face ->
                     putBitmap(zos, "assets/minecraft/textures/gui/title/background/panorama_$idx.png", face)
                 }
@@ -344,17 +345,17 @@ object AerixClientPackGenerator {
     }
 
     /* ═══════════════════════════════════════════════════════════════════════
-     * 2. SEAMLESS MISTY FOREST PANORAMA (`images.jpeg` -> `panorama_0..5.png`)
+     * 2. DARK CLIENT PANORAMA (`panorama_0..5.png`)
      * ═══════════════════════════════════════════════════════════════════════ */
 
     /**
-     * Projects `R.drawable.aerix_client_title_bg` (`images.jpeg` monochrome misty pine forest)
-     * seamlessly across all 6 `512×512` cubemap faces (`0`=front, `1`=right, `2`=back, `3`=left, `4`=up, `5`=down)
+     * Projects the shared dark Client background
+     * seamlessly across all 6 `384×384` cubemap faces (`0`=front, `1`=right, `2`=back, `3`=left, `4`=up, `5`=down)
      * using proper 3D ray-direction spherical projection + mirrored horizontal wrap so there are ZERO seams!
      */
-    private fun buildMistyForestPanoramaFaces(context: Context): List<Bitmap> {
+    private fun buildClientPanoramaFaces(context: Context): List<Bitmap> {
         val raw = runCatching {
-            BitmapFactory.decodeResource(context.resources, R.drawable.aerix_client_title_bg)
+            context.assets.open(CLIENT_BACKGROUND_ASSET).use { BitmapFactory.decodeStream(it) }
         }.getOrNull()
 
         if (raw == null) {
@@ -369,6 +370,7 @@ object AerixClientPackGenerator {
         val srcH = raw.height.coerceAtLeast(2)
         val srcPixels = IntArray(srcW * srcH)
         raw.getPixels(srcPixels, 0, srcW, 0, 0, srcW, srcH)
+        raw.recycle()
 
         // Compute average top-mist color and bottom-forest-floor color for smooth zenith/nadir blending
         var topR = 0L; var topG = 0L; var topB = 0L
@@ -408,12 +410,12 @@ object AerixClientPackGenerator {
                     val pitch = atan2(dy, horiz) // -pi/2 .. +pi/2
                     val yaw = atan2(-dx, dz)     // -pi .. +pi (0 at center of face 0)
 
-                    // Mirror-wrap yaw cleanly across 2 seamless forest spans around the 360° horizon
+                    // Mirror-wrap the landscape around the 360° horizon.
                     val normYaw = (yaw + Math.PI) / (2.0 * Math.PI) // 0..1
                     val saw = (normYaw * 2.0) % 2.0
                     val mirroredU = if (saw <= 1.0) saw else (2.0 - saw)
 
-                    // Map vertical FOV [-0.52 .. +0.52 rad] onto source forest height, blending cleanly into mist/floor
+                    // Map vertical FOV onto the source height, blending into the sky and ground.
                     val vRaw = 0.5 - (pitch / 1.08)
                     val col = when {
                         vRaw <= 0.0 -> zenithCol

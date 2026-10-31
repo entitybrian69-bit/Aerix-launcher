@@ -66,6 +66,7 @@ jobs:
         run: |
           python3 tests/branding_identity_smoke.py
           python3 tests/social_profile_cosmetics_smoke.py
+          python3 tests/client_background_smoke.py
           mkdir -p "$RUNNER_TEMP/aerix-memory-test"
           javac -d "$RUNNER_TEMP/aerix-memory-test" \
             app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/utils/jre/InstanceMemory.java \
@@ -79,6 +80,11 @@ jobs:
             app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/client/ClientVersions.java \
             tests/ClientVersionsSmokeTest.java
           java -cp "$RUNNER_TEMP/aerix-memory-test" ClientVersionsSmokeTest
+          javac -d "$RUNNER_TEMP/aerix-memory-test" \
+            app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/client/ClientVersions.java \
+            app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/client/ClientBootLabels.java \
+            tests/ClientBootLabelsSmokeTest.java
+          java -cp "$RUNNER_TEMP/aerix-memory-test" ClientBootLabelsSmokeTest
           javac -d "$RUNNER_TEMP/aerix-memory-test" \
             app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/client/ClientVersionOptions.java \
             tests/ClientVersionOptionsSmokeTest.java

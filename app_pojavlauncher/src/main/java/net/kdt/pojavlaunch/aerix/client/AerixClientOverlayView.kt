@@ -227,7 +227,7 @@ class AerixClientOverlayView @JvmOverloads constructor(
         activeClientInstance = instance
         AerixClientStore.reload(context.applicationContext)
         ClientPerformanceSettings.reload(context.applicationContext)
-        AerixClientInputBridge.resetSessionState()
+        AerixClientInputBridge.resetSessionState(instance.versionId)
         AerixClientInputBridge.clientSessionActive = true
         bootOverlayVisible = true
         activeModal = InGameClientModal.NONE
@@ -346,7 +346,6 @@ class AerixClientOverlayView @JvmOverloads constructor(
         composeView.setContent {
             AerixLauncherTheme {
                 AerixClientRootOverlay(
-                    instanceLabel = activeClientInstance?.name ?: "Aerix Client",
                     mcVersion = AerixClientPackGenerator.resolveMcVersionFromInstance(activeClientInstance?.versionId, AerixClientStore.selectedClientVersion),
                     gameDir = activeClientInstance?.gameDirectory,
                     bootVisible = bootOverlayVisible,
@@ -396,7 +395,6 @@ class AerixClientOverlayView @JvmOverloads constructor(
  * ═══════════════════════════════════════════════════════════════════════════ */
 @Composable
 private fun AerixClientRootOverlay(
-    instanceLabel: String,
     gameDir: File?,
     bootVisible: Boolean,
     isGrabbing: Boolean,
@@ -769,7 +767,7 @@ private fun AerixClientRootOverlay(
             enter = fadeIn(),
             exit = fadeOut()
         ) {
-            CrimsonBootSplash(instanceLabel = instanceLabel)
+            CrimsonBootSplash()
         }
     }
 }
@@ -3026,13 +3024,33 @@ private fun OledAfkScreen(
 }
 
 @Composable
-private fun CrimsonBootSplash(instanceLabel: String) {
+private fun CrimsonBootSplash() {
+    val context = LocalContext.current
+    var background by remember(context) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
+    LaunchedEffect(context) {
+        background = withContext(Dispatchers.IO) {
+            runCatching {
+                context.assets.open(AerixClientPackGenerator.CLIENT_BACKGROUND_ASSET).use {
+                    BitmapFactory.decodeStream(it)?.asImageBitmap()
+                }
+            }.getOrNull()
+        }
+    }
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(LiquidCrystalPalette.DarkOuter),
         contentAlignment = Alignment.Center
     ) {
+        background?.let { image ->
+            Image(
+                bitmap = image,
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.22f)))
+        }
         LiquidCrystalCard(
             modifier = Modifier.width(420.dp),
             cornerRadius = 16.dp,
@@ -3062,7 +3080,7 @@ private fun CrimsonBootSplash(instanceLabel: String) {
                             fontWeight = FontWeight.ExtraBold
                         )
                         Text(
-                            text = instanceLabel,
+                            text = ClientBootLabels.header(AerixClientInputBridge.sessionMinecraftVersion),
                             color = Color.White,
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Black
