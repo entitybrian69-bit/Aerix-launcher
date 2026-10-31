@@ -70,6 +70,10 @@ jobs:
             tests/InstanceMemorySmokeTest.java
           java -cp "$RUNNER_TEMP/aerix-memory-test" InstanceMemorySmokeTest
           javac -d "$RUNNER_TEMP/aerix-memory-test" \
+            app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/client/ClientVersions.java \
+            tests/ClientVersionsSmokeTest.java
+          java -cp "$RUNNER_TEMP/aerix-memory-test" ClientVersionsSmokeTest
+          javac -d "$RUNNER_TEMP/aerix-memory-test" \
             app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/client/ClientOptionLines.java \
             tests/ClientOptionLinesSmokeTest.java
           java -cp "$RUNNER_TEMP/aerix-memory-test" ClientOptionLinesSmokeTest
@@ -81,6 +85,13 @@ jobs:
             -I app_pojavlauncher/src/main/jni/fps tests/frame_counter_smoke.c \
             app_pojavlauncher/src/main/jni/fps/frame_counter.c -o "$RUNNER_TEMP/aerix-frame-test"
           "$RUNNER_TEMP/aerix-frame-test"
+          gcc -std=c11 -D_POSIX_C_SOURCE=200809L -Wall -Wextra -Werror \
+            -I app_pojavlauncher/src/main/jni/fps tests/sdl_frame_hook_smoke.c \
+            app_pojavlauncher/src/main/jni/fps/sdl_frame_hook.c app_pojavlauncher/src/main/jni/fps/frame_counter.c -o "$RUNNER_TEMP/aerix-sdl-frame-test"
+          "$RUNNER_TEMP/aerix-sdl-frame-test"
+          javac -d "$RUNNER_TEMP/aerix-memory-test" \
+            aerix_client_mod/src/main/java/aerix/client/mod/ClientTelemetry.java tests/ModernTelemetrySmokeTest.java
+          java -cp "$RUNNER_TEMP/aerix-memory-test" aerix.client.mod.ModernTelemetrySmokeTest
           javac -d "$RUNNER_TEMP/aerix-memory-test" \
             aerix_client_mod/src/main/java/aerix/client/mod/ClientVisualOverrides.java \
             tests/ClientVisualOverridesSmokeTest.java

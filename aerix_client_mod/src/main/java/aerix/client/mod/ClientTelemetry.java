@@ -39,13 +39,19 @@ final class ClientTelemetry {
                 }
                 if (!enabled.isFile() || !pending.compareAndSet(false, true)) continue;
                 try {
-                    Class<?> client = Class.forName("net.minecraft.class_310");
-                    Object mc = invoke(client, null, "method_1551");
+                    Class<?> client;
+                    boolean modern;
+                    try { client = Class.forName("net.minecraft.class_310"); modern = false; }
+                    catch (ClassNotFoundException oldNamesUnavailable) {
+                        client = Class.forName("net.minecraft.client.Minecraft"); modern = true;
+                    }
+                    Object mc = invoke(client, null, modern ? "getInstance" : "method_1551");
                     if (!(mc instanceof Executor)) { pending.set(false); continue; }
                     final Object clientObject = mc;
+                    final boolean modernNames = modern;
                     ((Executor) mc).execute(new Runnable() {
                         @Override public void run() {
-                            try { snapshot.set(readSnapshot(clientObject)); }
+                            try { snapshot.set(modernNames ? readModernSnapshot(clientObject) : readSnapshot(clientObject)); }
                             catch (Throwable ignored) { snapshot.set(null); }
                             finally { pending.set(false); }
                         }
@@ -56,6 +62,38 @@ final class ClientTelemetry {
                 return;
             } catch (Throwable ignored) { pending.set(false); }
         }
+    }
+
+    /** Best-effort Mojang-named 26.x telemetry; missing members are omitted, not guessed. */
+    static Properties readModernSnapshot(Object mc) throws Exception {
+        Properties p = new Properties();
+        p.setProperty("updated", Long.toString(System.currentTimeMillis()));
+        Object player = field(mc, "player");
+        if (player == null) { p.setProperty("available", "false"); return p; }
+        p.setProperty("available", "true");
+        putValue(p, "x", player, "getX"); putValue(p, "y", player, "getY"); putValue(p, "z", player, "getZ");
+        putValue(p, "yaw", player, "getYRot");
+        putValue(p, "health", player, "getHealth"); putValue(p, "maxHealth", player, "getMaxHealth");
+        try {
+            Object options = field(mc, "options");
+            Object option = invoke(options.getClass(), options, "renderDistance");
+            putValue(p, "renderDistance", option, "get");
+        } catch (Throwable ignored) { }
+        try {
+            Object inventory = invoke(player.getClass(), player, "getInventory");
+            Object slot = invoke(inventory.getClass(), inventory, "getSelectedSlot");
+            if (slot instanceof Number) p.setProperty("selectedSlot", Integer.toString(((Number) slot).intValue() + 1));
+        } catch (Throwable ignored) { }
+        try {
+            Object world = field(mc, "level");
+            if (world != null) {
+                putValue(p, "dayTime", world, "getDayTime");
+                Object key = invoke(world.getClass(), world, "dimension");
+                Object location = invoke(key.getClass(), key, "location");
+                if (location != null) p.setProperty("dimension", String.valueOf(location));
+            }
+        } catch (Throwable ignored) { }
+        return p;
     }
 
     private static Properties readSnapshot(Object mc) throws Exception {

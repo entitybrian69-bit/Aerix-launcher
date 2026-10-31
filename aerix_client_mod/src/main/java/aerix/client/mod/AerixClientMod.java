@@ -57,6 +57,7 @@ public final class AerixClientMod implements ClientModInitializer {
     private Method mNativeCopyFrom;        // method_4317 (Lclass_1011;)V
 
     private boolean handlesResolved = false;
+    private boolean modernRuntime = false;
     private final ClientVisualOverrides visualOverrides = new ClientVisualOverrides();
     private final ClientAdaptiveDistance adaptiveDistance = new ClientAdaptiveDistance();
 
@@ -120,7 +121,17 @@ public final class AerixClientMod implements ClientModInitializer {
     private boolean resolveHandles() {
         try {
             ClassLoader cl = AerixClientMod.class.getClassLoader();
-            clsMinecraftClient = Class.forName("net.minecraft.class_310", false, cl);
+            try {
+                clsMinecraftClient = Class.forName("net.minecraft.class_310", false, cl);
+            } catch (ClassNotFoundException oldNamesUnavailable) {
+                clsMinecraftClient = Class.forName("net.minecraft.client.Minecraft", false, cl);
+                mGetInstance = clsMinecraftClient.getDeclaredMethod("getInstance");
+                mGetInstance.setAccessible(true);
+                fRunDirectory = findFieldSafe(clsMinecraftClient, "gameDirectory");
+                modernRuntime = true;
+                handlesResolved = true;
+                return true;
+            }
             mGetInstance = clsMinecraftClient.getDeclaredMethod("method_1551");
             mGetInstance.setAccessible(true);
             mGetTextureManager = clsMinecraftClient.getDeclaredMethod("method_1531");
@@ -168,8 +179,12 @@ public final class AerixClientMod implements ClientModInitializer {
 
     private void onRenderThreadTick(Object mc) throws Exception {
         File runDir = resolveRunDir(mc);
-        visualOverrides.tick(mc, runDir);
+        if (!modernRuntime) visualOverrides.tick(mc, runDir);
         adaptiveDistance.tick(mc, runDir);
+        if (modernRuntime) {
+            if (++slowCounter >= 8) { slowCounter = 0; syncWaveyCapesIfNeeded(runDir); }
+            return; // NativeImage/cape and visual internals need a separate 26.x port.
+        }
         slowCounter++;
         if (slowCounter >= 8) {
             slowCounter = 0;

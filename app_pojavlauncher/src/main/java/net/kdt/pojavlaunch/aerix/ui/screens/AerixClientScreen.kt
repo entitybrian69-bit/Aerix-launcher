@@ -198,7 +198,7 @@ fun AerixClientScreen(activity: FragmentActivity) {
                         }
                         Spacer(Modifier.height(2.dp))
                         Text(
-                            text = "Aerix Client ${spec.mcVersion}",
+                            text = spec.summary,
                             color = Color.White.copy(alpha = 0.76f),
                             fontSize = 12.sp
                         )

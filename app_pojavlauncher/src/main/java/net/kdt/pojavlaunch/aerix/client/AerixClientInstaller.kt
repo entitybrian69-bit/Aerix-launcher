@@ -42,18 +42,14 @@ object AerixClientInstaller {
     private const val USER_AGENT =
         "entitybrian69-bit/Aerix-launcher/aerix-client (https://github.com/entitybrian69-bit/Aerix-launcher)"
 
-    private const val TUNED_CLIENT_JVM_ARGS =
-        "-XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=35 -XX:G1HeapRegionSize=16M -XX:+DisableExplicitGC"
+    // JVM defaults adapt to the actual heap and runtime. Do not force large fixed G1 regions
+    // or blanket GC flags on mobile; preserve custom flags on existing instances.
+    private const val TUNED_CLIENT_JVM_ARGS = ""
 
-    val availableVersions: List<ClientVersionSpec> = listOf(
-        ClientVersionSpec("1.21.4", "Aerix Client 1.21.4", "Minecraft 1.21.4 · Ultra FPS + 3D Capes"),
-        ClientVersionSpec("1.21.1", "Aerix Client 1.21.1", "Minecraft 1.21.1 · Ultra FPS + 3D Capes"),
-        ClientVersionSpec("1.20.4", "Aerix Client 1.20.4", "Minecraft 1.20.4 · Ultra FPS + 3D Capes"),
-        ClientVersionSpec("1.20.1", "Aerix Client 1.20.1", "Minecraft 1.20.1 · Ultra FPS + 3D Capes"),
-        ClientVersionSpec("1.19.4", "Aerix Client 1.19.4", "Minecraft 1.19.4 · Ultra FPS + 3D Capes"),
-        ClientVersionSpec("1.18.2", "Aerix Client 1.18.2", "Minecraft 1.18.2 · Ultra FPS + 3D Capes"),
-        ClientVersionSpec("1.16.5", "Aerix Client 1.16.5", "Minecraft 1.16.5 · Ultra FPS + 3D Capes")
-    )
+    val availableVersions: List<ClientVersionSpec> = ClientVersions.RELEASES.map { version ->
+        ClientVersionSpec(version, "Aerix Client $version", if (ClientVersions.modern(version))
+            "Experimental · Java 25 · some Client features unavailable" else "Fabric · version-matched optimization mods")
+    }
 
     var isInstalling by mutableStateOf(false)
         private set
@@ -80,7 +76,7 @@ object AerixClientInstaller {
             list.firstOrNull { inst ->
                 inst.isAerixClient && (
                     inst.name.equals(expectedName, ignoreCase = true) ||
-                        inst.versionId?.contains(mcVersion) == true
+                        ClientVersions.resolve(inst.versionId, "") == mcVersion
                 )
             } ?: list.firstOrNull { inst ->
                 inst.name.equals(expectedName, ignoreCase = true)
@@ -94,15 +90,15 @@ object AerixClientInstaller {
     fun buildModListForVersion(mcVersion: String): List<ClientModEntry> {
         val out = ArrayList<ClientModEntry>()
         out += ClientModEntry("fabric-api", "Fabric API", "Core")
-        out += ClientModEntry("sodium", "Sodium", "GPU Chunk FPS")
-        out += ClientModEntry("lithium", "Lithium", "Physics & Tick FPS")
-        out += ClientModEntry("ferrite-core", "FerriteCore", "45% RAM Saver")
+        out += ClientModEntry("sodium", "Sodium", "Chunk rendering")
+        out += ClientModEntry("lithium", "Lithium", "Tick optimization")
+        out += ClientModEntry("ferrite-core", "FerriteCore", "Memory optimization")
         out += ClientModEntry("immediatelyfast", "ImmediatelyFast", "Entity & HUD Batching")
         out += ClientModEntry("entityculling", "EntityCulling", "Wall Occlusion FPS")
-        out += ClientModEntry("modernfix", "ModernFix", "Zero-Stutter Engine")
+        out += ClientModEntry("modernfix", "ModernFix", "Loading & memory")
         out += ClientModEntry("krypton", "Krypton", "Fast Netty Stack")
         if (mcVersion == "1.16.5" || mcVersion == "1.18.2" || mcVersion == "1.19.4") {
-            out += ClientModEntry("lazydfu", "LazyDFU", "Instant Boot")
+            out += ClientModEntry("lazydfu", "LazyDFU", "Startup optimization")
             out += ClientModEntry("starlight", "Starlight", "Lighting Engine")
         }
         out += ClientModEntry("wavey-capes", "WaveyCapes", "3D Waving Capes")
@@ -264,16 +260,18 @@ object AerixClientInstaller {
                 deployBundledAnimatorAndPurgeBloat(context, modsDir)
 
                 val modPlan = buildModListForVersion(mcVersion)
+                val missingMods = mutableListOf<String>()
                 modPlan.forEachIndexed { idx, mod ->
                     progressFraction = 0.30f + (0.55f * (idx.toFloat() / modPlan.size.coerceAtLeast(1)))
                     statusHeadline = "Downloading ${mod.title} (${idx + 1}/${modPlan.size})..."
                     statusDetail = "Minecraft $mcVersion · ${mod.category}"
-                    runCatching {
+                    val installed = runCatching {
                         ensureModrinthJar(modsDir, mod.slug, mcVersion, depth = 0)
-                    }
+                    }.getOrDefault(false)
+                    if (!installed && mod.slug != "wavey-capes") missingMods += mod.title
                 }
 
-                ensureWaveyCapes(modsDir, mcVersion)
+                val capeWarning = runCatching { ensureWaveyCapes(modsDir, mcVersion) }.exceptionOrNull()
                 progressFraction = 0.90f
                 statusHeadline = "Applying Aerix Client Pack & FPS Engine..."
                 statusDetail = "Syncing AERIX CLIENT title, capes & Sodium"
@@ -285,7 +283,11 @@ object AerixClientInstaller {
 
                 progressFraction = 1.0f
                 statusHeadline = "$targetName ready!"
-                statusDetail = "Ready to launch"
+                if (capeWarning != null) missingMods += "WaveyCapes"
+                statusDetail = if (missingMods.isEmpty()) "Ready to launch" else "Unavailable: ${missingMods.joinToString()}"
+                if (missingMods.isNotEmpty()) android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    android.widget.Toast.makeText(context, "Not installed for $mcVersion: ${missingMods.joinToString()}", android.widget.Toast.LENGTH_LONG).show()
+                }
                 clientInstance
             }.onFailure { err ->
                 lastError = err.message ?: "Download failed"
@@ -310,7 +312,7 @@ object AerixClientInstaller {
         runCatching { ensureModrinthJar(modsDir, "wavey-capes", mcVersion, 0) }
         if (present()) return
         // Official version-specific release fallback; keep any existing user-installed copy intact.
-        val supported = availableVersions.any { it.mcVersion == mcVersion }
+        val supported = mcVersion in setOf("1.16.5", "1.18.2", "1.19.4", "1.20.1", "1.20.2", "1.20.4", "1.20.6", "1.21.1", "1.21.3", "1.21.4", "1.21.5", "1.21.8", "1.21.10", "1.21.11", "26.1", "26.2", "26.3")
         if (!supported) error("WaveyCapes is not available for Minecraft $mcVersion")
         val filename = "waveycapes-fabric-1.11.3-mc$mcVersion.jar"
         val target = File(modsDir, filename)
@@ -332,13 +334,13 @@ object AerixClientInstaller {
         }
     }
 
-    private fun ensureModrinthJar(modsDir: File, projectSlugOrId: String, mcVersion: String, depth: Int) {
+    private fun ensureModrinthJar(modsDir: File, projectSlugOrId: String, mcVersion: String, depth: Int): Boolean {
         val normalizedKey = projectSlugOrId.replace("-", "").lowercase()
         val alreadyExists = modsDir.listFiles()?.any { f ->
             f.isFile && f.extension.equals("jar", true) &&
                 f.name.replace("-", "").replace("_", "").lowercase().contains(normalizedKey)
         } == true
-        if (alreadyExists) return
+        if (alreadyExists) return true
 
         val loadersParam = URLEncoder.encode("[\"fabric\"]", "UTF-8")
         val gvParam = URLEncoder.encode("[\"$mcVersion\"]", "UTF-8")
@@ -352,12 +354,12 @@ object AerixClientInstaller {
             .build()
 
         val bodyStr = SocialRealtime.restClient.newCall(req).execute().use { resp ->
-            if (!resp.isSuccessful) return
+            if (!resp.isSuccessful) return false
             resp.body?.string().orEmpty()
         }
-        if (bodyStr.isBlank()) return
+        if (bodyStr.isBlank()) return false
         val versions = JSONArray(bodyStr)
-        if (versions.length() == 0) return
+        if (versions.length() == 0) return false
 
         val verObj = versions.getJSONObject(0)
 
@@ -377,8 +379,8 @@ object AerixClientInstaller {
             }
         }
 
-        val files = verObj.optJSONArray("files") ?: return
-        if (files.length() == 0) return
+        val files = verObj.optJSONArray("files") ?: return false
+        if (files.length() == 0) return false
         var chosen = files.getJSONObject(0)
         for (i in 0 until files.length()) {
             val f = files.getJSONObject(i)
@@ -389,10 +391,11 @@ object AerixClientInstaller {
         }
         val dlUrl = chosen.optString("url")
         val fileName = chosen.optString("filename")
-        if (dlUrl.isBlank() || fileName.isBlank() || !fileName.endsWith(".jar", true)) return
+        if (dlUrl.isBlank() || fileName.isBlank() || !fileName.endsWith(".jar", true) ||
+            fileName != File(fileName).name || fileName.contains('\\')) return false
 
         val targetFile = File(modsDir, fileName)
-        if (targetFile.isFile && targetFile.length() > 1024L) return
+        if (targetFile.isFile && targetFile.length() > 1024L) return true
 
         val tmpFile = File(modsDir, "$fileName.part")
         val dlReq = Request.Builder()
@@ -400,16 +403,28 @@ object AerixClientInstaller {
             .header("User-Agent", USER_AGENT)
             .get()
             .build()
-        SocialRealtime.restClient.newCall(dlReq).execute().use { resp ->
-            if (!resp.isSuccessful) return
-            val stream = resp.body?.byteStream() ?: return
-            FileOutputStream(tmpFile).use { out -> stream.copyTo(out) }
-        }
-        if (tmpFile.length() > 512L) {
-            tmpFile.renameTo(targetFile)
-        } else {
-            tmpFile.delete()
-        }
+        try {
+            SocialRealtime.restClient.newCall(dlReq).execute().use { resp ->
+                if (!resp.isSuccessful) return false
+                val stream = resp.body?.byteStream() ?: return false
+                FileOutputStream(tmpFile).use { out -> stream.copyTo(out) }
+            }
+            if (tmpFile.length() <= 512L) return false
+            val sha512 = chosen.optJSONObject("hashes")?.optString("sha512").orEmpty()
+            if (sha512.isNotBlank()) {
+                val digest = java.security.MessageDigest.getInstance("SHA-512")
+                tmpFile.inputStream().use { input ->
+                    val buffer = ByteArray(8192)
+                    while (true) { val read = input.read(buffer); if (read < 0) break; digest.update(buffer, 0, read) }
+                }
+                val actual = digest.digest().joinToString("") { "%02x".format(it.toInt() and 0xff) }
+                if (!actual.equals(sha512, ignoreCase = true)) return false
+            }
+            java.util.zip.ZipFile(tmpFile).use { zip ->
+                if (zip.getEntry("fabric.mod.json") == null) return false
+            }
+            return tmpFile.renameTo(targetFile)
+        } finally { tmpFile.delete() }
     }
 
     private fun writeCustomClientInstanceIcon(context: Context, instance: Instance) {

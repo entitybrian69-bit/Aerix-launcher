@@ -12,6 +12,16 @@ public final class ClientAdaptiveDistanceSmokeTest {
     public static final class OldOptions { public int field_1870 = 12; }
     public static final class NewOptions { public ModernOption field_1870 = new ModernOption(); }
     public static final class Client { public Object field_1690; }
+    public static final class NamedOption {
+        Object value = Integer.valueOf(11);
+        public Object get() { return value; }
+        public void set(Object v) { value = v; }
+    }
+    public static final class NamedOptions {
+        public NamedOption distance = new NamedOption();
+        public NamedOption renderDistance() { return distance; }
+    }
+    public static final class NamedClient { public NamedOptions options = new NamedOptions(); }
     static void check(boolean v) { if (!v) throw new AssertionError(); }
     public static void main(String[] args) throws Exception {
         File dir = Files.createTempDirectory("aerix-distance-test").toFile();
@@ -27,6 +37,13 @@ public final class ClientAdaptiveDistanceSmokeTest {
         Files.write(settings.toPath(), "distance=-1\n".getBytes(StandardCharsets.UTF_8)); check(settings.setLastModified(next));
         for (int i = 0; i < 8; i++) bridge.tick(c, dir);
         check(modern.field_1870.value.equals(10));
+        Files.write(settings.toPath(), "distance=7\n".getBytes(StandardCharsets.UTF_8)); check(settings.setLastModified(next + 2000));
+        NamedClient named = new NamedClient();
+        for (int i = 0; i < 8; i++) bridge.tick(named, dir);
+        check(named.options.distance.value.equals(7));
+        Files.write(settings.toPath(), "distance=-1\n".getBytes(StandardCharsets.UTF_8)); check(settings.setLastModified(next + 4000));
+        for (int i = 0; i < 8; i++) bridge.tick(named, dir);
+        check(named.options.distance.value.equals(11));
         settings.delete(); config.delete(); dir.delete();
         System.out.println("Client adaptive bridge smoke tests passed");
     }

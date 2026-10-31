@@ -29,7 +29,9 @@ final class ClientAdaptiveDistance {
                     stamp = current;
                 }
             }
-            Object options = field(mc.getClass(), "field_1690").get(mc);
+            Object options;
+            try { options = field(mc.getClass(), "field_1690").get(mc); }
+            catch (NoSuchFieldException modern) { options = field(mc.getClass(), "options").get(mc); }
             if (options != savedOptions && savedOptions != null && original != null) {
                 writeDistance(savedOptions, original.intValue());
                 original = null;
@@ -47,16 +49,26 @@ final class ClientAdaptiveDistance {
     }
 
     private static int readDistance(Object options) throws Exception {
-        Object value = field(options.getClass(), "field_1870").get(options);
-        if (!(value instanceof Number)) value = method(value.getClass(), "method_41753").invoke(value);
+        Object value;
+        try { value = field(options.getClass(), "field_1870").get(options); }
+        catch (NoSuchFieldException modern) { value = method(options.getClass(), "renderDistance").invoke(options); }
+        if (!(value instanceof Number)) {
+            try { value = method(value.getClass(), "method_41753").invoke(value); }
+            catch (NoSuchMethodException modern) { value = method(value.getClass(), "get").invoke(value); }
+        }
         return ((Number) value).intValue();
     }
     private static void writeDistance(Object options, int value) throws Exception {
-        Field f = field(options.getClass(), "field_1870");
-        if (f.getType() == int.class) f.setInt(options, value);
-        else {
-            Object option = f.get(options);
-            method(option.getClass(), "method_41748", Object.class).invoke(option, Integer.valueOf(value));
+        try {
+            Field f = field(options.getClass(), "field_1870");
+            if (f.getType() == int.class) f.setInt(options, value);
+            else {
+                Object option = f.get(options);
+                method(option.getClass(), "method_41748", Object.class).invoke(option, Integer.valueOf(value));
+            }
+        } catch (NoSuchFieldException modern) {
+            Object option = method(options.getClass(), "renderDistance").invoke(options);
+            method(option.getClass(), "set", Object.class).invoke(option, Integer.valueOf(value));
         }
     }
     private static Field field(Class<?> c, String name) throws Exception {

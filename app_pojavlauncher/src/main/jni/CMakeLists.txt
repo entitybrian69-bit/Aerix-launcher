@@ -43,7 +43,15 @@ set(SDL_TESTS		 OFF CACHE BOOL "" FORCE)
 set(SDL_EXAMPLES	 OFF CACHE BOOL "" FORCE)
 set(SDL3_MAINPROJECT OFF CACHE BOOL "" FORCE)
 add_subdirectory(sdl)
-target_link_libraries(SDL3-shared PRIVATE mojoexec)
+# 26.3 uses SDL instead of GLFW. Wrap its Android GLES swap, without changing
+# the submodule or SDL's dynamic API dispatch.
+get_target_property(AERIX_SDL_SOURCE_DIR SDL3-shared SOURCE_DIR)
+set_property(SOURCE "${AERIX_SDL_SOURCE_DIR}/src/video/android/SDL_androidgl.c"
+    DIRECTORY "${AERIX_SDL_SOURCE_DIR}" APPEND PROPERTY
+    COMPILE_DEFINITIONS "Android_GLES_SwapWindow=aerixOriginalSdlSwap")
+target_sources(SDL3-shared PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/fps/sdl_frame_hook.c")
+target_include_directories(SDL3-shared PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/fps")
+target_link_libraries(SDL3-shared PRIVATE mojoexec aerix_frame_counter)
 
 # ----------------------
 

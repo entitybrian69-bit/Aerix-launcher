@@ -30,30 +30,12 @@ import kotlin.math.hypot
 object AerixClientPackGenerator {
 
     const val PACK_FILE_NAME = "Aerix-Client-Pack.zip"
-    private const val PACK_SCHEMA_REV = "v3_forest_aerix_vanilla_anim_2"
+    private const val PACK_SCHEMA_REV = "v4_versioned_pack_metadata"
 
-    fun packFormatForVersion(mcVersion: String): Int = when {
-        mcVersion.startsWith("1.21.4") -> 46
-        mcVersion.startsWith("1.21") -> 34
-        mcVersion.startsWith("1.20.4") || mcVersion.startsWith("1.20.3") -> 22
-        mcVersion.startsWith("1.20.2") -> 18
-        mcVersion.startsWith("1.20") -> 15
-        mcVersion.startsWith("1.19.4") -> 13
-        mcVersion.startsWith("1.19") -> 9
-        mcVersion.startsWith("1.18") -> 8
-        mcVersion.startsWith("1.17") -> 7
-        else -> 6
-    }
+    fun packFormatForVersion(mcVersion: String): Int = ClientVersions.format(mcVersion)
 
-    fun resolveMcVersionFromInstance(versionId: String?, fallback: String = "1.16.5"): String {
-        val raw = versionId.orEmpty()
-        val known = listOf("1.21.4", "1.21.1", "1.20.4", "1.20.2", "1.20.1", "1.19.4", "1.18.2", "1.16.5")
-        for (v in known) {
-            if (raw.contains(v)) return v
-        }
-        val regex = Regex("""\b(1\.\d+(?:\.\d+)?)\b""")
-        return regex.find(raw)?.groupValues?.getOrNull(1) ?: fallback
-    }
+    fun resolveMcVersionFromInstance(versionId: String?, fallback: String = "1.16.5"): String =
+        ClientVersions.resolve(versionId, fallback)
 
     fun findVanillaClientJar(mcVersion: String, instanceGameDir: File? = null): File? {
         val candidates = ArrayList<File>()
@@ -117,10 +99,11 @@ object AerixClientPackGenerator {
         val packFmt = packFormatForVersion(mcVersion)
 
         ZipOutputStream(FileOutputStream(zipFile)).use { zos ->
+            val modernRange = if (packFmt >= 69) ",\n    \"min_format\": [$packFmt, ${ClientVersions.formatMinor(mcVersion)}],\n    \"max_format\": [$packFmt, ${ClientVersions.formatMinor(mcVersion)}]" else ""
             val mcmeta = """
                 {
                   "pack": {
-                    "pack_format": $packFmt,
+                    "pack_format": $packFmt$modernRange,
                     "description": "\u00a7c\u2726 Aerix Client $mcVersion \u00a78\u00b7 Crimson Performance"
                   }
                 }
