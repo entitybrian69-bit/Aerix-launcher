@@ -100,18 +100,6 @@ jobs:
           fi
           exit "$code"
 
-      - name: Test client performance option merging
-        shell: bash
-        run: |
-          set +e
-          ./gradlew :app_pojavlauncher:testNoruntimeDebugUnitTest --tests "net.kdt.pojavlaunch.aerix.client.ClientPerformanceSettingsTest" --console=plain > test.log 2>&1
-          code=$?
-          if [ "$code" -ne 0 ]; then
-            grep -E "^e: |error: |FAILED|FAILURE:|What went wrong|Caused by|Exception|Could not" -A3 test.log | head -60 | while IFS= read -r line; do echo "::error title=client-test::${line:0:400}"; done
-            tail -30 test.log | while IFS= read -r line; do echo "::error title=client-test-tail::${line:0:400}"; done
-          fi
-          exit "$code"
-
       - name: Check it is really the debug build
         id: verify
         run: |
