@@ -392,6 +392,7 @@ private fun AerixClientRootOverlay(
     val context = LocalContext.current
 
     var currentFps by remember { mutableIntStateOf(0) }
+    var fpsHistory by remember { mutableStateOf<List<Int>>(emptyList()) }
     var onePercentLowFps by remember { mutableIntStateOf(0) }
     var usedRamMb by remember { mutableIntStateOf(0) }
     var batteryPct by remember { mutableIntStateOf(100) }
@@ -470,7 +471,7 @@ private fun AerixClientRootOverlay(
 
             slowTick++
             if (slowTick % 10 == 0) {
-                val totalFrames = if (AerixClientStore.perfPillEnabled || modal == InGameClientModal.OLED_AFK) NativeFrameCounter.read() else -1L
+                val totalFrames = if (AerixClientStore.perfPillEnabled || AerixClientStore.fpsHistoryEnabled || modal == InGameClientModal.OLED_AFK) NativeFrameCounter.read() else -1L
                 val nowNanos = System.nanoTime()
                 if (totalFrames >= 0) {
                     if (lastNativeFrames >= 0 && nowNanos > lastSampleNanos) {
@@ -478,17 +479,21 @@ private fun AerixClientRootOverlay(
                         val elapsedNs = nowNanos - lastSampleNanos
                         val instantFps = ((deltaFrames * 1_000_000_000.0) / elapsedNs).roundToInt().coerceAtLeast(0)
                         currentFps = instantFps
+                        if (AerixClientStore.fpsHistoryEnabled) fpsHistory = (fpsHistory + instantFps).takeLast(60) else fpsHistory = emptyList()
                         if (recentFpsWindow.size >= 20) recentFpsWindow.removeFirst()
                         recentFpsWindow.addLast(instantFps)
                         onePercentLowFps = recentFpsWindow.minOrNull() ?: instantFps
                     }
                     lastNativeFrames = totalFrames
                     lastSampleNanos = nowNanos
+                } else {
+                    lastNativeFrames = -1L
+                    lastSampleNanos = 0L
                 }
                 AerixClientInputBridge.pollLatestLog(context)
             }
 
-            if (slowTick % 50 == 1 && (AerixClientStore.perfPillEnabled || AerixClientStore.thermalGuardEnabled || modal == InGameClientModal.OLED_AFK)) {
+            if (slowTick % 50 == 1 && (AerixClientStore.perfPillEnabled || AerixClientStore.fpsHistoryEnabled || AerixClientStore.thermalGuardEnabled || modal == InGameClientModal.OLED_AFK)) {
                 runCatching {
                     val am = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
                     if (am != null) {
@@ -506,7 +511,7 @@ private fun AerixClientRootOverlay(
                     }
                 }
             }
-            val needsFastUpdates = AerixClientStore.perfPillEnabled || AerixClientStore.cpsPillEnabled ||
+            val needsFastUpdates = AerixClientStore.perfPillEnabled || AerixClientStore.fpsHistoryEnabled || AerixClientStore.cpsPillEnabled ||
                 AerixClientStore.keystrokesEnabled || AerixClientStore.swordCooldownBarEnabled ||
                 AerixClientStore.hitmarkerEnabled || AerixClientStore.speedrunTimerEnabled
             delay(if (needsFastUpdates) 100L else 500L)
@@ -582,6 +587,7 @@ private fun AerixClientRootOverlay(
                 wPx = wPx,
                 hPx = hPx,
                 fps = currentFps,
+                fpsHistory = fpsHistory,
                 low1Pct = onePercentLowFps,
                 ramMb = usedRamMb,
                 batteryPct = batteryPct,
@@ -1557,6 +1563,7 @@ private fun ClientPerformancePage() {
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
+        ClientInformationToggle("Show FPS history HUD", AerixClientStore.fpsHistoryEnabled) { AerixClientStore.fpsHistoryEnabled = it }
         Text("Settings apply next time Minecraft starts. Lower settings can improve FPS but reduce visual quality.",
             color = LiquidCrystalPalette.TextSecondary, fontSize = 11.sp)
         Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -2061,6 +2068,7 @@ private fun InGameCrimsonHud(
     wPx: Float,
     hPx: Float,
     fps: Int,
+    fpsHistory: List<Int>,
     low1Pct: Int,
     ramMb: Int,
     batteryPct: Int,
@@ -2173,12 +2181,13 @@ private fun InGameCrimsonHud(
         }
 
         // 2. FPS & Telemetry Pill (Safe slot x=0.02, y=0.21 — below 3RD, above D-pad)
-        if (AerixClientStore.perfPillEnabled) {
+        if (AerixClientStore.perfPillEnabled || AerixClientStore.fpsHistoryEnabled) {
             val hotWarning = AerixClientStore.thermalGuardEnabled && tempC >= 42.0f
             CrimsonHudBox(
                 modifier = Modifier.atHudSlot("perf"),
                 highlight = hotWarning
             ) {
+                Column {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(7.dp)
@@ -2192,6 +2201,19 @@ private fun InGameCrimsonHud(
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold
                     )
+                }
+                if (AerixClientStore.fpsHistoryEnabled && fpsHistory.size > 1) {
+                    val peak = (fpsHistory.maxOrNull() ?: 1).coerceAtLeast(1)
+                    Canvas(Modifier.width(160.dp).height(24.dp)) {
+                        val step = size.width / 59f
+                        fpsHistory.zipWithNext().forEachIndexed { i, (a, b) ->
+                            drawLine(LiquidCrystalPalette.CrimsonGlow,
+                                Offset(i * step, size.height * (1f - a.toFloat() / peak)),
+                                Offset((i + 1) * step, size.height * (1f - b.toFloat() / peak)), strokeWidth = 2f)
+                        }
+                    }
+                    Text("FPS history · 1 sample/s", color = LiquidCrystalPalette.TextMuted, fontSize = 9.sp)
+                }
                 }
             }
         }

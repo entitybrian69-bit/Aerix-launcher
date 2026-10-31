@@ -141,6 +141,7 @@ object AerixClientStore {
     var crosshairAttackPulse by mutableStateOf(false)
 
     var perfPillEnabled by mutableStateOf(false)
+    var fpsHistoryEnabled by mutableStateOf(false)
     var cpsPillEnabled by mutableStateOf(false)
     var keystrokesEnabled by mutableStateOf(false)
     var keystrokesStyle by mutableStateOf(KeystrokesStyle.CRIMSON_DARK)
@@ -228,6 +229,7 @@ object AerixClientStore {
         crosshairAttackPulse = p.getBoolean("crosshairAttackPulse", false)
 
         perfPillEnabled = p.getBoolean("perfPillEnabled", false)
+        fpsHistoryEnabled = p.getBoolean("fpsHistoryEnabled", false)
         cpsPillEnabled = p.getBoolean("cpsPillEnabled", false)
         keystrokesEnabled = p.getBoolean("keystrokesEnabled", false)
         swordCooldownBarEnabled = p.getBoolean("swordCooldownBarEnabled", false)
@@ -302,6 +304,7 @@ object AerixClientStore {
             putBoolean("crosshairAttackPulse", crosshairAttackPulse)
 
             putBoolean("perfPillEnabled", perfPillEnabled)
+            putBoolean("fpsHistoryEnabled", fpsHistoryEnabled)
             putBoolean("cpsPillEnabled", cpsPillEnabled)
             putBoolean("keystrokesEnabled", keystrokesEnabled)
             putBoolean("swordCooldownBarEnabled", swordCooldownBarEnabled)

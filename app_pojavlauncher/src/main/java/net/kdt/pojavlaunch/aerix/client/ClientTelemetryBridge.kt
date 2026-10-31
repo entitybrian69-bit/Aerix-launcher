@@ -48,9 +48,11 @@ object ClientTelemetryBridge {
         }
         val effects = (0 until (p.getProperty("effects")?.toIntOrNull() ?: 0).coerceIn(0, 12)).mapNotNull { i ->
             val name = p.getProperty("effect${i}Name")?.substringAfterLast('.')?.replace('_', ' ') ?: return@mapNotNull null
-            val duration = (p.getProperty("effect${i}Ticks")?.toIntOrNull() ?: 0).coerceAtLeast(0) / 20
+            val ticks = p.getProperty("effect${i}Ticks")?.toIntOrNull() ?: return@mapNotNull null
+            val duration = ticks.coerceAtLeast(0) / 20
             val level = (p.getProperty("effect${i}Level")?.toIntOrNull() ?: 0) + 1
-            "$name $level ${duration / 60}:${(duration % 60).toString().padStart(2, '0')}"
+            val time = if (ticks < 0) "∞" else "${duration / 60}:${(duration % 60).toString().padStart(2, '0')}"
+            "$name $level $time"
         }
         ClientTelemetrySnapshot(x, y, z, p.getProperty("yaw")?.toFloatOrNull(), p.getProperty("health")?.toFloatOrNull(), p.getProperty("maxHealth")?.toFloatOrNull(),
             p.getProperty("dimension", "unknown"), p.getProperty("dayTime")?.toLongOrNull(),
