@@ -89,6 +89,7 @@ object AerixClientPackGenerator {
             append("glint=").append(AerixClientStore.packEnhancedGlint).append('|')
             append("fire=").append(AerixClientStore.packLowFire).append('|')
             append("shield=").append(AerixClientStore.packLoweredShield).append('|')
+            append("totem=").append(AerixClientStore.packCompactTotem).append('|')
             append("pump=").append(AerixClientStore.packNoPumpkinBlur).append('|')
             append("water=").append(AerixClientStore.packClearWater)
         }

@@ -70,6 +70,7 @@ public final class AerixClientMod implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         if (!STARTED.compareAndSet(false, true)) return;
+        ClientTelemetry.start();
         Thread worker = new Thread(new Runnable() {
             @Override
             public void run() {

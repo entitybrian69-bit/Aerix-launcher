@@ -152,6 +152,13 @@ object AerixClientStore {
     var toggleSneakEnabled by mutableStateOf(false)
     var autoWalkEnabled by mutableStateOf(false)
 
+    var coordsHudEnabled by mutableStateOf(false)
+    var armorHudEnabled by mutableStateOf(false)
+    var effectsHudEnabled by mutableStateOf(false)
+    var worldTimeHudEnabled by mutableStateOf(false)
+    var serverHudEnabled by mutableStateOf(false)
+    var clockHudEnabled by mutableStateOf(false)
+    var waypointHudEnabled by mutableStateOf(false)
     var compassEnabled by mutableStateOf(false)
     var matchStatsEnabled by mutableStateOf(false)
     var speedrunTimerEnabled by mutableStateOf(false)
@@ -193,6 +200,11 @@ object AerixClientStore {
 
         packVanillaAnimatedGear = p.getBoolean("packVanillaAnimatedGear", true)
         packEnhancedGlint = p.getBoolean("packEnhancedGlint", true)
+        packLowFire = p.getBoolean("packLowFire", true)
+        packLoweredShield = p.getBoolean("packLoweredShield", true)
+        packCompactTotem = p.getBoolean("packCompactTotem", true)
+        packClearWater = p.getBoolean("packClearWater", true)
+        packNoPumpkinBlur = p.getBoolean("packNoPumpkinBlur", true)
         selectedClientVersion = p.getString("selectedClientVersion", "1.16.5") ?: "1.16.5"
 
         equippedCapeId = p.getString("equippedCapeId", "crimson_sovereign") ?: "crimson_sovereign"
@@ -221,6 +233,14 @@ object AerixClientStore {
         toggleSneakEnabled = p.getBoolean("toggleSneakEnabled", false)
         autoWalkEnabled = p.getBoolean("autoWalkEnabled", false)
 
+        coordsHudEnabled = p.getBoolean("coordsHudEnabled", false)
+        armorHudEnabled = p.getBoolean("armorHudEnabled", false)
+        effectsHudEnabled = p.getBoolean("effectsHudEnabled", false)
+        worldTimeHudEnabled = p.getBoolean("worldTimeHudEnabled", false)
+        serverHudEnabled = p.getBoolean("serverHudEnabled", false)
+        clockHudEnabled = p.getBoolean("clockHudEnabled", false)
+        waypointHudEnabled = p.getBoolean("waypointHudEnabled", false)
+        loadWaypoints(p.getString("clientWaypoints", null))
         compassEnabled = p.getBoolean("compassEnabled", false)
         matchStatsEnabled = p.getBoolean("matchStatsEnabled", false)
         speedrunTimerEnabled = p.getBoolean("speedrunTimerEnabled", false)
@@ -248,6 +268,11 @@ object AerixClientStore {
         p.edit().apply {
             putBoolean("packVanillaAnimatedGear", packVanillaAnimatedGear)
             putBoolean("packEnhancedGlint", packEnhancedGlint)
+            putBoolean("packLowFire", packLowFire)
+            putBoolean("packLoweredShield", packLoweredShield)
+            putBoolean("packCompactTotem", packCompactTotem)
+            putBoolean("packClearWater", packClearWater)
+            putBoolean("packNoPumpkinBlur", packNoPumpkinBlur)
             putString("selectedClientVersion", selectedClientVersion)
 
             putString("equippedCapeId", equippedCapeId)
@@ -274,6 +299,14 @@ object AerixClientStore {
             putBoolean("toggleSneakEnabled", toggleSneakEnabled)
             putBoolean("autoWalkEnabled", autoWalkEnabled)
 
+            putBoolean("coordsHudEnabled", coordsHudEnabled)
+            putBoolean("armorHudEnabled", armorHudEnabled)
+            putBoolean("effectsHudEnabled", effectsHudEnabled)
+            putBoolean("worldTimeHudEnabled", worldTimeHudEnabled)
+            putBoolean("serverHudEnabled", serverHudEnabled)
+            putBoolean("clockHudEnabled", clockHudEnabled)
+            putBoolean("waypointHudEnabled", waypointHudEnabled)
+            putString("clientWaypoints", encodeWaypoints())
             putBoolean("compassEnabled", compassEnabled)
             putBoolean("matchStatsEnabled", matchStatsEnabled)
             putBoolean("speedrunTimerEnabled", speedrunTimerEnabled)
@@ -318,6 +351,13 @@ object AerixClientStore {
         persist()
     }
 
+    fun scaleHud(delta: Float) {
+        hudPositions = hudPositions.mapValues { (id, pos) ->
+            if (id == "client_btn") pos else pos.copy(scale = (pos.scale + delta).coerceIn(0.65f, 1.45f))
+        }
+        persist()
+    }
+
     fun resetHudPositions() {
         hudPositions = defaultHudPositions()
         persist()
@@ -335,6 +375,7 @@ object AerixClientStore {
         "perf" to HudWidgetPos("perf", "FPS & Telemetry", 0.02f, 0.21f, 1.0f),
         "cps" to HudWidgetPos("cps", "CPS Counter", 0.22f, 0.21f, 1.0f),
         "keystrokes" to HudWidgetPos("keystrokes", "Keystrokes", 0.02f, 0.29f, 1.0f),
+        "info" to HudWidgetPos("info", "Information HUD", 0.30f, 0.25f, 1.0f),
         "compass" to HudWidgetPos("compass", "Direction Compass", 0.39f, 0.11f, 1.0f),
         "match" to HudWidgetPos("match", "Session Timer", 0.83f, 0.13f, 1.0f),
         "speedrun" to HudWidgetPos("speedrun", "Speedrun Stopwatch", 0.79f, 0.21f, 1.0f),
@@ -345,6 +386,27 @@ object AerixClientStore {
     private inline fun <reified E : Enum<E>> enumOrDefault(raw: String?, fallback: E): E {
         if (raw.isNullOrBlank()) return fallback
         return enumValues<E>().firstOrNull { it.name == raw } ?: fallback
+    }
+
+    private fun encodeWaypoints(): String {
+        val array = JSONArray()
+        waypoints.forEach { waypoint ->
+            array.put(JSONObject().put("id", waypoint.id).put("name", waypoint.name)
+                .put("x", waypoint.x).put("y", waypoint.y).put("z", waypoint.z)
+                .put("dimension", waypoint.dimension))
+        }
+        return array.toString()
+    }
+
+    private fun loadWaypoints(raw: String?) {
+        waypoints = runCatching {
+            val array = JSONArray(raw ?: "[]")
+            (0 until array.length()).mapNotNull { i ->
+                val obj = array.optJSONObject(i) ?: return@mapNotNull null
+                ClientWaypoint(obj.optString("id"), obj.optString("name", "Waypoint"),
+                    obj.optInt("x"), obj.optInt("y"), obj.optInt("z"), obj.optString("dimension"))
+            }
+        }.getOrDefault(emptyList())
     }
 
     private fun encodeHudPositions(): String {
