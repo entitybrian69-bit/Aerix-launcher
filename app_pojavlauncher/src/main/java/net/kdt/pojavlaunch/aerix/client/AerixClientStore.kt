@@ -142,6 +142,7 @@ object AerixClientStore {
 
     var perfPillEnabled by mutableStateOf(false)
     var fpsHistoryEnabled by mutableStateOf(false)
+    var frameTimingEnabled by mutableStateOf(false)
     var cpsPillEnabled by mutableStateOf(false)
     var keystrokesEnabled by mutableStateOf(false)
     var keystrokesStyle by mutableStateOf(KeystrokesStyle.CRIMSON_DARK)
@@ -233,6 +234,7 @@ object AerixClientStore {
 
         perfPillEnabled = p.getBoolean("perfPillEnabled", false)
         fpsHistoryEnabled = p.getBoolean("fpsHistoryEnabled", false)
+        frameTimingEnabled = p.getBoolean("frameTimingEnabled", false)
         cpsPillEnabled = p.getBoolean("cpsPillEnabled", false)
         keystrokesEnabled = p.getBoolean("keystrokesEnabled", false)
         swordCooldownBarEnabled = p.getBoolean("swordCooldownBarEnabled", false)
@@ -284,6 +286,12 @@ object AerixClientStore {
         loadHudPositions(p.getString("hudPositionsJson", null))
     }
 
+    /** Reload in the game process after a validated settings import. */
+    fun reload(context: Context) {
+        prefs = null
+        init(context)
+    }
+
     fun persist() {
         val p = prefs ?: return
         p.edit().apply {
@@ -311,6 +319,7 @@ object AerixClientStore {
 
             putBoolean("perfPillEnabled", perfPillEnabled)
             putBoolean("fpsHistoryEnabled", fpsHistoryEnabled)
+            putBoolean("frameTimingEnabled", frameTimingEnabled)
             putBoolean("cpsPillEnabled", cpsPillEnabled)
             putBoolean("keystrokesEnabled", keystrokesEnabled)
             putBoolean("swordCooldownBarEnabled", swordCooldownBarEnabled)

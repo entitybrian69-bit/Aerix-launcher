@@ -43,6 +43,17 @@ object ClientPerformanceSettings {
         persist()
     }
 
+    fun validateImported(values: Map<String, String>): Map<String, String> {
+        require(values.size <= supportedKeys.size) { "Too many performance options" }
+        require(values.all { (key, value) -> key in supportedKeys && value.length <= 64 && !value.contains('\n') && !value.contains('\r') }) { "Invalid performance option" }
+        return values.toMap()
+    }
+
+    fun restoreImported(values: Map<String, String>) {
+        overrides = validateImported(values)
+        persist()
+    }
+
     private fun persist() {
         val json = JSONObject()
         overrides.forEach { (key, value) -> json.put(key, value) }

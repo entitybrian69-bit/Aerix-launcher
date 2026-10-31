@@ -13,5 +13,10 @@ public final class NativeFrameCounter {
         AVAILABLE = loaded;
     }
     public static long read() { return AVAILABLE ? readFrames() : -1; }
+    /** Optional 1-ms frame-interval histogram, with the final bucket representing 100 ms or more. */
+    public static void setTimingEnabled(boolean enabled) { if (AVAILABLE) setTiming(enabled); }
+    public static long[] timingHistogram() { return AVAILABLE ? readTiming() : null; }
     private static native long readFrames();
+    private static native void setTiming(boolean enabled);
+    private static native long[] readTiming();
 }

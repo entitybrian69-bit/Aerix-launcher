@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
 import android.content.IntentFilter
+import android.graphics.BitmapFactory
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
@@ -14,6 +15,8 @@ import android.util.AttributeSet
 import android.view.MotionEvent
 import android.widget.FrameLayout
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.OnBackPressedDispatcherOwner
 import androidx.activity.findViewTreeOnBackPressedDispatcherOwner
 import androidx.activity.setViewTreeOnBackPressedDispatcherOwner
@@ -62,6 +65,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -79,6 +83,8 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -116,6 +122,7 @@ import net.kdt.pojavlaunch.aerix.bridge.AerixPreferences
 import net.kdt.pojavlaunch.aerix.bridge.PojavAccountBridge
 import net.kdt.pojavlaunch.aerix.theme.AerixLauncherTheme
 import net.kdt.pojavlaunch.game.NativeFrameCounter
+import net.kdt.pojavlaunch.game.FrameTimingStats
 import net.kdt.pojavlaunch.game.platform.Platform
 import net.kdt.pojavlaunch.game.platform.input.PlatformGrabListener
 import net.kdt.pojavlaunch.instances.Instance
@@ -145,7 +152,9 @@ private enum class ClientMenuSubPage {
     CHAT_SHORTCUTS,
     AIM,
     PACKS,
-    KEY_PROFILES
+    KEY_PROFILES,
+    TRANSFER,
+    GALLERY
 }
 
 private enum class FeatureIconKind {
@@ -398,6 +407,14 @@ private fun AerixClientRootOverlay(
 
     var currentFps by remember { mutableIntStateOf(0) }
     var fpsHistory by remember { mutableStateOf<List<Int>>(emptyList()) }
+    var frameTiming by remember { mutableStateOf<FrameTimingStats?>(null) }
+    var previousTiming by remember { mutableStateOf<LongArray?>(null) }
+    DisposableEffect(AerixClientStore.frameTimingEnabled) {
+        previousTiming = null
+        frameTiming = null
+        NativeFrameCounter.setTimingEnabled(AerixClientStore.frameTimingEnabled)
+        onDispose { NativeFrameCounter.setTimingEnabled(false) }
+    }
     var onePercentLowFps by remember { mutableIntStateOf(0) }
     var usedRamMb by remember { mutableIntStateOf(0) }
     var batteryPct by remember { mutableIntStateOf(100) }
@@ -476,7 +493,7 @@ private fun AerixClientRootOverlay(
 
             slowTick++
             if (slowTick % 10 == 0) {
-                val totalFrames = if (AerixClientStore.perfPillEnabled || AerixClientStore.fpsHistoryEnabled || modal == InGameClientModal.OLED_AFK) NativeFrameCounter.read() else -1L
+                val totalFrames = if (AerixClientStore.perfPillEnabled || AerixClientStore.fpsHistoryEnabled || AerixClientStore.frameTimingEnabled || modal == InGameClientModal.OLED_AFK) NativeFrameCounter.read() else -1L
                 val nowNanos = System.nanoTime()
                 if (totalFrames >= 0) {
                     if (lastNativeFrames >= 0 && nowNanos > lastSampleNanos) {
@@ -495,10 +512,15 @@ private fun AerixClientRootOverlay(
                     lastNativeFrames = -1L
                     lastSampleNanos = 0L
                 }
+                if (AerixClientStore.frameTimingEnabled) {
+                    val current = NativeFrameCounter.timingHistogram()
+                    frameTiming = FrameTimingStats.calculate(previousTiming, current)
+                    previousTiming = current
+                }
                 AerixClientInputBridge.pollLatestLog(context)
             }
 
-            if (slowTick % 50 == 1 && (AerixClientStore.perfPillEnabled || AerixClientStore.fpsHistoryEnabled || AerixClientStore.thermalGuardEnabled || modal == InGameClientModal.OLED_AFK)) {
+            if (slowTick % 50 == 1 && (AerixClientStore.perfPillEnabled || AerixClientStore.fpsHistoryEnabled || AerixClientStore.frameTimingEnabled || AerixClientStore.thermalGuardEnabled || modal == InGameClientModal.OLED_AFK)) {
                 runCatching {
                     val am = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
                     if (am != null) {
@@ -516,7 +538,7 @@ private fun AerixClientRootOverlay(
                     }
                 }
             }
-            val needsFastUpdates = AerixClientStore.perfPillEnabled || AerixClientStore.fpsHistoryEnabled || AerixClientStore.cpsPillEnabled ||
+            val needsFastUpdates = AerixClientStore.perfPillEnabled || AerixClientStore.fpsHistoryEnabled || AerixClientStore.frameTimingEnabled || AerixClientStore.cpsPillEnabled ||
                 AerixClientStore.keystrokesEnabled || AerixClientStore.swordCooldownBarEnabled ||
                 AerixClientStore.hitmarkerEnabled || AerixClientStore.speedrunTimerEnabled
             delay(if (needsFastUpdates) 100L else 500L)
@@ -593,6 +615,7 @@ private fun AerixClientRootOverlay(
                 hPx = hPx,
                 fps = currentFps,
                 fpsHistory = fpsHistory,
+                frameTiming = frameTiming,
                 low1Pct = onePercentLowFps,
                 ramMb = usedRamMb,
                 batteryPct = batteryPct,
@@ -775,6 +798,8 @@ private fun FamousClientRectangleMenu(
                             ClientMenuSubPage.AIM -> "AERIX CLIENT  ·  AIM"
                             ClientMenuSubPage.PACKS -> "AERIX CLIENT  ·  RESOURCE PACKS"
                             ClientMenuSubPage.KEY_PROFILES -> "AERIX CLIENT  ·  KEYBIND PROFILES"
+                            ClientMenuSubPage.TRANSFER -> "AERIX CLIENT  ·  IMPORT / EXPORT"
+                            ClientMenuSubPage.GALLERY -> "AERIX CLIENT  ·  SCREENSHOTS"
                         },
                         color = Color.White,
                         fontSize = 15.sp,
@@ -855,6 +880,8 @@ private fun FamousClientRectangleMenu(
                         onOpenAim = { onChangeSubPage(ClientMenuSubPage.AIM) },
                         onOpenPacks = { onChangeSubPage(ClientMenuSubPage.PACKS) },
                         onOpenKeyProfiles = { onChangeSubPage(ClientMenuSubPage.KEY_PROFILES) },
+                        onOpenTransfer = { onChangeSubPage(ClientMenuSubPage.TRANSFER) },
+                        onOpenGallery = { onChangeSubPage(ClientMenuSubPage.GALLERY) },
                         onOpenOledAfk = onOpenOledAfk,
                         onSyncOptionsTxt = onSyncOptionsTxt
                     )
@@ -870,6 +897,8 @@ private fun FamousClientRectangleMenu(
                     ClientMenuSubPage.AIM -> ClientAimPage()
                     ClientMenuSubPage.PACKS -> ClientResourcePacksPage(gameDir)
                     ClientMenuSubPage.KEY_PROFILES -> ClientKeyProfilesPage(gameDir)
+                    ClientMenuSubPage.TRANSFER -> ClientTransferPage()
+                    ClientMenuSubPage.GALLERY -> ClientGalleryPage(gameDir)
                 }
             }
         }
@@ -891,10 +920,16 @@ private fun ClientSquaresGridPage(
     onOpenAim: () -> Unit,
     onOpenPacks: () -> Unit,
     onOpenKeyProfiles: () -> Unit,
+    onOpenTransfer: () -> Unit,
+    onOpenGallery: () -> Unit,
     onOpenOledAfk: () -> Unit,
     onSyncOptionsTxt: () -> Unit
 ) {
     val modules = listOf(
+        ClientSquareModule("gallery", "Screenshots", FeatureIconKind.HOTBAR,
+            { false }, { "GALLERY ›" }, onOpenGallery),
+        ClientSquareModule("transfer", "Import / Export", FeatureIconKind.HOTBAR,
+            { false }, { "OPEN ›" }, onOpenTransfer),
         ClientSquareModule("packs", "Resource Packs", FeatureIconKind.FULLBRIGHT,
             { false }, { "MANAGE ›" }, onOpenPacks),
         ClientSquareModule("key_profiles", "Key Profiles", FeatureIconKind.KEYSTROKES,
@@ -1442,6 +1477,98 @@ private fun DrawScope.drawFeatureSymbol(kind: FeatureIconKind, color: Color) {
 }
 
 @Composable
+private fun ClientGalleryPage(gameDir: File?) {
+    var files by remember(gameDir) { mutableStateOf<List<File>>(emptyList()) }
+    var selected by remember(gameDir) { mutableStateOf<File?>(null) }
+    var preview by remember(gameDir) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
+    LaunchedEffect(gameDir) {
+        files = withContext(Dispatchers.IO) {
+            gameDir?.let { File(it, "screenshots").listFiles().orEmpty().filter { f ->
+                f.isFile && f.extension.lowercase() in setOf("png", "jpg", "jpeg")
+            }.sortedByDescending { it.lastModified() }.take(100) } ?: emptyList()
+        }
+    }
+    LaunchedEffect(selected) {
+        preview = withContext(Dispatchers.IO) {
+            selected?.let { file -> runCatching {
+                val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                BitmapFactory.decodeFile(file.absolutePath, bounds)
+                var sample = 1
+                while (bounds.outWidth / sample > 1280 || bounds.outHeight / sample > 1280) sample *= 2
+                BitmapFactory.decodeFile(file.absolutePath, BitmapFactory.Options().apply { inSampleSize = sample })?.asImageBitmap()
+            }.getOrNull() }
+        }
+    }
+    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text("Minecraft screenshots in this instance · newest first", color = LiquidCrystalPalette.TextSecondary, fontSize = 11.sp)
+        if (selected != null) {
+            Text(selected?.name.orEmpty(), color = Color.White, fontSize = 11.sp)
+            preview?.let { Image(bitmap = it, contentDescription = selected?.name, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxWidth().height(180.dp)) }
+            if (preview == null) Text("Loading preview…", color = LiquidCrystalPalette.TextMuted, fontSize = 10.sp)
+            LiquidCrystalPill("Back to screenshots", onClick = { selected = null })
+        } else {
+            if (files.isEmpty()) Text("No screenshots found. Use the screenshot action or Minecraft's screenshot key.", color = LiquidCrystalPalette.TextMuted, fontSize = 11.sp)
+            files.forEach { file ->
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(file.name, modifier = Modifier.weight(1f), color = Color.White, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    LiquidCrystalPill("View", onClick = { selected = file })
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ClientTransferPage() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        if (uri != null) {
+            val result = runCatching { ClientSettingsTransfer.export(context) }
+            val text = result.getOrNull()
+            if (text == null) Toast.makeText(context, result.exceptionOrNull()?.message ?: "Export failed", Toast.LENGTH_LONG).show()
+            else scope.launch {
+                val written = withContext(Dispatchers.IO) { runCatching {
+                    val output = context.contentResolver.openOutputStream(uri) ?: error("Could not open destination")
+                    output.bufferedWriter().use { it.write(text) }
+                } }
+                Toast.makeText(context, if (written.isSuccess) "Client settings exported" else written.exceptionOrNull()?.message ?: "Export failed", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) scope.launch {
+            val loaded = withContext(Dispatchers.IO) { runCatching {
+                val input = context.contentResolver.openInputStream(uri) ?: error("Could not open file")
+                input.bufferedReader().use { reader ->
+                    val out = StringBuilder()
+                    val buffer = CharArray(4096)
+                    while (true) {
+                        val count = reader.read(buffer)
+                        if (count < 0) break
+                        require(out.length + count <= 250_000) { "Settings file is too large" }
+                        out.append(buffer, 0, count)
+                    }
+                    out.toString()
+                }
+            } }
+            val imported = loaded.mapCatching { ClientSettingsTransfer.importSettings(context, it) }
+            Toast.makeText(context, if (imported.isSuccess) "Client settings imported; restart Minecraft to apply pack and game options" else imported.exceptionOrNull()?.message ?: "Import failed", Toast.LENGTH_LONG).show()
+        }
+    }
+    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("Transfer Client settings as a JSON file. It includes waypoints and saved chat shortcuts, but no account credentials. Keep the file private.",
+            color = LiquidCrystalPalette.TextSecondary, fontSize = 11.sp)
+        Text("Import replaces included settings and performance overrides. Movement latches are turned off for safety; pack and game-option changes apply next launch.",
+            color = LiquidCrystalPalette.TextMuted, fontSize = 10.sp)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            LiquidCrystalPill("Export settings", onClick = { exportLauncher.launch("aerix-client-settings.json") })
+            LiquidCrystalPill("Import settings", onClick = { importLauncher.launch(arrayOf("application/json", "text/plain")) })
+        }
+    }
+}
+
+@Composable
 private fun ClientResourcePacksPage(gameDir: File?) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -1719,6 +1846,8 @@ private fun ClientPerformancePage(gameDir: File?) {
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         ClientInformationToggle("Show FPS history HUD", AerixClientStore.fpsHistoryEnabled) { AerixClientStore.fpsHistoryEnabled = it }
+        ClientInformationToggle("Frame time and stutters HUD", AerixClientStore.frameTimingEnabled) { AerixClientStore.frameTimingEnabled = it }
+        Text("Frame timing measures swap-to-swap intervals while enabled; 100 ms and longer are grouped together.", color = LiquidCrystalPalette.TextMuted, fontSize = 10.sp)
         Text("Optimization mods installed (loading and compatibility are not guaranteed):",
             color = LiquidCrystalPalette.TextSecondary, fontSize = 10.sp)
         Text(if (installedMods.isEmpty()) "None detected" else installedMods.joinToString(" · "),
@@ -2228,6 +2357,7 @@ private fun InGameCrimsonHud(
     hPx: Float,
     fps: Int,
     fpsHistory: List<Int>,
+    frameTiming: FrameTimingStats?,
     low1Pct: Int,
     ramMb: Int,
     batteryPct: Int,
@@ -2344,7 +2474,7 @@ private fun InGameCrimsonHud(
         }
 
         // 2. FPS & Telemetry Pill (Safe slot x=0.02, y=0.21 — below 3RD, above D-pad)
-        if (AerixClientStore.perfPillEnabled || AerixClientStore.fpsHistoryEnabled) {
+        if (AerixClientStore.perfPillEnabled || AerixClientStore.fpsHistoryEnabled || AerixClientStore.frameTimingEnabled) {
             val hotWarning = AerixClientStore.thermalGuardEnabled && tempC >= 42.0f
             CrimsonHudBox(
                 modifier = Modifier.atHudSlot("perf"),
@@ -2364,6 +2494,14 @@ private fun InGameCrimsonHud(
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold
                     )
+                }
+                if (AerixClientStore.frameTimingEnabled) {
+                    val stat = frameTiming
+                    val details = if (stat == null) "Frame timing: waiting for frames…" else {
+                        val p95 = if (stat.p95Ms >= 100) "100+" else stat.p95Ms.toString()
+                        "Frame ~${"%.1f".format(stat.meanMsCapped)} ms · P95 ${p95}ms · ≥50ms ${stat.stutters50ms}"
+                    }
+                    Text(details, color = LiquidCrystalPalette.TextSecondary, fontSize = 9.sp)
                 }
                 if (AerixClientStore.fpsHistoryEnabled && fpsHistory.size > 1) {
                     val peak = (fpsHistory.maxOrNull() ?: 1).coerceAtLeast(1)

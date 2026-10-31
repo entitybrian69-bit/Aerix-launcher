@@ -73,6 +73,14 @@ jobs:
             app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/client/ClientOptionLines.java \
             tests/ClientOptionLinesSmokeTest.java
           java -cp "$RUNNER_TEMP/aerix-memory-test" ClientOptionLinesSmokeTest
+          javac -d "$RUNNER_TEMP/aerix-memory-test" \
+            app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/game/FrameTimingStats.java \
+            tests/FrameTimingStatsSmokeTest.java
+          java -cp "$RUNNER_TEMP/aerix-memory-test" FrameTimingStatsSmokeTest
+          gcc -std=c11 -D_POSIX_C_SOURCE=200809L -Wall -Wextra -Werror \
+            -I app_pojavlauncher/src/main/jni/fps tests/frame_counter_smoke.c \
+            app_pojavlauncher/src/main/jni/fps/frame_counter.c -o "$RUNNER_TEMP/aerix-frame-test"
+          "$RUNNER_TEMP/aerix-frame-test"
 
       - name: Get LTW
         uses: dawidd6/action-download-artifact@v6
