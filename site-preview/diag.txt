@@ -16,7 +16,7 @@ none
   7775    413 op=1     footer.footer
 
 == images ==
-     892x832 box=34x34        complete=True assets/aerix-logo.png
+     512x512 box=34x34        complete=True assets/aerix-logo.png
     1200x537 box=514x240      complete=True assets/screenshots/shot-home.jpg
      420x420 box=188x188      complete=True assets/themes/teapots.jpg
      420x420 box=188x188      complete=True assets/themes/rockets.jpg
@@ -39,7 +39,7 @@ none
     1200x675 box=387x241      complete=True assets/hd/night-sky.jpg
     1200x675 box=387x241      complete=True assets/hd/wisteria-lake.jpg
      736x736 box=116x116      complete=True assets/creator-entitybrian.jpg
-     892x832 box=34x34        complete=True assets/aerix-logo.png
+     512x512 box=34x34        complete=True assets/aerix-logo.png
      736x736 box=48x48        complete=True assets/creator-entitybrian.jpg
          0x0 box=0x0          complete=True None
 
