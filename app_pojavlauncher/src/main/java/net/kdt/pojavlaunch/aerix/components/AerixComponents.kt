@@ -152,7 +152,7 @@ fun AerixGhostButton(
             .height(40.dp)
             .liquidGlass(shape = CircleShape, strength = 0.6f, elevation = AerixMetrics.glassSubtleElevation),
         shape = CircleShape,
-        color = AerixSurface.panelRaised.copy(alpha = 0.54f),
+        color = AerixSurface.panelRaised.copy(alpha = 0.27f),
         contentColor = tint,
         border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft),
         onClick = onClick
@@ -176,7 +176,7 @@ fun MetaPill(text: String, @DrawableRes iconRes: Int? = null, modifier: Modifier
     Surface(
         modifier = modifier,
         shape = CircleShape,
-        color = AerixSurface.panelRaised.copy(alpha = 0.54f),
+        color = AerixSurface.panelRaised.copy(alpha = 0.27f),
         border = BorderStroke(1.dp, Color.White.copy(alpha = 0.25f)),
         contentColor = Color.White
     ) {
@@ -330,7 +330,7 @@ private fun SettingRowFrame(
     val base = Modifier
         .fillMaxWidth()
         .clip(shape)
-        .background(AerixSurface.panelRaised.copy(alpha = 0.42f), shape)
+        .background(AerixSurface.panelRaised.copy(alpha = 0.21f), shape)
     Column(
         modifier = (if (onClick != null) base.clickable(onClick = onClick) else base)
             .padding(horizontal = AerixSpacing.md, vertical = AerixSpacing.smPlus)
@@ -481,8 +481,10 @@ fun ActionSettingRow(title: String, summary: String?, onClick: () -> Unit, @Draw
 /** Converts any Android drawable (instance icons, skin faces) into an ImageBitmap for Compose. */
 fun Drawable.toAerixBitmap(sizePx: Int = 128): ImageBitmap {
     if (this is BitmapDrawable && bitmap != null) return bitmap.asImageBitmap()
-    val w = if (intrinsicWidth > 0) intrinsicWidth else sizePx
-    val h = if (intrinsicHeight > 0) intrinsicHeight else sizePx
+    // Loader marks are vector drawables with a 24dp intrinsic size; rendered at that they turn to
+    // mush on a card, so they are drawn at the requested size instead.
+    val w = if (intrinsicWidth > sizePx) intrinsicWidth else sizePx
+    val h = if (intrinsicHeight > sizePx) intrinsicHeight else sizePx
     val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
     setBounds(0, 0, w, h)

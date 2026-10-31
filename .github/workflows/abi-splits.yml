@@ -1,0 +1,111 @@
+name: Release split check
+
+# Builds the release APKs exactly as release.yml does - one per architecture plus the universal
+# one - and publishes nothing. Its only job is to prove, before a release is cut, that the split
+# build works and to report the real size of each file.
+#
+# It is also the fastest way to answer "how big is the arm64 APK actually?" without shipping a
+# release. Nothing here touches the Releases page; the APKs land as workflow artifacts.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "arena/2f1249a3-aerix-launcher" ]
+    paths: [ ".github/workflows/abi-splits.yml" ]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    env:
+      POJAV_KEYSTORE_PASSWORD: ${{ secrets.POJAV_KEYSTORE_PASSWORD }}
+      CURSEFORGE_API_KEY: ${{ secrets.CURSEFORGE_API_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+
+      - name: Get LTW
+        uses: dawidd6/action-download-artifact@v6
+        continue-on-error: true
+        with:
+          repo: MojoLauncher/LTW
+          workflow: android.yml
+          workflow_conclusion: success
+          name: output-aar
+          path: app_pojavlauncher/libs
+
+      - name: Get Mesa
+        uses: dawidd6/action-download-artifact@v6
+        continue-on-error: true
+        with:
+          github_token: ${{ secrets.MESA_ACTIONS }}
+          repo: MojoLauncher/mesa-unified2
+          workflow: android.yml
+          workflow_conclusion: success
+          branch: mojo/26.2
+          name: mesa-aar
+          path: app_pojavlauncher/libs
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.14.3"
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Build the split release APKs
+        run: |
+          set -e
+          mkdir -p out
+          gradle :app_pojavlauncher:assembleFullRelease -PabiSplits --console=plain
+          gradle :app_pojavlauncher:assembleNoruntimeRelease -PabiSplits --console=plain
+          ls -l app_pojavlauncher/build/outputs/apk/full/release/
+          ls -l app_pojavlauncher/build/outputs/apk/noruntime/release/
+
+      - name: Name them the way the release does
+        run: |
+          set -e
+          VERSION=$(sed -n 's/^versionName=//p' version.properties | tr -d '[:space:]')
+          test -n "$VERSION"
+          collect() {
+            local dir="$1" base="$2" found=0
+            for apk in "$dir"/*.apk; do
+              [ -f "$apk" ] || continue
+              case "$(basename "$apk")" in
+                *arm64-v8a*)   cp "$apk" "out/$base-arm64-v8a.apk";   found=$((found+1)) ;;
+                *armeabi-v7a*) cp "$apk" "out/$base-armeabi-v7a.apk"; found=$((found+1)) ;;
+                *-universal*)  cp "$apk" "out/$base.apk";             found=$((found+1)) ;;
+              esac
+            done
+            test "$found" -eq 3 || { echo "::error::$base: expected 3 APKs, got $found"; ls -l "$dir"; exit 1; }
+          }
+          collect app_pojavlauncher/build/outputs/apk/full/release "Aerix-Launcher-$VERSION"
+          collect app_pojavlauncher/build/outputs/apk/noruntime/release "Aerix-Launcher-$VERSION-noruntime"
+          cd out
+          ls -l
+          # The sizes are the point of this workflow, so put them in the summary as well.
+          {
+            echo "### APK sizes"
+            echo
+            echo "| file | bytes | MiB |"
+            echo "| --- | --- | --- |"
+            for apk in *.apk; do
+              bytes=$(stat -c%s "$apk")
+              echo "| $apk | $bytes | $(awk "BEGIN{printf \"%.1f\", $bytes/1048576}") |"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+          sha256sum *.apk | tee SHA256SUMS
+
+      - name: Upload the APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: split-release-check
+          path: out/
+          if-no-files-found: error

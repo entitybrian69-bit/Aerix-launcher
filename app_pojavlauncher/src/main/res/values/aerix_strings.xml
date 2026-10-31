@@ -17,6 +17,7 @@
     <string name="aerix_nav_wallpapers">Themes</string>
     <string name="aerix_nav_accounts">Accounts</string>
     <string name="aerix_nav_settings">Settings</string>
+    <string name="aerix_nav_contribution">Contribution</string>
     <string name="aerix_nav_about">About</string>
     <string name="aerix_nav_back_home">Back to Aerix home</string>
 
@@ -36,6 +37,65 @@
     <string name="aerix_home_recent">Recent worlds</string>
     <string name="aerix_home_view_all">View all</string>
     <string name="aerix_home_quick_tools">Quick tools</string>
+    <!-- In game menu (full screen overlay) -->
+    <string name="aerix_ingame_menu_title">Aerix Menu</string>
+    <string name="aerix_ingame_menu_subtitle">%1$s</string>
+    <string name="aerix_ingame_menu_resume">Resume game</string>
+    <string name="aerix_ingame_menu_force_close">Force close game</string>
+    <string name="aerix_ingame_menu_logs">Log output</string>
+    <string name="aerix_ingame_menu_keycode">Send custom keycode</string>
+    <string name="aerix_ingame_menu_quick_settings">Quick settings</string>
+    <string name="aerix_ingame_menu_controls">Custom controls</string>
+    <string name="aerix_ingame_menu_downloads">In-Game Downloads</string>
+    <string name="aerix_ingame_menu_close">Close the menu</string>
+    <string name="aerix_ingame_menu_no_account">No account</string>
+
+    <!-- In game downloader -->
+    <string name="aerix_ingame_download_title">In-Game Downloads</string>
+    <string name="aerix_ingame_download_subtitle">Into %1$s, without closing the game</string>
+    <string name="aerix_ingame_download_type_resourcepacks">Resource packs</string>
+    <string name="aerix_ingame_download_type_shaders">Shaders</string>
+    <string name="aerix_ingame_download_type_worlds">Worlds</string>
+    <string name="aerix_ingame_download_search">Search %1$s</string>
+    <string name="aerix_ingame_download_install">Install</string>
+    <string name="aerix_ingame_download_installed">Installed</string>
+    <string name="aerix_ingame_download_working">Downloading…</string>
+    <string name="aerix_ingame_download_done">Installed %1$s</string>
+    <string name="aerix_ingame_download_searching">Looking for content…</string>
+    <string name="aerix_ingame_download_empty">Nothing found for Minecraft %1$s. Try another search.</string>
+    <string name="aerix_ingame_download_offline">No internet connection. Check your network, then retry.</string>
+    <string name="aerix_ingame_download_api_error">The download source did not answer. Retry in a moment.</string>
+    <string name="aerix_ingame_download_no_instance">No instance is selected, so there is no folder to download into.</string>
+    <string name="aerix_ingame_download_storage_error">The instance folder cannot be written to. Free up space, or move the launcher data back to internal storage.</string>
+    <string name="aerix_ingame_download_storage_action">Storage</string>
+    <string name="aerix_ingame_download_failed">The download failed. Retry, or pick another file.</string>
+    <string name="aerix_ingame_download_retry">Retry</string>
+    <string name="aerix_ingame_download_clear">Clear the search</string>
+    <string name="aerix_loader_title">Modloader</string>
+    <string name="aerix_loader_subtitle">installs into %1$s · running %2$s</string>
+    <string name="aerix_loader_bench_minecraft">Minecraft version</string>
+    <string name="aerix_loader_bench_build">%1$s build</string>
+    <string name="aerix_loader_stable_only">Stable only</string>
+    <string name="aerix_loader_unstable">beta</string>
+    <string name="aerix_loader_install">Install</string>
+    <string name="aerix_loader_installing">Installing…</string>
+    <string name="aerix_loader_install_detail">Minecraft %1$s · updates %2$s in place</string>
+    <string name="aerix_loader_pick_a_build">Pick a loader and a version</string>
+    <string name="aerix_loader_installed">Installed %1$s</string>
+    <string name="aerix_loader_install_failed">The loader could not be installed. Check your connection and try again.</string>
+    <string name="aerix_loader_failed">Could not load the version list. Check your connection and try again.</string>
+    <string name="aerix_loader_retry">Retry</string>
+    <string name="aerix_loader_nothing_here">Nothing here</string>
+    <string name="aerix_loader_own_page">%1$s keeps its own install page, which just opened.</string>
+    <string name="aerix_ingame_download_empty_any">Nothing found. Try other words, or the other download source.</string>
+    <string name="aerix_ingame_download_version_relaxed">Nothing is tagged for Minecraft %1$s, so the newest content is shown instead.</string>
+    <string name="aerix_ingame_download_key_error">CurseForge did not answer. Setting an API key in the launcher settings can help.</string>
+
+    <string name="aerix_settings_aetherium">Try the Aetherium mod</string>
+    <string name="aerix_settings_aetherium_sub">A visual mod that pairs with the wallpapers and shaders of the launcher. Opens the content browser.</string>
+    <string name="aerix_settings_aetherium_tag">New</string>
+    <string name="aerix_home_quick_socials">Socials</string>
+    <string name="aerix_home_quick_socials_sub">Friends and parties</string>
     <string name="aerix_home_quick_create">Create instance</string>
     <string name="aerix_home_quick_create_sub">Vanilla or modded</string>
     <string name="aerix_home_quick_explore">Explore content</string>
@@ -381,6 +441,7 @@
     <string name="aerix_create_loader_empty">No %1$s build for Minecraft %2$s</string>
     <string name="aerix_create_loader_loading">Loading builds</string>
     <string name="aerix_create_only_stable">Stable only</string>
+    <string name="aerix_create_vanilla_hint">No loader build to pick - Create &amp; Install makes the instance straight away.</string>
     <string name="aerix_create_import_modpack">Import modpack</string>
     <string name="aerix_create_import_modpack_sub">Modrinth / CurseForge / .mrpack</string>
     <string name="aerix_create_install">Create &amp; Install Instance</string>
@@ -462,4 +523,61 @@
     <string name="aerix_download_next">Next page</string>
     <string name="aerix_download_no_files">No versions match this filter</string>
     <string name="aerix_editor_jvm_args_hint">Custom JVM arguments</string>
+    <string name="aerix_install_title">Install %1$s</string>
+    <string name="aerix_install_dependencies">Dependencies</string>
+    <string name="aerix_install_dependencies_none">Nothing else is needed: this file works on its own.</string>
+    <string name="aerix_install_dependencies_loading">Checking what this file needs…</string>
+    <string name="aerix_install_dependency_required">required</string>
+    <string name="aerix_install_dependency_optional">optional</string>
+    <string name="aerix_install_dependency_missing">no build for this version</string>
+    <string name="aerix_install_targets">Install for which instance?</string>
+    <string name="aerix_install_targets_detected">Detected: %1$s</string>
+    <string name="aerix_install_targets_loading">Loading install destinations…</string>
+    <string name="aerix_install_targets_none">No instance to install into yet. Create one first, then come back.</string>
+    <string name="aerix_install_target_detected">Detected</string>
+    <string name="aerix_install_target_needs_version">needs %1$s</string>
+    <string name="aerix_install_target_needs_loader">%1$s only</string>
+    <string name="aerix_install_targets_no_match">Nothing here is built for this file. Tick an instance to install anyway.</string>
+    <string name="aerix_install_targets_none_ticked">Tick the instance to install into.</string>
+    <string name="aerix_install_select_all">Select all</string>
+    <string name="aerix_install_deselect_all">Clear</string>
+    <string name="aerix_install_confirm">Install</string>
+    <string name="aerix_install_confirm_to">Install to %1$d</string>
+    <string name="aerix_install_cancel">Cancel</string>
+    <string name="aerix_install_modpack_note">A modpack brings its own instance; it is installed as a new one.</string>
+    <string name="aerix_install_started">Installing %1$s</string>
+    <string name="aerix_install_progress_summary">%1$d of %2$d files</string>
+    <string name="aerix_install_into">into %1$s</string>
+    <string name="aerix_install_done">%1$s installed</string>
+    <string name="aerix_install_done_deps">%1$s and %2$d more installed</string>
+    <string name="aerix_install_failed">Install failed</string>
+    <string name="aerix_install_cancelled">Install cancelled</string>
+    <string name="aerix_install_cancel_task">Cancel</string>
+    <string name="aerix_install_minimize">Minimize</string>
+    <string name="aerix_install_expand">Show install progress</string>
+    <string name="aerix_install_tasks">Installs</string>
+    <string name="aerix_install_clear_finished">Clear finished</string>
+    <string name="aerix_install_queued">Waiting to start</string>
+    <string name="aerix_install_dismiss">Dismiss</string>
+    <string name="aerix_loader_finish_installer">Complete the installer to update this instance</string>
+    <string name="aerix_loader_change_game_title">Change Minecraft version?</string>
+    <string name="aerix_loader_change_game_warning">This updates the existing instance to a different Minecraft version. Its mods may be incompatible. Back up your worlds before launching.</string>
+    <string name="aerix_logo_size_title">In-game Aerix logo size</string>
+    <string name="aerix_logo_size_value">Logo size: %1$d dp</string>
+    <string name="aerix_logo_size_hint">Very small (20 dp) to big (96 dp). Drag the slider for a live preview. Small sizes are harder to tap.</string>
+    <string name="aerix_logo_size_default">Default</string>
+    <string name="aerix_logo_size_accessibility">Aerix menu. Tap to open; drag to move; hold to resize.</string>
+
+
+    <!-- Aerix menu: the wallpaper behind the controls while the game starts. -->
+    <string name="aerix_ingame_menu_loading_wallpaper">Use wallpaper as loading background</string>
+    <string name="aerix_ingame_menu_loading_wallpaper_summary">Your wallpaper - or animation - instead of black until the game window appears.</string>
+
+    <!-- Aerix menu: the account panel and the restart it needs to switch accounts in game. -->
+    <string name="aerix_ingame_menu_switch_account">Switch account</string>
+    <string name="aerix_ingame_menu_rotate_hint">Drag to rotate</string>
+    <string name="aerix_ingame_menu_switch_restart_title">Switch account</string>
+    <string name="aerix_ingame_menu_switch_restart">The game is signed in as %1$s. Switching to %2$s restarts it, so the world you are in now is closed.</string>
+    <string name="aerix_ingame_menu_switch_restart_confirm">Switch and restart</string>
+    <string name="aerix_ingame_menu_switch_restart_cancel">Not now</string>
 </resources>

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
     <!-- App name part -->
-    <string name="app_short_name">PojavLauncher</string>
+    <string name="app_short_name">Aerix Launcher</string>
 
     <!-- Action bar part -->
 
@@ -69,6 +69,22 @@
     <string name="mcl_setting_renderer_ltw">LTW (OpenGL ES 3) - 1.17+ only</string>
     <string name="mcl_setting_renderer_mobileglues">MobileGlues (OpenGL ES) - (1.17+ only)</string>
     <string name="mcl_setting_renderer_sfpew">SFPEW/MobileGlues (OpenGL ES) - (all versions)</string>
+    <string name="mcl_setting_renderer_proton">Proton (OpenGL over PowerVR) - 32-bit devices only</string>
+    <string name="aerix_wallpaper_tab_wallpaper">Wallpapers</string>
+    <string name="aerix_wallpaper_tab_animations">Animations</string>
+    <string name="aerix_animation_live">LIVE</string>
+    <string name="aerix_wallpaper_video_button">Add animation</string>
+    <string name="aerix_wallpaper_video_active">Your clip is playing</string>
+    <string name="aerix_clip_badge">CLIP</string>
+    <string name="aerix_clip_real">REAL</string>
+    <string name="aerix_clip_kind">Real footage · loops</string>
+    <string name="aerix_wallpaper_blur">Blur %1$d dp</string>
+    <string name="aerix_wallpaper_motion_on">Motion on</string>
+    <string name="aerix_wallpaper_motion_off">Motion off</string>
+    <string name="aerix_settings_theme_motion">Animated theme</string>
+    <string name="aerix_settings_theme_motion_sub">The accent pulses, selected items glow, and every wallpaper drifts with its own particles. Turning this off applies immediately.</string>
+    <string name="mcl_setting_renderer_emesis">Emesis (OpenGL 3.2+ core) - all versions</string>
+    <string name="mcl_setting_renderer_emesis_description">A super performant renderer built only to outmatch and outperform every other renderer, supporting all devices and versions.</string>
     <string name="mcl_setting_renderer_freedreno_kgsl">Freedreno (KGSL) - all versions</string>
     <string name="mcl_setting_renderer_mesa_desktop">Mesa (DRM) - all versions</string>
     <string name="mcl_setting_renderer_mesa_desktop_ext">Mesa (DRM, external) - all versions</string>
@@ -133,6 +149,14 @@
     <string name="import_control_import_button">import controls</string>
     <string name="import_control_verifying_file">File is being verified, please wait and try again…</string>
     <string name="import_control_invalid_name">Invalid name or file already exists</string>
+    <string name="import_control_compatibility_title">Control layout compatibility</string>
+    <string name="import_control_compatibility_warning">%1$s layout detected. Buttons and supported joystick/key bindings will be adapted to Aerix. Layers are flattened; layer switching, text/chat macros, text widgets, source-specific images and some visual/gesture effects cannot be reproduced exactly.
+
+Skipped widgets: %2$d
+Buttons without an action: %3$d
+Unsupported or excess events: %4$d
+
+Your original layout is kept unchanged. Continue importing?</string>
     <string name="import_control_done">Importation done</string>
     <!--
     <string name="control_more3"></string>
@@ -214,6 +238,8 @@
     <string name="preference_experimental_description">Use things there with consideration, no support</string>
     <string name="preference_sustained_performance_title">Enable sustained performance mode</string>
     <string name="preference_sustained_performance_description">Limit thermal throttling by limiting peak performance.</string>
+    <string name="preference_show_fps_title">Frame rate counter</string>
+    <string name="preference_show_fps_description">Shows the frame rate of the game in the top left corner of the screen.</string>
     <string name="preference_force_vsync_title">Force enable VSync</string>
     <string name="preference_force_vsync_description">Limit thermal throttling by limiting peak performance.</string>
     <string name="preference_use_angle_title">Use ANGLE</string>
@@ -567,4 +593,71 @@
     <string name="mjdl_download_error_subtitle">Download failed. Check your internet connection and make sure that you have enough free disk space.</string>
     <string name="mjdl_download_error_subtitle_2">File verification failed. Please try again. If this error keeps happening, contact us on GitHub or on Discord.</string>
     <string name="bta_configuring">Configuring BTA…</string>
+    <string name="dock_download_minecraft">Downloading Minecraft</string>
+    <string name="dock_working">Preparing files</string>
+    <string name="dock_pause">Pause download</string>
+    <string name="dock_resume">Resume download</string>
+    <string name="dock_paused">Download paused</string>
+    <string name="dock_cancel">Cancel download</string>
+    <string name="dock_cancel_message">Stop this download? Verified files will be kept for your next attempt.</string>
+    <string name="dock_stopping">Stopping download…</string>
+    <string name="dock_cancelled">Download cancelled</string>
+    <string name="dock_cancelled_detail">You can try again when ready. Existing verified files have been kept.</string>
+    <string name="dock_show_tasks">Show active tasks</string>
+    <string name="dock_hide_tasks">Hide active tasks</string>
+    <string name="dock_size">%1$.1f / %2$.1f MB</string>
+    <string name="dock_speed">%1$.2f MB/s</string>
+    <string name="dock_eta">%1$dm %2$ds left</string>
+    <string name="dock_percent">%1$d%%</string>
+    <string name="dock_runtime">Installing runtime</string>
+    <string name="dock_modpack">Installing content</string>
+    <string name="dock_auth">Signing in</string>
+    <string name="dock_versions">Refreshing versions</string>
+    <string name="dock_migration">Moving files</string>
+    <string name="dock_extract">Extracting files</string>
+    <plurals name="dock_tasks"><item quantity="one">%d active task</item><item quantity="other">%d active tasks</item></plurals>
+    <string name="fps_overlay_waiting">-- FPS</string>
+    <string name="fps_overlay_unavailable">FPS unavailable</string>
+    <string name="fps_overlay_value">%1$d FPS (avg. %2$d)</string>
+    <string name="fps_overlay_drag">Drag the FPS counter to move it</string>
+
+    <!-- First-run guide, after Zalith Launcher 2's spotlight tour. -->
+    <string name="aerix_guide_welcome_title">Welcome to %1$s</string>
+    <string name="aerix_guide_welcome_body">A short tour of the four places you will use most. Tap anywhere to move on; it will not show again.</string>
+    <string name="aerix_guide_create_title">Create an instance</string>
+    <string name="aerix_guide_create_body">Every world starts here: pick a Minecraft version, name it, and Aerix sets up the rest. Vanilla or modded, it is the same button.</string>
+    <string name="aerix_guide_library_title">Your library</string>
+    <string name="aerix_guide_library_body">All your instances live here. Tap one to select it, hold it to edit the version, mods and renderer for that instance only.</string>
+    <string name="aerix_guide_play_title">Pick, then play</string>
+    <string name="aerix_guide_play_body">The panel on the right always shows the selected instance. Play launches it; the gear beside it opens the settings for that instance.</string>
+    <string name="aerix_guide_renderer_title">Renderers</string>
+    <string name="aerix_guide_renderer_body">Emesis is bundled and works everywhere. If a game will not start, this is the first setting to try - another renderer, or a lower resolution.</string>
+    <string name="aerix_guide_wallpapers_title">Make it yours</string>
+    <string name="aerix_guide_wallpapers_body">25 photographs, 12 real recorded Minecraft animations, and any clip of your own. The accent colour follows whatever you pick.</string>
+    <string name="aerix_guide_end_title">That is everything</string>
+    <string name="aerix_guide_end_body">Add an account from the avatar at the bottom of the rail, then create your first instance. The guide can be shown again from Settings.</string>
+    <string name="aerix_guide_replay">Show the guide again</string>
+    <string name="aerix_guide_replay_body">Replays the tour of the launcher from the start. It only runs by itself the first time.</string>
+
+    <!-- Control themes: the animated looks a control can wear, picked in the control editor. -->
+    <string name="ctrl_theme_title">Control themes</string>
+    <string name="ctrl_theme_hint">Tap a picture to wear it. Off gives the plain control back.</string>
+    <string name="ctrl_theme_off">Off</string>
+    <string name="ctrl_theme_apply_all">Apply to all controls</string>
+    <string name="ctrl_themes_applied">%1$d controls now wear this theme</string>
+    <string name="ctrl_theme_haptics">Feel it</string>
+    <string name="ctrl_theme_sound">Hear it</string>
+    <string name="ctrl_theme_animate">Move it</string>
+
+    <string name="ctrl_theme_teapots">Tea Party</string>
+    <string name="ctrl_theme_rockets">Rocket Ride</string>
+    <string name="ctrl_theme_nebula">Nebula</string>
+    <string name="ctrl_theme_stardust">Stardust</string>
+    <string name="ctrl_theme_aurora">Aurora</string>
+    <string name="ctrl_theme_galaxy">Galaxy</string>
+    <string name="ctrl_theme_moonrise">Moonrise</string>
+    <string name="ctrl_theme_horizon">Event Horizon</string>
+    <string name="ctrl_theme_static">Static</string>
+    <string name="ctrl_theme_starcross">Star Cross</string>
+    <string name="ctrl_theme_comet">Comet Grid</string>
 </resources>

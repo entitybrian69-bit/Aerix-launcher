@@ -27,10 +27,12 @@ package net.kdt.pojavlaunch.aerix.components
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Color as AndroidColor
-import android.util.Base64
+import android.os.Handler
+import android.os.Looper
 import android.view.MotionEvent
 import android.view.ViewGroup
 import android.webkit.ConsoleMessage
+import android.webkit.JavascriptInterface
 import android.webkit.JsResult
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
@@ -38,18 +40,26 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -57,20 +67,46 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
-import net.kdt.pojavlaunch.Tools
 import net.kdt.pojavlaunch.aerix.bridge.AerixAccount
 import net.kdt.pojavlaunch.aerix.bridge.PojavAccountBridge
 import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
-import org.apache.commons.io.IOUtils
-import java.io.File
-import java.net.URL
+import java.io.ByteArrayInputStream
+import java.util.concurrent.atomic.AtomicInteger
 
 @SuppressLint("SetJavaScriptEnabled")
 class AerixPlayerSkin(private val context: Context) {
     private var webview: WebView? = null
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     private val skinViewUrl = "https://appassets.androidplatform.net/assets/skinview/skinview.html"
     private val defaultSkinUrl = "https://appassets.androidplatform.net/assets/steve.png"
+
+    @Volatile
+    private var currentSkinBytes: ByteArray? = null
+    @Volatile
+    private var currentCapeBytes: ByteArray? = null
+    private val assetCounter = AtomicInteger(1)
+
+    var viewerReadyCallback: (() -> Unit)? = null
+    var viewerErrorCallback: (() -> Unit)? = null
+    var skinPaintedCallback: ((Boolean) -> Unit)? = null
+
+    private inner class SkinJsBridge {
+        @JavascriptInterface
+        fun onViewerReady() {
+            mainHandler.post { viewerReadyCallback?.invoke() }
+        }
+
+        @JavascriptInterface
+        fun onViewerError(reason: String?) {
+            mainHandler.post { viewerErrorCallback?.invoke() }
+        }
+
+        @JavascriptInterface
+        fun onSkinPainted(ok: Boolean) {
+            mainHandler.post { skinPaintedCallback?.invoke(ok) }
+        }
+    }
 
     fun loadWebView(viewContext: Context, onPageFinished: () -> Unit): WebView {
         val view = WebView(viewContext).apply {
@@ -86,11 +122,35 @@ class AerixPlayerSkin(private val context: Context) {
             overScrollMode = WebView.OVER_SCROLL_NEVER
             isVerticalScrollBarEnabled = false
             isHorizontalScrollBarEnabled = false
+            addJavascriptInterface(SkinJsBridge(), "AndroidSkinBridge")
             webViewClient = object : WebViewClient() {
                 override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
                     val uri = request.url ?: return null
                     if (uri.host != "appassets.androidplatform.net") return null
-                    val path = uri.path?.removePrefix("/assets/")?.trimStart('/') ?: return null
+                    val rawPath = uri.path ?: return null
+                    if (rawPath == "/local/skin.png") {
+                        val bytes = currentSkinBytes ?: return null
+                        return WebResourceResponse(
+                            "image/png",
+                            null,
+                            200,
+                            "OK",
+                            mapOf("Cache-Control" to "no-store", "Access-Control-Allow-Origin" to "*"),
+                            ByteArrayInputStream(bytes)
+                        )
+                    }
+                    if (rawPath == "/local/cape.png") {
+                        val bytes = currentCapeBytes ?: return null
+                        return WebResourceResponse(
+                            "image/png",
+                            null,
+                            200,
+                            "OK",
+                            mapOf("Cache-Control" to "no-store", "Access-Control-Allow-Origin" to "*"),
+                            ByteArrayInputStream(bytes)
+                        )
+                    }
+                    val path = rawPath.removePrefix("/assets/").trimStart('/')
                     val mime = when {
                         path.endsWith(".html") -> "text/html"
                         path.endsWith(".js") -> "application/javascript"
@@ -123,18 +183,24 @@ class AerixPlayerSkin(private val context: Context) {
     fun loadSkinBytes(bytes: ByteArray?, model: String = "auto-detect") {
         val safeModel = if (model == "slim" || model == "default") model else "auto-detect"
         if (bytes != null && bytes.isNotEmpty()) {
-            val dataUrl = "data:image/png;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP)
-            webview?.evaluateJavascript("loadSkin('$dataUrl', '$safeModel')", null)
+            currentSkinBytes = bytes
+            val rev = assetCounter.incrementAndGet()
+            val localUrl = "https://appassets.androidplatform.net/local/skin.png?rev=$rev"
+            webview?.evaluateJavascript("loadSkin('$localUrl', '$safeModel')", null)
         } else {
+            currentSkinBytes = null
             webview?.evaluateJavascript("loadSkin('$defaultSkinUrl', '$safeModel')", null)
         }
     }
 
     fun loadCapeBytes(bytes: ByteArray?) {
         if (bytes != null && bytes.isNotEmpty()) {
-            val dataUrl = "data:image/png;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP)
-            webview?.evaluateJavascript("loadCape('$dataUrl')", null)
+            currentCapeBytes = bytes
+            val rev = assetCounter.incrementAndGet()
+            val localUrl = "https://appassets.androidplatform.net/local/cape.png?rev=$rev"
+            webview?.evaluateJavascript("loadCape('$localUrl')", null)
         } else {
+            currentCapeBytes = null
             webview?.evaluateJavascript("loadCape(null)", null)
         }
     }
@@ -151,7 +217,14 @@ class AerixPlayerSkin(private val context: Context) {
         webview?.evaluateJavascript("setRenderPaused($paused)", null)
     }
 
+    fun requestResize() {
+        webview?.evaluateJavascript("if (typeof resize === 'function') resize();", null)
+    }
+
     fun destroy() {
+        viewerReadyCallback = null
+        viewerErrorCallback = null
+        skinPaintedCallback = null
         webview?.apply {
             stopLoading()
             loadUrl("about:blank")
@@ -164,8 +237,8 @@ class AerixPlayerSkin(private val context: Context) {
 }
 
 /**
- * 3D skin preview (mirai SkinPreview3D). Idle animation stays paused so the WebView only repaints
- * when the camera angle changes.
+ * 3D skin preview (mirai SkinPreview3D) with automatic 2D pixel-body fallback on devices whose
+ * Android System WebView lacks WebGL or while the WebView canvas finishes painting.
  */
 @Composable
 fun AerixSkinPreview3D(
@@ -179,93 +252,139 @@ fun AerixSkinPreview3D(
     val context = LocalContext.current
     val playerSkin = remember { AerixPlayerSkin(context.applicationContext) }
     var pageFinished by remember { mutableStateOf(false) }
-    // Coalesces rapid camera updates: only the newest angle survives until the paced reader takes it.
+    var viewerReady by remember { mutableStateOf(false) }
+    var webglFailed by remember { mutableStateOf(false) }
+    var webglPainted by remember { mutableStateOf(false) }
+    var fallbackBody by remember { mutableStateOf<ImageBitmap?>(null) }
+    var skinLoadTrigger by remember { mutableIntStateOf(0) }
     val cameraAngles = remember { Channel<Pair<Int, Int>>(Channel.CONFLATED) }
 
-    DisposableEffect(Unit) {
+    DisposableEffect(playerSkin) {
+        playerSkin.viewerReadyCallback = {
+            viewerReady = true
+            webglFailed = false
+            skinLoadTrigger++
+        }
+        playerSkin.viewerErrorCallback = {
+            webglFailed = true
+            webglPainted = false
+        }
+        playerSkin.skinPaintedCallback = { ok ->
+            if (ok) {
+                webglPainted = true
+            } else {
+                webglFailed = true
+            }
+        }
         onDispose { playerSkin.destroy() }
     }
 
-    Box(modifier = modifier) {
-        AndroidView(
-            modifier = Modifier.matchParentSize(),
-            factory = { viewContext ->
-                TouchGateLayout(viewContext).apply {
-                    addView(
-                        playerSkin.loadWebView(viewContext) { pageFinished = true },
-                        ViewGroup.LayoutParams(
-                            ViewGroup.LayoutParams.MATCH_PARENT,
-                            ViewGroup.LayoutParams.MATCH_PARENT
-                        )
-                    )
-                }
-            },
-            update = { container ->
-                container.gateOpen = interactionEnabled && isVisible
-            }
-        )
+    val wardrobeRevision = PojavAccountBridge.wardrobeRevision
 
-        LaunchedEffect(pageFinished, isVisible) {
-            if (!pageFinished) return@LaunchedEffect
+    // Always decode the crisp 2D full-body preview immediately so the skin shows up on the very
+    // first frame after returning to Dashboard — and stays visible on devices without WebGL.
+    LaunchedEffect(account?.key, account?.username, account?.authType, wardrobeRevision) {
+        fallbackBody = withContext(Dispatchers.IO) {
+            PojavAccountBridge.loadAccountBodyPreview(context, account)
+        }
+    }
+
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        if (!webglFailed) {
+            AndroidView(
+                modifier = Modifier
+                    .matchParentSize()
+                    .alpha(if (webglPainted) 1f else 0.01f),
+                factory = { viewContext ->
+                    TouchGateLayout(viewContext).apply {
+                        val wv = playerSkin.loadWebView(viewContext) { pageFinished = true }
+                        wv.addOnLayoutChangeListener { _, l, t, r, b, ol, ot, or2, ob ->
+                            if ((r - l) != (or2 - ol) || (b - t) != (ob - ot)) {
+                                playerSkin.requestResize()
+                            }
+                        }
+                        addView(
+                            wv,
+                            ViewGroup.LayoutParams(
+                                ViewGroup.LayoutParams.MATCH_PARENT,
+                                ViewGroup.LayoutParams.MATCH_PARENT
+                            )
+                        )
+                    }
+                },
+                update = { container ->
+                    container.gateOpen = interactionEnabled && isVisible
+                }
+            )
+        }
+
+        if (!webglPainted || webglFailed) {
+            val preview = fallbackBody
+            if (preview != null) {
+                Image(
+                    bitmap = preview,
+                    contentDescription = account?.username ?: "Player skin",
+                    contentScale = ContentScale.Fit,
+                    filterQuality = FilterQuality.None,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(vertical = 8.dp, horizontal = 12.dp)
+                )
+            } else if (!webglFailed) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    color = AerixThemeManager.currentAccent(),
+                    strokeWidth = 2.dp
+                )
+            }
+        }
+
+        // If the page finished loading but JS/WebGL never initialized within 1.8s, keep the crisp 2D body preview.
+        LaunchedEffect(pageFinished, viewerReady) {
+            if (pageFinished && !viewerReady && !webglFailed) {
+                delay(1800)
+                if (!viewerReady) {
+                    webglFailed = true
+                    webglPainted = false
+                }
+            }
+        }
+
+        val ready = viewerReady
+        LaunchedEffect(ready, isVisible) {
+            if (!ready) return@LaunchedEffect
             playerSkin.setRenderPaused(true)
         }
-        LaunchedEffect(pageFinished, azimuth, pitch, isVisible) {
-            if (!pageFinished || !isVisible) return@LaunchedEffect
+        LaunchedEffect(ready, azimuth, pitch, isVisible) {
+            if (!ready || !isVisible) return@LaunchedEffect
             cameraAngles.trySend(azimuth to pitch)
         }
-        LaunchedEffect(pageFinished, isVisible) {
-            if (!pageFinished || !isVisible) return@LaunchedEffect
+        LaunchedEffect(ready, isVisible) {
+            if (!ready || !isVisible) return@LaunchedEffect
             for ((azimuthDeg, pitchDeg) in cameraAngles) {
                 playerSkin.setAzimuthAndPitch(azimuthDeg, pitchDeg)
                 delay(16)
             }
         }
-        LaunchedEffect(pageFinished, interactionEnabled, isVisible) {
-            if (!pageFinished) return@LaunchedEffect
+        LaunchedEffect(ready, interactionEnabled, isVisible) {
+            if (!ready) return@LaunchedEffect
             playerSkin.setInteractionEnabled(interactionEnabled && isVisible)
         }
-        val wardrobeRevision = PojavAccountBridge.wardrobeRevision
-        LaunchedEffect(pageFinished, account?.username, account?.authType, wardrobeRevision) {
-            if (!pageFinished) return@LaunchedEffect
+        LaunchedEffect(ready, skinLoadTrigger, account?.key, account?.username, account?.authType, wardrobeRevision) {
+            if (!ready || webglFailed) return@LaunchedEffect
             val (skinBytes, capeBytes, model) = withContext(Dispatchers.IO) {
                 Triple(
-                    resolveSkinBytes(account),
+                    PojavAccountBridge.resolveAccountSkinBytes(account),
                     PojavAccountBridge.resolveCapeBytes(account),
                     if (PojavAccountBridge.isSlimModel(account)) "slim" else "default"
                 )
             }
             playerSkin.loadSkinBytes(skinBytes, model)
             playerSkin.loadCapeBytes(capeBytes)
-        }
-
-        if (!pageFinished) {
-            CircularProgressIndicator(
-                modifier = Modifier
-                    .size(24.dp)
-                    .align(Alignment.Center),
-                color = AerixThemeManager.currentAccent(),
-                strokeWidth = 2.dp
-            )
+            delay(120)
+            playerSkin.requestResize()
         }
     }
-}
-
-private fun resolveSkinBytes(account: AerixAccount?): ByteArray? {
-    if (account == null) return null
-    PojavAccountBridge.resolveCustomSkinBytes(account)?.let { return it }
-    val template = account.authType.skinUrl ?: return null
-    val cacheFile = File(Tools.DIR_CACHE, "aerix-skin-${account.source.profileId}-${account.authType.name}.png")
-    if (cacheFile.isFile && cacheFile.length() > 0) {
-        runCatching { return cacheFile.readBytes() }
-    }
-    return runCatching {
-        val url = String.format(template, account.username)
-        val bytes = IOUtils.toByteArray(URL(url))
-        if (bytes.isNotEmpty()) {
-            runCatching { cacheFile.writeBytes(bytes) }
-            bytes
-        } else null
-    }.getOrNull()
 }
 
 private class TouchGateLayout(context: Context) : FrameLayout(context) {

@@ -17,17 +17,29 @@
     <uses-permission
         android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
+    <!-- Renderer plugins are ordinary APKs installed by the user. Android 11+ hides them from
+         getInstalledApplications unless this permission is present, so plugin discovery depends on it.
+         Aerix ships APKs directly from GitHub Releases, where the Play package-visibility policy
+         does not apply. -->
+    <uses-permission
+        android:name="android.permission.QUERY_ALL_PACKAGES"
+        tools:ignore="QueryAllPackagesPermission" />
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <uses-permission android:name="android.permission.VIBRATE"/>                         
 
     <application
         android:name="net.kdt.pojavlaunch.PojavApplication"
         android:allowBackup="true"
+        android:allowAudioPlaybackCapture="true"
         android:allowNativeHeapPointerTagging="false"
         android:appCategory="game"
         android:hasFragileUserData="true"
@@ -67,9 +79,29 @@
             android:name="net.kdt.pojavlaunch.LauncherActivity"
             android:label="@string/aerix_app_label"
             android:theme="@style/Aerix.Launcher"
+            android:launchMode="singleTask"
+            android:exported="true"
             android:configChanges="keyboardHidden|orientation|screenSize|smallestScreenSize|screenLayout|keyboard|navigation"
             android:screenOrientation="sensorLandscape"
-            android:windowSoftInputMode="adjustResize"/>
+            android:windowSoftInputMode="adjustResize">
+            <!-- Comes back here after the browser finishes a Google sign-in for Socials. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data
+                    android:host="auth"
+                    android:scheme="aerix-social" />
+                <data
+                    android:host="friend"
+                    android:scheme="aerix-social" />
+                <data
+                    android:host="chat"
+                    android:scheme="aerix-social" />
+            </intent-filter>
+        </activity>
         <activity
             android:name="net.kdt.pojavlaunch.ImportControlActivity"
             android:configChanges="keyboard|keyboardHidden"
@@ -125,6 +157,14 @@
             android:screenOrientation="sensorLandscape" />
 
         <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.updates"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/update_paths" />
+        </provider>
+
+        <provider
             android:name="net.kdt.pojavlaunch.scoped.FolderProvider"
             android:authorities="@string/storageProviderAuthorities"
             android:exported="true"
@@ -141,18 +181,52 @@
             android:screenOrientation="sensorLandscape"
             android:theme="@style/MojoLauncher.AppTheme" />
 
+        <service android:name="net.kdt.pojavlaunch.recording.ScreenRecordingService"
+            android:exported="false" android:process=":recorder"
+            android:stopWithTask="true"
+            android:foregroundServiceType="mediaProjection|microphone" />
+
         <service
             android:name="net.kdt.pojavlaunch.mobileglues.MgQueryService"
             android:exported="false"
             android:process=":mgquery" />
 
         <service android:name="net.kdt.pojavlaunch.services.ProgressService"
+            android:stopWithTask="true"
             android:foregroundServiceType="dataSync"/>
         <service android:name="net.kdt.pojavlaunch.services.GameService" android:process=":game"
+            android:stopWithTask="true"
             android:foregroundServiceType="specialUse">
             <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="This application is intended to run a 3rd-party piece of software which cannot be managed using the activity's saved instance state. This service is used for background persistence of this piece of software."/>
         </service>
+
+        <service
+            android:name="net.kdt.pojavlaunch.aerix.social.SocialMessagingService"
+            android:exported="false"
+            android:stopWithTask="true"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Maintains a low-bandwidth Realtime listener while the launcher session is open and shuts down immediately when removed from Recent Apps." />
+        </service>
+
+        <service
+            android:name="net.kdt.pojavlaunch.aerix.social.SocialInboxJobService"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
+
+        <receiver
+            android:name="net.kdt.pojavlaunch.aerix.social.SocialNotificationReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="net.kdt.pojavlaunch.aerix.ACTION_SOCIAL_DIRECT_REPLY" />
+                <action android:name="net.kdt.pojavlaunch.aerix.ACTION_SOCIAL_MARK_READ" />
+                <action android:name="net.kdt.pojavlaunch.aerix.ACTION_DISCORD_GAME_STARTED" />
+                <action android:name="net.kdt.pojavlaunch.aerix.ACTION_DISCORD_SCHEDULE_CLEAR" />
+                <action android:name="net.kdt.pojavlaunch.aerix.ACTION_DISCORD_CLEAR_NOW" />
+            </intent-filter>
+        </receiver>
     </application>
     <queries>
         <package android:name="net.kdt.pojavlaunch.ffmpeg"/>
@@ -161,5 +235,21 @@
         <package android:name="net.kdt.pojavlaunch"/>
         <package android:name="net.kdt.pojavlaunch.debug"/>
         <package android:name="net.kdt.pojavlaunch.pub"/>
+        <!-- The renderer plugins this launcher brands. Listed explicitly so they stay visible
+             even on devices that withhold QUERY_ALL_PACKAGES. -->
+        <package android:name="com.entitybrian.emesis"/>
+        <package android:name="np.proton.renderer.powervr"/>
+        <!-- Discord Rich Presence: the Discord app publishes presence through this bound service. -->
+        <package android:name="com.discord"/>
+        <package android:name="cocobo1.pupu.app"/>
+        <!-- Fallback visibility for plugin APKs that ship a launcher activity, used when the
+             package visibility permission above is not granted. -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+        <intent>
+            <action android:name="com.discord.socialsdk.rpc.IDiscordRpcService"/>
+        </intent>
     </queries>
 </manifest>

@@ -1,0 +1,13 @@
+<!--
+  Send: the button that posts a message in the in-game social panel.
+  Material "send" filled, drawn white so it can be tinted by the panel accent.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="960"
+    android:viewportHeight="960">
+  <path
+      android:pathData="M120,800L120,560L440,480L120,400L120,160L880,480L120,800Z"
+      android:fillColor="#FFFFFFFF"/>
+</vector>

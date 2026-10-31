@@ -1,0 +1,94 @@
+name: Site preview shots
+
+# Temporary helper: renders the static site in headless Chromium so the pages can
+# be eyeballed without a local browser. Manual only; never wired into deploy.
+on:
+  push:
+    paths:
+      - "docs/**"
+      - "tools/shoot_site.py"
+      - ".github/workflows/preview-shots.yml"
+    branches-ignore:
+      - v3_openjdk
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: preview-shots-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  shoot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Playwright + Chromium
+        run: |
+          python -m pip install --upgrade pip
+          pip install playwright pillow
+          python -m playwright install --with-deps chromium
+
+      - name: Serve docs/
+        run: |
+          nohup python -m http.server 8123 --bind 127.0.0.1 --directory docs >/tmp/serve.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:8123/ >/dev/null && break; sleep 1; done
+          curl -sf -o /dev/null -w 'index %{http_code}\n' http://127.0.0.1:8123/
+
+      - name: Screenshot every page
+        run: python tools/shoot_site.py
+
+      # The log is not readable through the API, so the parts worth checking are surfaced as
+      # annotations instead: console errors, and any section that never revealed.
+      - name: Report what the pages did
+        if: always()
+        run: |
+          python - <<'PY'
+          import pathlib, urllib.parse
+          p = pathlib.Path("site-preview/diag.txt")
+          if not p.exists():
+              print("::error title=no diag::site-preview/diag.txt missing")
+              raise SystemExit(0)
+          text = p.read_text()
+          def section(name, stop):
+              try:
+                  body = text.split(name, 1)[1].split(stop, 1)[0]
+              except IndexError:
+                  return "?"
+              return " | ".join(l.strip() for l in body.strip().splitlines() if l.strip())
+          console = section("== console errors ==", "== sections")
+          hidden = section("== reveal elements never shown ==", "\Z")
+          print(f"::notice title=Console::{console[:900]}")
+          print(f"::notice title=Never revealed::{hidden[:900]}")
+          print(f"::notice title=Pages::" + " | ".join(
+              l.strip() for l in text.split("== images ==")[0].splitlines() if l.strip().startswith(tuple("0123456789"))))
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: site-preview
+          path: site-preview/
+          if-no-files-found: error
+
+      # Shots are committed so they can be looked at from any machine. The folder is ignored
+      # again once the design is signed off.
+      - name: Commit the shots
+        if: ${{ github.event_name == 'push' }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f site-preview
+          if git diff --cached --quiet; then echo "no change"; else
+            git commit -m "chore: site preview shots [skip ci]"
+            git push origin HEAD:${{ github.ref_name }}
+          fi
+

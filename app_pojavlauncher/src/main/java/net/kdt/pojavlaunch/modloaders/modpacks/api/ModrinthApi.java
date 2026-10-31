@@ -82,7 +82,9 @@ public class ModrinthApi implements ModpackApi{
                     hit.get("project_id").getAsString(),
                     hit.get("title").getAsString(),
                     hit.get("description").getAsString(),
-                    hit.get("icon_url").getAsString()
+                    // A project can be without an icon; that is not a reason to fail the whole page.
+                    hit.has("icon_url") && !hit.get("icon_url").isJsonNull() ?
+                            hit.get("icon_url").getAsString() : null
             );
         }
         if(modrinthSearchResult == null) modrinthSearchResult = new ModrinthSearchResult();

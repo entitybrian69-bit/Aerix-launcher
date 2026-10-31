@@ -46,7 +46,6 @@ import com.kdt.LoggerView;
 
 import net.kdt.pojavlaunch.BaseActivity;
 import net.kdt.pojavlaunch.CallbackBridge;
-import net.kdt.pojavlaunch.aerix.ui.screens.social.SocialInGameOverlay;
 import net.kdt.pojavlaunch.game.renderer.def.Renderers;
 import net.kdt.pojavlaunch.game.renderer.impl.GLESRenderSpec;
 import net.kdt.pojavlaunch.game.renderer.RenderSpec;
@@ -56,6 +55,10 @@ import net.kdt.pojavlaunch.utils.KeycodeUtils;
 import net.kdt.pojavlaunch.Logger;
 import net.kdt.pojavlaunch.Tools;
 import net.kdt.pojavlaunch.authenticator.accounts.Accounts;
+import net.kdt.pojavlaunch.aerix.bridge.AerixPreferences;
+import net.kdt.pojavlaunch.aerix.bridge.AerixAccount;
+import net.kdt.pojavlaunch.aerix.ui.game.GameMenuCallbacks;
+import net.kdt.pojavlaunch.aerix.ui.game.GameMenuOverlayView;
 import net.kdt.pojavlaunch.customcontrols.ControlButtonMenuListener;
 import net.kdt.pojavlaunch.customcontrols.ControlData;
 import net.kdt.pojavlaunch.customcontrols.ControlDrawerData;
@@ -88,8 +91,12 @@ import java.util.Objects;
 import net.kdt.pojavlaunch.R;
 
 public class GameActivity extends BaseActivity implements ControlButtonMenuListener, EditorExitable, ServiceConnection {
+    private net.kdt.pojavlaunch.recording.RecorderController mRecorder;
+    /** Request code of the legacy storage permission asked for by the in game downloader. */
+    private static final int REQUEST_STORAGE_PERMISSION = 0x41E1;
     public static final String INTENT_LAUNCH_VERSION = "intent_version";
     public static final String INTENT_LAUNCH_CLASSPATH = "intent_classpath";
+    public static final String INTENT_LAUNCH_SERVER = "intent_launch_server";
 
     public static TouchCharInput touchCharInput;
     private GameView launcherGLView;
@@ -98,10 +105,12 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     private DrawerLayout drawerLayout;
     private ListView navDrawer;
     private View mDrawerPullButton;
+    private FpsView mFpsView;
+    private GameMenuOverlayView mGameMenuOverlay;
+    private net.kdt.pojavlaunch.aerix.client.AerixClientOverlayView mAerixClientOverlay;
     private GyroControl mGyroControl = null;
     private ControlLayout mControlLayout;
     private HotbarView mHotbarView;
-    private View mLoadingScreen;
     private GameRenderer mGameRenderer;
 
     Instance instance;
@@ -121,6 +130,15 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        try {
+            net.kdt.pojavlaunch.aerix.social.SocialBackend.attach(getApplicationContext());
+        } catch (Throwable ignored) {}
+        // Explicit process policy before Minecraft creates its native audio tracks.
+        // Per-track/backend restrictions and OEM privacy controls can still disallow capture.
+        if (android.os.Build.VERSION.SDK_INT >= 29) {
+            android.media.AudioManager audioManager = getSystemService(android.media.AudioManager.class);
+            if (audioManager != null) audioManager.setAllowedCapturePolicy(android.media.AudioAttributes.ALLOW_CAPTURE_BY_ALL);
+        }
         instance = Instances.loadSelectedInstance();
         account = Accounts.getCurrent();
         if(instance == null) {
@@ -128,7 +146,19 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
             finish();
             return;
         }
-        mGameRenderer = new GameRenderer(instance.getLaunchRenderer());
+        // A saved renderer tag can point at a plugin that is no longer usable (an Emesis plugin the
+        // launcher now bundles itself, or one whose libraries have gone). Resolving it here keeps
+        // the game on the renderer the player expects instead of a silent fallback.
+        String launchRenderer = instance.getLaunchRenderer();
+        String resolvedRenderer = net.kdt.pojavlaunch.aerix.bridge.PojavPluginBridge.resolveLaunchTag(this, launchRenderer);
+        // The saved choice was a plugin that cannot be used on this device any more. Writing the
+        // replacement here means the renderer picker shows what the game actually runs on, instead
+        // of offering the same broken choice on the next launch.
+        if (resolvedRenderer != null && !resolvedRenderer.equals(launchRenderer)) {
+            instance.renderer = resolvedRenderer;
+            instance.maybeWrite();
+        }
+        mGameRenderer = new GameRenderer(resolvedRenderer != null ? resolvedRenderer : launchRenderer);
         net.kdt.pojavlaunch.aerix.bridge.PojavPluginBridge.applyLaunchOverride(this, mGameRenderer, instance.getLaunchRenderer());
 
         if(GpuUtils.getGlInfo().isAdreno() && !PREF_ZINK_PREFER_SYSTEM_DRIVER) {
@@ -162,13 +192,29 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
             getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         // Make keyboard pan the activity so the user sees what they're typing
         ViewCompat.setOnApplyWindowInsetsListener(getWindow().getDecorView(), (view, insets) -> {
+            boolean imeVisible = insets.isVisible(WindowInsetsCompat.Type.ime());
+            int imeBottom = imeVisible ? insets.getInsets(WindowInsetsCompat.Type.ime()).bottom : 0;
+            if (mGameMenuOverlay != null) {
+                mGameMenuOverlay.onImeInsetsChanged(imeBottom);
+            }
             if(launcherGLView.mSurface == null)
                 return insets;
+            if (mGameMenuOverlay != null && mGameMenuOverlay.isMenuShown()) {
+                launcherGLView.mSurface.setTranslationY(0);
+                launcherGLView.mCursorView.setTranslationY(0);
+                mImeHeight = 0;
+                if (!imeVisible && androidCompat) {
+                    view.postDelayed(() -> {
+                        view.setSystemUiVisibility(View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY | View.SYSTEM_UI_FLAG_FULLSCREEN);
+                    }, 150);
+                }
+                return insets;
+            }
             ViewPropertyAnimator animSurface = launcherGLView.mSurface.animate()
                     .setDuration(100);
             ViewPropertyAnimator animCursor = launcherGLView.mCursorView.animate()
                     .setDuration(100);
-            if(!insets.isVisible(WindowInsetsCompat.Type.ime())){
+            if(!imeVisible){
                 animSurface.translationY(0).start();
                 animCursor.translationY(0).start();
                 mImeHeight = 0;
@@ -231,6 +277,53 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         mControlLayout.setMenuListener(this);
 
         mDrawerPullButton.setOnClickListener(v -> onClickedMenu());
+        mRecorder = new net.kdt.pojavlaunch.recording.RecorderController(this);
+        mGameMenuOverlay.setCallbacks(new GameMenuCallbacks() {
+            @Override public void onScreenRecorder() {
+                hideGameMenu();
+                mRecorder.show();
+            }
+
+            @Override
+            public void onResumeGame() {
+                hideGameMenu();
+            }
+
+            @Override
+            public void onForceCloseGame() {
+                dialogForceClose(GameActivity.this);
+            }
+
+            @Override
+            public void onLogOutput() {
+                openLogOutput();
+            }
+
+            @Override
+            public void onSendCustomKey() {
+                dialogSendCustomKey();
+            }
+
+            @Override
+            public void onQuickSettings() {
+                openQuickSettings();
+            }
+
+            @Override
+            public void onCustomControls() {
+                openCustomControls();
+            }
+
+            @Override
+            public void onRequestStoragePermission() {
+                requestStorageAccess();
+            }
+
+            @Override
+            public void onSwitchAccount(AerixAccount account) {
+                switchAccount(account);
+            }
+        });
         drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED);
         launcherGLView.mCursorView.setCursorScale(LauncherPreferences.PREF_MOUSESCALE);
         weakCursor = new WeakReference<>(launcherGLView.mCursorView);
@@ -245,11 +338,22 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
             Bundle extras = Objects.requireNonNull(activityIntent.getExtras());
             String version = extras.getString(INTENT_LAUNCH_VERSION);
             File[] classpath = (File[]) extras.getSerializable(INTENT_LAUNCH_CLASSPATH);
+            String launchServer = extras.getString(INTENT_LAUNCH_SERVER);
 
             activityIntent.removeExtra(INTENT_LAUNCH_VERSION);
             activityIntent.removeExtra(INTENT_LAUNCH_CLASSPATH);
+            activityIntent.removeExtra(INTENT_LAUNCH_SERVER);
 
             setIntent(activityIntent);
+
+            GameRunner.setPendingServerAddress(launchServer);
+            net.kdt.pojavlaunch.aerix.social.SocialBackend.onGameStarted(this, instance, version);
+            net.kdt.pojavlaunch.aerix.discord.AerixDiscordPresence.onGameStarted(
+                    this,
+                    instance != null ? instance.name : null,
+                    version,
+                    instance != null ? instance.modpackIconUrl : null
+            );
 
             setTitle("MojoLauncher (" + version + ")");
 
@@ -326,8 +430,18 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         loggerView = findViewById(R.id.mainLoggerView);
         touchCharInput = findViewById(R.id.mainTouchCharInput);
         mDrawerPullButton = findViewById(R.id.drawer_button);
+        mFpsView = findViewById(R.id.main_fps_view);
+        mGameMenuOverlay = findViewById(R.id.game_menu_overlay);
+        mAerixClientOverlay = findViewById(R.id.aerix_client_overlay);
         mHotbarView = findViewById(R.id.hotbar_view);
-        mLoadingScreen = findViewById(R.id.main_loading_screen);
+        if (instance != null && instance.isAerixClient && mAerixClientOverlay != null) {
+            mAerixClientOverlay.attachForInstance(instance);
+        } else if (mControlLayout != null) {
+            // The wallpaper that can stand in for the black screen while the game starts. It is added
+            // inside the control layout, above the game surface and under the buttons, so the controls
+            // and the Aerix menu button stay usable and visible the whole time.
+            net.kdt.pojavlaunch.aerix.loading.AerixLoadingWallpaper.attach(mControlLayout);
+        }
     }
 
     @Override
@@ -336,11 +450,24 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         ContextExecutor.setActivity(this);
         if(PREF_ENABLE_GYRO) mGyroControl.enable();
         PLATFORM.setHovered(true);
+        updateFpsViewVisibility();
+    }
+
+    /** Show the frame rate readout only when the player asked for it and the Aerix menu is hidden. */
+    private void updateFpsViewVisibility() {
+        if (mFpsView == null) return;
+        boolean isClient = instance != null && instance.isAerixClient;
+        boolean show = !isClient
+                && LauncherPreferences.PREF_SHOW_FPS
+                && (mGameMenuOverlay == null || !mGameMenuOverlay.isMenuShown());
+        mFpsView.setVisibility(show ? View.VISIBLE : View.GONE);
     }
 
     @Override
     protected void onPause() {
+        if (touchCharInput != null) touchCharInput.setKeyboardState(false);
         ContextExecutor.clearActivity();
+        hideGameMenu();
         mGyroControl.disable();
         // Avoid going through the JNI each time.
         if (Platform.isGrabbing()){
@@ -357,16 +484,29 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     protected void onStart() {
         super.onStart();
         PLATFORM.setVisible(true);
+        net.kdt.pojavlaunch.aerix.discord.AerixDiscordPresence.onGameResumed(this);
     }
 
     @Override
     protected void onStop() {
+        if (mRecorder != null) mRecorder.onGameStopped();
         PLATFORM.setVisible(false);
+        net.kdt.pojavlaunch.aerix.discord.AerixDiscordPresence.onGameStopped(this);
         super.onStop();
     }
 
     @Override
     protected void onDestroy() {
+        net.kdt.pojavlaunch.aerix.social.SocialBackend.onGameStopped();
+        net.kdt.pojavlaunch.aerix.social.SocialBackend.shutdownBackgroundActivity(getApplicationContext());
+        net.kdt.pojavlaunch.aerix.discord.AerixDiscordPresence.onGameStopped(this);
+        // Nothing of ours outlives the activity: if the player backs out during the boot, the
+        // wallpaper goes with the screen.
+        net.kdt.pojavlaunch.aerix.loading.AerixLoadingWallpaper.detach();
+        if (mAerixClientOverlay != null) mAerixClientOverlay.onHostDestroy();
+        // The loopback endpoint that gave the game its profile and skin is done with the game.
+        net.kdt.pojavlaunch.aerix.bridge.AerixSkinServer.stop();
+        if (mRecorder != null) mRecorder.destroy();
         super.onDestroy();
         ContextExecutor.clearActivity();
     }
@@ -391,14 +531,21 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     @Override
     protected void onPostResume() {
         super.onPostResume();
-        if(mLoadingScreen != null && !(PLATFORM instanceof DummyBackend)) hideLoadingScreen();
+        if(!(PLATFORM instanceof DummyBackend)) hideLoadingScreen();
         if(launcherGLView != null)  // Useful when backing out of the app
             Tools.MAIN_HANDLER.postDelayed(() -> launcherGLView.refreshSize(), 500);
     }
 
     @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (mRecorder != null) mRecorder.onRequestPermissionsResult(requestCode, grantResults);
+    }
+
+    @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (mRecorder != null && mRecorder.onActivityResult(requestCode, resultCode, data)) return;
 
         if (requestCode == 1 && resultCode == Activity.RESULT_OK) {
             // Reload PREF_DEFAULTCTRL_PATH
@@ -427,9 +574,39 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
             Toast.makeText(this, R.string.angelica_found_sfpew_notice, Toast.LENGTH_LONG).show();
         }
 
+        if (instance.isAerixClient) {
+            net.kdt.pojavlaunch.aerix.client.AerixClientInstaller.syncLocalAssetsAtGameStart(this, instance);
+        }
         GameRunner.launchGame(this, account, instance, versionId, classpath, mGameRenderer);
         //Note that we actually stall in the above function, even if the game crashes. But let's be safe.
         Tools.runOnUiThread(()-> mServiceBinder.isActive = false);
+    }
+
+    /**
+     * Signs the game in as [account] by starting it again.
+     *
+     * The running game holds the session it was launched with; nothing inside it can be told to
+     * become somebody else. So the launcher is brought back up with the chosen account and asked to
+     * start the game again - what a player would otherwise have to do by hand, from the dashboard,
+     * which is exactly the trip this panel used to send them on instead of switching.
+     */
+    private void switchAccount(AerixAccount account) {
+        if (account == null) return;
+        Logger.appendToLog("Switching account to " + account.getUsername()
+                + "; restarting the game");
+        try {
+            // The account is selected by the launcher process, not here: the saved choice is a
+            // preference, and this process is about to be killed - a write from here would race
+            // with its own death, and the launcher's copy of the preference is the one that counts.
+            Tools.restartLauncherActivityAndLaunch(this, account.getKey());
+        } catch (Throwable error) {
+            Log.e("GameActivity", "Could not switch account", error);
+            Tools.showErrorRemote(error);
+            return;
+        }
+        // Let the launch request reach the system before this process dies, so the switch cannot
+        // be swallowed on the way out.
+        Tools.MAIN_HANDLER.postDelayed(Tools::fullyExit, 700L);
     }
 
     private void dialogSendCustomKey() {
@@ -442,6 +619,7 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     boolean isInEditor;
     private void openCustomControls() {
         if(ingameControlsEditorListener == null || ingameControlsEditorArrayAdapter == null) return;
+        hideGameMenu();
 
         mControlLayout.setModifiable(true);
         navDrawer.setAdapter(ingameControlsEditorArrayAdapter);
@@ -451,10 +629,15 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     }
 
     private void openLogOutput() {
+        hideGameMenu();
         loggerView.setVisibility(View.VISIBLE);
     }
 
+    /** Opens the existing in-game launcher settings (including resolution) from Aerix Client. */
+    public void openAerixQuickSettings() { openQuickSettings(); }
+
     private void openQuickSettings() {
+        hideGameMenu();
         if(mQuickSettingSideDialog == null) {
             mQuickSettingSideDialog = new QuickSettingSideDialog(this, mControlLayout) {
                 @Override
@@ -505,6 +688,42 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
+        // The menu is on top of the game and takes the back button: if the soft keyboard is up
+        // inside In-Game Socials / Downloads it dismisses the keyboard first, then navigates back.
+        if (mGameMenuOverlay != null && mGameMenuOverlay.isMenuShown()) {
+            int keyCode = event.getKeyCode();
+            if (keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN
+                    || keyCode == KeyEvent.KEYCODE_VOLUME_MUTE) {
+                return super.dispatchKeyEvent(event);
+            }
+            if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_ESCAPE) {
+                if (event.getAction() == KeyEvent.ACTION_UP) {
+                    if (!mGameMenuOverlay.dismissKeyboardIfShown()) {
+                        mGameMenuOverlay.handleBackPress();
+                    }
+                }
+                return true;
+            }
+            // Deliver all other key events (Backspace, Enter, soft keyboard keys, physical keyboard)
+            // to the focused editor inside GameMenuOverlayView, and never pass through to GameView.
+            super.dispatchKeyEvent(event);
+            return true;
+        }
+        if (mAerixClientOverlay != null && mAerixClientOverlay.isBlockingModalOpen()) {
+            int keyCode = event.getKeyCode();
+            if (keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN
+                    || keyCode == KeyEvent.KEYCODE_VOLUME_MUTE) {
+                return super.dispatchKeyEvent(event);
+            }
+            if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_ESCAPE) {
+                if (event.getAction() == KeyEvent.ACTION_UP) {
+                    mAerixClientOverlay.handleBackPress();
+                }
+                return true;
+            }
+            super.dispatchKeyEvent(event);
+            return true;
+        }
         if(isInEditor) {
             if(event.getKeyCode() == KeyEvent.KEYCODE_BACK) {
                 if(event.getAction() == KeyEvent.ACTION_DOWN) mControlLayout.askToExit(this);
@@ -536,37 +755,75 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         }
     }
 
+    /**
+     * Called once the game's own window is up.
+     *
+     * There is no loading screen to take down any more: the game activity shows its controls and
+     * its overlay from the first frame, so there is nothing covering them to remove. What is left
+     * to do here is let the frame rate readout appear now that the game, not the boot, is what is
+     * on screen.
+     */
     public void hideLoadingScreen(){
-        if(mLoadingScreen == null) return;
-        ((TextView) mLoadingScreen.findViewById(R.id.main_loading_screen_text)).setText(getString(R.string.loading_screen_booted, PLATFORM.backendName()));
-        mLoadingScreen.animate()
-                .alpha(0f)
-                .setDuration(300)
-                .withEndAction(() -> {
-                    ((ViewGroup) mLoadingScreen.getParent()).removeView(mLoadingScreen);
-                    mLoadingScreen = null;
-                })
-                .start();
+        updateFpsViewVisibility();
+        // The game window is here: the wallpaper, and anything decoding it, goes now.
+        net.kdt.pojavlaunch.aerix.loading.AerixLoadingWallpaper.detach();
+        if (mAerixClientOverlay != null) mAerixClientOverlay.onGlWindowReady();
     }
 
     @Override
     public void onClickedMenu() {
-        // The controls editor keeps its drawer; in game the overlay offers
-        // Settings and Social first, with the classic drawer behind it.
-        if(isInEditor) {
-            openActionDrawer();
+        if (isInEditor) {
+            // While the controls are being edited the drawer holds the properties of the button
+            // that was picked, which is what the menu button opens there.
+            drawerLayout.openDrawer(navDrawer);
+            navDrawer.requestLayout();
             return;
         }
-        SocialInGameOverlay.INSTANCE.show(
-                this,
-                this::openQuickSettings,
-                this::openActionDrawer
-        );
+        if (mGameMenuOverlay != null && mGameMenuOverlay.isMenuShown()) {
+            hideGameMenu();
+            return;
+        }
+        showGameMenu();
     }
 
-    private void openActionDrawer() {
-        drawerLayout.openDrawer(navDrawer);
-        navDrawer.requestLayout();
+    /** Open the full screen in game menu. */
+    private void showGameMenu() {
+        if (mGameMenuOverlay == null) return;
+        drawerLayout.closeDrawers();
+        if (touchCharInput != null) touchCharInput.disable();
+        if (launcherGLView != null) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                launcherGLView.releasePointerCapture();
+            }
+            launcherGLView.clearFocus();
+        }
+        // The readout belongs to the game, not to the menu: it would sit on top of the buttons.
+        if (mFpsView != null) mFpsView.setVisibility(View.GONE);
+        mGameMenuOverlay.showMenu();
+    }
+
+    private void hideGameMenu() {
+        if (mGameMenuOverlay == null) return;
+        mGameMenuOverlay.hideMenu();
+        if (launcherGLView != null) {
+            launcherGLView.requestFocus();
+        }
+        updateFpsViewVisibility();
+    }
+
+    /**
+     * The instance folders belong to the app, so the downloader writes without asking for
+     * anything. On the older versions a custom folder on the shared storage still needs the
+     * legacy permission, which is what this asks for; on the newer ones the launcher can only
+     * report that the folder is not writable.
+     */
+    private void requestStorageAccess() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            requestPermissions(new String[]{android.Manifest.permission.WRITE_EXTERNAL_STORAGE},
+                    REQUEST_STORAGE_PERMISSION);
+        } else {
+            Toast.makeText(this, R.string.aerix_ingame_download_storage_error, Toast.LENGTH_LONG).show();
+        }
     }
 
     @Override

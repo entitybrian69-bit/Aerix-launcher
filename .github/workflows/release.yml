@@ -1,10 +1,48 @@
 name: Release CI
 
+# Public release build. It is only allowed to run after the owner asks for a
+# release and types the confirmation below. Everything else gets tested on the
+# debug APK built by aerix-debug.yml.
+#
+# A marked push has to touch this file to be seen at all, so each release cuts a
+# one line note here recording what it shipped.
+#
+# Last cut: v1.5.6 - the first-run guide no longer closes the launcher. The
+# tour's card was offset from a component that could be off canvas, which made
+# Compose reject a negative padding (report: Android 9, AerixGuide.kt:235).
+# Everything from 1.5.5 ships unchanged.
+#
+# The job only produces artifacts. Publishing them is a separate, deliberate
+# step. Each edition goes up three times, named after version.properties:
+#   Aerix-Launcher-<version>-arm64-v8a.apk       64-bit phones
+#   Aerix-Launcher-<version>-armeabi-v7a.apk     32-bit phones
+#   Aerix-Launcher-<version>.apk                 universal, the fallback
+# plus the -noruntime editions of the same three. The in-app updater looks for
+# exactly those names, picks the one matching the device, and falls back to the
+# universal build if a split is missing.
+
 on:
   workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type RELEASE to build the public APK'
+        required: true
+        default: ''
+  # A dispatch needs an Actions-write token. Where the tooling only has contents write, the same
+  # build can be started by pushing a change to this file whose commit message carries the marker
+  # below. Any other push only skips the job: the marker is the confirmation.
+  push:
+    branches: [ "arena/2f1249a3-aerix-launcher" ]
+    paths: [ ".github/workflows/release.yml" ]
+
+permissions:
+  contents: read
 
 jobs:
   build:
+    if: >-
+      github.event.inputs.confirm == 'RELEASE' ||
+      (github.event_name == 'push' && contains(github.event.head_commit.message, '[build-release]'))
     runs-on: ubuntu-22.04
     env:
       POJAV_KEYSTORE_PASSWORD: ${{ secrets.POJAV_KEYSTORE_PASSWORD }}
@@ -26,7 +64,7 @@ jobs:
           path: app_pojavlauncher/libs
 
       - name: Get Mesa
-        uses: dawidd6/action-download-artifact@v6  
+        uses: dawidd6/action-download-artifact@v6
         continue-on-error: true
         with:
           github_token: ${{ secrets.MESA_ACTIONS }}
@@ -41,23 +79,136 @@ jobs:
         with:
           gradle-version: "8.14.3"
 
-      - name: Set up JDK 17
+      - name: Set up JDK 21
         uses: actions/setup-java@v3
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '21'
 
       - name: Create out directory
         run: mkdir out
 
+      # One APK per architecture, plus the universal one. A phone only uses one set of native
+      # libraries, so a split is roughly half the size of the universal build with nothing removed;
+      # the universal file stays for x86 devices and as the updater's fallback.
       - name: Build Release .apk
         run: |
-          # Build the launcher
-          gradle :app_pojavlauncher:assembleFullRelease
-          mv app_pojavlauncher/build/outputs/apk/full/release/app_pojavlauncher-full-release.apk out/app-release.apk
+          gradle :app_pojavlauncher:assembleFullRelease -PabiSplits
+          ls -l app_pojavlauncher/build/outputs/apk/full/release/
 
-      - name: Upload Release APK
+      - name: Build no-runtime Release .apk
+        run: |
+          # The same build without an embedded Java runtime: it downloads the runtime it needs,
+          # and it is the APK the -noruntime edition of the launcher updates itself with.
+          gradle :app_pojavlauncher:assembleNoruntimeRelease -PabiSplits
+          ls -l app_pojavlauncher/build/outputs/apk/noruntime/release/
+
+      - name: Name the assets after the version
+        run: |
+          set -e
+          VERSION=$(sed -n 's/^versionName=//p' version.properties | tr -d '[:space:]')
+          test -n "$VERSION"
+          # Collect by what the file actually is, not by what Gradle chose to call it: the split
+          # suffix carries the ABI, and the universal build carries none.
+          collect() {
+            local dir="$1" base="$2"
+            local found=0
+            for apk in "$dir"/*.apk; do
+              [ -f "$apk" ] || continue
+              case "$(basename "$apk")" in
+                *arm64-v8a*)     cp "$apk" "out/$base-arm64-v8a.apk";     found=$((found+1)) ;;
+                *armeabi-v7a*)   cp "$apk" "out/$base-armeabi-v7a.apk";   found=$((found+1)) ;;
+                *-universal*)    cp "$apk" "out/$base.apk";               found=$((found+1)) ;;
+              esac
+            done
+            test "$found" -eq 3 || { echo "::error::$base: expected 3 APKs, got $found"; ls -l "$dir"; exit 1; }
+          }
+          collect app_pojavlauncher/build/outputs/apk/full/release "Aerix-Launcher-$VERSION"
+          collect app_pojavlauncher/build/outputs/apk/noruntime/release "Aerix-Launcher-$VERSION-noruntime"
+          cd out
+          ls -l
+          sha256sum Aerix-Launcher-*.apk > SHA256SUMS
+          cat SHA256SUMS
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Check the package and version inside the APKs
+        run: |
+          set -e
+          SDK="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          # build-tools carry aapt2; the runner image already has one.
+          AAPT2=$(ls "$SDK"/build-tools/*/aapt2 2>/dev/null | tail -1 || true)
+          test -n "$AAPT2"
+          for apk in out/Aerix-Launcher-*.apk; do
+            echo "== $apk"
+            "$AAPT2" dump badging "$apk" | grep -E "^package:|^application-label:"
+          done
+
+      - name: Upload full APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-release
-          path: out/app-release.apk
+          name: app-release-full
+          path: out/Aerix-Launcher-*.apk
+          if-no-files-found: error
+
+      - name: Upload checksums
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-checksums
+          path: out/SHA256SUMS
+          if-no-files-found: error
+
+  # Publishes the release the build job produced. Kept apart from the build so a failure here never
+  # leaves a half-built APK on the Releases page: the assets only go up once both files exist.
+  publish:
+    needs: build
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 1
+
+      - name: Download the APKs
+        uses: actions/download-artifact@v4
+        with:
+          name: app-release-full
+          path: dist
+
+      - name: Download the checksums
+        uses: actions/download-artifact@v4
+        with:
+          name: app-release-checksums
+          path: dist
+
+      - name: Publish the GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          VERSION=$(sed -n 's/^versionName=//p' version.properties | tr -d '[:space:]')
+          NOTES="docs/releases/v$VERSION.md"
+          test -n "$VERSION"
+          test -f "$NOTES"
+          ls -l dist
+          # The tag is the version; the in-app updater only accepts a stable release whose tag and
+          # asset names match it, so a release that already exists is reported, never overwritten.
+          if gh release view "v$VERSION" > /dev/null 2>&1; then
+            echo "::error title=release-exists::v$VERSION is already published"
+            exit 1
+          fi
+          # The website's download buttons point at the unversioned names under
+          # releases/latest/download, so the universal builds also go up under those names.
+          cp "dist/Aerix-Launcher-$VERSION.apk" dist/Aerix-Launcher.apk
+          cp "dist/Aerix-Launcher-$VERSION-noruntime.apk" dist/Aerix-Launcher-noruntime.apk
+          ( cd dist && sha256sum Aerix-Launcher-*.apk Aerix-Launcher.apk > SHA256SUMS && cat SHA256SUMS )
+          TITLE=$(head -1 "$NOTES" | sed 's/^# //')
+          gh release create "v$VERSION" \
+            --title "$TITLE" \
+            --notes-file "$NOTES" \
+            --target "$GITHUB_SHA" \
+            --latest \
+            dist/Aerix-Launcher-*.apk dist/Aerix-Launcher.apk dist/SHA256SUMS
+          gh release view "v$VERSION" --json tagName,name,url,assets \
+            -q '.tagName, .name, .url, (.assets[] | "\(.name) \(.size) \(.digest // "-")")'

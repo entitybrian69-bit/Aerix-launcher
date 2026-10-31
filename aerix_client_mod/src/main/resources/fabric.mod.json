@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "aerix_client_animator",
+  "version": "1.0.0",
+  "name": "Aerix Client Animator",
+  "description": "Live animated 3D capes and instant client runtime bridge for Aerix Client.",
+  "authors": [
+    "Aerix"
+  ],
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "aerix.client.mod.AerixClientMod"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.12.0"
+  }
+}

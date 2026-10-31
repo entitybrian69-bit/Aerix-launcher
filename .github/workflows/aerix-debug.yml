@@ -1,0 +1,250 @@
+name: Aerix debug (testing)
+
+# Builds the APK that all testing happens on and attaches it to the `debug-latest`
+# GitHub Release (prerelease, so `releases/latest` stays on the public stable release).
+# This workflow only ever builds the "noruntime" debug variant:
+#   applicationId net.kdt.pojavlaunch.debug, signed with app_pojavlauncher/debug.keystore
+# so it installs next to the public launcher and can never be mistaken for, or
+# overwrite, a release APK. Public releases are built by release.yml / nightly.yml,
+# which only run after a typed confirmation.
+
+on:
+  push:
+    branches: [ "v3_openjdk", "arena/**" ]
+    paths:
+      - "app_pojavlauncher/src/**"
+      - "app_pojavlauncher/*.gradle"
+      - "app_pojavlauncher/proguard-rules.pro"
+      - "app_pojavlauncher/libs/**"
+      - "forge_installer/**"
+      - "aerix_client_mod/**"
+      - "tests/**"
+      - "glfw/**"
+      - "sdl/**"
+      - "mojoexec/**"
+      - "*.gradle"
+      - "gradle/**"
+      - "gradle.properties"
+      - "version.properties"
+      - "settings.gradle"
+      - ".github/workflows/aerix-debug.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: aerix-debug
+  cancel-in-progress: true
+
+env:
+  # One APK for every phone: the debug build carries both ARM architectures, so it installs
+  # anywhere without a second file to choose between.
+  APK_NAME: Aerix-Launcher-debug.apk
+  APK_PATH: app_pojavlauncher/build/outputs/apk/noruntime/debug/app_pojavlauncher-noruntime-debug.apk
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      CURSEFORGE_API_KEY: ${{ secrets.CURSEFORGE_API_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Verify Client smoke tests
+        run: |
+          mkdir -p "$RUNNER_TEMP/aerix-memory-test"
+          javac -d "$RUNNER_TEMP/aerix-memory-test" \
+            app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/utils/jre/InstanceMemory.java \
+            tests/InstanceMemorySmokeTest.java
+          java -cp "$RUNNER_TEMP/aerix-memory-test" InstanceMemorySmokeTest
+          javac -d "$RUNNER_TEMP/aerix-memory-test" \
+            app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/client/ClientVersions.java \
+            tests/ClientVersionsSmokeTest.java
+          java -cp "$RUNNER_TEMP/aerix-memory-test" ClientVersionsSmokeTest
+          javac -d "$RUNNER_TEMP/aerix-memory-test" \
+            app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/client/ClientVersionOptions.java \
+            tests/ClientVersionOptionsSmokeTest.java
+          java -cp "$RUNNER_TEMP/aerix-memory-test" ClientVersionOptionsSmokeTest
+          javac -d "$RUNNER_TEMP/aerix-memory-test" \
+            app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/client/ClientOptionLines.java \
+            tests/ClientOptionLinesSmokeTest.java
+          java -cp "$RUNNER_TEMP/aerix-memory-test" ClientOptionLinesSmokeTest
+          javac -d "$RUNNER_TEMP/aerix-memory-test" \
+            app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/game/FrameTimingStats.java \
+            tests/FrameTimingStatsSmokeTest.java
+          java -cp "$RUNNER_TEMP/aerix-memory-test" FrameTimingStatsSmokeTest
+          gcc -std=c11 -D_POSIX_C_SOURCE=200809L -Wall -Wextra -Werror \
+            -I app_pojavlauncher/src/main/jni/fps tests/frame_counter_smoke.c \
+            app_pojavlauncher/src/main/jni/fps/frame_counter.c -o "$RUNNER_TEMP/aerix-frame-test"
+          "$RUNNER_TEMP/aerix-frame-test"
+          javac -d "$RUNNER_TEMP/aerix-memory-test" \
+            aerix_client_mod/src/main/java/aerix/client/mod/ClientTelemetry.java tests/ModernTelemetrySmokeTest.java
+          java -cp "$RUNNER_TEMP/aerix-memory-test" aerix.client.mod.ModernTelemetrySmokeTest
+          javac -d "$RUNNER_TEMP/aerix-memory-test" \
+            aerix_client_mod/src/main/java/aerix/client/mod/ClientVisualOverrides.java \
+            tests/ClientVisualOverridesSmokeTest.java
+          java -cp "$RUNNER_TEMP/aerix-memory-test" aerix.client.mod.ClientVisualOverridesSmokeTest
+          javac -d "$RUNNER_TEMP/aerix-memory-test" \
+            app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/client/AdaptiveDistanceController.java \
+            tests/AdaptiveDistanceSmokeTest.java \
+            aerix_client_mod/src/main/java/aerix/client/mod/ClientAdaptiveDistance.java \
+            tests/ClientAdaptiveDistanceSmokeTest.java
+          java -cp "$RUNNER_TEMP/aerix-memory-test" AdaptiveDistanceSmokeTest
+          java -cp "$RUNNER_TEMP/aerix-memory-test" aerix.client.mod.ClientAdaptiveDistanceSmokeTest
+
+      - name: Get LTW
+        uses: dawidd6/action-download-artifact@v6
+        continue-on-error: true
+        with:
+          repo: MojoLauncher/LTW
+          workflow: android.yml
+          workflow_conclusion: success
+          name: output-aar
+          path: app_pojavlauncher/libs
+
+      - name: Get Mesa
+        uses: dawidd6/action-download-artifact@v6
+        continue-on-error: true
+        with:
+          github_token: ${{ secrets.MESA_ACTIONS }}
+          repo: MojoLauncher/mesa-unified2
+          workflow: android.yml
+          workflow_conclusion: success
+          branch: mojo/26.2
+          name: mesa-aar
+          path: app_pojavlauncher/libs
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.14.3"
+
+      - name: Build debug APK
+        shell: bash
+        run: |
+          set +e
+          ./gradlew :app_pojavlauncher:assembleNoruntimeDebug --console=plain > build.log 2>&1
+          code=$?
+          if [ "$code" -ne 0 ]; then
+            grep -E "^e: |error: |CMake Error|CMake Generate step failed|FAILURE: |What went wrong|Caused by" -A5 build.log | sort -u | head -40 |
+              while read -r l; do echo "::error title=gradle::$(printf '%s' "$l" | head -c 500)"; done
+            tail -20 build.log | while read -r l; do echo "::error title=tail::$(printf '%s' "$l" | head -c 500)"; done
+          fi
+          exit "$code"
+
+      - name: Check it is really the debug build
+        id: verify
+        run: |
+          set -euo pipefail
+          test -f "$APK_PATH"
+          python3 -c "
+          import sys
+          data = open('$APK_PATH', 'rb').read()
+          wanted = 'net.kdt.pojavlaunch.debug'.encode('utf-16-le')
+          sys.exit(0 if wanted in data else 1)
+          "
+          echo "applicationId net.kdt.pojavlaunch.debug confirmed"
+
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          BT_DIR="$(ls -d "$SDK_ROOT"/build-tools/* | sort -V | tail -n 1)"
+          echo "Using build-tools: $BT_DIR"
+          "$BT_DIR/zipalign" -c 4 "$APK_PATH"
+          "$BT_DIR/apksigner" verify --verbose --min-sdk-version 23 --print-certs "$APK_PATH" | tee apksigner.txt
+          BADGING="$("$BT_DIR/aapt2" dump badging "$APK_PATH" | head -n 1)"
+          echo "$BADGING"
+          VCODE="$(printf '%s' "$BADGING" | sed -n "s/.*versionCode='\([0-9]*\)'.*/\1/p")"
+          echo "version_code=$VCODE" >> "$GITHUB_OUTPUT"
+          echo "::notice title=apk-verified::$BADGING"
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: aerix-debug-apk
+          path: ${{ env.APK_PATH }}
+          retention-days: 30
+
+      - name: Publish debug APK to GitHub Release (debug-latest)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION_CODE: ${{ steps.verify.outputs.version_code }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="debug-latest"
+          SHORT="${GITHUB_SHA:0:7}"
+          STAMPED_NAME="Aerix-Launcher-debug-$SHORT.apk"
+          BUILT_AT="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+          STAGE="$(mktemp -d)"
+          cp "$APK_PATH" "$STAGE/$APK_NAME"
+          cp "$APK_PATH" "$STAGE/$STAMPED_NAME"
+          ( cd "$STAGE" && sha256sum "$APK_NAME" > "$APK_NAME.sha256" )
+          SHA256="$(cut -d' ' -f1 "$STAGE/$APK_NAME.sha256")"
+          {
+            echo "kind: debug (testing only)"
+            echo "name: $APK_NAME (universal, arm64 + arm32)"
+            echo "stamped: $STAMPED_NAME"
+            echo "branch: $GITHUB_REF_NAME"
+            echo "commit: $GITHUB_SHA"
+            echo "versionCode: $VERSION_CODE"
+            echo "run: $GITHUB_RUN_ID"
+            echo "built: $BUILT_AT"
+            echo "sha256: $SHA256"
+            echo "package: net.kdt.pojavlaunch.debug"
+            echo "note: side-by-side testing build; public stable releases live under v* tags"
+          } > "$STAGE/DEBUG_BUILD.txt"
+          {
+            echo "Side-by-side testing build (\`net.kdt.pojavlaunch.debug\`) — installs next to the public launcher without touching its data."
+            echo ""
+            echo "- **Direct download:** [\`$APK_NAME\`](https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/$APK_NAME)"
+            echo "- **Commit-stamped download (avoids browser filename cache):** [\`$STAMPED_NAME\`](https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/$STAMPED_NAME)"
+            echo "- **Branch:** \`$GITHUB_REF_NAME\`"
+            echo "- **Commit:** \`$SHORT\` (\`$GITHUB_SHA\`)"
+            echo "- **versionCode:** \`$VERSION_CODE\`"
+            echo "- **Built:** \`$BUILT_AT\`"
+            echo "- **SHA-256:** \`$SHA256\`"
+          } > "$STAGE/RELEASE_NOTES.md"
+
+          # Anchor the tag ref to the root 2020 keystore commit so GitHub's /releases list
+          # always sorts debug-latest below every public v* release and never touches the website.
+          ANCHOR_SHA="cadb0ab12ff45b582927361b703df878b37e0221"
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            # Prune previous commit-stamped APKs so only the latest pair remains on debug-latest.
+            for old_asset in $(gh release view "$TAG" --json assets --jq '.assets[].name' | grep -E '^Aerix-Launcher-debug-[0-9a-f]+\.apk$' || true); do
+              if [ "$old_asset" != "$STAMPED_NAME" ]; then
+                gh release delete-asset "$TAG" "$old_asset" --yes || true
+              fi
+            done
+            gh release upload "$TAG" --clobber \
+              "$STAGE/$APK_NAME" \
+              "$STAGE/$STAMPED_NAME" \
+              "$STAGE/$APK_NAME.sha256" \
+              "$STAGE/DEBUG_BUILD.txt"
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/$TAG" -f sha="$ANCHOR_SHA" -F force=true > /dev/null 2>&1 || true
+            gh release edit "$TAG" \
+              --prerelease \
+              --title "Aerix Debug Build (latest)" \
+              --notes-file "$STAGE/RELEASE_NOTES.md"
+          else
+            gh api -X POST "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/$TAG" -f sha="$ANCHOR_SHA" > /dev/null 2>&1 || true
+            gh release create "$TAG" \
+              --prerelease \
+              --title "Aerix Debug Build (latest)" \
+              --notes-file "$STAGE/RELEASE_NOTES.md" \
+              "$STAGE/$APK_NAME" \
+              "$STAGE/$STAMPED_NAME" \
+              "$STAGE/$APK_NAME.sha256" \
+              "$STAGE/DEBUG_BUILD.txt"
+          fi
+          rm -rf "$STAGE"
+          echo "::notice title=debug-apk::https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/$APK_NAME (versionCode $VERSION_CODE, from $SHORT)"

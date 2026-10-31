@@ -1,0 +1,109 @@
+name: Website
+
+# Publishes docs/ as the project website. GitHub Pages serves it for free at
+# https://entitybrian69-bit.github.io/Aerix-launcher/ — there is no server to run.
+#
+# Pages has to be turned on once in Settings → Pages; this workflow cannot do that, the token of a
+# workflow is not allowed to enable it. Whichever source is chosen there, this file stays quiet:
+#
+#   * Source "Deploy from a branch" (branch + /docs)  -> Pages publishes docs/ itself, and the
+#     steps below skip, so nothing goes red.
+#   * Source "GitHub Actions"                          -> the steps below deploy docs/ on every
+#     push that touches it, including the first one.
+
+on:
+  push:
+    branches: [ "v3_openjdk", "arena/**" ]
+    paths:
+      - "docs/*.html"
+      - "docs/site.css"
+      - "docs/site.js"
+      - "docs/assets/**"
+      - "tools/build_site.py"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    outputs:
+      publish: ${{ steps.pages.outputs.publish }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify generated site has only public release downloads
+        run: |
+          set -euo pipefail
+          python3 tools/build_site.py
+          git diff --exit-code docs/
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+
+          for page_path in sorted(Path("docs").glob("*.html")):
+              html = page_path.read_text(encoding="utf-8")
+              assert "debug-latest" not in html and "Aerix-Launcher-debug" not in html, (
+                  f"{page_path}: public website must never link to a debug build"
+              )
+          for page in ("docs/index.html", "docs/install.html"):
+              html = Path(page).read_text(encoding="utf-8")
+              primaries = re.findall(r'<a[^>]*data-primary-download[^>]*>', html)
+              assert primaries, f"{page}: missing data-primary-download button"
+              for tag in primaries:
+                  assert "/releases/latest/download/" in tag, f"{page}: primary button does not point at /releases/latest/download/: {tag}"
+                  assert "debug" not in tag.lower(), f"{page}: primary button must never point at debug: {tag}"
+          print("Site verification passed: zero debug links on website, primary buttons target /releases/latest/download/.")
+          PY
+
+      - name: Is Pages set up for this workflow?
+        id: pages
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mode=$(gh api "repos/$GITHUB_REPOSITORY/pages" --jq '.build_type' 2>/dev/null || echo "off")
+          echo "mode=$mode"
+          if [ "$mode" = "workflow" ]; then
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            case "$mode" in
+              legacy) echo "::notice title=Pages publishes the branch itself::Settings → Pages serves docs/ directly, so this workflow verified docs/ and skipped artifact deploy." ;;
+              off)    echo "::notice title=Pages is not enabled::Turn it on in Settings → Pages to get the site URL." ;;
+              *)      echo "::notice title=Pages not reachable::Leaving the site to Settings → Pages." ;;
+            esac
+          fi
+
+  deploy:
+    needs: verify
+    if: needs.verify.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload the site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

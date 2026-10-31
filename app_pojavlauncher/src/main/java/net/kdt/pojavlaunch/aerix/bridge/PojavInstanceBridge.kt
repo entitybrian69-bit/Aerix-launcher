@@ -59,7 +59,16 @@ class AerixInstance(
     val name: String,
     val versionId: String,
     val icon: ImageBitmap?
-)
+) {
+    /** Folder identity stays unique across copies and stable across renames/loader updates. */
+    val id: String = source.instanceId
+    val isAerixClient: Boolean = source.isAerixClient
+}
+
+/** Defensive boundary: repeated records cannot become duplicate Compose keys.
+ * Copies with identical labels remain distinct because identity is the instance folder ID.
+ */
+internal fun uniqueInstanceRows(rows: List<AerixInstance>): List<AerixInstance> = rows.distinctBy { it.id }
 
 enum class ModpackExportFormat(val label: String, val extension: String, val description: String) {
     MODRINTH("Modrinth (.mrpack)", "mrpack", "Modrinth index + overrides archive"),
@@ -81,6 +90,7 @@ object PojavInstanceBridge {
     val selected: AerixInstance?
         get() = instances.getOrNull(selectedIndex)
 
+    private val reloadGeneration = java.util.concurrent.atomic.AtomicLong()
     private var attached = false
     private var appContext: Context? = null
 
@@ -102,11 +112,16 @@ object PojavInstanceBridge {
     /** Reloads the instance list off the main thread, same source as Pojav's mcVersionSpinner. */
     fun reload() {
         val context = appContext ?: return
+        val generation = reloadGeneration.incrementAndGet()
+        val editorId = PojavInstanceEditorBridge.draft?.instance?.instanceId
         loading = true
         PojavApplication.sExecutorService.execute {
             val result = runCatching {
                 val display = Instances.loadDisplay()
-                val rows = display.list.map { instance ->
+                // Modpack instances without the pack's own artwork get it in the background; the
+                // refresh it fires redraws this list with the publisher's logo in place.
+                PojavModpackIcons.sweep(context, display.list)
+                val rows = uniqueInstanceRows(display.list.map { instance ->
                     val icon = runCatching {
                         InstanceIconProvider.fetchIcon(context.resources, instance).toAerixBitmap()
                     }.getOrNull()
@@ -116,13 +131,21 @@ object PojavInstanceBridge {
                         versionId = instance.versionId ?: "",
                         icon = icon
                     )
-                }
-                rows to display.selectedIndex
+                })
+                val editorInstance = editorId?.let { runCatching { Instances.loadInstance(it) }.getOrNull() }
+                val selectedId = display.list.getOrNull(display.selectedIndex)?.instanceId
+                Triple(rows, rows.indexOfFirst { it.id == selectedId }, editorInstance)
             }
             Tools.runOnUiThread {
-                result.onSuccess { (rows, index) ->
+                // A slower earlier scan must not overwrite a just-completed installation.
+                if (generation != reloadGeneration.get()) return@runOnUiThread
+                result.onSuccess { (rows, index, editorInstance) ->
                     instances = rows
                     selectedIndex = index
+                    editorInstance?.let {
+                        PojavInstanceEditorBridge.syncLoaderState(it)
+                        PojavInstanceEditorBridge.syncIcon(context, it)
+                    }
                 }.onFailure { Tools.showErrorRemote(it) }
                 loading = false
             }

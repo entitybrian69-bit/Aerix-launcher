@@ -3,14 +3,20 @@
  * Ported from mirai-launcher- (Zalith Launcher 2 fork):
  *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/ui/screens/content/VersionsManageScreen.kt
  *     (VersionsManageScreen, LandscapeInstanceListItem, VersionManagementDetailPane,
- *      VersionManagementInfoTile, VersionManagementQuickAction)
+ *      VersionManagementQuickAction)
  *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/ui/screens/content/VersionExportScreen.kt
  * Header ("Instance Management" / "Select an instance to manage", count circle pill, folder button,
  * "+ Install" button), search bar + sort button, AerixPillTabRow ("All", "Modpacks", "Vanilla",
  * "Pinned"), "YOUR INSTANCES" horizontal LazyRow of LandscapeInstanceListItem cards, and the
  * VersionManagementDetailPane below (with Overview, Mods, Resource Packs, Worlds, Settings tabs,
  * favorite heart, overflow menu with Pin / Rename / Copy / Export Modpack / Open folder / Delete,
- * info tiles, quick actions and full-width PLAY button).
+ * meta pills, quick actions and a full-width PLAY button that stays put).
+ *
+ * On a tall display that is the page. A display shorter than 500dp - a phone held sideways - cannot
+ * stack chrome, a card strip and a detail card without leaving the detail card a couple of
+ * centimetres, so there the instances become a vertical list beside the detail and both keep the
+ * full height (InstanceListPane + InstanceListRow). The wide tiles of the old detail card are now
+ * pills that wrap, and PLAY sits outside the scrolling part so it is never scrolled away.
  * Zalith Launcher 2 Copyright (C) 2025 MovTery <movtery228@qq.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
@@ -34,12 +40,14 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -48,8 +56,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -86,7 +96,9 @@ import androidx.compose.ui.unit.sp
 import androidx.fragment.app.FragmentActivity
 import net.kdt.pojavlaunch.R
 import net.kdt.pojavlaunch.aerix.bridge.AerixInstance
+import net.kdt.pojavlaunch.aerix.bridge.instanceRenderKey
 import net.kdt.pojavlaunch.aerix.bridge.AerixPreferences
+import net.kdt.pojavlaunch.aerix.bridge.GameDownloadTarget
 import net.kdt.pojavlaunch.aerix.bridge.ModpackExportFormat
 import net.kdt.pojavlaunch.aerix.bridge.PojavInstanceBridge
 import net.kdt.pojavlaunch.aerix.bridge.PojavLaunchBridge
@@ -117,22 +129,17 @@ private enum class LibrarySortMode(val label: String) {
     VERSION("Sort: Game Version")
 }
 
-private val mcVerPattern = Regex("""(\d+\.\d+(?:\.\d+)?)""")
-
+/**
+ * The version of the game an instance runs. In "fabric-loader-0.16.10-1.16.5" the first number is
+ * the loader's version and only the second is Minecraft's, so it is picked by shape rather than by
+ * being first: [GameDownloadTarget.minecraftVersionIn].
+ */
 private fun extractGameVersion(versionId: String): String =
-    mcVerPattern.find(versionId)?.value ?: versionId.ifBlank { "Latest" }
+    GameDownloadTarget.minecraftVersionIn(versionId) ?: versionId.ifBlank { "Latest" }
 
-private fun extractLoaderSummary(versionId: String, vanilla: String): String {
-    val loader = loaderLabel(versionId, vanilla)
-    if (loader == vanilla) return vanilla
-    val id = versionId.lowercase()
-    val ver = when {
-        id.contains("fabric-loader-") -> versionId.substringAfter("fabric-loader-").substringBefore('-')
-        id.contains("quilt-loader-") -> versionId.substringAfter("quilt-loader-").substringBefore('-')
-        else -> ""
-    }
-    return if (ver.isNotBlank()) "$loader $ver" else loader
-}
+/** The loader alone ("Fabric"); the game's version is always shown beside it. */
+private fun extractLoaderSummary(versionId: String, vanilla: String): String =
+    loaderLabel(versionId, vanilla)
 
 @Composable
 fun LibraryScreen(activity: FragmentActivity) {
@@ -145,7 +152,6 @@ fun LibraryScreen(activity: FragmentActivity) {
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var selectedFilter by rememberSaveable { mutableStateOf(LibraryFilterGroup.ALL) }
     var sortMode by rememberSaveable { mutableStateOf(LibrarySortMode.PINNED_AND_ACTIVE) }
-    var showSortMenu by remember { mutableStateOf(false) }
 
     var renameTarget by remember { mutableStateOf<AerixInstance?>(null) }
     var copyTarget by remember { mutableStateOf<AerixInstance?>(null) }
@@ -241,237 +247,19 @@ fun LibraryScreen(activity: FragmentActivity) {
         )
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = AerixSpacing.mdPlus, vertical = AerixSpacing.smPlus),
-        verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
-    ) {
-        // 1. Top Header Row (Mirai VersionsManageScreen.kt lines 845-933)
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Instance Management",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = Color.White,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = "Select an instance to manage",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = AerixSurface.textSecondary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            Surface(
-                modifier = Modifier.size(30.dp),
-                shape = RoundedCornerShape(AerixRadii.pill),
-                color = AerixSurface.panelRaised,
-                border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text(
-                        text = "${displayedInstances.size}",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = AerixSurface.textPrimary
-                    )
-                }
-            }
-            Surface(
-                modifier = Modifier.size(34.dp),
-                shape = RoundedCornerShape(AerixRadii.controlSmall),
-                color = AerixSurface.panel,
-                border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft),
-                onClick = { PojavInstanceBridge.openGameDirectory(activity) }
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        painter = painterResource(R.drawable.aerix_ic_folder_outlined),
-                        contentDescription = "Directories",
-                        tint = AerixSurface.textSecondary,
-                        modifier = Modifier.size(17.dp)
-                    )
-                }
-            }
-            Surface(
-                modifier = Modifier
-                    .height(34.dp)
-                    .widthIn(min = 34.dp),
-                shape = RoundedCornerShape(AerixRadii.controlSmall),
-                color = accent,
-                contentColor = AerixSurface.onAccent,
-                onClick = { AerixNav.navigate(LauncherSection.CREATE_INSTANCE) }
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = AerixSpacing.md, vertical = AerixSpacing.xs),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(AerixSpacing.xs)
-                ) {
-                    Icon(
-                        painter = painterResource(R.drawable.aerix_ic_add),
-                        contentDescription = "Install instance",
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Text(
-                        text = "Install",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-        }
+    // The page reads differently on a short display (a phone held sideways) than on a tall one.
+    // Stacked, five rows of chrome and a strip of cards left the detail card a couple of
+    // centimetres of height, so everything inside it was cut off at the bottom edge. Side by side
+    // on a short display, the list and the detail each get the whole height instead.
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val sideBySide = maxHeight < 500.dp
+        // Read here, in the scope that owns it: inside the Row below, the receiver is the row and
+        // maxWidth would not resolve.
+        val listPaneWidth = (maxWidth * 0.34f).coerceIn(196.dp, 288.dp)
 
-        // 2. Search bar + Sort button (Mirai VersionsManageScreen.kt lines 935-977)
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
-        ) {
-            ModrinthCompactSearchField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                placeholder = "Search instances...",
-                modifier = Modifier.weight(1f)
-            )
-            Box {
-                Surface(
-                    modifier = Modifier.size(36.dp),
-                    shape = RoundedCornerShape(AerixRadii.controlSmall),
-                    color = AerixSurface.panel,
-                    border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft),
-                    onClick = { showSortMenu = true }
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            painter = painterResource(R.drawable.aerix_ic_sort),
-                            contentDescription = "Sort instances",
-                            tint = AerixSurface.textSecondary,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                }
-                DropdownMenu(
-                    expanded = showSortMenu,
-                    onDismissRequest = { showSortMenu = false }
-                ) {
-                    LibrarySortMode.entries.forEach { mode ->
-                        DropdownMenuItem(
-                            text = { Text(mode.label) },
-                            onClick = {
-                                sortMode = mode
-                                showSortMenu = false
-                            }
-                        )
-                    }
-                }
-            }
-        }
-
-        // 3. Filter group pill tabs ("All", "Modpacks", "Vanilla", "Pinned")
-        AerixPillTabRow(modifier = Modifier.fillMaxWidth()) {
-            LibraryFilterGroup.entries.forEach { group ->
-                val selected = selectedFilter == group
-                AerixPillTab(
-                    selected = selected,
-                    onClick = { selectedFilter = group }
-                ) {
-                    Text(
-                        text = group.label,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                        maxLines = 1
-                    )
-                }
-            }
-        }
-
-        // 4. "YOUR INSTANCES" + "N installed"
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(
-                text = "YOUR INSTANCES",
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-                color = AerixSurface.textSecondary
-            )
-            Text(
-                text = "${instances.size} installed",
-                style = MaterialTheme.typography.labelSmall,
-                color = AerixSurface.textMuted
-            )
-        }
-
-        // 5. Horizontal LazyRow of LandscapeInstanceListItem cards (220dp wide)
-        if (displayedInstances.isEmpty()) {
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(64.dp),
-                shape = RoundedCornerShape(AerixRadii.cardSmall),
-                color = AerixSurface.panel,
-                border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft)
-            ) {
-                Box(
-                    modifier = Modifier.padding(horizontal = AerixSpacing.md),
-                    contentAlignment = Alignment.CenterStart
-                ) {
-                    Text(
-                        text = if (instances.isEmpty()) {
-                            "No instances yet \u2014 install one to get started."
-                        } else {
-                            "No instances match this search."
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = AerixSurface.textSecondary
-                    )
-                }
-            }
-        } else {
-            LazyRow(
-                modifier = Modifier.fillMaxWidth(),
-                contentPadding = PaddingValues(horizontal = AerixSpacing.xs),
-                horizontalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
-            ) {
-                items(
-                    items = displayedInstances,
-                    key = { "${it.name}_${it.versionId}" }
-                ) { instance ->
-                    val isSelected = instance == selectedInstance
-                    val isActive = instance == activeInstance
-                    val isPinned = instance.name in pinnedNames
-                    LandscapeInstanceListItem(
-                        instance = instance,
-                        selected = isSelected,
-                        active = isActive,
-                        pinned = isPinned,
-                        vanilla = vanilla,
-                        onClick = { PojavInstanceBridge.select(instance) },
-                        modifier = Modifier.width(220.dp)
-                    )
-                }
-            }
-        }
-
-        // 6. VersionManagementDetailPane (Mirai VersionsManageScreen.kt lines 1066-1628)
-        VersionManagementDetailPane(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
-            instance = selectedInstance,
-            isCurrent = selectedInstance != null && selectedInstance == activeInstance,
-            isPinned = selectedInstance != null && selectedInstance.name in pinnedNames,
-            vanilla = vanilla,
+        // Everything the detail card can ask for, gathered once: both arrangements hand it over the
+        // same way, so neither can drift from the other.
+        val actions = LibraryActions(
             onInstall = { AerixNav.navigate(LauncherSection.CREATE_INSTANCE) },
             onPlay = { inst ->
                 PojavInstanceBridge.select(inst)
@@ -490,6 +278,631 @@ fun LibraryScreen(activity: FragmentActivity) {
             },
             onDelete = { deleteTarget = it }
         )
+        val selectedIsActive = selectedInstance != null && selectedInstance == activeInstance
+        val selectedIsPinned = selectedInstance != null && selectedInstance.name in pinnedNames
+
+        if (sideBySide) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = AerixSpacing.mdPlus, vertical = AerixSpacing.sm),
+                verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
+            ) {
+                LibraryHeaderRow(
+                    shownCount = displayedInstances.size,
+                    onOpenFolder = { PojavInstanceBridge.openGameDirectory(activity) },
+                    onInstall = { AerixNav.navigate(LauncherSection.CREATE_INSTANCE) }
+                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(AerixSpacing.md)
+                ) {
+                    InstanceListPane(
+                        modifier = Modifier
+                            .width(listPaneWidth)
+                            .fillMaxHeight(),
+                        instances = displayedInstances,
+                        installedCount = instances.size,
+                        selected = selectedInstance,
+                        active = activeInstance,
+                        pinned = pinnedNames,
+                        vanilla = vanilla,
+                        query = searchQuery,
+                        onQueryChange = { searchQuery = it },
+                        filter = selectedFilter,
+                        onFilterChange = { selectedFilter = it },
+                        sortMode = sortMode,
+                        onSortChange = { sortMode = it },
+                        onSelect = { PojavInstanceBridge.select(it) }
+                    )
+                    InstanceDetailCard(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight(),
+                        instance = selectedInstance,
+                        selectedIsActive = selectedIsActive,
+                        selectedIsPinned = selectedIsPinned,
+                        vanilla = vanilla,
+                        actions = actions
+                    )
+                }
+            }
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = AerixSpacing.mdPlus, vertical = AerixSpacing.smPlus),
+                verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
+            ) {
+                LibraryHeaderRow(
+                    shownCount = displayedInstances.size,
+                    onOpenFolder = { PojavInstanceBridge.openGameDirectory(activity) },
+                    onInstall = { AerixNav.navigate(LauncherSection.CREATE_INSTANCE) }
+                )
+
+                LibrarySearchRow(
+                    query = searchQuery,
+                    onQueryChange = { searchQuery = it },
+                    sortMode = sortMode,
+                    onSortChange = { sortMode = it }
+                )
+
+                AerixPillTabRow(modifier = Modifier.fillMaxWidth()) {
+                    LibraryFilterGroup.entries.forEach { group ->
+                        val selected = selectedFilter == group
+                        AerixPillTab(
+                            selected = selected,
+                            onClick = { selectedFilter = group }
+                        ) {
+                            Text(
+                                text = group.label,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                maxLines = 1
+                            )
+                        }
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "YOUR INSTANCES",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = AerixSurface.textSecondary
+                    )
+                    Text(
+                        text = "${instances.size} installed",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = AerixSurface.textMuted
+                    )
+                }
+
+                InstanceStrip(
+                    instances = displayedInstances,
+                    totalInstalled = instances.size,
+                    selected = selectedInstance,
+                    active = activeInstance,
+                    pinned = pinnedNames,
+                    vanilla = vanilla,
+                    onSelect = { PojavInstanceBridge.select(it) }
+                )
+
+                InstanceDetailCard(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    instance = selectedInstance,
+                    selectedIsActive = selectedIsActive,
+                    selectedIsPinned = selectedIsPinned,
+                    vanilla = vanilla,
+                    actions = actions
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Everything the detail card can ask for, in one object, so the two arrangements of the page pass
+ * it along the same way and neither can drift from the other.
+ */
+private class LibraryActions(
+    val onInstall: () -> Unit,
+    val onPlay: (AerixInstance) -> Unit,
+    val onOpenSubTab: (AerixInstance, String) -> Unit,
+    val onTogglePin: (AerixInstance) -> Unit,
+    val onRename: (AerixInstance) -> Unit,
+    val onCopy: (AerixInstance) -> Unit,
+    val onExport: (AerixInstance) -> Unit,
+    val onOpenFolder: (AerixInstance) -> Unit,
+    val onDelete: (AerixInstance) -> Unit
+)
+
+/** The detail card for the selected instance, wired to the page's actions. */
+@Composable
+private fun InstanceDetailCard(
+    modifier: Modifier = Modifier,
+    instance: AerixInstance?,
+    selectedIsActive: Boolean,
+    selectedIsPinned: Boolean,
+    vanilla: String,
+    actions: LibraryActions
+) {
+    VersionManagementDetailPane(
+        modifier = modifier,
+        instance = instance,
+        isCurrent = selectedIsActive,
+        isPinned = selectedIsPinned,
+        vanilla = vanilla,
+        onInstall = actions.onInstall,
+        onPlay = actions.onPlay,
+        onOpenSubTab = actions.onOpenSubTab,
+        onTogglePin = actions.onTogglePin,
+        onRename = actions.onRename,
+        onCopy = actions.onCopy,
+        onExport = actions.onExport,
+        onOpenFolder = actions.onOpenFolder,
+        onDelete = actions.onDelete
+    )
+}
+
+/**
+ * The title, how many instances are showing, the folder button and Install. One row on every
+ * display, so the height it costs is the same everywhere.
+ */
+@Composable
+private fun LibraryHeaderRow(
+    shownCount: Int,
+    onOpenFolder: () -> Unit,
+    onInstall: () -> Unit
+) {
+    val accent = AerixThemeManager.currentAccent()
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "Instance Management",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.ExtraBold,
+                color = Color.White,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = "Select an instance to manage",
+                style = MaterialTheme.typography.labelSmall,
+                color = AerixSurface.textSecondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        Surface(
+            modifier = Modifier.size(30.dp),
+            shape = RoundedCornerShape(AerixRadii.pill),
+            color = AerixSurface.panelRaised,
+            border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Text(
+                    text = "$shownCount",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = AerixSurface.textPrimary
+                )
+            }
+        }
+        Surface(
+            modifier = Modifier.size(34.dp),
+            shape = RoundedCornerShape(AerixRadii.controlSmall),
+            color = AerixSurface.panel,
+            border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft),
+            onClick = onOpenFolder
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    painter = painterResource(R.drawable.aerix_ic_folder_outlined),
+                    contentDescription = "Directories",
+                    tint = AerixSurface.textSecondary,
+                    modifier = Modifier.size(17.dp)
+                )
+            }
+        }
+        Surface(
+            modifier = Modifier
+                .height(34.dp)
+                .widthIn(min = 34.dp),
+            shape = RoundedCornerShape(AerixRadii.controlSmall),
+            color = accent,
+            contentColor = AerixSurface.onAccent,
+            onClick = onInstall
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = AerixSpacing.md, vertical = AerixSpacing.xs),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(AerixSpacing.xs)
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.aerix_ic_add),
+                    contentDescription = "Install instance",
+                    modifier = Modifier.size(16.dp)
+                )
+                Text(
+                    text = "Install",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    }
+}
+
+/** Search, and the sort menu behind one button. */
+@Composable
+private fun LibrarySearchRow(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    sortMode: LibrarySortMode,
+    onSortChange: (LibrarySortMode) -> Unit
+) {
+    var showSortMenu by remember { mutableStateOf(false) }
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
+    ) {
+        ModrinthCompactSearchField(
+            value = query,
+            onValueChange = onQueryChange,
+            placeholder = "Search instances...",
+            modifier = Modifier.weight(1f)
+        )
+        Box {
+            Surface(
+                modifier = Modifier.size(36.dp),
+                shape = RoundedCornerShape(AerixRadii.controlSmall),
+                color = AerixSurface.panel,
+                border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft),
+                onClick = { showSortMenu = true }
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        painter = painterResource(R.drawable.aerix_ic_sort),
+                        contentDescription = "Sort instances",
+                        tint = AerixSurface.textSecondary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+            DropdownMenu(
+                expanded = showSortMenu,
+                onDismissRequest = { showSortMenu = false }
+            ) {
+                LibrarySortMode.entries.forEach { mode ->
+                    DropdownMenuItem(
+                        text = { Text(if (sortMode == mode) "${mode.label}\u2003\u2713" else mode.label) },
+                        onClick = {
+                            onSortChange(mode)
+                            showSortMenu = false
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** A filter chip small enough to fit in the narrow list pane, where it may wrap to a second line. */
+@Composable
+private fun CompactFilterChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    val accent = AerixThemeManager.currentAccent()
+    Surface(
+        shape = RoundedCornerShape(AerixRadii.pill),
+        color = if (selected) accent.copy(alpha = 0.22f) else AerixSurface.panelRaised,
+        border = BorderStroke(
+            AerixSpacing.hairline,
+            if (selected) accent.copy(alpha = 0.8f) else AerixSurface.borderSoft
+        ),
+        onClick = onClick
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+            color = if (selected) accent else AerixSurface.textSecondary,
+            maxLines = 1,
+            modifier = Modifier.padding(horizontal = AerixSpacing.smPlus, vertical = AerixSpacing.xsPlus)
+        )
+    }
+}
+
+/**
+ * The instances as a list, for the side-by-side layout: search, filters, sort, and a scrolling
+ * column of rows that never has to be squeezed the way a card strip is.
+ */
+@Composable
+private fun InstanceListPane(
+    modifier: Modifier = Modifier,
+    instances: List<AerixInstance>,
+    installedCount: Int,
+    selected: AerixInstance?,
+    active: AerixInstance?,
+    pinned: Set<String>,
+    vanilla: String,
+    query: String,
+    onQueryChange: (String) -> Unit,
+    filter: LibraryFilterGroup,
+    onFilterChange: (LibraryFilterGroup) -> Unit,
+    sortMode: LibrarySortMode,
+    onSortChange: (LibrarySortMode) -> Unit,
+    onSelect: (AerixInstance) -> Unit
+) {
+    var showSortMenu by remember { mutableStateOf(false) }
+    val shape = RoundedCornerShape(AerixRadii.card)
+
+    Surface(
+        modifier = modifier,
+        shape = shape,
+        color = AerixSurface.panel,
+        border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(AerixSpacing.smPlus),
+            verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
+        ) {
+            ModrinthCompactSearchField(
+                value = query,
+                onValueChange = onQueryChange,
+                placeholder = "Search instances...",
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(AerixSpacing.xs),
+                verticalArrangement = Arrangement.spacedBy(AerixSpacing.xs)
+            ) {
+                LibraryFilterGroup.entries.forEach { group ->
+                    CompactFilterChip(
+                        label = group.label,
+                        selected = filter == group,
+                        onClick = { onFilterChange(group) }
+                    )
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "$installedCount installed",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = AerixSurface.textMuted
+                )
+                Box {
+                    Surface(
+                        modifier = Modifier.size(30.dp),
+                        shape = RoundedCornerShape(AerixRadii.controlSmall),
+                        color = AerixSurface.panelRaised,
+                        border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft),
+                        onClick = { showSortMenu = true }
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                painter = painterResource(R.drawable.aerix_ic_sort),
+                                contentDescription = "Sort instances",
+                                tint = AerixSurface.textSecondary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                    DropdownMenu(
+                        expanded = showSortMenu,
+                        onDismissRequest = { showSortMenu = false }
+                    ) {
+                        LibrarySortMode.entries.forEach { mode ->
+                            DropdownMenuItem(
+                                text = { Text(if (sortMode == mode) "${mode.label}\u2003\u2713" else mode.label) },
+                                onClick = {
+                                    onSortChange(mode)
+                                    showSortMenu = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                verticalArrangement = Arrangement.spacedBy(AerixSpacing.xs),
+                contentPadding = PaddingValues(bottom = AerixSpacing.xs)
+            ) {
+                if (instances.isEmpty()) {
+                    item {
+                        Text(
+                            text = if (installedCount == 0) {
+                                "No instances yet \u2014 install one to get started."
+                            } else {
+                                "No instances match this search."
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = AerixSurface.textSecondary,
+                            modifier = Modifier.padding(AerixSpacing.xs)
+                        )
+                    }
+                }
+                itemsIndexed(
+                    items = instances,
+                    key = { index, instance -> instanceRenderKey(index, instance.id) }
+                ) { _, instance ->
+                    InstanceListRow(
+                        instance = instance,
+                        selected = instance == selected,
+                        active = instance == active,
+                        pinned = instance.name in pinned,
+                        vanilla = vanilla,
+                        onClick = { onSelect(instance) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** One instance in the list pane: icon, name, loader and version, and its active or pinned mark. */
+@Composable
+private fun InstanceListRow(
+    instance: AerixInstance,
+    selected: Boolean,
+    active: Boolean,
+    pinned: Boolean,
+    vanilla: String,
+    onClick: () -> Unit
+) {
+    val accent = AerixThemeManager.currentAccent()
+    val loaderSummary = remember(instance.versionId, vanilla) {
+        extractLoaderSummary(instance.versionId, vanilla)
+    }
+    val gameVersion = remember(instance.versionId) { extractGameVersion(instance.versionId) }
+    val shape = RoundedCornerShape(AerixRadii.controlSmall)
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = shape,
+        color = if (selected) AerixSurface.panelRaised else AerixSurface.panel.copy(alpha = 0.31f),
+        border = BorderStroke(
+            if (selected) 1.5.dp else AerixSpacing.hairline,
+            if (selected) accent.copy(alpha = 0.86f) else AerixSurface.borderSoft
+        ),
+        onClick = onClick
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(AerixSpacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
+        ) {
+            AerixImageWell(
+                image = instance.icon,
+                fallback = R.drawable.aerix_loader_vanilla,
+                size = 34.dp,
+                radius = AerixRadii.controlSmall
+            )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(AerixSpacing.xxs)
+            ) {
+                Text(
+                    text = instance.name,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = "$loaderSummary \u2022 $gameVersion",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = AerixSurface.textSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            if (active) {
+                Surface(
+                    modifier = Modifier.size(8.dp),
+                    shape = RoundedCornerShape(AerixRadii.pill),
+                    color = AerixSurface.success
+                ) {}
+            } else if (pinned) {
+                Icon(
+                    painter = painterResource(R.drawable.aerix_ic_favorite_filled),
+                    contentDescription = "Pinned",
+                    tint = accent,
+                    modifier = Modifier.size(13.dp)
+                )
+            }
+        }
+    }
+}
+
+/** The strip of instance cards, for the tall layout. */
+@Composable
+private fun InstanceStrip(
+    instances: List<AerixInstance>,
+    totalInstalled: Int,
+    selected: AerixInstance?,
+    active: AerixInstance?,
+    pinned: Set<String>,
+    vanilla: String,
+    onSelect: (AerixInstance) -> Unit
+) {
+    if (instances.isEmpty()) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(64.dp),
+            shape = RoundedCornerShape(AerixRadii.cardSmall),
+            color = AerixSurface.panel,
+            border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft)
+        ) {
+            Box(
+                modifier = Modifier.padding(horizontal = AerixSpacing.md),
+                contentAlignment = Alignment.CenterStart
+            ) {
+                Text(
+                    text = if (totalInstalled == 0) {
+                        "No instances yet \u2014 install one to get started."
+                    } else {
+                        "No instances match this search."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = AerixSurface.textSecondary
+                )
+            }
+        }
+    } else {
+        LazyRow(
+            modifier = Modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(horizontal = AerixSpacing.xs),
+            horizontalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
+        ) {
+            itemsIndexed(
+                items = instances,
+                key = { index, instance -> instanceRenderKey(index, instance.id) }
+            ) { _, instance ->
+                LandscapeInstanceListItem(
+                    instance = instance,
+                    selected = instance == selected,
+                    active = instance == active,
+                    pinned = instance.name in pinned,
+                    vanilla = vanilla,
+                    onClick = { onSelect(instance) },
+                    modifier = Modifier.width(220.dp)
+                )
+            }
+        }
     }
 }
 
@@ -520,7 +933,7 @@ private fun LandscapeInstanceListItem(
                 elevation = AerixMetrics.glassSubtleElevation
             ),
         shape = shape,
-        color = if (selected) AerixSurface.panelRaised else AerixSurface.panel.copy(alpha = 0.82f),
+        color = if (selected) AerixSurface.panelRaised else AerixSurface.panel.copy(alpha = 0.41f),
         border = BorderStroke(
             if (selected) 1.5.dp else AerixSpacing.hairline,
             if (selected) accent.copy(alpha = 0.86f) else AerixSurface.borderSoft
@@ -636,8 +1049,8 @@ private fun VersionManagementDetailPane(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(AerixSpacing.md),
-                verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
+                    .padding(AerixSpacing.mdPlus),
+                verticalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus)
             ) {
                 // Header row inside detail card (Screenshot 7 bottom card)
                 Row(
@@ -759,13 +1172,13 @@ private fun VersionManagementDetailPane(
                     }
                 }
 
-                // Scrollable body: subscreen tab pills + info tiles + quick actions + PLAY button
+                // Scrollable body: subscreen tab pills + meta pills + quick actions
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
                         .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
+                    verticalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus)
                 ) {
                     Row(
                         modifier = Modifier
@@ -809,31 +1222,23 @@ private fun VersionManagementDetailPane(
                         }
                     }
 
-                    Row(
+                    // What the four wide tiles used to say, as pills: they wrap onto a second line
+                    // when the pane is narrow instead of being crushed to a sliver each, and they
+                    // cost a third of the height.
+                    FlowRow(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
+                        horizontalArrangement = Arrangement.spacedBy(AerixSpacing.xs),
+                        verticalArrangement = Arrangement.spacedBy(AerixSpacing.xs)
                     ) {
-                        VersionManagementInfoTile(
-                            modifier = Modifier.weight(1f),
-                            title = "Status",
-                            value = "Healthy",
-                            valueColor = AerixSurface.success
+                        ModrinthMetaPill(
+                            text = "Healthy",
+                            backgroundColor = AerixSurface.success.copy(alpha = 0.16f),
+                            textColor = AerixSurface.success,
+                            borderColor = AerixSurface.success.copy(alpha = 0.42f)
                         )
-                        VersionManagementInfoTile(
-                            modifier = Modifier.weight(1f),
-                            title = "Version / Loader",
-                            value = loaderSummary
-                        )
-                        VersionManagementInfoTile(
-                            modifier = Modifier.weight(1f),
-                            title = "Game Version",
-                            value = gameVersion
-                        )
-                        VersionManagementInfoTile(
-                            modifier = Modifier.weight(1f),
-                            title = "Instance",
-                            value = instance.name
-                        )
+                        ModrinthMetaPill(text = loaderSummary)
+                        ModrinthMetaPill(text = "Minecraft $gameVersion")
+                        ModrinthMetaPill(text = instance.name)
                     }
 
                     FlowRow(
@@ -860,82 +1265,46 @@ private fun VersionManagementDetailPane(
                             onExport(instance)
                         }
                     }
+                }
 
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(44.dp),
-                        shape = RoundedCornerShape(AerixRadii.cardSmall),
-                        color = accent,
-                        contentColor = AerixSurface.onAccent,
-                        onClick = { onPlay(instance) }
+                // PLAY sits under the scrolling part, not inside it, so it is on screen whatever
+                // height the card was given.
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(46.dp),
+                    shape = RoundedCornerShape(AerixRadii.cardSmall),
+                    color = accent,
+                    contentColor = AerixSurface.onAccent,
+                    onClick = { onPlay(instance) }
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxSize(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            Icon(
-                                painter = painterResource(R.drawable.aerix_ic_play_arrow_filled),
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(Modifier.width(AerixSpacing.sm))
-                            Text(
-                                text = "PLAY",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.ExtraBold
-                            )
-                        }
-                    }
-                    if (isCurrent) {
+                        Icon(
+                            painter = painterResource(R.drawable.aerix_ic_play_arrow_filled),
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(Modifier.width(AerixSpacing.sm))
                         Text(
-                            modifier = Modifier.align(Alignment.CenterHorizontally),
-                            text = "Selected as the current launch instance",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = AerixSurface.textSecondary
+                            text = "PLAY",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.ExtraBold
                         )
                     }
                 }
+                if (isCurrent) {
+                    Text(
+                        modifier = Modifier.align(Alignment.CenterHorizontally),
+                        text = "Selected as the current launch instance",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = AerixSurface.textSecondary
+                    )
+                }
             }
-        }
-    }
-}
-
-@Composable
-private fun VersionManagementInfoTile(
-    modifier: Modifier = Modifier,
-    title: String,
-    value: String,
-    valueColor: Color = AerixSurface.textPrimary
-) {
-    Surface(
-        modifier = modifier.heightIn(min = 58.dp),
-        shape = RoundedCornerShape(AerixRadii.control),
-        color = AerixSurface.panelRaised.copy(alpha = 0.82f),
-        border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(AerixSpacing.smPlus),
-            verticalArrangement = Arrangement.spacedBy(AerixSpacing.xxs)
-        ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.labelSmall,
-                color = AerixSurface.textSecondary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                text = value,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = valueColor,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
         }
     }
 }

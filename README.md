@@ -20,6 +20,17 @@
   <a href="https://discord.gg/RS7q9KaCm6"><img src="https://img.shields.io/badge/Discord-Community%20%26%20suggestions-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord"></a>
 </p>
 
+<p align="center">
+  <sub><strong>LIVE FROM GITHUB — updated by GitHub, not by hand</strong></sub>
+</p>
+
+<p align="center">
+  <a href="https://github.com/entitybrian69-bit/Aerix-launcher/releases"><img src="https://img.shields.io/github/downloads/entitybrian69-bit/Aerix-launcher/total?style=for-the-badge&label=TOTAL%20DOWNLOADS&color=C8102E&logo=github&logoColor=white" alt="Total downloads across every release"></a>
+  <a href="https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest"><img src="https://img.shields.io/github/downloads/entitybrian69-bit/Aerix-launcher/latest/total?style=for-the-badge&label=THIS%20RELEASE&color=101014&logo=android&logoColor=3DDC84" alt="Downloads of the latest release"></a>
+  <a href="https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest"><img src="https://img.shields.io/github/v/release/entitybrian69-bit/Aerix-launcher?style=for-the-badge&label=LATEST&color=C8102E" alt="Latest release"></a>
+  <a href="https://entitybrian69-bit.github.io/Aerix-launcher/"><img src="https://img.shields.io/badge/Website-Live-C8102E?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Website"></a>
+</p>
+
 ***
 
 > ⚠️ **CRITICAL PROJECT REBOOT NOTICE (READ FIRST)**  
@@ -150,9 +161,15 @@ Aerix consolidates instance optimization, engine selection, profile customizatio
 
 ## 👥 The Team
 <p align="center">
-  <img src="assets/team/entitybrian.jpg" width="140" alt="entitybrian"><br>
+  <img src="assets/team/entitybrian.jpg" width="140" alt="entitybrian" style="border-radius:50%"><br>
   <strong>entitybrian</strong><br>
-  <sub>Owner, Core Developer, Tester, and Maintainer</sub>
+  <sub>Owner · Core Developer · Tester · Maintainer</sub>
+</p>
+
+<p align="center">
+  <a href="https://github.com/entitybrian69-bit"><img src="https://img.shields.io/badge/GitHub-entitybrian69--bit-101014?style=for-the-badge&logo=github&logoColor=white" alt="GitHub profile"></a>
+  <a href="https://entitybrian69-bit.github.io/Aerix-launcher/"><img src="https://img.shields.io/badge/Website-Aerix%20Launcher-C8102E?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Website"></a>
+  <a href="https://discord.gg/RS7q9KaCm6"><img src="https://img.shields.io/badge/Discord-Say%20hello-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord"></a>
 </p>
 
 entitybrian designs, writes, tests, and ships Aerix Launcher.

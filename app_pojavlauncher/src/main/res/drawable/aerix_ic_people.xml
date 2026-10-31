@@ -1,0 +1,13 @@
+<!--
+  Two players: the social section of the launcher.
+  Material "group" outline, so it stays legible at rail size and at card size.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="960"
+    android:viewportHeight="960">
+  <path
+      android:pathData="M0,720L0,688q0,-43 44,-66.5T160,598q16,0 30.5,1t28.5,5q-21,24 -32,53t-11,63v-8L0,712v8ZM240,720v-44q0,-44 44,-70t116,-26h160q72,0 116,26t44,70v44L240,720ZM760,720v-8q0,-34 -11,-63t-32,-53q14,-4 28.5,-5t30.5,-1q72,0 116,23.5T936,688v32L760,720ZM320,640h320q-14,-20 -68,-30t-80,-10h-24q-26,0 -80,10t-68,30ZM480,520q-50,0 -85,-35t-35,-85q0,-50 35,-85t85,-35q50,0 85,35t35,85q0,50 -35,85t-85,35ZM160,400q0,-50 35,-85t85,-35q50,0 85,35t35,85q0,50 -35,85t-85,35q-50,0 -85,-35t-35,-85ZM640,400q0,-50 35,-85t85,-35q50,0 85,35t35,85q0,50 -35,85t-85,35q-50,0 -85,-35t-35,-85ZM480,440q17,0 28.5,-11.5T520,400q0,-17 -11.5,-28.5T480,360q-17,0 -28.5,11.5T440,400q0,17 11.5,28.5T480,440ZM280,400q17,0 28.5,-11.5T320,360q0,-17 -11.5,-28.5T280,320q-17,0 -28.5,11.5T240,360q0,17 11.5,28.5T280,400ZM760,400q17,0 28.5,-11.5T800,360q0,-17 -11.5,-28.5T760,320q-17,0 -28.5,11.5T720,360q0,17 11.5,28.5T760,400ZM480,400ZM480,640Z"
+      android:fillColor="#FFFFFFFF"/>
+</vector>

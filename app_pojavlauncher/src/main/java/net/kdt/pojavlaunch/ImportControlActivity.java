@@ -1,6 +1,9 @@
 package net.kdt.pojavlaunch;
 
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.graphics.Point;
+import net.kdt.pojavlaunch.customcontrols.LayoutConverter;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
@@ -12,6 +15,7 @@ import android.widget.Toast;
 
 import androidx.annotation.Nullable;
 
+import net.kdt.pojavlaunch.customcontrols.ControlLayoutImporter;
 import net.kdt.pojavlaunch.customcontrols.LayoutBitmaps;
 import net.kdt.pojavlaunch.utils.FileUtils;
 
@@ -78,6 +82,7 @@ public class ImportControlActivity extends Activity {
         }
         if(!mHasIntentChanged) return;
         mIsFileVerified = false;
+        mCompatibilityWarning = null;
         getUriData();
         if(mUriData == null) {
             finishAndRemoveTask();
@@ -125,25 +130,42 @@ public class ImportControlActivity extends Activity {
             return;
         }
 
-        new File(Tools.CTRLMAP_PATH + "/TMP_IMPORT_FILE.json").renameTo(new File(Tools.CTRLMAP_PATH + "/" + fileName + ".json"));
-        Toast.makeText(getApplicationContext(), getText(R.string.import_control_done), Toast.LENGTH_SHORT).show();
-        finishAndRemoveTask();
+        if (mCompatibilityWarning != null) {
+            new AlertDialog.Builder(this).setTitle(R.string.import_control_compatibility_title)
+                    .setMessage(mCompatibilityWarning)
+                    .setPositiveButton(R.string.import_control_import_button, (dialog, which) -> finishImport(fileName))
+                    .setNegativeButton(android.R.string.cancel, null).show();
+        } else finishImport(fileName);
     }
 
     /**
      * Copy a the file from the Intent data with a provided name into the controlmap folder.
      */
-    private void importControlFile(){
-        InputStream is;
-        try {
-            is = getContentResolver().openInputStream(mUriData);
-            OutputStream os = new FileOutputStream(Tools.CTRLMAP_PATH + "/" + "TMP_IMPORT_FILE" + ".json");
-            IOUtils.copy(is, os);
+    private void finishImport(String fileName) {
+        if (!isFileNameValid(fileName)) {
+            Toast.makeText(this, R.string.import_control_invalid_name, Toast.LENGTH_LONG).show();
+            return;
+        }
+        if (!new File(Tools.CTRLMAP_PATH, "TMP_IMPORT_FILE.json").renameTo(new File(Tools.CTRLMAP_PATH, fileName + ".json"))) {
+            Toast.makeText(this, R.string.import_control_invalid_file, Toast.LENGTH_LONG).show();
+            return;
+        }
+        Toast.makeText(this, R.string.import_control_done, Toast.LENGTH_SHORT).show();
+        finishAndRemoveTask();
+    }
 
-            os.close();
-            is.close();
+    private String mCompatibilityWarning;
+
+    private void importControlFile(){
+        File staged = new File(Tools.CTRLMAP_PATH, "TMP_IMPORT_FILE.json");
+        staged.delete();
+        try (InputStream is = getContentResolver().openInputStream(mUriData);
+             OutputStream os = new FileOutputStream(staged)) {
+            if (is == null) throw new IOException("Cannot read the selected control file");
+            IOUtils.copy(is, os);
         } catch (IOException e) {
-            e.printStackTrace();
+            staged.delete();
+            Log.w("ImportControlActivity", "Cannot stage control import", e);
         }
     }
 
@@ -185,15 +207,31 @@ public class ImportControlActivity extends Activity {
     }
 
     /**
-     * Verify if the control file is valid
-     * @return Whether the control file is valid
+     * Verify if the control file is valid.
+     * The file may come from this launcher, from another PojavLauncher launcher, from the Zalith
+     * Launcher 2 editor or from Fold Craft Launcher: the last two are converted when the layout is
+     * loaded.
+     * @return Whether the control file can be used
      */
-    private static boolean verify() {
+    private boolean verify() {
         try {
             LayoutBitmaps.ControlsContainer layout = LayoutBitmaps.load(new File(Tools.CTRLMAP_PATH,"TMP_IMPORT_FILE.json"));
             JSONObject layoutJobj = new JSONObject(layout.mControlsJson);
-            return layoutJobj.has("version") && layoutJobj.has("mControlDataList");
-        }catch (IOException | JSONException e) {
+            ControlLayoutImporter.Format format = ControlLayoutImporter.detectFormat(layoutJobj);
+            if (format == ControlLayoutImporter.Format.UNKNOWN) return false;
+            if (Tools.currentDisplayMetrics == null) Tools.currentDisplayMetrics = getResources().getDisplayMetrics();
+            Point size = new Point(Math.max(Tools.currentDisplayMetrics.widthPixels, Tools.currentDisplayMetrics.heightPixels),
+                    Math.min(Tools.currentDisplayMetrics.widthPixels, Tools.currentDisplayMetrics.heightPixels));
+            if (format == ControlLayoutImporter.Format.POJAV) {
+                return LayoutConverter.loadFromString(this, size, layout.mControlsJson) != null;
+            }
+            ControlLayoutImporter.Result result = ControlLayoutImporter.convert(this, size, layoutJobj, format);
+            if (result == null) return false;
+            mCompatibilityWarning = getString(R.string.import_control_compatibility_warning,
+                    format == ControlLayoutImporter.Format.ZALITH ? "Zalith Launcher 2" : "Fold Craft Launcher",
+                    result.skippedEntries, result.inertButtons, result.unsupportedEvents);
+            return true;
+        }catch (Exception e) {
             Log.w("ImportControlActivity", "Failed to validate layout", e);
             return false;
         }

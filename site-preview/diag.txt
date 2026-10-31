@@ -1,0 +1,57 @@
+== console errors ==
+none
+
+== sections (top / height / opacity / class) ==
+     0     71 op=1     header.nav
+    71    798 op=1     section.hero
+   869    269 op=1     section.section
+  1189    995 op=1     section.section
+  2184    945 op=1     section.section
+  3129   1055 op=1     section.section
+  4183    706 op=1     section.section
+  4889    927 op=1     section.section
+  5816    871 op=1     section.section
+  6687    685 op=1     section.section
+  7372    342 op=1     section.section
+  7775    413 op=1     footer.footer
+
+== images ==
+     512x512 box=34x34        complete=True assets/aerix-logo.png
+    1200x537 box=514x240      complete=True assets/screenshots/shot-home.jpg
+     420x420 box=188x188      complete=True assets/themes/teapots.jpg
+     420x420 box=188x188      complete=True assets/themes/rockets.jpg
+     336x420 box=188x188      complete=True assets/themes/nebula.jpg
+     420x308 box=188x188      complete=True assets/themes/stardust.jpg
+     420x167 box=188x188      complete=True assets/themes/aurora.jpg
+     420x420 box=188x188      complete=True assets/themes/galaxy.jpg
+     315x420 box=188x188      complete=True assets/themes/moonrise.jpg
+     420x276 box=188x188      complete=True assets/themes/horizon.jpg
+     420x167 box=188x188      complete=True assets/themes/static.jpg
+     420x420 box=188x188      complete=True assets/themes/starcross.jpg
+     420x405 box=188x188      complete=True assets/themes/comet.jpg
+    1200x537 box=386x173      complete=True assets/screenshots/shot-home.jpg
+    1200x537 box=386x173      complete=True assets/screenshots/shot-instances.jpg
+    1200x537 box=386x173      complete=True assets/screenshots/shot-renderer.jpg
+    1200x675 box=387x241      complete=True assets/hd/autumn-mountains.jpg
+    1200x675 box=387x241      complete=True assets/hd/butterfly-garden.jpg
+    1200x675 box=387x241      complete=True assets/hd/sakura-field.jpg
+    1200x675 box=387x241      complete=True assets/hd/flower-forest-train.jpg
+    1200x675 box=387x241      complete=True assets/hd/night-sky.jpg
+    1200x675 box=387x241      complete=True assets/hd/wisteria-lake.jpg
+     736x736 box=116x116      complete=True assets/creator-entitybrian.jpg
+     512x512 box=34x34        complete=True assets/aerix-logo.png
+     736x736 box=48x48        complete=True assets/creator-entitybrian.jpg
+         0x0 box=0x0          complete=True None
+
+== theme strip ==
+{'width': 1200, 'cols': '190px 190px 190px 190px 190px 190px', 'display': 'grid'}
+== ancestor chain ==
+ 1200 grid         cols=190px 190px 190px 190px 190px 190px                            maxW=none     pad=0px              div.theme-strip
+ 1200 block        cols=none                                                           maxW=none     pad=0px              div.reveal is-in
+ 1200 block        cols=none                                                           maxW=none     pad=0px              div.wrap
+ 1440 block        cols=none                                                           maxW=none     pad=82px 0px         section.section
+ 1440 block        cols=none                                                           maxW=none     pad=0px              main.
+ 1440 block        cols=none                                                           maxW=none     pad=0px              body.
+
+== reveal elements never shown ==
+none

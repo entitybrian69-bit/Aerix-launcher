@@ -42,7 +42,8 @@ public class BTAInstallFragment extends ModVersionListFragment<BTAUtils.BTAVersi
 
     @Override
     public Runnable createDownloadTask(Object selectedVersion, ModloaderListenerProxy listenerProxy) {
-        return new BTADownloadTask(listenerProxy, (BTAUtils.BTAVersion) selectedVersion);
+        String targetId = getArguments() == null ? null : getArguments().getString(net.kdt.pojavlaunch.instances.InstanceLoaderUpdate.TARGET_ARGUMENT);
+        return new BTADownloadTask(listenerProxy, (BTAUtils.BTAVersion) selectedVersion).intoInstance(targetId);
     }
 
     @Override

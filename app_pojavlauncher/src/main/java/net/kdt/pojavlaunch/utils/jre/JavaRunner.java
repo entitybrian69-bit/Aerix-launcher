@@ -91,12 +91,11 @@ public class JavaRunner {
      *  and the auto-generated ones (eg. the window resolution).
      * @return A list filled with args.
      */
-    private static List<String> getJavaArgs(String runtimeHome, List<String> userArguments) {
+    private static List<String> getJavaArgs(String runtimeHome, List<String> userArguments, int memoryMb) {
         String resolvFile;
         resolvFile = new File(Tools.DIR_DATA,"resolv.conf").getAbsolutePath();
 
-        userArguments.add(0, "-Xms"+LauncherPreferences.PREF_RAM_ALLOCATION+"M");
-        userArguments.add(0, "-Xmx"+LauncherPreferences.PREF_RAM_ALLOCATION+"M");
+        userArguments.addAll(0, Arrays.asList(InstanceMemory.heapOptions(memoryMb)));
 
         ArrayList<String> overridableArguments = new ArrayList<>(Arrays.asList(
                 "-Djava.home=" + runtimeHome,
@@ -270,7 +269,13 @@ public class JavaRunner {
      * @param applicationArgs the application arguments
      * @throws VMLoadException if an error occurred during VM loading
      */
-    public static void startJvm(Runtime runtime, List<String> vmArgs, List<String> classpathEntries, String mainClass, List<String> applicationArgs) throws VMLoadException{
+    public static void startJvm(Runtime runtime, List<String> vmArgs, List<String> classpathEntries, String mainClass, List<String> applicationArgs) throws VMLoadException {
+        startJvm(runtime, vmArgs, classpathEntries, mainClass, applicationArgs, LauncherPreferences.PREF_RAM_ALLOCATION);
+    }
+
+    /** Game launches may supply an instance-specific allocation; installers use the global one. */
+    public static void startJvm(Runtime runtime, List<String> vmArgs, List<String> classpathEntries, String mainClass, List<String> applicationArgs, int memoryMb) throws VMLoadException{
+        if (memoryMb <= 0) memoryMb = LauncherPreferences.PREF_RAM_ALLOCATION;
         File runtimeHomeDir = MultiRTUtils.getRuntimeHome(runtime.name);
         File vmPath = findVmPath(runtimeHomeDir, runtime.arch);
         if(vmPath == null) {
@@ -280,7 +285,7 @@ public class JavaRunner {
         boolean hasJavaAgent = preprocessUserArgs(vmArgs);
         List<String> runtimeArgs = new ArrayList<>();
         if(getCacioJavaArgs(runtimeArgs,runtime.javaVersion == 8)) hasJavaAgent = true;
-        runtimeArgs.addAll(getJavaArgs(runtimeHomeDir.getAbsolutePath(), vmArgs));
+        runtimeArgs.addAll(getJavaArgs(runtimeHomeDir.getAbsolutePath(), vmArgs, memoryMb));
         vmArgs.clear();
 
 

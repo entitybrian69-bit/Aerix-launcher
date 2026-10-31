@@ -44,11 +44,13 @@ public class GLFWBackend implements PlatformBackend {
 
     @Override
     public void sendMousePosition(double x, double y, boolean relative) {
+        net.kdt.pojavlaunch.aerix.client.AerixClientInputBridge.onCursorPos(x, y);
         GLFW.sendMousePosition0(x, y);
     }
 
     @Override
     public void sendMouseEvent(int button, int action, int mods, double x, double y, boolean relative) {
+        net.kdt.pojavlaunch.aerix.client.AerixClientInputBridge.onMouseButton(button, action != 0);
         int glfwButton;
         switch (button) {
             case MotionEvent.BUTTON_PRIMARY:
@@ -74,16 +76,19 @@ public class GLFWBackend implements PlatformBackend {
 
     @Override
     public boolean sendKeyEvent(int key, int state, int mods, char codepoint) {
+        net.kdt.pojavlaunch.aerix.client.AerixClientInputBridge.onKeyEvent(key, state != 0);
         return GLFW.sendRawKeyEvent(key, state, mods, codepoint);
     }
 
     @Override
     public boolean sendKeyEvent(int key, int state, int mods) {
+        net.kdt.pojavlaunch.aerix.client.AerixClientInputBridge.onKeyEvent(key, state != 0);
         return GLFW.sendRawKeyEvent(key, state, mods, (char) 0);
     }
 
     @Override
     public boolean sendKeyEvent(int key, boolean state, int mods) {
+        net.kdt.pojavlaunch.aerix.client.AerixClientInputBridge.onKeyEvent(key, state);
         return GLFW.sendRawKeyEvent(key, state ? 1 : 0, mods, (char) 0);
     }
 

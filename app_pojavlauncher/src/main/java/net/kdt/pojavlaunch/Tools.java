@@ -546,6 +546,9 @@ public final class Tools {
     }
 
     public static void fullyExit() {
+        try {
+            net.kdt.pojavlaunch.aerix.discord.AerixDiscordPresence.onProcessExiting(null);
+        } catch (Throwable ignored) {}
         android.os.Process.killProcess(android.os.Process.myPid());
     }
 
@@ -924,6 +927,42 @@ public final class Tools {
     public static void restartLauncherActivity(Context context){
         Intent intent = new Intent(context, LauncherActivity.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        context.getApplicationContext().startActivity(intent);
+    }
+
+    /** Extra asking the launcher to start the game again as soon as it is up. */
+    public static final String EXTRA_RELAUNCH_GAME = "aerix.relaunchGame";
+    /** Extra naming the account the game should come back as; its accounts file name. */
+    public static final String EXTRA_SWITCH_ACCOUNT = "aerix.switchAccount";
+    /** Extra naming the instance directory ID to switch to before relaunching. */
+    public static final String EXTRA_SWITCH_INSTANCE = "aerix.switchInstance";
+    /** Extra naming the multiplayer server address to auto-join on relaunch. */
+    public static final String EXTRA_LAUNCH_SERVER = "aerix.launchServer";
+
+    public static void restartLauncherActivityToSocialTarget(Context context, String instanceId, String serverAddress) {
+        Intent intent = new Intent(context, LauncherActivity.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        intent.putExtra(EXTRA_RELAUNCH_GAME, true);
+        if (instanceId != null && !instanceId.isEmpty()) intent.putExtra(EXTRA_SWITCH_INSTANCE, instanceId);
+        if (serverAddress != null && !serverAddress.isEmpty()) intent.putExtra(EXTRA_LAUNCH_SERVER, serverAddress);
+        context.getApplicationContext().startActivity(intent);
+    }
+
+    /**
+     * Restarts the launcher activity with a request to start the game again.
+     *
+     * Used when something only a new game session can apply - a different account, above all -
+     * was changed from inside the game. The launcher comes back with the new choice already made
+     * and launches from there, so the player lands in the game signed in as somebody else instead
+     * of being told to go and do it by hand.
+     *
+     * @param accountKey the account to sign in as, or null to keep the current one
+     */
+    public static void restartLauncherActivityAndLaunch(Context context, String accountKey){
+        Intent intent = new Intent(context, LauncherActivity.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        intent.putExtra(EXTRA_RELAUNCH_GAME, true);
+        if (accountKey != null) intent.putExtra(EXTRA_SWITCH_ACCOUNT, accountKey);
         context.getApplicationContext().startActivity(intent);
     }
 
