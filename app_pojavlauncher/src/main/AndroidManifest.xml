@@ -235,6 +235,9 @@
         <package android:name="net.kdt.pojavlaunch"/>
         <package android:name="net.kdt.pojavlaunch.debug"/>
         <package android:name="net.kdt.pojavlaunch.pub"/>
+        <package android:name="net.kdt.aerixlauncher"/>
+        <package android:name="net.kdt.aerixlauncher.debug"/>
+        <package android:name="net.kdt.aerixlauncher.pub"/>
         <!-- The renderer plugins this launcher brands. Listed explicitly so they stay visible
              even on devices that withhold QUERY_ALL_PACKAGES. -->
         <package android:name="com.entitybrian.emesis"/>

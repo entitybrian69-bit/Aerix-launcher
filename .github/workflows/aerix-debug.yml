@@ -3,7 +3,7 @@ name: Aerix debug (testing)
 # Builds the APK that all testing happens on and attaches it to the `debug-latest`
 # GitHub Release (prerelease, so `releases/latest` stays on the public stable release).
 # This workflow only ever builds the "noruntime" debug variant:
-#   applicationId net.kdt.pojavlaunch.debug, signed with app_pojavlauncher/debug.keystore
+#   applicationId net.kdt.aerixlauncher.debug, signed with app_pojavlauncher/debug.keystore
 # so it installs next to the public launcher and can never be mistaken for, or
 # overwrite, a release APK. Public releases are built by release.yml / nightly.yml,
 # which only run after a typed confirmation.
@@ -64,6 +64,7 @@ jobs:
 
       - name: Verify Client smoke tests
         run: |
+          python3 tests/branding_identity_smoke.py
           mkdir -p "$RUNNER_TEMP/aerix-memory-test"
           javac -d "$RUNNER_TEMP/aerix-memory-test" \
             app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/utils/jre/InstanceMemory.java \
@@ -152,14 +153,6 @@ jobs:
         run: |
           set -euo pipefail
           test -f "$APK_PATH"
-          python3 -c "
-          import sys
-          data = open('$APK_PATH', 'rb').read()
-          wanted = 'net.kdt.pojavlaunch.debug'.encode('utf-16-le')
-          sys.exit(0 if wanted in data else 1)
-          "
-          echo "applicationId net.kdt.pojavlaunch.debug confirmed"
-
           SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
           BT_DIR="$(ls -d "$SDK_ROOT"/build-tools/* | sort -V | tail -n 1)"
           echo "Using build-tools: $BT_DIR"
@@ -167,6 +160,8 @@ jobs:
           "$BT_DIR/apksigner" verify --verbose --min-sdk-version 23 --print-certs "$APK_PATH" | tee apksigner.txt
           BADGING="$("$BT_DIR/aapt2" dump badging "$APK_PATH" | head -n 1)"
           echo "$BADGING"
+          [[ "$BADGING" == "package: name='net.kdt.aerixlauncher.debug' "* ]]
+          echo "applicationId net.kdt.aerixlauncher.debug confirmed"
           VCODE="$(printf '%s' "$BADGING" | sed -n "s/.*versionCode='\([0-9]*\)'.*/\1/p")"
           echo "version_code=$VCODE" >> "$GITHUB_OUTPUT"
           echo "::notice title=apk-verified::$BADGING"
@@ -204,11 +199,11 @@ jobs:
             echo "run: $GITHUB_RUN_ID"
             echo "built: $BUILT_AT"
             echo "sha256: $SHA256"
-            echo "package: net.kdt.pojavlaunch.debug"
+            echo "package: net.kdt.aerixlauncher.debug"
             echo "note: side-by-side testing build; public stable releases live under v* tags"
           } > "$STAGE/DEBUG_BUILD.txt"
           {
-            echo "Side-by-side testing build (\`net.kdt.pojavlaunch.debug\`) — installs next to the public launcher without touching its data."
+            echo "Side-by-side testing build (\`net.kdt.aerixlauncher.debug\`) — installs next to the public launcher without touching its data."
             echo ""
             echo "- **Direct download:** [\`$APK_NAME\`](https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/$APK_NAME)"
             echo "- **Commit-stamped download (avoids browser filename cache):** [\`$STAMPED_NAME\`](https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/$STAMPED_NAME)"

@@ -54,6 +54,9 @@ object AngleProvider {
         "net.kdt.pojavlaunch",
         "net.kdt.pojavlaunch.debug",
         "net.kdt.pojavlaunch.pub",
+        "net.kdt.aerixlauncher",
+        "net.kdt.aerixlauncher.debug",
+        "net.kdt.aerixlauncher.pub",
     )
 
     /**

@@ -94,7 +94,7 @@ object AerixClientInstaller {
         out += ClientModEntry("fabric-api", "Fabric API", "Core")
         out += ClientModEntry("sodium", "Sodium", "Chunk rendering")
         if (ClientVersions.supportsPodium(mcVersion)) {
-            out += ClientModEntry("podium", "Podium", "Sodium / Pojav compatibility")
+            out += ClientModEntry("podium", "Podium", "Sodium / Android compatibility")
         }
         out += ClientModEntry("lithium", "Lithium", "Tick optimization")
         out += ClientModEntry("ferrite-core", "FerriteCore", "Memory optimization")

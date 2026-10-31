@@ -460,14 +460,16 @@ public class LauncherActivity extends BaseActivity {
 
     // Call async
     private void checkPreviousInstalls(){
-        final String[] packages = {"net.kdt.pojavlaunch", "net.kdt.pojavlaunch.debug", "net.kdt.pojavlaunch.pub"};
+        final String[] packages = {"net.kdt.pojavlaunch", "net.kdt.pojavlaunch.debug", "net.kdt.pojavlaunch.pub",
+                "net.kdt.aerixlauncher", "net.kdt.aerixlauncher.debug", "net.kdt.aerixlauncher.pub"};
         for(String s : packages){
+            if (s.equals(getPackageName())) continue;
             Intent i = getPackageManager().getLaunchIntentForPackage(s);
             if(i == null) continue;
             Tools.runOnUiThread(() ->
                     new AlertDialog.Builder(this)
                         .setTitle(R.string.migration_progress_warning_title)
-                        .setMessage(R.string.migration_notice)
+                        .setMessage(R.string.aerix_package_migration_notice)
                         .setPositiveButton(android.R.string.ok, (d, button) -> LauncherPreferences.DEFAULT_PREF.edit().putBoolean("migrationNotice", false).apply())
                         .setOnDismissListener(d -> LauncherPreferences.PREF_MIGRATION_NOTICE = false)
                         .show());
