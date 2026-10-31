@@ -83,15 +83,18 @@ public final class AerixClientMod implements ClientModInitializer {
 
     private void runLoop() {
         final AtomicBoolean renderPending = new AtomicBoolean(false);
+        long nextResolveAttempt = 0L;
         while (true) {
             try {
                 Thread.sleep(95L);
-                if (!handlesResolved) {
-                    if (!resolveHandles()) {
-                        Thread.sleep(500L);
-                        continue;
-                    }
+                // Texture APIs change between Minecraft versions. Do not let a missing texture
+                // handle prevent the independent WaveyCapes setting from updating.
+                long now = System.currentTimeMillis();
+                if (!handlesResolved && now >= nextResolveAttempt) {
+                    resolveHandles();
+                    nextResolveAttempt = now + 2000L;
                 }
+                if (mGetInstance == null) continue;
                 final Object mc = mGetInstance.invoke(null);
                 if (!(mc instanceof Executor)) continue;
                 if (!renderPending.compareAndSet(false, true)) continue;
@@ -166,14 +169,14 @@ public final class AerixClientMod implements ClientModInitializer {
         slowCounter++;
         if (slowCounter >= 8) {
             slowCounter = 0;
-            reloadCapeFramesIfNeeded(runDir);
             syncWaveyCapesIfNeeded(runDir);
             syncLiveOptionsIfNeeded(mc, runDir);
-        } else if (frameNativeImages.isEmpty()) {
+            if (handlesResolved) reloadCapeFramesIfNeeded(runDir);
+        } else if (handlesResolved && frameNativeImages.isEmpty()) {
             reloadCapeFramesIfNeeded(runDir);
         }
 
-        if (frameNativeImages.isEmpty() || fPlayer == null) return;
+        if (!handlesResolved || frameNativeImages.isEmpty() || fPlayer == null) return;
         Object player = fPlayer.get(mc);
         if (player == null) return;
 
@@ -314,26 +317,28 @@ public final class AerixClientMod implements ClientModInitializer {
             Object cfg = fCfg.get(null);
             if (cfg == null) return;
 
-            setEnumField(cfg, "windMode", wavesOn ? "WAVES" : "NONE");
-            setEnumField(cfg, "capeStyle", wavesOn ? "SMOOTH" : "BLOCKY");
-            setEnumField(cfg, "capeMovement", wavesOn ? "BASIC_SIMULATION_3D" : "VANILLA");
-            // Retry until the mod has actually initialised; the animator starts on another thread.
-            lastWaveyMtime = mtime;
+            boolean wind = setEnumField(cfg, "windMode", wavesOn ? "WAVES" : "NONE");
+            boolean style = setEnumField(cfg, "capeStyle", wavesOn ? "SMOOTH" : "BLOCKY");
+            boolean movement = setEnumField(cfg, "capeMovement", wavesOn ? "BASIC_SIMULATION_3D" : "VANILLA");
+            // Retry until the mod has actually initialised and its fields have been updated.
+            if (wind && style && movement) lastWaveyMtime = mtime;
         } catch (Throwable ignored) {
         }
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private static void setEnumField(Object target, String fieldName, String enumConst) {
+    private static boolean setEnumField(Object target, String fieldName, String enumConst) {
         try {
             Field f = target.getClass().getField(fieldName);
             Class<?> t = f.getType();
             if (t.isEnum()) {
                 Object val = Enum.valueOf((Class<Enum>) t, enumConst);
                 f.set(target, val);
+                return true;
             }
         } catch (Throwable ignored) {
         }
+        return false;
     }
 
     private void syncLiveOptionsIfNeeded(Object mc, File runDir) {
