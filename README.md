@@ -1,7 +1,7 @@
 # Aerix Launcher — Minecraft: Java Edition on Android
 
 <p align="center">
-  <img src="assets/aerix-logo.png" alt="Aerix Launcher logo" width="160" />
+  <img src="assets/aerix-launcher-logo.png" alt="Aerix Launcher’s new hand-drawn A logo" width="240" />
 </p>
 
 <p align="center">

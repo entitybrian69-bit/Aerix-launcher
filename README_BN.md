@@ -4,7 +4,7 @@
 
 <a href="./README_RU.md">Readme на русском</a>
 
-<img src="assets/aerix-logo.png" align="left" width="130" alt="Aerix Launcher logo">
+<img src="assets/aerix-launcher-logo.png" align="left" width="130" alt="Aerix Launcher logo">
 
 [![Android CI](https://github.com/TeamPojavLauncher/PojavLauncher/workflows/Android%20CI/badge.svg)](https://github.com/TeamPojavLauncher/PojavLauncher/actions)
 [![Github commit activity](https://img.shields.io/github/commit-activity/m/TeamPojavLauncher/PojavLauncher.svg?style=flat)](https://github.com/TeamPojavLauncher/PojavLauncher/graphs/commit-activity)
