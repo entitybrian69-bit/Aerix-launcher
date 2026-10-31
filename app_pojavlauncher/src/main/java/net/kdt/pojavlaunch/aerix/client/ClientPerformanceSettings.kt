@@ -72,8 +72,8 @@ object ClientPerformanceSettings {
     private val supportedKeys = setOf("renderDistance", "simulationDistance", "graphicsMode", "renderClouds", "entityShadows", "particles", "biomeBlendRadius", "mipmapLevels", "enableVsync", "maxFps", "viewBobbing", "autoJump", "rawMouseInput", "showSubtitles", "fovEffectScale", "screenEffectScale", "guiScale", "fov", "soundCategory_music", "soundCategory_master", "entityDistanceScaling", "mouseSensitivity", "damageTiltStrength", "glintStrength", "glintSpeed", "darknessEffectScale")
 
     /** Preserve every unknown line and setting, including third-party settings and resource packs. */
-    fun applyAtLaunch(gameDir: File) {
-        val selected = overrides.filterKeys { it in supportedKeys }
+    fun applyAtLaunch(gameDir: File, mcVersion: String) {
+        val selected = ClientVersionOptions.translate(mcVersion, overrides.filterKeys { it in supportedKeys })
         if (selected.isEmpty()) return
         val file = File(gameDir, "options.txt")
         val lines = if (file.isFile) file.readLines() else emptyList()

@@ -364,8 +364,9 @@ class AerixClientOverlayView @JvmOverloads constructor(
                         syncGyroRegistration()
                     },
                     onSyncOptionsTxt = {
-                        activeClientInstance?.gameDirectory?.let { dir ->
-                            AerixClientPackGenerator.applyClientOptionsTxt(dir)
+                        activeClientInstance?.let { inst ->
+                            val version = AerixClientPackGenerator.resolveMcVersionFromInstance(inst.versionId, AerixClientStore.selectedClientVersion)
+                            AerixClientPackGenerator.applyClientOptionsTxt(inst.gameDirectory, version)
                         }
                         syncGyroRegistration()
                     },

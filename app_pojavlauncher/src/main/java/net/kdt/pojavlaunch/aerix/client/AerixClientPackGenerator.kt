@@ -82,7 +82,7 @@ object AerixClientPackGenerator {
             buildAndApplyToInstance(context, instanceGameDir, mcVersion)
             runCatching { stampFile.writeText(desiredStamp) }
         } else {
-            applyClientOptionsTxt(instanceGameDir)
+            applyClientOptionsTxt(instanceGameDir, mcVersion)
             applySodiumAndModConfigs(instanceGameDir)
             AerixClientCosmetics.syncCapeAssetsToInstance(context, instanceGameDir)
         }
@@ -205,7 +205,7 @@ object AerixClientPackGenerator {
             }
         }
 
-        applyClientOptionsTxt(instanceGameDir)
+        applyClientOptionsTxt(instanceGameDir, mcVersion)
         applySodiumAndModConfigs(instanceGameDir)
         AerixClientCosmetics.syncCapeAssetsToInstance(context, instanceGameDir)
         return zipFile
@@ -214,7 +214,7 @@ object AerixClientPackGenerator {
     /**
      * Syncs `<instanceGameDir>/options.txt` with all competitive FPS boosters & active client settings.
      */
-    fun applyClientOptionsTxt(instanceGameDir: File) {
+    fun applyClientOptionsTxt(instanceGameDir: File, mcVersion: String) {
         instanceGameDir.mkdirs()
         val optFile = File(instanceGameDir, "options.txt")
         val existingLines = if (optFile.isFile) optFile.readLines().toMutableList() else mutableListOf()
@@ -240,6 +240,7 @@ object AerixClientPackGenerator {
         map["gamma"] = if (AerixClientStore.fullbrightEnabled) "100.0" else "1.0"
         // Initial defaults only: never overwrite existing user graphics or audio choices on launch.
         if (!map.containsKey("autoJump")) map["autoJump"] = "false"
+        if (mcVersion == "26.3" && !map.containsKey("graphicsPreset")) map["graphicsPreset"] = "\"fast\""
         if (!map.containsKey("renderDistance")) map["renderDistance"] = "8"
         if (!map.containsKey("simulationDistance")) map["simulationDistance"] = "5"
         if (!map.containsKey("entityShadows")) map["entityShadows"] = "false"
