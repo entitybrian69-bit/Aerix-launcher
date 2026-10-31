@@ -225,6 +225,8 @@ class AerixClientOverlayView @JvmOverloads constructor(
             return
         }
         activeClientInstance = instance
+        AerixClientStore.reload(context.applicationContext)
+        ClientPerformanceSettings.reload(context.applicationContext)
         AerixClientInputBridge.resetSessionState()
         AerixClientInputBridge.clientSessionActive = true
         bootOverlayVisible = true
@@ -443,7 +445,7 @@ private fun AerixClientRootOverlay(
                 }
                 telemetry = if (enabled) withContext(Dispatchers.IO) { ClientTelemetryBridge.read(gameDir) } else null
                 telemetry?.yaw?.let { yaw -> AerixClientInputBridge.headingYawDeg = ((yaw % 360f) + 360f) % 360f }
-                telemetry?.selectedSlot?.let { slot -> AerixClientInputBridge.activeHotbarSlot = slot }
+                telemetry?.selectedSlot?.let { slot -> AerixClientInputBridge.syncHotbarSlot(slot) }
                 delay(1000L)
             }
         } finally {
@@ -655,6 +657,7 @@ private fun AerixClientRootOverlay(
             Row(
                 modifier = Modifier
                     .offset { IntOffset(bx, by) }
+                    .scale(btnPos?.scale ?: 1f)
                     .clip(RoundedCornerShape(8.dp))
                     .background(Color(0xE016181F))
                     .border(1.1.dp, LiquidCrystalPalette.CrimsonPrimary, RoundedCornerShape(8.dp))
@@ -1741,6 +1744,14 @@ private fun ClientAimPage() {
                 })
             }
         }
+        Text("Quick action buttons · default Minecraft keybinds", color = Color.White, fontSize = 11.sp)
+        ClientInformationToggle("Show quick-action HUD", AerixClientStore.quickPvpButtonsEnabled) { AerixClientStore.quickPvpButtonsEnabled = it }
+        ClientInformationToggle("180° flick", AerixClientStore.quickFlickEnabled) { AerixClientStore.quickFlickEnabled = it }
+        ClientInformationToggle("Hold zoom · requires compatible zoom mod", AerixClientStore.quickZoomEnabled) { AerixClientStore.quickZoomEnabled = it }
+        ClientInformationToggle("Swap offhand · F", AerixClientStore.quickOffhandEnabled) { AerixClientStore.quickOffhandEnabled = it }
+        ClientInformationToggle("Perspective · F5", AerixClientStore.quickPerspectiveEnabled) { AerixClientStore.quickPerspectiveEnabled = it }
+        ClientInformationToggle("Screenshot · F2", AerixClientStore.quickScreenshotEnabled) { AerixClientStore.quickScreenshotEnabled = it }
+        ClientInformationToggle("Hitboxes · F3+B", AerixClientStore.quickHitboxesEnabled) { AerixClientStore.quickHitboxesEnabled = it }
         Text("Gyro requires a supported sensor. Avoid enabling both Aerix and launcher gyro at once.",
             color = LiquidCrystalPalette.TextMuted, fontSize = 10.sp)
     }
@@ -1830,6 +1841,8 @@ private fun ClientVisualPage(gameDir: File?) {
         }
         Text("Resource-pack changes apply when Minecraft next starts.", color = LiquidCrystalPalette.TextSecondary, fontSize = 11.sp)
         ClientInformationToggle("Animated vanilla item textures", AerixClientStore.packVanillaAnimatedGear) { AerixClientStore.packVanillaAnimatedGear = it }
+        ClientInformationToggle("Animate all eligible item sprites", AerixClientStore.packAnimateAllItemSprites) { AerixClientStore.packAnimateAllItemSprites = it }
+        Text("All eligible square vanilla item sprites; existing vanilla animations are preserved. Requires animated item textures and may substantially reduce performance.", color = LiquidCrystalPalette.TextMuted, fontSize = 10.sp)
         ClientInformationToggle("Sparkle enchantment glint", AerixClientStore.packEnhancedGlint) { AerixClientStore.packEnhancedGlint = it }
         Row(modifier = Modifier.horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("Glint color", color = Color.White, fontSize = 11.sp)
@@ -2753,8 +2766,8 @@ private fun InGameCrimsonHud(
                 horizontalAlignment = Alignment.End,
                 verticalArrangement = Arrangement.spacedBy(5.dp)
             ) {
-                LiquidCrystalPill("180°") { AerixClientInputBridge.trigger180Flick() }
-                Box(
+                if (AerixClientStore.quickFlickEnabled) LiquidCrystalPill("180°") { AerixClientInputBridge.trigger180Flick() }
+                if (AerixClientStore.quickZoomEnabled) Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
                         .background(
@@ -2766,8 +2779,7 @@ private fun InGameCrimsonHud(
                             detectTapGestures(
                                 onPress = {
                                     AerixClientInputBridge.setZoomActive(true)
-                                    tryAwaitRelease()
-                                    AerixClientInputBridge.setZoomActive(false)
+                                    try { tryAwaitRelease() } finally { AerixClientInputBridge.setZoomActive(false) }
                                 }
                             )
                         }
@@ -2775,7 +2787,10 @@ private fun InGameCrimsonHud(
                 ) {
                     Text("ZOOM", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold)
                 }
-                LiquidCrystalPill("F · Offhand") { AerixClientInputBridge.triggerSwapOffhand() }
+                if (AerixClientStore.quickOffhandEnabled) LiquidCrystalPill("F · Offhand") { AerixClientInputBridge.triggerSwapOffhand() }
+                if (AerixClientStore.quickPerspectiveEnabled) LiquidCrystalPill("F5 · View") { AerixClientInputBridge.triggerPerspectiveToggle() }
+                if (AerixClientStore.quickScreenshotEnabled) LiquidCrystalPill("F2 · Shot") { AerixClientInputBridge.tapKey(android.view.KeyEvent.KEYCODE_F2) }
+                if (AerixClientStore.quickHitboxesEnabled) LiquidCrystalPill("Hitboxes") { AerixClientInputBridge.triggerF3Chord(android.view.KeyEvent.KEYCODE_B) }
             }
         }
 
@@ -2883,6 +2898,14 @@ private fun HudPositionEditorModal(onDone: () -> Unit) {
     ) {
         val wPx = constraints.maxWidth.toFloat().coerceAtLeast(1f)
         val hPx = constraints.maxHeight.toFloat().coerceAtLeast(1f)
+        var selectedWidget by remember { mutableStateOf<String?>(null) }
+        Canvas(Modifier.fillMaxSize()) {
+            listOf(0.25f, 0.5f, 0.75f).forEach { fraction ->
+                val shade = if (fraction == 0.5f) LiquidCrystalPalette.CrimsonGlow.copy(alpha = 0.38f) else Color.White.copy(alpha = 0.13f)
+                drawLine(shade, Offset(size.width * fraction, 0f), Offset(size.width * fraction, size.height), strokeWidth = 1.dp.toPx())
+                drawLine(shade, Offset(0f, size.height * fraction), Offset(size.width, size.height * fraction), strokeWidth = 1.dp.toPx())
+            }
+        }
 
         AerixClientStore.hudPositions.values.forEach { widget ->
             var dragX by remember(widget.id, widget.xNorm) { mutableFloatStateOf(widget.xNorm) }
@@ -2893,11 +2916,14 @@ private fun HudPositionEditorModal(onDone: () -> Unit) {
                     .offset {
                         IntOffset((dragX * wPx).roundToInt(), (dragY * hPx).roundToInt())
                     }
+                    .scale(widget.scale)
                     .clip(RoundedCornerShape(8.dp))
                     .background(LiquidCrystalPalette.CrimsonTintFill)
-                    .border(1.2.dp, LiquidCrystalPalette.CrimsonGlow, RoundedCornerShape(8.dp))
+                    .border(if (selectedWidget == widget.id) 2.dp else 1.2.dp, if (selectedWidget == widget.id) Color.White else LiquidCrystalPalette.CrimsonGlow, RoundedCornerShape(8.dp))
+                    .clickable { selectedWidget = widget.id }
                     .pointerInput(widget.id) {
                         detectDragGestures(
+                            onDragStart = { selectedWidget = widget.id },
                             onDragEnd = {
                                 AerixClientStore.updateWidgetPos(widget.id, dragX, dragY)
                             }
@@ -2925,17 +2951,18 @@ private fun HudPositionEditorModal(onDone: () -> Unit) {
                 .clip(RoundedCornerShape(10.dp))
                 .background(LiquidCrystalPalette.DarkHeader)
                 .border(1.2.dp, LiquidCrystalPalette.CrimsonPrimary, RoundedCornerShape(10.dp))
-                .padding(horizontal = 14.dp, vertical = 8.dp),
+                .padding(horizontal = 14.dp, vertical = 8.dp)
+                .horizontalScroll(rememberScrollState()),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Text(
-                text = "Drag any HUD item to reposition",
+                text = selectedWidget?.let { "Selected: ${AerixClientStore.hudPositions[it]?.label}" } ?: "Drag or tap a widget",
                 color = LiquidCrystalPalette.TextSecondary,
                 fontSize = 11.sp
             )
-            LiquidCrystalPill("HUD −", onClick = { AerixClientStore.scaleHud(-0.1f) })
-            LiquidCrystalPill("HUD +", onClick = { AerixClientStore.scaleHud(0.1f) })
+            LiquidCrystalPill("Size −", onClick = { selectedWidget?.let { AerixClientStore.scaleWidget(it, -0.1f) } ?: AerixClientStore.scaleHud(-0.1f) })
+            LiquidCrystalPill("Size +", onClick = { selectedWidget?.let { AerixClientStore.scaleWidget(it, 0.1f) } ?: AerixClientStore.scaleHud(0.1f) })
             LiquidCrystalPill(
                 label = "Reset Safe Positions",
                 onClick = { AerixClientStore.resetHudPositions() }

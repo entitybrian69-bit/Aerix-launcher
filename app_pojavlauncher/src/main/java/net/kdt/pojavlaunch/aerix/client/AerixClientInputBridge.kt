@@ -209,6 +209,10 @@ object AerixClientInputBridge {
         Platform.PLATFORM.sendKeyEvent(KeyEvent.KEYCODE_C, holding, 0)
     }
 
+    fun syncHotbarSlot(slot1To9: Int) {
+        if (slot1To9 in 1..9) activeHotbarSlot = slot1To9
+    }
+
     fun selectHotbarSlot(slot1To9: Int) {
         val clamped = slot1To9.coerceIn(1, 9)
         activeHotbarSlot = clamped

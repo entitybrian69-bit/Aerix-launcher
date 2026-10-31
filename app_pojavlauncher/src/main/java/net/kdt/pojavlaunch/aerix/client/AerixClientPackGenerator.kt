@@ -86,6 +86,7 @@ object AerixClientPackGenerator {
             append(mcVersion).append('|')
             append("jar=").append(jarReady).append('|')
             append("animGear=").append(AerixClientStore.packVanillaAnimatedGear).append('|')
+            append("allItemSprites=").append(AerixClientStore.packAnimateAllItemSprites).append('|')
             append("glint=").append(AerixClientStore.packEnhancedGlint).append('|')
             append("glintColor=").append(AerixClientStore.packGlintColor).append('|')
             append("fire=").append(AerixClientStore.packLowFire).append('|')
@@ -552,7 +553,7 @@ object AerixClientPackGenerator {
                     val fileName = path.substringAfterLast('/')
                     val shouldAnimate = ANIMATED_VANILLA_EXACT_ITEMS.contains(fileName) ||
                         ANIMATED_VANILLA_ITEM_SUFFIXES.any { fileName.endsWith(it) }
-                    if (!shouldAnimate) continue
+                    if (!AerixClientStore.packAnimateAllItemSprites && !shouldAnimate) continue
 
                     // Skip if vanilla already defines a custom .mcmeta animation for this sprite
                     if (zf.getEntry("$path.mcmeta") != null) continue
@@ -560,12 +561,18 @@ object AerixClientPackGenerator {
                     val bytes = zf.getInputStream(entry).use { it.readBytes() }
                     val baseBmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: continue
                     // Only animate square single-frame sprites (16x16 or 32x32)
-                    if (baseBmp.width <= 0 || baseBmp.width != baseBmp.height || baseBmp.width > 32) continue
-
-                    val particleColor = resolveMaterialParticleColor(fileName)
-                    val strip = buildVanillaShimmerAndParticleStrip(baseBmp, particleColor, fileName.hashCode())
-                    putBitmap(zos, path, strip)
-                    putText(zos, "$path.mcmeta", """{"animation":{"frametime":2}}""")
+                    if (baseBmp.width <= 0 || baseBmp.width != baseBmp.height || baseBmp.width > 32) {
+                        baseBmp.recycle()
+                        continue
+                    }
+                    try {
+                        val particleColor = resolveMaterialParticleColor(fileName)
+                        val strip = buildVanillaShimmerAndParticleStrip(baseBmp, particleColor, fileName.hashCode())
+                        try {
+                            putBitmap(zos, path, strip)
+                            putText(zos, "$path.mcmeta", """{"animation":{"frametime":2}}""")
+                        } finally { strip.recycle() }
+                    } finally { baseBmp.recycle() }
                 }
             }
         }

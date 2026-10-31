@@ -18,11 +18,16 @@ object ClientPerformanceSettings {
     fun init(context: Context) {
         if (this.context != null) return
         this.context = context.applicationContext
-        val text = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(OPTIONS, "{}")
+        val text = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE or Context.MODE_MULTI_PROCESS).getString(OPTIONS, "{}")
         overrides = runCatching {
             val json = JSONObject(text ?: "{}")
             json.keys().asSequence().associateWith { json.getString(it) }
         }.getOrDefault(emptyMap())
+    }
+
+    fun reload(context: Context) {
+        this.context = null
+        init(context)
     }
 
     fun set(key: String, value: String) {

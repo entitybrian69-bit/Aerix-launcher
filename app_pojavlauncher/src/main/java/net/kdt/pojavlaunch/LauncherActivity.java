@@ -378,6 +378,8 @@ public class LauncherActivity extends BaseActivity {
     protected void onResume() {
         super.onResume();
         ContextExecutor.setActivity(this);
+        // The game activity is a separate process and may have changed Client settings.
+        net.kdt.pojavlaunch.aerix.client.AerixClientStore.INSTANCE.reload(getApplicationContext());
         InstanceInstaller.postInstallCheck(this);
     }
 

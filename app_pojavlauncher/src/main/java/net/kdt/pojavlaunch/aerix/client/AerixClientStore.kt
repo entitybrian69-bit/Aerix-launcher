@@ -108,6 +108,7 @@ object AerixClientStore {
     var installClientResourcePack by mutableStateOf(true)
 
     var packVanillaAnimatedGear by mutableStateOf(true)
+    var packAnimateAllItemSprites by mutableStateOf(false)
     var packEnhancedGlint by mutableStateOf(true)
     var packGlintColor by mutableStateOf("CRIMSON")
     var packLowFire by mutableStateOf(true)
@@ -185,6 +186,12 @@ object AerixClientStore {
     var palmShieldEnabled by mutableStateOf(false)
     var hotbarSwipeEnabled by mutableStateOf(false)
     var quickPvpButtonsEnabled by mutableStateOf(false)
+    var quickFlickEnabled by mutableStateOf(true)
+    var quickZoomEnabled by mutableStateOf(true)
+    var quickOffhandEnabled by mutableStateOf(true)
+    var quickPerspectiveEnabled by mutableStateOf(false)
+    var quickScreenshotEnabled by mutableStateOf(false)
+    var quickHitboxesEnabled by mutableStateOf(false)
 
     var fullbrightEnabled by mutableStateOf(false)
     var visualTimeMode by mutableStateOf("OFF")
@@ -214,10 +221,11 @@ object AerixClientStore {
 
     fun init(context: Context) {
         if (prefs != null) return
-        val p = context.applicationContext.getSharedPreferences(PREFS_FILE, Context.MODE_PRIVATE)
+        val p = context.applicationContext.getSharedPreferences(PREFS_FILE, Context.MODE_PRIVATE or Context.MODE_MULTI_PROCESS)
         prefs = p
 
         packVanillaAnimatedGear = p.getBoolean("packVanillaAnimatedGear", true)
+        packAnimateAllItemSprites = p.getBoolean("packAnimateAllItemSprites", false)
         packEnhancedGlint = p.getBoolean("packEnhancedGlint", true)
         packGlintColor = p.getString("packGlintColor", "CRIMSON")?.takeIf { it in setOf("CRIMSON", "VIOLET", "BLUE", "GOLD", "GREEN", "WHITE") } ?: "CRIMSON"
         packLowFire = p.getBoolean("packLowFire", true)
@@ -289,6 +297,12 @@ object AerixClientStore {
         palmShieldEnabled = p.getBoolean("palmShieldEnabled", false)
         hotbarSwipeEnabled = p.getBoolean("hotbarSwipeEnabled", false)
         quickPvpButtonsEnabled = p.getBoolean("quickPvpButtonsEnabled", false)
+        quickFlickEnabled = p.getBoolean("quickFlickEnabled", true)
+        quickZoomEnabled = p.getBoolean("quickZoomEnabled", true)
+        quickOffhandEnabled = p.getBoolean("quickOffhandEnabled", true)
+        quickPerspectiveEnabled = p.getBoolean("quickPerspectiveEnabled", false)
+        quickScreenshotEnabled = p.getBoolean("quickScreenshotEnabled", false)
+        quickHitboxesEnabled = p.getBoolean("quickHitboxesEnabled", false)
 
         fullbrightEnabled = p.getBoolean("fullbrightEnabled", false)
         visualTimeMode = p.getString("visualTimeMode", "OFF")?.takeIf { it in setOf("OFF", "DAY", "SUNSET", "NIGHT") } ?: "OFF"
@@ -314,6 +328,7 @@ object AerixClientStore {
         val p = prefs ?: return
         p.edit().apply {
             putBoolean("packVanillaAnimatedGear", packVanillaAnimatedGear)
+            putBoolean("packAnimateAllItemSprites", packAnimateAllItemSprites)
             putBoolean("packEnhancedGlint", packEnhancedGlint)
             putString("packGlintColor", packGlintColor)
             putBoolean("packLowFire", packLowFire)
@@ -380,6 +395,12 @@ object AerixClientStore {
             putBoolean("palmShieldEnabled", palmShieldEnabled)
             putBoolean("hotbarSwipeEnabled", hotbarSwipeEnabled)
             putBoolean("quickPvpButtonsEnabled", quickPvpButtonsEnabled)
+            putBoolean("quickFlickEnabled", quickFlickEnabled)
+            putBoolean("quickZoomEnabled", quickZoomEnabled)
+            putBoolean("quickOffhandEnabled", quickOffhandEnabled)
+            putBoolean("quickPerspectiveEnabled", quickPerspectiveEnabled)
+            putBoolean("quickScreenshotEnabled", quickScreenshotEnabled)
+            putBoolean("quickHitboxesEnabled", quickHitboxesEnabled)
 
             putBoolean("fullbrightEnabled", fullbrightEnabled)
             putString("visualTimeMode", visualTimeMode)
@@ -417,6 +438,11 @@ object AerixClientStore {
         persist()
     }
 
+    fun scaleWidget(id: String, delta: Float) {
+        val pos = hudPositions[id] ?: return
+        updateWidgetPos(id, pos.xNorm, pos.yNorm, pos.scale + delta)
+    }
+
     fun scaleHud(delta: Float) {
         hudPositions = hudPositions.mapValues { (id, pos) ->
             if (id == "client_btn") pos else pos.copy(scale = (pos.scale + delta).coerceIn(0.65f, 1.45f))
@@ -430,7 +456,7 @@ object AerixClientStore {
     }
 
     /**
-     * Verified non-overlapping HUD slots against PojavLauncher controls:
+     * Suggested default HUD slots for the default control layout; custom layouts may differ:
      * - Top-left DEBUG|CHAT|KEYBOARD|TAB (`0.04..0.46, 0.00..0.09`) & 3RD (`0.04..0.14, 0.09..0.18`) untouched.
      * - Top-right `A` button (`~0.77, 0.03`) & MOUSE (`0.89..1.00, 0.00..0.09`) untouched.
      * - Left D-pad / PRI / SEC / GUI / INV (`0.04..0.25, 0.54..0.98`) untouched.
