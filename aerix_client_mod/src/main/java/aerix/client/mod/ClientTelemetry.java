@@ -68,6 +68,7 @@ final class ClientTelemetry {
     static Properties readModernSnapshot(Object mc) throws Exception {
         Properties p = new Properties();
         p.setProperty("updated", Long.toString(System.currentTimeMillis()));
+        putValue(p, "fps", mc, "getFps");
         Object player = field(mc, "player");
         if (player == null) { p.setProperty("available", "false"); return p; }
         p.setProperty("available", "true");

@@ -347,6 +347,7 @@ class AerixClientOverlayView @JvmOverloads constructor(
             AerixLauncherTheme {
                 AerixClientRootOverlay(
                     instanceLabel = activeClientInstance?.name ?: "Aerix Client",
+                    mcVersion = AerixClientPackGenerator.resolveMcVersionFromInstance(activeClientInstance?.versionId, AerixClientStore.selectedClientVersion),
                     gameDir = activeClientInstance?.gameDirectory,
                     bootVisible = bootOverlayVisible,
                     isGrabbing = isGrabbingState,
@@ -399,6 +400,7 @@ private fun AerixClientRootOverlay(
     gameDir: File?,
     bootVisible: Boolean,
     isGrabbing: Boolean,
+    mcVersion: String,
     modal: InGameClientModal,
     subPage: ClientMenuSubPage,
     onChangeSubPage: (ClientMenuSubPage) -> Unit,
@@ -427,7 +429,7 @@ private fun AerixClientRootOverlay(
 
     var telemetry by remember { mutableStateOf<ClientTelemetrySnapshot?>(null) }
     var wallClock by remember { mutableStateOf("") }
-    val needsTelemetry = AerixClientStore.coordsHudEnabled || AerixClientStore.armorHudEnabled ||
+    val needsTelemetry = (mcVersion == "26.3" && (AerixClientStore.perfPillEnabled || AerixClientStore.fpsHistoryEnabled || AerixClientStore.adaptiveDistanceEnabled || modal == InGameClientModal.OLED_AFK)) || AerixClientStore.coordsHudEnabled || AerixClientStore.armorHudEnabled ||
         AerixClientStore.effectsHudEnabled || AerixClientStore.worldTimeHudEnabled ||
         AerixClientStore.serverHudEnabled || AerixClientStore.pingHudEnabled || AerixClientStore.lightHudEnabled || AerixClientStore.biomeHudEnabled ||
         AerixClientStore.compassEnabled || AerixClientStore.waypointHudEnabled || AerixClientStore.deathWaypointEnabled || AerixClientStore.healthHudEnabled || AerixClientStore.selectedSlotHudEnabled || AerixClientStore.hotbarSwipeEnabled || AerixClientStore.adaptiveDistanceEnabled || ClientAdaptiveBridge.recovering ||
@@ -569,7 +571,7 @@ private fun AerixClientRootOverlay(
 
             slowTick++
             if (slowTick % 10 == 0) {
-                val totalFrames = if (AerixClientStore.perfPillEnabled || AerixClientStore.fpsHistoryEnabled || AerixClientStore.frameTimingEnabled || AerixClientStore.adaptiveDistanceEnabled || modal == InGameClientModal.OLED_AFK) NativeFrameCounter.read() else -1L
+                val totalFrames = if (mcVersion != "26.3" && (AerixClientStore.perfPillEnabled || AerixClientStore.fpsHistoryEnabled || AerixClientStore.frameTimingEnabled || AerixClientStore.adaptiveDistanceEnabled || modal == InGameClientModal.OLED_AFK)) NativeFrameCounter.read() else -1L
                 val nowNanos = System.nanoTime()
                 if (totalFrames >= 0) {
                     if (lastNativeFrames >= 0 && nowNanos > lastSampleNanos) {
@@ -587,8 +589,16 @@ private fun AerixClientRootOverlay(
                 } else {
                     lastNativeFrames = -1L
                     lastSampleNanos = 0L
+                    val gameFps = if (mcVersion == "26.3") telemetry?.fps else null
+                    if (gameFps != null) {
+                        currentFps = gameFps
+                        if (AerixClientStore.fpsHistoryEnabled) fpsHistory = (fpsHistory + gameFps).takeLast(60) else fpsHistory = emptyList()
+                        if (recentFpsWindow.size >= 20) recentFpsWindow.removeFirst()
+                        recentFpsWindow.addLast(gameFps)
+                        onePercentLowFps = recentFpsWindow.minOrNull() ?: gameFps
+                    } else if (mcVersion == "26.3") currentFps = 0
                 }
-                if (AerixClientStore.frameTimingEnabled) {
+                if (AerixClientStore.frameTimingEnabled && mcVersion != "26.3") {
                     val current = NativeFrameCounter.timingHistogram()
                     frameTiming = FrameTimingStats.calculate(previousTiming, current)
                     previousTiming = current
