@@ -48,7 +48,7 @@ object AerixClientInstaller {
 
     val availableVersions: List<ClientVersionSpec> = ClientVersions.RELEASES.map { version ->
         ClientVersionSpec(version, "Aerix Client $version", if (ClientVersions.modern(version))
-            "Experimental · Java 25 · animated capes and time/weather overrides not yet ported" else "Fabric · version-matched optimization mods")
+            "Experimental · Java 25 · cape animation needs device testing · time/weather overrides unavailable" else "Fabric · version-matched optimization mods")
     }
 
     var isInstalling by mutableStateOf(false)

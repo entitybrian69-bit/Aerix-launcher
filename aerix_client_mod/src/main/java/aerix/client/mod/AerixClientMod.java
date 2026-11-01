@@ -58,6 +58,7 @@ public final class AerixClientMod implements ClientModInitializer {
 
     private boolean handlesResolved = false;
     private boolean modernRuntime = false;
+    private ModernCapeBridge modernCapeBridge;
     private final ClientVisualOverrides visualOverrides = new ClientVisualOverrides();
     private final ClientAdaptiveDistance adaptiveDistance = new ClientAdaptiveDistance();
 
@@ -181,9 +182,13 @@ public final class AerixClientMod implements ClientModInitializer {
         File runDir = resolveRunDir(mc);
         if (!modernRuntime) visualOverrides.tick(mc, runDir);
         adaptiveDistance.tick(mc, runDir);
-        if (modernRuntime) {
+        boolean assetSkin = modernRuntime || (handlesResolved && mSkinCompCape != null &&
+                clsIdentifier != null && !clsIdentifier.isAssignableFrom(mSkinCompCape.getReturnType()));
+        if (assetSkin) {
             if (++slowCounter >= 8) { slowCounter = 0; syncWaveyCapesIfNeeded(runDir); }
-            return; // NativeImage/cape and visual internals need a separate 26.x port.
+            if (modernCapeBridge == null) modernCapeBridge = new ModernCapeBridge(AerixClientMod.class.getClassLoader(), modernRuntime);
+            modernCapeBridge.tick(mc, runDir);
+            return;
         }
         slowCounter++;
         if (slowCounter >= 8) {
@@ -291,7 +296,7 @@ public final class AerixClientMod implements ClientModInitializer {
         List<byte[]> loadedBytes = new ArrayList<byte[]>();
         List<Object> loadedImages = new ArrayList<Object>();
         for (int i = 0; i < 16; i++) {
-            String name = String.format("frame_%02d.png", Integer.valueOf(i));
+            String name = String.format(java.util.Locale.ROOT, "frame_%02d.png", Integer.valueOf(i));
             File f = new File(dir, name);
             if (!f.isFile()) break;
             try {

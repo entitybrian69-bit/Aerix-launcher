@@ -76,7 +76,7 @@ object AerixPreferences {
     const val KEY_DISCORD_APP_ID = "aerixDiscordAppId"
     /** Switch in-game Rich Presence to Minecraft's verified catalog ID so clicking opens its Game Profile. */
     const val KEY_DISCORD_GAME_PROFILE_MODE = "aerixDiscordGameProfileMode"
-    /** Attach cover art, clickable info URLs, and action buttons to Discord Rich Presence cards. */
+    /** Attach modpack art, clickable info URLs, and action buttons to Discord Rich Presence cards. */
     const val KEY_DISCORD_CLICKABLE_LINKS = "aerixDiscordClickableLinks"
 
     const val DEFAULT_CUSTOM_COLOR = 0xFF8DEFE0.toInt()
@@ -174,7 +174,7 @@ object AerixPreferences {
     var discordGameProfileMode by mutableStateOf(true)
         private set
 
-    /** True to attach cover art, clickable info URLs, and action buttons to Rich Presence cards. */
+    /** True to attach modpack art, clickable info URLs, and action buttons to Rich Presence cards. */
     var discordClickableLinks by mutableStateOf(true)
         private set
 

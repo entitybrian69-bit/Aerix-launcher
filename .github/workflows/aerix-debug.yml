@@ -65,6 +65,8 @@ jobs:
       - name: Verify Client smoke tests
         run: |
           python3 tests/branding_identity_smoke.py
+          python3 tests/discord_presence_logo_smoke.py
+          python3 tests/modern_cape_smoke.py
           python3 tests/social_profile_cosmetics_smoke.py
           python3 tests/client_background_smoke.py
           mkdir -p "$RUNNER_TEMP/aerix-memory-test"

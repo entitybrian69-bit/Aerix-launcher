@@ -143,8 +143,8 @@ fun DiscordPresenceSettingsCard() {
 
         MiraiSwitchSettingsCard(
             position = CardPosition.Middle,
-            title = "Cover art, clickable info links & buttons",
-            summary = "Attach Aerix / modpack cover artwork, make the headline & status clickable " +
+            title = "Modpack art, clickable info links & buttons",
+            summary = "Show modpack cover artwork, make the headline & status clickable " +
                 "(opening the official Aerix website & Discord), and display \u201CAbout Aerix Launcher\u201D " +
                 "+ \u201CJoin Aerix Discord\u201D buttons on your profile card.",
             checked = clickableLinks,
@@ -297,44 +297,28 @@ private fun DiscordRichPresenceLivePreview(
                                 if (clickableLinks) mod.clickable(onClick = onOpenWebsite) else mod
                             }
                     ) {
-                        if (clickableLinks) {
+                        Image(
+                            painter = painterResource(R.drawable.aerix_logo),
+                            contentDescription = "Aerix Cover Art",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .size(62.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Color(0xFF1E1F22))
+                        )
+                        if (usingOfficialMcProfile) {
                             Image(
                                 painter = painterResource(R.drawable.aerix_logo),
-                                contentDescription = "Aerix Cover Art",
+                                contentDescription = "Aerix Badge",
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier
-                                    .size(62.dp)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(Color(0xFF1E1F22))
+                                    .size(22.dp)
+                                    .align(Alignment.BottomEnd)
+                                    .offset(x = 4.dp, y = 4.dp)
+                                    .clip(CircleShape)
+                                    .border(2.dp, Color(0xFF111214), CircleShape)
+                                    .let { mod -> if (clickableLinks) mod.clickable(onClick = onOpenDiscord) else mod }
                             )
-                            if (usingOfficialMcProfile) {
-                                Image(
-                                    painter = painterResource(R.drawable.aerix_logo),
-                                    contentDescription = "Aerix Badge",
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier
-                                        .size(22.dp)
-                                        .align(Alignment.BottomEnd)
-                                        .offset(x = 4.dp, y = 4.dp)
-                                        .clip(CircleShape)
-                                        .border(2.dp, Color(0xFF111214), CircleShape)
-                                        .clickable(onClick = onOpenDiscord)
-                                )
-                            }
-                        } else {
-                            Box(
-                                modifier = Modifier
-                                    .size(62.dp)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(Color(0xFF2B2D31)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = if (usingOfficialMcProfile) "MC" else "AX",
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White.copy(alpha = 0.72f)
-                                )
-                            }
                         }
                     }
 

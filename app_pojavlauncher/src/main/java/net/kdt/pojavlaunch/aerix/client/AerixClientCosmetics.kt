@@ -240,7 +240,7 @@ object AerixClientCosmetics {
             val total = 12
             for (i in 0 until total) {
                 val bmp = buildAnimatedCapeFrameBitmap(spec, frameIndex = i, totalFrames = total)
-                val outFile = File(framesDir, String.format("frame_%02d.png", i))
+                val outFile = File(framesDir, String.format(java.util.Locale.ROOT, "frame_%02d.png", i))
                 FileOutputStream(outFile).use { fos ->
                     bmp.compress(Bitmap.CompressFormat.PNG, 100, fos)
                 }

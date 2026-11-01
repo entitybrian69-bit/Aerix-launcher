@@ -73,7 +73,7 @@ object AerixDiscordPresence {
     const val AERIX_WEBSITE_URL = "https://entitybrian69-bit.github.io/Aerix-launcher/"
     const val AERIX_DISCORD_URL = "https://discord.gg/RS7q9KaCm6"
     const val AERIX_LOGO_URL =
-        "https://raw.githubusercontent.com/entitybrian69-bit/Aerix-launcher/v3_openjdk/assets/aerix-logo.png"
+        "https://raw.githubusercontent.com/entitybrian69-bit/Aerix-launcher/4a3b1c37a8d4838eaa5cb8933610db7fb6efdec5/assets/aerix-logo.png"
 
     /** Verified Discord catalog IDs for Minecraft's native Game Profile sheet. */
     const val MINECRAFT_PRIMARY_APP_ID = 1402418491272986635L
@@ -957,33 +957,27 @@ object AerixDiscordPresence {
             }
         }
 
+        val assets = JSONObject()
+        val validPackIcon = activeModpackIconUrl?.takeIf { clickable && inGameMode && isValidHttpAssetUrl(it) }
+        if (validPackIcon != null) {
+            assets.put("large_image", validPackIcon)
+            assets.put("large_text", "$state · Aerix Launcher")
+            assets.put("small_image", AERIX_LOGO_URL)
+            assets.put("small_text", "Aerix Launcher — Tap to join Discord")
+        } else {
+            assets.put("large_image", AERIX_LOGO_URL)
+            assets.put("large_text", if (usingMinecraftProfile)
+                "Aerix Launcher — Minecraft Java Edition on Android" else "Aerix Launcher — Official Website & Info")
+            if (usingMinecraftProfile) {
+                assets.put("small_image", AERIX_LOGO_URL)
+                assets.put("small_text", "Powered by Aerix Launcher")
+            }
+        }
         if (clickable) {
             activity.put("details_url", AERIX_WEBSITE_URL)
             activity.put("state_url", AERIX_DISCORD_URL)
-
-            val assets = JSONObject()
-            val validPackIcon = activeModpackIconUrl?.takeIf { inGameMode && isValidHttpAssetUrl(it) }
-            if (validPackIcon != null) {
-                assets.put("large_image", validPackIcon)
-                assets.put("large_text", "$state · Aerix Launcher")
-                assets.put("large_url", AERIX_WEBSITE_URL)
-                assets.put("small_image", AERIX_LOGO_URL)
-                assets.put("small_text", "Aerix Launcher — Tap to join Discord")
-                assets.put("small_url", AERIX_DISCORD_URL)
-            } else if (usingMinecraftProfile) {
-                assets.put("large_image", AERIX_LOGO_URL)
-                assets.put("large_text", "Aerix Launcher — Minecraft Java Edition on Android")
-                assets.put("large_url", AERIX_WEBSITE_URL)
-                assets.put("small_image", AERIX_LOGO_URL)
-                assets.put("small_text", "Powered by Aerix Launcher")
-                assets.put("small_url", AERIX_DISCORD_URL)
-            } else {
-                assets.put("large_image", AERIX_LOGO_URL)
-                assets.put("large_text", "Aerix Launcher — Official Website & Info")
-                assets.put("large_url", AERIX_WEBSITE_URL)
-            }
-            activity.put("assets", assets)
-
+            assets.put("large_url", AERIX_WEBSITE_URL)
+            if (validPackIcon != null || usingMinecraftProfile) assets.put("small_url", AERIX_DISCORD_URL)
             if (supportsExtendedFields) {
                 val buttons = JSONArray()
                     .put(
@@ -999,6 +993,7 @@ object AerixDiscordPresence {
                 activity.put("buttons", buttons)
             }
         }
+        activity.put("assets", assets)
 
         val args = JSONObject()
             .put("pid", HANDLER_PID)
