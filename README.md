@@ -50,23 +50,45 @@ To keep existing Aerix installs updatable, the release app retains the Android I
 
 ## 📸 Screenshots
 
-**Home (No Top Bar):** The page starts cleanly at the very top of your mobile screen, keeping *Create a World*, *Open Library*, and *PLAY* exactly one touch away.  
-![Home](assets/screenshots/shot-home.jpg)
+**Home**
 
-**Create New Instance:** The Minecraft version list takes over the left column (with the selected version clearly outlined by a check mark), flanked beautifully by a responsive modloader grid.  
-![Create New Instance](assets/screenshots/shot-instances.jpg)
+![Home](assets/screenshots/readme-01-home.jpg)
 
-**Discover:** Fully integrated window to browse and natively install mods, modpacks, shaders, and resource packs with modular filters for platform, category, game version, and loader framework.  
-![Discover](assets/screenshots/shot-discover.jpg)
+**Aerix Client**
 
-**Wallpapers:** 25 built-in, HD custom Minecraft wallpapers—each housing its own tailored accent theme, dim controls, and support for external user imports.  
-![Wallpapers](assets/screenshots/shot-wallpapers.jpg)
+![Aerix Client](assets/screenshots/readme-02-aerix-client.jpg)
 
-**Renderers:** Pick your renderer, Vulkan driver configuration, and graphics API per-version, backed by a smart, automated recommended default template.  
-![Renderers](assets/screenshots/shot-renderer.jpg)
+**Create New Instance**
 
-**Accounts & Skins:** Authenticate Microsoft, offline, or external auth-server accounts in tandem with a searchable three-column skin library featuring one-tap installations.  
-![Accounts & Skins](assets/screenshots/shot-accounts.jpg)
+![Create New Instance](assets/screenshots/readme-03-create-instance.jpg)
+
+**Instance Management**
+
+![Instance Management](assets/screenshots/readme-04-instance-management.jpg)
+
+**Discover**
+
+![Discover](assets/screenshots/readme-05-discover.jpg)
+
+**Other Releases**
+
+![Other Releases](assets/screenshots/readme-06-other-releases.jpg)
+
+**Wallpapers**
+
+![Wallpapers](assets/screenshots/readme-07-wallpapers.jpg)
+
+**Renderer Settings**
+
+![Renderer Settings](assets/screenshots/readme-08-renderer-settings.jpg)
+
+**Contribution**
+
+![Contribution](assets/screenshots/readme-09-contribution.jpg)
+
+**Skins**
+
+![Skins](assets/screenshots/readme-10-skins.jpg)
 
 ---
 
