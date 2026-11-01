@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>FAQ — Aerix Launcher</title>
+<meta name="description" content="Answers about Aerix Launcher: which APK to download, updating without losing instances, mods and shaders, supported Android versions, account safety, and what to do when a game will not start.">
+<meta name="theme-color" content="#c8102e">
+<meta name="color-scheme" content="light">
+<link rel="icon" href="assets/aerix-logo.png">
+<link rel="apple-touch-icon" href="assets/aerix-logo.png">
+<link rel="canonical" href="https://entitybrian69-bit.github.io/Aerix-launcher/faq.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Aerix Launcher">
+<meta property="og:title" content="FAQ — Aerix Launcher">
+<meta property="og:description" content="Answers about Aerix Launcher: which APK to download, updating without losing instances, mods and shaders, supported Android versions, account safety, and what to do when a game will not start.">
+<meta property="og:url" content="https://entitybrian69-bit.github.io/Aerix-launcher/faq.html">
+<meta property="og:image" content="https://entitybrian69-bit.github.io/Aerix-launcher/assets/screenshots/shot-home.jpg">
+<meta property="og:image:alt" content="The Aerix Launcher home screen">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+<div class="bg" aria-hidden="true">
+  <span class="bg-grid"></span>
+  <span class="bg-ribbon r1"></span>
+  <span class="bg-ribbon r2"></span>
+  <span class="bg-ribbon r3"></span>
+  <span class="bg-dots"></span>
+  <span class="bg-arc a1"></span>
+  <span class="bg-arc a2"></span>
+</div>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="nav">
+  <div class="wrap nav-inner">
+    <a class="brand" href="index.html">
+      <img src="assets/aerix-logo.png" alt="" width="34" height="34">
+      <span>AERIX<small>LAUNCHER</small></span>
+    </a>
+    <nav class="nav-links" id="navLinks" aria-label="Pages">
+      <a href="index.html">Home</a>
+      <a href="features.html">Features</a>
+      <a href="renderers.html">Renderers</a>
+      <a href="screenshots.html">Gallery</a>
+      <a href="install.html">Install</a>
+      <a href="faq.html" aria-current="page">FAQ</a>
+    </nav>
+    <a class="nav-cta" href="index.html#download">Download</a>
+    <button class="nav-toggle" id="navToggle" type="button" aria-expanded="false" aria-controls="navLinks" aria-label="Open menu">
+      <span></span>
+    </button>
+  </div>
+</header>
+
+  <section class="page-head">
+    <div class="wrap">
+      <span class="kicker">FAQ</span>
+      <h1>Questions people actually ask</h1>
+      <p>The short answers first; the awkward ones with a link to the page that covers them properly.</p>
+    </div>
+  </section>
+
+<main id="main">
+  <section class="section">
+    <div class="wrap">
+      <div class="faq reveal">
+        <details open>
+          <summary>Is Aerix Launcher free?</summary>
+          <div class="body"><p>Yes. There is no paid tier, no subscription and no ad. The launcher has no account of its own — you sign in with the Minecraft account you already have, or play offline.</p></div>
+        </details>
+        <details>
+          <summary>Do I need to own Minecraft?</summary>
+          <div class="body"><p>To play online on a Microsoft account, yes — the launcher signs in to your existing copy, it does not provide the game. Offline accounts work for testing packs and playing alone, exactly as they do in the desktop launcher.</p></div>
+        </details>
+        <details>
+          <summary>Which file do I download?</summary>
+          <div class="body"><p>For nearly every phone made since 2016, <b>arm64-v8a</b>. For an older 32-bit phone, <b>armeabi-v7a</b>. If you are not sure, the <b>universal</b> build works on everything and is bigger because it carries every architecture.</p></div>
+        </details>
+        <details>
+          <summary>Will I lose my instances when I update?</summary>
+          <div class="body"><p>No, as long as you install the new APK over the old one. Uninstalling first deletes the launcher's storage, which includes your instances, worlds, accounts and wallpapers. The in-app updater updates in place.</p></div>
+        </details>
+        <details>
+          <summary>The game will not start. What do I do?</summary>
+          <div class="body"><p>Change the renderer for that instance first — the default, Emesis, works almost everywhere, but a phone with a strong Vulkan driver may prefer Zink, and old versions often want GL4ES. If that does not help, lower the resolution and give the instance more memory. The <a href='renderers.html'>renderer page</a> has a short decision tree.</p></div>
+        </details>
+        <details>
+          <summary>Does it support mods and shaders?</summary>
+          <div class="body"><p>Yes. Choose Fabric, Forge, NeoForge or Quilt when you create the instance, then install mods from the built-in browser or drop them into the instance folder. Shaders need a capable GPU and the right renderer — that is where MG-ES or Zink earn their place.</p></div>
+        </details>
+        <details>
+          <summary>Which Android versions and devices are supported?</summary>
+          <div class="body"><p>Android 6.0 and newer, on both 64-bit and 32-bit devices. There is no device allowlist: the launcher runs where the GPU and drivers allow it, which is why there are so many renderers.</p></div>
+        </details>
+        <details>
+          <summary>Is my Microsoft login safe?</summary>
+          <div class="body"><p>The sign-in happens with Microsoft through the usual flow, and the token is stored on your device, in the launcher's own storage. The launcher sends nothing about you anywhere except the login you choose — there is no telemetry and no analytics.</p></div>
+        </details>
+        <details>
+          <summary>Can I import my existing worlds and controls?</summary>
+          <div class="body"><p>Yes. Worlds go into the instance's <code>saves</code> folder, and control layouts are plain JSON that import from the controls editor, including layouts from other launchers.</p></div>
+        </details>
+        <details>
+          <summary>How do I switch accounts while playing?</summary>
+          <div class="body"><p>Open the in-game menu and tap your name under the character. Pick the account and confirm — the game restarts and comes back signed in as them. A running game keeps the session it launched with, so the restart is the switch.</p></div>
+        </details>
+        <details>
+          <summary>Where do the files live?</summary>
+          <div class="body"><p>In the launcher's private storage on your device: instances, worlds, mods, Java runtimes and accounts. Nothing is uploaded; if you want a copy, the launcher's folders are reachable from its own file browser.</p></div>
+        </details>
+        <details>
+          <summary>Why is the download so large?</summary>
+          <div class="body"><p>The full build carries a Java runtime so the game can start without downloading anything else, plus native libraries for the architectures it supports. The <b>no-runtime</b> build is much smaller and fetches Java on first launch.</p></div>
+        </details>
+      </div>
+
+      <div class="grid grid-2 mt-32">
+        <article class="card">
+          <h3>Still stuck?</h3>
+          <p>Open an issue with your device, the instance's version and loader, the renderer, and the
+             last thirty lines of the log. That is enough to answer almost anything.</p>
+          <div class="tag-row"><a class="tag" href="https://github.com/entitybrian69-bit/Aerix-launcher/issues" target="_blank" rel="noopener">Open an issue</a></div>
+        </article>
+        <article class="card">
+          <h3>Ask in Discord</h3>
+          <p>Faster for "why does this look wrong" questions, where a screenshot answers it in one message.</p>
+          <div class="tag-row"><a class="tag" href="https://discord.gg/RS7q9KaCm6" target="_blank" rel="noopener">Join the server</a></div>
+        </article>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <div class="wrap">
+    <div class="footer-grid">
+      <div>
+        <a class="brand" href="index.html">
+          <img src="assets/aerix-logo.png" alt="" width="34" height="34">
+          <span>AERIX<small>LAUNCHER</small></span>
+        </a>
+        <p class="small" style="max-width:32ch">
+          Minecraft: Java Edition on Android — instances, renderers, accounts and a
+          content browser in one launcher.
+        </p>
+      </div>
+      <div>
+        <h4>The launcher</h4>
+        <ul>
+          <li><a href="features.html">Features</a></li>
+          <li><a href="renderers.html">Renderers</a></li>
+          <li><a href="screenshots.html">Gallery</a></li>
+          <li><a href="install.html">Install guide</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Get it</h4>
+        <ul>
+          <li><a href="index.html#download">Download</a></li>
+          <li><a href="https://github.com/entitybrian69-bit/Aerix-launcher/releases" target="_blank" rel="noopener">All releases</a></li>
+          <li><a href="https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest/download/SHA256SUMS" target="_blank" rel="noopener">Checksums</a></li>
+          <li><a href="faq.html">FAQ</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Project</h4>
+        <ul>
+          <li><a href="https://github.com/entitybrian69-bit/Aerix-launcher" target="_blank" rel="noopener">GitHub</a></li>
+          <li><a href="https://discord.gg/RS7q9KaCm6" target="_blank" rel="noopener">Discord</a></li>
+          <li><a href="https://github.com/entitybrian69-bit/Aerix-launcher/issues" target="_blank" rel="noopener">Report a bug</a></li>
+          <li><a href="https://github.com/entitybrian69-bit/Aerix-launcher/blob/v3_openjdk/PRIVACY_POLICY.md" target="_blank" rel="noopener">Privacy</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-credit">
+      <img src="assets/creator-entitybrian.jpg" alt="" width="48" height="48" loading="lazy">
+      <p>
+        <b>entitybrian</b> — Owner · Core developer · Tester · Maintainer<br>
+        <a href="index.html#creator">Who builds Aerix</a> · <a href="https://github.com/entitybrian69-bit" target="_blank" rel="noopener">GitHub profile</a>
+      </p>
+    </div>
+    <div class="footer-bottom">
+      <span>© <span id="year">2026</span> Aerix Launcher. Not affiliated with Mojang or Microsoft.</span>
+      <span>Minecraft is a trademark of Mojang Synergies AB.</span>
+    </div>
+  </div>
+</footer>
+<script src="site.js" defer></script>
+</body>
+</html>

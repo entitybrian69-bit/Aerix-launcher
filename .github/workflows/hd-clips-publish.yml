@@ -1,0 +1,56 @@
+name: Publish HD clips
+
+# The five high-resolution clips would add about 17 MB to every download of the launcher, so it
+# fetches them on demand. This puts them where it can reach them: as assets of the `clips-hd-v2`
+# release.
+#
+# The files in hd-clips/ are the artist's originals cut to one or two second keyframe-aligned
+# loops, container rewritten and packets copied - no re-encode, so the picture is exactly the
+# original encoding. The sha256 in the app is of these exact bytes.
+#
+# The release is a prerelease on purpose. The in-app updater looks at the newest stable release, so
+# a clips release must never be the newest stable one or it would be offered as a launcher update.
+#
+# Run it whenever hd-clips/ changes. It is safe to run again: assets that already exist are left
+# alone, so the bytes a phone is verifying never change underneath it.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "arena/2f1249a3-aerix-launcher" ]
+    paths: [ "hd-clips/**", ".github/workflows/hd-clips-publish.yml" ]
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 1
+
+      - name: Upload the clips that are missing from the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          TAG=clips-hd-v2
+          if ! gh release view "$TAG" > /dev/null 2>&1; then
+            gh release create "$TAG" --prerelease \
+              --title "Aerix HD clips (4K/1440p pack)" \
+              --notes "Full-quality clip pack for Aerix Launcher, downloaded on demand so the APK stays small. Nothing here is re-encoded: the files are the originals, and the launcher checks each one against the sha256 baked into the app."
+          fi
+          existing=$(gh release view "$TAG" --json assets -q '.assets[].name')
+          for file in hd-clips/*.mp4; do
+            name=$(basename "$file")
+            if printf '%s\n' "$existing" | grep -qx "$name"; then
+              echo "$name already published"
+            else
+              echo "uploading $name ($(stat -c%s "$file") bytes)"
+              gh release upload "$TAG" "$file"
+            fi
+          done
+          gh release view "$TAG" --json assets -q '.assets[] | "\(.name) \(.size) \(.state)"'

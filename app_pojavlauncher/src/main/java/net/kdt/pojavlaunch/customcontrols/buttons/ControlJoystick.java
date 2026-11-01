@@ -45,6 +45,7 @@ public class ControlJoystick extends JoystickView implements ControlInterface {
 
     private static void sendInput(int[] keys, boolean isDown) {
         for (int key : keys) {
+            if (key <= KeyEvent.KEYCODE_UNKNOWN || key > KeyEvent.getMaxKeyCode()) continue;
             int modifiers = CallbackBridge.getCurrentMods();
             PLATFORM.sendKeyEvent(key, isDown, modifiers);
         }
@@ -53,7 +54,7 @@ public class ControlJoystick extends JoystickView implements ControlInterface {
     private void init(ControlJoystickData data, ControlLayout layout) {
         mControlData = data;
         setProperties(preProcessProperties(data, layout));
-        setDeadzone(35);
+        setDeadzone(Math.max(0, Math.min(95, data.deadzone)));
         setFixedCenter(data.absolute);
         setAutoReCenterButton(true);
 
@@ -73,7 +74,7 @@ public class ControlJoystick extends JoystickView implements ControlInterface {
 
             @Override
             public void onForwardLock(boolean isLocked) {
-                sendInput(mDirectionForwardLock, isLocked);
+                sendInput(mControlData.forwardLockKeycodes == null ? mDirectionForwardLock : mControlData.forwardLockKeycodes, isLocked);
             }
         });
     }
@@ -92,6 +93,7 @@ public class ControlJoystick extends JoystickView implements ControlInterface {
     public void setProperties(ControlData properties, boolean changePos) {
         mControlData = (ControlJoystickData) properties;
         mControlData.isHideable = true;
+        setDeadzone(Math.max(0, Math.min(95, mControlData.deadzone)));
         ControlInterface.super.setProperties(properties, changePos);
         postDelayed(() -> {
             setForwardLockDistance(mControlData.forwardLock ? (int) Tools.dpToPx(60) : 0);
@@ -136,6 +138,11 @@ public class ControlJoystick extends JoystickView implements ControlInterface {
     }
 
     private void sendDirectionalKeycode(int direction, boolean isDown) {
+        if (mControlData.directionKeycodes != null && direction >= 0 && direction < 8) {
+            int[] keys = direction < mControlData.directionKeycodes.length ? mControlData.directionKeycodes[direction] : null;
+            if (keys != null) sendInput(keys, isDown);
+            return;
+        }
         switch (direction) {
             case DIRECTION_NORTH:
                 sendInput(mDirectionForward, isDown);

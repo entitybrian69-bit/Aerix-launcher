@@ -1,0 +1,25 @@
+Bundled third-party renderer: Proton
+====================================
+
+File:      app_pojavlauncher/src/main/jniLibs/armeabi-v7a/libpowervr.so
+Renderer:  Proton ("PowerVR Unified"), a desktop OpenGL over OpenGL ES translator
+Upstream:  https://github.com/kushaladhikari982648-lgtm/proton-renderer
+Built by:  the upstream project's GitHub Actions (the library records its build path
+           /home/runner/work/proton-renderer/proton-renderer/... and reports itself as
+           "Krypton Wrapper with glslang and SPIRV-Cross")
+Sources:   the library is a merge of two upstream projects,
+             - Large Thin Wrapper (LTW), https://github.com/MojoLauncher/LTW
+             - NG-GL4ES ("Krypton Wrapper"), https://github.com/BZLZHH/NG-GL4ES
+           See those repositories for the corresponding source and their licence terms.
+
+Packaged ABI: 32-bit ARM (armeabi-v7a) only.
+
+This is the library shipped in the PowerVR Unified r2 plugin APK
+(np.proton.renderer.powervr, version 0.2.0-experimental) published by the upstream project,
+for its 32-bit ARM build. It is bundled so the renderer is available without installing a
+separate plugin APK; the plugin APK is still detected and usable if it is installed.
+
+The renderer is offered on 32-bit devices only, which is what the app reports next to its
+name, because that is the only ABI of it that is packaged here. It needs nothing but the
+system EGL implementation and its own library; it is aimed at PowerVR GPUs, where the
+platform GLES driver is the weakest link.

@@ -1,7 +1,7 @@
 # Aerix Launcher — Minecraft: Java Edition on Android
 
 <p align="center">
-  <img src="assets/aerix-logo.png" alt="Aerix Launcher logo" width="160" />
+  <img src="assets/aerix-launcher-logo.png" alt="Aerix Launcher’s new hand-drawn A logo" width="240" />
 </p>
 
 <p align="center">
@@ -16,8 +16,14 @@
   <a href="#-the-team"><img src="https://img.shields.io/badge/Maintained%20by-entitybrian-F59E0B?style=for-the-badge" alt="Team"></a>
   <a href="#%EF%B8%8F-private-on-purpose"><img src="https://img.shields.io/badge/Privacy-No%20Trackers-111827?style=for-the-badge" alt="Privacy"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPL--3.0-blue?style=for-the-badge" alt="License"></a>
-  <a href="https://github.com/entitybrian69-bit/Aerix-launcher/releases"><img src="https://img.shields.io/github/downloads/entitybrian69-bit/Aerix-launcher/total?style=for-the-badge&logo=github&color=green" alt="Downloads"></a>
   <a href="https://discord.gg/RS7q9KaCm6"><img src="https://img.shields.io/badge/Discord-Community%20%26%20suggestions-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord"></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/entitybrian69-bit/Aerix-launcher/releases"><img src="https://img.shields.io/github/downloads/entitybrian69-bit/Aerix-launcher/total?style=for-the-badge&label=TOTAL%20DOWNLOADS&color=C8102E&logo=github&logoColor=white" alt="Total downloads across every release"></a>
+  <a href="https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest"><img src="https://img.shields.io/github/downloads/entitybrian69-bit/Aerix-launcher/latest/total?style=for-the-badge&label=THIS%20RELEASE&color=101014&logo=android&logoColor=3DDC84" alt="Downloads of the latest release"></a>
+  <a href="https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest"><img src="https://img.shields.io/github/v/release/entitybrian69-bit/Aerix-launcher?style=for-the-badge&label=LATEST&color=C8102E" alt="Latest release"></a>
+  <a href="https://entitybrian69-bit.github.io/Aerix-launcher/"><img src="https://img.shields.io/badge/Website-Live-C8102E?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Website"></a>
 </p>
 
 ***
@@ -26,6 +32,10 @@
 > The legacy codebase of Aerix Launcher was completely discontinued and deleted by the developer due to unfixable internal architectural bugs. **This repository represents a completely fresh, optimized, written-from-scratch codebase.** Any historical download pages, third-party mirrors (such as old Appteka links), or legacy forks referencing old builds are completely obsolete and broken. **This is the single official, live, and actively maintained repository for Aerix Launcher.**
 
 ***
+
+## Android package and existing data
+
+To keep existing Aerix installs updatable, the release app retains the Android ID `net.kdt.pojavlaunch`; the debug app retains `net.kdt.pojavlaunch.debug`. Android can install an update over an existing app only when its package ID and signing certificate match and its version code is not lower. Debug and release are separate apps and cannot update each other. Back up your data before installing an update.
 
 ## 🗺️ Quick Links
 <p align="center">
@@ -40,23 +50,45 @@
 
 ## 📸 Screenshots
 
-**Home (No Top Bar):** The page starts cleanly at the very top of your mobile screen, keeping *Create a World*, *Open Library*, and *PLAY* exactly one touch away.  
-![Home](assets/screenshots/shot-home.jpg)
+**Home**
 
-**Create New Instance:** The Minecraft version list takes over the left column (with the selected version clearly outlined by a check mark), flanked beautifully by a responsive modloader grid.  
-![Create New Instance](assets/screenshots/shot-instances.jpg)
+![Home](assets/screenshots/readme-01-home.jpg)
 
-**Discover:** Fully integrated window to browse and natively install mods, modpacks, shaders, and resource packs with modular filters for platform, category, game version, and loader framework.  
-![Discover](assets/screenshots/shot-discover.jpg)
+**Aerix Client**
 
-**Wallpapers:** 25 built-in, HD custom Minecraft wallpapers—each housing its own tailored accent theme, dim controls, and support for external user imports.  
-![Wallpapers](assets/screenshots/shot-wallpapers.jpg)
+![Aerix Client](assets/screenshots/readme-02-aerix-client.jpg)
 
-**Renderers:** Pick your renderer, Vulkan driver configuration, and graphics API per-version, backed by a smart, automated recommended default template.  
-![Renderers](assets/screenshots/shot-renderer.jpg)
+**Create New Instance**
 
-**Accounts & Skins:** Authenticate Microsoft, offline, or external auth-server accounts in tandem with a searchable three-column skin library featuring one-tap installations.  
-![Accounts & Skins](assets/screenshots/shot-accounts.jpg)
+![Create New Instance](assets/screenshots/readme-03-create-instance.jpg)
+
+**Instance Management**
+
+![Instance Management](assets/screenshots/readme-04-instance-management.jpg)
+
+**Discover**
+
+![Discover](assets/screenshots/readme-05-discover.jpg)
+
+**Other Releases**
+
+![Other Releases](assets/screenshots/readme-06-other-releases.jpg)
+
+**Wallpapers**
+
+![Wallpapers](assets/screenshots/readme-07-wallpapers.jpg)
+
+**Renderer Settings**
+
+![Renderer Settings](assets/screenshots/readme-08-renderer-settings.jpg)
+
+**Contribution**
+
+![Contribution](assets/screenshots/readme-09-contribution.jpg)
+
+**Skins**
+
+![Skins](assets/screenshots/readme-10-skins.jpg)
 
 ---
 
@@ -150,9 +182,15 @@ Aerix consolidates instance optimization, engine selection, profile customizatio
 
 ## 👥 The Team
 <p align="center">
-  <img src="assets/team/entitybrian.jpg" width="140" alt="entitybrian"><br>
+  <img src="assets/team/entitybrian.jpg" width="140" alt="entitybrian" style="border-radius:50%"><br>
   <strong>entitybrian</strong><br>
-  <sub>Owner, Core Developer, Tester, and Maintainer</sub>
+  <sub>Owner · Core Developer · Tester · Maintainer</sub>
+</p>
+
+<p align="center">
+  <a href="https://github.com/entitybrian69-bit"><img src="https://img.shields.io/badge/GitHub-entitybrian69--bit-101014?style=for-the-badge&logo=github&logoColor=white" alt="GitHub profile"></a>
+  <a href="https://entitybrian69-bit.github.io/Aerix-launcher/"><img src="https://img.shields.io/badge/Website-Aerix%20Launcher-C8102E?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Website"></a>
+  <a href="https://discord.gg/RS7q9KaCm6"><img src="https://img.shields.io/badge/Discord-Say%20hello-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord"></a>
 </p>
 
 entitybrian designs, writes, tests, and ships Aerix Launcher.

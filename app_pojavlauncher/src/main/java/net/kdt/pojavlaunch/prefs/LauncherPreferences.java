@@ -13,10 +13,12 @@ import android.util.DisplayMetrics;
 import android.util.Log;
 
 import net.kdt.pojavlaunch.*;
+import net.kdt.pojavlaunch.game.renderer.def.Renderers;
 import net.kdt.pojavlaunch.multirt.MultiRTUtils;
 import net.kdt.pojavlaunch.utils.GpuUtils;
 import net.kdt.pojavlaunch.utils.JREUtils;
 
+import java.io.File;
 import java.io.IOException;
 
 import net.kdt.pojavlaunch.R;
@@ -76,14 +78,28 @@ public class LauncherPreferences {
     public static boolean PREF_ALSOFT_FORCE_OPENSL = false;
     public static boolean PREF_SHOW_MEMORY_WARNING_DIALOG = true;
     public static short PREF_BUTTON_TRANSPARENCY = 100;
+
+    /** Control themes: felt on touch down, and heard, unless the player turns either off. */
+    public static boolean PREF_CONTROL_THEME_HAPTICS = true;
+    /** Control themes: the system key click, played on touch down. */
+    public static boolean PREF_CONTROL_THEME_SOUND = true;
+    /** Control themes: the art keeps moving at rest. Off makes a themed control completely still. */
+    public static boolean PREF_CONTROL_THEME_ANIMATED = true;
     public static boolean PREF_UBWC_WORKAROUND = false;
+    /** Whether the frame rate counter is drawn over the game. */
+    public static boolean PREF_SHOW_FPS = true;
 
     public static void loadPreferences(Context ctx) {
         //Required for CTRLDEF_FILE and MultiRT
         Tools.initStorageConstants(ctx);
         boolean isDevicePowerful = isDevicePowerful(ctx);
 
-        PREF_RENDERER = DEFAULT_PREF.getString("renderer", "opengles2");
+        net.kdt.pojavlaunch.aerix.bridge.RetiredRendererCleanup.clean(ctx);
+        PREF_RENDERER = DEFAULT_PREF.getString("renderer", defaultRendererId(ctx));
+        if (net.kdt.pojavlaunch.aerix.bridge.RetiredRendererCleanup.isRetiredTag(PREF_RENDERER)) {
+            PREF_RENDERER = defaultRendererId(ctx);
+            DEFAULT_PREF.edit().putString("renderer", PREF_RENDERER).apply();
+        }
         PREF_BUTTONSIZE = DEFAULT_PREF.getInt("buttonscale", 100);
         PREF_MOUSESCALE = DEFAULT_PREF.getInt("mousescale", 100)/100f;
         PREF_MOUSESPEED = ((float)DEFAULT_PREF.getInt("mousespeed",100))/100f;
@@ -125,7 +141,11 @@ public class LauncherPreferences {
         PREF_ALSOFT_FORCE_OPENSL = DEFAULT_PREF.getBoolean("alsoftForceOpenSL", false);
         PREF_SHOW_MEMORY_WARNING_DIALOG = DEFAULT_PREF.getBoolean("showMemoryWarning", true);
         PREF_BUTTON_TRANSPARENCY = (short) DEFAULT_PREF.getInt("buttonTransparency", 100);
+        PREF_CONTROL_THEME_HAPTICS = DEFAULT_PREF.getBoolean("controlThemeHaptics", true);
+        PREF_CONTROL_THEME_SOUND = DEFAULT_PREF.getBoolean("controlThemeSound", true);
+        PREF_CONTROL_THEME_ANIMATED = DEFAULT_PREF.getBoolean("controlThemeAnimated", true);
         PREF_UBWC_WORKAROUND = DEFAULT_PREF.getBoolean("ubwcWorkaround", false);
+        PREF_SHOW_FPS = DEFAULT_PREF.getBoolean("show_fps", true);
 
         String argLwjglLibname = "-Dorg.lwjgl.opengl.libname=";
         for (String arg : JREUtils.parseJavaArguments(PREF_CUSTOM_JAVA_ARGS)) {
@@ -145,6 +165,24 @@ public class LauncherPreferences {
             PREF_DEFAULT_RUNTIME = MultiRTUtils.getRuntimes().get(0).name;
             LauncherPreferences.DEFAULT_PREF.edit().putString("defaultRuntime",LauncherPreferences.PREF_DEFAULT_RUNTIME).apply();
         }
+    }
+
+    /**
+     * Renderer used until one is picked in the settings.
+     * MobileGlues is the default one, devices that cannot run it fall back to GL4ES.
+     * @param ctx Context needed to read the graphics capabilities of the device.
+     * @return The renderer id to use when nothing was picked yet.
+     */
+    public static String defaultRendererId(Context ctx){
+        try {
+            if(GpuUtils.getGlInfo().glesMajorVersion >= 3
+                    && new File(Tools.NATIVE_LIB_DIR, "libmobileglues.so").exists()) {
+                return Renderers.MOBILEGLUES_RENDERER;
+            }
+        } catch (Throwable ignored) {
+            // Keep GL4ES as the fallback when the device cannot be queried.
+        }
+        return Renderers.GL4ES_RENDERER;
     }
 
     /**

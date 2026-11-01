@@ -48,7 +48,8 @@ object AerixNav {
         LauncherSection.ADD_ACCOUNT,
         LauncherSection.OFFLINE_ACCOUNT,
         LauncherSection.FILES,
-        LauncherSection.LOGS
+        LauncherSection.LOGS,
+        LauncherSection.CONTRIBUTION_DETAIL
     )
 
     var section by mutableStateOf(LauncherSection.HOME)
@@ -109,6 +110,7 @@ object AerixNav {
         LauncherSection.ADD_ACCOUNT -> LauncherSection.ACCOUNTS
         LauncherSection.INSTANCE_EDITOR -> LauncherSection.LIBRARY
         LauncherSection.LOGS -> LauncherSection.SETTINGS
+        LauncherSection.CONTRIBUTION_DETAIL -> LauncherSection.CONTRIBUTION
         else -> LauncherSection.HOME
     }
 }

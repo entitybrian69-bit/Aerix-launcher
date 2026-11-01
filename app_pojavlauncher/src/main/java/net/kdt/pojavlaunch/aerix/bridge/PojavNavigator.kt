@@ -60,8 +60,11 @@ enum class PojavInstaller(val fragment: Class<out Fragment>, val tag: String) {
 }
 
 object PojavNavigator {
-    fun openInstaller(activity: FragmentActivity, installer: PojavInstaller) {
-        Tools.swapFragment(activity, installer.fragment, installer.tag, null)
+    fun openInstaller(activity: FragmentActivity, installer: PojavInstaller, targetId: String? = null) {
+        val arguments = targetId?.let { id -> android.os.Bundle().apply {
+            putString(net.kdt.pojavlaunch.instances.InstanceLoaderUpdate.TARGET_ARGUMENT, id)
+        } }
+        Tools.swapFragment(activity, installer.fragment, installer.tag, arguments)
     }
 
     fun openCustomControls(context: Context) {

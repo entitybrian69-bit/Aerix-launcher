@@ -187,6 +187,17 @@ public class Instances {
      * which uses getImmutableInstanceList()
      * @return currently selected instance
      */
+    public static Instance loadInstance(String id) throws IOException {
+        if (id == null || id.isEmpty() || id.equals(".") || id.equals("..") || id.contains("/") || id.contains("\\"))
+            throw new IOException("Invalid instance identity");
+        File root = new File(sInstancePath, id);
+        if (!filterInstanceDirectories(root)) throw new IOException("Target instance no longer exists");
+        Instance instance = read(root, Instance.class);
+        if (instance == null) throw new IOException("Cannot read target instance");
+        instance.sanitize();
+        return instance;
+    }
+
     public static Instance loadSelectedInstance() {
         File selectedInstanceLocation = selectedInstanceLocation();
         Instance instance = read(selectedInstanceLocation, Instance.class);

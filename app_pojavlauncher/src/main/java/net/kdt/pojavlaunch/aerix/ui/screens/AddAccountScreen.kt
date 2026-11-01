@@ -233,7 +233,7 @@ private fun AuthCard(
                     .fillMaxWidth()
                     .height(46.dp)
                     .clip(CircleShape)
-                    .background(AerixSurface.panelRaised.copy(alpha = 0.4f), CircleShape)
+                    .background(AerixSurface.panelRaised.copy(alpha = 0.2f), CircleShape)
                     .border(BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft), CircleShape)
                     .clickable(role = Role.Button, onClick = onClick),
                 contentAlignment = Alignment.Center
@@ -250,7 +250,7 @@ private fun AccountChip(account: AerixAccount, selected: Boolean, accent: Color,
     Row(
         modifier = Modifier
             .clip(shape)
-            .background(if (selected) accent.copy(alpha = 0.22f) else AerixSurface.panelRaised.copy(alpha = 0.34f), shape)
+            .background(if (selected) accent.copy(alpha = 0.22f) else AerixSurface.panelRaised.copy(alpha = 0.17f), shape)
             .border(BorderStroke(AerixSpacing.hairline, if (selected) accent else AerixSurface.borderSoft), shape)
             .clickable(role = Role.RadioButton, onClick = onClick)
             .padding(horizontal = AerixSpacing.sm, vertical = AerixSpacing.xs),

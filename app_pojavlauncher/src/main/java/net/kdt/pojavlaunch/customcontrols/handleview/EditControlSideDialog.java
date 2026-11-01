@@ -6,15 +6,25 @@ import static android.view.View.VISIBLE;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Color;
+import android.graphics.BitmapFactory;
+import android.graphics.Outline;
+import android.graphics.drawable.GradientDrawable;
 import android.util.Log;
+import android.util.TypedValue;
+import android.view.Gravity;
+import android.view.ViewOutlineProvider;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
+import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.SeekBar;
 import android.widget.Spinner;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.appcompat.widget.SwitchCompat;
 
@@ -30,13 +40,18 @@ import net.kdt.pojavlaunch.customcontrols.ControlDrawerData;
 import net.kdt.pojavlaunch.customcontrols.ControlJoystickData;
 import net.kdt.pojavlaunch.customcontrols.ControlLayout;
 import net.kdt.pojavlaunch.customcontrols.LayoutBitmaps;
+import net.kdt.pojavlaunch.customcontrols.buttons.ControlButton;
 import net.kdt.pojavlaunch.customcontrols.buttons.ControlDrawer;
 import net.kdt.pojavlaunch.customcontrols.buttons.ControlInterface;
+import net.kdt.pojavlaunch.customcontrols.theme.ControlTheme;
+import net.kdt.pojavlaunch.customcontrols.theme.ControlThemes;
+import net.kdt.pojavlaunch.prefs.LauncherPreferences;
 import net.kdt.pojavlaunch.utils.CropperUtils;
 import net.kdt.pojavlaunch.utils.interfaces.SimpleItemSelectedListener;
 import net.kdt.pojavlaunch.utils.interfaces.SimpleSeekBarListener;
 import net.kdt.pojavlaunch.utils.interfaces.SimpleTextWatcher;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class EditControlSideDialog extends SideDialogView {
@@ -82,6 +97,14 @@ public class EditControlSideDialog extends SideDialogView {
     private ColorSelector mColorSelector;
     private final ViewGroup mParent;
 
+    // Control themes
+    private LinearLayout mThemeChipRow;
+    private Button mThemeApplyAllButton;
+    private androidx.appcompat.widget.SwitchCompat mThemeAnimateSwitch, mThemeHapticsSwitch, mThemeSoundSwitch;
+    /** Theme thumbnails, decoded once for the whole editor. */
+    private static final java.util.HashMap<Integer, android.graphics.Bitmap> THEME_THUMBS = new java.util.HashMap<>();
+    private final List<ThemeChip> mThemeChips = new ArrayList<>();
+
     public EditControlSideDialog(Context context, ViewGroup parent) {
         super(context, parent, R.layout.dialog_control_button_setting);
         mParent = parent;
@@ -93,6 +116,7 @@ public class EditControlSideDialog extends SideDialogView {
         buildColorSelector();
         loadAdapter();
         setupRealTimeListeners();
+        buildThemeSection();
     }
 
     @Override
@@ -183,6 +207,9 @@ public class EditControlSideDialog extends SideDialogView {
 
         mDisplayInGameCheckbox.setChecked(data.displayInGame);
         mDisplayInMenuCheckbox.setChecked(data.displayInMenu);
+
+        // Which look this control is wearing right now.
+        refreshThemeChips(data.theme);
 
         for (int i = 0; i < data.keycodes.length; i++) {
             if (data.keycodes[i] < 0) {
@@ -365,6 +392,12 @@ public class EditControlSideDialog extends SideDialogView {
         mSizeXTextView = mDialogContent.findViewById(R.id.editSize_x_textView);
         mStrokeWidthTextView = mDialogContent.findViewById(R.id.editStrokeWidth_textView);
         mColorSelectWarningTextView = mDialogContent.findViewById(R.id.editBackgroundColorWarning_textView);
+
+        mThemeChipRow = mDialogContent.findViewById(R.id.theme_chip_row);
+        mThemeApplyAllButton = mDialogContent.findViewById(R.id.theme_apply_all_button);
+        mThemeAnimateSwitch = mDialogContent.findViewById(R.id.theme_animate_switch);
+        mThemeHapticsSwitch = mDialogContent.findViewById(R.id.theme_haptics_switch);
+        mThemeSoundSwitch = mDialogContent.findViewById(R.id.theme_sound_switch);
     }
 
     private void removeBitmap(ControlInterface button) {
@@ -570,6 +603,208 @@ public class EditControlSideDialog extends SideDialogView {
             Log.e("EditControlPopup", e.toString());
         }
         return out;
+    }
+
+    // ------------------------------------------------------------------ control themes
+
+    /**
+     * Builds the Control themes strip: Off first, then every theme in the launcher.
+     *
+     * <p>Each chip is drawn in its own two colours, so the strip is the preview: what a player sees
+     * before tapping is what the control will wear. Picking one paints the control immediately and
+     * plays the press animation once, so the choice can be judged without leaving the editor.
+     */
+    private void buildThemeSection() {
+        if (mThemeChipRow == null) return;
+        mThemeChipRow.removeAllViews();
+        mThemeChips.clear();
+
+        addThemeChip(null);
+        for (ControlTheme theme : ControlThemes.ALL) addThemeChip(theme);
+
+        mThemeApplyAllButton.setOnClickListener(v -> applyThemeToAllControls());
+
+        mThemeAnimateSwitch.setChecked(LauncherPreferences.PREF_CONTROL_THEME_ANIMATED);
+        mThemeAnimateSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            LauncherPreferences.PREF_CONTROL_THEME_ANIMATED = isChecked;
+            LauncherPreferences.DEFAULT_PREF.edit()
+                    .putBoolean("controlThemeAnimated", isChecked).apply();
+            // Redraw every control, so the change is visible immediately rather than at next launch.
+            if (mCurrentlyEditedButton != null) {
+                ControlLayout layout = mCurrentlyEditedButton.getControlLayoutParent();
+                if (layout != null) {
+                    for (ControlInterface button : layout.getButtonChildren()) {
+                        button.getControlView().invalidate();
+                    }
+                }
+            }
+        });
+
+        mThemeHapticsSwitch.setChecked(LauncherPreferences.PREF_CONTROL_THEME_HAPTICS);
+        mThemeHapticsSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            LauncherPreferences.PREF_CONTROL_THEME_HAPTICS = isChecked;
+            LauncherPreferences.DEFAULT_PREF.edit()
+                    .putBoolean("controlThemeHaptics", isChecked).apply();
+            if (isChecked) previewThemeFeedback();
+        });
+
+        mThemeSoundSwitch.setChecked(LauncherPreferences.PREF_CONTROL_THEME_SOUND);
+        mThemeSoundSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            LauncherPreferences.PREF_CONTROL_THEME_SOUND = isChecked;
+            LauncherPreferences.DEFAULT_PREF.edit()
+                    .putBoolean("controlThemeSound", isChecked).apply();
+            if (isChecked) previewThemeFeedback();
+        });
+    }
+
+    private void addThemeChip(@androidx.annotation.Nullable ControlTheme theme) {
+        Context context = mDialogContent.getContext();
+        int size = dp(58);
+
+        // The chip is the picture itself, so the strip is the preview: what is tapped is what the
+        // control will wear.
+        LinearLayout chip = new LinearLayout(context);
+        chip.setOrientation(LinearLayout.VERTICAL);
+        chip.setGravity(Gravity.CENTER_HORIZONTAL);
+        chip.setPadding(dp(4), dp(4), dp(4), dp(4));
+
+        GradientDrawable frame = new GradientDrawable();
+        frame.setCornerRadius(dp(12));
+        frame.setColor(0x33101820);
+        chip.setBackground(frame);
+
+        ImageView art = new ImageView(context);
+        art.setLayoutParams(new LinearLayout.LayoutParams(size, size));
+        art.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        art.setClipToOutline(true);
+        final float corner = dp(9);
+        art.setOutlineProvider(new ViewOutlineProvider() {
+            @Override
+            public void getOutline(View view, Outline outline) {
+                outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), corner);
+            }
+        });
+        art.setImageBitmap(theme == null ? null : thumbnail(context, theme.art, size));
+        if (theme == null) {
+            // "Off" has no picture: a plain grey swatch stands for the untouched control.
+            GradientDrawable plain = new GradientDrawable();
+            plain.setCornerRadius(corner);
+            plain.setColor(0xFF39424C);
+            art.setBackground(plain);
+        }
+        chip.addView(art);
+
+        TextView label = new TextView(context);
+        label.setText(theme == null ? R.string.ctrl_theme_off : theme.nameRes);
+        label.setTextSize(TypedValue.COMPLEX_UNIT_SP, 9f);
+        label.setGravity(Gravity.CENTER);
+        label.setMaxLines(1);
+        label.setPadding(0, dp(3), 0, 0);
+        chip.addView(label);
+
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        params.rightMargin = dp(8);
+        chip.setLayoutParams(params);
+
+        chip.setOnClickListener(v -> selectTheme(theme));
+        mThemeChipRow.addView(chip);
+        mThemeChips.add(new ThemeChip(theme, frame, label));
+    }
+
+    /** Decodes a theme's art down to a thumbnail; each one is decoded once for the whole editor. */
+    private android.graphics.Bitmap thumbnail(Context context, int res, int size) {
+        android.graphics.Bitmap cached = THEME_THUMBS.get(res);
+        if (cached != null) return cached;
+        BitmapFactory.Options bounds = new BitmapFactory.Options();
+        bounds.inJustDecodeBounds = true;
+        BitmapFactory.decodeResource(context.getResources(), res, bounds);
+        int sample = 1;
+        int shortest = Math.min(bounds.outWidth, bounds.outHeight);
+        while (shortest / (sample * 2) >= size) sample *= 2;
+
+        BitmapFactory.Options options = new BitmapFactory.Options();
+        options.inSampleSize = sample;
+        options.inScaled = false;
+        android.graphics.Bitmap bitmap =
+                BitmapFactory.decodeResource(context.getResources(), res, options);
+        if (bitmap != null) THEME_THUMBS.put(res, bitmap);
+        return bitmap;
+    }
+
+    /** Puts [theme] on the control being edited, and previews it once. */
+    private void selectTheme(@androidx.annotation.Nullable ControlTheme theme) {
+        if (mCurrentlyEditedButton == null) return;
+        mCurrentlyEditedButton.getProperties().theme = theme == null ? null : theme.id;
+        mCurrentlyEditedButton.setProperties(mCurrentlyEditedButton.getProperties(), false);
+        refreshThemeChips(theme == null ? null : theme.id);
+        previewEditedTheme();
+    }
+
+    private void refreshThemeChips(@androidx.annotation.Nullable String themeId) {
+        if (mThemeChips.isEmpty()) return;
+        for (ThemeChip chip : mThemeChips) {
+            boolean selected = chip.theme == null
+                    ? themeId == null || themeId.isEmpty()
+                    : themeId != null && themeId.equals(chip.theme.id);
+            chip.frame.setStroke(dp(selected ? 2 : 1), selected ? Color.WHITE : 0x33FFFFFF);
+            chip.frame.setColor(selected ? 0x44FFFFFF : 0x33101820);
+            chip.label.setTextColor(selected ? Color.WHITE : 0xFFB9C6D0);
+        }
+    }
+
+    /** Runs one press and release on the edited control, so the look can be seen in motion. */
+    private void previewEditedTheme() {
+        if (mCurrentlyEditedButton == null) return;
+        View view = mCurrentlyEditedButton.getControlView();
+        if (view instanceof ControlButton) {
+            ((ControlButton) view).getThemePainter().preview(view);
+        }
+    }
+
+    /** Plays the haptic and the click for the theme being edited, from the feedback switches. */
+    private void previewThemeFeedback() {
+        if (mCurrentlyEditedButton == null) return;
+        View view = mCurrentlyEditedButton.getControlView();
+        if (view instanceof ControlButton) {
+            ((ControlButton) view).getThemePainter().playFeedback(view);
+        }
+    }
+
+    /** Gives every control in the layout the theme the edited one is wearing. */
+    private void applyThemeToAllControls() {
+        if (mCurrentlyEditedButton == null) return;
+        ControlLayout layout = mCurrentlyEditedButton.getControlLayoutParent();
+        if (layout == null) return;
+        String themeId = mCurrentlyEditedButton.getProperties().theme;
+        int applied = 0;
+        for (ControlInterface button : layout.getButtonChildren()) {
+            if (button == mCurrentlyEditedButton) continue;
+            button.getProperties().theme = themeId;
+            button.updateProperties();
+            applied++;
+        }
+        Toast.makeText(mDialogContent.getContext(),
+                mDialogContent.getContext().getString(R.string.ctrl_themes_applied, applied),
+                Toast.LENGTH_SHORT).show();
+    }
+
+    private int dp(int value) {
+        return (int) (value * mDialogContent.getResources().getDisplayMetrics().density);
+    }
+
+    /** One chip in the strip: the theme it stands for, its frame and its label. */
+    private static final class ThemeChip {
+        @androidx.annotation.Nullable final ControlTheme theme;
+        final GradientDrawable frame;
+        final TextView label;
+
+        ThemeChip(@androidx.annotation.Nullable ControlTheme theme, GradientDrawable frame,
+                  TextView label) {
+            this.theme = theme;
+            this.frame = frame;
+            this.label = label;
+        }
     }
 
     public void setCurrentlyEditedButton(ControlInterface button) {

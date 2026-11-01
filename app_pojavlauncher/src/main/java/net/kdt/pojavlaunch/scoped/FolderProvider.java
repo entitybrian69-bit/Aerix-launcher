@@ -82,7 +82,7 @@ public class FolderProvider extends DocumentsProvider {
     @Override
     public Cursor queryRoots(String[] projection) {
         final MatrixCursor result = new MatrixCursor(projection != null ? projection : DEFAULT_ROOT_PROJECTION);
-        final String applicationName = getContext().getString(R.string.app_short_name);
+        final String applicationName = getContext().getString(R.string.aerix_app_label);
 
         String summary = BuildConfig.VERSION_NAME;
         if (BuildConfig.DEBUG) {

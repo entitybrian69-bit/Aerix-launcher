@@ -11,4 +11,6 @@ public final class Renderers {
     public static final String MOBILEGLUES_RENDERER = "opengles_mobileglues";
     public static final String NGGL4ES_RENDERER = "opengles_nggl4es";
     public static final String SFPEW_RENDERER = "opengles_sfpew";
+    public static final String PROTON_RENDERER = "opengles_proton";
+    public static final String EMESIS_RENDERER = "emesis";
     }

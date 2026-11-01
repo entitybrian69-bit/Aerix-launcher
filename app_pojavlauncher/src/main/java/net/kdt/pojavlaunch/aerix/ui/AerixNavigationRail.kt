@@ -71,28 +71,42 @@ import net.kdt.pojavlaunch.aerix.components.liquidGlass
 import net.kdt.pojavlaunch.aerix.theme.AERIX_COMPACT_HEIGHT_THRESHOLD_DP
 import net.kdt.pojavlaunch.aerix.theme.AerixMetrics
 import net.kdt.pojavlaunch.aerix.theme.AerixRadii
+import net.kdt.pojavlaunch.aerix.guide.AerixGuideState
+import net.kdt.pojavlaunch.aerix.guide.guideAnchor
 import net.kdt.pojavlaunch.aerix.theme.AerixSpacing
 import net.kdt.pojavlaunch.aerix.theme.AerixSurface
+import net.kdt.pojavlaunch.aerix.theme.ThemeMotion
+import net.kdt.pojavlaunch.aerix.theme.accentGlow
+import net.kdt.pojavlaunch.aerix.theme.accentRing
 import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
 
 /** Primary destinations kept visible while the Aerix launcher is open. */
 enum class LauncherSection {
     HOME,
+    /** Dedicated Aerix Client (Minecraft 1.16.5 Testing Edition · Liquid Crystal Clear). */
+    AERIX_CLIENT,
     LIBRARY,
+    /** Friends, messages and parties - the social launcher, opened from Home and the rail. */
+    SOCIALS,
     DISCOVER,
+    OTHER_RELEASES,
     DOWNLOADS,
     CONTENT,
     FILES,
     WALLPAPERS,
     LOGS,
     SETTINGS,
+    /** The team page, between Settings and the account entry. */
+    CONTRIBUTION,
     ACCOUNTS,
     ABOUT,
     /** Pages opened on top of a section (Mirai "Create New Instance", instance settings, account sign-in). */
     CREATE_INSTANCE,
     INSTANCE_EDITOR,
     ADD_ACCOUNT,
-    OFFLINE_ACCOUNT
+    OFFLINE_ACCOUNT,
+    /** One team member's page, opened from Contribution. */
+    CONTRIBUTION_DETAIL
 }
 
 @Composable
@@ -115,7 +129,9 @@ fun AerixNavigationRail(
             modifier = Modifier
                 .width(if (expandedRail) AerixMetrics.expandedNavigationRailWidth else AerixMetrics.navigationRailWidth)
                 .fillMaxHeight()
-                .padding(horizontal = AerixSpacing.xs, vertical = AerixSpacing.smPlus)
+                // The pill sits against the left edge - only the end side keeps a gap, so the
+                // pages own the rest of the width.
+                .padding(start = 2.dp, end = AerixSpacing.xs, top = AerixSpacing.smPlus, bottom = AerixSpacing.smPlus)
                 .liquidGlass(shape = CircleShape, tint = AerixSurface.glassTint, strength = 0.94f, elevation = AerixMetrics.glassRailElevation),
             shape = CircleShape,
             color = Color.Transparent,
@@ -168,19 +184,33 @@ fun AerixNavigationRail(
 
                 RailIconItem(R.drawable.aerix_ic_home_filled, stringResource(R.string.aerix_nav_home),
                     selectedSection == LauncherSection.HOME, activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.HOME) }
+                RailIconItem(R.drawable.aerix_ic_client_crystal, "Aerix Client",
+                    selectedSection == LauncherSection.AERIX_CLIENT, activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.AERIX_CLIENT) }
                 RailIconItem(R.drawable.aerix_ic_add, stringResource(R.string.create_instance),
-                    selectedSection == LauncherSection.CREATE_INSTANCE, activeAccent, expandedRail, compactRail, onCreateInstance)
+                    selectedSection == LauncherSection.CREATE_INSTANCE, activeAccent, expandedRail, compactRail,
+                    onClick = onCreateInstance, guideKey = AerixGuideState.CREATE)
                 RailIconItem(R.drawable.aerix_ic_dashboard_filled, stringResource(R.string.aerix_nav_library),
-                    librarySelected(selectedSection), activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.LIBRARY) }
+                    librarySelected(selectedSection), activeAccent, expandedRail, compactRail,
+                    onClick = { onNavigate(LauncherSection.LIBRARY) }, guideKey = AerixGuideState.LIBRARY)
+                // Socials is not a rail entry: it opens from the Home dashboard and brings its own
+                // sidebar, so it is not listed next to the launcher's own sections.
                 RailIconItem(R.drawable.aerix_ic_public, stringResource(R.string.aerix_nav_discover),
                     discoverSelected(selectedSection), activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.DISCOVER) }
+                RailIconItem(R.drawable.aerix_ic_rocket_launch_filled, "Our other new releases",
+                    selectedSection == LauncherSection.OTHER_RELEASES, activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.OTHER_RELEASES) }
                 RailIconItem(R.drawable.aerix_ic_format_paint_outlined, stringResource(R.string.aerix_nav_wallpapers),
-                    wallpapersSelected(selectedSection), activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.WALLPAPERS) }
+                    wallpapersSelected(selectedSection), activeAccent, expandedRail, compactRail,
+                    onClick = { onNavigate(LauncherSection.WALLPAPERS) }, guideKey = AerixGuideState.WALLPAPERS)
 
                 HorizontalDivider(modifier = Modifier.width(28.dp).padding(vertical = AerixSpacing.xxs), color = AerixSurface.borderSoft)
 
                 RailIconItem(R.drawable.aerix_ic_settings_filled, stringResource(R.string.aerix_nav_settings),
-                    settingsSelected(selectedSection), activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.SETTINGS) }
+                    settingsSelected(selectedSection), activeAccent, expandedRail, compactRail,
+                    onClick = { onNavigate(LauncherSection.SETTINGS) }, guideKey = AerixGuideState.SETTINGS)
+
+                RailIconItem(R.drawable.aerix_ic_group_outlined, stringResource(R.string.aerix_nav_contribution),
+                    selectedSection == LauncherSection.CONTRIBUTION || selectedSection == LauncherSection.CONTRIBUTION_DETAIL,
+                    activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.CONTRIBUTION) }
 
                 AccountAvatarRailButton(
                     account = account,
@@ -221,12 +251,18 @@ private fun RailIconItem(
     accentColor: Color,
     expanded: Boolean,
     compact: Boolean,
+    /** Names this item for the first-run guide, so the tour can point at it. */
+    guideKey: String? = null,
     onClick: () -> Unit
 ) {
     // The selected item uses the current theme accent; icon, fill and border update together.
     val selectedContentColor = MaterialTheme.colorScheme.onPrimary
+    // With the animated theme on, the selected item's accent breathes and carries a glow. Off, it
+    // is the identical flat accent as before - and no animation is started for unselected items.
+    val motionOn = ThemeMotion.rememberEnabled()
+    val liveAccent = ThemeMotion.rememberPulse(accentColor, selected, motionOn)
     val containerColor by animateColorAsState(
-        targetValue = if (selected) accentColor else AerixSurface.panel,
+        targetValue = if (selected) liveAccent else AerixSurface.panel,
         animationSpec = tween(140),
         label = "railContainerColor"
     )
@@ -248,10 +284,13 @@ private fun RailIconItem(
     val itemShape = RoundedCornerShape(AerixRadii.control)
     Box(
         modifier = Modifier
+            .then(if (guideKey != null) Modifier.guideAnchor(guideKey) else Modifier)
             .size(width = itemWidth, height = itemHeight)
             .clip(itemShape)
             .background(containerColor)
-            .border(BorderStroke(AerixSpacing.hairline, if (selected) accentColor else AerixSurface.borderSoft), itemShape)
+            .accentGlow(liveAccent, selected, motionOn)
+            .accentRing(liveAccent, itemShape, selected, motionOn, AerixSpacing.hairline)
+            .border(BorderStroke(AerixSpacing.hairline, if (selected) liveAccent else AerixSurface.borderSoft), itemShape)
             .clickable(role = Role.Tab, onClick = onClick)
             .semantics { contentDescription = label },
         contentAlignment = Alignment.Center

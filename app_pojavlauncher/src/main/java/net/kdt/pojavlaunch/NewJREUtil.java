@@ -17,12 +17,21 @@ import net.kdt.pojavlaunch.utils.MathUtils;
 import net.kdt.pojavlaunch.utils.SignatureCheckUtil;
 import net.kdt.pojavlaunch.utils.jre.RuntimeSelectionException;
 
+import org.apache.commons.io.IOUtils;
+
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 
 import net.kdt.pojavlaunch.R;
 
@@ -157,12 +166,12 @@ public class NewJREUtil {
 
 
     public static void installNewJreIfNeeded(AssetManager assetManager, JVersionList.Version versionInfo) throws IOException, RuntimeSelectionException {
-        //Now we have the reliable information to check if our runtime settings are good enough
-        if (versionInfo.javaVersion == null || "jre-legacy".equalsIgnoreCase(versionInfo.javaVersion.component)) return;
-
-        int gameRequiredVersion = versionInfo.javaVersion.majorVersion;
-
         Instance instance = Instances.loadSelectedInstance();
+        if (instance == null) throw new IOException("No selected instance for runtime selection");
+        int baseMinimum = versionInfo.javaVersion == null ? 8 : versionInfo.javaVersion.majorVersion;
+        int gameRequiredVersion = net.kdt.pojavlaunch.utils.jre.ModJavaRequirements.minimumJava(instance.getGameDirectory(), baseMinimum);
+        // Vanilla legacy metadata may say Java 8 while a mod's mixins explicitly need Java 17+;
+        // ModJavaRequirements has already folded that in, so gameRequiredVersion is the truth.
         String profileRuntime = Tools.getSelectedRuntime(instance);
         Runtime runtime = MultiRTUtils.read(profileRuntime);
         // Partly trust the user with his own selection, if the game can even try to run in this case
@@ -173,6 +182,20 @@ public class NewJREUtil {
             if(internalRuntime != null) {
                 checkInternalRuntime(assetManager, internalRuntime);
             }
+            return;
+        }
+
+        // A legacy game needs Java 8. Returning here without doing anything (the old behaviour)
+        // left a fresh install with no runtime and no offer to download one, so detect it and
+        // install the real Java 8 build.
+        if (gameRequiredVersion <= 8) {
+            String installedJava8 = MultiRTUtils.getExactJreName(8);
+            if (installedJava8 == null) {
+                ExternalRuntime.JRE_8.downloadRuntime(assetManager);
+                installedJava8 = ExternalRuntime.JRE_8.name;
+            }
+            instance.selectedRuntime = installedJava8;
+            instance.write();
             return;
         }
 
@@ -220,25 +243,111 @@ public class NewJREUtil {
     }
 
     public enum ExternalRuntime {
-        JRE_8(8, "Internal-8", "components/jre-new"),
-        JRE_17(17, "Internal-17", "components/jre-new"),
-        JRE_21(21, "Internal-21", "components/jre-21"),
-        JRE_25(25, "Internal-25", "components/jre-25");
+        /**
+         * Java 8 is published as one zip (jre8-pojav.zip) that holds the same binpack pieces
+         * (universal.tar.xz, bin-&lt;arch&gt;.tar.xz, version) as the component folders below.
+         * It used to be missing entirely, so the only "Java 8" on offer installed Java 17.
+         */
+        JRE_8(8, "Internal-8", null,
+                "https://github.com/MojoLauncher/android-openjdk-build-multiarch/releases/download/rolling/jre8-pojav.zip"),
+        JRE_17(17, "Internal-17", "components/jre-new", null),
+        JRE_21(21, "Internal-21", "components/jre-21", null),
+        JRE_25(25, "Internal-25", "components/jre-25", null);
 
         public final int majorVersion;
         public final String name;
+        /** Component folder on the download host; null when the runtime ships as one zip. */
         public final String path;
+        /** Full URL of the runtime zip; null for the component-folder runtimes. */
+        public final String zipUrl;
         public boolean isDownloading = false;
 
-        ExternalRuntime(int majorVersion, String name, String path) {
+        ExternalRuntime(int majorVersion, String name, String path, String zipUrl) {
             this.majorVersion = majorVersion;
             this.name = name;
             this.path = path;
+            this.zipUrl = zipUrl;
+        }
+
+        /** What the Runtime Manager shows: the Java version, never an internal slot name. */
+        public String getLabel() {
+            return "Java " + majorVersion;
         }
 
         public void downloadRuntime(AssetManager assetManager) throws RuntimeSelectionException {
-            tryDownloadExternalRuntime(assetManager, this);
+            if (zipUrl != null) downloadZipRuntime(this);
+            else tryDownloadExternalRuntime(assetManager, this);
         }
+    }
+
+    /**
+     * Downloads and installs a runtime published as a single zip of binpack pieces (Java 8).
+     * The archive is kept on disk between attempts, so an interrupted download resumes instead of
+     * starting over.
+     */
+    private static void downloadZipRuntime(ExternalRuntime externalRuntime) throws RuntimeSelectionException {
+        File archive = new File(Tools.DIR_CACHE, externalRuntime.name + ".zip");
+        File universal = null;
+        File platform = null;
+        try {
+            DownloadUtils.downloadFileMonitored(
+                    externalRuntime.zipUrl, archive, null,
+                    new DownloaderProgressWrapper(R.string.downloading_java_runtime_uni, ProgressLayout.UNPACK_RUNTIME));
+            String platformName = "bin-" + archAsString(Tools.DEVICE_ARCHITECTURE) + ".tar.xz";
+            String version = "zip-" + archive.length();
+            try (ZipFile zipFile = new ZipFile(archive)) {
+                ZipEntry versionEntry = findZipEntry(zipFile, "version");
+                if (versionEntry != null) {
+                    try (InputStream inputStream = zipFile.getInputStream(versionEntry)) {
+                        String stamped = new String(IOUtils.toByteArray(inputStream), StandardCharsets.UTF_8).trim();
+                        if (!stamped.isEmpty()) version = stamped;
+                    }
+                }
+                universal = extractZipEntry(zipFile, "universal.tar.xz");
+                platform = extractZipEntry(zipFile, platformName);
+            }
+            try (FileInputStream universalStream = new FileInputStream(universal);
+                 FileInputStream platformStream = new FileInputStream(platform)) {
+                MultiRTUtils.installRuntimeNamedBinpack(
+                        universalStream, platformStream, externalRuntime.name, version);
+                MultiRTUtils.postPrepare(externalRuntime.name);
+                MultiRTUtils.forceReread(externalRuntime.name);
+            }
+        } catch (IOException | RuntimeException failure) {
+            RuntimeSelectionException error = new RuntimeSelectionException(
+                    RuntimeSelectionException.RUNTIME_STATE_INSTALLATION_FAILED, externalRuntime.majorVersion);
+            error.initCause(failure);
+            throw error;
+        } finally {
+            ProgressLayout.clearProgress(ProgressLayout.UNPACK_RUNTIME);
+            if (universal != null && universal.isFile()) universal.delete();
+            if (platform != null && platform.isFile()) platform.delete();
+        }
+    }
+
+    /** Looks an entry up by bare file name; the zip is flat today, but never assume that. */
+    private static ZipEntry findZipEntry(ZipFile zipFile, String name) {
+        ZipEntry direct = zipFile.getEntry(name);
+        if (direct != null) return direct;
+        Enumeration<? extends ZipEntry> entries = zipFile.entries();
+        while (entries.hasMoreElements()) {
+            ZipEntry entry = entries.nextElement();
+            String entryName = entry.getName();
+            int slash = entryName.lastIndexOf('/');
+            if ((slash >= 0 ? entryName.substring(slash + 1) : entryName).equals(name)) return entry;
+        }
+        return null;
+    }
+
+    private static File extractZipEntry(ZipFile zipFile, String name) throws IOException {
+        ZipEntry entry = findZipEntry(zipFile, name);
+        if (entry == null) throw new IOException("Runtime archive is missing " + name);
+        File target = File.createTempFile("jre-install-", "-" + name, Tools.DIR_CACHE);
+        try (InputStream inputStream = zipFile.getInputStream(entry);
+             OutputStream outputStream = new FileOutputStream(target)) {
+            IOUtils.copy(inputStream, outputStream);
+        }
+        return target;
     }
 
     private static void tryDownloadExternalRuntime(AssetManager assetManager, ExternalRuntime externalRuntime) throws RuntimeSelectionException {

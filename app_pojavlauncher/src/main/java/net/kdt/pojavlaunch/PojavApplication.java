@@ -2,8 +2,10 @@ package net.kdt.pojavlaunch;
 
 import static android.content.Intent.FLAG_ACTIVITY_NEW_TASK;
 
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.os.Build;
@@ -12,6 +14,8 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 
+import net.kdt.pojavlaunch.aerix.bridge.PojavPluginBridge;
+import net.kdt.pojavlaunch.aerix.social.SocialBackend;
 import net.kdt.pojavlaunch.lifecycle.ContextExecutor;
 import net.kdt.pojavlaunch.mobileglues.MGApplication;
 import net.kdt.pojavlaunch.prefs.LauncherPreferences;
@@ -67,9 +71,34 @@ public class PojavApplication extends MGApplication {
 		});
 	}
 
+	private static String resolveCurrentProcessName(Context context) {
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+			return android.app.Application.getProcessName();
+		}
+		try {
+			android.app.ActivityManager am = (android.app.ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
+			if (am != null && am.getRunningAppProcesses() != null) {
+				int myPid = android.os.Process.myPid();
+				for (android.app.ActivityManager.RunningAppProcessInfo info : am.getRunningAppProcesses()) {
+					if (info.pid == myPid) return info.processName;
+				}
+			}
+		} catch (Throwable ignored) {}
+		return null;
+	}
+
 	@Override
 	public void onCreate() {
 		ContextExecutor.setApplication(this);
+		String procName = resolveCurrentProcessName(this);
+		if (procName != null && (procName.endsWith(":recorder") || procName.endsWith(":mgquery"))) {
+			super.onCreate();
+			try {
+				Tools.initEarlyConstants(this);
+			} catch (Throwable ignored) {}
+			return;
+		}
+
 		// Disable fatal errors on gplay. This is necessary so that google can collect crash report data and send it to me
 		// (where i can find the cause and fix it)
         //noinspection ConstantValue
@@ -101,6 +130,55 @@ public class PojavApplication extends MGApplication {
 			ferrorIntent.setFlags(FLAG_ACTIVITY_NEW_TASK);
 			startActivity(ferrorIntent);
 		}
+		initRendererPlugins();
+		try {
+			net.kdt.pojavlaunch.aerix.discord.AerixDiscordPresence.captureApplicationContext(this);
+			// Passive load ONLY: never auto-open WebSockets or background services until an Activity opens.
+			SocialBackend.initPassive(this);
+		} catch (Throwable t) {
+			Log.w("PojavApplication", "SocialBackend passive init failed", t);
+		}
+	}
+
+	/**
+	 * Scans for renderer plugin APKs off the main thread so every renderer list already contains
+	 * them, then rescans when a plugin APK is installed, replaced or removed.
+	 */
+	private void initRendererPlugins() {
+		try {
+			sExecutorService.execute(() -> {
+				try {
+					PojavPluginBridge.loadPlugins(this);
+				} catch (Throwable pluginScanError) {
+					Log.w("PojavApplication", "Renderer plugin scan failed", pluginScanError);
+				}
+			});
+
+			BroadcastReceiver pluginPackageReceiver = new BroadcastReceiver() {
+				@Override
+				public void onReceive(Context context, Intent intent) {
+					sExecutorService.execute(() -> {
+						try {
+							PojavPluginBridge.refreshPlugins(context.getApplicationContext());
+						} catch (Throwable pluginRefreshError) {
+							Log.w("PojavApplication", "Renderer plugin refresh failed", pluginRefreshError);
+						}
+					});
+				}
+			};
+			IntentFilter pluginPackageFilter = new IntentFilter();
+			pluginPackageFilter.addAction(Intent.ACTION_PACKAGE_ADDED);
+			pluginPackageFilter.addAction(Intent.ACTION_PACKAGE_REMOVED);
+			pluginPackageFilter.addAction(Intent.ACTION_PACKAGE_REPLACED);
+			pluginPackageFilter.addDataScheme("package");
+			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+				registerReceiver(pluginPackageReceiver, pluginPackageFilter, Context.RECEIVER_NOT_EXPORTED);
+			} else {
+				registerReceiver(pluginPackageReceiver, pluginPackageFilter);
+			}
+		} catch (Throwable pluginInitError) {
+			Log.w("PojavApplication", "Renderer plugin support failed to initialize", pluginInitError);
+		}
 	}
 
 	@Override
@@ -111,12 +189,12 @@ public class PojavApplication extends MGApplication {
 
 	@Override
     protected void attachBaseContext(Context base) {
-        super.attachBaseContext(LocaleUtils.setLocale(base));
+        super.attachBaseContext(LocaleUtils.applyApplicationLocale(base));
     }
 
     @Override
     public void onConfigurationChanged(@NonNull Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
-        LocaleUtils.setLocale(this);
+        LocaleUtils.applyApplicationLocale(this);
     }
 }

@@ -8,12 +8,15 @@ import net.kdt.pojavlaunch.R;
 
 import net.kdt.pojavlaunch.Tools;
 import net.kdt.pojavlaunch.instances.InstanceInstaller;
+import net.kdt.pojavlaunch.instances.InstanceRefreshEvents;
 import net.kdt.pojavlaunch.instances.Instances;
 import net.kdt.pojavlaunch.instances.Instance;
 import net.kdt.pojavlaunch.lifecycle.ContextExecutor;
 import net.kdt.pojavlaunch.modloaders.modpacks.api.modloader.LoaderInstaller;
 import net.kdt.pojavlaunch.modloaders.modpacks.imagecache.ModIconCache;
+import net.kdt.pojavlaunch.modloaders.modpacks.models.Constants;
 import net.kdt.pojavlaunch.modloaders.modpacks.models.ModDetail;
+import net.kdt.pojavlaunch.modloaders.modpacks.models.ModItem;
 import net.kdt.pojavlaunch.progresskeeper.DownloaderProgressWrapper;
 import net.kdt.pojavlaunch.utils.DownloadUtils;
 import net.kdt.pojavlaunch.utils.FileUtils;
@@ -26,9 +29,34 @@ import java.util.concurrent.Callable;
 public class ModpackInstaller {
 
     public static LoaderInstaller installModpack(String modpackName, String title, File modpackFile, String icon, InstallFunction installFunction) throws IOException {
+        return installModpack(modpackName, title, modpackFile, icon, null, null, installFunction);
+    }
+
+    /**
+     * @param iconImageUrl the pack's own image, so an instance installed without the browse cache
+     *                     still ends up with the pack's logo rather than a stock one
+     */
+    public static LoaderInstaller installModpack(String modpackName, String title, File modpackFile, String icon,
+                                                 String iconImageUrl, InstallFunction installFunction) throws IOException {
+        return installModpack(modpackName, title, modpackFile, icon, iconImageUrl, null, installFunction);
+    }
+
+    /**
+     * @param artSource the pack this instance is built from. Its project id and image are recorded
+     *                  on the instance, so the publisher's artwork can be fetched again later even
+     *                  when this install happened without a cached image.
+     */
+    public static LoaderInstaller installModpack(String modpackName, String title, File modpackFile, String icon,
+                                                 String iconImageUrl, ModItem artSource, InstallFunction installFunction) throws IOException {
         // Build a new minecraft instance, folder first
         LoaderInstaller loaderInstaller;
-        Instance instance = Instances.createInstance(i-> i.name = title, modpackName.substring(0, Math.min(16,modpackName.length())));
+        Instance instance = Instances.createInstance(i-> {
+            i.name = title;
+            if (artSource == null) return;
+            i.modpackIconUrl = artSource.imageUrl;
+            i.modpackProjectId = artSource.id;
+            i.modpackSource = artSource.apiSource == Constants.SOURCE_MODRINTH ? "modrinth" : "curseforge";
+        }, modpackName.substring(0, Math.min(16,modpackName.length())));
         try {
             // Install the modpack
             loaderInstaller = installFunction.installModpack(modpackFile, instance.getGameDirectory());
@@ -45,13 +73,15 @@ public class ModpackInstaller {
                 instance.versionId = versionId;
             }
             instance.write();
-            ModIconCache.writeInstanceImage(instance, icon);
+            ModIconCache.writeInstanceImage(instance, icon, iconImageUrl);
 
             Instances.setSelectedInstance(instance);
             if(loaderInstaller.requiresGuiInstallation()) {
                 instance.installer.start();
             }
             else ContextExecutor.executeActivity(activity -> Toast.makeText(activity, R.string.modpack_install_toast_success, Toast.LENGTH_SHORT).show());
+            // Refresh only after installation (or GUI-installer handoff) succeeded.
+            InstanceRefreshEvents.notifyChanged();
         } catch (IOException e) {
             Instances.removeInstance(instance);
             throw e;
@@ -94,7 +124,7 @@ public class ModpackInstaller {
             throw e;
         }
 
-        return installModpack(modpackName, name, modpackFile, icon, installFunction);
+        return installModpack(modpackName, name, modpackFile, icon, modDetail.imageUrl, modDetail, installFunction);
     }
 
     public interface InstallFunction {

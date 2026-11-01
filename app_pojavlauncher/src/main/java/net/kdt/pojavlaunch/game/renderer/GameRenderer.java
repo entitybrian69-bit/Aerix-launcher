@@ -10,6 +10,8 @@ import static net.kdt.pojavlaunch.game.renderer.def.Renderers.ZINK_RENDERER;
 import static net.kdt.pojavlaunch.game.renderer.def.Renderers.NGGL4ES_RENDERER;
 import static net.kdt.pojavlaunch.game.renderer.def.Renderers.MOBILEGLUES_RENDERER;
 import static net.kdt.pojavlaunch.game.renderer.def.Renderers.SFPEW_RENDERER;
+import static net.kdt.pojavlaunch.game.renderer.def.Renderers.PROTON_RENDERER;
+import static net.kdt.pojavlaunch.game.renderer.def.Renderers.EMESIS_RENDERER;
 
 import android.content.Context;
 import android.system.ErrnoException;
@@ -18,10 +20,12 @@ import android.util.Log;
 
 import net.kdt.pojavlaunch.Logger;
 import net.kdt.pojavlaunch.Tools;
+import net.kdt.pojavlaunch.game.renderer.impl.EmesisRenderSpec;
 import net.kdt.pojavlaunch.game.renderer.impl.GLESRenderSpec;
 import net.kdt.pojavlaunch.game.renderer.impl.MesaRenderSpec;
 import net.kdt.pojavlaunch.prefs.LauncherPreferences;
 
+import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -46,6 +50,7 @@ import git.artdeell.mojoexec.MojoExec;
 public class GameRenderer {
     private final static String TAG = "Renderer";
     private final static String FALLBACK_RENDERER = GL4ES_RENDERER;
+    private static volatile boolean pluginInitializationFailed;
     private RenderSpec currentRenderer;
     private Map<String, String> environment = new HashMap<>();
 
@@ -76,6 +81,8 @@ public class GameRenderer {
             case NGGL4ES_RENDERER: return new GLESRenderSpec.NGGL4ESRenderSpec();
             case MOBILEGLUES_RENDERER: return new GLESRenderSpec.MgRenderSpec();
             case SFPEW_RENDERER: return new GLESRenderSpec.SFPEWRenderSpec();
+            case PROTON_RENDERER: return new net.kdt.pojavlaunch.game.renderer.impl.ProtonRenderSpec();
+            case EMESIS_RENDERER: return new net.kdt.pojavlaunch.game.renderer.impl.EmesisRenderSpec();
             default:
                 Log.e(TAG, "Unknown renderer " + renderer);
                 return null;
@@ -109,7 +116,14 @@ public class GameRenderer {
         currentRenderer.setupEnvironment(context, environment);
         for(Map.Entry<String, String> e : environment.entrySet()) {
             Logger.appendToLog("Added renderer env: " + e.getKey() + '=' + e.getValue());
-            Os.setenv(e.getKey(), e.getValue(), true);
+            try {
+                Os.setenv(e.getKey(), e.getValue(), true);
+            } catch (ErrnoException error) {
+                // A renderer (a plugin among them) may contribute a variable the kernel rejects.
+                // Losing one variable is not a reason to take the whole launch down.
+                Log.w(TAG, "Could not export " + e.getKey(), error);
+                Logger.appendToLog("Could not export renderer env " + e.getKey() + ": " + error.getMessage());
+            }
         }
         environment.clear();
         environment = null;
@@ -147,16 +161,128 @@ public class GameRenderer {
     }
 
     /**
+     * The renderer the game is actually started on, after checking that the OpenGL library it names
+     * is really there.
+     *
+     * The library is handed to LWJGL as {@code -Dorg.lwjgl.opengl.libname}, and the JVM loads it
+     * while the game window is being created. When that path does not resolve, LWJGL throws
+     * {@code UnsatisfiedLinkError: ... not found} on the render thread and the game dies during
+     * startup, with no way for the player to reach the renderer picker and pick something else.
+     * An absolute path is therefore checked here, before the JVM is started, and a renderer whose
+     * library is missing is replaced: the bundled Emesis first (the same renderer most plugins
+     * provide), then the built-in fallback.
+     *
+     * @return the renderer to launch with; never one that names a library that is not on disk
+     */
+    public RenderSpec getLaunchableRenderer() {
+        RenderSpec spec = currentRenderer;
+        String library = spec.glLibraryPath();
+        if (libraryIsPresent(library)) {
+            // The one line that says which renderer the JVM is really started on, and which
+            // library LWJGL was told to bind OpenGL to.
+            Logger.appendToLog("Renderer at launch: " + spec.name() + " (" + spec.tag() + ") gl=" + library);
+            return spec;
+        }
+
+        Logger.appendToLog("Renderer " + spec.name() + " names a library that cannot be opened by "
+                + "this process (" + (library.isEmpty() ? "<none>" : library)
+                + "); choosing a renderer that can actually load");
+        Log.e(TAG, "Renderer " + spec.name() + " cannot launch: " + library + " is missing");
+        spec = replacementRenderer(null);
+        currentRenderer = spec;
+        return spec;
+    }
+
+    /**
+     * The renderer to use when the chosen one cannot load. A plugin failure keeps the player on
+     * the renderer they meant to use by falling back to the bundled Emesis, which is the same
+     * translation layer, rather than dropping them onto GL4ES.
+     *
+     * @param failed the renderer that just failed, so it is not chosen again
+     */
+    private static RenderSpec replacementRenderer(RenderSpec failed) {
+        boolean emesisFailed = failed != null && EMESIS_RENDERER.equals(failed.tag());
+        if (!emesisFailed && EmesisRenderSpec.available()) {
+            RenderSpec emesis = getKnownRenderer(EMESIS_RENDERER);
+            if (emesis != null && libraryIsPresent(emesis.glLibraryPath())) {
+                Logger.appendToLog("Renderer: using the bundled Emesis instead");
+                return emesis;
+            }
+        }
+        RenderSpec fallback = getKnownRenderer(FALLBACK_RENDERER);
+        if (fallback != null) Logger.appendToLog("Renderer: using " + fallback.name() + " instead");
+        return fallback;
+    }
+
+    /**
+     * Whether a renderer's OpenGL library can be handed to LWJGL as it is.
+     *
+     * A bare name is resolved by the linker against the paths the process already has, which is
+     * how every built-in renderer works; an absolute path is only usable when the file is there.
+     */
+    public static boolean libraryIsPresent(String library) {
+        if (library == null || library.isEmpty()) return false;
+        if (!library.startsWith("/")) return true;
+        File file = new File(library);
+        if (!file.isFile() || file.length() == 0) return false;
+        // Android gives every app its own linker namespace. A library that sits in another
+        // package's directory (/data/app/~~…/com.someone.else-…/lib/arm64) is not reachable from
+        // this process: dlopen reports the absolute path as "not found" even though the file is
+        // really there, and that error is thrown while the game window is created, which takes
+        // the whole launch down. Only a path inside this app's own storage can be handed to
+        // LWJGL.
+        return isInOwnStorage(file);
+    }
+
+    /** Whether [file] lives in this app's own data, cache or native library directory. */
+    private static boolean isInOwnStorage(File file) {
+        String path = file.getAbsolutePath();
+        String[] roots = {Tools.DIR_DATA, Tools.NATIVE_LIB_DIR,
+                Tools.DIR_CACHE != null ? Tools.DIR_CACHE.getAbsolutePath() : null};
+        for (String root : roots) {
+            if (root == null || root.isEmpty()) continue;
+            if (root.endsWith("/")) root = root.substring(0, root.length() - 1);
+            if (path.equals(root) || path.startsWith(root + "/")) return true;
+        }
+        return false;
+    }
+
+    /**
      * Set up the current renderer or fallback to {@link GameRenderer#FALLBACK_RENDERER} if failed
      *
      * @return whether the renderer setup was successful
      */
     public boolean maybeSetupRenderer() {
+        if (pluginInitializationFailed && currentRenderer instanceof net.kdt.pojavlaunch.aerix.bridge.AerixRendererPlugin) {
+            // The plugin already failed once in this process; do not load it a second time.
+            Log.e(TAG, "A plugin failed native initialization in this process; using " + FALLBACK_RENDERER);
+            currentRenderer = getKnownRenderer(FALLBACK_RENDERER);
+        }
         setRendererLibraryPath(Tools.NATIVE_LIB_DIR, currentRenderer.librarySearchPath());
         if (!currentRenderer.setupRenderer()) {
-            Log.e(TAG, "Failed to setup renderer " + currentRenderer.name() + ", falling back to " + FALLBACK_RENDERER);
-            // Hopefully (yes, it's going to be fun if it returns null for the fallback renderer. Shouldn't happen though)
-            return getKnownRenderer(FALLBACK_RENDERER).setupRenderer();
+            if (currentRenderer instanceof net.kdt.pojavlaunch.aerix.bridge.AerixRendererPlugin) {
+                // A plugin whose provider will not load must not take the whole launch with it:
+                // remember it (so it is not retried in this process) and start the game on the
+                // built-in renderer, exactly like any other renderer that fails to set up.
+                pluginInitializationFailed = true;
+                Log.e(TAG, "Plugin renderer initialization failed; falling back to " + FALLBACK_RENDERER);
+                Logger.appendToLog("Renderer plugin failed to initialise; launched on " + FALLBACK_RENDERER);
+            } else {
+                Log.e(TAG, "Failed to setup renderer " + currentRenderer.name() + ", falling back to " + FALLBACK_RENDERER);
+            }
+            RenderSpec replacement = replacementRenderer(currentRenderer);
+            if (replacement != null) currentRenderer = replacement;
+            setRendererLibraryPath(Tools.NATIVE_LIB_DIR, currentRenderer.librarySearchPath());
+            if (currentRenderer.setupRenderer()) return true;
+            // Last resort: the plain built-in renderer every device has.
+            RenderSpec fallback = getKnownRenderer(FALLBACK_RENDERER);
+            if (fallback != null && !FALLBACK_RENDERER.equals(currentRenderer.tag())) {
+                Logger.appendToLog("Renderer: " + currentRenderer.name() + " could not start either; using the built-in renderer");
+                currentRenderer = fallback;
+                setRendererLibraryPath(Tools.NATIVE_LIB_DIR, currentRenderer.librarySearchPath());
+                return currentRenderer.setupRenderer();
+            }
+            return false;
         }
         return true;
     }

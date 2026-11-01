@@ -77,7 +77,7 @@ public class ControlLayout extends FrameLayout {
 	public void loadLayout(String jsonPath) throws IOException, JsonSyntaxException {
 		Point size = new Point(getWidth(), getHeight());
         try {
-            CustomControls layout = LayoutConverter.loadAndConvertIfNecessary(size, jsonPath);
+            CustomControls layout = LayoutConverter.loadAndConvertIfNecessary(getContext(), size, jsonPath);
             loadLayout(layout);
             updateLoadedFileName(jsonPath);
         }catch (IOException | JsonSyntaxException e) {

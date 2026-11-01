@@ -1,5 +1,7 @@
 package net.kdt.pojavlaunch.customcontrols;
 
+import android.util.Log;
+
 import java.util.Iterator;
 import java.util.List;
 
@@ -7,6 +9,7 @@ public class LayoutSanitizer {
 
     // Maybe add more conditions here later?
     private static boolean isValidFormula(String formula) {
+        if(formula == null) return false;
         return !formula.contains("Infinity") && !formula.contains("NaN");
     }
 
@@ -23,10 +26,17 @@ public class LayoutSanitizer {
             if(!isSaneData(drawerData.properties)) return false;
             sanitizeList(drawerData.buttonProperties);
             return true;
-        }else throw new RuntimeException("Unknown data entry "+entry.getClass().getName());
+        }else{
+            // A layout written by another launcher may hold entries this one cannot display.
+            // Drop them instead of failing while the game is starting.
+            Log.w("LayoutSanitizer", "Dropping unsupported control entry " +
+                    (entry == null ? "null" : entry.getClass().getName()));
+            return false;
+        }
     }
 
     private static boolean sanitizeList(List<?> controlDataList) {
+        if(controlDataList == null) return false;
         boolean madeChanges = false;
         Iterator<?> iterator = controlDataList.iterator();
         while(iterator.hasNext()) {
@@ -45,6 +55,7 @@ public class LayoutSanitizer {
      * @return whether the sanitization process made any changes to the layout
      */
     public static boolean sanitizeLayout(CustomControls controls) {
+        if (controls == null) return false;
         boolean madeChanges = sanitizeList(controls.mControlDataList);
         if(sanitizeList(controls.mDrawerDataList)) madeChanges = true;
         if(sanitizeList(controls.mJoystickDataList)) madeChanges = true;

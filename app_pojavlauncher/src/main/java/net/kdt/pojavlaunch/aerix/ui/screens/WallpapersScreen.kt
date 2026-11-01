@@ -30,6 +30,7 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -41,6 +42,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -48,6 +50,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -57,10 +60,13 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -88,6 +94,36 @@ import net.kdt.pojavlaunch.aerix.theme.AerixSpacing
 import net.kdt.pojavlaunch.aerix.theme.AerixSurface
 import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
 import net.kdt.pojavlaunch.aerix.theme.AerixWallpaperPreset
+import net.kdt.pojavlaunch.aerix.components.AerixAnimations
+import net.kdt.pojavlaunch.aerix.components.paintScenePreview
+import net.kdt.pojavlaunch.aerix.components.AerixHdClips
+import net.kdt.pojavlaunch.aerix.components.HdClip
+import net.kdt.pojavlaunch.aerix.components.rememberClipThumbnail
+import net.kdt.pojavlaunch.aerix.components.MEDIA_WALLPAPER_MIME
+import net.kdt.pojavlaunch.aerix.components.BundledClip
+import net.kdt.pojavlaunch.aerix.components.BundledClips
+import net.kdt.pojavlaunch.aerix.components.AerixAnimation
+import net.kdt.pojavlaunch.aerix.components.isAnimationId
+
+/**
+ * Which half of the wallpapers page is showing.
+ *
+ * It lives here rather than in the composable because applying a clip changes the theme, which
+ * rebuilds the settings screen around this page; a local remember slot can then come back reset and
+ * the page appears to jump to Wallpapers by itself after every tap.
+ */
+private object WallpaperSection {
+    var showAnimations by mutableStateOf(false)
+    var initialised = false
+
+    fun initialise(selectedId: String) {
+        if (initialised) return
+        initialised = true
+        showAnimations = AerixThemeManager.isBundledClipId(selectedId) ||
+            AerixThemeManager.isClipId(selectedId) ||
+            isAnimationId(selectedId)
+    }
+}
 
 @Composable
 fun WallpapersScreen(modifier: Modifier = Modifier) {
@@ -97,8 +133,49 @@ fun WallpapersScreen(modifier: Modifier = Modifier) {
     val failedText = stringResource(R.string.aerix_wallpaper_failed)
 
     val selectedId = AerixPreferences.selectedWallpaper
+    // Kept outside the composable: applying a clip switches the theme, which rebuilds this screen,
+    // and a rememberSaveable slot could come back initialised to Wallpapers - the page would jump
+    // out from under the tap.
+    WallpaperSection.initialise(selectedId)
+    var showAnimations by remember { mutableStateOf(WallpaperSection.showAnimations) }
     val selectedPreset = remember(selectedId) { AerixThemeManager.wallpapers.firstOrNull { it.id == selectedId } }
+    val selectedAnimation = remember(selectedId) { AerixAnimations.firstOrNull { it.id == selectedId } }
     val opacitySetting = AerixPreferences.backgroundOpacity
+
+    // Any clip or animated image on the device: they are copied into app storage, so the launcher
+    // can show real footage without shipping any of it.
+    val clipPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            scope.launch {
+                runCatching {
+                    val name = context.contentResolver.query(
+                        uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null
+                    )?.use { cursor ->
+                        if (cursor.moveToFirst()) cursor.getString(0) else null
+                    }
+                    withContext(Dispatchers.IO) {
+                        val input = context.contentResolver.openInputStream(uri)
+                            ?: error("The file could not be read")
+                        AerixThemeManager.importClip(context, name, input)
+                    }
+                }.onFailure { Toast.makeText(context, failedText, Toast.LENGTH_LONG).show() }
+            }
+        }
+    }
+
+    // Reading the folder touches disk, so it happens off the composition. A new import or a delete
+    // bumps the theme revision, which re-reads the list.
+    val clipRevision = AerixThemeManager.wallpaperRevision
+    var clips by remember(clipRevision) { mutableStateOf<List<java.io.File>>(emptyList()) }
+    LaunchedEffect(clipRevision) {
+        clips = withContext(Dispatchers.IO) { AerixThemeManager.clips(context) }
+    }
+    // The high-resolution pack is saved into the same folder as the player's own imports, so it is
+    // taken back out of that list here: those five are drawn by their own cards, which know whether
+    // they have been downloaded yet.
+    val hdFileNames = remember { AerixHdClips.clips.map { it.file }.toSet() }
+    val importedClips = clips.filterNot { it.name in hdFileNames }
+    val gridState = rememberLazyGridState()
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
@@ -124,7 +201,7 @@ fun WallpapersScreen(modifier: Modifier = Modifier) {
                     elevation = AerixMetrics.glassFloatingElevation
                 ),
             shape = RoundedCornerShape(AerixRadii.cardSmall),
-            color = AerixSurface.panelRaised.copy(alpha = 0.66f),
+            color = AerixSurface.panelRaised.copy(alpha = 0.33f),
             border = BorderStroke(AerixSpacing.hairline, activeAccent.copy(alpha = 0.45f))
         ) {
             Row(
@@ -134,26 +211,59 @@ fun WallpapersScreen(modifier: Modifier = Modifier) {
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus)
             ) {
-                // Active theme swatch
-                Box(
-                    modifier = Modifier
-                        .size(32.dp)
-                        .clip(RoundedCornerShape(AerixRadii.compact))
-                        .background(activeAccent.copy(alpha = 0.18f))
-                        .border(AerixSpacing.hairline, activeAccent, RoundedCornerShape(AerixRadii.compact)),
-                    contentAlignment = Alignment.Center
+                // Left side of the bar: the one switch for everything that moves, and the blur
+                // meter that governs every wallpaper rather than a single one.
+                Surface(
+                    shape = RoundedCornerShape(AerixRadii.compact),
+                    color = if (AerixPreferences.themeMotion) activeAccent.copy(alpha = 0.22f) else AerixSurface.panel,
+                    border = BorderStroke(
+                        AerixSpacing.hairline,
+                        if (AerixPreferences.themeMotion) activeAccent else AerixSurface.borderSoft
+                    ),
+                    onClick = { AerixPreferences.saveThemeMotion(!AerixPreferences.themeMotion) }
                 ) {
-                    Box(
+                    Text(
+                        text = stringResource(
+                            if (AerixPreferences.themeMotion) R.string.aerix_wallpaper_motion_on
+                            else R.string.aerix_wallpaper_motion_off
+                        ),
+                        color = if (AerixPreferences.themeMotion) activeAccent else AerixSurface.textPrimary,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = AerixSpacing.smPlus, vertical = AerixSpacing.smCompact)
+                    )
+                }
+                Column {
+                    Text(
+                        text = stringResource(R.string.aerix_wallpaper_blur, AerixPreferences.backgroundBlur),
+                        color = AerixSurface.textSecondary,
+                        fontSize = 10.sp
+                    )
+                    Slider(
+                        value = AerixPreferences.backgroundBlur.toFloat(),
+                        onValueChange = { AerixPreferences.saveBackgroundBlur(it.toInt()) },
+                        valueRange = 0f..20f,
                         modifier = Modifier
-                            .size(14.dp)
-                            .clip(CircleShape)
-                            .background(activeAccent)
+                            .width(104.dp)
+                            .height(22.dp),
+                        colors = SliderDefaults.colors(
+                            thumbColor = activeAccent,
+                            activeTrackColor = activeAccent,
+                            inactiveTrackColor = AerixSurface.canvas
+                        )
                     )
                 }
 
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = stringResource(R.string.aerix_wallpaper_header, AerixThemeManager.wallpapers.size),
+                        text = if (showAnimations) {
+                            stringResource(
+                                R.string.aerix_wallpaper_header,
+                                BundledClips.size + AerixHdClips.clips.size + importedClips.size
+                            )
+                        } else {
+                            stringResource(R.string.aerix_wallpaper_header, AerixThemeManager.wallpapers.size)
+                        },
                         color = Color.White,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.ExtraBold,
@@ -162,6 +272,7 @@ fun WallpapersScreen(modifier: Modifier = Modifier) {
                     )
                     Text(
                         text = when {
+                            selectedAnimation != null -> "${selectedAnimation.title} \u00B7 ${selectedAnimation.biome}"
                             selectedPreset != null -> stringResource(
                                 R.string.aerix_wallpaper_active_line,
                                 selectedPreset.title,
@@ -248,9 +359,73 @@ fun WallpapersScreen(modifier: Modifier = Modifier) {
             }
         }
 
-        // ---- three column grid of the HD wallpapers -------------------------------------------
+        // ---- two grids: the 25 photographs, and the 25 animated scenes -----------------------
+        // Both live on this page; the buttons switch which one is showing.
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(AerixSpacing.sm),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            listOf(
+                stringResource(R.string.aerix_wallpaper_tab_wallpaper) to false,
+                stringResource(R.string.aerix_wallpaper_tab_animations) to true
+            ).forEach { (label, animations) ->
+                val active = showAnimations == animations
+                Surface(
+                    shape = RoundedCornerShape(AerixRadii.compact),
+                    color = if (active) activeAccent.copy(alpha = 0.22f) else AerixSurface.panel,
+                    border = BorderStroke(
+                        AerixSpacing.hairline,
+                        if (active) activeAccent else AerixSurface.borderSoft
+                    ),
+                    onClick = {
+                        showAnimations = animations
+                        WallpaperSection.showAnimations = animations
+                        if (!animations) scope.launch { gridState.scrollToItem(0) }
+                    }
+                ) {
+                    Text(
+                        text = label,
+                        color = if (active) activeAccent else AerixSurface.textPrimary,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = AerixSpacing.md, vertical = AerixSpacing.xsPlus)
+                    )
+                }
+            }
+            // Adding your own clip sits with the section buttons, so nothing pushes the grid down.
+            Surface(
+                shape = RoundedCornerShape(AerixRadii.compact),
+                color = if (showAnimations) activeAccent else AerixSurface.panel,
+                contentColor = if (showAnimations) AerixSurface.onAccent else AerixSurface.textPrimary,
+                border = BorderStroke(
+                    AerixSpacing.hairline,
+                    if (showAnimations) activeAccent else AerixSurface.borderSoft
+                ),
+                onClick = { clipPicker.launch(MEDIA_WALLPAPER_MIME) }
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = AerixSpacing.md, vertical = AerixSpacing.xsPlus),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(AerixSpacing.xs)
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.aerix_ic_add),
+                        contentDescription = null,
+                        modifier = Modifier.size(12.dp)
+                    )
+                    Text(
+                        text = stringResource(R.string.aerix_wallpaper_video_button),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+
         LazyVerticalGrid(
             columns = GridCells.Fixed(3),
+            state = gridState,
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f),
@@ -258,14 +433,468 @@ fun WallpapersScreen(modifier: Modifier = Modifier) {
             horizontalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus),
             verticalArrangement = Arrangement.spacedBy(AerixSpacing.smPlus)
         ) {
-            items(
-                items = AerixThemeManager.wallpapers,
-                key = { it.id }
-            ) { preset ->
-                WallpaperPresetCard(
-                    preset = preset,
-                    isSelected = selectedId == preset.id,
-                    onClick = { AerixThemeManager.applyPreset(preset) }
+            if (showAnimations) {
+                // Real recorded footage first: it is what the section is for.
+                items(items = BundledClips, key = { it.id }) { clip ->
+                    BundledClipCard(
+                        clip = clip,
+                        isSelected = selectedId == AerixThemeManager.bundledClipId(clip),
+                        onClick = { AerixThemeManager.applyBundledClip(clip) }
+                    )
+                }
+                items(items = AerixHdClips.clips, key = { "hd:" + it.id }) { hd ->
+                    val saved = AerixHdClips.file(context, hd)
+                    val downloaded = AerixHdClips.isDownloaded(context, hd)
+                    HdClipCard(
+                        clip = hd,
+                        downloaded = downloaded,
+                        downloading = AerixHdClips.downloadingId == hd.id,
+                        progress = AerixHdClips.progress,
+                        isSelected = downloaded && selectedId == AerixThemeManager.clipId(saved),
+                        onClick = {
+                            if (downloaded) {
+                                AerixThemeManager.applyClip(saved)
+                            } else if (AerixHdClips.downloadingId == null) {
+                                scope.launch {
+                                    val file = AerixHdClips.download(context, hd)
+                                    if (file != null) {
+                                        AerixThemeManager.applyClip(file)
+                                    } else {
+                                        val message = AerixHdClips.failure ?: "The download failed"
+                                        Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                                        AerixHdClips.clearFailure()
+                                    }
+                                }
+                            }
+                        }
+                    )
+                }
+                items(items = importedClips, key = { "clip:" + it.absolutePath }) { clip ->
+                    ClipCard(
+                        file = clip,
+                        isSelected = selectedId == AerixThemeManager.clipId(clip),
+                        onClick = { AerixThemeManager.applyClip(clip) },
+                        onDelete = { AerixThemeManager.deleteClip(context, clip) }
+                    )
+                }
+            } else {
+                items(
+                    items = AerixThemeManager.wallpapers,
+                    key = { it.id }
+                ) { preset ->
+                    WallpaperPresetCard(
+                        preset = preset,
+                        isSelected = selectedId == preset.id,
+                        onClick = { AerixThemeManager.applyPreset(preset) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * One of the 25 animated scenes in the grid.
+ *
+ * The preview is painted from the scene's own sky and accent rather than run live: twenty five
+ * running scenes at once would cost far more than it shows, and tapping the card puts the real
+ * thing full screen immediately.
+ */
+@Composable
+private fun AnimationCard(animation: AerixAnimation, isSelected: Boolean, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(AerixRadii.control)
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .clickable(onClick = onClick),
+        shape = shape,
+        color = AerixSurface.panelRaised,
+        border = BorderStroke(
+            width = if (isSelected) 2.dp else AerixSpacing.hairline,
+            color = if (isSelected) animation.accent else AerixSurface.panelRaised
+        )
+    ) {
+        Column {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(16f / 9f)
+            ) {
+                // The preview is the scene itself, painted at a fixed moment: sky, its own light,
+                // the hills and the water, exactly as it will look behind the launcher. A still of
+                // the real thing reads far better than any gradient stand-in.
+                Canvas(Modifier.fillMaxSize()) {
+                    paintScenePreview(animation)
+                }
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(AerixSpacing.xsPlus),
+                    shape = RoundedCornerShape(AerixRadii.compact),
+                    color = AerixSurface.canvas.copy(alpha = 0.55f)
+                ) {
+                    Text(
+                        text = stringResource(R.string.aerix_animation_live),
+                        color = animation.accent,
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = 0.8.sp,
+                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                    )
+                }
+            }
+            Column(modifier = Modifier.padding(AerixSpacing.xsPlus)) {
+                Text(
+                    text = animation.title,
+                    color = AerixSurface.textPrimary,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = animation.biome,
+                    color = AerixSurface.textSecondary,
+                    fontSize = 9.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Footage that ships with the launcher: a recorded Minecraft scene, previewed with a real frame
+ * from the clip rather than a gradient.
+ */
+@Composable
+private fun BundledClipCard(clip: BundledClip, isSelected: Boolean, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(AerixRadii.control)
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .clickable(onClick = onClick),
+        shape = shape,
+        color = AerixSurface.panelRaised,
+        border = BorderStroke(
+            width = if (isSelected) 2.dp else AerixSpacing.hairline,
+            color = if (isSelected) clip.accent else AerixSurface.panelRaised
+        )
+    ) {
+        Column {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(16f / 9f)
+                    .background(AerixSurface.panelTrack)
+            ) {
+                // A real frame of this exact clip, shipped at 640x360 so the grid shows the scene
+                // immediately instead of spinning up a video decoder per card.
+                Image(
+                    painter = painterResource(clip.poster),
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(AerixSpacing.xsPlus),
+                    shape = RoundedCornerShape(AerixRadii.compact),
+                    color = AerixSurface.canvas.copy(alpha = 0.62f)
+                ) {
+                    Text(
+                        text = stringResource(R.string.aerix_clip_real),
+                        color = clip.accent,
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = 0.8.sp,
+                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                    )
+                }
+            }
+            Column(modifier = Modifier.padding(AerixSpacing.xsPlus)) {
+                Text(
+                    text = clip.title,
+                    color = AerixSurface.textPrimary,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = clip.subtitle,
+                    color = AerixSurface.textSecondary,
+                    fontSize = 9.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
+/**
+ * One clip of the high-resolution pack.
+ *
+ * Until it is downloaded the card is a placeholder that says what it is, how big and how sharp, and
+ * downloads it on tap - the pack is far too large to put in everybody's APK. Once downloaded it
+ * behaves exactly like the player's own imported clip, because that is what it is: the original
+ * file, byte for byte, in the same folder.
+ */
+@Composable
+private fun HdClipCard(
+    clip: HdClip,
+    downloaded: Boolean,
+    downloading: Boolean,
+    progress: Float,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    val shape = RoundedCornerShape(AerixRadii.control)
+    val context = LocalContext.current
+    val thumbnail = if (downloaded) rememberClipThumbnail(java.io.File(AerixThemeManager.clipDir(context), clip.file)) else null
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .clickable(onClick = onClick),
+        shape = shape,
+        color = AerixSurface.panelRaised,
+        border = BorderStroke(
+            width = if (isSelected) 2.dp else AerixSpacing.hairline,
+            color = if (isSelected) clip.accent else AerixSurface.panelRaised
+        )
+    ) {
+        Column {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(16f / 9f)
+                    .background(AerixSurface.panelTrack),
+                contentAlignment = Alignment.Center
+            ) {
+                if (thumbnail != null) {
+                    Image(
+                        bitmap = thumbnail,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    // Not downloaded yet. Without a frame the card used to be a coloured square with
+                    // a cloud on it, which said nothing about what the animation looks like; the
+                    // poster shipped with the pack is a real frame of this exact clip.
+                    Image(
+                        painter = painterResource(clip.poster),
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .size(34.dp)
+                            .background(AerixSurface.canvas.copy(alpha = 0.55f), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.aerix_ic_cloud_download),
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(AerixSpacing.xsPlus),
+                    shape = RoundedCornerShape(AerixRadii.compact),
+                    color = AerixSurface.canvas.copy(alpha = 0.62f)
+                ) {
+                    Text(
+                        text = "HD",
+                        color = clip.accent,
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = 0.8.sp,
+                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                    )
+                }
+
+                if (downloading) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(AerixSurface.canvas.copy(alpha = 0.55f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "${(progress * 100).toInt()}%",
+                            color = clip.accent,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .fillMaxWidth()
+                            .height(3.dp)
+                            .background(clip.accent.copy(alpha = 0.25f))
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(progress.coerceIn(0f, 1f))
+                                .fillMaxHeight()
+                                .background(clip.accent)
+                        )
+                    }
+                }
+            }
+            Column(modifier = Modifier.padding(AerixSpacing.xsPlus)) {
+                Text(
+                    text = clip.title,
+                    color = AerixSurface.textPrimary,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = if (downloaded) "${clip.subtitle} · ${clip.seconds}" else "${clip.resolution} · ${clip.seconds} · ${clip.megabytes}",
+                    color = AerixSurface.textSecondary,
+                    fontSize = 9.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
+/**
+ * A wallpaper the user brought in: real footage or a real looping animation.
+ *
+ * The card shows a frame from the clip itself, so the grid mixes their own clips with the drawn
+ * scenes and everything looks like what it will be.
+ */
+@Composable
+private fun ClipCard(
+    file: java.io.File,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    onDelete: () -> Unit
+) {
+    val shape = RoundedCornerShape(AerixRadii.control)
+    val accent = AerixThemeManager.currentAccent()
+    val thumbnail = rememberClipThumbnail(file)
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .clickable(onClick = onClick),
+        shape = shape,
+        color = AerixSurface.panelRaised,
+        border = BorderStroke(
+            width = if (isSelected) 2.dp else AerixSpacing.hairline,
+            color = if (isSelected) accent else AerixSurface.panelRaised
+        )
+    ) {
+        Column {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(16f / 9f)
+                    .background(AerixSurface.panelTrack)
+            ) {
+                if (thumbnail != null) {
+                    Image(
+                        bitmap = thumbnail,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    // The frame is read out of the player's own file the first time it is shown;
+                    // until then the card is a wash of the theme accent rather than an empty box.
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    listOf(accent.copy(alpha = 0.34f), accent.copy(alpha = 0.10f))
+                                )
+                            )
+                    )
+                    Icon(
+                        painter = painterResource(R.drawable.aerix_ic_play_arrow_filled),
+                        contentDescription = null,
+                        tint = Color.White.copy(alpha = 0.85f),
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .size(22.dp)
+                    )
+                }
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(AerixSpacing.xsPlus),
+                    shape = RoundedCornerShape(AerixRadii.compact),
+                    color = AerixSurface.canvas.copy(alpha = 0.62f)
+                ) {
+                    Text(
+                        text = stringResource(R.string.aerix_clip_badge),
+                        color = accent,
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = 0.8.sp,
+                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                    )
+                }
+                // Removing a clip lives on the corner of its own card, never in a menu.
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(AerixSpacing.xsPlus)
+                        .size(18.dp)
+                        .clickable(onClick = onDelete),
+                    shape = RoundedCornerShape(AerixRadii.compact),
+                    color = AerixSurface.canvas.copy(alpha = 0.62f)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            text = "\u00D7",
+                            color = AerixSurface.textSecondary,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+            Column(modifier = Modifier.padding(AerixSpacing.xsPlus)) {
+                Text(
+                    text = file.nameWithoutExtension,
+                    color = AerixSurface.textPrimary,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = stringResource(R.string.aerix_clip_kind),
+                    color = AerixSurface.textSecondary,
+                    fontSize = 9.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
         }
@@ -299,7 +928,7 @@ private fun WallpaperPresetCard(preset: AerixWallpaperPreset, isSelected: Boolea
             )
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(AerixRadii.control),
-        color = AerixSurface.panelRaised.copy(alpha = 0.68f),
+        color = AerixSurface.panelRaised.copy(alpha = 0.34f),
         border = BorderStroke(
             width = if (isSelected) 2.dp else AerixSpacing.hairline,
             color = if (isSelected) preset.accentColor else AerixSurface.panelRaised

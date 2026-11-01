@@ -12,7 +12,10 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import net.kdt.pojavlaunch.Architecture;
 import net.kdt.pojavlaunch.JVersionList;
+import net.kdt.pojavlaunch.Logger;
 import net.kdt.pojavlaunch.Tools;
+import net.kdt.pojavlaunch.aerix.bridge.AerixSkinServer;
+import net.kdt.pojavlaunch.aerix.bridge.PojavAccountBridge;
 import net.kdt.pojavlaunch.authenticator.accounts.Account;
 import net.kdt.pojavlaunch.game.renderer.def.Renderers;
 import net.kdt.pojavlaunch.game.renderer.impl.GLESRenderSpec;
@@ -45,6 +48,61 @@ import java.util.Map;
 import net.kdt.pojavlaunch.R;
 
 public class GameRunner {
+    private static volatile String sPendingServerAddress;
+
+    public static void setPendingServerAddress(String serverAddress) {
+        sPendingServerAddress = (serverAddress != null && !serverAddress.trim().isEmpty())
+                ? serverAddress.trim()
+                : null;
+    }
+
+    private static boolean usesQuickPlayMultiplayer(JVersionList.Version versionInfo, String versionId) {
+        String candidate = versionInfo != null && versionInfo.inheritsFrom != null
+                ? versionInfo.inheritsFrom
+                : (versionInfo != null && versionInfo.id != null ? versionInfo.id : versionId);
+        if (candidate != null) {
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile("(?:^|[^0-9])1\\.(\\d+)(?:\\.\\d+)?").matcher(candidate);
+            if (m.find()) {
+                try {
+                    return Integer.parseInt(m.group(1)) >= 20;
+                } catch (NumberFormatException ignored) {
+                }
+            }
+        }
+        try {
+            return !DateUtils.dateBefore(DateUtils.getOriginalReleaseDate(versionInfo), 2023, 3, 5);
+        } catch (Throwable ignored) {
+            return true;
+        }
+    }
+
+    private static void appendServerAutoConnectArgs(List<String> launchArgs, JVersionList.Version versionInfo, String versionId) {
+        String raw = sPendingServerAddress;
+        sPendingServerAddress = null;
+        if (raw == null || raw.isEmpty()) return;
+
+        if (usesQuickPlayMultiplayer(versionInfo, versionId)) {
+            launchArgs.add("--quickPlayMultiplayer");
+            launchArgs.add(raw);
+            return;
+        }
+
+        String host = raw;
+        String port = "25565";
+        int lastColon = raw.lastIndexOf(':');
+        if (lastColon > 0 && raw.indexOf(':') == lastColon && lastColon < raw.length() - 1) {
+            String maybePort = raw.substring(lastColon + 1);
+            if (maybePort.matches("\\d{1,5}")) {
+                host = raw.substring(0, lastColon);
+                port = maybePort;
+            }
+        }
+        launchArgs.add("--server");
+        launchArgs.add(host);
+        launchArgs.add("--port");
+        launchArgs.add(port);
+    }
+
     /**
      * Optimization mods based on Sodium can mitigate the render distance issue. Check if Sodium
      * or its derivative is currently installed to skip the render distance check.
@@ -261,12 +319,15 @@ public class GameRunner {
 
         int requiredJavaVersion = 8;
         if(versionInfo.javaVersion != null) requiredJavaVersion = versionInfo.javaVersion.majorVersion;
+        requiredJavaVersion = ModJavaRequirements.minimumJava(gamedir, requiredJavaVersion);
+        Log.i("GameRunner", "Minimum Java including enabled mod requirements: " + requiredJavaVersion);
 
         Runtime runtime = MultiRTUtils.forceReread(pickRuntime(instance, requiredJavaVersion));
 
         // Pre-process specific files
         disableSplash(gamedir);
         List<String> launchArgs = getMoJsonClientArgs(account, versionInfo, gamedir);
+        appendServerAutoConnectArgs(launchArgs, versionInfo, versionId);
 
         // Select the appropriate openGL version
         OldVersionsUtils.selectOpenGlVersion(versionInfo);
@@ -309,6 +370,11 @@ public class GameRunner {
         FileUtils.ensureDirectory(lwjglExtractDir);
         javaArgList.add("-Dorg.lwjgl.system.SharedLibraryExtractPath="+lwjglExtractDir.getAbsolutePath());
 
+        // The skin chosen in the wardrobe only reaches the game this way: the game reads its own
+        // profile from the session service, so the launcher serves that profile (with the skin,
+        // cape and arm model) from a loopback endpoint and points the shipped authlib-injector at
+        // it. Without an equipped skin this adds nothing and the launch is unchanged.
+        javaArgList.addAll(AerixSkinServer.launchArguments(activity, account));
         addAuthlibInjectorArgs(javaArgList, account);
 
         mergeMoJsonArgs(javaArgList, getMoJsonJvmArgs(versionId));
@@ -331,10 +397,37 @@ public class GameRunner {
             if(showDialog(activity, R.string.gr_err_renderer_load_Failed)) return;
             System.exit(0);
         }
-        javaArgList.add("-Dorg.lwjgl.opengl.libname=libGLMojo.so");
+        // A renderer plugin may ship its own OpenGL library; built-in renderers keep the shim.
+        // LWJGL loads this while the game window is being created, and a path that does not
+        // resolve takes the whole launch down with an UnsatisfiedLinkError on the render thread,
+        // so the renderer is only used when its library is really on disk.
+        RenderSpec activeRenderer = gameRenderer.getLaunchableRenderer();
+        Logger.appendToLog("LWJGL OpenGL library: " + activeRenderer.glLibraryPath()
+                + " (renderer " + activeRenderer.name() + ")");
+        javaArgList.add("-Dorg.lwjgl.opengl.libname=" + activeRenderer.glLibraryPath());
         javaArgList.add("-Dorg.lwjgl.freetype.libname="+ Tools.NATIVE_LIB_DIR+"/libfreetype.so");
+        // Renderer plugins that pick a compatibility core by game version read this property
+        // (Emesis does), so state the version instead of letting them guess from the classpath.
+        if (versionId != null && !versionId.isEmpty()) {
+            javaArgList.add("-Dpojav.mc.version=" + versionId);
+            if (activeRenderer instanceof net.kdt.pojavlaunch.aerix.bridge.AerixRendererPlugin) {
+                // The same value as an environment variable: a plugin reads /proc/self/cmdline for
+                // the -D form, and that file holds the application's command line, not the JVM
+                // arguments of an in-process VM. Without it the plugin cannot tell which core to
+                // use and falls back to its own default.
+                try {
+                    android.system.Os.setenv("pojav.mc.version", versionId, true);
+                    android.system.Os.setenv("emesis.mc.version", versionId, true);
+                } catch (android.system.ErrnoException error) {
+                    Log.w("GameRunner", "Could not state the game version to the renderer", error);
+                }
+            }
+        }
 
-        activity.runOnUiThread(() -> Toast.makeText(activity, activity.getString(R.string.autoram_info_msg,LauncherPreferences.PREF_RAM_ALLOCATION), Toast.LENGTH_SHORT).show());
+        final int launchMemoryMb = InstanceMemory.effectiveMb(instance.jvmArgs, LauncherPreferences.PREF_RAM_ALLOCATION);
+        Logger.appendToLog("Java heap allocation: " + launchMemoryMb + " MB" +
+                (InstanceMemory.overrideMb(instance.jvmArgs) > 0 ? " (instance override)" : " (launcher default)") + "\n");
+        activity.runOnUiThread(() -> Toast.makeText(activity, activity.getString(R.string.autoram_info_msg, launchMemoryMb), Toast.LENGTH_SHORT).show());
 
         Log.i("GameRunner", "Running with "+ launchArgs.toString());
 
@@ -342,7 +435,7 @@ public class GameRunner {
 
         try {
             JavaRunner.nativeSetupExit(activity);
-            JavaRunner.startJvm(runtime, javaArgList, launchClassPath, mainClass, launchArgs);
+            JavaRunner.startJvm(runtime, javaArgList, launchClassPath, mainClass, launchArgs, launchMemoryMb);
         }catch (VMLoadException e) {
             LifecycleAwareAlertDialog.DialogCreator dialogCreator = (dialog, builder) ->
                 builder.setMessage(e.toString(activity)).setPositiveButton(android.R.string.ok, (d, w)->{});
@@ -449,11 +542,14 @@ public class GameRunner {
         }
 
 
+        String effectiveToken = PojavAccountBridge.effectiveAccessToken(profile);
+        String effectiveUuid = PojavAccountBridge.effectiveProfileId(profile).replace("-", "");
+
         Map<String, String> varArgMap = new ArrayMap<>();
-        varArgMap.put("auth_session", profile.accessToken); // For legacy versions of MC
-        varArgMap.put("auth_access_token", profile.accessToken);
+        varArgMap.put("auth_session", effectiveToken); // For legacy versions of MC
+        varArgMap.put("auth_access_token", effectiveToken);
         varArgMap.put("auth_player_name", username);
-        varArgMap.put("auth_uuid", profile.profileId.replace("-", ""));
+        varArgMap.put("auth_uuid", effectiveUuid);
         varArgMap.put("auth_xuid", profile.xuid);
         varArgMap.put("assets_root", Tools.ASSETS_PATH);
         varArgMap.put("assets_index_name", versionInfo.assets);

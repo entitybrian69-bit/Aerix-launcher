@@ -39,6 +39,6 @@ open class MGApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        authController.refresh()
+        if (applicationInfo.uid == android.os.Process.myUid()) authController.refresh()
     }
 }

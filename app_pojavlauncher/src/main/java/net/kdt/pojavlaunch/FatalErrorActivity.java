@@ -33,7 +33,11 @@ public class FatalErrorActivity extends AppCompatActivity {
 			throwable = (Throwable) extras.getSerializable("throwable");
 		} catch (Throwable ignored) {
 		}
-		final String stackTrace = resolveStackTrace(preformatted, throwable, strSavePath);
+		final String stackTrace = "Aerix Launcher " + BuildConfig.VERSION_NAME
+                + " (code " + BuildConfig.VERSION_CODE + ", " + BuildConfig.BUILD_TYPE + ")\n"
+                + "Package: " + getPackageName() + "\n"
+                + "Android: " + android.os.Build.VERSION.RELEASE + "\n\n"
+                + resolveStackTrace(preformatted, throwable, strSavePath);
 		String errHeader = storageAllow ?
 			"Crash stack trace saved to " + strSavePath + "." :
 			"Storage permission is required to save crash stack trace!";

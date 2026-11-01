@@ -14,6 +14,7 @@ public abstract class DownloaderTask implements Runnable {
     @Override
     public final void run() {
         try {
+            mDownloader.checkpoint();
             performTask();
         }catch (IOException e) {
             mDownloader.taskException(e);

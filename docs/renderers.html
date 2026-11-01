@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Renderers — Aerix Launcher</title>
+<meta name="description" content="Aerix Launcher ships twelve renderers: Emesis, Zink, OpenLTW, GL4ES, MobileGlues, SFPEW and more. What each one is for, which to try first, and how the automatic fallback works.">
+<meta name="theme-color" content="#c8102e">
+<meta name="color-scheme" content="light">
+<link rel="icon" href="assets/aerix-logo.png">
+<link rel="apple-touch-icon" href="assets/aerix-logo.png">
+<link rel="canonical" href="https://entitybrian69-bit.github.io/Aerix-launcher/renderers.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Aerix Launcher">
+<meta property="og:title" content="Renderers — Aerix Launcher">
+<meta property="og:description" content="Aerix Launcher ships twelve renderers: Emesis, Zink, OpenLTW, GL4ES, MobileGlues, SFPEW and more. What each one is for, which to try first, and how the automatic fallback works.">
+<meta property="og:url" content="https://entitybrian69-bit.github.io/Aerix-launcher/renderers.html">
+<meta property="og:image" content="https://entitybrian69-bit.github.io/Aerix-launcher/assets/screenshots/shot-home.jpg">
+<meta property="og:image:alt" content="The Aerix Launcher home screen">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+<div class="bg" aria-hidden="true">
+  <span class="bg-grid"></span>
+  <span class="bg-ribbon r1"></span>
+  <span class="bg-ribbon r2"></span>
+  <span class="bg-ribbon r3"></span>
+  <span class="bg-dots"></span>
+  <span class="bg-arc a1"></span>
+  <span class="bg-arc a2"></span>
+</div>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="nav">
+  <div class="wrap nav-inner">
+    <a class="brand" href="index.html">
+      <img src="assets/aerix-logo.png" alt="" width="34" height="34">
+      <span>AERIX<small>LAUNCHER</small></span>
+    </a>
+    <nav class="nav-links" id="navLinks" aria-label="Pages">
+      <a href="index.html">Home</a>
+      <a href="features.html">Features</a>
+      <a href="renderers.html" aria-current="page">Renderers</a>
+      <a href="screenshots.html">Gallery</a>
+      <a href="install.html">Install</a>
+      <a href="faq.html">FAQ</a>
+    </nav>
+    <a class="nav-cta" href="index.html#download">Download</a>
+    <button class="nav-toggle" id="navToggle" type="button" aria-expanded="false" aria-controls="navLinks" aria-label="Open menu">
+      <span></span>
+    </button>
+  </div>
+</header>
+
+  <section class="page-head">
+    <div class="wrap">
+      <span class="kicker">Renderers</span>
+      <h1>Twelve ways to draw the same world</h1>
+      <p>Android GPUs, drivers and game versions disagree about almost everything. Aerix ships several translation layers so a phone that will not run one renderer can still run the game.</p>
+    </div>
+  </section>
+
+<main id="main">
+
+  <section class="section">
+    <div class="wrap">
+      <div class="callout reveal">
+        <span aria-hidden="true">◆</span>
+        <p><strong>Start with Emesis.</strong> It is bundled, needs no plugin APK, and works on the
+        widest range of devices. Change the renderer per instance, not globally, so a game that
+        needs Zink does not force everything else onto it.</p>
+      </div>
+
+      <div class="table-wrap reveal mt-32">
+        <table>
+          <caption class="small muted" style="text-align:left;padding:14px 18px">The full lineup, as it ships in 1.5.6.</caption>
+          <thead>
+            <tr><th scope="col">Renderer</th><th scope="col">What it is</th><th scope="col">What it does</th><th scope="col">Reach for it when</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><b>Emesis</b></td><td>Bundled, default</td><td>GL → GLES translation. The widest compatibility across Adreno and Mali, and needs no plugin APK.</td><td><span class="tag">Start here</span></td></tr>
+            <tr><td><b>Zink</b></td><td>Mesa on Vulkan</td><td>Desktop OpenGL implemented on top of Vulkan. Fast on phones with a good Vulkan driver; poor on bad ones.</td><td><span class="tag">New phones</span></td></tr>
+            <tr><td><b>Zink (Legacy)</b></td><td>Mesa on Vulkan</td><td>The older Zink build, aimed at 1.8 – 1.16 era games and mods.</td><td><span class="tag">Old versions</span></td></tr>
+            <tr><td><b>OpenLTW</b></td><td>LWJGL on TLW</td><td>A modern translation path that suits current versions and modern mod loaders.</td><td><span class="tag">Modern versions</span></td></tr>
+            <tr><td><b>GL4ES</b></td><td>Classic GLES1/2 shim</td><td>The long-standing fallback. Broadest device support, lowest feature level; used automatically if nothing else can load.</td><td><span class="tag">Last resort</span></td></tr>
+            <tr><td><b>NG-GL4ES</b></td><td>Newer GL4ES</td><td>A newer GL4ES build with fixes the original never got.</td><td><span class="tag">GL4ES with fixes</span></td></tr>
+            <tr><td><b>MG-ES</b></td><td>MobileGlues</td><td>A GL 4.x translation layer for modern versions. Wants a capable GPU.</td><td><span class="tag">Powerful GPU</span></td></tr>
+            <tr><td><b>SFPEW</b></td><td>Fixed-pipeline wrapper</td><td>Simple FPE Wrapper: translates the fixed-function GL that old mods and Angelica-style mods rely on.</td><td><span class="tag">Old mods</span></td></tr>
+            <tr><td><b>Mesa</b></td><td>Desktop GL via Mesa</td><td>Mesa's software/hardware desktop GL path, for the cases that need real desktop GL semantics.</td><td><span class="tag">Experimental</span></td></tr>
+            <tr><td><b>Mesa (external)</b></td><td>External Mesa build</td><td>The same, using a Mesa build supplied outside the launcher.</td><td><span class="tag">Experimental</span></td></tr>
+            <tr><td><b>Freedreno</b></td><td>Adreno Mesa driver</td><td>Mesa's open Adreno driver. Device-specific, and only useful on hardware it supports.</td><td><span class="tag">Adreno, advanced</span></td></tr>
+            <tr><td><b>Proton</b></td><td>32-bit only</td><td>For 32-bit setups that need a Proton-style GL path.</td><td><span class="tag">32-bit only</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap">
+      <div class="section-head reveal">
+        <span class="kicker">New in 1.5.5</span>
+        <h2>A missing library no longer kills the launch</h2>
+        <p>
+          A renderer names the OpenGL library LWJGL should load. When that library is not on
+          disk — a plugin APK pointing at a path that does not exist, most often — the game used
+          to die during startup, before the renderer picker was reachable.
+        </p>
+      </div>
+      <div class="grid grid-3 reveal">
+        <article class="card"><h3>Checked first</h3><p>The library is resolved <b>before</b> the JVM starts, so a bad path is caught while there is still a launcher to say so.</p></article>
+        <article class="card"><h3>Bundled Emesis</h3><p>The replacement is the Emesis that ships with the launcher — the same translation layer most plugins provide — so you stay on the renderer you meant to use.</p></article>
+        <article class="card"><h3>Then GL4ES</h3><p>If Emesis is the one that failed, GL4ES takes over rather than the game closing.</p></article>
+      </div>
+      <div class="callout warn mt-32">
+        <span aria-hidden="true">!</span>
+        <p><strong>If a game still refuses to start:</strong> open the instance settings, try another
+        renderer, and lower the resolution. If you have an Emesis plugin APK installed, remove it —
+        the launcher already carries its own.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap">
+      <div class="section-head reveal">
+        <span class="kicker">Choosing</span>
+        <h2>A short decision tree</h2>
+      </div>
+      <ol class="steps reveal">
+        <li><h3>Does it start on Emesis?</h3><p>Stop there. The default is the default because it works on the most hardware.</p></li>
+        <li><h3>Black screen, crash on launch, or unreadable graphics?</h3><p>Try <b>Zink</b> if your phone has a recent Vulkan driver, otherwise <b>OpenLTW</b> for modern versions.</p></li>
+        <li><h3>Running something old — 1.8 to 1.16?</h3><p><b>Zink (Legacy)</b> or <b>GL4ES</b>, and expect to lower the resolution.</p></li>
+        <li><h3>Modded, with graphics mods?</h3><p><b>MG-ES</b> or <b>Zink</b> if the GPU is capable; shaders and Sodium-style mods are where renderer choice matters most.</p></li>
+        <li><h3>Nothing works?</h3><p>Turn the resolution down before changing anything else. It fixes more launches than any renderer swap.</p></li>
+      </ol>
+    </div>
+  </section>
+
+</main>
+
+<footer class="footer">
+  <div class="wrap">
+    <div class="footer-grid">
+      <div>
+        <a class="brand" href="index.html">
+          <img src="assets/aerix-logo.png" alt="" width="34" height="34">
+          <span>AERIX<small>LAUNCHER</small></span>
+        </a>
+        <p class="small" style="max-width:32ch">
+          Minecraft: Java Edition on Android — instances, renderers, accounts and a
+          content browser in one launcher.
+        </p>
+      </div>
+      <div>
+        <h4>The launcher</h4>
+        <ul>
+          <li><a href="features.html">Features</a></li>
+          <li><a href="renderers.html">Renderers</a></li>
+          <li><a href="screenshots.html">Gallery</a></li>
+          <li><a href="install.html">Install guide</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Get it</h4>
+        <ul>
+          <li><a href="index.html#download">Download</a></li>
+          <li><a href="https://github.com/entitybrian69-bit/Aerix-launcher/releases" target="_blank" rel="noopener">All releases</a></li>
+          <li><a href="https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest/download/SHA256SUMS" target="_blank" rel="noopener">Checksums</a></li>
+          <li><a href="faq.html">FAQ</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Project</h4>
+        <ul>
+          <li><a href="https://github.com/entitybrian69-bit/Aerix-launcher" target="_blank" rel="noopener">GitHub</a></li>
+          <li><a href="https://discord.gg/RS7q9KaCm6" target="_blank" rel="noopener">Discord</a></li>
+          <li><a href="https://github.com/entitybrian69-bit/Aerix-launcher/issues" target="_blank" rel="noopener">Report a bug</a></li>
+          <li><a href="https://github.com/entitybrian69-bit/Aerix-launcher/blob/v3_openjdk/PRIVACY_POLICY.md" target="_blank" rel="noopener">Privacy</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-credit">
+      <img src="assets/creator-entitybrian.jpg" alt="" width="48" height="48" loading="lazy">
+      <p>
+        <b>entitybrian</b> — Owner · Core developer · Tester · Maintainer<br>
+        <a href="index.html#creator">Who builds Aerix</a> · <a href="https://github.com/entitybrian69-bit" target="_blank" rel="noopener">GitHub profile</a>
+      </p>
+    </div>
+    <div class="footer-bottom">
+      <span>© <span id="year">2026</span> Aerix Launcher. Not affiliated with Mojang or Microsoft.</span>
+      <span>Minecraft is a trademark of Mojang Synergies AB.</span>
+    </div>
+  </div>
+</footer>
+<script src="site.js" defer></script>
+</body>
+</html>

@@ -28,6 +28,15 @@ public class Instance extends DisplayInstance {
     public String selectedRuntime;
     public String controlLayout;
     public boolean sharedData;
+    /**
+     * The artwork the publisher of the modpack this instance was built from uses, and the pack it
+     * belongs to. Kept so the pack's logo can be restored if the icon file is ever lost - the
+     * launcher's own mark is not a stand-in for it.
+     */
+    public String modpackIconUrl;
+    public String modpackProjectId;
+    /** "modrinth" or "curseforge" for an instance built from a modpack, null otherwise. */
+    public String modpackSource;
 
     protected Instance() {
     }
@@ -36,6 +45,9 @@ public class Instance extends DisplayInstance {
     protected void sanitize() {
         super.sanitize();
         sanitizeArgs();
+        if (net.kdt.pojavlaunch.aerix.bridge.RetiredRendererCleanup.isRetiredTag(renderer)) {
+            renderer = null; // Inherit the remaining global renderer; preserve all other instance data.
+        }
     }
 
     private void sanitizeArgs() {
@@ -87,7 +99,8 @@ public class Instance extends DisplayInstance {
     }
 
     public String getLaunchRenderer() {
-        if(Tools.isValidString(renderer)) return renderer;
+        if(Tools.isValidString(renderer) &&
+                !net.kdt.pojavlaunch.aerix.bridge.RetiredRendererCleanup.isRetiredTag(renderer)) return renderer;
         return LauncherPreferences.PREF_RENDERER;
     }
 

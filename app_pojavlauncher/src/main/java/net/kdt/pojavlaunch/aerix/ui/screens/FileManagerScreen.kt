@@ -498,7 +498,7 @@ private fun ActionBar(content: @Composable () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(shape)
-            .background(AerixSurface.panelRaised.copy(alpha = 0.7f), shape)
+            .background(AerixSurface.panelRaised.copy(alpha = 0.35f), shape)
             .horizontalScroll(rememberScrollState())
             .padding(horizontal = AerixSpacing.xs, vertical = AerixSpacing.xxs),
         verticalAlignment = Alignment.CenterVertically,
@@ -571,7 +571,7 @@ private fun FileRow(item: FileItem, selected: Boolean, onClick: () -> Unit, onLo
         modifier = Modifier
             .fillMaxWidth()
             .clip(shape)
-            .background(if (selected) accent.copy(alpha = 0.22f) else AerixSurface.panelRaised.copy(alpha = 0.42f), shape)
+            .background(if (selected) accent.copy(alpha = 0.22f) else AerixSurface.panelRaised.copy(alpha = 0.21f), shape)
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .padding(horizontal = AerixSpacing.md, vertical = AerixSpacing.sm),
         verticalAlignment = Alignment.CenterVertically,
@@ -712,7 +712,7 @@ private fun ColumnScope.TrashPane(onChanged: () -> Unit) {
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(shape)
-                            .background(AerixSurface.panelRaised.copy(alpha = 0.42f), shape)
+                            .background(AerixSurface.panelRaised.copy(alpha = 0.21f), shape)
                             .padding(horizontal = AerixSpacing.md, vertical = AerixSpacing.sm),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(AerixSpacing.md)

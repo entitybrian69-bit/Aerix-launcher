@@ -30,9 +30,11 @@ public class ProgressKeeper {
         List<ProgressListener> progressListeners = sProgressListeners.get(progressRecord);
         if(progressListeners != null)
             for(ProgressListener listener : progressListeners) {
-                    if(shouldCallStarted) listener.onProgressStarted();
-                    else if(shouldCallEnded) listener.onProgressEnded();
-                    else listener.onProgressUpdated(progress, resid, va);
+                    if (shouldCallEnded) listener.onProgressEnded();
+                    else {
+                        if (shouldCallStarted) listener.onProgressStarted();
+                        listener.onProgressUpdated(progress, resid, va);
+                    }
             }
     }
 

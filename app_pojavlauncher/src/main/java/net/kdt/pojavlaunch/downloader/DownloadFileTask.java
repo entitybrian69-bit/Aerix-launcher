@@ -33,6 +33,7 @@ public class DownloadFileTask extends DownloaderTask implements BytesCopiedListe
                 if(!rangeAllowed) performRetry(attempt, false);
             }
         }catch (IOException e) {
+            mDownloader.checkCancelled();
             if(attempt == 5) throw e;
             performRetry(attempt, rangeAllowed);
         }

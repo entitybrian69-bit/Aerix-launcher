@@ -18,6 +18,7 @@ rootProject.name='PojavLauncher'
 include ':app_pojavlauncher'
 
 include ':forge_installer'
+include ':aerix_client_mod'
 include ':glfw:jni_bindings'
 include ':mojoexec:jni_bindings'
 include ':sdl:jni_bindings'

@@ -16,6 +16,7 @@ import net.kdt.pojavlaunch.R;
 import net.kdt.pojavlaunch.Architecture;
 import net.kdt.pojavlaunch.mobileglues.MainActivity;
 import net.kdt.pojavlaunch.game.renderer.RendererCache;
+import net.kdt.pojavlaunch.game.renderer.def.Renderers;
 import net.kdt.pojavlaunch.game.renderer.extra.GLESProvider;
 import net.kdt.pojavlaunch.prefs.CustomSeekBarPreference;
 import net.kdt.pojavlaunch.prefs.LauncherPreferences;
@@ -81,6 +82,9 @@ public class LauncherPreferenceVideoFragment extends LauncherPreferenceFragment 
         RendererCache list = RendererCache.getCompatibleRenderers(getContext());
         rendererListPreference.setEntries(list.rendererDisplayNames);
         rendererListPreference.setEntryValues(list.rendererIds.toArray(new String[0]));
+        // The default renderer depends on the device, so it cannot live in the XML as a
+        // defaultValue. Show the one the launcher picked until the user changes it.
+        rendererListPreference.setValue(LauncherPreferences.PREF_RENDERER);
 
         requirePreference("renderer_settings", Preference.class).setOnPreferenceClickListener(preference -> {
             startActivity(new Intent(getContext(), MainActivity.class));
@@ -108,8 +112,7 @@ public class LauncherPreferenceVideoFragment extends LauncherPreferenceFragment 
     private void computeVisibility(){
         requirePreference("force_vsync", SwitchPreferenceCompat.class)
                 .setVisible(LauncherPreferences.PREF_USE_ALTERNATE_SURFACE);
-       String currentRenderer = LauncherPreferences.DEFAULT_PREF.getString("renderer", "opengles2");
-       boolean isMobileGluesRenderer = "opengles_mobileglues".equals(currentRenderer);
+       boolean isMobileGluesRenderer = Renderers.MOBILEGLUES_RENDERER.equals(LauncherPreferences.PREF_RENDERER);
        requirePreference("renderer_settings", Preference.class).setVisible(isMobileGluesRenderer);
     }
 }
