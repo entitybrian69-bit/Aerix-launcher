@@ -28,5 +28,5 @@ for game, entries in manifest.items():
             required = set(metadata.get('depends', {}))
             unknown = required - {'minecraft', 'java', 'fabricloader', 'fabric-api', 'fabric'} - nested_ids
             assert not unknown, (game, entry['id'], unknown, nested_ids)
-            print(game, entry['id'], metadata.get('version'), 'depends=', metadata.get('depends', {}), 'nested=', sorted(nested_ids))
+            print(f"::notice title=FastClient mod metadata::{game} {entry['id']} {metadata.get('version')} depends={json.dumps(metadata.get('depends', {}), separators=(',', ':'))} nested={','.join(sorted(nested_ids))}")
 print('Pinned FastClient performance mod downloads verified')
