@@ -61,13 +61,13 @@ fun ClientHubScreen(activity: FragmentActivity, page: ClientOwnerPage, onPageCha
                     ) {
                         OwnerCard(
                             photo = R.drawable.client_owner_sahil,
-                            label = "Made by Sahil, the owner of the launcher",
+                            label = "Aerix client",
                             onClick = { onPageChange(ClientOwnerPage.SAHIL) },
                             modifier = Modifier.weight(1f)
                         )
                         OwnerCard(
                             photo = R.drawable.client_owner_mx_inspire,
-                            label = "MX Inspire",
+                            label = "Fast client 2.0",
                             onClick = { onPageChange(ClientOwnerPage.MX_INSPIRE) },
                             modifier = Modifier.weight(1f)
                         )

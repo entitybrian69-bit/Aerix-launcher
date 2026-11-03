@@ -107,6 +107,37 @@ object FastClientInstaller {
         if (modId(output) != "fabric-api") throw IOException("Downloaded Fabric API has an unexpected mod ID")
     }
 
+    /** Pinned, version-specific upstream releases. Verify both hash and Fabric mod identity. */
+    private fun downloadPerformanceMods(context: Context, version: String, staging: File): List<File> {
+        val manifest = context.assets.open("components/fastclient/performance-mods.json")
+            .bufferedReader().use { JSONObject(it.readText()) }
+        val entries = manifest.getJSONArray(version)
+        if (entries.length() != 2) throw IOException("Performance mod list is incomplete")
+        val result = mutableListOf<File>()
+        val ids = mutableSetOf<String>()
+        for (index in 0 until entries.length()) {
+            val entry = entries.getJSONObject(index)
+            val id = entry.getString("id")
+            val url = entry.getString("url")
+            val hash = entry.getString("sha256")
+            if (id !in setOf("lithium", "entityculling") || !ids.add(id) ||
+                !url.startsWith("https://github.com/") || !hash.matches(Regex("[a-f0-9]{64}"))) {
+                throw IOException("Invalid performance mod configuration")
+            }
+            status = "Downloading ${if (id == "lithium") "Lithium" else "Entity Culling"}…"
+            val output = File(staging, "$id.jar")
+            SocialRealtime.restClient.newCall(Request.Builder().url(url).header("User-Agent", "AerixLauncher/FastClient").build()).execute().use { response ->
+                if (!response.isSuccessful) throw IOException("$id download failed (HTTP ${response.code})")
+                val body = response.body ?: throw IOException("$id download was empty")
+                if (body.contentLength() > 40_000_000) throw IOException("$id is too large")
+                copyVerified(body.byteStream(), output, "SHA-256", hash)
+            }
+            if (modId(output) != id) throw IOException("Unexpected mod ID in $id download")
+            result.add(output)
+        }
+        return result
+    }
+
     /** Creates a separate private instance. Never changes an existing instance or its mods. */
     suspend fun install(context: Context, build: FastClientBuild): Result<Instance> = withContext(Dispatchers.IO) {
         if (!installationLock.compareAndSet(false, true)) return@withContext Result.failure(IOException("Another FastClient installation is in progress"))
@@ -138,13 +169,15 @@ object FastClientInstaller {
             status = "Downloading Fabric API…"
             val api = File(staging, "fabric-api.jar")
             fabricApi(build.minecraft, api)
+            progress = 0.62f
+            val performanceMods = downloadPerformanceMods(context, build.minecraft, staging)
             progress = 0.82f
             // Do not adopt an existing, similarly named profile: users may have their own data there.
             check(findInstalled(build, Instances.loadAllInstances()) == null) { "FastClient ${build.minecraft} is already installed" }
             created = Instances.createInstance({ instance ->
                 instance.name = "FastClient ${build.minecraft} (incomplete)"
                 instance.versionId = profile
-                instance.icon = "fabric"
+                instance.icon = "fastclient"
                 instance.sharedData = false
                 instance.isAerixClient = false
             }, "fastclient_${build.minecraft.replace('.', '_')}")
@@ -153,6 +186,7 @@ object FastClientInstaller {
             if (!mods.mkdirs() && !mods.isDirectory) throw IOException("Could not create mods folder")
             client.copyTo(File(mods, "fastclient-hud-${build.minecraft}.jar"), overwrite = false)
             api.copyTo(File(mods, "fabric-api.jar"), overwrite = false)
+            performanceMods.forEach { it.copyTo(File(mods, it.name), overwrite = false) }
             created.name = "FastClient ${build.minecraft}"
             created.fastClientVersion = build.minecraft
             created.write()

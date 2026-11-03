@@ -1,0 +1,38 @@
+{
+  "1.21.11": [
+    {
+      "id": "lithium",
+      "url": "https://github.com/CaffeineMC/lithium/releases/download/mc1.21.11-0.21.4/lithium-fabric-0.21.4%2Bmc1.21.11.jar",
+      "sha256": "5135c41da5b43cbdcb29424bde65195143ac4084e23834c8eac065942201c78b"
+    },
+    {
+      "id": "entityculling",
+      "url": "https://github.com/tr7zw/EntityCulling/releases/download/1.11.3/entityculling-fabric-1.11.3-mc1.21.11.jar",
+      "sha256": "79294b608e1edc8dd4746dbbeeef1ba157fc27a361a3f31d155594dc7f30ea85"
+    }
+  ],
+  "26.1.2": [
+    {
+      "id": "lithium",
+      "url": "https://github.com/CaffeineMC/lithium/releases/download/mc26.1.2-0.24.7/lithium-fabric-0.24.7%2Bmc26.1.2.jar",
+      "sha256": "a155b26df2593772e80a9f935837ba3319c68a3e774ba5e1b3a21eb64d477e86"
+    },
+    {
+      "id": "entityculling",
+      "url": "https://github.com/tr7zw/EntityCulling/releases/download/1.11.3/entityculling-fabric-1.11.3-mc26.1.jar",
+      "sha256": "65f02a584e749d4feda3a921ce43653c013f38472393b98c4831356e98b9cf55"
+    }
+  ],
+  "26.2": [
+    {
+      "id": "lithium",
+      "url": "https://github.com/CaffeineMC/lithium/releases/download/mc26.2-0.25.3/lithium-fabric-0.25.3%2Bmc26.2.jar",
+      "sha256": "fdde92e238e8075f89ad7f701f2a3d5854af88ba9a67657184a4407b104ac563"
+    },
+    {
+      "id": "entityculling",
+      "url": "https://github.com/tr7zw/EntityCulling/releases/download/1.11.3/entityculling-fabric-1.11.3-mc26.2.jar",
+      "sha256": "8f977af47b8d0531da81d1801fbe6bfcaa2f1f585a6ea4dccf9885da42e6cf89"
+    }
+  ]
+}

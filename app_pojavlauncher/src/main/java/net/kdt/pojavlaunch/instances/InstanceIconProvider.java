@@ -39,6 +39,7 @@ public class InstanceIconProvider {
         sStaticIcons.put(FALLBACK_ICON_NAME, R.drawable.aerix_loader_vanilla);
         sStaticIcons.put("vanilla", R.drawable.aerix_loader_vanilla);
         sStaticIcons.put("fabric", R.drawable.ic_fabric);
+        sStaticIcons.put("fastclient", R.drawable.fastclient_instance);
         sStaticIcons.put("quilt", R.drawable.ic_quilt);
         sStaticIcons.put("forge", R.drawable.ic_forge);
         sStaticIcons.put("neoforge", R.drawable.ic_neoforge);
@@ -94,7 +95,14 @@ public class InstanceIconProvider {
         if(cached != null && cached.stamp == stamp) return cached.drawable;
 
         Drawable iconDrawable = hasIconFile ? decodeIconFile(resources, iconLocation) : null;
-        if(iconDrawable == null) iconDrawable = fetchStaticIcon(resources, instance.icon);
+        // Existing FastClient installations used the Fabric placeholder. Show their own mark
+        // without changing metadata or overriding a user-selected custom icon.
+        String iconName = instance.icon;
+        if(instance instanceof Instance && ((Instance) instance).fastClientVersion != null &&
+                (iconName == null || "fabric".equals(iconName) || FALLBACK_ICON_NAME.equals(iconName))) {
+            iconName = "fastclient";
+        }
+        if(iconDrawable == null) iconDrawable = fetchStaticIcon(resources, iconName);
         sIconCache.put(cacheKey, new CachedIcon(iconDrawable, stamp));
         return iconDrawable;
     }

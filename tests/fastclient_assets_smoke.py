@@ -27,6 +27,14 @@ for version, (sha, loader, minecraft, java) in BUILDS.items():
         assert metadata['depends']['fabric-api'] == '*'
         assert any(name.startswith('LICENSE_') for name in jar.namelist())
     assert sha in installer and f'FastClientBuild("{version}"' in installer
+manifest = json.loads((BASE / 'performance-mods.json').read_text())
+assert set(manifest) == set(BUILDS)
+for version, mods in manifest.items():
+    assert {m['id'] for m in mods} == {'lithium', 'entityculling'}
+    assert all(m['url'].startswith('https://github.com/') and len(m['sha256']) == 64 for m in mods)
+assert 'downloadPerformanceMods(context, build.minecraft, staging)' in installer
+assert 'performanceMods.forEach' in installer
+assert 'instance.icon = "fastclient"' in installer
 assert 'instance.sharedData = false' in installer
 assert 'instance.isAerixClient = false' in installer
 assert 'overwrite = false' in installer
@@ -39,6 +47,12 @@ assert 'onClick = { onPageChange(ClientOwnerPage.SAHIL) }' in hub
 assert 'onClick = { onPageChange(ClientOwnerPage.MX_INSPIRE) }' in hub
 assert 'BackHandler(enabled = page != ClientOwnerPage.OWNERS' in hub
 assert 'Modifier.size(76.dp).clip(CircleShape)' in hub
+assert 'label = "Aerix client"' in hub and 'label = "Fast client 2.0"' in hub
+icon = (ROOT / 'app_pojavlauncher/src/main/res/drawable-nodpi/fastclient_instance.png').read_bytes()
+with zipfile.ZipFile(BASE / 'fastclient-hud-26.2.jar') as jar:
+    assert icon == jar.read('assets/fastclient-hud/icon.png')
+provider = (JAVA / 'instances/InstanceIconProvider.java').read_text()
+assert 'R.drawable.fastclient_instance' in provider and 'fastClientVersion' in provider
 assert 'LauncherSection.FAST_CLIENT' not in (JAVA / 'aerix/ui/AerixNavigationRail.kt').read_text()
 for name in ('client_owner_sahil.jpg', 'client_owner_mx_inspire.jpg'):
     data = (ROOT / 'app_pojavlauncher/src/main/res/drawable-nodpi' / name).read_bytes()
@@ -48,4 +62,7 @@ for name in ('AerixClientScreen.kt', 'FastClientScreen.kt'):
 screen = (JAVA / 'aerix/ui/screens/FastClientScreen.kt').read_text()
 assert 'FastClientInstaller.install(activity, build)' in screen
 assert 'PojavLaunchBridge.play(activity)' in screen
+assert 'Thanks Mx inspire for supporting and giving us permission to use their client' in screen
+assert 'https://m.youtube.com/channel/UCjC7cPjoCxQycsw0DITzLQA' in screen
+assert 'https://discord.gg/Z6aCUNfPJH' in screen
 print('FastClient asset integrity and navigation smoke test passed')

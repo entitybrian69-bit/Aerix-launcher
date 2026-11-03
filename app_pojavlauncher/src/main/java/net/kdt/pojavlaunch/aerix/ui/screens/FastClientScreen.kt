@@ -1,16 +1,21 @@
 package net.kdt.pojavlaunch.aerix.ui.screens
 
+import android.content.Intent
+import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -22,12 +27,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
 import kotlinx.coroutines.launch
 import net.kdt.pojavlaunch.aerix.bridge.PojavInstanceBridge
 import net.kdt.pojavlaunch.aerix.bridge.PojavLaunchBridge
 import net.kdt.pojavlaunch.aerix.components.GlassPanel
+import net.kdt.pojavlaunch.aerix.components.PageHeader
 import net.kdt.pojavlaunch.aerix.fastclient.FastClientInstaller
+import net.kdt.pojavlaunch.aerix.theme.AerixLayoutDefaults
 import net.kdt.pojavlaunch.aerix.theme.AerixRadii
 import net.kdt.pojavlaunch.aerix.theme.AerixSpacing
 import net.kdt.pojavlaunch.aerix.theme.AerixSurface
@@ -41,9 +49,23 @@ fun FastClientScreen(activity: FragmentActivity, onBack: () -> Unit) {
     val instances = remember(refresh, FastClientInstaller.installingVersion) {
         runCatching { Instances.loadAllInstances() }.getOrDefault(emptyList())
     }
-    AerixPage(title = "FastClient", subtitle = "By Mxinspire1 · Fabric", trailing = { ClientOwnerBackButton(onBack) }) {
+    Column(Modifier.fillMaxSize().padding(AerixLayoutDefaults.pagePadding()), verticalArrangement = Arrangement.spacedBy(AerixSpacing.md)) {
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            if (maxWidth >= 560.dp) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(0.9f)) { FastClientTitle() }
+                    FastClientThanks(activity, Modifier.weight(2f))
+                    ClientOwnerBackButton(onBack)
+                }
+            } else {
+                Column(Modifier.fillMaxWidth()) {
+                    PageHeader(title = "FastClient", subtitle = "By Mxinspire1 · Fabric", trailing = { ClientOwnerBackButton(onBack) })
+                    FastClientThanks(activity, Modifier.fillMaxWidth())
+                }
+            }
+        }
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm)) {
-            Text("Install a separate FastClient instance. Fabric Loader and Fabric API are downloaded during setup; Minecraft files download when you launch.", color = AerixSurface.textSecondary, fontSize = 12.sp)
+            Text("Install a separate FastClient instance. Fabric Loader, Fabric API, Lithium and Entity Culling are downloaded during setup; Minecraft files download when you launch.", color = AerixSurface.textSecondary, fontSize = 12.sp)
             if (FastClientInstaller.installingVersion != null) {
                 GlassPanel(Modifier.fillMaxWidth(), radius = AerixRadii.card) {
                     Text(FastClientInstaller.status, color = Color.White, fontWeight = FontWeight.Bold)
@@ -87,6 +109,35 @@ fun FastClientScreen(activity: FragmentActivity, onBack: () -> Unit) {
                 }
             }
             Text("Android compatibility and performance depend on the device and renderer. FastClient is provided by its creator.", color = AerixSurface.textSecondary, fontSize = 12.sp)
+        }
+    }
+}
+
+@Composable
+private fun FastClientTitle() {
+    Text("FastClient", color = AerixSurface.textPrimary, fontSize = 22.sp, fontWeight = FontWeight.Black)
+    Text("By Mxinspire1 · Fabric", color = AerixSurface.textSecondary, fontSize = 12.sp)
+}
+
+@Composable
+private fun FastClientThanks(activity: FragmentActivity, modifier: Modifier = Modifier) {
+    fun openLink(url: String) {
+        try {
+            activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+        } catch (_: Exception) {
+            Toast.makeText(activity, "No app available to open this link", Toast.LENGTH_SHORT).show()
+        }
+    }
+    Column(modifier) {
+        Text("Thanks Mx inspire for supporting and giving us permission to use their client",
+            color = AerixSurface.textPrimary, fontSize = 12.sp, lineHeight = 16.sp)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            TextButton(onClick = { openLink("https://m.youtube.com/channel/UCjC7cPjoCxQycsw0DITzLQA") }) {
+                Text("YouTube", color = AerixSurface.accent, fontSize = 12.sp)
+            }
+            TextButton(onClick = { openLink("https://discord.gg/Z6aCUNfPJH") }) {
+                Text("Discord", color = AerixSurface.accent, fontSize = 12.sp)
+            }
         }
     }
 }
