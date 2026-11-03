@@ -293,7 +293,7 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         mControlLayout.setMenuListener(this);
 
         mDrawerPullButton.setOnClickListener(v -> onClickedMenu());
-        mRecorder = new net.kdt.pojavlaunch.recording.RecorderController(this);
+        mRecorder = new net.kdt.pojavlaunch.recording.RecorderController(this, instance.getInstanceDirectory());
         mGameMenuOverlay.setRunningInstance(instance);
         mGameMenuOverlay.setCallbacks(new GameMenuCallbacks() {
             @Override public void onScreenRecorder() {
@@ -653,6 +653,10 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
 
     /** Opens the existing in-game launcher settings (including resolution) from Aerix Client. */
     public void openAerixQuickSettings() { openQuickSettings(); }
+
+    public void openAerixScreenRecorder() {
+        if (mRecorder != null) mRecorder.show();
+    }
 
     private void openQuickSettings() {
         hideGameMenu();

@@ -71,6 +71,12 @@ jobs:
           python3 tests/client_background_smoke.py
           python3 tests/instance_renderer_smoke.py
           python3 tests/fastclient_assets_smoke.py
+          python3 tests/recorder_wiring_smoke.py
+          mkdir -p "$RUNNER_TEMP/aerix-recorder-test"
+          javac -d "$RUNNER_TEMP/aerix-recorder-test" \
+            app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/recording/RecordingPaths.java \
+            tests/RecordingPathsSmokeTest.java
+          java -cp "$RUNNER_TEMP/aerix-recorder-test" RecordingPathsSmokeTest
           mkdir -p "$RUNNER_TEMP/aerix-worldshare-test"
           javac -d "$RUNNER_TEMP/aerix-worldshare-test" \
             app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/worldshare/WorldSharePolicy.java \

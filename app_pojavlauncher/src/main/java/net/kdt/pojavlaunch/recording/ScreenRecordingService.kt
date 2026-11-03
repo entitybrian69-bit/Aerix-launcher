@@ -29,6 +29,7 @@ import android.widget.Toast
 import androidx.core.content.ContextCompat
 import net.kdt.pojavlaunch.R
 import java.nio.ByteBuffer
+import java.io.File
 
 /**
  * Hardware Surface-to-H.264 + optional AAC MP4 recorder isolated in `:recorder` so `MediaCodec`
@@ -51,11 +52,14 @@ class ScreenRecordingService : Service() {
     private var audioEnabledForSession = false
     private var videoTrack = -1
     private var audioTrack = -1
+    private var pendingAudioFormat: MediaFormat? = null
     private var muxerStarted = false
     private var samples = 0
     private var videoSamples = 0
-    private var stopping = false
-    private var finished = false
+    private var videoHasKeyFrame = false
+    @Volatile private var startPending = false
+    @Volatile private var stopping = false
+    @Volatile private var finished = false
     private var videoEnded = false
     private var audioEnded = false
 
@@ -65,6 +69,12 @@ class ScreenRecordingService : Service() {
     private lateinit var timestamps: RecordingTimestamps
 
     private val stopTimeout = Runnable { finish(videoSamples > 0 && muxerStarted) }
+    private val audioTimeout = Runnable {
+        if (!finished && audioEnabledForSession && audioTrack < 0) {
+            try { dropAudio("Audio encoder produced no samples") }
+            catch (error: Throwable) { finish(false, error.message ?: "Could not start video output") }
+        }
+    }
     private val projectionCallback = object : MediaProjection.Callback() {
         override fun onStop() {
             if (!stopping && !finished && ::worker.isInitialized && thread.isAlive) {
@@ -93,6 +103,10 @@ class ScreenRecordingService : Service() {
 
     private fun encoded(codec: MediaCodec, index: Int, source: MediaCodec.BufferInfo, trackIndex: Int, isAudio: Boolean) {
         if (source.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG != 0 || source.size <= 0 || trackIndex < 0) return
+        if (!isAudio && !videoHasKeyFrame) {
+            if (source.flags and MediaCodec.BUFFER_FLAG_KEY_FRAME == 0) return
+            videoHasKeyFrame = true
+        }
         val buffer = codec.getOutputBuffer(index) ?: return
         buffer.position(source.offset)
         buffer.limit(source.offset + source.size)
@@ -104,9 +118,8 @@ class ScreenRecordingService : Service() {
             if (pendingBytes + source.size > 6 * 1024 * 1024) {
                 // If audio never started emitting format, drop back to video-only muxing immediately
                 if (audioEnabledForSession && audioTrack < 0 && videoTrack >= 0) {
-                    audioEnabledForSession = false
-                    audioEnded = true
-                    startMuxerWhenReady()
+                    dropAudio("Audio did not start in time")
+                    if (finished) return
                     buffer.position(source.offset)
                     buffer.limit(source.offset + source.size)
                     val info = MediaCodec.BufferInfo().apply { set(source.offset, source.size, pts, source.flags) }
@@ -165,7 +178,7 @@ class ScreenRecordingService : Service() {
         // could throw, and fall back to MEDIA_PROJECTION-only if OEM rejects MICROPHONE FGS type.
         var fgStarted = false
         if (Build.VERSION.SDK_INT >= 29) {
-            if (Build.VERSION.SDK_INT >= 30 && requestedAudio.hasAudio) {
+            if (Build.VERSION.SDK_INT >= 30 && requestedAudio.microphone) {
                 try {
                     startForeground(
                         NOTIFICATION,
@@ -176,7 +189,7 @@ class ScreenRecordingService : Service() {
                     fgStarted = true
                 } catch (sec: Throwable) {
                     Log.w(TAG, "Microphone FGS rejected by OS, falling back to video-only MediaProjection", sec)
-                    requestedAudio = RecordingOptions.AudioSource.NONE
+                    requestedAudio = if (requestedAudio.game) RecordingOptions.AudioSource.GAME else RecordingOptions.AudioSource.NONE
                 }
             }
             if (!fgStarted) {
@@ -205,7 +218,7 @@ class ScreenRecordingService : Service() {
             return START_NOT_STICKY
         }
 
-        if (RecordingState.isActive() && !finished && videoEncoder != null) {
+        if (startPending || (RecordingState.isActive() && !finished && videoEncoder != null)) {
             return START_NOT_STICKY
         }
 
@@ -230,10 +243,14 @@ class ScreenRecordingService : Service() {
                     config.bitrate > 0 && config.encoder.isNotEmpty()
             ) { "Invalid recorder configuration" }
 
+            val rootPath = intent.getStringExtra("instanceRoot") ?: error("Missing running instance directory")
+            val instanceRoot = File(rootPath)
+            RecordingPaths.directory(instanceRoot, false)
             finished = false
             stopping = false
+            startPending = true
             RecordingState.update(RecordingState.Phase.STARTING, "Starting recorder...", this)
-            worker.post { begin(token, config) }
+            worker.post { begin(token, config, instanceRoot) }
         } catch (error: Throwable) {
             worker.post { finish(false, error.message ?: "Cannot start recorder") }
         }
@@ -249,7 +266,7 @@ class ScreenRecordingService : Service() {
         }
     }
 
-    private fun begin(token: Intent, config: RecordingOptions.Config) {
+    private fun begin(token: Intent, config: RecordingOptions.Config, instanceRoot: File) {
         if (Build.VERSION.SDK_INT < 29) {
             finish(false)
             return
@@ -257,18 +274,14 @@ class ScreenRecordingService : Service() {
         try {
             val epochUs = System.nanoTime() / 1000
             timestamps = RecordingTimestamps(epochUs)
-            output = RecordingOutput(this)
+            output = RecordingOutput(this, instanceRoot)
             muxer = output!!.open()
 
-            val codec = runCatching { MediaCodec.createByCodecName(config.encoder) }
-                .getOrElse { MediaCodec.createEncoderByType("video/avc") }
-            videoEncoder = codec
-
-            codec.setCallback(object : MediaCodec.Callback() {
+            val callback = object : MediaCodec.Callback() {
                 override fun onInputBufferAvailable(codec: MediaCodec, index: Int) = Unit
 
                 override fun onOutputFormatChanged(codec: MediaCodec, format: MediaFormat) {
-                    if (finished) return
+                    if (finished || codec !== videoEncoder) return
                     try {
                         videoTrack = muxer!!.addTrack(format)
                         startMuxerWhenReady()
@@ -278,7 +291,7 @@ class ScreenRecordingService : Service() {
                 }
 
                 override fun onOutputBufferAvailable(codec: MediaCodec, index: Int, info: MediaCodec.BufferInfo) {
-                    if (finished) return
+                    if (finished || codec !== videoEncoder) return
                     try {
                         encoded(codec, index, info, videoTrack, false)
                         if (!finished) runCatching { codec.releaseOutputBuffer(index, false) }
@@ -292,33 +305,51 @@ class ScreenRecordingService : Service() {
                 }
 
                 override fun onError(codec: MediaCodec, error: MediaCodec.CodecException) {
-                    if (!finished) finish(false, "Video encoder: ${error.diagnosticInfo}")
+                    if (!finished && codec === videoEncoder) finish(false, "Video encoder: ${error.diagnosticInfo}")
                 }
-            }, worker)
-
-            fun buildVideoFormat(withOptionalHints: Boolean): MediaFormat =
-                MediaFormat.createVideoFormat("video/avc", config.width, config.height).apply {
-                    setInteger(
-                        MediaFormat.KEY_COLOR_FORMAT,
-                        MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface
-                    )
-                    setInteger(MediaFormat.KEY_BIT_RATE, config.bitrate)
-                    setInteger(MediaFormat.KEY_FRAME_RATE, config.fps)
-                    setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 2)
-                    if (withOptionalHints && Build.VERSION.SDK_INT >= 29) {
-                        setFloat(MediaFormat.KEY_MAX_FPS_TO_ENCODER, config.fps.toFloat())
-                    }
-                }
-
-            try {
-                codec.configure(buildVideoFormat(true), null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
-            } catch (_: Throwable) {
-                codec.reset()
-                codec.configure(buildVideoFormat(false), null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
             }
 
-            surface = codec.createInputSurface()
-            codec.start()
+            fun videoFormat(optional: Boolean) = MediaFormat.createVideoFormat("video/avc", config.width, config.height).apply {
+                setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
+                setInteger(MediaFormat.KEY_BIT_RATE, config.bitrate)
+                setInteger(MediaFormat.KEY_FRAME_RATE, config.fps)
+                setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 2)
+                if (optional && Build.VERSION.SDK_INT >= 29) {
+                    setInteger(MediaFormat.KEY_PROFILE, MediaCodecInfo.CodecProfileLevel.AVCProfileBaseline)
+                    setInteger(MediaFormat.KEY_MAX_B_FRAMES, 0)
+                    setFloat(MediaFormat.KEY_MAX_FPS_TO_ENCODER, config.fps.toFloat())
+                }
+            }
+
+            // Some vendors advertise a codec but reject its configuration. Resetting a codec
+            // removes its asynchronous callback, so retry on a fresh codec with its callback set.
+            var lastError: Throwable? = null
+            var ready = false
+            val candidates = runCatching { RecordingOptions.encoderCandidates(config) }.getOrDefault(listOf(config.encoder))
+            for (name in candidates) {
+                for (optional in listOf(true, false)) {
+                    var candidate: MediaCodec? = null
+                    var candidateSurface: Surface? = null
+                    try {
+                        candidate = MediaCodec.createByCodecName(name)
+                        candidate.setCallback(callback, worker)
+                        candidate.configure(videoFormat(optional), null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+                        candidateSurface = candidate.createInputSurface()
+                        candidate.start()
+                        videoEncoder = candidate
+                        surface = candidateSurface
+                        ready = true
+                        break
+                    } catch (error: Throwable) {
+                        lastError = error
+                        Log.w(TAG, "Encoder $name rejected configuration (optional=$optional)", error)
+                        runCatching { candidate?.release() }
+                        runCatching { candidateSurface?.release() }
+                    }
+                }
+                if (ready) break
+            }
+            if (!ready) throw IllegalStateException("No AVC encoder could start at ${config.quality}p ${config.fps}fps; try a lower setting", lastError)
 
             val manager = getSystemService(MediaProjectionManager::class.java)
             projection = requireNotNull(manager.getMediaProjection(Activity.RESULT_OK, token)) {
@@ -333,21 +364,24 @@ class ScreenRecordingService : Service() {
                 try {
                     audio = RecordingAudio(this, worker, epochUs, config.audioSource, object : RecordingAudio.Listener {
                         override fun format(format: MediaFormat) {
-                            if (finished) return
-                            try {
-                                audioTrack = muxer!!.addTrack(format)
-                                startMuxerWhenReady()
-                            } catch (err: Throwable) {
-                                Log.w(TAG, "Audio track rejected, continuing video-only", err)
-                                audioEnabledForSession = false
-                                audioEnded = true
-                                startMuxerWhenReady()
-                            }
+                            if (!finished && audioEnabledForSession) pendingAudioFormat = format
                         }
 
                         override fun sample(codec: MediaCodec, index: Int, info: MediaCodec.BufferInfo) {
-                            if (!finished && audioEnabledForSession) {
+                            if (finished || !audioEnabledForSession || info.size <= 0 ||
+                                info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG != 0) return
+                            try {
+                                if (audioTrack < 0) {
+                                    val format = pendingAudioFormat ?: return
+                                    // Do not create an empty AAC track on devices where capture never starts.
+                                    audioTrack = muxer!!.addTrack(format)
+                                    worker.removeCallbacks(audioTimeout)
+                                    startMuxerWhenReady()
+                                }
                                 encoded(codec, index, info, audioTrack, true)
+                            } catch (error: Throwable) {
+                                try { dropAudio("Audio track unavailable: ${error.message}") }
+                                catch (fatal: Throwable) { finish(false, fatal.message ?: "Cannot write video") }
                             }
                         }
 
@@ -357,15 +391,12 @@ class ScreenRecordingService : Service() {
                         }
 
                         override fun error(message: String) {
-                            Log.w(TAG, "Audio capture degraded ($message); continuing video recording")
-                            audioEnabledForSession = false
-                            audioEnded = true
-                            runCatching { audio?.release() }
-                            audio = null
-                            startMuxerWhenReady()
-                            finishWhenDrained()
+                            try { dropAudio(message) }
+                            catch (fatal: Throwable) { finish(false, fatal.message ?: "Cannot write video") }
                         }
-                    }).also { it.start(projection!!) }
+                    })
+                    audio!!.start(projection!!)
+                    worker.postDelayed(audioTimeout, 4_000L)
                 } catch (audioErr: Throwable) {
                     Log.w(TAG, "Audio capture unavailable, continuing video-only", audioErr)
                     runCatching { audio?.release() }
@@ -375,7 +406,7 @@ class ScreenRecordingService : Service() {
                 }
             }
 
-            display = projection!!.createVirtualDisplay(
+            display = requireNotNull(projection!!.createVirtualDisplay(
                 "AerixRecorder",
                 config.width,
                 config.height,
@@ -384,7 +415,7 @@ class ScreenRecordingService : Service() {
                 surface,
                 null,
                 worker
-            )
+            )) { "Could not create the screen capture display" }
 
             val activeAudioLabel = if (audioEnabledForSession) config.audioSource.label else "Video only"
             RecordingState.update(
@@ -399,6 +430,18 @@ class ScreenRecordingService : Service() {
         }
     }
 
+    private fun dropAudio(reason: String) {
+        Log.w(TAG, "$reason; continuing video recording")
+        worker.removeCallbacks(audioTimeout)
+        audioEnabledForSession = false
+        audioEnded = true
+        runCatching { audio?.release() }
+        audio = null
+        startMuxerWhenReady()
+        finishWhenDrained()
+        toast("Audio unavailable; continuing video only")
+    }
+
     private fun stopRecording() {
         if (stopping || finished) return
         stopping = true
@@ -406,7 +449,7 @@ class ScreenRecordingService : Service() {
         audio?.stop()
         runCatching { display?.release() }
         display = null
-        val signaled = runCatching { videoEncoder?.signalEndOfInputStream(); true }.getOrDefault(false)
+        val signaled = runCatching { videoEncoder?.signalEndOfInputStream() ?: return@runCatching false; true }.getOrDefault(false)
         if (!signaled) videoEnded = true
         if (!audioEnabledForSession || audio == null) audioEnded = true
         worker.postDelayed(stopTimeout, 2500)
@@ -416,8 +459,12 @@ class ScreenRecordingService : Service() {
     private fun finish(usable: Boolean, failure: String? = null) {
         if (finished) return
         finished = true
-        if (::worker.isInitialized) worker.removeCallbacks(stopTimeout)
-        audio?.release()
+        if (::worker.isInitialized) {
+            worker.removeCallbacks(stopTimeout)
+            worker.removeCallbacks(audioTimeout)
+        }
+        startPending = false
+        runCatching { audio?.release() }
         audio = null
         runCatching { display?.release() }; display = null
         runCatching { projection?.unregisterCallback(projectionCallback) }
@@ -434,18 +481,21 @@ class ScreenRecordingService : Service() {
         }
         runCatching { muxer?.release() }; muxer = null
 
-        val saved = runCatching { output?.finish(muxed).orEmpty() }.getOrElse { error ->
+        val saved = runCatching { output?.finish(muxed) }.getOrElse { error ->
             Log.e(TAG, "Output finalize failed", error)
-            ""
+            null
         }
         val result = when {
-            saved.isNotEmpty() -> "Saved to $saved"
+            saved?.playable == true -> "Saved to ${saved.path}"
+            saved != null -> "Recording incomplete; kept for recovery at ${saved.path}"
             failure != null -> failure
-            else -> "Recording discarded (too short)"
+            else -> "Recording discarded (no video data)"
         }
         toast(result)
         RecordingState.update(RecordingState.Phase.IDLE, result, this)
-        if (Build.VERSION.SDK_INT >= 24) stopForeground(STOP_FOREGROUND_REMOVE) else @Suppress("DEPRECATION") stopForeground(true)
+        runCatching {
+            if (Build.VERSION.SDK_INT >= 24) stopForeground(STOP_FOREGROUND_REMOVE) else @Suppress("DEPRECATION") stopForeground(true)
+        }
         stopSelf()
         thread.quitSafely()
     }
@@ -478,10 +528,10 @@ class ScreenRecordingService : Service() {
     }
 
     override fun onDestroy() {
-        if (!finished && !stopping && videoEncoder != null && ::worker.isInitialized && thread.isAlive) {
-            stopRecording()
-        } else if (!finished && ::worker.isInitialized && thread.isAlive) {
-            worker.post { finish(videoSamples > 0 && muxerStarted) }
+        // MediaCodec, muxer and display must only be touched on their callback handler thread.
+        if (!finished && ::worker.isInitialized && thread.isAlive) {
+            if (!stopping) worker.post { stopRecording() }
+            // If stopping, retain the worker until EOS or the bounded drain timeout.
         } else {
             thread.quitSafely()
         }

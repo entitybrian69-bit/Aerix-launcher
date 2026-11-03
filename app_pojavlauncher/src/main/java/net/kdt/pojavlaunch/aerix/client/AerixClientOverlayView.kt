@@ -978,6 +978,13 @@ private fun FamousClientRectangleMenu(
                         onOpenTransfer = { onChangeSubPage(ClientMenuSubPage.TRANSFER) },
                         onOpenGallery = { onChangeSubPage(ClientMenuSubPage.GALLERY) },
                         onOpenWorldSharing = { onChangeSubPage(ClientMenuSubPage.WORLD_SHARING) },
+                        onOpenRecorder = {
+                            var candidate: Context? = context
+                            while (candidate is ContextWrapper && candidate !is net.kdt.pojavlaunch.game.GameActivity) candidate = candidate.baseContext
+                            val game = candidate as? net.kdt.pojavlaunch.game.GameActivity
+                            if (game == null) Toast.makeText(context, "Screen recorder unavailable", Toast.LENGTH_SHORT).show()
+                            else { onClose(); game.openAerixScreenRecorder() }
+                        },
                         onOpenOledAfk = onOpenOledAfk,
                         onSyncOptionsTxt = onSyncOptionsTxt
                     )
@@ -1025,10 +1032,14 @@ private fun ClientSquaresGridPage(
     onOpenTransfer: () -> Unit,
     onOpenGallery: () -> Unit,
     onOpenWorldSharing: () -> Unit,
+    onOpenRecorder: () -> Unit,
     onOpenOledAfk: () -> Unit,
     onSyncOptionsTxt: () -> Unit
 ) {
     val modules = listOf(
+        ClientSquareModule("screen_recorder", "Screen Recorder", FeatureIconKind.HOTBAR,
+            { net.kdt.pojavlaunch.recording.RecordingState.isActive() },
+            { if (net.kdt.pojavlaunch.recording.RecordingState.isActive()) "RECORDING" else "OPEN ›" }, onOpenRecorder),
         ClientSquareModule("world_sharing", "World Sharing", FeatureIconKind.COMPASS,
             { false }, { "OPEN ›" }, onOpenWorldSharing),
         ClientSquareModule("gallery", "Screenshots", FeatureIconKind.HOTBAR,

@@ -1,76 +1,56 @@
 package net.kdt.pojavlaunch.recording
 
-import android.content.ContentValues
 import android.content.Context
+import android.media.MediaExtractor
+import android.media.MediaFormat
 import android.media.MediaMuxer
 import android.media.MediaScannerConnection
-import android.net.Uri
-import android.os.Build
-import android.os.Environment
-import android.os.ParcelFileDescriptor
-import android.provider.MediaStore
+import android.util.Log
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-/** Streams directly to the final file. Pending MediaStore rows are exposed only after MP4 finalization. */
-internal class RecordingOutput(private val context: Context) {
-    private val recovery = context.getSharedPreferences("aerix_recording_recovery", 0)
-    private var uri: Uri? = null
-    private var file: File? = null
-    private var descriptor: ParcelFileDescriptor? = null
-    private val name = "Aerix-${SimpleDateFormat("yyyyMMdd-HHmmss-SSS", Locale.ROOT).format(Date())}.mp4"
+/** Mux to a temporary file in the actual instance; retain incomplete data for recovery. */
+internal class RecordingOutput(private val context: Context, private val instanceRoot: File) {
+    data class Saved(val path: String, val playable: Boolean)
+    private var temporary: File? = null
 
     fun open(): MediaMuxer {
-        if (Build.VERSION.SDK_INT >= 29) {
-            // Only recover our own last pending URI; never delete a finalized recording.
-            recovery.getString("pending_uri", null)?.let { previous ->
-                runCatching {
-                    val abandoned = Uri.parse(previous)
-                    if (abandoned.authority == MediaStore.AUTHORITY) {
-                        context.contentResolver.query(abandoned, arrayOf(MediaStore.Video.Media.IS_PENDING), null, null, null)?.use { cursor ->
-                            if (cursor.moveToFirst() && cursor.getInt(0) == 1) context.contentResolver.delete(abandoned, null, null)
-                        }
-                    }
-                }
-                recovery.edit().remove("pending_uri").commit()
-            }
-            uri = requireNotNull(context.contentResolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
-                ContentValues().apply {
-                    put(MediaStore.Video.Media.DISPLAY_NAME, name)
-                    put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
-                    put(MediaStore.Video.Media.RELATIVE_PATH, "Movies/Aerix")
-                    put(MediaStore.Video.Media.IS_PENDING, 1)
-                })) { "Cannot create recording in Movies/Aerix" }
-            check(recovery.edit().putString("pending_uri", uri.toString()).commit()) { "Cannot track pending recording" }
-            descriptor = requireNotNull(context.contentResolver.openFileDescriptor(uri!!, "rw"))
-            return MediaMuxer(descriptor!!.fileDescriptor, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
-        }
-        val directory = File(requireNotNull(context.getExternalFilesDir(Environment.DIRECTORY_MOVIES)), "Aerix")
-        check(directory.isDirectory || directory.mkdirs()) { "Cannot create recording folder" }
-        file = File(directory, name)
-        return MediaMuxer(file!!.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+        val directory = RecordingPaths.directory(instanceRoot, true)
+        val stamp = SimpleDateFormat("yyyyMMdd-HHmmss-SSS", Locale.ROOT).format(Date())
+        val target = File.createTempFile("Aerix-$stamp-", ".partial", directory)
+        temporary = target
+        return MediaMuxer(target.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
     }
 
-    fun finish(success: Boolean): String {
-        runCatching { descriptor?.close() }
-        descriptor = null
-        if (!success) {
-            uri?.let { runCatching { context.contentResolver.delete(it, null, null) } }
-            file?.delete()
-            recovery.edit().remove("pending_uri").commit()
-            return ""
-        }
-        uri?.let {
-            check(context.contentResolver.update(it, ContentValues().apply {
-                put(MediaStore.Video.Media.IS_PENDING, 0)
-            }, null, null) > 0) { "Cannot publish recording" }
-            recovery.edit().remove("pending_uri").commit()
-            return "Movies/Aerix/$name"
-        }
-        val path = requireNotNull(file).absolutePath
-        MediaScannerConnection.scanFile(context, arrayOf(path), arrayOf("video/mp4"), null)
-        return path
+    /** Extractor checks MP4 structure and first sync sample, not actual hardware decoding. */
+    private fun validVideo(file: File): Boolean {
+        val extractor = MediaExtractor()
+        return try {
+            extractor.setDataSource(file.absolutePath)
+            val track = (0 until extractor.trackCount).firstOrNull {
+                extractor.getTrackFormat(it).getString(MediaFormat.KEY_MIME)?.startsWith("video/") == true
+            } ?: return false
+            extractor.selectTrack(track)
+            extractor.sampleSize > 0 && extractor.sampleFlags and MediaExtractor.SAMPLE_FLAG_SYNC != 0
+        } catch (error: Exception) {
+            Log.w("AerixRecorder", "Saved MP4 validation failed", error)
+            false
+        } finally { extractor.release() }
+    }
+
+    fun finish(success: Boolean): Saved? {
+        val source = temporary ?: return null
+        temporary = null
+        if (!source.isFile || source.length() == 0L) { source.delete(); return null }
+        val valid = success && validVideo(source)
+        val name = source.name.removeSuffix(".partial") + if (valid) ".mp4" else "-incomplete.mp4"
+        val destination = File(source.parentFile, name)
+        // Reserve exclusively; never intentionally replace another recording.
+        if (!destination.createNewFile()) return Saved(source.absolutePath, false)
+        if (!source.renameTo(destination)) { destination.delete(); return Saved(source.absolutePath, false) }
+        if (valid) MediaScannerConnection.scanFile(context, arrayOf(destination.absolutePath), arrayOf("video/mp4"), null)
+        return Saved(destination.absolutePath, valid)
     }
 }

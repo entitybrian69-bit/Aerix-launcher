@@ -13,6 +13,9 @@ public class DisplayInstance {
     /** Stable directory identity, independent of whichever profile is currently selected. */
     public String getInstanceId() { return mInstanceRoot.getName(); }
 
+    /** Private directory belonging to this profile, even when game data is shared. */
+    public File getInstanceDirectory() { return mInstanceRoot; }
+
     /** The icon file this instance carries, or null when it has no directory of its own. */
     public File getOwnIconLocation() {
         return mInstanceRoot == null ? null : getInstanceIconLocation();

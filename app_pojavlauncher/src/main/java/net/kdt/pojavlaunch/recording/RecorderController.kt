@@ -22,9 +22,10 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import net.kdt.pojavlaunch.PojavApplication
 import net.kdt.pojavlaunch.Tools
+import java.io.File
 
 /** Keeps the game menu, floating REC pill, permissions, and `:recorder` service lifecycle together. */
-class RecorderController(private val activity: Activity) {
+class RecorderController @JvmOverloads constructor(private val activity: Activity, private val instanceDir: File? = null) {
     private val prefs = activity.getSharedPreferences("aerix_recorder", 0)
     private var pending: RecordingOptions.Config? = null
     private var dialog: AlertDialog? = null
@@ -80,6 +81,10 @@ class RecorderController(private val activity: Activity) {
 
     fun show() {
         dialog?.dismiss()
+        if (instanceDir == null || !instanceDir.isDirectory) {
+            Toast.makeText(activity, "The running instance directory is unavailable.", Toast.LENGTH_LONG).show()
+            return
+        }
         if (Build.VERSION.SDK_INT < 29) {
             Toast.makeText(activity, "Screen recording requires Android 10 or newer.", Toast.LENGTH_LONG).show()
             return
@@ -105,7 +110,12 @@ class RecorderController(private val activity: Activity) {
 
     private fun showOptions(configs: List<RecordingOptions.Config>) {
         if (configs.isEmpty()) {
-            Toast.makeText(activity, "No compatible H.264 video encoder found on this device.", Toast.LENGTH_LONG).show()
+            dialog = AlertDialog.Builder(activity)
+                .setTitle("Screen Recorder")
+                .setMessage("No compatible H.264 video encoder was found on this device.")
+                .setPositiveButton("Recordings") { _, _ -> showRecordings() }
+                .setNegativeButton("Close", null)
+                .show()
             return
         }
         val density = activity.resources.displayMetrics.density
@@ -160,7 +170,7 @@ class RecorderController(private val activity: Activity) {
         audio.setSelection(audioSources.indexOf(savedAudio).coerceAtLeast(0))
 
         TextView(activity).apply {
-            text = "Isolated hardware H.264 MP4 recorder · Saves to Movies/Aerix."
+            text = "H.264 MP4 · Saves in this instance's recordings folder."
             textSize = 12f
             setPadding(0, (10 * density).toInt(), 0, 0)
             body.addView(this)
@@ -170,6 +180,7 @@ class RecorderController(private val activity: Activity) {
             .setTitle("Screen Recorder")
             .setView(body)
             .setNegativeButton("Cancel", null)
+            .setNeutralButton("Recordings") { _, _ -> showRecordings() }
             .setPositiveButton("Start recording") { _, _ ->
                 val chosenQuality = availableQualities.getOrElse(quality.selectedItemPosition) { preferred.quality }
                 val chosenFps = availableFps.getOrElse(fps.selectedItemPosition) { preferred.fps }
@@ -180,6 +191,32 @@ class RecorderController(private val activity: Activity) {
                 start(match.copy(audioSource = chosenAudio))
             }
             .show()
+    }
+
+
+    private fun showRecordings() {
+        val root = instanceDir ?: return
+        val directory = runCatching { RecordingPaths.directory(root, false) }.getOrElse {
+            Toast.makeText(activity, "Cannot open this instance's recordings folder.", Toast.LENGTH_LONG).show()
+            return
+        }
+        val files = directory.listFiles()?.filter { it.isFile && it.extension.equals("mp4", true) }
+            ?.sortedByDescending { it.lastModified() }.orEmpty()
+        if (files.isEmpty()) {
+            Toast.makeText(activity, "No recordings in this instance yet.", Toast.LENGTH_LONG).show()
+            return
+        }
+        dialog = AlertDialog.Builder(activity)
+            .setTitle("Instance recordings")
+            .setItems(files.map { it.name }.toTypedArray()) { _, which ->
+                val file = files.getOrNull(which) ?: return@setItems
+                dialog = AlertDialog.Builder(activity).setTitle(file.name)
+                    .setItems(arrayOf("Open video", "Share video")) { _, action ->
+                        runCatching { Tools.openPath(activity, file, action == 1) }.onFailure {
+                            Toast.makeText(activity, "No app could open this video: ${it.message.orEmpty()}", Toast.LENGTH_LONG).show()
+                        }
+                    }.setNegativeButton("Cancel", null).show()
+            }.setNegativeButton("Close", null).show()
     }
 
     private fun start(config: RecordingOptions.Config) {
@@ -254,6 +291,7 @@ class RecorderController(private val activity: Activity) {
             val intent = Intent(activity, ScreenRecordingService::class.java)
                 .setAction(ScreenRecordingService.START)
                 .putExtra("consent", consentCopy)
+                .putExtra("instanceRoot", instanceDir?.absolutePath)
                 .putExtra("quality", config.quality)
                 .putExtra("fps", config.fps)
                 .putExtra("width", config.width)
