@@ -138,7 +138,8 @@ public class LauncherActivity extends BaseActivity {
                 this.getAssets(),
                 mcVersion,
                 normalizedVersionId,
-                new ContextAwareDoneListener(this, normalizedVersionId)
+                new ContextAwareDoneListener(this, normalizedVersionId, selectedInstance.getInstanceId(),
+                        LauncherPreferences.PREF_RENDERER)
         );
         return false;
     };

@@ -6,8 +6,7 @@
  *      VersionManagementQuickAction)
  *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/ui/screens/content/VersionExportScreen.kt
  * Header ("Instance Management" / "Select an instance to manage", count circle pill, folder button,
- * "+ Install" button), search bar + sort button, AerixPillTabRow ("All", "Modpacks", "Vanilla",
- * "Pinned"), "YOUR INSTANCES" horizontal LazyRow of LandscapeInstanceListItem cards, and the
+ * "+ Install" button), search bar + sort button, "YOUR INSTANCES" horizontal LazyRow of LandscapeInstanceListItem cards, and the
  * VersionManagementDetailPane below (with Overview, Mods, Resource Packs, Worlds, Settings tabs,
  * favorite heart, overflow menu with Pin / Rename / Copy / Export Modpack / Open folder / Delete,
  * meta pills, quick actions and a full-width PLAY button that stays put).
@@ -103,8 +102,6 @@ import net.kdt.pojavlaunch.aerix.bridge.ModpackExportFormat
 import net.kdt.pojavlaunch.aerix.bridge.PojavInstanceBridge
 import net.kdt.pojavlaunch.aerix.bridge.PojavLaunchBridge
 import net.kdt.pojavlaunch.aerix.components.AerixImageWell
-import net.kdt.pojavlaunch.aerix.components.AerixPillTab
-import net.kdt.pojavlaunch.aerix.components.AerixPillTabRow
 import net.kdt.pojavlaunch.aerix.components.ModrinthCompactSearchField
 import net.kdt.pojavlaunch.aerix.components.ModrinthMetaPill
 import net.kdt.pojavlaunch.aerix.components.liquidGlass
@@ -115,13 +112,6 @@ import net.kdt.pojavlaunch.aerix.theme.AerixSurface
 import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
 import net.kdt.pojavlaunch.aerix.ui.AerixNav
 import net.kdt.pojavlaunch.aerix.ui.LauncherSection
-
-private enum class LibraryFilterGroup(val label: String) {
-    ALL("All"),
-    MODPACKS("Modpacks"),
-    VANILLA("Vanilla"),
-    PINNED("Pinned")
-}
 
 private enum class LibrarySortMode(val label: String) {
     PINNED_AND_ACTIVE("Sort: Pinned & Active"),
@@ -150,7 +140,6 @@ fun LibraryScreen(activity: FragmentActivity) {
     val accent = AerixThemeManager.currentAccent()
 
     var searchQuery by rememberSaveable { mutableStateOf("") }
-    var selectedFilter by rememberSaveable { mutableStateOf(LibraryFilterGroup.ALL) }
     var sortMode by rememberSaveable { mutableStateOf(LibrarySortMode.PINNED_AND_ACTIVE) }
 
     var renameTarget by remember { mutableStateOf<AerixInstance?>(null) }
@@ -158,19 +147,12 @@ fun LibraryScreen(activity: FragmentActivity) {
     var deleteTarget by remember { mutableStateOf<AerixInstance?>(null) }
     var exportTarget by remember { mutableStateOf<AerixInstance?>(null) }
 
-    val displayedInstances = remember(instances, activeInstance, pinnedNames, searchQuery, selectedFilter, sortMode) {
+    val displayedInstances = remember(instances, activeInstance, pinnedNames, searchQuery, sortMode) {
         val filtered = instances.filter { inst ->
             val matchesQuery = searchQuery.isBlank() ||
                 inst.name.contains(searchQuery, ignoreCase = true) ||
                 inst.versionId.contains(searchQuery, ignoreCase = true)
-            val loader = loaderLabel(inst.versionId, vanilla)
-            val matchesGroup = when (selectedFilter) {
-                LibraryFilterGroup.ALL -> true
-                LibraryFilterGroup.MODPACKS -> loader != vanilla
-                LibraryFilterGroup.VANILLA -> loader == vanilla
-                LibraryFilterGroup.PINNED -> inst.name in pinnedNames
-            }
-            matchesQuery && matchesGroup
+            matchesQuery
         }
         when (sortMode) {
             LibrarySortMode.PINNED_AND_ACTIVE -> filtered.sortedWith(
@@ -311,8 +293,6 @@ fun LibraryScreen(activity: FragmentActivity) {
                         vanilla = vanilla,
                         query = searchQuery,
                         onQueryChange = { searchQuery = it },
-                        filter = selectedFilter,
-                        onFilterChange = { selectedFilter = it },
                         sortMode = sortMode,
                         onSortChange = { sortMode = it },
                         onSelect = { PojavInstanceBridge.select(it) }
@@ -348,23 +328,6 @@ fun LibraryScreen(activity: FragmentActivity) {
                     sortMode = sortMode,
                     onSortChange = { sortMode = it }
                 )
-
-                AerixPillTabRow(modifier = Modifier.fillMaxWidth()) {
-                    LibraryFilterGroup.entries.forEach { group ->
-                        val selected = selectedFilter == group
-                        AerixPillTab(
-                            selected = selected,
-                            onClick = { selectedFilter = group }
-                        ) {
-                            Text(
-                                text = group.label,
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                                maxLines = 1
-                            )
-                        }
-                    }
-                }
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -601,36 +564,8 @@ private fun LibrarySearchRow(
     }
 }
 
-/** A filter chip small enough to fit in the narrow list pane, where it may wrap to a second line. */
-@Composable
-private fun CompactFilterChip(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit
-) {
-    val accent = AerixThemeManager.currentAccent()
-    Surface(
-        shape = RoundedCornerShape(AerixRadii.pill),
-        color = if (selected) accent.copy(alpha = 0.22f) else AerixSurface.panelRaised,
-        border = BorderStroke(
-            AerixSpacing.hairline,
-            if (selected) accent.copy(alpha = 0.8f) else AerixSurface.borderSoft
-        ),
-        onClick = onClick
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-            color = if (selected) accent else AerixSurface.textSecondary,
-            maxLines = 1,
-            modifier = Modifier.padding(horizontal = AerixSpacing.smPlus, vertical = AerixSpacing.xsPlus)
-        )
-    }
-}
-
 /**
- * The instances as a list, for the side-by-side layout: search, filters, sort, and a scrolling
+ * The instances as a list, for the side-by-side layout: search, sort, and a scrolling
  * column of rows that never has to be squeezed the way a card strip is.
  */
 @Composable
@@ -644,8 +579,6 @@ private fun InstanceListPane(
     vanilla: String,
     query: String,
     onQueryChange: (String) -> Unit,
-    filter: LibraryFilterGroup,
-    onFilterChange: (LibraryFilterGroup) -> Unit,
     sortMode: LibrarySortMode,
     onSortChange: (LibrarySortMode) -> Unit,
     onSelect: (AerixInstance) -> Unit
@@ -671,20 +604,6 @@ private fun InstanceListPane(
                 placeholder = "Search instances...",
                 modifier = Modifier.fillMaxWidth()
             )
-
-            FlowRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(AerixSpacing.xs),
-                verticalArrangement = Arrangement.spacedBy(AerixSpacing.xs)
-            ) {
-                LibraryFilterGroup.entries.forEach { group ->
-                    CompactFilterChip(
-                        label = group.label,
-                        selected = filter == group,
-                        onClick = { onFilterChange(group) }
-                    )
-                }
-            }
 
             Row(
                 modifier = Modifier.fillMaxWidth(),

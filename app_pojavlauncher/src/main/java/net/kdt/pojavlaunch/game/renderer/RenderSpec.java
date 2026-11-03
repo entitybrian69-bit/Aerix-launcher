@@ -74,6 +74,12 @@ public interface RenderSpec {
      */
     void setupEnvironment(Context context, Map<String, String> envMap);
 
+    /** Prepare with the instance being launched, not a potentially stale global selection. */
+    default void setupEnvironment(Context context, Map<String, String> envMap,
+                                  net.kdt.pojavlaunch.instances.Instance instance) {
+        setupEnvironment(context, envMap);
+    }
+
     /**
      * Setup this renderer in MojoExec. Prefer using {@link GameRenderer#maybeSetupRenderer()}
      *

@@ -21,16 +21,22 @@ import java.io.File;
 public class ContextAwareDoneListener implements MoJsonExtras.DoneListener, ContextExecutorTask {
     private final String mErrorString;
     private final String mNormalizedVersionid;
+    private final String mInstanceId;
+    private final String mGlobalRenderer;
     private File[] classpath;
 
-    public ContextAwareDoneListener(Context baseContext, String versionId) {
+    public ContextAwareDoneListener(Context baseContext, String versionId, String instanceId, String globalRenderer) {
         this.mErrorString = baseContext.getString(R.string.mc_download_failed);
         this.mNormalizedVersionid = versionId;
+        this.mInstanceId = instanceId;
+        this.mGlobalRenderer = globalRenderer;
     }
 
     private Intent createGameStartIntent(Context context) {
         Intent mainIntent = new Intent(context, GameActivity.class);
         mainIntent.putExtra(INTENT_LAUNCH_VERSION, mNormalizedVersionid);
+        mainIntent.putExtra(GameActivity.INTENT_INSTANCE_ID, mInstanceId);
+        mainIntent.putExtra(GameActivity.INTENT_GLOBAL_RENDERER, mGlobalRenderer);
         mainIntent.putExtra(INTENT_LAUNCH_CLASSPATH, classpath);
         String pendingServer = PojavLaunchBridge.consumePendingServerAddress();
         if (pendingServer != null && !pendingServer.isEmpty()) {

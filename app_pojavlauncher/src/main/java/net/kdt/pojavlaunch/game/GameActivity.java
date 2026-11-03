@@ -97,6 +97,8 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     public static final String INTENT_LAUNCH_VERSION = "intent_version";
     public static final String INTENT_LAUNCH_CLASSPATH = "intent_classpath";
     public static final String INTENT_LAUNCH_SERVER = "intent_launch_server";
+    public static final String INTENT_INSTANCE_ID = "intent_instance_id";
+    public static final String INTENT_GLOBAL_RENDERER = "intent_global_renderer";
 
     public static TouchCharInput touchCharInput;
     private GameView launcherGLView;
@@ -139,27 +141,41 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
             android.media.AudioManager audioManager = getSystemService(android.media.AudioManager.class);
             if (audioManager != null) audioManager.setAllowedCapturePolicy(android.media.AudioAttributes.ALLOW_CAPTURE_BY_ALL);
         }
-        instance = Instances.loadSelectedInstance();
+        String instanceId = getIntent().getStringExtra(INTENT_INSTANCE_ID);
+        try {
+            instance = instanceId != null ? Instances.loadInstance(instanceId) : Instances.loadSelectedInstance();
+        } catch (java.io.IOException error) {
+            android.util.Log.e("GameActivity", "Could not load the instance requested for this launch", error);
+            instance = null;
+        }
         account = Accounts.getCurrent();
         if(instance == null) {
             Toast.makeText(this, R.string.instance_dir_missing, Toast.LENGTH_LONG).show();
             finish();
             return;
         }
-        // A saved renderer tag can point at a plugin that is no longer usable (an Emesis plugin the
-        // launcher now bundles itself, or one whose libraries have gone). Resolving it here keeps
-        // the game on the renderer the player expects instead of a silent fallback.
-        String launchRenderer = instance.getLaunchRenderer();
-        String resolvedRenderer = net.kdt.pojavlaunch.aerix.bridge.PojavPluginBridge.resolveLaunchTag(this, launchRenderer);
-        // The saved choice was a plugin that cannot be used on this device any more. Writing the
-        // replacement here means the renderer picker shows what the game actually runs on, instead
-        // of offering the same broken choice on the next launch.
-        if (resolvedRenderer != null && !resolvedRenderer.equals(launchRenderer)) {
-            instance.renderer = resolvedRenderer;
-            instance.maybeWrite();
+        // The instance choice is authoritative. An empty choice intentionally follows the global
+        // selection captured by the launcher, rather than a stale :game-process preference cache.
+        boolean instanceRenderer = Tools.isValidString(instance.renderer);
+        String globalRenderer = getIntent().getStringExtra(INTENT_GLOBAL_RENDERER);
+        String launchRenderer = instanceRenderer ? instance.renderer :
+                (Tools.isValidString(globalRenderer) ? globalRenderer : instance.getLaunchRenderer());
+        String resolvedRenderer = instanceRenderer ? launchRenderer :
+                net.kdt.pojavlaunch.aerix.bridge.PojavPluginBridge.resolveLaunchTag(this, launchRenderer);
+        if (resolvedRenderer == null) resolvedRenderer = launchRenderer;
+        boolean plugin = resolvedRenderer.startsWith("plugin:");
+        if (instanceRenderer && !plugin && GameRenderer.getKnownRenderer(resolvedRenderer) == null) {
+            Toast.makeText(this, R.string.aerix_instance_renderer_unavailable, Toast.LENGTH_LONG).show();
+            finish();
+            return;
         }
-        mGameRenderer = new GameRenderer(resolvedRenderer != null ? resolvedRenderer : launchRenderer);
-        net.kdt.pojavlaunch.aerix.bridge.PojavPluginBridge.applyLaunchOverride(this, mGameRenderer, instance.getLaunchRenderer());
+        mGameRenderer = new GameRenderer(resolvedRenderer, instanceRenderer);
+        net.kdt.pojavlaunch.aerix.bridge.PojavPluginBridge.applyLaunchOverride(this, mGameRenderer, resolvedRenderer);
+        if (instanceRenderer && plugin && !resolvedRenderer.equals(mGameRenderer.getCurrentRenderer().tag())) {
+            Toast.makeText(this, R.string.aerix_instance_renderer_unavailable, Toast.LENGTH_LONG).show();
+            finish();
+            return;
+        }
 
         if(GpuUtils.getGlInfo().isAdreno() && !PREF_ZINK_PREFER_SYSTEM_DRIVER) {
             mGameRenderer.overrideVulkanDriver();
@@ -278,6 +294,7 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
 
         mDrawerPullButton.setOnClickListener(v -> onClickedMenu());
         mRecorder = new net.kdt.pojavlaunch.recording.RecorderController(this);
+        mGameMenuOverlay.setRunningInstance(instance);
         mGameMenuOverlay.setCallbacks(new GameMenuCallbacks() {
             @Override public void onScreenRecorder() {
                 hideGameMenu();
@@ -414,6 +431,8 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
 
     @Override
     public void onAttachedToWindow() {
+        // A missing instance or unavailable renderer can finish before views are bound.
+        if (mControlLayout == null) return;
         // Post to get the correct display dimensions after layout.
         mControlLayout.post(()->{
             Tools.getDisplayMetrics(this);
@@ -448,7 +467,7 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     public void onResume() {
         super.onResume();
         ContextExecutor.setActivity(this);
-        if(PREF_ENABLE_GYRO) mGyroControl.enable();
+        if(PREF_ENABLE_GYRO && mGyroControl != null) mGyroControl.enable();
         PLATFORM.setHovered(true);
         updateFpsViewVisibility();
     }
@@ -468,7 +487,7 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         if (touchCharInput != null) touchCharInput.setKeyboardState(false);
         ContextExecutor.clearActivity();
         hideGameMenu();
-        mGyroControl.disable();
+        if (mGyroControl != null) mGyroControl.disable();
         // Avoid going through the JNI each time.
         if (Platform.isGrabbing()){
             CallbackBridge.sendKeyPress(KeyEvent.KEYCODE_ESCAPE);
@@ -568,7 +587,6 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
 
         // Show Angelica + SFPEW notice
         RenderSpec renderer = mGameRenderer.getCurrentRenderer();
-        Instance instance = Instances.loadSelectedInstance();
         File gamedir = instance.getGameDirectory();
         if (GameRunner.hasAngelica(gamedir) && renderer instanceof GLESRenderSpec.SFPEWRenderSpec) {
             Toast.makeText(this, R.string.angelica_found_sfpew_notice, Toast.LENGTH_LONG).show();

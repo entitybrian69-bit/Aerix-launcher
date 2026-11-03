@@ -221,12 +221,10 @@ public class GameRunner {
     private static void switchRendererIfSupported(boolean support,
                                                   RenderSpec renderer,
                                                   GameRenderer gameRenderer,
-                                                  Instance instance,
                                                   AppCompatActivity activity,
                                                   int resId) throws InterruptedException, IOException {
         if(support) {
-            instance.renderer = renderer.tag();
-            instance.write();
+            // A compatibility adjustment for Follow Global is for this launch only.
             gameRenderer.setCurrentRenderer(renderer);
         }else {
             showDialog(activity, resId);
@@ -278,10 +276,12 @@ public class GameRunner {
 
         RenderSpec renderer = gameRenderer.getCurrentRenderer();
 
-        if(!versionInfo.disableRendererChecks) {
+        // Never silently replace an explicit per-instance choice. Follow Global retains the
+        // existing compatibility switches; unsupported explicit choices may fail at runtime.
+        if(!versionInfo.disableRendererChecks && !Tools.isValidString(instance.renderer)) {
             // Switch renderer to GL4ES when running a compat context version on LTW
             if(isCompatContext(versionInfo) && !hasAngelica(gamedir) && renderer instanceof GLESRenderSpec.LTWRenderSpec) {
-                switchRendererIfSupported(true, GameRenderer.getKnownRenderer(Renderers.GL4ES_RENDERER), gameRenderer, instance, activity, 0);
+                switchRendererIfSupported(true, GameRenderer.getKnownRenderer(Renderers.GL4ES_RENDERER), gameRenderer, activity, 0);
             }
 
             boolean isGl4es = renderer instanceof GLESRenderSpec.GL4ESRenderSpec;
@@ -289,15 +289,16 @@ public class GameRunner {
             boolean ltwSupported = ltw != null && ltw.compatibleDevice(activity);
             // Block Sodium from running with GL4ES on 1.17+
             if(!isCompatContext(versionInfo) && isGl4es && hasSodium(gamedir)) {
-                switchRendererIfSupported(ltwSupported, ltw, gameRenderer, instance, activity, R.string.compat_sodium_not_supported);
+                switchRendererIfSupported(ltwSupported, ltw, gameRenderer, activity, R.string.compat_sodium_not_supported);
             }
 
             // Switch renderer to LTW when running 1.21.5
             if(!isGl4esCompatible(versionInfo) && isGl4es) {
-                switchRendererIfSupported(ltwSupported, ltw, gameRenderer, instance, activity, R.string.compat_sodium_not_supported);
+                switchRendererIfSupported(ltwSupported, ltw, gameRenderer, activity, R.string.compat_sodium_not_supported);
             }
         }
 
+        renderer = gameRenderer.getCurrentRenderer();
         boolean isLtw = renderer instanceof GLESRenderSpec.LTWRenderSpec;
 
         if(isLtw && checkRenderDistance(versionInfo, gamedir)) {
@@ -389,12 +390,14 @@ public class GameRunner {
         Map<String, String> versionEnvMap = versionInfo.environment;
 
         // TODO: this should be decoupled from GameRunner completely
-        gameRenderer.setupEnvironment(activity);
+        gameRenderer.setupEnvironment(activity, instance);
         JREUtils.setGameEnvironment(activity, versionEnvMap);
         JREUtils.chdir(instance.getGameDirectory().getAbsolutePath());
 
         if(!gameRenderer.maybeSetupRenderer()) {
-            if(showDialog(activity, R.string.gr_err_renderer_load_Failed)) return;
+            int message = Tools.isValidString(instance.renderer)
+                    ? R.string.aerix_instance_renderer_unavailable : R.string.gr_err_renderer_load_Failed;
+            if(showDialog(activity, message)) return;
             System.exit(0);
         }
         // A renderer plugin may ship its own OpenGL library; built-in renderers keep the shim.
@@ -402,6 +405,11 @@ public class GameRunner {
         // resolve takes the whole launch down with an UnsatisfiedLinkError on the render thread,
         // so the renderer is only used when its library is really on disk.
         RenderSpec activeRenderer = gameRenderer.getLaunchableRenderer();
+        if (activeRenderer == null) {
+            if (showDialog(activity, R.string.aerix_instance_renderer_unavailable)) return;
+            System.exit(0);
+            return;
+        }
         Logger.appendToLog("LWJGL OpenGL library: " + activeRenderer.glLibraryPath()
                 + " (renderer " + activeRenderer.name() + ")");
         javaArgList.add("-Dorg.lwjgl.opengl.libname=" + activeRenderer.glLibraryPath());

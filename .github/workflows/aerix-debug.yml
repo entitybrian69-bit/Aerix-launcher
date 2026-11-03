@@ -69,7 +69,18 @@ jobs:
           python3 tests/modern_cape_smoke.py
           python3 tests/social_profile_cosmetics_smoke.py
           python3 tests/client_background_smoke.py
+          python3 tests/instance_renderer_smoke.py
+          python3 tests/fastclient_assets_smoke.py
+          mkdir -p "$RUNNER_TEMP/aerix-worldshare-test"
+          javac -d "$RUNNER_TEMP/aerix-worldshare-test" \
+            app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/worldshare/WorldSharePolicy.java \
+            tests/WorldSharePolicySmokeTest.java
+          java -cp "$RUNNER_TEMP/aerix-worldshare-test" WorldSharePolicySmokeTest
           mkdir -p "$RUNNER_TEMP/aerix-memory-test"
+          javac -d "$RUNNER_TEMP/aerix-memory-test" \
+            app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/customcontrols/ControlKeycodes.java \
+            tests/ControlKeycodesSmokeTest.java
+          java -cp "$RUNNER_TEMP/aerix-memory-test" ControlKeycodesSmokeTest
           javac -d "$RUNNER_TEMP/aerix-memory-test" \
             app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/utils/jre/InstanceMemory.java \
             tests/InstanceMemorySmokeTest.java

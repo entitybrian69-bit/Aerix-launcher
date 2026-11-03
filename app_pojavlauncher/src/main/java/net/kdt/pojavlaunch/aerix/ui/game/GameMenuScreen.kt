@@ -108,7 +108,7 @@ import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
 import net.kdt.pojavlaunch.aerix.loading.AerixLoadingWallpaper
 
 /** The pages of the in-game menu. */
-enum class GameMenuPage { MAIN, DOWNLOADS, SOCIALS }
+enum class GameMenuPage { MAIN, DOWNLOADS, SOCIALS, WORLD_SHARING }
 
 /** Everything the menu asks the game activity to do. */
 interface GameMenuCallbacks {
@@ -233,6 +233,11 @@ fun GameMenuScreen(
                     onStorageProblem = { callbacks.onRequestStoragePermission() }
                 )
             }
+            GameMenuPage.WORLD_SHARING -> Box(
+                modifier = Modifier.fillMaxSize().padding(horizontal = AerixSpacing.mdPlus, vertical = AerixSpacing.sm)
+            ) {
+                GameWorldSharingScreen(target = target, accent = palette.accent, onBack = { page = GameMenuPage.MAIN }, onResumeGame = callbacks::onResumeGame)
+            }
             GameMenuPage.MAIN -> AnimatedVisibility(
                 visible = shown,
                 enter = fadeIn(tween(140)) + scaleIn(tween(180), initialScale = 0.97f),
@@ -245,7 +250,8 @@ fun GameMenuScreen(
                     versionLine = versionLine,
                     onCloseRequest = onCloseRequest,
                     onOpenDownloads = { page = GameMenuPage.DOWNLOADS },
-                    onOpenSocials = { page = GameMenuPage.SOCIALS }
+                    onOpenSocials = { page = GameMenuPage.SOCIALS },
+                    onOpenWorldSharing = { page = GameMenuPage.WORLD_SHARING }
                 )
             }
         }
@@ -260,7 +266,8 @@ private fun GameMenuMainPage(
     versionLine: String,
     onCloseRequest: () -> Unit,
     onOpenDownloads: () -> Unit,
-    onOpenSocials: () -> Unit
+    onOpenSocials: () -> Unit,
+    onOpenWorldSharing: () -> Unit
 ) {
     BoxWithConstraints(
         modifier = Modifier.fillMaxSize(),
@@ -338,6 +345,14 @@ private fun GameMenuMainPage(
                         height = rowHeight,
                         badgeCount = net.kdt.pojavlaunch.aerix.social.SocialBackend.totalActionableBadge,
                         onClick = onOpenSocials
+                    )
+                    CompactMenuButton(
+                        label = "World Sharing",
+                        iconRes = R.drawable.aerix_ic_public,
+                        color = palette.tiles[3],
+                        compact = compact,
+                        height = rowHeight,
+                        onClick = onOpenWorldSharing
                     )
                     CompactMenuButton(
                         label = stringResource(R.string.aerix_ingame_menu_downloads),

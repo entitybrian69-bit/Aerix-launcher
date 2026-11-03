@@ -38,6 +38,7 @@ import net.kdt.pojavlaunch.colorselector.ColorSelector;
 import net.kdt.pojavlaunch.customcontrols.ControlData;
 import net.kdt.pojavlaunch.customcontrols.ControlDrawerData;
 import net.kdt.pojavlaunch.customcontrols.ControlJoystickData;
+import net.kdt.pojavlaunch.customcontrols.ControlKeycodes;
 import net.kdt.pojavlaunch.customcontrols.ControlLayout;
 import net.kdt.pojavlaunch.customcontrols.LayoutBitmaps;
 import net.kdt.pojavlaunch.customcontrols.buttons.ControlButton;
@@ -56,7 +57,9 @@ import java.util.List;
 
 public class EditControlSideDialog extends SideDialogView {
 
-    private final Spinner[] mKeycodeSpinners = new Spinner[4];
+    private final Spinner[] mKeycodeSpinners = new Spinner[ControlKeycodes.EDITOR_SLOTS];
+    private final int[] mPendingKeycodeSelections = {-1, -1, -1, -1};
+    private ControlData mMappingData;
     public boolean internalChanges = false; // True when we programmatically change stuff.
     private final View.OnLayoutChangeListener mLayoutChangedListener = new View.OnLayoutChangeListener() {
         @Override
@@ -211,12 +214,19 @@ public class EditControlSideDialog extends SideDialogView {
         // Which look this control is wearing right now.
         refreshThemeChips(data.theme);
 
-        for (int i = 0; i < data.keycodes.length; i++) {
-            if (data.keycodes[i] < 0) {
-                mKeycodeSpinners[i].setSelection(data.keycodes[i] + mSpecialArray.size());
-            } else {
-                mKeycodeSpinners[i].setSelection(KeycodeUtils.getIndexByValue(data.keycodes[i]) + mSpecialArray.size());
-            }
+        data.keycodes = ControlKeycodes.ensureEditorSlots(data.keycodes);
+        mMappingData = data;
+        for (int i = 0; i < mKeycodeSpinners.length; i++) {
+            int keycode = data.keycodes[i];
+            int selection = keycode < 0 ? keycode + mSpecialArray.size()
+                    : KeycodeUtils.getIndexByValue(keycode) + mSpecialArray.size();
+            if (selection < 0 || selection >= mAdapter.getCount()) selection = mSpecialArray.size();
+            mPendingKeycodeSelections[i] = selection;
+            mKeycodeSpinners[i].setSelection(selection);
+        }
+        if (data.keycodes.length > mKeycodeSpinners.length && mCurrentlyEditedButton instanceof ControlButton &&
+                !(mCurrentlyEditedButton instanceof ControlDrawer)) {
+            Toast.makeText(mDialogContent.getContext(), R.string.customctrl_extra_mappings_preserved, Toast.LENGTH_LONG).show();
         }
 
         setHasBitmap(Tools.isValidString(data.bitmapTag));
@@ -508,14 +518,21 @@ public class EditControlSideDialog extends SideDialogView {
             mKeycodeTextviews[i].setOnClickListener(v -> mKeycodeSpinners[finalI].performClick());
 
             mKeycodeSpinners[i].setOnItemSelectedListener((SimpleItemSelectedListener) (parent, view, position, id) -> {
-                // Side note, spinner listeners are fired later than all the other ones.
-                // Meaning the internalChanges bool is useless here.
-                if (position < mSpecialArray.size()) {
-                    mCurrentlyEditedButton.getProperties().keycodes[finalI] = mKeycodeSpinners[finalI].getSelectedItemPosition() - mSpecialArray.size();
-                } else {
-                    mCurrentlyEditedButton.getProperties().keycodes[finalI] = KeycodeUtils.getValueByIndex(mKeycodeSpinners[finalI].getSelectedItemPosition() - mSpecialArray.size());
-                }
                 mKeycodeTextviews[finalI].setText((String) mKeycodeSpinners[finalI].getSelectedItem());
+                if (mCurrentlyEditedButton == null || mMappingData == null ||
+                        mCurrentlyEditedButton.getProperties() != mMappingData) return;
+                if (mPendingKeycodeSelections[finalI] == position) {
+                    mPendingKeycodeSelections[finalI] = -1;
+                    return;
+                }
+                mPendingKeycodeSelections[finalI] = -1;
+                if (position < 0 || position >= mAdapter.getCount()) return;
+                mMappingData.keycodes = ControlKeycodes.ensureEditorSlots(mMappingData.keycodes);
+                if (position < mSpecialArray.size()) {
+                    mMappingData.keycodes[finalI] = position - mSpecialArray.size();
+                } else {
+                    mMappingData.keycodes[finalI] = KeycodeUtils.getValueByIndex(position - mSpecialArray.size());
+                }
             });
         }
 

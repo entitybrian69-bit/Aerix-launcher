@@ -190,6 +190,7 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
                             LauncherSection.OTHER_RELEASES -> net.kdt.pojavlaunch.aerix.ui.screens.OtherReleasesScreen(activity, navigate)
                             LauncherSection.HOME -> HomeScreen(activity, navigate)
                             LauncherSection.AERIX_CLIENT -> net.kdt.pojavlaunch.aerix.ui.screens.AerixClientScreen(activity)
+                            LauncherSection.FAST_CLIENT -> net.kdt.pojavlaunch.aerix.ui.screens.FastClientScreen(activity)
                             LauncherSection.LIBRARY -> LibraryScreen(activity)
                             LauncherSection.SOCIALS -> SocialsScreen(activity) { AerixNav.finishTo(LauncherSection.HOME) }
                             LauncherSection.DISCOVER, LauncherSection.DOWNLOADS -> DiscoverScreen(activity, navigate)

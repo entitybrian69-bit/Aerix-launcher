@@ -69,6 +69,8 @@ class GameMenuOverlayView @JvmOverloads constructor(
     private val callbacksState = mutableStateOf<GameMenuCallbacks?>(null)
     private val revisionState = mutableIntStateOf(0)
     private val targetState = mutableStateOf(GameDownloadTarget.of(null))
+    private var runningInstance: net.kdt.pojavlaunch.instances.Instance? = null
+    fun setRunningInstance(instance: net.kdt.pojavlaunch.instances.Instance) { runningInstance = instance }
     private var contentInstalled = false
     private var imeBottomPx = 0
 
@@ -145,7 +147,7 @@ class GameMenuOverlayView @JvmOverloads constructor(
     /** Open the menu, refreshing the instance it downloads into. */
     fun showMenu() {
         if (isMenuShown()) return
-        targetState.value = PojavGameDownloadsBridge.runningTarget()
+        targetState.value = runningInstance?.let { GameDownloadTarget.of(it) } ?: PojavGameDownloadsBridge.runningTarget()
         // Who the game is running as, for the character panel. Loaded once, no network.
         PojavAccountBridge.ensureLoaded()
         installContent()

@@ -132,6 +132,21 @@ public class ControlLayoutImporterTest {
         assertArrayEquals(new int[]{KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_RIGHT}, data.directionKeycodes[1]);
     }
 
+    @Test public void cloningControlPreservesBindingsBeyondEditorSlots() {
+        ControlData original = new ControlData();
+        original.keycodes = new int[]{10, 11, 12, 13, 14, 15};
+        ControlData copy = new ControlData(original);
+        assertArrayEquals(original.keycodes, copy.keycodes);
+        copy.keycodes[4] = 99;
+        assertEquals(14, original.keycodes[4]);
+    }
+
+    @Test public void cloningControlWithMissingBindingsCreatesEditableSlots() {
+        ControlData original = new ControlData();
+        original.keycodes = null;
+        assertArrayEquals(new int[]{0, 0, 0, 0}, new ControlData(original).keycodes);
+    }
+
     @Test public void rejectsEmptyForeignLayoutInsteadOfReportingSuccess() throws Exception {
         assertNull(convert(layout(new JSONObject())));
     }
