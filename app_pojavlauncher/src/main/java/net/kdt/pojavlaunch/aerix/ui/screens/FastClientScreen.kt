@@ -35,13 +35,13 @@ import net.kdt.pojavlaunch.instances.Instances
 
 /** The creator's builds are separate profiles and never receive Aerix Client's own mod stack. */
 @Composable
-fun FastClientScreen(activity: FragmentActivity) {
+fun FastClientScreen(activity: FragmentActivity, onBack: () -> Unit) {
     var refresh by remember { mutableIntStateOf(0) }
     val scope = rememberCoroutineScope()
     val instances = remember(refresh, FastClientInstaller.installingVersion) {
         runCatching { Instances.loadAllInstances() }.getOrDefault(emptyList())
     }
-    AerixPage(title = "FastClient", subtitle = "By Mxinspire1 · Fabric") {
+    AerixPage(title = "FastClient", subtitle = "By Mxinspire1 · Fabric", trailing = { ClientOwnerBackButton(onBack) }) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm)) {
             Text("Install a separate FastClient instance. Fabric Loader and Fabric API are downloaded during setup; Minecraft files download when you launch.", color = AerixSurface.textSecondary, fontSize = 12.sp)
             if (FastClientInstaller.installingVersion != null) {

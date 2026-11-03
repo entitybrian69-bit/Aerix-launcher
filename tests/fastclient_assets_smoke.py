@@ -31,8 +31,20 @@ assert 'instance.sharedData = false' in installer
 assert 'instance.isAerixClient = false' in installer
 assert 'overwrite = false' in installer
 assert 'SHA-512' in installer and 'cdn.modrinth.com' in installer
-assert 'FastClientScreen(activity)' in (JAVA / 'aerix/ui/AerixLauncherScreen.kt').read_text()
-assert 'LauncherSection.FAST_CLIENT' in (JAVA / 'aerix/ui/AerixNavigationRail.kt').read_text()
+assert 'ClientHubScreen(activity, clientOwnerPage)' in (JAVA / 'aerix/ui/AerixLauncherScreen.kt').read_text()
+hub = (JAVA / 'aerix/ui/screens/ClientHubScreen.kt').read_text()
+assert 'ClientOwnerPage.MX_INSPIRE -> FastClientScreen(activity, onBack = back)' in hub
+assert 'ClientOwnerPage.SAHIL -> AerixClientScreen(activity, onBack = back)' in hub
+assert 'onClick = { onPageChange(ClientOwnerPage.SAHIL) }' in hub
+assert 'onClick = { onPageChange(ClientOwnerPage.MX_INSPIRE) }' in hub
+assert 'BackHandler(enabled = page != ClientOwnerPage.OWNERS' in hub
+assert 'Modifier.size(76.dp).clip(CircleShape)' in hub
+assert 'LauncherSection.FAST_CLIENT' not in (JAVA / 'aerix/ui/AerixNavigationRail.kt').read_text()
+for name in ('client_owner_sahil.jpg', 'client_owner_mx_inspire.jpg'):
+    data = (ROOT / 'app_pojavlauncher/src/main/res/drawable-nodpi' / name).read_bytes()
+    assert data[:2] == b'\xff\xd8' and len(data) > 1000, name
+for name in ('AerixClientScreen.kt', 'FastClientScreen.kt'):
+    assert 'ClientOwnerBackButton(onBack)' in (JAVA / 'aerix/ui/screens' / name).read_text()
 screen = (JAVA / 'aerix/ui/screens/FastClientScreen.kt').read_text()
 assert 'FastClientInstaller.install(activity, build)' in screen
 assert 'PojavLaunchBridge.play(activity)' in screen

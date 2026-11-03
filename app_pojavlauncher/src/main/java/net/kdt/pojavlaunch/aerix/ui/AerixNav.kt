@@ -67,7 +67,9 @@ object AerixNav {
     fun init() {
         if (initialized) return
         initialized = true
-        val saved = runCatching { LauncherSection.valueOf(AerixPreferences.lastSection) }.getOrDefault(LauncherSection.HOME)
+        // Migrate the short-lived FastClient sidebar destination to the unified Clients page.
+        val last = if (AerixPreferences.lastSection == "FAST_CLIENT") "AERIX_CLIENT" else AerixPreferences.lastSection
+        val saved = runCatching { LauncherSection.valueOf(last) }.getOrDefault(LauncherSection.HOME)
         section = if (saved in pageSections) LauncherSection.HOME else saved
     }
 

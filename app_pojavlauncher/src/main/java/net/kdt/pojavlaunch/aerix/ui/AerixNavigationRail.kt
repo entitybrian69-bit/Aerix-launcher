@@ -85,7 +85,6 @@ enum class LauncherSection {
     HOME,
     /** Dedicated Aerix Client (Minecraft 1.16.5 Testing Edition · Liquid Crystal Clear). */
     AERIX_CLIENT,
-    FAST_CLIENT,
     LIBRARY,
     /** Friends, messages and parties - the social launcher, opened from Home and the rail. */
     SOCIALS,
@@ -187,8 +186,6 @@ fun AerixNavigationRail(
                     selectedSection == LauncherSection.HOME, activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.HOME) }
                 RailIconItem(R.drawable.aerix_ic_client_crystal, "Aerix Client",
                     selectedSection == LauncherSection.AERIX_CLIENT, activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.AERIX_CLIENT) }
-                RailIconItem(R.drawable.ic_px_speed, "FastClient",
-                    selectedSection == LauncherSection.FAST_CLIENT, activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.FAST_CLIENT) }
                 RailIconItem(R.drawable.aerix_ic_add, stringResource(R.string.create_instance),
                     selectedSection == LauncherSection.CREATE_INSTANCE, activeAccent, expandedRail, compactRail,
                     onClick = onCreateInstance, guideKey = AerixGuideState.CREATE)
