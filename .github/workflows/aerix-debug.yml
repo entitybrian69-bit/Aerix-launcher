@@ -73,6 +73,7 @@ jobs:
           python3 tests/fastclient_assets_smoke.py
           python3 tests/fastclient_performance_download_test.py
           python3 tests/recorder_wiring_smoke.py
+          python3 tests/authlib_263_smoke.py
           mkdir -p "$RUNNER_TEMP/aerix-recorder-test"
           javac -d "$RUNNER_TEMP/aerix-recorder-test" \
             app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/recording/RecordingPaths.java \
