@@ -30,6 +30,7 @@ import net.kdt.pojavlaunch.aerix.bridge.AerixPreferences
 
 object AerixNav {
     /** Settings tab ids (mirai NormalNavKey.Settings.*). */
+    const val TAB_STYLES = "styles"
     const val TAB_RENDERER = "renderer"
     const val TAB_GAME = "game"
     const val TAB_JAVA = "java"

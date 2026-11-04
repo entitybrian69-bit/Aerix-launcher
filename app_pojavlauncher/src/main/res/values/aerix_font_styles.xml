@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Native activities and dialogs use the same selection as the Compose launcher. -->
+    <style name="AerixFont_default">
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="fontFamily">sans-serif</item>
+    </style>
+    <style name="AerixFont_minecraft">
+        <item name="android:fontFamily">@font/minecraft_ten</item>
+        <item name="fontFamily">@font/minecraft_ten</item>
+    </style>
+    <style name="AerixFont_pressstart2p">
+        <item name="android:fontFamily">@font/font_pressstart2p</item>
+        <item name="fontFamily">@font/font_pressstart2p</item>
+    </style>
+    <style name="AerixFont_silkscreen">
+        <item name="android:fontFamily">@font/font_silkscreen</item>
+        <item name="fontFamily">@font/font_silkscreen</item>
+    </style>
+    <style name="AerixFont_vt323">
+        <item name="android:fontFamily">@font/font_vt323</item>
+        <item name="fontFamily">@font/font_vt323</item>
+    </style>
+    <style name="AerixFont_lato">
+        <item name="android:fontFamily">@font/font_lato</item>
+        <item name="fontFamily">@font/font_lato</item>
+    </style>
+    <style name="AerixFont_poppins">
+        <item name="android:fontFamily">@font/font_poppins</item>
+        <item name="fontFamily">@font/font_poppins</item>
+    </style>
+    <style name="AerixFont_firasans">
+        <item name="android:fontFamily">@font/font_firasans</item>
+        <item name="fontFamily">@font/font_firasans</item>
+    </style>
+    <style name="AerixFont_kanit">
+        <item name="android:fontFamily">@font/font_kanit</item>
+        <item name="fontFamily">@font/font_kanit</item>
+    </style>
+    <style name="AerixFont_oxygen">
+        <item name="android:fontFamily">@font/font_oxygen</item>
+        <item name="fontFamily">@font/font_oxygen</item>
+    </style>
+    <style name="AerixFont_ibmplexmono">
+        <item name="android:fontFamily">@font/font_ibmplexmono</item>
+        <item name="fontFamily">@font/font_ibmplexmono</item>
+    </style>
+    <style name="AerixFont_varelaround">
+        <item name="android:fontFamily">@font/font_varelaround</item>
+        <item name="fontFamily">@font/font_varelaround</item>
+    </style>
+    <style name="AerixFont_titilliumweb">
+        <item name="android:fontFamily">@font/font_titilliumweb</item>
+        <item name="fontFamily">@font/font_titilliumweb</item>
+    </style>
+    <style name="AerixFont_bebasneue">
+        <item name="android:fontFamily">@font/font_bebasneue</item>
+        <item name="fontFamily">@font/font_bebasneue</item>
+    </style>
+    <style name="AerixFont_anton">
+        <item name="android:fontFamily">@font/font_anton</item>
+        <item name="fontFamily">@font/font_anton</item>
+    </style>
+    <style name="AerixFont_arvo">
+        <item name="android:fontFamily">@font/font_arvo</item>
+        <item name="fontFamily">@font/font_arvo</item>
+    </style>
+    <style name="AerixFont_comforter">
+        <item name="android:fontFamily">@font/font_comforter</item>
+        <item name="fontFamily">@font/font_comforter</item>
+    </style>
+    <style name="AerixFont_amaticsc">
+        <item name="android:fontFamily">@font/font_amaticsc</item>
+        <item name="fontFamily">@font/font_amaticsc</item>
+    </style>
+    <style name="AerixFont_abrilfatface">
+        <item name="android:fontFamily">@font/font_abrilfatface</item>
+        <item name="fontFamily">@font/font_abrilfatface</item>
+    </style>
+    <style name="AerixFont_lobster">
+        <item name="android:fontFamily">@font/font_lobster</item>
+        <item name="fontFamily">@font/font_lobster</item>
+    </style>
+    <style name="AerixFont_righteous">
+        <item name="android:fontFamily">@font/font_righteous</item>
+        <item name="fontFamily">@font/font_righteous</item>
+    </style>
+    <style name="AerixFont_alegreyasans">
+        <item name="android:fontFamily">@font/font_alegreyasans</item>
+        <item name="fontFamily">@font/font_alegreyasans</item>
+    </style>
+    <style name="AerixFont_hind">
+        <item name="android:fontFamily">@font/font_hind</item>
+        <item name="fontFamily">@font/font_hind</item>
+    </style>
+    <style name="AerixFont_alfaslabone">
+        <item name="android:fontFamily">@font/font_alfaslabone</item>
+        <item name="fontFamily">@font/font_alfaslabone</item>
+    </style>
+    <style name="AerixFont_acme">
+        <item name="android:fontFamily">@font/font_acme</item>
+        <item name="fontFamily">@font/font_acme</item>
+    </style>
+    <style name="AerixFont_architectsdaughter">
+        <item name="android:fontFamily">@font/font_architectsdaughter</item>
+        <item name="fontFamily">@font/font_architectsdaughter</item>
+    </style>
+    <style name="AerixFont_barlow">
+        <item name="android:fontFamily">@font/font_barlow</item>
+        <item name="fontFamily">@font/font_barlow</item>
+    </style>
+    <style name="AerixFont_breeserif">
+        <item name="android:fontFamily">@font/font_breeserif</item>
+        <item name="fontFamily">@font/font_breeserif</item>
+    </style>
+    <style name="AerixFont_creepster">
+        <item name="android:fontFamily">@font/font_creepster</item>
+        <item name="fontFamily">@font/font_creepster</item>
+    </style>
+    <style name="AerixFont_mukta">
+        <item name="android:fontFamily">@font/font_mukta</item>
+        <item name="fontFamily">@font/font_mukta</item>
+    </style>
+    <style name="AerixFont_patrickhand">
+        <item name="android:fontFamily">@font/font_patrickhand</item>
+        <item name="fontFamily">@font/font_patrickhand</item>
+    </style>
+    <style name="AerixFont_chakrapetch">
+        <item name="android:fontFamily">@font/font_chakrapetch</item>
+        <item name="fontFamily">@font/font_chakrapetch</item>
+    </style>
+    <style name="AerixFont_asapcondensed">
+        <item name="android:fontFamily">@font/font_asapcondensed</item>
+        <item name="fontFamily">@font/font_asapcondensed</item>
+    </style>
+    <style name="AerixFont_inconsolata">
+        <item name="android:fontFamily">@font/font_inconsolata</item>
+        <item name="fontFamily">@font/font_inconsolata</item>
+    </style>
+    <style name="AerixFont_cabincondensed">
+        <item name="android:fontFamily">@font/font_cabincondensed</item>
+        <item name="fontFamily">@font/font_cabincondensed</item>
+    </style>
+</resources>

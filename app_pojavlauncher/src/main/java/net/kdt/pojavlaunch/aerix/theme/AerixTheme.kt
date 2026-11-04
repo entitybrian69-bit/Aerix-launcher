@@ -29,36 +29,36 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import net.kdt.pojavlaunch.aerix.bridge.AerixColorTheme
 import net.kdt.pojavlaunch.aerix.bridge.AerixPreferences
 
-private val systemSans = FontFamily.SansSerif
 private val defaults = Typography()
 
-private fun TextStyle.aerixText(weight: FontWeight = fontWeight ?: FontWeight.Normal) = copy(
-    fontFamily = systemSans,
+private fun TextStyle.aerixText(family: FontFamily, weight: FontWeight = fontWeight ?: FontWeight.Normal) = copy(
+    fontFamily = family,
     fontWeight = weight
 )
 
-val AerixTypography = Typography(
-    displayLarge = defaults.displayLarge.aerixText(FontWeight.Bold),
-    displayMedium = defaults.displayMedium.aerixText(FontWeight.Bold),
-    displaySmall = defaults.displaySmall.aerixText(FontWeight.Bold),
-    headlineLarge = defaults.headlineLarge.aerixText(FontWeight.Bold),
-    headlineMedium = defaults.headlineMedium.aerixText(FontWeight.SemiBold),
-    headlineSmall = defaults.headlineSmall.aerixText(FontWeight.SemiBold),
-    titleLarge = defaults.titleLarge.aerixText(FontWeight.SemiBold),
-    titleMedium = defaults.titleMedium.aerixText(FontWeight.Medium),
-    titleSmall = defaults.titleSmall.aerixText(FontWeight.Medium),
-    bodyLarge = defaults.bodyLarge.aerixText(),
-    bodyMedium = defaults.bodyMedium.aerixText(),
-    bodySmall = defaults.bodySmall.aerixText(),
-    labelLarge = defaults.labelLarge.aerixText(FontWeight.Medium),
-    labelMedium = defaults.labelMedium.aerixText(FontWeight.Medium),
-    labelSmall = defaults.labelSmall.aerixText(FontWeight.Medium),
+private fun aerixTypography(family: FontFamily) = Typography(
+    displayLarge = defaults.displayLarge.aerixText(family, FontWeight.Bold),
+    displayMedium = defaults.displayMedium.aerixText(family, FontWeight.Bold),
+    displaySmall = defaults.displaySmall.aerixText(family, FontWeight.Bold),
+    headlineLarge = defaults.headlineLarge.aerixText(family, FontWeight.Bold),
+    headlineMedium = defaults.headlineMedium.aerixText(family, FontWeight.SemiBold),
+    headlineSmall = defaults.headlineSmall.aerixText(family, FontWeight.SemiBold),
+    titleLarge = defaults.titleLarge.aerixText(family, FontWeight.SemiBold),
+    titleMedium = defaults.titleMedium.aerixText(family, FontWeight.Medium),
+    titleSmall = defaults.titleSmall.aerixText(family, FontWeight.Medium),
+    bodyLarge = defaults.bodyLarge.aerixText(family),
+    bodyMedium = defaults.bodyMedium.aerixText(family),
+    bodySmall = defaults.bodySmall.aerixText(family),
+    labelLarge = defaults.labelLarge.aerixText(family, FontWeight.Medium),
+    labelMedium = defaults.labelMedium.aerixText(family, FontWeight.Medium),
+    labelSmall = defaults.labelSmall.aerixText(family, FontWeight.Medium),
 )
 
 private val aerixDark = darkColorScheme(
@@ -124,9 +124,12 @@ fun AerixLauncherTheme(content: @Composable () -> Unit) {
             AerixColorTheme.CUSTOM -> customAccentScheme(Color(custom))
         }
     }
+    AerixFonts.initialize(LocalContext.current)
+    val fontId = AerixFonts.selectedId
+    val typography = remember(fontId) { aerixTypography(AerixFonts.selected().family()) }
     MaterialTheme(
         colorScheme = scheme,
-        typography = AerixTypography,
+        typography = typography,
         content = content
     )
 }
