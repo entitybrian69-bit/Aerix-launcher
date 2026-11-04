@@ -45,8 +45,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -61,7 +59,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
 import net.kdt.pojavlaunch.aerix.bridge.AerixPreferences
 import net.kdt.pojavlaunch.aerix.bridge.AerixTransitionType
@@ -94,7 +91,6 @@ import net.kdt.pojavlaunch.aerix.ui.screens.CreateInstanceScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.DiscoverScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.FileManagerScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.HomeScreen
-import net.kdt.pojavlaunch.aerix.ui.screens.GlassHomeScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.InstanceEditorScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.LibraryScreen
 import net.kdt.pojavlaunch.aerix.bridge.AerixInstallQueue
@@ -113,7 +109,6 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
     net.kdt.pojavlaunch.aerix.ui.screens.LauncherUpdateNoticeHost(activity)
     val section = AerixNav.section
     var clientOwnerPage by rememberSaveable { mutableStateOf(ClientOwnerPage.OWNERS) }
-    var showMoreHomeTools by rememberSaveable { mutableStateOf(false) }
     val navigate: (LauncherSection) -> Unit = { target ->
         when (target) {
             // The Wallpapers rail entry is the Wallpapers tab of the settings page, as in mirai's rail.
@@ -182,9 +177,21 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
         // The wallpaper and the festival effects run to the edges of the display; the shell
         // itself stays clear of the camera cutout and of the system bars.
         Box(modifier = Modifier.fillMaxSize().padding(AerixWindowInsets.padding())) {
-            Box(
-                modifier = Modifier.fillMaxSize().padding(bottom = if (section == LauncherSection.SOCIALS) 0.dp else 64.dp)
-            ) {
+            Row(modifier = Modifier.fillMaxSize()) {
+                // The social space has its own sidebar and takes the whole window; every other
+                // section keeps the launcher's rail.
+                if (section != LauncherSection.SOCIALS) {
+                    AerixNavigationRail(
+                        selectedSection = section,
+                        onNavigate = navigate,
+                        onCreateInstance = { AerixNav.navigate(LauncherSection.CREATE_INSTANCE) }
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                ) {
                     AnimatedContent(
                         targetState = section,
                         transitionSpec = { sectionTransition(transitionType, duration, extent) },
@@ -192,16 +199,7 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
                     ) { target ->
                         when (target) {
                             LauncherSection.OTHER_RELEASES -> net.kdt.pojavlaunch.aerix.ui.screens.OtherReleasesScreen(activity, navigate)
-                            LauncherSection.HOME -> {
-                                if (showMoreHomeTools && !AerixGuideState.running) {
-                                    Box(Modifier.fillMaxSize()) {
-                                        HomeScreen(activity, navigate)
-                                        TextButton(onClick = { showMoreHomeTools = false }, modifier = Modifier.align(Alignment.TopEnd)) {
-                                            Text("Back to home")
-                                        }
-                                    }
-                                } else GlassHomeScreen(activity, navigate) { showMoreHomeTools = true }
-                            }
+                            LauncherSection.HOME -> HomeScreen(activity, navigate)
                             LauncherSection.AERIX_CLIENT -> ClientHubScreen(activity, clientOwnerPage) { clientOwnerPage = it }
                             LauncherSection.LIBRARY -> LibraryScreen(activity)
                             LauncherSection.SOCIALS -> SocialsScreen(activity) { AerixNav.finishTo(LauncherSection.HOME) }
@@ -261,12 +259,7 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
                             trackColor = Color.Transparent
                         )
                     }
-            }
-            if (section != LauncherSection.SOCIALS) {
-                AerixBottomNavigation(selectedSection = section, onNavigate = { target ->
-                    if (target == LauncherSection.HOME) showMoreHomeTools = false
-                    navigate(target)
-                }, modifier = Modifier.align(Alignment.BottomCenter))
+                }
             }
 
             FestivalTitleText(
