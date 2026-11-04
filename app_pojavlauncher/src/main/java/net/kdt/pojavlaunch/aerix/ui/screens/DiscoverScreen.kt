@@ -311,9 +311,10 @@ fun DiscoverScreen(activity: FragmentActivity, navigate: (LauncherSection) -> Un
         }
     }
     BoxWithConstraints(Modifier.fillMaxSize().padding(horizontal = AerixSpacing.md, vertical = AerixSpacing.sm)) {
+        val sideWidth = (maxWidth * .25f).coerceIn(150.dp, 220.dp)
         if (maxWidth >= 620.dp && maxWidth > maxHeight) {
             Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(AerixSpacing.md)) {
-                Column(Modifier.width((maxWidth * .25f).coerceIn(150.dp, 220.dp)).fillMaxHeight()
+                Column(Modifier.width(sideWidth).fillMaxHeight()
                     .verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                     Text("Browse", color = AerixSurface.textPrimary, style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 4.dp))

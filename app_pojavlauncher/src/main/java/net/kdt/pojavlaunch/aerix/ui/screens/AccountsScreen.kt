@@ -373,10 +373,11 @@ fun AccountsScreen(activity: FragmentActivity) {
         }
     }
     BoxWithConstraints(Modifier.fillMaxSize().padding(12.dp)) {
+        val useColumns = maxWidth >= 620.dp && maxWidth > maxHeight
         Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Accounts", style = MaterialTheme.typography.headlineSmall,
                 color = AerixSurface.textPrimary, fontWeight = FontWeight.Bold)
-            if (maxWidth >= 620.dp && maxWidth > maxHeight) {
+            if (useColumns) {
                 Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Column(Modifier.weight(1.5f).fillMaxHeight().verticalScroll(rememberScrollState())) { accountList() }
                     Column(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState())) { accountActions() }
