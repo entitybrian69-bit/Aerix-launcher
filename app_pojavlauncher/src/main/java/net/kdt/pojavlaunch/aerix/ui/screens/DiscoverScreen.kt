@@ -44,6 +44,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -118,6 +119,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import net.kdt.pojavlaunch.R
+import net.kdt.pojavlaunch.aerix.bridge.PojavAccountBridge
 import net.kdt.pojavlaunch.aerix.bridge.AerixInstallQueue
 import net.kdt.pojavlaunch.aerix.bridge.AerixPreferences
 import net.kdt.pojavlaunch.aerix.bridge.AssetFile
@@ -218,7 +220,8 @@ private enum class DiscoverTab(val label: String, @DrawableRes val iconRes: Int,
     SHADERS("Shaders", R.drawable.aerix_ic_lightbulb, AssetType.SHADER_PACK),
     WORLDS("Worlds", R.drawable.aerix_ic_public, AssetType.WORLD),
     INSTALL_VANILLA("Install Vanilla", R.drawable.aerix_ic_videogame_asset_outlined, null),
-    FAVORITES("Favorites", R.drawable.aerix_ic_favorite_filled, null)
+    FAVORITES("Favorites", R.drawable.aerix_ic_favorite_filled, null),
+    SKINS("Skins & capes", R.drawable.aerix_ic_person_outlined, null)
 }
 
 /** Lets other screens open Discover on a specific content tab (e.g. from Instance Management "+"). */
@@ -273,71 +276,77 @@ fun DiscoverScreen(activity: FragmentActivity, navigate: (LauncherSection) -> Un
 
     BackHandler(enabled = activeProject != null, onBack = closeDetail)
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = AerixSpacing.md, vertical = AerixSpacing.sm),
-        verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
-    ) {
-        // Top category pill bar (Mirai DownloadScreen.kt lines 152-160)
-        AerixPillTabRow(modifier = Modifier.fillMaxWidth()) {
-            DiscoverTab.entries.forEach { tab ->
-                val selected = selectedTab == tab
-                AerixPillTab(
-                    selected = selected,
-                    onClick = {
-                        if (tab == DiscoverTab.INSTALL_VANILLA) {
-                            AerixNav.navigate(LauncherSection.CREATE_INSTANCE)
-                        } else {
-                            selectedTab = tab
-                            activeProject = null
-                            returnToReleases = false
+    val chooseTab: (DiscoverTab) -> Unit = { tab ->
+        if (tab == DiscoverTab.INSTALL_VANILLA) AerixNav.navigate(LauncherSection.CREATE_INSTANCE)
+        else {
+            selectedTab = tab
+            activeProject = null
+            returnToReleases = false
+        }
+    }
+    val browser: @Composable () -> Unit = {
+        Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm)) {
+            val detailProject = activeProject
+            if (detailProject != null) {
+                AssetDetailContent(activity = activity, project = detailProject, onBack = closeDetail,
+                    modifier = Modifier.fillMaxWidth().weight(1f))
+            } else {
+                browseStates.SaveableStateProvider(selectedTab.name) {
+                    when (selectedTab) {
+                        DiscoverTab.FAVORITES -> FavoritesContent(onOpenProject = { activeProject = it },
+                            modifier = Modifier.fillMaxWidth().weight(1f))
+                        DiscoverTab.SKINS -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                            Text("Skins & capes", style = MaterialTheme.typography.titleLarge,
+                                color = AerixSurface.textPrimary, fontWeight = FontWeight.Bold)
+                            Text("Search and equip skins here. Manage your cape in Accounts.",
+                                color = AerixSurface.textSecondary, style = MaterialTheme.typography.bodySmall)
+                            TextButton(onClick = { navigate(LauncherSection.ACCOUNTS) }) { Text("Manage accounts & capes") }
+                            MiraiSkinLibraryPanel(activity, PojavAccountBridge.current)
                         }
+                        else -> SearchAssetsContent(activity = activity, type = selectedTab.assetType ?: AssetType.MOD,
+                            onOpenProject = { activeProject = it }, modifier = Modifier.fillMaxWidth().weight(1f))
                     }
-                ) {
-                    Icon(
-                        painter = painterResource(tab.iconRes),
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Text(
-                        text = tab.label,
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
                 }
             }
         }
-
-        val detailProject = activeProject
-        if (detailProject != null) {
-            AssetDetailContent(
-                activity = activity,
-                project = detailProject,
-                onBack = closeDetail,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-            )
-        } else {
-            // Detail navigation removes the browser from composition. Keep each content tab's
-            // saveable filters, page and lazy-list position until that browser returns.
-            browseStates.SaveableStateProvider(selectedTab.name) {
-                if (selectedTab == DiscoverTab.FAVORITES) {
-                    FavoritesContent(
-                        onOpenProject = { activeProject = it },
-                        modifier = Modifier.fillMaxWidth().weight(1f)
-                    )
-                } else {
-                    SearchAssetsContent(
-                        activity = activity,
-                        type = selectedTab.assetType ?: AssetType.MOD,
-                        onOpenProject = { activeProject = it },
-                        modifier = Modifier.fillMaxWidth().weight(1f)
-                    )
+    }
+    BoxWithConstraints(Modifier.fillMaxSize().padding(horizontal = AerixSpacing.md, vertical = AerixSpacing.sm)) {
+        if (maxWidth >= 620.dp && maxWidth > maxHeight) {
+            Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(AerixSpacing.md)) {
+                Column(Modifier.width((maxWidth * .25f).coerceIn(150.dp, 220.dp)).fillMaxHeight()
+                    .verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Text("Browse", color = AerixSurface.textPrimary, style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 4.dp))
+                    DiscoverTab.entries.forEach { tab ->
+                        val selected = selectedTab == tab
+                        Surface(onClick = { chooseTab(tab) }, shape = RoundedCornerShape(18.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                            color = if (selected) AerixSurface.panelRaised else AerixSurface.panel,
+                            border = BorderStroke(1.dp, if (selected) AerixThemeManager.currentAccent().copy(alpha = .55f) else AerixSurface.borderSoft)) {
+                            Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically) {
+                                Icon(painterResource(tab.iconRes), null, Modifier.size(18.dp),
+                                    tint = if (selected) AerixThemeManager.currentAccent() else AerixSurface.textSecondary)
+                                Spacer(Modifier.width(9.dp))
+                                Text(tab.label, color = AerixSurface.textPrimary, style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal, maxLines = 1)
+                            }
+                        }
+                    }
                 }
+                Box(Modifier.weight(1f).fillMaxHeight()) { browser() }
+            }
+        } else {
+            Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm)) {
+                AerixPillTabRow(modifier = Modifier.fillMaxWidth()) {
+                    DiscoverTab.entries.forEach { tab ->
+                        AerixPillTab(selected = selectedTab == tab, onClick = { chooseTab(tab) }) {
+                            Icon(painterResource(tab.iconRes), null, Modifier.size(16.dp))
+                            Text(tab.label, style = MaterialTheme.typography.labelMedium, maxLines = 1)
+                        }
+                    }
+                }
+                Box(Modifier.fillMaxWidth().weight(1f)) { browser() }
             }
         }
     }

@@ -128,12 +128,6 @@ fun AerixPillTabRow(
 ) {
     Row(
         modifier = modifier
-            .liquidGlass(
-                shape = CircleShape,
-                tint = AerixSurface.glassTint,
-                strength = 0.72f,
-                elevation = AerixMetrics.glassSelectedElevation
-            )
             .selectableGroup()
             .horizontalScroll(rememberScrollState())
             .padding(contentPadding),
@@ -154,26 +148,16 @@ fun AerixPillTab(
 ) {
     val activeAccent = AerixThemeManager.currentAccent()
     val outline by animateColorAsState(
-        targetValue = if (selected) AerixSurface.borderHighlight else Color.Transparent,
+        targetValue = if (selected) activeAccent else AerixSurface.borderSoft,
         animationSpec = tween(durationMillis = 160),
         label = "aerixTabOutline"
     )
-    val contentColor = if (selected) activeAccent else AerixSurface.textSecondary
+    val contentColor = if (selected) MaterialTheme.colorScheme.onPrimary else AerixSurface.textSecondary
     val interactionSource = remember { MutableInteractionSource() }
 
     Surface(
         modifier = modifier
             .defaultMinSize(minHeight = AerixMetrics.pillTabHeight)
-            .then(
-                if (selected) {
-                    Modifier.liquidGlass(
-                        shape = CircleShape,
-                        tint = activeAccent,
-                        strength = 0.95f,
-                        elevation = AerixMetrics.glassSelectedElevation
-                    )
-                } else Modifier
-            )
             .selectable(
                 selected = selected,
                 enabled = enabled,
@@ -183,10 +167,10 @@ fun AerixPillTab(
                 onClick = onClick
             ),
         shape = CircleShape,
-        color = Color.Transparent,
+        color = if (selected) activeAccent else AerixSurface.panel,
         contentColor = if (enabled) contentColor else contentColor.copy(alpha = 0.48f),
         border = BorderStroke(AerixSpacing.hairline, outline),
-        shadowElevation = if (selected) AerixSpacing.xs else 0.dp
+        shadowElevation = 0.dp
     ) {
         Row(
             modifier = Modifier.padding(horizontal = AerixSpacing.md, vertical = AerixSpacing.sm),

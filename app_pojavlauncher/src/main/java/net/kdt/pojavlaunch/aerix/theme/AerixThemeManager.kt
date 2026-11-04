@@ -62,6 +62,7 @@ object AerixThemeManager {
         private set
 
     val wallpapers: List<AerixWallpaperPreset> = listOf(
+        AerixWallpaperPreset("aerix_twilight", "Aerix Twilight", "A cozy voxel village at dusk", "wallpapers/aerix_twilight.jpg", "Mint", AerixSurface.accentDefault),
         AerixWallpaperPreset("wp_01_lush_caves", "Lush Glowberry Cave", "Lush Caves • Complementary Shaders", "wallpapers/wp_01_lush_caves.webp", "Lush Teal", AerixSurface.accentDefault),
         AerixWallpaperPreset("wp_02_cherry_blossom", "Cherry Blossom Grove", "Cherry Grove • BSL Shaders", "wallpapers/wp_02_cherry_blossom.webp", "Sakura Pink", Color(0xFFF472B6)),
         AerixWallpaperPreset("wp_03_sunset_river", "Golden Sunset River", "River Valley • SEUS Renewed", "wallpapers/wp_03_sunset_river.webp", "Sunset Amber", Color(0xFFF59E0B)),

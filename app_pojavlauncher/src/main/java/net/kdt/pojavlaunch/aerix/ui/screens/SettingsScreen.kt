@@ -270,6 +270,8 @@ fun SettingsScreen(activity: FragmentActivity, tabKey: String, onTabChanged: (St
             .padding(horizontal = AerixSpacing.md, vertical = AerixSpacing.sm),
         verticalArrangement = Arrangement.spacedBy(AerixSpacing.md)
     ) {
+        Text("Settings", color = AerixSurface.textPrimary, style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold)
         // The Wallpapers page is reached from its own rail entry and is a full page of its own:
         // it carries no settings tab strip, and the rail's settings entry returns to Renderer, so
         // nothing is unreachable. This is what lifts the page's own controls to the top.
