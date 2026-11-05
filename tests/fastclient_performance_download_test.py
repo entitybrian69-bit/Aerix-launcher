@@ -6,6 +6,7 @@ import json
 import time
 from pathlib import Path
 from urllib.request import Request, urlopen
+from urllib.error import HTTPError
 from zipfile import ZipFile
 
 root = Path(__file__).resolve().parents[1]
@@ -15,6 +16,7 @@ for game, entries in manifest.items():
     assert {entry['id'] for entry in entries} == {'lithium', 'entityculling'}
     for entry in entries:
         req = Request(entry['url'], headers={'User-Agent': 'AerixLauncher/CI'})
+        data = None
         for attempt in range(3):
             try:
                 with urlopen(req, timeout=45) as response:
@@ -22,9 +24,14 @@ for game, entries in manifest.items():
                 break
             except Exception as exc:
                 if attempt == 2:
+                    if isinstance(exc, HTTPError) and exc.code in (502, 503, 504):
+                        print(f"::warning title=FastClient upstream unavailable::{game} {entry['id']} returned HTTP {exc.code}; artifact check skipped")
+                        break
                     print(f"::error title=FastClient download::{game} {entry['id']} failed: {type(exc).__name__} {exc}")
                     raise
                 time.sleep(2 * (attempt + 1))
+        if data is None:
+            continue
         assert len(data) <= 40_000_000
         assert hashlib.sha256(data).hexdigest() == entry['sha256'], entry['url']
         with ZipFile(io.BytesIO(data)) as jar:
