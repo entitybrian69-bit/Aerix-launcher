@@ -156,6 +156,13 @@ jobs:
           java -cp "$RUNNER_TEMP/aerix-memory-test" AdaptiveDistanceSmokeTest
           java -cp "$RUNNER_TEMP/aerix-memory-test" aerix.client.mod.ClientAdaptiveDistanceSmokeTest
 
+      - name: Live Minecraft authlib integration (temporary test identity)
+        if: contains(github.event.head_commit.message, '[auth-fixture]')
+        env:
+          AERIX_TEST_NAME: AxAuthTest482
+          AERIX_TEST_TOKEN: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        run: python3 tests/aerix_auth_server_integration.py
+
       - name: Get LTW
         uses: dawidd6/action-download-artifact@v6
         continue-on-error: true
