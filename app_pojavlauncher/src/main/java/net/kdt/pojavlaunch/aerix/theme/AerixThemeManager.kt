@@ -62,6 +62,7 @@ object AerixThemeManager {
         private set
 
     val wallpapers: List<AerixWallpaperPreset> = listOf(
+        AerixWallpaperPreset("aerix_twilight", "Aerix Twilight", "A cozy voxel village at dusk", "wallpapers/aerix_twilight.jpg", "Mint", AerixSurface.accentDefault),
         AerixWallpaperPreset("wp_01_lush_caves", "Lush Glowberry Cave", "Lush Caves • Complementary Shaders", "wallpapers/wp_01_lush_caves.webp", "Lush Teal", AerixSurface.accentDefault),
         AerixWallpaperPreset("wp_02_cherry_blossom", "Cherry Blossom Grove", "Cherry Grove • BSL Shaders", "wallpapers/wp_02_cherry_blossom.webp", "Sakura Pink", Color(0xFFF472B6)),
         AerixWallpaperPreset("wp_03_sunset_river", "Golden Sunset River", "River Valley • SEUS Renewed", "wallpapers/wp_03_sunset_river.webp", "Sunset Amber", Color(0xFFF59E0B)),
@@ -86,8 +87,7 @@ object AerixThemeManager {
         AerixWallpaperPreset("wp_22_amethyst_geode", "Amethyst Geode Lake", "Amethyst Geode • Crystal Shaders", "wallpapers/wp_22_amethyst_geode.webp", "Amethyst Bloom", Color(0xFFA855F7)),
         AerixWallpaperPreset("wp_23_bamboo_dawn", "Bamboo Sunrise", "Bamboo Jungle • Sunrise Shaders", "wallpapers/wp_23_bamboo_dawn.webp", "Bamboo Dawn", Color(0xFF84CC16)),
         AerixWallpaperPreset("wp_24_badlands_canyon", "Badlands Canyon River", "Badlands Mesa • Canyon Shaders", "wallpapers/wp_24_badlands_canyon.webp", "Terracotta Sunset", Color(0xFFF97316)),
-        AerixWallpaperPreset("wp_25_deep_dark", "Deep Dark Sculk City", "Deep Dark • Sculk Shaders", "wallpapers/wp_25_deep_dark.webp", "Sculk Abyss", Color(0xFF06B6D4)),
-        AerixWallpaperPreset("aerix_twilight", "Aerix Twilight", "A cozy voxel village at dusk", "wallpapers/aerix_twilight.jpg", "Mint", AerixSurface.accentDefault),
+        AerixWallpaperPreset("wp_25_deep_dark", "Deep Dark Sculk City", "Deep Dark • Sculk Shaders", "wallpapers/wp_25_deep_dark.webp", "Sculk Abyss", Color(0xFF06B6D4))
     )
 
     val selectedWallpaperId: String

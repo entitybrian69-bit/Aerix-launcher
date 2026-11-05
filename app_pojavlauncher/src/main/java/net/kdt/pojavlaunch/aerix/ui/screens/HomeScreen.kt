@@ -273,7 +273,7 @@ private fun ActionMenuCard(
     }
 
     Surface(
-        modifier = modifier.liquidGlass(shape = RoundedCornerShape(AerixRadii.card), strength = 0.75f),
+        modifier = modifier,
         shape = RoundedCornerShape(AerixRadii.card),
         color = AerixSurface.panel,
         border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft)

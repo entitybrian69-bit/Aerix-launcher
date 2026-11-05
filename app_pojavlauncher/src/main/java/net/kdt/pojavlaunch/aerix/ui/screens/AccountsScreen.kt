@@ -41,6 +41,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -282,62 +283,10 @@ fun AccountsScreen(activity: FragmentActivity) {
         return
     }
 
-    // Mirai AccountManageScreen + SkinLibraryPanel layout (Photo 6)
-    Surface(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(all = 12.dp)
-            .liquidGlass(shape = RoundedCornerShape(22.dp), strength = 0.7f),
-        shape = RoundedCornerShape(22.dp),
-        color = AerixSurface.panel,
-        border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(all = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            // 1. Top row of pill buttons: + Microsoft, + Offline, + Auth Server, and + Equip Cape (from internal storage)
-            FlowRow(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                MiraiTopAccountPill(
-                    text = "Microsoft",
-                    onClick = { AerixNav.navigate(LauncherSection.ADD_ACCOUNT) }
-                )
-                MiraiTopAccountPill(
-                    text = "Offline",
-                    onClick = { showOfflineDialog = true }
-                )
-                MiraiTopAccountPill(
-                    text = "Auth Server",
-                    onClick = { AerixNav.navigate(LauncherSection.ADD_ACCOUNT) }
-                )
-                MiraiTopAccountPill(
-                    text = "Equip Cape",
-                    highlighted = true,
-                    onClick = {
-                        val target = current ?: accounts.firstOrNull()
-                        if (target == null) {
-                            Toast.makeText(activity, "Add or select an account first", Toast.LENGTH_SHORT).show()
-                        } else {
-                            runCatching {
-                                capeFilePicker.launch(arrayOf("image/png", "image/*"))
-                            }.onFailure {
-                                Toast.makeText(activity, "Unable to open file picker", Toast.LENGTH_SHORT).show()
-                            }
-                        }
-                    }
-                )
-            }
-
-            // 2. Accounts list (Mirai AccountItem cards — Photo 6)
+    val accountList: @Composable () -> Unit = {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("SAVED ON THIS PHONE (${accounts.size})", color = AerixSurface.textSecondary,
+                style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
             if (accounts.isEmpty()) {
                 Surface(
                     modifier = Modifier
@@ -399,13 +348,63 @@ fun AccountsScreen(activity: FragmentActivity) {
                 }
             }
 
-            // 3. SkinLibraryPanel (Search skins from MC Skin... + 3-column skin grid — Photo 6)
-            MiraiSkinLibraryPanel(
-                activity = activity,
-                currentAccount = current ?: accounts.firstOrNull()
-            )
+            MiraiSkinLibraryPanel(activity = activity, currentAccount = current ?: accounts.firstOrNull())
         }
     }
+    val accountActions: @Composable () -> Unit = {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("ADD AN ACCOUNT", color = AerixSurface.textSecondary,
+                style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+            GlassAccountAction("Microsoft", "Official login and your Minecraft skin", R.drawable.aerix_ic_login) {
+                AerixNav.navigate(LauncherSection.ADD_ACCOUNT)
+            }
+            GlassAccountAction("Ely.by / Auth server", "Sign in with an authentication server", R.drawable.aerix_ic_public) {
+                AerixNav.navigate(LauncherSection.ADD_ACCOUNT)
+            }
+            GlassAccountAction("Offline", "Local account for single-player and offline servers", R.drawable.aerix_ic_person_outlined) {
+                showOfflineDialog = true
+            }
+            GlassAccountAction("Equip cape", "Choose a PNG cape from this device", R.drawable.aerix_ic_image_outlined) {
+                val target = current ?: accounts.firstOrNull()
+                if (target == null) Toast.makeText(activity, "Add or select an account first", Toast.LENGTH_SHORT).show()
+                else runCatching { capeFilePicker.launch(arrayOf("image/png", "image/*")) }
+                    .onFailure { Toast.makeText(activity, "Unable to open file picker", Toast.LENGTH_SHORT).show() }
+            }
+        }
+    }
+    BoxWithConstraints(Modifier.fillMaxSize().padding(12.dp)) {
+        val useColumns = maxWidth >= 620.dp && maxWidth > maxHeight
+        Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Accounts", style = MaterialTheme.typography.headlineSmall,
+                color = AerixSurface.textPrimary, fontWeight = FontWeight.Bold)
+            if (useColumns) {
+                Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Column(Modifier.weight(1.5f).fillMaxHeight().verticalScroll(rememberScrollState())) { accountList() }
+                    Column(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState())) { accountActions() }
+                }
+            } else {
+                Column(Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)) { accountActions(); accountList() }
+            }
+        }
+    }
+}
+
+@Composable
+private fun GlassAccountAction(title: String, summary: String, icon: Int, onClick: () -> Unit) {
+    Surface(onClick = onClick, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp),
+        color = AerixSurface.panel, border = BorderStroke(1.dp, AerixSurface.borderSoft)) {
+        Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Icon(painterResource(icon), null, Modifier.size(24.dp), tint = Color.White)
+            Column(Modifier.weight(1f)) {
+                Text(title, color = Color.White, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(summary, color = AerixSurface.textSecondary, style = MaterialTheme.typography.bodySmall)
+            }
+            Icon(painterResource(R.drawable.aerix_ic_chevron_right), null, Modifier.size(18.dp), tint = AerixSurface.textSecondary)
+        }
+    }
+
 }
 
 @Composable
@@ -663,7 +662,7 @@ private val defaultMcSkinEntries = listOf(
 )
 
 @Composable
-private fun MiraiSkinLibraryPanel(
+internal fun MiraiSkinLibraryPanel(
     activity: FragmentActivity,
     currentAccount: AerixAccount?
 ) {
