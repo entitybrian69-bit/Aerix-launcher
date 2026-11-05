@@ -587,7 +587,7 @@ private fun InstanceListPane(
     val shape = RoundedCornerShape(AerixRadii.card)
 
     Surface(
-        modifier = modifier,
+        modifier = modifier.liquidGlass(shape = shape, strength = 0.7f),
         shape = shape,
         color = AerixSurface.panel,
         border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft)
@@ -933,7 +933,7 @@ private fun VersionManagementDetailPane(
     val shape = RoundedCornerShape(AerixRadii.card)
 
     Surface(
-        modifier = modifier,
+        modifier = modifier.liquidGlass(shape = shape, strength = 0.7f),
         shape = shape,
         color = AerixSurface.panel,
         border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft)

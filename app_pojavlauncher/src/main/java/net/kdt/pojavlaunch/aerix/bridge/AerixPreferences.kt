@@ -82,7 +82,7 @@ object AerixPreferences {
     const val DEFAULT_CUSTOM_COLOR = 0xFF8DEFE0.toInt()
     const val DEFAULT_BACKGROUND_OPACITY = 60
     const val DEFAULT_ANIMATE_SPEED = 3
-    const val DEFAULT_WALLPAPER = "aerix_twilight"
+    const val DEFAULT_WALLPAPER = "wp_01_lush_caves"
     /** Mirai AllSettings.logBufferFlushInterval default. */
     const val DEFAULT_LOG_BUFFER_FLUSH_INTERVAL = 200
 

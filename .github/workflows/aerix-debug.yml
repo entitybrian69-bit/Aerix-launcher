@@ -45,26 +45,16 @@ env:
   APK_PATH: app_pojavlauncher/build/outputs/apk/noruntime/debug/app_pojavlauncher-noruntime-debug.apk
 
 jobs:
-  horizon:
-    uses: ./.github/workflows/horizon-native-check.yml
   build:
-    needs: horizon
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
-      AERIX_HORIZON_LIB_DIR: /tmp/aerix-horizon-direct
       CURSEFORGE_API_KEY: ${{ secrets.CURSEFORGE_API_KEY }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           submodules: recursive
-
-      - name: Download patched Rust game engines
-        uses: actions/download-artifact@v4
-        with:
-          pattern: horizon-direct-native-*
-          path: /tmp/aerix-horizon-direct
 
       - name: Set up JDK 21
         uses: actions/setup-java@v4
@@ -86,7 +76,16 @@ jobs:
           python3 tests/authlib_263_smoke.py
           python3 tests/font_styles_smoke.py
           python3 tests/glass_launcher_ui_smoke.py
-          python3 tests/horizon_integration_smoke.py
+          python3 tests/rust_removed_smoke.py
+          python3 tests/offline_username_smoke.py
+          python3 tests/aerix_cloud_skin_smoke.py
+          mkdir -p "$RUNNER_TEMP/aerix-kotlin"
+          (cd "$RUNNER_TEMP/aerix-kotlin" && npm pack kotlin-compiler@2.2.10 --silent && tar -xzf kotlin-compiler-2.2.10.tgz --strip-components=1)
+          "$RUNNER_TEMP/aerix-kotlin/bin/kotlinc" tests/skinserver_stubs/*.kt \
+            app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/bridge/AerixSkinServer.kt \
+            tests/AerixSkinServerOfflineTest.kt -classpath app_pojavlauncher/libs/gson-2.8.6.jar \
+            -d "$RUNNER_TEMP/aerix-skinserver-test.jar"
+          java -cp "$RUNNER_TEMP/aerix-skinserver-test.jar:app_pojavlauncher/libs/gson-2.8.6.jar:$RUNNER_TEMP/aerix-kotlin/lib/kotlin-stdlib.jar" AerixSkinServerOfflineTestKt
           mkdir -p "$RUNNER_TEMP/aerix-recorder-test"
           javac -d "$RUNNER_TEMP/aerix-recorder-test" \
             app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/recording/RecordingPaths.java \
@@ -194,7 +193,7 @@ jobs:
         run: |
           set -euo pipefail
           test -f "$APK_PATH"
-          python3 tests/horizon_apk_verify.py "$APK_PATH"
+          python3 tests/launcher_apk_verify.py "$APK_PATH"
           SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
           BT_DIR="$(ls -d "$SDK_ROOT"/build-tools/* | sort -V | tail -n 1)"
           echo "Using build-tools: $BT_DIR"

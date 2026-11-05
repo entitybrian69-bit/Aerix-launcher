@@ -53,20 +53,6 @@
         android:networkSecurityConfig="@xml/netconfig"
         android:enableOnBackInvokedCallback="false"
         tools:ignore="UnusedAttribute">
-        <!-- Horizon exits its own native process after a session; never let it terminate the launcher. -->
-        <activity android:name="dev.horizon.android.HorizonActivity"
-            android:process=":horizon" android:exported="false"
-            android:screenOrientation="sensorLandscape"
-            android:configChanges="orientation|screenSize|keyboardHidden|keyboard|density|screenLayout"
-            android:windowSoftInputMode="adjustResize" android:theme="@style/HorizonGameTheme">
-            <meta-data android:name="android.app.lib_name" android:value="horizon_android" />
-        </activity>
-        <provider android:name="dev.horizon.android.HorizonDocumentsProvider"
-            android:process=":horizon" android:authorities="${applicationId}.documents"
-            android:exported="true" android:grantUriPermissions="true"
-            android:permission="android.permission.MANAGE_DOCUMENTS">
-            <intent-filter><action android:name="android.content.action.DOCUMENTS_PROVIDER" /></intent-filter>
-        </provider>
         <activity
             android:name="net.kdt.pojavlaunch.MissingStorageActivity"
             android:exported="false"

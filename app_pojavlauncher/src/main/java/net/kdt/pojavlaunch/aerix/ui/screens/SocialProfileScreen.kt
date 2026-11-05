@@ -19,6 +19,7 @@
 package net.kdt.pojavlaunch.aerix.ui.screens
 
 import android.widget.Toast
+import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -77,6 +78,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.fragment.app.FragmentActivity
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 import net.kdt.pojavlaunch.R
 import net.kdt.pojavlaunch.aerix.bridge.PojavAccountBridge
@@ -710,6 +713,13 @@ private fun ProfileCharacter(modifier: Modifier, onClick: () -> Unit) {
 private fun ProfileCosmeticsPage(activity: FragmentActivity, onBack: () -> Unit) {
     val account = PojavAccountBridge.current
     val selectedClient = PojavInstanceBridge.selected?.isAerixClient == true
+    val scope = rememberCoroutineScope()
+    var cloudBusy by remember { mutableStateOf(false) }
+    var cloudAction by remember { mutableStateOf<String?>(null) }
+    var gameAccount by remember { mutableStateOf<SocialBackend.AerixGameAccount?>(null) }
+    var gameLoaded by remember { mutableStateOf(false) }
+    var gameError by remember { mutableStateOf<String?>(null) }
+    var gameDialog by remember { mutableStateOf<String?>(null) }
     var skinTarget by remember { mutableStateOf<net.kdt.pojavlaunch.aerix.bridge.AerixAccount?>(null) }
     var capeTarget by remember { mutableStateOf<net.kdt.pojavlaunch.aerix.bridge.AerixAccount?>(null) }
     val skinPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -722,13 +732,199 @@ private fun ProfileCosmeticsPage(activity: FragmentActivity, onBack: () -> Unit)
         capeTarget = null
         if (uri != null && target != null) PojavAccountBridge.equipCapeFromUri(activity, target, uri)
     }
-    LaunchedEffect(Unit) { AerixClientStore.init(activity) }
+    LaunchedEffect(Unit) {
+        AerixClientStore.init(activity)
+        if (SocialBackend.signedIn) SocialBackend.loadMyProfile()
+    }
+
+    LaunchedEffect(SocialBackend.signedIn, SocialBackend.myUserId()) {
+        gameAccount = null
+        gameLoaded = false
+        gameError = null
+        if (SocialBackend.signedIn) {
+            val owner = SocialBackend.myUserId()
+            SocialBackend.clearError()
+            val loaded = SocialBackend.loadGameAccount()
+            if (SocialBackend.myUserId() == owner) {
+                gameAccount = loaded
+                gameError = SocialBackend.lastError
+                gameLoaded = true
+            }
+        }
+    }
+
+    gameDialog?.let { action ->
+        val claiming = action == "claim"
+        AlertDialog(
+            onDismissRequest = { gameDialog = null },
+            title = { Text(if (claiming) "Claim ${account?.username}?" else "Share your game appearance?") },
+            text = { Text(if (claiming)
+                "This permanently links this offline name to your Aerix account. It cannot be renamed here. Existing accounts and worlds remain unchanged. Offline-mode identities can be impersonated and do not grant access to Microsoft-authenticated servers."
+                else "Anyone who knows your offline game UUID can look up your published skin and cape, and the image URLs include your Aerix user ID. Other players need a compatible client. Offline identities can be impersonated.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    gameDialog = null
+                    val owner = SocialBackend.myUserId() ?: return@TextButton
+                    val selected = account
+                    cloudBusy = true
+                    SocialBackend.clearError()
+                    scope.launch {
+                        val success = if (claiming && selected != null && PojavAccountBridge.current?.key == selected.key) {
+                            val claimed = SocialBackend.claimGameAccount(selected.username, owner)
+                            if (SocialBackend.myUserId() == owner) gameAccount = claimed
+                            claimed != null
+                        } else if (!claiming) {
+                            SocialBackend.setGameSharing(true, owner).also { ok ->
+                                if (ok && SocialBackend.myUserId() == owner) gameAccount = SocialBackend.loadGameAccount()
+                            }
+                        } else false
+                        cloudBusy = false
+                        if (!success) Toast.makeText(activity, SocialBackend.lastError ?: "Could not save; try again", Toast.LENGTH_LONG).show()
+                    }
+                }) { Text(if (claiming) "Claim permanently" else "Share") }
+            },
+            dismissButton = { TextButton(onClick = { gameDialog = null }) { Text("Cancel") } }
+        )
+    }
+
+    cloudAction?.let { action ->
+        val uploading = action.startsWith("upload-")
+        val kind = if (action.endsWith("cape")) SocialBackend.CloudTexture.CAPE else SocialBackend.CloudTexture.SKIN
+        val label = if (kind == SocialBackend.CloudTexture.SKIN) "skin" else "cape"
+        AlertDialog(
+            onDismissRequest = { cloudAction = null },
+            title = { Text(if (uploading) "Publish $label to Aerix?" else "Apply Aerix profile $label?") },
+            text = {
+                Text(if (uploading)
+                    "Your selected $label will be uploaded to public Aerix storage and used on your social profile. If game appearance sharing is enabled, compatible players can also see it."
+                else "This backs up and replaces the selected Minecraft account's local $label. The account and worlds are not changed.")
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    cloudAction = null
+                    val target = account ?: return@TextButton
+                    val owner = SocialBackend.myUserId()
+                    val slim = PojavAccountBridge.isSlimModelFor(activity, target.source)
+                    cloudBusy = true
+                    SocialBackend.clearError()
+                    scope.launch {
+                        if (uploading) {
+                            val bytes = withContext(Dispatchers.IO) {
+                                val file = if (kind == SocialBackend.CloudTexture.SKIN)
+                                    PojavAccountBridge.customSkinFile(target.source)
+                                else PojavAccountBridge.customCapeFile(target.source)
+                                if (!file.isFile || file.length() <= 0 || file.length() > 2 * 1024 * 1024) null
+                                else runCatching { file.readBytes() }.getOrNull()
+                            }
+                            val saved = bytes != null && owner != null &&
+                                SocialBackend.publishGameTexture(bytes, owner, kind, slim)
+                            cloudBusy = false
+                            Toast.makeText(activity, if (saved) "$label published to your Aerix profile"
+                                else SocialBackend.lastError ?: "Equip a valid custom $label first", Toast.LENGTH_LONG).show()
+                        } else {
+                            val appearance = SocialBackend.downloadOwnGameTexture(kind)
+                            if (appearance == null || owner == null || SocialBackend.myUserId() != owner ||
+                                PojavAccountBridge.current?.key != target.key) {
+                                cloudBusy = false
+                                Toast.makeText(activity, SocialBackend.lastError ?: "Account changed; try again", Toast.LENGTH_LONG).show()
+                            } else {
+                                val temp = withContext(Dispatchers.IO) {
+                                    runCatching {
+                                        java.io.File.createTempFile("aerix-cloud-$label-", ".png", activity.cacheDir)
+                                            .apply { writeBytes(appearance.bytes) }
+                                    }.getOrNull()
+                                }
+                                val backedUp = if (temp == null) false else withContext(Dispatchers.IO) {
+                                    runCatching {
+                                        val previous = if (kind == SocialBackend.CloudTexture.SKIN)
+                                            PojavAccountBridge.customSkinFile(target.source)
+                                        else PojavAccountBridge.customCapeFile(target.source)
+                                        if (previous.isFile) {
+                                            val dir = java.io.File(PojavAccountBridge.skinsDirectory(), "cloud-backups")
+                                            if (!dir.isDirectory && !dir.mkdirs()) throw java.io.IOException("Cannot create backup directory")
+                                            val backup = java.io.File(dir, "Before_Aerix_${label}_${java.util.UUID.randomUUID()}.png")
+                                            previous.copyTo(backup, overwrite = false)
+                                        }
+                                        true
+                                    }.getOrDefault(false)
+                                }
+                                if (temp == null || !backedUp || SocialBackend.myUserId() != owner ||
+                                    PojavAccountBridge.current?.key != target.key) {
+                                    temp?.delete()
+                                    cloudBusy = false
+                                    Toast.makeText(activity, "Could not safely restore; nothing was changed", Toast.LENGTH_LONG).show()
+                                } else if (kind == SocialBackend.CloudTexture.SKIN) {
+                                    PojavAccountBridge.equipSkinFromUri(activity, target, Uri.fromFile(temp)) { ok ->
+                                        if (ok && appearance.slim != null) PojavAccountBridge.setSlimModel(activity, target, appearance.slim)
+                                        temp.delete()
+                                        cloudBusy = false
+                                    }
+                                } else {
+                                    PojavAccountBridge.equipCapeFromUri(activity, target, Uri.fromFile(temp)) {
+                                        temp.delete()
+                                        cloudBusy = false
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }) { Text(if (uploading) "Publish" else "Apply") }
+            },
+            dismissButton = { TextButton(onClick = { cloudAction = null }) { Text("Cancel") } }
+        )
+    }
 
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(AerixSpacing.lg),
         verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
     ) {
         SocialPageBar(title = "Skin & Cape", onBack = onBack)
+        SocialPanel(Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Aerix game account", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = AerixSurface.textPrimary)
+                if (!SocialBackend.signedIn) {
+                    Text("Sign in to Aerix to link an offline game name.", fontSize = 11.sp, color = AerixSurface.textSecondary)
+                } else if (!gameLoaded) {
+                    Text("Loading game account…", fontSize = 11.sp, color = AerixSurface.textSecondary)
+                } else if (gameError != null) {
+                    Text("Could not load game account: $gameError. Reopen this page to retry.", fontSize = 11.sp, color = AerixSurface.textSecondary)
+                } else if (gameAccount == null) {
+                    Text("Select or create an offline account in Accounts, then claim its name here. The name is permanent.", fontSize = 11.sp, color = AerixSurface.textSecondary)
+                    SocialButton("Claim selected offline name", filled = false,
+                        enabled = account?.authType == net.kdt.pojavlaunch.authenticator.AuthType.LOCAL && !cloudBusy) { gameDialog = "claim" }
+                } else {
+                    val identity = gameAccount!!
+                    Text("Name: ${identity.name}  •  ${if (identity.sharing) "Appearance shared" else "Appearance private"}",
+                        fontSize = 11.sp, color = AerixSurface.textSecondary)
+                    SocialButton("Use this game name on this device", filled = false, enabled = !cloudBusy) {
+                        val existing = PojavAccountBridge.accounts.firstOrNull {
+                            it.authType == net.kdt.pojavlaunch.authenticator.AuthType.LOCAL && it.username == identity.name
+                        }
+                        if (existing != null) PojavAccountBridge.select(existing)
+                        else PojavAccountBridge.createOfflineAccount(identity.name)
+                        Toast.makeText(activity, "Selecting ${identity.name}. Restore your profile skin and cape below.", Toast.LENGTH_LONG).show()
+                    }
+                    SocialButton(if (identity.sharing) "Stop sharing game appearance" else "Share game appearance",
+                        filled = false, enabled = !cloudBusy) {
+                        if (!identity.sharing) gameDialog = "share"
+                        else {
+                            val owner = SocialBackend.myUserId()
+                            if (owner != null) {
+                                cloudBusy = true
+                                scope.launch {
+                                    val ok = SocialBackend.setGameSharing(false, owner)
+                                    if (ok && SocialBackend.myUserId() == owner) gameAccount = SocialBackend.loadGameAccount()
+                                    cloudBusy = false
+                                    if (!ok) Toast.makeText(activity, SocialBackend.lastError ?: "Could not stop sharing", Toast.LENGTH_LONG).show()
+                                }
+                            }
+                        }
+                    }
+                    Text("Offline names can be impersonated. Microsoft-authenticated servers still require a Microsoft account.",
+                        fontSize = 11.sp, color = AerixSurface.textSecondary)
+                }
+            }
+        }
         if (account == null) {
             SocialPanel(Modifier.fillMaxWidth()) {
                 Text("Select a Minecraft account to change your skin and cape.",
@@ -745,6 +941,13 @@ private fun ProfileCosmeticsPage(activity: FragmentActivity, onBack: () -> Unit)
                     runCatching { skinPicker.launch(arrayOf("image/png")) }
                         .onFailure { skinTarget = null; Toast.makeText(activity, "Unable to open file picker", Toast.LENGTH_SHORT).show() }
                 }
+                Text("Aerix account: publish this skin to your profile or restore it on this device. " +
+                    "Published images are public. Skins published here include your Wide or Slim choice.",
+                    fontSize = 11.sp, color = AerixSurface.textSecondary)
+                SocialButton(if (cloudBusy) "Working…" else "Publish current skin", filled = false,
+                    enabled = SocialBackend.signedIn && !cloudBusy) { cloudAction = "upload-skin" }
+                SocialButton("Apply profile skin", filled = false,
+                    enabled = SocialBackend.signedIn && !cloudBusy) { cloudAction = "download-skin" }
             }
         }
         SocialPanel(Modifier.fillMaxWidth()) {
@@ -760,7 +963,54 @@ private fun ProfileCosmeticsPage(activity: FragmentActivity, onBack: () -> Unit)
                     runCatching { capePicker.launch(arrayOf("image/png")) }
                         .onFailure { capeTarget = null; Toast.makeText(activity, "Unable to open file picker", Toast.LENGTH_SHORT).show() }
                 }
+                Text("Publish or restore your imported cape with your Aerix account. Save or restore the animated Client cape choice separately below.",
+                    fontSize = 11.sp, color = AerixSurface.textSecondary)
+                SocialButton(if (cloudBusy) "Working…" else "Publish imported cape", filled = false,
+                    enabled = SocialBackend.signedIn && !cloudBusy) { cloudAction = "upload-cape" }
+                SocialButton("Apply profile cape", filled = false,
+                    enabled = SocialBackend.signedIn && !cloudBusy) { cloudAction = "download-cape" }
                 Text("Aerix Client capes", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = AerixSurface.textPrimary)
+                Text("Save or restore your animated Client cape choice separately from the imported cape image.",
+                    fontSize = 11.sp, color = AerixSurface.textSecondary)
+                SocialButton("Save Client cape to Aerix", filled = false,
+                    enabled = SocialBackend.signedIn && gameAccount != null && !cloudBusy) {
+                    val owner = SocialBackend.myUserId()
+                    if (owner != null) {
+                        val capeId = AerixClientCosmetics.effectiveCapeSpec().id
+                        cloudBusy = true
+                        SocialBackend.clearError()
+                        scope.launch {
+                            val saved = SocialBackend.saveClientCape(capeId, owner)
+                            cloudBusy = false
+                            Toast.makeText(activity, if (saved) "Client cape saved" else SocialBackend.lastError ?: "Unable to save Client cape", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }
+                SocialButton("Restore Client cape", filled = false,
+                    enabled = SocialBackend.signedIn && gameAccount != null && !cloudBusy) {
+                    val owner = SocialBackend.myUserId()
+                    if (owner != null) {
+                        cloudBusy = true
+                        SocialBackend.clearError()
+                        scope.launch {
+                            val id = SocialBackend.loadClientCape(owner)
+                            val cape = AerixClientCosmetics.capes.firstOrNull { it.id == id }
+                            if (SocialBackend.myUserId() == owner && cape != null && AerixClientCosmetics.canEquipCape(cape)) {
+                                AerixClientStore.equippedCapeId = cape.id
+                                AerixClientStore.persist()
+                                net.kdt.pojavlaunch.PojavApplication.sExecutorService.execute {
+                                    synchronized(AerixClientCosmetics) {
+                                        AerixClientCosmetics.syncCapeAssetsToAllClientInstances(activity.applicationContext)
+                                    }
+                                }
+                                Toast.makeText(activity, "Client cape restored", Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast.makeText(activity, SocialBackend.lastError ?: "No available Client cape saved", Toast.LENGTH_LONG).show()
+                            }
+                            cloudBusy = false
+                        }
+                    }
+                }
                 AerixClientCosmetics.capes.chunked(2).forEach { row ->
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         row.forEach { cape ->

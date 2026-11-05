@@ -23,10 +23,3 @@
  }
 # Option screens
  -keep class net.kdt.pojavlaunch.prefs.screens** {*;}
-
-
-
-# JNI calls this by name from the patched Rust game engine.
--keepclassmembers class dev.horizon.android.HorizonActivity {
-    public void aerixStatus(java.lang.String);
-}

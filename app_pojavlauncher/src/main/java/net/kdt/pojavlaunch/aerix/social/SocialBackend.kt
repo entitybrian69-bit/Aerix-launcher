@@ -4012,7 +4012,7 @@ object SocialBackend {
         return saved != null
     }
 
-    suspend fun uploadImage(folder: String, bytes: ByteArray, extension: String = "png"): String? =
+    suspend fun uploadImage(folder: String, bytes: ByteArray, extension: String = "png", expectedUserId: String? = null): String? =
         withContext(Dispatchers.IO) {
             lastError = null
             ensureToken()
@@ -4020,6 +4020,10 @@ object SocialBackend {
             val token = accessToken
             if (me == null || token == null) {
                 if (lastError == null) lastError = "Sign in first"
+                return@withContext null
+            }
+            if (expectedUserId != null && (me != expectedUserId || ownerHeaders(expectedUserId)?.get("Authorization") != "Bearer $token")) {
+                lastError = "Your Aerix account changed; try again."
                 return@withContext null
             }
             val path = "$me/${folder}-${System.currentTimeMillis()}.$extension"
@@ -4054,6 +4058,185 @@ object SocialBackend {
                 null
             }
         }
+
+    private fun ownerHeaders(expectedOwner: String): Map<String, String>? {
+        val token = accessToken ?: return null
+        val subject = runCatching {
+            val part = token.split('.')[1]
+            val decoded = android.util.Base64.decode(part + "=".repeat((4 - part.length % 4) % 4), android.util.Base64.URL_SAFE)
+            (JsonParser.parseString(String(decoded, Charsets.UTF_8)) as JsonObject).stringOrNull("sub")
+        }.getOrNull()
+        if (userId != expectedOwner || subject != expectedOwner) {
+            lastError = "Your Aerix account changed; try again."
+            return null
+        }
+        return mapOf("Authorization" to "Bearer $token")
+    }
+
+    data class AerixGameAccount(val name: String, val offlineUuid: String, val slim: Boolean, val sharing: Boolean)
+
+    private fun parseGameAccount(json: JsonElement?): AerixGameAccount? {
+        val row = json?.takeIf { it.isJsonArray }?.asJsonArray?.firstOrNull()?.asJsonObject ?: return null
+        val name = row.stringOrNull("game_name") ?: return null
+        val uuid = row.stringOrNull("offline_uuid") ?: return null
+        return AerixGameAccount(name, uuid, row.get("slim")?.asBoolean == true, row.get("sharing")?.asBoolean == true)
+    }
+
+    suspend fun loadGameAccount(): AerixGameAccount? = attempt {
+        ensureToken()
+        if (!signedIn || userId == null) return@attempt null
+        val owner = userId ?: return@attempt null
+        val headers = ownerHeaders(owner) ?: return@attempt null
+        val result = parseGameAccount(call("POST", "$PROJECT_URL/rest/v1/rpc/aerix_my_game_account", "{}", extraHeaders = headers))
+        if (userId == owner) result else null
+    }
+
+    suspend fun claimGameAccount(name: String, expectedOwner: String): AerixGameAccount? = attempt {
+        ensureToken()
+        if (!signedIn || userId != expectedOwner) {
+            lastError = "Your Aerix account changed; try again."
+            return@attempt null
+        }
+        val headers = ownerHeaders(expectedOwner) ?: return@attempt null
+        val body = JsonObject().apply { addProperty("p_name", name) }
+        parseGameAccount(call("POST", "$PROJECT_URL/rest/v1/rpc/aerix_claim_game_name", body.toString(), extraHeaders = headers))
+    }
+
+    suspend fun setGameSharing(enabled: Boolean, expectedOwner: String): Boolean = attempt {
+        ensureToken()
+        if (!signedIn || userId != expectedOwner) {
+            lastError = "Your Aerix account changed; try again."
+            return@attempt false
+        }
+        val headers = ownerHeaders(expectedOwner) ?: return@attempt false
+        val body = JsonObject().apply { addProperty("p_enabled", enabled) }
+        call("POST", "$PROJECT_URL/rest/v1/rpc/aerix_set_game_sharing", body.toString(), extraHeaders = headers)?.asBoolean == true
+    } ?: false
+
+    suspend fun saveClientCape(capeId: String, expectedOwner: String): Boolean = attempt {
+        ensureToken()
+        val headers = ownerHeaders(expectedOwner) ?: return@attempt false
+        val body = JsonObject().apply { addProperty("p_cape_id", capeId) }
+        call("POST", "$PROJECT_URL/rest/v1/rpc/aerix_set_client_cape", body.toString(), extraHeaders = headers)?.asBoolean == true
+    } ?: false
+
+    suspend fun loadClientCape(expectedOwner: String): String? = attempt {
+        ensureToken()
+        val headers = ownerHeaders(expectedOwner) ?: return@attempt null
+        val result = call("POST", "$PROJECT_URL/rest/v1/rpc/aerix_get_client_cape", "{}", extraHeaders = headers)
+        if (userId != expectedOwner || result == null || result.isJsonNull) null else result.asString
+    }
+
+    enum class CloudTexture { SKIN, CAPE }
+    data class CloudAppearance(val bytes: ByteArray, val slim: Boolean?)
+
+    /** Publishes a texture only after the user has explicitly confirmed sharing it. */
+    suspend fun publishGameTexture(bytes: ByteArray, expectedOwner: String, kind: CloudTexture, slim: Boolean): Boolean {
+        if (!validGameTexturePng(bytes, kind)) {
+            lastError = "Choose a valid Minecraft PNG ${kind.name.lowercase()} first."
+            return false
+        }
+        val owner = myUserId()
+        if (!signedIn || owner == null || owner != expectedOwner) {
+            lastError = "Your Aerix account changed; sign in and try again."
+            return false
+        }
+        val folder = when (kind) {
+            CloudTexture.SKIN -> if (slim) "game-skin-slim" else "game-skin-wide"
+            CloudTexture.CAPE -> "game-cape"
+        }
+        val url = uploadImage(folder, bytes, "png", expectedUserId = expectedOwner) ?: return false
+        val saved = attempt {
+            ensureToken()
+            if (userId != owner) {
+                lastError = "Your Aerix account changed; try again."
+                return@attempt false
+            }
+            val headers = ownerHeaders(owner) ?: return@attempt false
+            val body = JsonObject().apply {
+                addProperty("p_kind", if (kind == CloudTexture.SKIN) "skin" else "cape")
+                addProperty("p_url", url)
+                addProperty("p_slim", slim)
+            }
+            val saved = call("POST", "$PROJECT_URL/rest/v1/rpc/aerix_publish_game_texture", body.toString(), extraHeaders = headers)?.asBoolean == true
+            if (!saved && lastError == null) lastError = "Could not update your Aerix profile."
+            saved
+        } ?: false
+        if (saved) loadMyProfile()
+        return saved
+    }
+
+    /** Reads only the signed-in user's own appearance from our public storage bucket. */
+    suspend fun downloadOwnGameTexture(kind: CloudTexture): CloudAppearance? = withContext(Dispatchers.IO) {
+        lastError = null
+        ensureToken()
+        val owner = userId
+        if (!signedIn || owner == null) {
+            lastError = "Sign in to your Aerix account first."
+            return@withContext null
+        }
+        val profile = loadMyProfile()
+        if (userId != owner) {
+            lastError = "Your Aerix account changed; try again."
+            return@withContext null
+        }
+        val url = if (kind == CloudTexture.SKIN) profile?.skinUrl else profile?.capeUrl
+        if (url.isNullOrBlank()) {
+            lastError = "There is no ${kind.name.lowercase()} on your Aerix profile yet."
+            return@withContext null
+        }
+        val allowed = "$PROJECT_URL/storage/v1/object/public/social-media/$owner/"
+        if (!url.startsWith(allowed) || url.substring(allowed.length).contains('/') ||
+            url.contains('?') || url.contains('#') || url.contains('%')) {
+            lastError = "The profile image is not stored in your Aerix account."
+            return@withContext null
+        }
+        try {
+            val request = Request.Builder().url(url).get().build()
+            val client = SocialRealtime.restClient.newBuilder().followRedirects(false).followSslRedirects(false).build()
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) throw java.io.IOException("Download failed (HTTP ${response.code})")
+                val body = response.body ?: throw java.io.IOException("Empty image download")
+                if (body.contentLength() > 2 * 1024 * 1024) throw java.io.IOException("Image is too large")
+                val buffer = ByteArray(8192)
+                val out = ByteArrayOutputStream()
+                body.byteStream().use { stream ->
+                    while (true) {
+                        val count = stream.read(buffer)
+                        if (count < 0) break
+                        if (out.size() + count > 2 * 1024 * 1024) throw java.io.IOException("Image is too large")
+                        out.write(buffer, 0, count)
+                    }
+                }
+                val bytes = out.toByteArray()
+                if (!validGameTexturePng(bytes, kind)) throw java.io.IOException("Invalid Minecraft PNG")
+                if (userId != owner) throw java.io.IOException("Your Aerix account changed; try again")
+                val filename = url.substring(allowed.length)
+                val slim = when {
+                    kind != CloudTexture.SKIN -> null
+                    filename.startsWith("game-skin-slim-") -> true
+                    filename.startsWith("game-skin-wide-") -> false
+                    else -> null // Older social uploads did not record the model.
+                }
+                CloudAppearance(bytes, slim)
+            }
+        } catch (error: Exception) {
+            lastError = error.message ?: "Unable to download your image"
+            null
+        }
+    }
+
+    private fun validGameTexturePng(bytes: ByteArray, kind: CloudTexture): Boolean {
+        if (bytes.size !in 8..(2 * 1024 * 1024)) return false
+        val png = byteArrayOf(0x89.toByte(), 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)
+        if (!bytes.copyOfRange(0, png.size).contentEquals(png)) return false
+        val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
+        val w = options.outWidth
+        val h = options.outHeight
+        if (w !in 1..1024 || h !in 1..1024) return false
+        return kind == CloudTexture.CAPE || (w >= 32 && (h == w || h * 2 == w))
+    }
 
     private fun writeOwnStorageJson(fileName: String, jsonContent: String): Boolean {
         val me = userId ?: return false

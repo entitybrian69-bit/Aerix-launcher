@@ -1,0 +1,11 @@
+# Aerix game accounts and appearance
+
+Sign in to Aerix Social, select an offline Minecraft account in Accounts, then open your profile's Skin & Cape page. Claim the selected name to link it to your Aerix account. The name is permanent for that social account. Names are unique within Aerix, ignoring case. This does not alter or delete existing local accounts or worlds.
+
+On another device, sign in to the same Aerix account and use **Use this game name on this device**. Publish or restore the skin, imported cape, and (separately) animated Aerix Client cape using the buttons on that page. Skin publication also records the Wide/Slim model. Old social uploads without model information retain the device's current model. Restoring a skin or imported cape backs up the replaced custom PNG under the skins directory's `cloud-backups` folder. Aerix Client's selected animated cape remains separate from the imported cape.
+
+Images published here are public in Supabase storage. Sharing the game appearance is separately opt-in and can be turned off; public texture URLs contain the social account's user ID. Sharing only exposes the chosen game name, offline UUID, model, and published image URLs to lookup by UUID, not social profile details. Turning sharing off cannot revoke images or profiles other clients have already cached or downloaded. Publicly uploaded images remain publicly accessible by URL unless removed from storage.
+
+Compatible Aerix clients using an offline account can look up explicitly shared appearances. This depends on the Minecraft version, server and authlib behavior; other launchers and unmodified clients will not necessarily show them, and remote animated cape motion is not provided by this lookup. The game account is an offline-mode identity: offline servers do not authenticate it, so names can be impersonated. It cannot substitute for a Microsoft account with Minecraft ownership on authenticated servers. Microsoft accounts and third-party authentication servers keep their own authentication paths.
+
+The database setup is in `supabase/aerix-game-accounts.sql`. It adds a separate RLS-protected table and narrowly scoped functions; it does not make the existing social profiles publicly readable. Backend security and isolated bridge tests do not replace a real Android, Minecraft-version or multiplayer-server test.
