@@ -3,6 +3,7 @@ package net.kdt.pojavlaunch.authenticator;
 import com.google.gson.annotations.SerializedName;
 
 import net.kdt.pojavlaunch.authenticator.impl.ElyByBackgroundLogin;
+import net.kdt.pojavlaunch.authenticator.impl.AerixBackgroundLogin;
 import net.kdt.pojavlaunch.authenticator.impl.MicrosoftBackgroundLogin;
 
 import net.kdt.pojavlaunch.R;
@@ -21,6 +22,13 @@ public enum AuthType {
             R.drawable.ic_auth_elyby,
             "ely.by",
             "http://skinsystem.ely.by/skins/%s.png"
+    ),
+    @SerializedName("aerix")
+    AERIX(
+            AerixBackgroundLogin.CREATOR,
+            R.drawable.aerix_ic_person_outlined,
+            "https://lktupxfszfefsoyksfkg.supabase.co/functions/v1/aerix-auth",
+            null
     ),
     @SerializedName("local")
     LOCAL(null, 0, null, null);

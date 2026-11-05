@@ -81,7 +81,44 @@ object PojavLaunchBridge {
             ?: runtimes.maxByOrNull { it.majorVersion }!!
     }
 
+    @Volatile private var aerixRefreshPending = false
+
     private fun fire(activity: Activity) {
+        val account = net.kdt.pojavlaunch.authenticator.accounts.Accounts.getCurrent()
+        if (account?.authType != net.kdt.pojavlaunch.authenticator.AuthType.AERIX) {
+            fireAfterAuth(activity)
+            return
+        }
+        if (!SocialBackend.signedIn || account.aerixOwnerId != SocialBackend.myUserId()) {
+            Toast.makeText(activity, "Sign in to the Aerix account linked to this player first", Toast.LENGTH_LONG).show()
+            return
+        }
+        if (account.expiresAt > System.currentTimeMillis() + 60_000) {
+            fireAfterAuth(activity)
+            return
+        }
+        if (aerixRefreshPending) return
+        aerixRefreshPending = true
+        account.authType.createAuth().refreshAccount(object : net.kdt.pojavlaunch.authenticator.listener.LoginListener {
+            override fun onLoginDone(refreshed: net.kdt.pojavlaunch.authenticator.accounts.Account) {
+                aerixRefreshPending = false
+                val current = net.kdt.pojavlaunch.authenticator.accounts.Accounts.getCurrent()
+                if (current?.mSaveLocation?.name == refreshed.mSaveLocation?.name &&
+                    SocialBackend.myUserId() == refreshed.aerixOwnerId) {
+                    PojavAccountBridge.reload()
+                    fireAfterAuth(activity)
+                } else Toast.makeText(activity, "Account changed; select it and try again", Toast.LENGTH_LONG).show()
+            }
+            override fun onLoginError(error: Throwable) {
+                aerixRefreshPending = false
+                Tools.showError(activity, error)
+            }
+            override fun onLoginProgress(step: Int) {}
+            override fun setMaxLoginProgress(max: Int) {}
+        }, account)
+    }
+
+    private fun fireAfterAuth(activity: Activity) {
         try {
             val runtimes = runCatching { MultiRTUtils.getRuntimes() }.getOrDefault(emptyList())
             if (runtimes.isEmpty()) {

@@ -62,6 +62,10 @@ jobs:
           distribution: temurin
           java-version: "21"
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
       - name: Verify Client smoke tests
         run: |
           python3 tests/branding_identity_smoke.py
@@ -79,6 +83,8 @@ jobs:
           python3 tests/rust_removed_smoke.py
           python3 tests/offline_username_smoke.py
           python3 tests/aerix_cloud_skin_smoke.py
+          python3 tests/game_auth_token_logging_smoke.py
+          node --experimental-strip-types tests/aerix_auth_edge_test.mjs
           mkdir -p "$RUNNER_TEMP/aerix-kotlin"
           (cd "$RUNNER_TEMP/aerix-kotlin" && npm pack kotlin-compiler@2.2.10 --silent && tar -xzf kotlin-compiler-2.2.10.tgz --strip-components=1)
           "$RUNNER_TEMP/aerix-kotlin/bin/kotlinc" tests/skinserver_stubs/*.kt \
@@ -215,6 +221,7 @@ jobs:
           retention-days: 30
 
       - name: Publish debug APK to GitHub Release (debug-latest)
+        if: ${{ !contains(github.event.head_commit.message, '[auth-check]') }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION_CODE: ${{ steps.verify.outputs.version_code }}

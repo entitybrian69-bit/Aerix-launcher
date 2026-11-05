@@ -720,6 +720,7 @@ private fun ProfileCosmeticsPage(activity: FragmentActivity, onBack: () -> Unit)
     var gameLoaded by remember { mutableStateOf(false) }
     var gameError by remember { mutableStateOf<String?>(null) }
     var gameDialog by remember { mutableStateOf<String?>(null) }
+    var gameNameDraft by remember { mutableStateOf("") }
     var skinTarget by remember { mutableStateOf<net.kdt.pojavlaunch.aerix.bridge.AerixAccount?>(null) }
     var capeTarget by remember { mutableStateOf<net.kdt.pojavlaunch.aerix.bridge.AerixAccount?>(null) }
     val skinPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -757,20 +758,23 @@ private fun ProfileCosmeticsPage(activity: FragmentActivity, onBack: () -> Unit)
         val claiming = action == "claim"
         AlertDialog(
             onDismissRequest = { gameDialog = null },
-            title = { Text(if (claiming) "Claim ${account?.username}?" else "Share your game appearance?") },
-            text = { Text(if (claiming)
-                "This permanently links this offline name to your Aerix account. It cannot be renamed here. Existing accounts and worlds remain unchanged. Offline-mode identities can be impersonated and do not grant access to Microsoft-authenticated servers."
-                else "Anyone who knows your offline game UUID can look up your published skin and cape, and the image URLs include your Aerix user ID. Other players need a compatible client. Offline identities can be impersonated.") },
+            title = { Text(if (claiming) "Choose your Aerix game name" else "Share your game appearance?") },
+            text = {
+                if (claiming) Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Your game name and UUID are public and the name is permanent. You can use an existing offline name to keep its offline UUID. Aerix servers verify your account; Microsoft servers still require Microsoft ownership.")
+                    SocialGlassInput(value = gameNameDraft, onValueChange = { gameNameDraft = it.take(16) }, label = "Game name", supporting = "3–16 ASCII letters, numbers, or underscores")
+                } else Text("Anyone who knows your game UUID can look up your published skin and cape, and the image URLs include your Aerix user ID. Other players need a compatible client.")
+            },
             confirmButton = {
-                TextButton(onClick = {
+                TextButton(enabled = !claiming || gameNameDraft.matches(Regex("^[A-Za-z0-9_]{3,16}$")), onClick = {
                     gameDialog = null
                     val owner = SocialBackend.myUserId() ?: return@TextButton
-                    val selected = account
+                    val chosenName = gameNameDraft
                     cloudBusy = true
                     SocialBackend.clearError()
                     scope.launch {
-                        val success = if (claiming && selected != null && PojavAccountBridge.current?.key == selected.key) {
-                            val claimed = SocialBackend.claimGameAccount(selected.username, owner)
+                        val success = if (claiming) {
+                            val claimed = SocialBackend.claimGameAccount(chosenName, owner)
                             if (SocialBackend.myUserId() == owner) gameAccount = claimed
                             claimed != null
                         } else if (!claiming) {
@@ -889,20 +893,17 @@ private fun ProfileCosmeticsPage(activity: FragmentActivity, onBack: () -> Unit)
                 } else if (gameError != null) {
                     Text("Could not load game account: $gameError. Reopen this page to retry.", fontSize = 11.sp, color = AerixSurface.textSecondary)
                 } else if (gameAccount == null) {
-                    Text("Select or create an offline account in Accounts, then claim its name here. The name is permanent.", fontSize = 11.sp, color = AerixSurface.textSecondary)
-                    SocialButton("Claim selected offline name", filled = false,
-                        enabled = account?.authType == net.kdt.pojavlaunch.authenticator.AuthType.LOCAL && !cloudBusy) { gameDialog = "claim" }
+                    Text("Choose a permanent game name, then sign in as an Aerix-authenticated account.", fontSize = 11.sp, color = AerixSurface.textSecondary)
+                    SocialButton("Choose Aerix game name", filled = false, enabled = !cloudBusy) {
+                        gameNameDraft = account?.username.orEmpty().take(16)
+                        gameDialog = "claim"
+                    }
                 } else {
                     val identity = gameAccount!!
                     Text("Name: ${identity.name}  •  ${if (identity.sharing) "Appearance shared" else "Appearance private"}",
                         fontSize = 11.sp, color = AerixSurface.textSecondary)
-                    SocialButton("Use this game name on this device", filled = false, enabled = !cloudBusy) {
-                        val existing = PojavAccountBridge.accounts.firstOrNull {
-                            it.authType == net.kdt.pojavlaunch.authenticator.AuthType.LOCAL && it.username == identity.name
-                        }
-                        if (existing != null) PojavAccountBridge.select(existing)
-                        else PojavAccountBridge.createOfflineAccount(identity.name)
-                        Toast.makeText(activity, "Selecting ${identity.name}. Restore your profile skin and cape below.", Toast.LENGTH_LONG).show()
+                    SocialButton("Sign in with Aerix", filled = false, enabled = !cloudBusy) {
+                        net.kdt.pojavlaunch.authenticator.AuthType.AERIX.createAuth().createAccount(PojavAccountBridge, "")
                     }
                     SocialButton(if (identity.sharing) "Stop sharing game appearance" else "Share game appearance",
                         filled = false, enabled = !cloudBusy) {
@@ -920,7 +921,7 @@ private fun ProfileCosmeticsPage(activity: FragmentActivity, onBack: () -> Unit)
                             }
                         }
                     }
-                    Text("Offline names can be impersonated. Microsoft-authenticated servers still require a Microsoft account.",
+                    Text("Works on servers configured for Aerix authentication. Microsoft-authenticated servers still require a Microsoft account.",
                         fontSize = 11.sp, color = AerixSurface.textSecondary)
                 }
             }

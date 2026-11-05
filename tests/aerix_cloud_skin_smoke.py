@@ -18,7 +18,7 @@ assert 'public Aerix storage' in ui and 'cloudAction?.let' in ui
 assert 'PojavAccountBridge.equipSkinFromUri' in ui and 'PojavAccountBridge.equipCapeFromUri' in ui
 assert 'SocialBackend.myUserId() != owner' in ui and 'PojavAccountBridge.current?.key != target.key' in ui
 assert 'PojavAccountBridge.setSlimModel' in ui and 'previous.copyTo(backup, overwrite = false)' in ui
-assert 'Offline names can be impersonated' in ui and 'Claim permanently' in ui
+assert 'servers configured for Aerix authentication' in ui and 'Claim permanently' in ui
 assert 'sharing boolean not null default false' in schema
 assert 'revoke all on public.aerix_game_accounts from public, anon, authenticated' in schema
 assert 'lower(game_name)' in schema and 'a.owner_id = auth.uid()' in schema

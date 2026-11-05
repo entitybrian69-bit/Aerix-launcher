@@ -234,6 +234,13 @@ public class GameRunner {
 
     public static void launchGame(final AppCompatActivity activity, Account account,
                                   Instance instance, String versionId, File[] classpath, GameRenderer gameRenderer) throws Throwable {
+        if(account.authType == net.kdt.pojavlaunch.authenticator.AuthType.AERIX &&
+                (account.aerixOwnerId == null ||
+                 !account.aerixOwnerId.equals(net.kdt.pojavlaunch.aerix.social.SocialBackend.myUserId()) ||
+                 account.expiresAt <= System.currentTimeMillis() ||
+                 account.accessToken == null || !account.accessToken.matches("[0-9a-f]{64}"))) {
+            throw new java.io.IOException("Sign in to your Aerix account and renew the game session before launching");
+        }
         int freeDeviceMemory = Tools.getFreeDeviceMemory(activity);
         int localeString;
         int freeAddressSpace = Architecture.is32BitsDevice() ? Tools.getMaxContinuousAddressSpaceSize() : -1;
@@ -437,7 +444,7 @@ public class GameRunner {
                 (InstanceMemory.overrideMb(instance.jvmArgs) > 0 ? " (instance override)" : " (launcher default)") + "\n");
         activity.runOnUiThread(() -> Toast.makeText(activity, activity.getString(R.string.autoram_info_msg, launchMemoryMb), Toast.LENGTH_SHORT).show());
 
-        Log.i("GameRunner", "Running with "+ launchArgs.toString());
+        Log.i("GameRunner", "Starting Minecraft");
 
         String mainClass = versionInfo.mainClass;
 

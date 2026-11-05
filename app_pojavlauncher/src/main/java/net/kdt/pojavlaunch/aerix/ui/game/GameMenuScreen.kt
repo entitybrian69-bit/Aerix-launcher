@@ -838,6 +838,7 @@ private fun AuthIcon(authType: AuthType?, accent: Color) {
 private fun authLabel(authType: AuthType?): String = when (authType) {
     AuthType.MICROSOFT -> stringResource(R.string.aerix_accounts_type_microsoft)
     AuthType.ELY_BY -> stringResource(R.string.aerix_accounts_type_elyby)
+    AuthType.AERIX -> "Aerix Auth"
     AuthType.LOCAL -> stringResource(R.string.aerix_accounts_type_local)
     null -> stringResource(R.string.aerix_ingame_menu_no_account)
 }

@@ -1032,6 +1032,11 @@ object SocialBackend {
 
     @JvmStatic
     fun signOut() {
+        val owner = userId
+        val headers = owner?.let { ownerHeaders(it) }
+        if (headers != null) bgScope.launch {
+            callRaw("POST", "$PROJECT_URL/rest/v1/rpc/aerix_revoke_game_sessions", "{}", extraHeaders = headers)
+        }
         SocialRealtime.disconnect()
         accessToken = null
         refreshToken = null
@@ -4125,6 +4130,23 @@ object SocialBackend {
         val headers = ownerHeaders(expectedOwner) ?: return@attempt null
         val result = call("POST", "$PROJECT_URL/rest/v1/rpc/aerix_get_client_cape", "{}", extraHeaders = headers)
         if (userId != expectedOwner || result == null || result.isJsonNull) null else result.asString
+    }
+
+    data class GameSession(val name: String, val profileId: String, val token: String, val expiresAt: Long)
+
+    suspend fun issueGameSession(expectedOwner: String): GameSession? = attempt {
+        ensureToken()
+        val headers = ownerHeaders(expectedOwner) ?: return@attempt null
+        val result = call("POST", "$PROJECT_URL/rest/v1/rpc/aerix_issue_game_session", "{}", extraHeaders = headers)
+        if (userId != expectedOwner) return@attempt null
+        val row = result?.takeIf { it.isJsonArray }?.asJsonArray?.firstOrNull()?.asJsonObject ?: return@attempt null
+        val name = row.stringOrNull("game_name") ?: return@attempt null
+        val uuid = row.stringOrNull("profile_id") ?: return@attempt null
+        val token = row.stringOrNull("access_token") ?: return@attempt null
+        val expires = row.longOr("expires_at_ms", 0L)
+        if (!name.matches(Regex("^[A-Za-z0-9_]{3,16}$")) || !token.matches(Regex("^[0-9a-f]{64}$")) ||
+            expires <= System.currentTimeMillis() || runCatching { java.util.UUID.fromString(uuid) }.isFailure) return@attempt null
+        GameSession(name, uuid, token, expires)
     }
 
     enum class CloudTexture { SKIN, CAPE }

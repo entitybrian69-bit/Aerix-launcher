@@ -315,6 +315,17 @@ fun AccountsScreen(activity: FragmentActivity) {
                     onClick = { AerixNav.navigate(LauncherSection.ADD_ACCOUNT) }
                 )
                 MiraiTopAccountPill(
+                    text = "Aerix",
+                    onClick = {
+                        if (net.kdt.pojavlaunch.aerix.social.SocialBackend.signedIn) {
+                            AuthType.AERIX.createAuth().createAccount(PojavAccountBridge, "")
+                        } else {
+                            Toast.makeText(activity, "Sign in to Aerix Social and choose a game name first", Toast.LENGTH_LONG).show()
+                            AerixNav.navigate(LauncherSection.SOCIALS)
+                        }
+                    }
+                )
+                MiraiTopAccountPill(
                     text = "Offline",
                     onClick = { showOfflineDialog = true }
                 )
@@ -462,6 +473,7 @@ private fun MiraiAccountItemRow(
     val typeLabel = when (account.authType) {
         AuthType.MICROSOFT -> "Microsoft"
         AuthType.ELY_BY -> "Auth Server"
+        AuthType.AERIX -> "Aerix Auth"
         AuthType.LOCAL -> "Offline"
     }
     Surface(
@@ -1849,6 +1861,7 @@ private fun SkinPresetGridCard(
 private fun authTypeDisplayLabel(authType: AuthType): String = when (authType) {
     AuthType.MICROSOFT -> "Microsoft Account"
     AuthType.ELY_BY -> "Ely.by Account"
+    AuthType.AERIX -> "Aerix Account"
     AuthType.LOCAL -> "Local / Offline Account"
 }
 
@@ -1866,6 +1879,7 @@ private fun AccountCard(
     val typeLabel = when (account.authType) {
         AuthType.MICROSOFT -> stringResource(R.string.aerix_accounts_type_microsoft)
         AuthType.ELY_BY -> stringResource(R.string.aerix_accounts_type_elyby)
+        AuthType.AERIX -> "Aerix Auth"
         AuthType.LOCAL -> stringResource(R.string.aerix_accounts_type_local)
     }
     Column(
