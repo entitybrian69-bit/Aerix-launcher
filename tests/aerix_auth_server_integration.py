@@ -21,7 +21,13 @@ try:
         subprocess.run(['javac', '-d', str(temp), str(ROOT / 'tests/AerixAuthlibIntegration.java')], check=True, timeout=45)
         agent = ROOT / 'app_pojavlauncher/src/main/assets/components/authlib-injector/authlib-injector.jar'
         endpoint = 'https://lktupxfszfefsoyksfkg.supabase.co/functions/v1/aerix-auth'
-        subprocess.run(['java', f'-javaagent:{agent}={endpoint}', '-cp', f'{temp}:{temp}/*', 'AerixAuthlibIntegration'], check=True, timeout=90)
+        run = subprocess.run(['java', f'-javaagent:{agent}={endpoint}', '-cp', f'{temp}:{temp}/*', 'AerixAuthlibIntegration'], text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=90)
+        output = run.stdout.replace(os.getenv('AERIX_TEST_TOKEN', 'a'*64), '[test-token]')
+        print(output)
+        if run.returncode:
+            for line in output.splitlines()[-25:]:
+                print('::error title=Authlib integration detail::' + line.replace('%', '%25'), flush=True)
+            raise RuntimeError('Authlib integration failed')
 except Exception as e:
     print('::error title=Live Minecraft authlib integration::' + str(e).replace('\n', ' '), flush=True)
     raise

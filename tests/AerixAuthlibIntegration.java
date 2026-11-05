@@ -1,5 +1,6 @@
 import java.lang.reflect.*;
-import java.net.*;
+import java.net.Proxy;
+import java.net.InetAddress;
 import java.util.*;
 
 /** Calls the actual Minecraft authlib session API through the bundled injector. */
