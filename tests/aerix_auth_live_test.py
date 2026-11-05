@@ -13,12 +13,15 @@ def request(path, body=None):
     except HTTPError as e:
         return e.code, e.read()
 status, data = request('/')
-assert status == 200, (status, data[:200])
+if status != 200:
+    raise SystemExit(f'::error title=Aerix auth metadata::HTTP {status}: {data[:200].decode(errors="replace")}')
 metadata = json.loads(data)
 assert metadata['signaturePublickey'].startswith('-----BEGIN PUBLIC KEY-----')
 assert 'lktupxfszfefsoyksfkg.supabase.co' in metadata['skinDomains']
 status, _ = request('/sessionserver/session/minecraft/join', {'accessToken':'x','selectedProfile':'0'*32,'serverId':'123'})
-assert status == 403, status
+if status != 403:
+    raise SystemExit(f'::error title=Aerix invalid join::HTTP {status}')
 status, _ = request('/sessionserver/session/minecraft/hasJoined?username=invalid&serverId=123')
-assert status == 204, status
+if status != 204:
+    raise SystemExit(f'::error title=Aerix unknown session::HTTP {status}')
 print('Live auth metadata and invalid-session checks passed')
