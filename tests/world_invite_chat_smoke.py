@@ -5,9 +5,12 @@ menu = (root / 'aerix/ui/game/GameMenuScreen.kt').read_text()
 world = (root / 'aerix/ui/game/GameWorldSharingScreen.kt').read_text()
 social = (root / 'aerix/ui/game/GameSocialsScreen.kt').read_text()
 chat = (root / 'aerix/ui/screens/SocialChatViews.kt').read_text()
+client = (root / 'aerix/client/AerixClientOverlayView.kt').read_text()
 clipboard = (root / 'game/platform/clipboard/AndroidClipboard.java').read_text()
 platform = (root / 'game/platform/Platform.java').read_text()
 assert 'choosingInviteRecipient = true' in menu and 'page = GameMenuPage.SOCIALS' in menu
+assert 'onOpenChats = { choosingInviteRecipient = true; onChangeSubPage(ClientMenuSubPage.SOCIALS) }' in client
+assert '"Friend Chats"' in client and 'chooseInviteRecipient = choosingInviteRecipient' in client
 assert 'Copy address & open chats' in world and 'ClipData.newPlainText("Minecraft world address", value)' in world
 assert 'onOpenChats()' in world and 'Direct Connection' in world
 assert 'if (offset < size) return null' in world and 'discardLine = true' in world

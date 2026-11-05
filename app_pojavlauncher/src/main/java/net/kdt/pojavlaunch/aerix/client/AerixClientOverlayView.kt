@@ -155,7 +155,8 @@ private enum class ClientMenuSubPage {
     KEY_PROFILES,
     TRANSFER,
     GALLERY,
-    WORLD_SHARING
+    WORLD_SHARING,
+    SOCIALS
 }
 
 private enum class FeatureIconKind {
@@ -805,6 +806,7 @@ private fun FamousClientRectangleMenu(
     worldSharingTarget: net.kdt.pojavlaunch.aerix.bridge.GameDownloadTarget
 ) {
     val context = LocalContext.current
+    var choosingInviteRecipient by remember { mutableStateOf(false) }
 
     Box(
         modifier = Modifier
@@ -895,6 +897,7 @@ private fun FamousClientRectangleMenu(
                             ClientMenuSubPage.TRANSFER -> "AERIX CLIENT  ·  IMPORT / EXPORT"
                             ClientMenuSubPage.GALLERY -> "AERIX CLIENT  ·  SCREENSHOTS"
                             ClientMenuSubPage.WORLD_SHARING -> "AERIX CLIENT  ·  WORLD SHARING"
+                            ClientMenuSubPage.SOCIALS -> "AERIX CLIENT  ·  CHATS"
                         },
                         color = Color.White,
                         fontSize = 15.sp,
@@ -978,6 +981,7 @@ private fun FamousClientRectangleMenu(
                         onOpenTransfer = { onChangeSubPage(ClientMenuSubPage.TRANSFER) },
                         onOpenGallery = { onChangeSubPage(ClientMenuSubPage.GALLERY) },
                         onOpenWorldSharing = { onChangeSubPage(ClientMenuSubPage.WORLD_SHARING) },
+                        onOpenSocials = { choosingInviteRecipient = false; onChangeSubPage(ClientMenuSubPage.SOCIALS) },
                         onOpenRecorder = {
                             var candidate: Context? = context
                             while (candidate is ContextWrapper && candidate !is net.kdt.pojavlaunch.game.GameActivity) candidate = candidate.baseContext
@@ -1006,7 +1010,13 @@ private fun FamousClientRectangleMenu(
                         target = worldSharingTarget,
                         accent = LiquidCrystalPalette.CrimsonPrimary,
                         onBack = { onChangeSubPage(ClientMenuSubPage.GRID) },
-                        onResumeGame = onClose
+                        onResumeGame = onClose,
+                        onOpenChats = { choosingInviteRecipient = true; onChangeSubPage(ClientMenuSubPage.SOCIALS) }
+                    )
+                    ClientMenuSubPage.SOCIALS -> net.kdt.pojavlaunch.aerix.ui.game.GameSocialsScreen(
+                        accent = LiquidCrystalPalette.CrimsonPrimary,
+                        onBack = { onChangeSubPage(ClientMenuSubPage.GRID) },
+                        chooseInviteRecipient = choosingInviteRecipient
                     )
                 }
             }
@@ -1032,6 +1042,7 @@ private fun ClientSquaresGridPage(
     onOpenTransfer: () -> Unit,
     onOpenGallery: () -> Unit,
     onOpenWorldSharing: () -> Unit,
+    onOpenSocials: () -> Unit,
     onOpenRecorder: () -> Unit,
     onOpenOledAfk: () -> Unit,
     onSyncOptionsTxt: () -> Unit
@@ -1042,6 +1053,8 @@ private fun ClientSquaresGridPage(
             { if (net.kdt.pojavlaunch.recording.RecordingState.isActive()) "RECORDING" else "OPEN ›" }, onOpenRecorder),
         ClientSquareModule("world_sharing", "World Sharing", FeatureIconKind.COMPASS,
             { false }, { "OPEN ›" }, onOpenWorldSharing),
+        ClientSquareModule("socials", "Friend Chats", FeatureIconKind.AUTOGG,
+            { false }, { "OPEN ›" }, onOpenSocials),
         ClientSquareModule("gallery", "Screenshots", FeatureIconKind.HOTBAR,
             { false }, { "GALLERY ›" }, onOpenGallery),
         ClientSquareModule("transfer", "Import / Export", FeatureIconKind.HOTBAR,
