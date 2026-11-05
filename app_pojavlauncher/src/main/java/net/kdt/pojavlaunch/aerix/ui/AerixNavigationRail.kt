@@ -105,6 +105,7 @@ enum class LauncherSection {
     INSTANCE_EDITOR,
     ADD_ACCOUNT,
     OFFLINE_ACCOUNT,
+    AERIX_ACCOUNT,
     /** One team member's page, opened from Contribution. */
     CONTRIBUTION_DETAIL
 }

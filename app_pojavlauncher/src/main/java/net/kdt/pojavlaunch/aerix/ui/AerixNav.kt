@@ -48,6 +48,7 @@ object AerixNav {
         LauncherSection.INSTANCE_EDITOR,
         LauncherSection.ADD_ACCOUNT,
         LauncherSection.OFFLINE_ACCOUNT,
+        LauncherSection.AERIX_ACCOUNT,
         LauncherSection.FILES,
         LauncherSection.LOGS,
         LauncherSection.CONTRIBUTION_DETAIL

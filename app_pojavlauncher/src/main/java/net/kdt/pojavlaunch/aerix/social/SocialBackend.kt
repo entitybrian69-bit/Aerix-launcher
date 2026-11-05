@@ -68,9 +68,6 @@ object SocialBackend {
     const val PROJECT_URL = "https://lktupxfszfefsoyksfkg.supabase.co"
     const val PUBLISHABLE_KEY = "sb_publishable_mA8stbSVwAg4Il3xgHDH5g_9a7WwojI"
 
-    /** Set once the Google Web client ID exists; until then the Google button explains itself. */
-    const val GOOGLE_WEB_CLIENT_ID = ""
-
     /** The scheme the browser comes back on after a Google sign-in (see the manifest). */
     const val OAUTH_REDIRECT = "aerix-social://auth"
 
@@ -1126,10 +1123,23 @@ object SocialBackend {
         return false
     }
 
+    /** Browser OAuth uses PKCE: intercepted custom-scheme codes cannot be redeemed without this verifier. */
     @JvmStatic
-    fun beginGoogleSignIn(context: Context): Boolean {
+    @JvmOverloads
+    fun beginGoogleSignIn(context: Context, openGameSetup: Boolean = false): Boolean {
+        val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val random = ByteArray(32).also { java.security.SecureRandom().nextBytes(it) }
+        val flags = android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP or android.util.Base64.NO_PADDING
+        val verifier = android.util.Base64.encodeToString(random, flags)
+        val challenge = android.util.Base64.encodeToString(
+            java.security.MessageDigest.getInstance("SHA-256").digest(verifier.toByteArray(Charsets.US_ASCII)), flags)
+        if (!prefs.edit().putString("oauth_pkce_verifier", verifier)
+                .putLong("oauth_pkce_started", System.currentTimeMillis())
+                .putBoolean("oauth_open_game_setup", openGameSetup).commit()) return false
         val url = "$PROJECT_URL/auth/v1/authorize?provider=google" +
             "&redirect_to=" + URLEncoder.encode(OAUTH_REDIRECT, "UTF-8") +
+            "&code_challenge=" + URLEncoder.encode(challenge, "UTF-8") +
+            "&code_challenge_method=s256" +
             "&apikey=" + URLEncoder.encode(PUBLISHABLE_KEY, "UTF-8")
         return try {
             val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, Uri.parse(url))
@@ -1137,37 +1147,52 @@ object SocialBackend {
             context.startActivity(intent)
             true
         } catch (error: Throwable) {
+            prefs.edit().remove("oauth_pkce_verifier").remove("oauth_pkce_started").remove("oauth_open_game_setup").apply()
             Log.w(TAG, "Could not open the Google sign-in page", error)
             false
         }
     }
 
+    fun interface BrowserSignInCallback { fun onComplete(success: Boolean) }
+
+    /** Accept only an outstanding PKCE callback, exchange it off the main thread, then update the UI. */
     @JvmStatic
-    fun completeBrowserSession(redirect: String?): Boolean {
-        if (redirect.isNullOrBlank()) return false
-        val fragment = redirect.substringAfter('#', "")
-        if (fragment.isEmpty()) return false
-        val values = fragment.split('&').mapNotNull { pair ->
-            val index = pair.indexOf('=')
-            if (index <= 0) null
-            else pair.substring(0, index) to Uri.decode(pair.substring(index + 1))
-        }.toMap()
-        val token = values["access_token"] ?: return false
-        val refresh = values["refresh_token"] ?: return false
-        accessToken = token
-        refreshToken = refresh
-        expiresAtMs = System.currentTimeMillis() + ((values["expires_in"]?.toLongOrNull() ?: 3600L) * 1000) - 60_000
-        applyJwtClaims(token)
-        signedIn = true
-        onboardingDismissedForSession = false
-        appContext?.getSharedPreferences(PREFS, Context.MODE_PRIVATE)?.edit()
-            ?.putString("refresh_token", refresh)
-            ?.putString("user_id", userId)
-            ?.putString("email", email)
-            ?.apply()
-        loadLocalCollections()
-        ensureRealtimeConnectedAsync()
-        appContext?.let { SocialMessagingService.ensureRunningIfSignedIn(it) }
+    fun completeBrowserSession(redirect: String?, callback: BrowserSignInCallback): Boolean {
+        val uri = runCatching { Uri.parse(redirect ?: return false) }.getOrNull() ?: return false
+        if (uri.scheme != "aerix-social" || uri.host != "auth" || !uri.path.isNullOrEmpty()) return false
+        val code = uri.getQueryParameter("code")?.takeIf { it.isNotBlank() && it.length <= 2048 } ?: return false
+        val prefs = appContext?.getSharedPreferences(PREFS, Context.MODE_PRIVATE) ?: return false
+        val verifier = prefs.getString("oauth_pkce_verifier", null) ?: return false
+        val age = System.currentTimeMillis() - prefs.getLong("oauth_pkce_started", 0L)
+        val openGameSetup = prefs.getBoolean("oauth_open_game_setup", false)
+        prefs.edit().remove("oauth_pkce_verifier").remove("oauth_pkce_started").remove("oauth_open_game_setup").commit()
+        if (age !in 0..600_000L) return false
+        bgScope.launch {
+            val json = attempt {
+                val body = JsonObject().apply { addProperty("auth_code", code); addProperty("code_verifier", verifier) }
+                asObject(call("POST", "$PROJECT_URL/auth/v1/token?grant_type=pkce", body.toString(), authenticated = false))
+            }
+            val ok = json != null && !json.stringOrNull("access_token").isNullOrBlank() &&
+                !json.stringOrNull("refresh_token").isNullOrBlank() &&
+                !asObject(json.get("user"))?.stringOrNull("id").isNullOrBlank()
+            if (ok && json != null) {
+                // Do not keep identity claims from a previously signed-in user.
+                userId = null
+                email = null
+                storeSession(json)
+                onboardingDismissedForSession = false
+                loadLocalCollections()
+                loadProfile()
+                ensureRealtimeConnectedAsync()
+            }
+            withContext(Dispatchers.Main) {
+                if (ok && openGameSetup) {
+                    net.kdt.pojavlaunch.aerix.ui.AerixNav.init()
+                    net.kdt.pojavlaunch.aerix.ui.AerixNav.navigate(net.kdt.pojavlaunch.aerix.ui.LauncherSection.AERIX_ACCOUNT)
+                }
+                callback.onComplete(ok)
+            }
+        }
         return true
     }
 

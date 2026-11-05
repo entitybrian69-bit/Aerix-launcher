@@ -160,7 +160,8 @@ private class HomeActions(
     val downloads: () -> Unit,
     val fileManager: () -> Unit,
     val logs: () -> Unit,
-    val accounts: () -> Unit
+    val accounts: () -> Unit,
+    val aerixAccount: () -> Unit
 )
 
 @Composable
@@ -201,7 +202,8 @@ fun HomeScreen(activity: FragmentActivity, navigate: (LauncherSection) -> Unit) 
         downloads = { navigate(LauncherSection.DISCOVER) },
         fileManager = { navigate(LauncherSection.FILES) },
         logs = { navigate(LauncherSection.LOGS) },
-        accounts = { navigate(LauncherSection.ACCOUNTS) }
+        accounts = { navigate(LauncherSection.ACCOUNTS) },
+        aerixAccount = { AerixNav.navigate(LauncherSection.AERIX_ACCOUNT) }
     )
 
     // Mirai LauncherScreen: content dashboard on the left (weight 7.4f) and the docked 3D skin
@@ -525,6 +527,7 @@ private fun WideHomeDashboard(
             }
         }
         QuickTiles(count, accent, actions, Modifier.fillMaxWidth().height(78.dp), scrollable = false)
+        AerixAccountHomeCard(accent, actions.aerixAccount)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -570,6 +573,31 @@ private fun CompactHomeDashboard(
         item { TaskSummaryPanel(taskCount, accent, Modifier.fillMaxWidth().height(74.dp)) }
         item { RecentWorldsPanel(recent, selected, accent, actions, Modifier.fillMaxWidth(), lazy = false) }
         item { QuickToolsPanel(accent, actions, Modifier.fillMaxWidth(), scrollable = false) }
+        item { AerixAccountHomeCard(accent, actions.aerixAccount) }
+    }
+}
+
+@Composable
+private fun AerixAccountHomeCard(accent: Color, onClick: () -> Unit) {
+    val signedIn = net.kdt.pojavlaunch.aerix.social.SocialBackend.signedIn
+    Surface(
+        modifier = Modifier.fillMaxWidth().clickable(role = Role.Button, onClick = onClick),
+        shape = RoundedCornerShape(AerixRadii.card),
+        color = AerixSurface.panelRaised,
+        border = BorderStroke(AerixSpacing.hairline, accent.copy(alpha = 0.5f))
+    ) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Icon(painterResource(R.drawable.aerix_ic_person_outlined), contentDescription = null,
+                tint = accent, modifier = Modifier.size(22.dp))
+            Column(Modifier.weight(1f)) {
+                Text(if (signedIn) "Aerix account" else "Sign in to Aerix account",
+                    color = AerixSurface.textPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                Text("Minecraft name, skin & cape", color = AerixSurface.textSecondary, fontSize = 10.sp)
+            }
+            Text("›", color = accent, fontSize = 22.sp)
+        }
     }
 }
 

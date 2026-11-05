@@ -1,8 +1,8 @@
 # Aerix game authentication
 
-Aerix-authenticated game accounts use your Aerix Social account. In the launcher,
-sign in to Social, open your profile's **Skin & Cape** page and choose a permanent
-game name. Then tap **Sign in with Aerix** (or choose Aerix in Accounts). The
+Aerix-authenticated game accounts use your Aerix Social account. On the home
+dashboard tap **Sign in to Aerix account**, continue with Google (or choose email),
+and choose a permanent game name on the account page. Then tap **Sign in with Aerix** (or choose Aerix in Accounts). The
 same Social account and game name can be used on another device. Existing
 Microsoft, Ely.by and offline accounts are not removed. Names are unique within
 Aerix, ignoring case, and the name and game UUID are public.

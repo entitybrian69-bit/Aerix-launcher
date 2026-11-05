@@ -710,7 +710,7 @@ private fun ProfileCharacter(modifier: Modifier, onClick: () -> Unit) {
 }
 
 @Composable
-private fun ProfileCosmeticsPage(activity: FragmentActivity, onBack: () -> Unit) {
+internal fun ProfileCosmeticsPage(activity: FragmentActivity, setupFlow: Boolean = false, onBack: () -> Unit) {
     val account = PojavAccountBridge.current
     val selectedClient = PojavInstanceBridge.selected?.isAerixClient == true
     val scope = rememberCoroutineScope()
@@ -776,6 +776,9 @@ private fun ProfileCosmeticsPage(activity: FragmentActivity, onBack: () -> Unit)
                         val success = if (claiming) {
                             val claimed = SocialBackend.claimGameAccount(chosenName, owner)
                             if (SocialBackend.myUserId() == owner) gameAccount = claimed
+                            if (claimed != null && setupFlow && SocialBackend.myUserId() == owner) {
+                                net.kdt.pojavlaunch.authenticator.AuthType.AERIX.createAuth().createAccount(PojavAccountBridge, "")
+                            }
                             claimed != null
                         } else if (!claiming) {
                             SocialBackend.setGameSharing(true, owner).also { ok ->
@@ -882,7 +885,8 @@ private fun ProfileCosmeticsPage(activity: FragmentActivity, onBack: () -> Unit)
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(AerixSpacing.lg),
         verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
     ) {
-        SocialPageBar(title = "Skin & Cape", onBack = onBack)
+        SocialPageBar(title = if (setupFlow) "Aerix account" else "Skin & Cape", onBack = onBack)
+        if (setupFlow) Text("Choose a game name, sign in for Minecraft, then select and publish your skin and cape. Enable appearance sharing to show them on compatible servers.", fontSize = 11.sp, color = AerixSurface.textSecondary)
         SocialPanel(Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Aerix game account", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = AerixSurface.textPrimary)

@@ -81,6 +81,7 @@ import net.kdt.pojavlaunch.aerix.theme.AerixSurface
 import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
 import net.kdt.pojavlaunch.aerix.ui.screens.AboutScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.AccountsScreen
+import net.kdt.pojavlaunch.aerix.ui.screens.AerixAccountSetupScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.AddAccountScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.AerixContribution
 import net.kdt.pojavlaunch.aerix.ui.screens.ContributionDetailScreen
@@ -225,6 +226,7 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
                                 }
                             }
                             LauncherSection.ACCOUNTS -> AccountsScreen(activity)
+                            LauncherSection.AERIX_ACCOUNT -> AerixAccountSetupScreen(activity) { AerixNav.back() }
                             LauncherSection.ABOUT -> AboutScreen(activity)
                             LauncherSection.CREATE_INSTANCE -> CreateInstanceScreen(activity) {
                                 AerixNav.finishTo(LauncherSection.LIBRARY)
