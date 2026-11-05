@@ -202,7 +202,9 @@ jobs:
           if [ "$code" -ne 0 ]; then
             grep -E "^e: |error: |CMake Error|CMake Generate step failed|FAILURE: |What went wrong|Caused by" -A5 build.log | sort -u | head -40 |
               while read -r l; do echo "::error title=gradle::$(printf '%s' "$l" | head -c 500)"; done
-            tail -20 build.log | while read -r l; do echo "::error title=tail::$(printf '%s' "$l" | head -c 500)"; done
+            grep -iE '(^e:|\.kt:[0-9]+|compilation error|unresolved reference|cannot infer|conflicting|type mismatch)' build.log | head -30 |
+              while IFS= read -r l; do echo "::error title=compiler::$(printf '%s' "$l" | head -c 500)"; done
+            tail -80 build.log | while IFS= read -r l; do echo "::error title=tail::$(printf '%s' "$l" | head -c 500)"; done
           fi
           exit "$code"
 
