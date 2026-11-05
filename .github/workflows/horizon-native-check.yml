@@ -1,0 +1,62 @@
+name: Horizon direct-game native build (development)
+
+# Builds and checks the proposed patched engine only. This workflow does not
+# publish an APK or replace the engine currently packaged by Aerix.
+on:
+  push:
+    branches: [ "arena/**" ]
+    paths:
+      - 'horizon/patches/**'
+      - '.github/workflows/horizon-native-check.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - abi: arm64-v8a
+            target: aarch64-linux-android
+          - abi: armeabi-v7a
+            target: armv7-linux-androideabi
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: Checkout Aerix
+        uses: actions/checkout@v4
+      - name: Checkout pinned upstream Horizon Android
+        uses: actions/checkout@v4
+        with:
+          repository: Vasysik/horizon-android
+          ref: 80700a6f26afe53a368032d8b28bd364f7c3e7e4
+          fetch-depth: 1
+          path: horizon-source
+      - name: Apply proposed direct-game changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C horizon-source rev-parse HEAD)" = 80700a6f26afe53a368032d8b28bd364f7c3e7e4
+          git -C horizon-source apply --check "$GITHUB_WORKSPACE/horizon/patches/direct-game.patch"
+          git -C horizon-source apply "$GITHUB_WORKSPACE/horizon/patches/direct-game.patch"
+      - uses: dtolnay/rust-toolchain@1.95.0
+        with:
+          targets: ${{ matrix.target }}
+      - name: Compile patched native engine
+        shell: bash
+        working-directory: horizon-source
+        run: |
+          set -euo pipefail
+          python3 tools/android_build.py --public --rust-only --profile fast --abi '${{ matrix.abi }}'
+          NDK=$(find "$ANDROID_HOME/ndk" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)
+          mkdir -p "$RUNNER_TEMP/${{ matrix.abi }}"
+          cp "target/${{ matrix.target }}/fast/libhorizon_android.so" "$RUNNER_TEMP/${{ matrix.abi }}/"
+          "$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip" --strip-unneeded "$RUNNER_TEMP/${{ matrix.abi }}/libhorizon_android.so"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: horizon-direct-native-${{ matrix.abi }}
+          path: ${{ runner.temp }}/${{ matrix.abi }}/libhorizon_android.so
+          retention-days: 3

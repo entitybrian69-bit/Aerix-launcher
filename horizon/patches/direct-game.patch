@@ -1,0 +1,125 @@
+--- a/crates/horizon-client/src/android/launcher.rs
++++ b/crates/horizon-client/src/android/launcher.rs
+@@ -29,6 +29,7 @@
+ 
+ pub(super) struct Launcher {
+     home: PathBuf,
++    aerix_started: bool,
+     controller_edges: horizon_client::gamepad::Edges,
+     controller_repeat: Option<(horizon_client::gamepad::Button, Instant, bool)>,
+     window: Option<Arc<Window>>,
+@@ -85,6 +86,7 @@
+         crate::device_runtime::configure(catalog.config.device);
+         Self {
+             home,
++            aerix_started: false,
+             controller_edges: Default::default(),
+             controller_repeat: None,
+             window: None,
+@@ -132,31 +134,8 @@
+         self.prepared_session = None;
+         horizon_client::discord_presence::stop();
+         horizon_client::ui_theme::reset_atlas();
+-        self.cursor = (0.0, 0.0);
+-        self.drag = None;
+-        self.chooser = None;
+-        self.exit_confirmation = false;
+-        self.focus = None;
+-        self.pending_focus = None;
+-        if let Err(error) = std::env::set_current_dir(&self.home) {
+-            self.fail(error);
+-            return;
+-        }
+-        horizon_client::android_runtime::clear_gamepads();
+-        self.controller_edges = Default::default();
+-        self.controller_repeat = None;
+-        self.catalog.config.input_host = horizon_client::android_runtime::input_mode();
+-        self.catalog.refresh(&self.home);
+-        self.login.refresh_status();
+-        crate::diagnostics::heartbeat("returned_to_launcher", || serde_json::json!({}));
+-        self.catalog.page = Page::Play;
+-        if let Ok(message) = std::fs::read_to_string(self.home.join("android-error.txt")) {
+-            self.error = Some(message);
+-        }
+-        if let Err(error) = self.open(events) {
+-            self.fail(error);
+-            events.exit();
+-        }
++        // Return to Aerix after the game, rather than showing Horizon's launcher.
++        events.exit();
+     }
+     pub(super) fn configure_screen(&self) {
+         crate::native_ime::configure_screen(
+@@ -169,6 +148,7 @@
+     }
+     fn fail(&mut self, error: impl std::fmt::Display) {
+         log::error!("{error}");
++        crate::platform::aerix_status(&format!("error:{error}"));
+         crate::diagnostics::record_error(&error.to_string());
+         self.error = Some(error.to_string());
+         let _ = std::fs::write(self.home.join("android-error.txt"), error.to_string());
+@@ -369,6 +349,7 @@
+             horizon_client::ui_theme::reset_atlas();
+             self.game = Some(game);
+             self.game.as_mut().unwrap().resumed(events);
++            crate::platform::aerix_status("");
+         } else {
+             if !self.home.join("engine-data.zip").is_file() {
+                 return Err(
+@@ -408,7 +389,11 @@
+         }
+         if let Err(error) = self.open(events) {
+             self.fail(error);
+-            events.exit();
++            return;
++        }
++        if !self.aerix_started {
++            self.aerix_started = true;
++            if let Err(error) = self.action(events) { self.fail(error); }
+         }
+     }
+     fn suspended(&mut self, events: &ActiveEventLoop) {
+@@ -569,15 +554,18 @@
+             crate::display::set_scale(crate::display::RenderScale::default());
+             self.fail(error);
+         }
++        if self.worker.is_some() {
++            let progress = *self.install.lock().unwrap();
++            let label = if progress.total > 0 {
++                format!("{}  ·  {} / {}", progress.stage.label(), progress.done, progress.total)
++            } else { progress.stage.label().to_string() };
++            crate::platform::aerix_status(&label);
++        }
+         if let Some(result) = self.worker.as_ref().and_then(|w| w.try_recv().ok()) {
+             self.worker = None;
+-            if let Err(error) = result {
+-                let message = error.to_string();
+-                if message.contains("Dns Failed") || message.contains("lookup address") {
+-                    self.fail("Minecraft download interrupted: DNS could not resolve the download host. Check your connection, VPN or Private DNS, then retry Download. Completed files are kept.");
+-                } else {
+-                    self.fail(error);
+-                }
++            match result {
++                Ok(()) => if let Err(error) = self.action(events) { self.fail(error); },
++                Err(error) => self.fail(format!("Installation failed: {error}. Close and try again; verified downloads are retained.")),
+             }
+         }
+         for out in crate::platform::poll() {
+--- a/crates/horizon-client/src/android/platform.rs
++++ b/crates/horizon-client/src/android/platform.rs
+@@ -220,6 +220,15 @@
+         }
+     })
+ }
++/// Report native installation state to the Aerix Activity; empty means the game is ready.
++pub fn aerix_status(message: &str) {
++    let _ = with_context(|env, activity| {
++        let message = JObject::from(env.new_string(message)?);
++        env.call_method(activity, "aerixStatus", "(Ljava/lang/String;)V", &[JValue::Object(&message)])?;
++        Ok(())
++    });
++}
++
+ pub fn clipboard_get() -> Option<String> {
+     with_context(|env, activity| {
+         let name = JObject::from(env.new_string("clipboard")?);
