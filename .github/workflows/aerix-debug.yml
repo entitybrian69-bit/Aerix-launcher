@@ -202,7 +202,8 @@ jobs:
           if [ "$code" -ne 0 ]; then
             # One compressed annotation avoids GitHub's ten-annotations-per-step limit
             # and preserves compiler diagnostics even when the remote log host is blocked.
-            echo "::error title=build-log-gzip-base64::$(tail -400 build.log | gzip -c | base64 -w0)"
+            tail -200 build.log | gzip -9c | base64 -w0 | fold -w 3500 |
+              while IFS= read -r chunk; do echo "::error title=build-log-gzip-base64::$chunk"; done
           fi
           exit "$code"
 
