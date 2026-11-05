@@ -3,6 +3,7 @@
 import hashlib
 import io
 import json
+import time
 from pathlib import Path
 from urllib.request import Request, urlopen
 from zipfile import ZipFile
@@ -14,8 +15,16 @@ for game, entries in manifest.items():
     assert {entry['id'] for entry in entries} == {'lithium', 'entityculling'}
     for entry in entries:
         req = Request(entry['url'], headers={'User-Agent': 'AerixLauncher/CI'})
-        with urlopen(req, timeout=45) as response:
-            data = response.read(40_000_001)
+        for attempt in range(3):
+            try:
+                with urlopen(req, timeout=45) as response:
+                    data = response.read(40_000_001)
+                break
+            except Exception as exc:
+                if attempt == 2:
+                    print(f"::error title=FastClient download::{game} {entry['id']} failed: {type(exc).__name__} {exc}")
+                    raise
+                time.sleep(2 * (attempt + 1))
         assert len(data) <= 40_000_000
         assert hashlib.sha256(data).hexdigest() == entry['sha256'], entry['url']
         with ZipFile(io.BytesIO(data)) as jar:
