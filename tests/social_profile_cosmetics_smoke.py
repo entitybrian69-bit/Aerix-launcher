@@ -22,13 +22,13 @@ class SocialCosmeticsSmoke(unittest.TestCase):
         self.assertIn("if (isMe) {\n                ProfileCharacter(", card)
         self.assertIn("widthIn(max = 148.dp)", card)
         self.assertIn("height(130.dp)", card)
-        character = screen.split("private fun ProfileCharacter(", 1)[1].split("private fun ProfileCosmeticsPage(", 1)[0]
+        character = screen.split("private fun ProfileCharacter(", 1)[1].split("fun ProfileCosmeticsPage(", 1)[0]
         for feature in ("clipToBounds()", "detectDragGestures", "onClick = onClick", "AerixSkinPreview3D", "useClientCape = clientCape"):
             self.assertIn(feature, character)
 
     def test_skin_and_cape_actions_use_existing_account_paths(self):
         screen = (ROOT / "ui/screens/SocialProfileScreen.kt").read_text()
-        page = screen.split("private fun ProfileCosmeticsPage(", 1)[1].split("private fun CountCell(", 1)[0]
+        page = screen.split("fun ProfileCosmeticsPage(", 1)[1].split("private fun CountCell(", 1)[0]
         for method in ("equipSkinFromUri", "equipCapeFromUri", "canEquipCape", "syncCapeAssetsToAllClientInstances"):
             self.assertIn(method, page)
         self.assertIn("AerixClientStore.persist()", page)
