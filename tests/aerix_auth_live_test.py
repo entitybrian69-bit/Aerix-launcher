@@ -25,3 +25,4 @@ status, _ = request('/sessionserver/session/minecraft/hasJoined?username=invalid
 if status != 204:
     raise SystemExit(f'::error title=Aerix unknown session::HTTP {status}')
 print('Live auth metadata and invalid-session checks passed')
+# The live probe runs before publishing a debug APK.
