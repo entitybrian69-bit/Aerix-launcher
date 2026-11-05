@@ -184,6 +184,7 @@ jobs:
         run: |
           set -euo pipefail
           test -f "$APK_PATH"
+          python3 tests/horizon_apk_verify.py "$APK_PATH"
           SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
           BT_DIR="$(ls -d "$SDK_ROOT"/build-tools/* | sort -V | tail -n 1)"
           echo "Using build-tools: $BT_DIR"
