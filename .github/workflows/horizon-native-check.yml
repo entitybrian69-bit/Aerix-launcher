@@ -1,13 +1,8 @@
 name: Horizon direct-game native build (development)
 
-# Builds and checks the proposed patched engine only. This workflow does not
-# publish an APK or replace the engine currently packaged by Aerix.
+# Each caller packages only native libraries built from this exact source patch.
 on:
-  push:
-    branches: [ "arena/**" ]
-    paths:
-      - 'horizon/patches/**'
-      - '.github/workflows/horizon-native-check.yml'
+  workflow_call:
   workflow_dispatch:
 
 permissions:
@@ -23,6 +18,10 @@ jobs:
             target: aarch64-linux-android
           - abi: armeabi-v7a
             target: armv7-linux-androideabi
+          - abi: x86
+            target: i686-linux-android
+          - abi: x86_64
+            target: x86_64-linux-android
     runs-on: ubuntu-latest
     timeout-minutes: 180
     steps:

@@ -281,6 +281,10 @@ android {
 def prepareHorizon = tasks.register('prepareHorizon', Exec) {
     def outputDir = layout.buildDirectory.dir('generated/aerix-horizon')
     inputs.file(rootProject.file('tools/prepare_horizon.py'))
+    inputs.file(rootProject.file('horizon/patches/direct-game.patch'))
+    def nativeDir = System.getenv('AERIX_HORIZON_LIB_DIR') ?: layout.buildDirectory.dir('horizon-native').get().asFile.absolutePath
+    inputs.property('horizonNativeDir', nativeDir)
+    inputs.files(fileTree(nativeDir))
     outputs.files(['arm64-v8a', 'armeabi-v7a', 'x86', 'x86_64'].collect {
         outputDir.get().file("jniLibs/${it}/libhorizon_android.so").asFile
     } + [outputDir.get().file('assets/engine-data.zip').asFile])

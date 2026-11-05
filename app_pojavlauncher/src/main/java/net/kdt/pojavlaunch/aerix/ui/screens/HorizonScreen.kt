@@ -17,6 +17,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
 import dev.horizon.android.HorizonActivity
+import net.kdt.pojavlaunch.aerix.bridge.PojavAccountBridge
 import net.kdt.pojavlaunch.aerix.theme.AerixSurface
 import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
 
@@ -36,14 +37,17 @@ fun HorizonScreen(activity: FragmentActivity) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
                 Text("Play using the built-in, unofficial Horizon Rust engine.", color = AerixSurface.textPrimary)
                 Text("The first launch downloads and verifies Minecraft 26.3 resources (about 500 MiB). Use a legally owned copy of Minecraft Java Edition.", color = AerixSurface.textSecondary)
-                Text("Horizon uses its own profiles, accounts, worlds and touch controls. Aerix Java instances and Java Fabric/Forge mods do not run in this engine.", color = AerixSurface.textSecondary)
+                Text("Worlds and touch controls are separate from Aerix Java instances. Java Fabric/Forge mods do not run in this Rust engine.", color = AerixSurface.textSecondary)
+                Text("Your Aerix username is used for offline play. Aerix Microsoft sign-in is not transferred to Rust; online account support remains separate.", color = AerixSurface.textSecondary)
                 Text("Experimental: device, graphics and server compatibility vary. Horizon's Microsoft account registration is still a development configuration.", color = AerixSurface.textSecondary)
                 if (!supported) Text("Requires Android ${if (minSdk == 28) "9" else "8.1"} or newer on this device.", color = AerixSurface.warning)
                 Button(enabled = supported, onClick = {
-                    runCatching { activity.startActivity(Intent(activity, HorizonActivity::class.java)) }
+                    runCatching { activity.startActivity(Intent(activity, HorizonActivity::class.java).apply {
+                        putExtra("aerixOfflineName", PojavAccountBridge.current?.username)
+                    }) }
                         .onFailure { Toast.makeText(activity, "Unable to start Rust Edition: ${it.message}", Toast.LENGTH_LONG).show() }
                 }, colors = ButtonDefaults.buttonColors(containerColor = accent, contentColor = AerixSurface.onAccent)) {
-                    Text("Open Rust Edition", fontWeight = FontWeight.Bold)
+                    Text("Play Rust Edition", fontWeight = FontWeight.Bold)
                 }
             }
         }

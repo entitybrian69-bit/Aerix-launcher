@@ -23,6 +23,26 @@ with tempfile.TemporaryDirectory() as tmp:
         try: mod.check_elf(extracted, 'x86_64' if abi != 'x86_64' else 'x86')
         except ValueError: pass
         else: raise AssertionError('Wrong ABI accepted')
+
+# Refuse an upstream (launcher-only) binary, even when its ABI is correct.
+with tempfile.TemporaryDirectory() as directory:
+    path = Path(directory) / 'engine.so'
+    fake = bytearray(128); fake[:4] = b'\x7fELF'; fake[4:6] = bytes([2, 1]); fake[18:20] = (183).to_bytes(2, 'little')
+    path.write_bytes(fake)
+    try: mod.check_direct_engine(path, 'arm64-v8a')
+    except ValueError: pass
+    else: raise AssertionError('Stock launcher binary must not be packaged')
+    path.write_bytes(fake + b'aerixStatus')
+    mod.check_direct_engine(path, 'arm64-v8a')
+    try: mod.stage(Path(directory) / 'output')
+    except FileNotFoundError as error: assert 'Missing patched Rust engine' in str(error)
+    else: raise AssertionError('Missing direct game engine must fail closed')
+
+patch = (root / 'horizon/patches/direct-game.patch').read_text()
+assert 'self.action(events)' in patch and 'events.exit()' in patch
+assert 'Do not create or draw the Horizon launcher window' in patch
+assert 'aerix_status' in patch
+
 android = '{http://schemas.android.com/apk/res/android}'
 manifest = ET.parse(app / 'AndroidManifest.xml').getroot().find('application')
 activity = next(x for x in manifest.findall('activity') if x.get(android+'name') == 'dev.horizon.android.HorizonActivity')
@@ -35,6 +55,10 @@ provider_source = (app / 'java/dev/horizon/android/HorizonDocumentsProvider.java
 assert 'getFilesDir()' in activity_source and '"horizon-rust"' in activity_source
 assert '"horizon-rust"' in provider_source
 assert 'nativeDocumentResult' in activity_source and 'nativeCall' in provider_source
+assert 'public void aerixStatus(String message)' in activity_source
+assert 'Cancel and return to Aerix' in activity_source and 'Return to Aerix and tap Play to retry' in activity_source
+assert 'aerixOfflineName' in activity_source
+assert 'Play Rust Edition' in (app / 'java/net/kdt/pojavlaunch/aerix/ui/screens/HorizonScreen.kt').read_text()
 assert 'procName.endsWith(":horizon")' in (app / 'java/net/kdt/pojavlaunch/PojavApplication.java').read_text()
 assert 'LauncherSection.HORIZON -> HorizonScreen(activity)' in (app / 'java/net/kdt/pojavlaunch/aerix/ui/AerixLauncherScreen.kt').read_text()
 assert 'Intent(activity, HorizonActivity::class.java)' in (app / 'java/net/kdt/pojavlaunch/aerix/ui/screens/HorizonScreen.kt').read_text()

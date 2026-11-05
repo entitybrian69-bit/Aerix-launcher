@@ -11,8 +11,9 @@ with zipfile.ZipFile(apk) as archive:
     for abi, cls, machine in [('arm64-v8a', 2, 183), ('armeabi-v7a', 1, 40)]:
         member = f'lib/{abi}/libhorizon_android.so'
         assert member in names, f'Missing Rust engine for {abi}'
-        with archive.open(member) as f:
-            header = f.read(20)
+        native = archive.read(member)
+        assert b'aerixStatus' in native, f'{abi} contains the upstream launcher instead of the direct-game engine'
+        header = native[:20]
         assert header[:4] == b'\x7fELF' and header[4] == cls and header[5] == 1
         assert int.from_bytes(header[18:20], 'little') == machine
     assert 'assets/engine-data.zip' in names, 'Missing generated Rust engine tables'

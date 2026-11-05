@@ -36,12 +36,19 @@ permissions:
   contents: read
 
 jobs:
+  horizon:
+    if: >-
+      github.event.inputs.confirm == 'RELEASE' ||
+      (github.event_name == 'push' && contains(github.event.head_commit.message, '[build-release]'))
+    uses: ./.github/workflows/horizon-native-check.yml
   build:
+    needs: horizon
     if: >-
       github.event.inputs.confirm == 'RELEASE' ||
       (github.event_name == 'push' && contains(github.event.head_commit.message, '[build-release]'))
     runs-on: ubuntu-22.04
     env:
+      AERIX_HORIZON_LIB_DIR: /tmp/aerix-horizon-direct
       POJAV_KEYSTORE_PASSWORD: ${{ secrets.POJAV_KEYSTORE_PASSWORD }}
       CURSEFORGE_API_KEY: ${{ secrets.CURSEFORGE_API_KEY }}
     steps:
@@ -75,6 +82,12 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.14.3"
+
+      - name: Download patched Rust game engines
+        uses: actions/download-artifact@v4
+        with:
+          pattern: horizon-direct-native-*
+          path: /tmp/aerix-horizon-direct
 
       - name: Set up JDK 21
         uses: actions/setup-java@v3

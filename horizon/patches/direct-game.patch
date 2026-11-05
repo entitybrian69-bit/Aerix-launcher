@@ -16,7 +16,7 @@
              controller_edges: Default::default(),
              controller_repeat: None,
              window: None,
-@@ -132,31 +134,8 @@
+@@ -132,31 +134,14 @@
          self.prepared_session = None;
          horizon_client::discord_presence::stop();
          horizon_client::ui_theme::reset_atlas();
@@ -38,19 +38,23 @@
 -        self.login.refresh_status();
 -        crate::diagnostics::heartbeat("returned_to_launcher", || serde_json::json!({}));
 -        self.catalog.page = Page::Play;
--        if let Ok(message) = std::fs::read_to_string(self.home.join("android-error.txt")) {
++        // The game's exiting callback records startup/runtime errors here.
++        // Keep the Activity open on failure so Aerix can show the error and retry.
+         if let Ok(message) = std::fs::read_to_string(self.home.join("android-error.txt")) {
 -            self.error = Some(message);
 -        }
 -        if let Err(error) = self.open(events) {
 -            self.fail(error);
 -            events.exit();
--        }
++            self.fail(message);
++            return;
+         }
 +        // Return to Aerix after the game, rather than showing Horizon's launcher.
 +        events.exit();
      }
      pub(super) fn configure_screen(&self) {
          crate::native_ime::configure_screen(
-@@ -169,6 +148,7 @@
+@@ -169,6 +154,7 @@
      }
      fn fail(&mut self, error: impl std::fmt::Display) {
          log::error!("{error}");
@@ -58,7 +62,7 @@
          crate::diagnostics::record_error(&error.to_string());
          self.error = Some(error.to_string());
          let _ = std::fs::write(self.home.join("android-error.txt"), error.to_string());
-@@ -369,6 +349,7 @@
+@@ -369,6 +355,7 @@
              horizon_client::ui_theme::reset_atlas();
              self.game = Some(game);
              self.game.as_mut().unwrap().resumed(events);
@@ -66,20 +70,22 @@
          } else {
              if !self.home.join("engine-data.zip").is_file() {
                  return Err(
-@@ -408,7 +389,11 @@
+@@ -406,9 +393,11 @@
+         if let Some(game) = &mut self.game {
+             return game.resumed(events);
          }
-         if let Err(error) = self.open(events) {
-             self.fail(error);
+-        if let Err(error) = self.open(events) {
+-            self.fail(error);
 -            events.exit();
-+            return;
-+        }
++        // Do not create or draw the Horizon launcher window. Aerix owns the
++        // preparation UI until the game creates its native window.
 +        if !self.aerix_started {
 +            self.aerix_started = true;
 +            if let Err(error) = self.action(events) { self.fail(error); }
          }
      }
      fn suspended(&mut self, events: &ActiveEventLoop) {
-@@ -569,15 +554,18 @@
+@@ -569,15 +558,18 @@
              crate::display::set_scale(crate::display::RenderScale::default());
              self.fail(error);
          }

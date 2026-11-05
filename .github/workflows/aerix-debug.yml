@@ -45,16 +45,26 @@ env:
   APK_PATH: app_pojavlauncher/build/outputs/apk/noruntime/debug/app_pojavlauncher-noruntime-debug.apk
 
 jobs:
+  horizon:
+    uses: ./.github/workflows/horizon-native-check.yml
   build:
+    needs: horizon
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
+      AERIX_HORIZON_LIB_DIR: /tmp/aerix-horizon-direct
       CURSEFORGE_API_KEY: ${{ secrets.CURSEFORGE_API_KEY }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           submodules: recursive
+
+      - name: Download patched Rust game engines
+        uses: actions/download-artifact@v4
+        with:
+          pattern: horizon-direct-native-*
+          path: /tmp/aerix-horizon-direct
 
       - name: Set up JDK 21
         uses: actions/setup-java@v4

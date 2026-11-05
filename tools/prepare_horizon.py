@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Stage the verified native Horizon Android 0.7.7 distribution for Aerix builds.
+"""Stage Aerix's patched native Rust engine and upstream generated data tables.
 
-Original APKs and their extracted binary outputs remain under Gradle's ignored build dir.
-An offline mirror can be provided via AERIX_HORIZON_APK_DIR. No Minecraft assets are bundled.
+The upstream launcher binaries are never packaged: native libraries must be built
+from the pinned source and direct-game patch. No Minecraft assets are bundled.
 """
 import hashlib
 import os
@@ -73,21 +73,36 @@ def check_elf(path, abi):
     if len(header) < 20 or header[:4] != b'\x7fELF' or header[5] != 1 or (header[4], int.from_bytes(header[18:20], 'little')) != expected[abi]:
         raise ValueError(f'Unexpected native library ABI: {abi}')
 
+def check_direct_engine(path, abi):
+    check_elf(path, abi)
+    # JNI callback exists only in our direct-game patch, not the upstream APK.
+    with path.open('rb') as native:
+        if b'aerixStatus' not in native.read():
+            raise ValueError(f'Not an Aerix direct-game engine: {path}')
+
+
 def stage(output):
-    cache = output / 'cache'
+    source = Path(os.environ.get('AERIX_HORIZON_LIB_DIR',
+        Path(__file__).resolve().parents[1] / 'app_pojavlauncher/build/horizon-native'))
     for abi in CHECKSUMS:
-        apk = apk_for(abi, cache)
-        with zipfile.ZipFile(apk) as archive:
-            library = output / 'jniLibs' / abi / 'libhorizon_android.so'
-            copy_member(archive, f'lib/{abi}/libhorizon_android.so', library)
-            check_elf(library, abi)
-            if abi == 'arm64-v8a':
-                data = output / 'assets' / 'engine-data.zip'
-                copy_member(archive, 'assets/engine-data.zip', data)
-                with zipfile.ZipFile(data) as engine:
-                    if 'horizon-resources.json' not in engine.namelist():
-                        raise ValueError('Generated Horizon engine tables are missing')
-    print('Verified Horizon Android native engine and generated tables staged.', flush=True)
+        library = source / f'horizon-direct-native-{abi}' / 'libhorizon_android.so'
+        if not library.is_file():
+            raise FileNotFoundError(f'Missing patched Rust engine: {library}. '
+                'Run tools/build_horizon_native.sh or set AERIX_HORIZON_LIB_DIR; '
+                'upstream launcher binaries cannot be used for direct play.')
+        check_direct_engine(library, abi)
+        destination = output / 'jniLibs' / abi / 'libhorizon_android.so'
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(library, destination)
+    # Generated engine tables are identical to the pinned upstream release.
+    apk = apk_for('arm64-v8a', output / 'cache')
+    with zipfile.ZipFile(apk) as archive:
+        data = output / 'assets' / 'engine-data.zip'
+        copy_member(archive, 'assets/engine-data.zip', data)
+        with zipfile.ZipFile(data) as engine:
+            if 'horizon-resources.json' not in engine.namelist():
+                raise ValueError('Generated Horizon engine tables are missing')
+    print('Patched Rust game engines and verified upstream generated tables staged.', flush=True)
 
 if __name__ == '__main__':
     if len(sys.argv) != 2:
