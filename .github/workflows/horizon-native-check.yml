@@ -27,7 +27,14 @@ jobs:
     steps:
       - name: Checkout Aerix
         uses: actions/checkout@v4
+      - name: Restore patched native engine cache
+        id: engine-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/${{ matrix.abi }}/libhorizon_android.so
+          key: aerix-horizon-fast-v1-80700a6f-${{ matrix.abi }}-${{ hashFiles('horizon/patches/direct-game.patch') }}
       - name: Checkout pinned upstream Horizon Android
+        if: steps.engine-cache.outputs.cache-hit != 'true'
         uses: actions/checkout@v4
         with:
           repository: Vasysik/horizon-android
@@ -35,6 +42,7 @@ jobs:
           fetch-depth: 1
           path: horizon-source
       - name: Apply proposed direct-game changes
+        if: steps.engine-cache.outputs.cache-hit != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -42,9 +50,11 @@ jobs:
           git -C horizon-source apply --check "$GITHUB_WORKSPACE/horizon/patches/direct-game.patch"
           git -C horizon-source apply "$GITHUB_WORKSPACE/horizon/patches/direct-game.patch"
       - uses: dtolnay/rust-toolchain@1.95.0
+        if: steps.engine-cache.outputs.cache-hit != 'true'
         with:
           targets: ${{ matrix.target }}
       - name: Compile patched native engine
+        if: steps.engine-cache.outputs.cache-hit != 'true'
         shell: bash
         working-directory: horizon-source
         run: |

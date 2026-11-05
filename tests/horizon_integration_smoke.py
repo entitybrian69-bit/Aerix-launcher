@@ -2,6 +2,8 @@
 """Verify Horizon build staging and process/data isolation without game downloads."""
 import importlib.util
 import io
+import os
+from unittest.mock import patch
 from pathlib import Path
 import tempfile
 import zipfile
@@ -34,9 +36,10 @@ with tempfile.TemporaryDirectory() as directory:
     else: raise AssertionError('Stock launcher binary must not be packaged')
     path.write_bytes(fake + b'aerixStatus')
     mod.check_direct_engine(path, 'arm64-v8a')
-    try: mod.stage(Path(directory) / 'output')
-    except FileNotFoundError as error: assert 'Missing patched Rust engine' in str(error)
-    else: raise AssertionError('Missing direct game engine must fail closed')
+    with patch.dict(os.environ, {'AERIX_HORIZON_LIB_DIR': str(Path(directory) / 'missing')}):
+        try: mod.stage(Path(directory) / 'output')
+        except FileNotFoundError as error: assert 'Missing patched Rust engine' in str(error)
+        else: raise AssertionError('Missing direct game engine must fail closed')
 
 patch = (root / 'horizon/patches/direct-game.patch').read_text()
 assert 'self.action(events)' in patch and 'events.exit()' in patch
