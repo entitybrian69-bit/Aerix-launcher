@@ -76,6 +76,7 @@ jobs:
           python3 tests/authlib_263_smoke.py
           python3 tests/font_styles_smoke.py
           python3 tests/glass_launcher_ui_smoke.py
+          python3 tests/horizon_integration_smoke.py
           mkdir -p "$RUNNER_TEMP/aerix-recorder-test"
           javac -d "$RUNNER_TEMP/aerix-recorder-test" \
             app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/recording/RecordingPaths.java \

@@ -85,6 +85,7 @@ enum class LauncherSection {
     HOME,
     /** Dedicated Aerix Client (Minecraft 1.16.5 Testing Edition · Liquid Crystal Clear). */
     AERIX_CLIENT,
+    HORIZON,
     LIBRARY,
     /** Friends, messages and parties - the social launcher, opened from Home and the rail. */
     SOCIALS,

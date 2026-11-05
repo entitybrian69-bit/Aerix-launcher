@@ -32,6 +32,7 @@ private val bottomDestinations = listOf(
     BottomDestination("Instances", R.drawable.aerix_ic_dashboard_filled, LauncherSection.LIBRARY, AerixGuideState.LIBRARY),
     BottomDestination("Browse", R.drawable.aerix_ic_search, LauncherSection.DISCOVER),
     BottomDestination("Client", R.drawable.aerix_ic_client_crystal, LauncherSection.AERIX_CLIENT),
+    BottomDestination("Rust", R.drawable.aerix_ic_videogame_asset_outlined, LauncherSection.HORIZON),
     BottomDestination("Social", R.drawable.aerix_ic_people, LauncherSection.SOCIALS),
     BottomDestination("Settings", R.drawable.aerix_ic_settings_filled, LauncherSection.SETTINGS, AerixGuideState.SETTINGS)
 )

@@ -91,7 +91,7 @@ public class PojavApplication extends MGApplication {
 	public void onCreate() {
 		ContextExecutor.setApplication(this);
 		String procName = resolveCurrentProcessName(this);
-		if (procName != null && (procName.endsWith(":recorder") || procName.endsWith(":mgquery"))) {
+		if (procName != null && (procName.endsWith(":recorder") || procName.endsWith(":mgquery") || procName.endsWith(":horizon"))) {
 			super.onCreate();
 			try {
 				Tools.initEarlyConstants(this);

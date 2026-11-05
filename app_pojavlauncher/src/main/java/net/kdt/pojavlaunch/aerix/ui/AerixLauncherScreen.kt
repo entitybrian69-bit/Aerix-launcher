@@ -93,6 +93,7 @@ import net.kdt.pojavlaunch.aerix.ui.screens.ClientOwnerPage
 import net.kdt.pojavlaunch.aerix.ui.screens.CreateInstanceScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.DiscoverScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.FileManagerScreen
+import net.kdt.pojavlaunch.aerix.ui.screens.HorizonScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.HomeScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.GlassHomeScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.InstanceEditorScreen
@@ -202,6 +203,7 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
                                     }
                                 } else GlassHomeScreen(activity, navigate) { showMoreHomeTools = true }
                             }
+                            LauncherSection.HORIZON -> HorizonScreen(activity)
                             LauncherSection.AERIX_CLIENT -> ClientHubScreen(activity, clientOwnerPage) { clientOwnerPage = it }
                             LauncherSection.LIBRARY -> LibraryScreen(activity)
                             LauncherSection.SOCIALS -> SocialsScreen(activity) { AerixNav.finishTo(LauncherSection.HOME) }
