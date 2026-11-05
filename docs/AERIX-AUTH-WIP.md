@@ -1,22 +1,13 @@
-# Aerix game authentication — work in progress
+# Aerix authentication testing status
 
-This is not ready for players or server operators. The application changes on this
-branch have compiled, but no end-to-end game/server authentication test has passed.
-Do not distribute an APK containing this code as a working Aerix authentication release.
+The `aerix_game_authentication_sessions` migration and the self-contained
+`aerix-auth` Edge Function are deployed. Automated checks exercise live public
+metadata, invalid sessions, and a synthetic authenticated handshake using actual
+Minecraft 1.20.1 authlib with the bundled authlib-injector. The synthetic account
+is temporary and must be removed after fixture checks. Direct access to session,
+join and signing-key tables is denied to anonymous and authenticated API roles.
 
-The `aerix_game_authentication_sessions` migration has been applied to the Aerix
-Supabase project. A rollback-only test exercised session issuance, invalid joins,
-single-use verification and revocation. The public `aerix-auth` Edge Function is
-intentionally unavailable (HTTP 503) while deployment is being repaired. Its
-implementation is in `supabase/functions/aerix-auth/index.ts`. An attempted
-immutable GitHub module import failed to start on Supabase (`BOOT_ERROR`); deploy a
-self-contained function bundle using the supported Supabase deployment tooling,
-then check the public metadata and negative requests using
-`tests/aerix_auth_live_test.py` and complete real client/server verification.
-
-Remaining work includes a security and compatibility review, rate/abuse testing,
-server operator instructions, and an actual multiplayer handshake and appearance
-test. Microsoft-only servers still require a legitimate Microsoft account.
-
-Commits tagged `[auth-check]` deliberately skip publishing `debug-latest`; the
-existing debug APK predates real authentication and must not be presented as such.
+Still needed: testing on a real Android device and a running multiplayer server,
+additional Minecraft-version compatibility tests, load/rate-limit evaluation, and
+independent security review. See `AERIX-GAME-ACCOUNTS.md` for usage and server
+operator setup.

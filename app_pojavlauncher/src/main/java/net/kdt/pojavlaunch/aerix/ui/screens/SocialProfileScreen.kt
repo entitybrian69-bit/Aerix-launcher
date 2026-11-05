@@ -887,7 +887,7 @@ private fun ProfileCosmeticsPage(activity: FragmentActivity, onBack: () -> Unit)
             Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Aerix game account", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = AerixSurface.textPrimary)
                 if (!SocialBackend.signedIn) {
-                    Text("Sign in to Aerix to link an offline game name.", fontSize = 11.sp, color = AerixSurface.textSecondary)
+                    Text("Sign in to Aerix to create an authenticated game account.", fontSize = 11.sp, color = AerixSurface.textSecondary)
                 } else if (!gameLoaded) {
                     Text("Loading game account…", fontSize = 11.sp, color = AerixSurface.textSecondary)
                 } else if (gameError != null) {
