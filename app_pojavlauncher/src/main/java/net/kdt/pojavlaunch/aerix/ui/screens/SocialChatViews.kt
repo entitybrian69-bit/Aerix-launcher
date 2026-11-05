@@ -1,6 +1,9 @@
 package net.kdt.pojavlaunch.aerix.ui.screens
 
 import android.content.Context
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.widget.Toast
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.SystemClock
@@ -54,6 +57,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -91,6 +95,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import net.kdt.pojavlaunch.R
 import net.kdt.pojavlaunch.aerix.social.SocialBackend
+import net.kdt.pojavlaunch.aerix.worldshare.WorldSharePolicy
 import net.kdt.pojavlaunch.aerix.social.SocialFriend
 import net.kdt.pojavlaunch.aerix.social.SocialMessage
 import net.kdt.pojavlaunch.aerix.social.SocialParty
@@ -185,6 +190,7 @@ fun SocialConversationPanel(
     onJoinSession: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val isParty = party != null
     val convKey = party?.id ?: friend?.id ?: return
     val accent = AerixThemeManager.currentAccent()
@@ -647,6 +653,14 @@ fun SocialConversationPanel(
                                             )
                                         }
 
+                                        if (WorldSharePolicy.isJoinAddress(msg.body.trim())) {
+                                            val address = msg.body.trim()
+                                            TextButton(onClick = {
+                                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                                clipboard.setPrimaryClip(ClipData.newPlainText("Minecraft world address", address))
+                                                Toast.makeText(context, "Copied. Paste into Multiplayer → Direct Connection.", Toast.LENGTH_LONG).show()
+                                            }) { Text("Copy address", fontSize = 11.sp) }
+                                        }
                                         Spacer(Modifier.height(2.dp))
                                         Row(
                                             verticalAlignment = Alignment.CenterVertically,
@@ -688,6 +702,17 @@ fun SocialConversationPanel(
                                     expanded = menuOpen,
                                     onDismissRequest = { menuOpen = false }
                                 ) {
+                                    if (msg.body.isNotBlank()) {
+                                        DropdownMenuItem(
+                                            text = { Text("Copy message", fontSize = 12.sp) },
+                                            onClick = {
+                                                menuOpen = false
+                                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                                clipboard.setPrimaryClip(ClipData.newPlainText("Aerix message", msg.body))
+                                                Toast.makeText(context, "Copied. Paste an address into Minecraft Direct Connection.", Toast.LENGTH_SHORT).show()
+                                            }
+                                        )
+                                    }
                                     if (msg.id > 0L) {
                                         DropdownMenuItem(
                                             text = { Text("Reply", fontSize = 12.sp) },

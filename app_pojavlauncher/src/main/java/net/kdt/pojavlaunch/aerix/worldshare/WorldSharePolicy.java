@@ -32,25 +32,43 @@ public final class WorldSharePolicy {
         return null;
     }
 
+    /** A plain DNS address, never a URL or command. Used only for an explicit copy action. */
+    public static boolean isJoinAddress(String text) {
+        if (text == null || text.length() > 253 || !text.equals(text.trim())) return false;
+        Matcher m = Pattern.compile("(?i)^([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+)(?::([0-9]{1,5}))?$").matcher(text);
+        if (!m.matches()) return false;
+        if (m.group(2) == null) return true;
+        int port = Integer.parseInt(m.group(2));
+        return port > 0 && port <= 65535;
+    }
+
+    // Handle vanilla/Fabric and Forge logger prefixes, but not player-chat messages.
+    private static final Pattern LOG_LINE = Pattern.compile(
+        "^\\[\\d{2}:\\d{2}:\\d{2}\\] \\[[^\\]\\r\\n]+/(?:INFO|WARN|ERROR)\\](?: \\[[^\\]\\r\\n]+\\]| \\([^()\\r\\n]+\\))?:? (?:(?:\\[e4all\\]|\\(e4all\\)) )?(.*)$",
+        Pattern.CASE_INSENSITIVE);
+    private static String logMessage(String line) {
+        if (line == null || line.toLowerCase(java.util.Locale.ROOT).contains("[chat]")) return null;
+        Matcher m = LOG_LINE.matcher(line.trim());
+        return m.matches() ? m.group(1) : null;
+    }
+
     /** Only parse a logger message, never a chat line containing a forged domain. */
     public static String addressEvent(String line) {
-        if (line == null || line.contains("[CHAT]")) return null;
-        Matcher match = Pattern.compile("^\\[\\d{2}:\\d{2}:\\d{2}\\] \\[[^\\r\\n]+/(?:INFO|WARN)\\]: (?:(?:\\[e4all\\]|\\(e4all\\)) )?Domain (?:assigned|reassigned): ([a-zA-Z0-9-]+(?:\\.[a-zA-Z0-9-]+)+(?::[0-9]{1,5})?)(?: \\(was: [^)]*\\))?$", Pattern.CASE_INSENSITIVE).matcher(line.trim());
+        String message = logMessage(line);
+        if (message == null) return null;
+        Matcher match = Pattern.compile("^Domain (?:assigned|reassigned): ([a-zA-Z0-9-]+(?:\\.[a-zA-Z0-9-]+)+(?::[0-9]{1,5})?)(?: \\(was: [^)]*\\))?$", Pattern.CASE_INSENSITIVE).matcher(message);
         if (!match.matches()) return null;
         String value = match.group(1);
-        int i = value.lastIndexOf(':');
-        if (i >= 0) {
-            int port = Integer.parseInt(value.substring(i + 1));
-            if (port < 1 || port > 65535) return null;
-        }
-        return value;
+        return isJoinAddress(value) ? value : null;
     }
     public static boolean endedEvent(String line) {
-        if (line == null || line.contains("[CHAT]")) return false;
-        return line.contains("e4all: world stopping, tearing down the relay session") ||
-            line.contains("e4all: relay session stopped") ||
-            line.contains("e4all: relay session failed") ||
-            line.contains("e4all: relay connection lost, session stopped") ||
-            line.contains("QUIC channel became inactive (relay connection lost)");
+        String message = logMessage(line);
+        if (message == null) return false;
+        return message.startsWith("e4all: world stopping, tearing down the relay session") ||
+            message.startsWith("e4all: world listener stopping, tearing down the relay session") ||
+            message.startsWith("e4all: relay session stopped") ||
+            message.startsWith("e4all: relay session failed") ||
+            message.startsWith("e4all: relay connection lost, session stopped") ||
+            message.startsWith("QUIC channel became inactive (relay connection lost)");
     }
 }

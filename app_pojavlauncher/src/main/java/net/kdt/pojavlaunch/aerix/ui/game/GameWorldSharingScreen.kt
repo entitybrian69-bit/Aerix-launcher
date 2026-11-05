@@ -51,15 +51,21 @@ import java.io.RandomAccessFile
 private class WorldShareLogReader {
     private var offset = 0L
     private var partial = ""
+    private var discardLine = false
     var address: String? = null
         private set
 
     fun read(file: File): String? {
-        if (!file.isFile) return address
+        if (!file.isFile) { offset = 0L; partial = ""; discardLine = false; address = null; return null }
         RandomAccessFile(file, "r").use { raf ->
             val size = raf.length()
-            if (size < offset) { offset = 0; partial = ""; address = null }
-            if (offset == 0L && size > 2_000_000L) offset = size - 2_000_000L
+            if (size < offset) { offset = 0; partial = ""; discardLine = false; address = null }
+            // The launcher truncates this log at game start. Skip a potentially partial line
+            // when attaching to a long current-session log.
+            if (offset == 0L && size > 2_000_000L) {
+                offset = size - 2_000_000L
+                discardLine = true
+            }
             raf.seek(offset)
             val bytes = ByteArray((size - offset).coerceAtMost(131072).toInt())
             val count = raf.read(bytes)
@@ -67,18 +73,26 @@ private class WorldShareLogReader {
             offset += count
             val content = partial + String(bytes, 0, count, Charsets.UTF_8)
             val lines = content.split('\n')
-            partial = lines.last().takeLast(8192)
             lines.dropLast(1).forEach { line ->
-                if (WorldSharePolicy.endedEvent(line)) address = null
-                WorldSharePolicy.addressEvent(line)?.let { address = it }
+                if (discardLine) discardLine = false else {
+                    if (WorldSharePolicy.endedEvent(line)) address = null
+                    WorldSharePolicy.addressEvent(line)?.let { address = it }
+                }
             }
+            partial = lines.last()
+            if (partial.length > 8192) { partial = ""; discardLine = true }
+            // Do not expose an old assignment while newer stop/reassignment events remain unread.
+            if (offset < size) return null
         }
         return address
     }
 }
 
 @Composable
-fun GameWorldSharingScreen(target: GameDownloadTarget, accent: Color, onBack: () -> Unit, onResumeGame: () -> Unit) {
+fun GameWorldSharingScreen(
+    target: GameDownloadTarget, accent: Color, onBack: () -> Unit,
+    onResumeGame: () -> Unit, onOpenChats: () -> Unit
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val prefs = remember { context.getSharedPreferences("aerix_world_sharing", Context.MODE_PRIVATE) }
@@ -174,13 +188,19 @@ fun GameWorldSharingScreen(target: GameDownloadTarget, accent: Color, onBack: ()
             }
         }
         if (message.isNotEmpty()) Text(message, color = AerixSurface.textSecondary)
-        Text("1. Open your single-player world.\n2. Pause and choose Open to LAN.\n3. Copy the public address from e4all's chat message and send it to your friends.", color = AerixSurface.textPrimary)
+        Text("1. Open your single-player world and choose Open to LAN.\n2. Open this A overlay and copy the address below.\n3. Open Chats here, select a friend and paste the address.\n4. Your friend copies it and pastes it into Multiplayer → Direct Connection.", color = AerixSurface.textPrimary)
         Text("e4all may automatically publish when you open a world to LAN. Anyone with the address can try to join. Do not share it publicly unless you intend to.", color = AerixSurface.textSecondary)
         if (address != null) {
             val value = address!!
             Text("Public address: $value", color = accent, fontWeight = FontWeight.Bold)
             Text("Detected from the game log. Verify it matches e4all's chat message before sharing; log detection can be stale or incorrect.", color = AerixSurface.textSecondary)
             OutlinedButton(onClick = { stopConfirmation = true }) { Text("Stop sharing") }
+            Button(onClick = {
+                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                clipboard.setPrimaryClip(ClipData.newPlainText("Minecraft world address", value))
+                Toast.makeText(context, "Address copied. Select a friend and paste it into chat.", Toast.LENGTH_LONG).show()
+                onOpenChats()
+            }) { Text("Copy address & open chats") }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = {
                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -195,6 +215,7 @@ fun GameWorldSharingScreen(target: GameDownloadTarget, accent: Color, onBack: ()
         } else {
             Text("No active public address detected. If one appears in Minecraft chat but not here, copy it from chat.", color = AerixSurface.textSecondary)
         }
+        Text("The host must keep the world open. Use the same Minecraft version and compatible mods. Connection and appearance depend on server authentication and the third-party relay.", color = AerixSurface.textSecondary)
         Text("To stop public sharing, use [Stop] in e4all's chat message or run /e4all stop in your own world. Closing the world also ends the session. Sharing uses the third-party e4mc relay; availability is not guaranteed.", color = AerixSurface.textSecondary)
         Text("e4all by Synquox, based on e4mc by vgskye · MIT license · github.com/Synquox/e4all", color = AerixSurface.textSecondary)
     }

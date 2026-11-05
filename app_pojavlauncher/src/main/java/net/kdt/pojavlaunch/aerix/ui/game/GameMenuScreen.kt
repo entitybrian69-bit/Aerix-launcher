@@ -180,10 +180,12 @@ fun GameMenuScreen(
     // opens, and the panel has to fill in as soon as they arrive.
     val account = PojavAccountBridge.current
     var page by remember { mutableStateOf(GameMenuPage.MAIN) }
+    var choosingInviteRecipient by remember { mutableStateOf(false) }
     var shown by remember { mutableStateOf(false) }
 
     LaunchedEffect(revision) {
         page = GameMenuPage.MAIN
+        choosingInviteRecipient = false
         shown = false
         shown = true
     }
@@ -218,6 +220,7 @@ fun GameMenuScreen(
             ) {
                 GameSocialsScreen(
                     accent = palette.accent,
+                    chooseInviteRecipient = choosingInviteRecipient,
                     onBack = { page = GameMenuPage.MAIN }
                 )
             }
@@ -236,7 +239,11 @@ fun GameMenuScreen(
             GameMenuPage.WORLD_SHARING -> Box(
                 modifier = Modifier.fillMaxSize().padding(horizontal = AerixSpacing.mdPlus, vertical = AerixSpacing.sm)
             ) {
-                GameWorldSharingScreen(target = target, accent = palette.accent, onBack = { page = GameMenuPage.MAIN }, onResumeGame = callbacks::onResumeGame)
+                GameWorldSharingScreen(target = target, accent = palette.accent, onBack = { page = GameMenuPage.MAIN },
+                    onResumeGame = callbacks::onResumeGame, onOpenChats = {
+                        choosingInviteRecipient = true
+                        page = GameMenuPage.SOCIALS
+                    })
             }
             GameMenuPage.MAIN -> AnimatedVisibility(
                 visible = shown,
@@ -250,7 +257,7 @@ fun GameMenuScreen(
                     versionLine = versionLine,
                     onCloseRequest = onCloseRequest,
                     onOpenDownloads = { page = GameMenuPage.DOWNLOADS },
-                    onOpenSocials = { page = GameMenuPage.SOCIALS },
+                    onOpenSocials = { choosingInviteRecipient = false; page = GameMenuPage.SOCIALS },
                     onOpenWorldSharing = { page = GameMenuPage.WORLD_SHARING }
                 )
             }
