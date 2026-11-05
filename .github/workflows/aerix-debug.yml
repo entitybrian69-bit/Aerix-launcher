@@ -68,6 +68,7 @@ jobs:
 
       - name: Verify Client smoke tests
         run: |
+          trap 'echo "::error title=Smoke test failed::$BASH_COMMAND"' ERR
           python3 tests/branding_identity_smoke.py
           python3 tests/discord_presence_logo_smoke.py
           python3 tests/modern_cape_smoke.py

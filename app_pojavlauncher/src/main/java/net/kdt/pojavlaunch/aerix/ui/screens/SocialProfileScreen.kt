@@ -726,12 +726,16 @@ internal fun ProfileCosmeticsPage(activity: FragmentActivity, setupFlow: Boolean
     val skinPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         val target = skinTarget
         skinTarget = null
-        if (uri != null && target != null) PojavAccountBridge.equipSkinFromUri(activity, target, uri)
+        if (uri != null && target != null) PojavAccountBridge.equipSkinFromUri(activity, target, uri) { ok ->
+            if (ok && setupFlow && PojavAccountBridge.current?.key == target.key) cloudAction = "upload-skin"
+        }
     }
     val capePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         val target = capeTarget
         capeTarget = null
-        if (uri != null && target != null) PojavAccountBridge.equipCapeFromUri(activity, target, uri)
+        if (uri != null && target != null) PojavAccountBridge.equipCapeFromUri(activity, target, uri) { ok ->
+            if (ok && setupFlow && PojavAccountBridge.current?.key == target.key) cloudAction = "upload-cape"
+        }
     }
     LaunchedEffect(Unit) {
         AerixClientStore.init(activity)
@@ -826,6 +830,7 @@ internal fun ProfileCosmeticsPage(activity: FragmentActivity, setupFlow: Boolean
                             val saved = bytes != null && owner != null &&
                                 SocialBackend.publishGameTexture(bytes, owner, kind, slim)
                             cloudBusy = false
+                            if (saved && setupFlow && gameAccount?.sharing == false) gameDialog = "share"
                             Toast.makeText(activity, if (saved) "$label published to your Aerix profile"
                                 else SocialBackend.lastError ?: "Equip a valid custom $label first", Toast.LENGTH_LONG).show()
                         } else {
@@ -937,9 +942,32 @@ internal fun ProfileCosmeticsPage(activity: FragmentActivity, setupFlow: Boolean
             }
             return@Column
         }
+        if (setupFlow && (account.authType != net.kdt.pojavlaunch.authenticator.AuthType.AERIX ||
+                account.source.aerixOwnerId != SocialBackend.myUserId())) {
+            SocialPanel(Modifier.fillMaxWidth()) {
+                Text("Tap Sign in with Aerix above to select this game account before choosing a skin or cape.",
+                    color = AerixSurface.textSecondary, modifier = Modifier.padding(16.dp))
+            }
+            return@Column
+        }
         SocialPanel(Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Skin", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = AerixSurface.textPrimary)
+                if (setupFlow) {
+                    val revision = PojavAccountBridge.wardrobeRevision
+                    val slim = remember(account.key, revision) { PojavAccountBridge.isSlimModelFor(activity, account.source) }
+                    Text("Arm model: ${if (slim) "Slim" else "Wide"}", fontSize = 11.sp, color = AerixSurface.textSecondary)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        SocialButton("Wide", filled = !slim) {
+                            PojavAccountBridge.setSlimModel(activity, account, false)
+                            if (slim && PojavAccountBridge.customSkinFile(account.source).isFile) cloudAction = "upload-skin"
+                        }
+                        SocialButton("Slim", filled = slim) {
+                            PojavAccountBridge.setSlimModel(activity, account, true)
+                            if (!slim && PojavAccountBridge.customSkinFile(account.source).isFile) cloudAction = "upload-skin"
+                        }
+                    }
+                }
                 Text("Choose a Minecraft skin image for ${account.username}.", fontSize = 11.sp, color = AerixSurface.textSecondary)
                 SocialButton("Change skin", filled = false) {
                     skinTarget = account

@@ -14,5 +14,5 @@ try:
 except urllib.error.HTTPError as e:
     location=urllib.parse.urlparse(e.headers.get('Location',''))
     if e.code not in (302,303) or location.scheme!='https' or location.hostname!='accounts.google.com':
-        raise RuntimeError('Google provider did not return its expected authorization redirect (HTTP %s)' % e.code)
+        raise RuntimeError('::error title=Google OAuth::Expected Google redirect, got HTTP %s host %s' % (e.code, location.hostname))
 print('Google provider authorization redirect and PKCE request accepted; interactive login not tested')
