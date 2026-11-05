@@ -16,7 +16,9 @@ Microsoft Minecraft account.
 
 ## Appearance and privacy
 
-Publish or restore your skin and imported cape on Skin & Cape. Published images
+Select a skin or imported cape on the account page; confirm the prompt to publish
+it, then confirm appearance sharing so compatible players can see it. On another
+device use the restore buttons to apply those images locally. Published images
 are publicly accessible by URL, which includes your Social user ID. Choose
 **Share game appearance** to expose them through your public game profile; turn
 sharing off to stop new profile lookups, although previously downloaded or cached
