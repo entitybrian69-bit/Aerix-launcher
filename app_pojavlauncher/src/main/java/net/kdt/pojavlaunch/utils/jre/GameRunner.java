@@ -90,7 +90,14 @@ public class GameRunner {
         String host = raw;
         String port = "25565";
         int lastColon = raw.lastIndexOf(':');
-        if (lastColon > 0 && raw.indexOf(':') == lastColon && lastColon < raw.length() - 1) {
+        if (raw.startsWith("[") && raw.indexOf(']') > 0) {
+            int close = raw.indexOf(']');
+            host = raw.substring(1, close);
+            if (close + 1 < raw.length() && raw.charAt(close + 1) == ':') {
+                String maybePort = raw.substring(close + 2);
+                if (maybePort.matches("\\d{1,5}")) port = maybePort;
+            }
+        } else if (lastColon > 0 && raw.indexOf(':') == lastColon && lastColon < raw.length() - 1) {
             String maybePort = raw.substring(lastColon + 1);
             if (maybePort.matches("\\d{1,5}")) {
                 host = raw.substring(0, lastColon);

@@ -100,6 +100,7 @@ import net.kdt.pojavlaunch.aerix.ui.screens.AerixInstallPill
 import net.kdt.pojavlaunch.aerix.ui.screens.LogScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.OfflineAccountScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.SettingsScreen
+import net.kdt.pojavlaunch.aerix.ui.screens.ServersScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.SocialsScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.WallpapersScreen
 
@@ -203,6 +204,7 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
                             LauncherSection.HOME -> HomeScreen(activity, navigate)
                             LauncherSection.AERIX_CLIENT -> ClientHubScreen(activity, clientOwnerPage) { clientOwnerPage = it }
                             LauncherSection.LIBRARY -> LibraryScreen(activity)
+                            LauncherSection.SERVERS -> ServersScreen(activity)
                             LauncherSection.SOCIALS -> SocialsScreen(activity) { AerixNav.finishTo(LauncherSection.HOME) }
                             LauncherSection.DISCOVER, LauncherSection.DOWNLOADS -> DiscoverScreen(activity, navigate)
                             LauncherSection.FILES -> FileManagerScreen(activity)

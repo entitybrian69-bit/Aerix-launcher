@@ -153,7 +153,9 @@ object PojavLaunchBridge {
         }
     }
 
-    fun play(activity: Activity) {
+    fun play(activity: Activity, serverAddress: String? = null) {
+        // Ordinary Play must not inherit a server from an earlier cancelled join attempt.
+        setPendingServerAddress(serverAddress)
         try {
             val instance = Instances.loadSelectedInstance()
             if (instance == null) {
@@ -243,14 +245,13 @@ object PojavLaunchBridge {
                     } else {
                         Instances.setSelectedInstance(matchedBySpec)
                         PojavInstanceBridge.reload()
-                        setPendingServerAddress(cleanServer)
                         val label = matchedBySpec.name ?: matchedBySpec.versionId ?: "instance"
                         Toast.makeText(
                             activity,
                             if (cleanServer != null) "Launching $label -> $cleanServer" else "Launching $label",
                             Toast.LENGTH_SHORT
                         ).show()
-                        play(activity)
+                        play(activity, cleanServer)
                     }
                 }
                 return@execute
@@ -321,8 +322,7 @@ object PojavLaunchBridge {
                         icon = null
                     ) { ok ->
                         if (ok) {
-                            setPendingServerAddress(cleanServer)
-                            play(activity)
+                            play(activity, cleanServer)
                         }
                     }
                 }
@@ -336,8 +336,7 @@ object PojavLaunchBridge {
                     Tools.restartLauncherActivityToSocialTarget(activity, null, cleanServer)
                     Tools.MAIN_HANDLER.postDelayed({ Tools.fullyExit() }, 700L)
                 } else {
-                    setPendingServerAddress(cleanServer)
-                    play(activity)
+                    play(activity, cleanServer)
                 }
             }
         }

@@ -89,6 +89,14 @@ jobs:
           python3 tests/aerix_auth_live_test.py
           python3 tests/aerix_account_setup_smoke.py
           python3 tests/world_invite_chat_smoke.py
+          python3 tests/servers_ui_smoke.py
+          mkdir -p "$RUNNER_TEMP/aerix-servers-test"
+          javac -cp app_pojavlauncher/libs/gson-2.8.6.jar -d "$RUNNER_TEMP/aerix-servers-test" \
+            app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/servers/ServerAddress.java \
+            app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/servers/ServerStatusClient.java \
+            app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/servers/SrvLookup.java \
+            tests/ServerStatusSmokeTest.java
+          java -cp "$RUNNER_TEMP/aerix-servers-test:app_pojavlauncher/libs/gson-2.8.6.jar" net.kdt.pojavlaunch.aerix.servers.ServerStatusSmokeTest
           python3 tests/game_launch_handoff_smoke.py
           mkdir -p "$RUNNER_TEMP/aerix-launch-test"
           javac -d "$RUNNER_TEMP/aerix-launch-test" \
