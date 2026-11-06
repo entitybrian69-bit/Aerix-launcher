@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Inspect published resource pack files without bundling or modifying them."""
 import hashlib
+import os
 import json
 import struct
 import time
@@ -61,6 +62,7 @@ def inspect(payload):
             'png_rgba_mib_if_all_decoded': round(sum(pixels for pixels, _, _, _ in dimensions) * 4 / 1048576, 1),
             'gui_rgba_mib_if_all_decoded': round(sum(pixels for pixels, _, _, path in dimensions if '/gui/' in path) * 4 / 1048576, 1),
             'pack_format': pack_format, 'strict_pack_metadata_valid': metadata_valid,
+            'legacy_animations': sum(('/optifine/anim/' in name or '/mcpatcher/anim/' in name) and name.endswith('.properties') for name in files),
         }
 
 
@@ -75,6 +77,9 @@ def main():
                 if len(data) > 12_000_000 or hashlib.sha512(data).hexdigest() != digest:
                     raise ValueError('Pack size or SHA-512 does not match publisher metadata')
                 info = inspect(data)
+                if name == 'animated' and os.environ.get('AERIX_PACK_TEST_FILE'):
+                    with open(os.environ['AERIX_PACK_TEST_FILE'], 'wb') as target:
+                        target.write(data)
                 print('::notice title=SenpaiSpider ' + name + ' pack::' + json.dumps(info, ensure_ascii=True, separators=(',', ':')).replace('%', '%25'))
                 err = None
                 break
