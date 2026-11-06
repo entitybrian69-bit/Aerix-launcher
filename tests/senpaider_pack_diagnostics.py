@@ -9,7 +9,7 @@ import zipfile
 from io import BytesIO
 
 PACKS = [
-    ('animated', 'https://cdn.modrinth.com/data/QdBlb8o2/versions/sSFc5jXV/%21%20%20%20%20%20%20%C2%A7f%C2%A7lSenpaiSpider%201M.zip',
+    ('animated', 'https://cdn.modrinth.com/data/QdBlb8o2/versions/sSFc5jXV/%21%20%20%20%20%20%20%20%C2%A7f%C2%A7lSenpaiSpider%201M.zip',
      '8f165ce7b2867e5ad665be374df4a238017d74c492d5567f6721f9bf1dc165635a54b4e4d7753d8ad9c98fb771cebb632b7bb62aa357100f03d967b1107cebc4'),
     ('not animated', 'https://cdn.modrinth.com/data/QdBlb8o2/versions/AT22R4ES/%C2%A7f%C2%A7lSenpaiSpider%20Not%20Animated%20%281%29.zip',
      'ab2a538330ecad7b76b6ce0a31d3f274ac010636cbfd74f0a52799761c947ca5ba9a178f2abf2208a74a7ec5b41b00d01697d5fa48351a77120b0f42c8dd744f'),
@@ -44,12 +44,23 @@ def inspect(payload):
                         invalid.append(entry.filename + ': missing PNG')
                 except (ValueError, UnicodeError):
                     invalid.append(entry.filename + ': invalid metadata')
+        pack_meta = archive.read('pack.mcmeta').decode('utf-8', errors='replace') if 'pack.mcmeta' in files else ''
+        try:
+            pack_json = json.loads(pack_meta)
+            pack_format = pack_json.get('pack', {}).get('pack_format')
+            metadata_valid = True
+        except (ValueError, AttributeError):
+            pack_format = None
+            metadata_valid = False
         return {
             'entries': len(infos), 'expanded_mib': round(sum(x.file_size for x in infos) / 1048576, 1),
             'pngs': len(dimensions), 'animated_pngs': len(metadata), 'invalid': invalid[:6],
             'biggest': sorted(dimensions, reverse=True)[:5],
+            'large_2048': sum(w > 2048 or h > 2048 for _, w, h, _ in dimensions),
             'large_4096': sum(w > 4096 or h > 4096 for _, w, h, _ in dimensions),
-            'pack_mcmeta': archive.read('pack.mcmeta')[:1024].decode('utf-8', errors='replace') if 'pack.mcmeta' in files else 'missing at root',
+            'png_rgba_mib_if_all_decoded': round(sum(pixels for pixels, _, _, _ in dimensions) * 4 / 1048576, 1),
+            'gui_rgba_mib_if_all_decoded': round(sum(pixels for pixels, _, _, path in dimensions if '/gui/' in path) * 4 / 1048576, 1),
+            'pack_format': pack_format, 'strict_pack_metadata_valid': metadata_valid,
         }
 
 
