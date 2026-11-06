@@ -90,6 +90,7 @@ jobs:
           python3 tests/aerix_account_setup_smoke.py
           python3 tests/world_invite_chat_smoke.py
           python3 tests/servers_ui_smoke.py
+          python3 tests/senpaider_pack_diagnostics.py
           mkdir -p "$RUNNER_TEMP/aerix-servers-test"
           javac -cp app_pojavlauncher/libs/gson-2.8.6.jar -d "$RUNNER_TEMP/aerix-servers-test" \
             app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/servers/ServerAddress.java \
