@@ -56,6 +56,15 @@ public class ServerStatusSmokeTest {
         ServerStatusClient.Target target = SrvLookup.parse(b.toByteArray(),42);
         check(target != null && target.port == 25570 && "example.com".equals(target.host), "compressed SRV lookup");
         check(SrvLookup.parse(b.toByteArray(),43) == null, "DNS transaction id");
-        System.out.println("Server status, handshake, pong, address and SRV tests passed");
+        try (java.io.Reader reader = new java.io.FileReader("app_pojavlauncher/src/main/assets/server_artwork/catalog.json")) {
+            ServerArtworkCatalog catalog = ServerArtworkCatalog.load(reader);
+            ServerArtworkCatalog.Artwork hypixel = catalog.find("hypixel.net");
+            check(hypixel != null && hypixel.url.contains("/hypixel/background.png"), "Hypixel root address artwork");
+            check(catalog.find("mc.hypixel.net") != null && catalog.find("play.hypixel.net") != null, "direct and wildcard matches");
+            check(catalog.find("hypixel.net:25566") == null, "don't confuse different ports");
+            check(catalog.find("evilhypixel.net") == null && catalog.find("hypixel.net.evil.example") == null, "don't match misleading domains");
+            check(catalog.find("192.168.1.1") == null, "no private IP lookup");
+        }
+        System.out.println("Server status, handshake, pong, address, SRV and artwork catalog tests passed");
     }
 }

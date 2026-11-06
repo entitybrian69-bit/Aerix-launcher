@@ -12,8 +12,10 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
@@ -49,6 +51,8 @@ import net.kdt.pojavlaunch.aerix.servers.SavedServer
 import net.kdt.pojavlaunch.aerix.servers.SavedServers
 import net.kdt.pojavlaunch.aerix.servers.ServerAddress
 import net.kdt.pojavlaunch.aerix.servers.ServerStatusClient
+import net.kdt.pojavlaunch.aerix.servers.ServerArtworkCatalog
+import net.kdt.pojavlaunch.aerix.servers.ServerArtworkImages
 import net.kdt.pojavlaunch.aerix.servers.SrvLookup
 import net.kdt.pojavlaunch.aerix.theme.AerixSurface
 import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
@@ -71,6 +75,9 @@ fun ServersScreen(activity: FragmentActivity) {
     var pickerOpen by remember { mutableStateOf(false) }
     val selected = PojavInstanceBridge.selected
     val instances = PojavInstanceBridge.instances
+    val artworkCatalog = remember(context) {
+        runCatching { context.assets.open("server_artwork/catalog.json").bufferedReader().use { ServerArtworkCatalog.load(it) } }.getOrNull()
+    }
 
     fun save(list: List<SavedServer>) { SavedServers.save(context, list); entries = list }
     val bannerPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
@@ -138,10 +145,14 @@ fun ServersScreen(activity: FragmentActivity) {
                 }
             }
         } else {
-            LazyColumn(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp),
+            BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+              val columns = when { maxWidth >= 690.dp -> 3; maxWidth >= 460.dp -> 2; else -> 1 }
+              LazyVerticalGrid(columns = GridCells.Fixed(columns), modifier = Modifier.fillMaxSize(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp),
                 contentPadding = PaddingValues(bottom = 18.dp)) {
                 items(entries, key = { it.id }) { entry ->
                     ServerCard(entry, results[entry.id], accent, bannerRevisions[entry.id] ?: 0,
+                        artwork = remember(entry.address, artworkCatalog) { artworkCatalog?.find(entry.address) },
                         onRefresh = { refreshing++ }, onEdit = { edit = entry }, onDelete = { deleting = entry },
                         onBanner = { bannerTarget = entry.id; bannerPicker.launch("image/*") },
                         onClearBanner = {
@@ -158,9 +169,10 @@ fun ServersScreen(activity: FragmentActivity) {
                             else PojavLaunchBridge.joinSocialSession(activity = activity, mcVersion = null, loaderName = null, serverAddress = entry.address)
                         })
                 }
-                item {
-                    Text("Banner art is decorative. Server-reported versions may not list every supported version. Saved here on this device; Minecraft's own server list is separate.", color = AerixSurface.textMuted, fontSize = 10.sp)
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    Text("Server artwork, when available, comes from LabyMod server-media; other banners are decorative. Reported versions may not be complete. Saved on this device; Minecraft's own server list is separate.", color = AerixSurface.textMuted, fontSize = 10.sp)
                 }
+              }
             }
         }
     }
@@ -204,7 +216,7 @@ private fun ServerEditor(initial: SavedServer?, atLimit: Boolean, onDismiss: () 
 }
 
 @Composable
-private fun ServerCard(entry: SavedServer, result: ServerResult?, accent: Color, bannerRevision: Int, onRefresh: () -> Unit,
+private fun ServerCard(entry: SavedServer, result: ServerResult?, accent: Color, bannerRevision: Int, artwork: ServerArtworkCatalog.Artwork?, onRefresh: () -> Unit,
     onEdit: () -> Unit, onDelete: () -> Unit, onBanner: () -> Unit, onClearBanner: () -> Unit,
     onCopy: () -> Unit, onJoin: () -> Unit) {
     val context = LocalContext.current
@@ -216,11 +228,18 @@ private fun ServerCard(entry: SavedServer, result: ServerResult?, accent: Color,
     val logo = remember(status?.favicon) { decodeServerLogo(status?.favicon) }
     // The ID is random and persisted with the entry: artwork stays stable across refreshes and edits.
     val automaticBanner = remember(entry.id) { automaticBannerFor(entry.id) }
+    val publicArtwork by produceState<ImageBitmap?>(null, artwork?.url, banner == null) {
+        value = null
+        if (banner == null && artwork != null) value = withContext(Dispatchers.IO) {
+            ServerArtworkImages.load(artwork)?.asImageBitmap()
+        }
+    }
     Surface(shape = RoundedCornerShape(18.dp), color = AerixSurface.panel, modifier = Modifier.fillMaxWidth()) {
         Column {
             Box(Modifier.fillMaxWidth().height(82.dp).background(Brush.linearGradient(listOf(accent.copy(alpha = 0.5f), Color(0xFF151820))))) {
+                Image(painterResource(automaticBanner), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
                 if (banner != null) Image(banner, contentDescription = "${entry.name} custom banner", contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                else Image(painterResource(automaticBanner), contentDescription = "Decorative server banner", contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                else if (publicArtwork != null) Image(publicArtwork!!, contentDescription = "${entry.name} server artwork", contentScale = if (artwork?.banner == true) ContentScale.Fit else ContentScale.Crop, modifier = Modifier.fillMaxSize())
                 Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xCC111217)))))
                 Text(status?.motd?.takeIf { it.isNotBlank() } ?: entry.address, modifier = Modifier.align(Alignment.BottomStart).padding(10.dp),
                     color = Color.White, fontSize = 11.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -242,7 +261,11 @@ private fun ServerCard(entry: SavedServer, result: ServerResult?, accent: Color,
                     if (status != null) Text("Reported versions: ${status.version ?: "Not provided"}", color = AerixSurface.textSecondary, fontSize = 10.sp, maxLines = 2)
                     if (status != null && status.sample.isNotEmpty()) Text("Players: ${status.sample.joinToString()}", color = AerixSurface.textMuted, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
-                Button(onClick = onJoin, contentPadding = PaddingValues(horizontal = 12.dp)) { Text("Join") }
+            }
+            Row(Modifier.fillMaxWidth().padding(start = 10.dp, end = 10.dp, bottom = 8.dp),
+                horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+                Button(onClick = onJoin, contentPadding = PaddingValues(horizontal = 14.dp)) { Text("Join") }
+                Spacer(Modifier.width(6.dp))
                 Box {
                     IconButton(onClick = { menu = true }, modifier = Modifier.size(32.dp)) {
                         Text("⋮", color = AerixSurface.textPrimary, fontSize = 23.sp)
