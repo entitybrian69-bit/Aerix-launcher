@@ -7,6 +7,10 @@ import static net.kdt.pojavlaunch.game.GameActivity.INTENT_LAUNCH_VERSION;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.ResultReceiver;
 
 import net.kdt.pojavlaunch.aerix.bridge.PojavLaunchBridge;
 import net.kdt.pojavlaunch.game.GameActivity;
@@ -62,11 +66,23 @@ public class ContextAwareDoneListener implements MoJsonExtras.DoneListener, Cont
         try {
             net.kdt.pojavlaunch.aerix.discord.AerixDiscordPresence.prepareHandoffToGame(activity);
             Intent gameStartIntent = createGameStartIntent(activity);
+            // Keep the launcher alive until the separate game process has a resumed window and
+            // connected service. Killing it immediately can leave no activity to return to if the
+            // new process fails during startup. A receiver is process-local IPC, not a service.
+            gameStartIntent.putExtra(GameActivity.INTENT_START_ACK, new ResultReceiver(new Handler(Looper.getMainLooper())) {
+                private boolean acknowledged;
+                @Override protected void onReceiveResult(int resultCode, Bundle resultData) {
+                    if (resultCode != GameActivity.START_ACK_READY || acknowledged) return;
+                    acknowledged = true;
+                    activity.finish();
+                    android.os.Process.killProcess(android.os.Process.myPid());
+                }
+            });
+            LaunchDiagnostics.mark(activity, "Game activity requested");
             activity.startActivity(gameStartIntent);
-            activity.finish();
-            android.os.Process.killProcess(android.os.Process.myPid()); //You should kill yourself, NOW!
         } catch (Throwable e) {
-            Tools.showError(activity.getBaseContext(), e);
+            LaunchDiagnostics.mark(activity, "Could not request game activity");
+            Tools.showError(activity, e);
         }
     }
 

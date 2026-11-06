@@ -178,8 +178,10 @@ public class GpuUtils {
         public final int glesMajorVersion;
         public final boolean forcedMsaa;
         protected GLInfo(String vendor, String renderer, int glesMajorVersion, boolean forcedMsaa) {
-            this.vendor = vendor;
-            this.renderer = renderer;
+            // A few drivers return null for a GL string even when a context was created.
+            // Treat those as unknown instead of crashing in the renderer checks at launch.
+            this.vendor = vendor != null ? vendor : "<Unknown>";
+            this.renderer = renderer != null ? renderer : "<Unknown>";
             this.glesMajorVersion = glesMajorVersion;
             this.forcedMsaa = forcedMsaa;
         }

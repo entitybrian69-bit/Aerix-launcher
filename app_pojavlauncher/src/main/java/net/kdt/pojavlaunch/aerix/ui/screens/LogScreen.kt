@@ -113,6 +113,12 @@ private fun readLog(file: File): String {
 private fun collectSources(context: Context): List<LogSource> {
     val sources = ArrayList<LogSource>()
     sources.add(LogSource(context.getString(R.string.aerix_logs_latest), File(Tools.DIR_GAME_HOME, "latestlog.txt")))
+    File(context.filesDir, net.kdt.pojavlaunch.lifecycle.LaunchDiagnostics.FILE_NAME)
+        .takeIf { it.isFile }?.let { sources.add(LogSource("Launch status", it)) }
+    File(Tools.DIR_GAME_HOME, "latestcrash.txt")
+        .takeIf { it.isFile }?.let { sources.add(LogSource("Launcher crash", it)) }
+    File(Tools.DIR_DATA, "latestcrash.txt")
+        .takeIf { it.isFile }?.let { sources.add(LogSource("Launcher crash (private)", it)) }
     val crashDirs = LinkedHashSet<File>()
     runCatching { Instances.loadSelectedInstance()?.gameDirectory?.let { crashDirs.add(File(it, "crash-reports")) } }
     Tools.DIR_HOME_CRASH?.let { crashDirs.add(File(it)) }
