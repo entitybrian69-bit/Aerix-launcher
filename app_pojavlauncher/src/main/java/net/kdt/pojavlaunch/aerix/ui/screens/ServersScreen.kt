@@ -159,7 +159,7 @@ fun ServersScreen(activity: FragmentActivity) {
                         })
                 }
                 item {
-                    Text("Server-reported versions may not list every supported version. Saved here on this device; Minecraft's own server list is separate.", color = AerixSurface.textMuted, fontSize = 10.sp)
+                    Text("Banner art is decorative. Server-reported versions may not list every supported version. Saved here on this device; Minecraft's own server list is separate.", color = AerixSurface.textMuted, fontSize = 10.sp)
                 }
             }
         }
@@ -214,10 +214,13 @@ private fun ServerCard(entry: SavedServer, result: ServerResult?, accent: Color,
         if (entry.banner) runCatching { BitmapFactory.decodeFile(SavedServers.bannerFile(context, entry.id).absolutePath)?.asImageBitmap() }.getOrNull() else null
     }
     val logo = remember(status?.favicon) { decodeServerLogo(status?.favicon) }
+    // The ID is random and persisted with the entry: artwork stays stable across refreshes and edits.
+    val automaticBanner = remember(entry.id) { automaticBannerFor(entry.id) }
     Surface(shape = RoundedCornerShape(18.dp), color = AerixSurface.panel, modifier = Modifier.fillMaxWidth()) {
         Column {
             Box(Modifier.fillMaxWidth().height(82.dp).background(Brush.linearGradient(listOf(accent.copy(alpha = 0.5f), Color(0xFF151820))))) {
-                if (banner != null) Image(banner, contentDescription = "${entry.name} banner", contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                if (banner != null) Image(banner, contentDescription = "${entry.name} custom banner", contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                else Image(painterResource(automaticBanner), contentDescription = "Decorative server banner", contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
                 Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xCC111217)))))
                 Text(status?.motd?.takeIf { it.isNotBlank() } ?: entry.address, modifier = Modifier.align(Alignment.BottomStart).padding(10.dp),
                     color = Color.White, fontSize = 11.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -256,6 +259,11 @@ private fun ServerCard(entry: SavedServer, result: ServerResult?, accent: Color,
             }
         }
     }
+}
+
+private fun automaticBannerFor(id: String): Int {
+    val scenes = intArrayOf(R.drawable.server_scene_forest, R.drawable.server_scene_nether, R.drawable.server_scene_night)
+    return scenes[(id.hashCode() and Int.MAX_VALUE) % scenes.size]
 }
 
 private fun decodeServerLogo(data: String?): ImageBitmap? = runCatching {

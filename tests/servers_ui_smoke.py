@@ -9,5 +9,9 @@ assert 'LauncherSection.SERVERS' in rail and 'ServersScreen(activity)' in router
 for expected in ['ServerStatusClient.ping', 'SrvLookup.resolve', 'Add server', 'Choose banner', 'Remove banner', 'Copy address', 'Edit server', 'Remove server', 'joinSocialSession', 'PojavInstanceBridge.select', 'Minecraft\'s own server list is separate']:
     assert expected in screen, expected
 assert 'server_banners' in store and '8 * 1024 * 1024' in store
+assert 'automaticBannerFor(entry.id)' in screen and 'Banner art is decorative' in screen
+assert 'if (banner != null) Image(banner' in screen and 'painterResource(automaticBanner)' in screen
+for scene in ('forest', 'nether', 'night'):
+    assert (root / f'app_pojavlauncher/src/main/res/drawable-nodpi/server_scene_{scene}.jpg').is_file()
 assert 'SocialServerHubSection' in (base / 'ui/screens/SocialPartiesAndDiscover.kt').read_text()
 print('Servers UI and preservation smoke test passed')
