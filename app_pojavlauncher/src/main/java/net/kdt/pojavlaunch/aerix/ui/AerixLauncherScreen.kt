@@ -97,6 +97,7 @@ import net.kdt.pojavlaunch.aerix.ui.screens.LibraryScreen
 import net.kdt.pojavlaunch.aerix.bridge.AerixInstallQueue
 import net.kdt.pojavlaunch.aerix.ui.screens.AerixInstallPanel
 import net.kdt.pojavlaunch.aerix.ui.screens.AerixInstallPill
+import net.kdt.pojavlaunch.aerix.ui.screens.AerixLobbyScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.LogScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.OfflineAccountScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.SettingsScreen
@@ -173,16 +174,23 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
 
     BackHandler(enabled = AerixNav.canGoBack) { AerixNav.back() }
 
+    // The Lobby is the new home: no glass rail, no dashboard, a full-bleed build behind one big
+    // skin. The first-run tour still uses the classic dashboard, because its steps highlight the
+    // rail and the docked skin card. Users can switch back at any time from Settings.
+    val lobbyActive = section == LauncherSection.HOME && AerixPreferences.lobbyUi &&
+        !AerixGuideState.running
+    val villageBackdrop = lobbyActive && AerixPreferences.lobbyVillageBackdrop
+
     CompositionLocalProvider(LocalGuideRegistry provides guideRegistry) {
-    AerixBackground {
+    AerixBackground(skipWallpaper = villageBackdrop) {
       FestivalEffectsHost(festivals = festivals, modifier = Modifier.fillMaxSize()) {
         // The wallpaper and the festival effects run to the edges of the display; the shell
         // itself stays clear of the camera cutout and of the system bars.
         Box(modifier = Modifier.fillMaxSize().padding(AerixWindowInsets.padding())) {
             Row(modifier = Modifier.fillMaxSize()) {
-                // The social space has its own sidebar and takes the whole window; every other
-                // section keeps the launcher's rail.
-                if (section != LauncherSection.SOCIALS) {
+                // The social space has its own sidebar and takes the whole window; the Lobby
+                // deliberately has no rail. Every other section keeps the launcher's rail.
+                if (section != LauncherSection.SOCIALS && !lobbyActive) {
                     AerixNavigationRail(
                         selectedSection = section,
                         onNavigate = navigate,
@@ -201,7 +209,11 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
                     ) { target ->
                         when (target) {
                             LauncherSection.OTHER_RELEASES -> net.kdt.pojavlaunch.aerix.ui.screens.OtherReleasesScreen(activity, navigate)
-                            LauncherSection.HOME -> HomeScreen(activity, navigate)
+                            LauncherSection.HOME -> if (lobbyActive) {
+                                AerixLobbyScreen(activity, navigate)
+                            } else {
+                                HomeScreen(activity, navigate)
+                            }
                             LauncherSection.AERIX_CLIENT -> ClientHubScreen(activity, clientOwnerPage) { clientOwnerPage = it }
                             LauncherSection.LIBRARY -> LibraryScreen(activity)
                             LauncherSection.SERVERS -> ServersScreen(activity)

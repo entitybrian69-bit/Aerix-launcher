@@ -1462,6 +1462,26 @@ private fun LauncherTabContent(activity: FragmentActivity) {
             DiscordPresenceSettingsCard()
         }
 
+        // Lobby home: the blocky full-bleed screen, with a way back to the glass dashboard.
+        item {
+            SettingsCardColumn(modifier = Modifier.fillMaxWidth()) {
+                MiraiSwitchSettingsCard(
+                    position = CardPosition.Top,
+                    title = stringResource(R.string.aerix_settings_lobby_home),
+                    summary = stringResource(R.string.aerix_settings_lobby_home_summary),
+                    checked = AerixPreferences.lobbyUi,
+                    onCheckedChange = { AerixPreferences.saveLobbyUi(it) }
+                )
+                MiraiSwitchSettingsCard(
+                    position = CardPosition.Bottom,
+                    title = stringResource(R.string.aerix_settings_lobby_village),
+                    summary = stringResource(R.string.aerix_settings_lobby_village_summary),
+                    checked = AerixPreferences.lobbyVillageBackdrop,
+                    onCheckedChange = { AerixPreferences.saveLobbyVillageBackdrop(it) }
+                )
+            }
+        }
+
         // Group 1: Color theme, custom color, festival effects, full screen (Mirai LauncherSettingsScreen)
         item {
             SettingsCardColumn(modifier = Modifier.fillMaxWidth()) {
