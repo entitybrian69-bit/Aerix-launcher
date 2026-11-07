@@ -13,6 +13,7 @@
     <!-- Navigation rail -->
     <string name="aerix_nav_home">Home</string>
     <string name="aerix_nav_library">Library</string>
+    <string name="aerix_nav_servers">Servers</string>
     <string name="aerix_nav_discover">Discover</string>
     <string name="aerix_nav_wallpapers">Themes</string>
     <string name="aerix_nav_accounts">Accounts</string>

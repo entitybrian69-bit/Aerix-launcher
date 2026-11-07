@@ -1,0 +1,10 @@
+Server artwork catalog
+
+Address and filename metadata indexed from LabyMod/server-media, revision
+325aff8938bfeac4ea67232896538fade6985165:
+https://github.com/LabyMod/server-media
+
+Matched public server images are loaded directly from the above repository, not
+bundled in Aerix. Images and trademarks belong to their respective owners and
+are used for identification only. They do not imply endorsement. The index is
+a snapshot; servers not listed or not downloadable use decorative fallback art.
