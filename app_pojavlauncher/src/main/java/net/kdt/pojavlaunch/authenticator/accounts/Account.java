@@ -73,6 +73,11 @@ public class Account {
         try {
             Account account = JSONUtils.readFromFile(mSaveLocation, Account.class);
             if(account == null) return null;
+            // Account files saved by older versions may not carry authType; keep the raw read as
+            // safe as Accounts.load() so callers never see a null type.
+            if(account.authType == null) {
+                account.authType = account.isMicrosoft ? AuthType.MICROSOFT : AuthType.LOCAL;
+            }
             account.mSaveLocation = mSaveLocation;
             return account;
         }catch (IOException | JsonParseException e) {

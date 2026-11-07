@@ -277,7 +277,7 @@ object PojavAccountBridge : LoginListener {
         // Wait until all tasks (including other login tasks) are done before refreshing, like AccountSpinner.
         ProgressKeeper.waitUntilDone {
             val refreshed = account.reload() ?: return@waitUntilDone
-            val authType = refreshed.authType
+            val authType = refreshed.authType ?: return@waitUntilDone
             if (authType.requiresLogin() && System.currentTimeMillis() > refreshed.expiresAt) {
                 authType.createAuth().refreshAccount(this, refreshed)
             }
@@ -297,7 +297,8 @@ object PojavAccountBridge : LoginListener {
         loginProgress = 0f
         ProgressKeeper.waitUntilDone {
             val refreshed = account.source.reload() ?: return@waitUntilDone
-            refreshed.authType.createAuth().refreshAccount(this, refreshed)
+            val refreshedType = refreshed.authType ?: return@waitUntilDone
+            refreshedType.createAuth().refreshAccount(this, refreshed)
         }
     }
 
