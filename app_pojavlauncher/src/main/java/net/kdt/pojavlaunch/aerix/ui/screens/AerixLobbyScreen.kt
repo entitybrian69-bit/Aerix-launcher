@@ -70,6 +70,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -333,7 +334,7 @@ private fun LobbyFeatureCard(
             fontFamily = LobbyFont,
             maxLines = 1,
             textAlign = TextAlign.Center,
-            style = androidx.compose.ui.text.style.TextStyle(shadow = LobbyTextShadow)
+            style = TextStyle(shadow = LobbyTextShadow)
         )
     }
 }
@@ -367,7 +368,7 @@ private fun LobbyPromoCard(modifier: Modifier, onClick: () -> Unit) {
                         fontSize = 20.sp,
                         fontFamily = LobbyFont,
                         maxLines = 1,
-                        style = androidx.compose.ui.text.style.TextStyle(shadow = LobbyTextShadow)
+                        style = TextStyle(shadow = LobbyTextShadow)
                     )
                     Text(
                         text = stringResource(R.string.aerix_lobby_promo_action),
@@ -375,7 +376,7 @@ private fun LobbyPromoCard(modifier: Modifier, onClick: () -> Unit) {
                         fontSize = 15.sp,
                         fontFamily = LobbyFont,
                         maxLines = 1,
-                        style = androidx.compose.ui.text.style.TextStyle(shadow = LobbyTextShadow)
+                        style = TextStyle(shadow = LobbyTextShadow)
                     )
                 }
                 Box(
@@ -478,7 +479,7 @@ private fun LobbyInstanceCard(
                         fontSize = 15.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        style = androidx.compose.ui.text.style.TextStyle(shadow = LobbyTextShadow)
+                        style = TextStyle(shadow = LobbyTextShadow)
                     )
                     Text(
                         text = selected?.let {
@@ -540,7 +541,7 @@ private fun LobbyPlayCard(
                     fontFamily = LobbyFont,
                     fontSize = 21.sp,
                     maxLines = 1,
-                    style = androidx.compose.ui.text.style.TextStyle(shadow = LobbyTextShadow)
+                    style = TextStyle(shadow = LobbyTextShadow)
                 )
                 Text(
                     text = if (installing) {
@@ -853,7 +854,7 @@ private fun LobbyMenuSheet(onDismiss: () -> Unit, navigate: (LauncherSection) ->
             color = LobbyWhite,
             fontFamily = LobbyFont,
             fontSize = 16.sp,
-            style = androidx.compose.ui.text.style.TextStyle(shadow = LobbyTextShadow)
+            style = TextStyle(shadow = LobbyTextShadow)
         )
         sections.chunked(3).forEach { row ->
             Row(
@@ -936,7 +937,7 @@ private fun LobbyRewardSheet(rewardId: String, onDismiss: () -> Unit, onApply: (
             color = LobbyWhite,
             fontFamily = LobbyFont,
             fontSize = 18.sp,
-            style = androidx.compose.ui.text.style.TextStyle(shadow = LobbyTextShadow)
+            style = TextStyle(shadow = LobbyTextShadow)
         )
         Text(
             text = preset?.biome ?: "",
