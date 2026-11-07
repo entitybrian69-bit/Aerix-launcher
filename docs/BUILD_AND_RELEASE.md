@@ -1,26 +1,38 @@
-# Debug builds and public releases
+# Aerix Nightly and public releases
 
-Testing happens on the debug APK. The public APK is only built when the owner
-asks for a release and confirms it.
+All non-release updates and testing happen on the **Aerix Nightly** APK. The public
+APK is only built when the owner asks for a release and confirms it.
 
-## The debug APK
+## The Aerix Nightly APK
 
 | | |
 |---|---|
 | Release tag | `debug-latest` (prerelease on GitHub Releases) |
-| Direct APK | `https://github.com/entitybrian69-bit/Aerix-launcher/releases/download/debug-latest/Aerix-Launcher-debug.apk` |
-| Checksum | `https://github.com/entitybrian69-bit/Aerix-launcher/releases/download/debug-latest/Aerix-Launcher-debug.apk.sha256` |
-| Build info | `https://github.com/entitybrian69-bit/Aerix-launcher/releases/download/debug-latest/DEBUG_BUILD.txt` |
-| CI artifact | Actions run of **Aerix debug (testing)**, artifact `aerix-debug-apk` |
-| Source | this branch (`version.properties` = `1.5.6`) |
-| Variant | `noruntimeDebug` |
+| Direct APK | `https://github.com/entitybrian69-bit/Aerix-launcher/releases/download/debug-latest/Aerix-Nightly.apk` |
+| Commit-stamped APK | `Aerix-Nightly-<commit>.apk` on the same release |
+| Checksum | `https://github.com/entitybrian69-bit/Aerix-launcher/releases/download/debug-latest/Aerix-Nightly.apk.sha256` |
+| Build info | `https://github.com/entitybrian69-bit/Aerix-launcher/releases/download/debug-latest/NIGHTLY_BUILD.txt` |
+| CI workflow | **Aerix Nightly (testing)** (`aerix-debug.yml`) |
+| CI artifact | `aerix-nightly-apk` |
+| Source | this branch (`version.properties` = `2.1.0`) |
+| Variant | `noruntimeNightly` |
 | applicationId | `net.kdt.pojavlaunch.debug` |
-| Label | Aerix Launcher (Debug) |
+| Label | Aerix Nightly |
 | Signing | `app_pojavlauncher/debug.keystore` (alias `androiddebugkey`) |
 
-Because the applicationId ends in `.debug`, this APK installs next to the public
-launcher on the same phone. Both can be open at once, and updating the debug
-build never touches the released app or its data.
+Aerix Nightly is the debug build with a different launcher label. It keeps the
+same applicationId, the same signing certificate and the same monotonically
+increasing versionCode as the old debug APK, so it installs straight over an
+existing **Aerix Launcher (Debug)** install, keeps that app's data, and behaves
+identically. It installs next to the public launcher and can never overwrite a
+release APK.
+
+The `debug-latest` tag is only the hosting anchor for the prerelease: it keeps the
+release sorted below every public `v*` release and keeps `releases/latest` on the
+stable build. Every APK asset on it is Aerix Nightly. On each publish the old
+`Aerix-Launcher-debug*.apk` files and `DEBUG_BUILD.txt` are removed, together with
+stamped nightlies from older commits, so there is only ever one testing build to
+download. Old debug download links are not updated anymore.
 
 The `noruntime` flavor does not embed a Java runtime, keeping downloads smaller;
 the launcher downloads the runtime it needs on first launch. APKs are never
@@ -29,68 +41,68 @@ committed to Git (`apk/` is ignored).
 ### When it is rebuilt
 
 `.github/workflows/aerix-debug.yml` runs on every push to the working branch that
-touches the app sources, Gradle files, submodules or the workflow itself. It also
-has a manual trigger. The job builds the APK, checks that the package name really
-is `net.kdt.pojavlaunch.debug`, uploads it as an Actions artifact, and attaches
-it to the `debug-latest` GitHub Release (marked as a prerelease so `releases/latest`
-remains the public stable release).
+touches the app sources, Gradle files, tests, submodules or the workflow itself.
+It also has a manual trigger. The job runs the smoke tests, builds
+`assembleNoruntimeNightly`, checks that the package really is
+`net.kdt.pojavlaunch.debug`, that the APK carries the Aerix Nightly label and that
+it is signed correctly, uploads it as an Actions artifact, and publishes it to the
+`debug-latest` prerelease.
 
 ### Building one locally
 
 ```bash
-./gradlew :app_pojavlauncher:assembleNoruntimeDebug
-# output: app_pojavlauncher/build/outputs/apk/noruntime/debug/app_pojavlauncher-noruntime-debug.apk
+./gradlew :app_pojavlauncher:assembleNoruntimeNightly
+# output: app_pojavlauncher/build/outputs/apk/noruntime/nightly/app_pojavlauncher-noruntime-nightly.apk
 ```
 
 A local build needs JDK 21, the Android SDK with NDK `29.0.14206865`, and
 initialised submodules (`git submodule update --init --recursive`).
 
+The separate `.github/workflows/nightly.yml` is legacy: it builds a different app
+(`net.kdt.pojavlaunch.pub`) and its publish steps only run for the upstream
+repository owner. It is not the testing channel.
+
 ## Public releases
 
-Public APKs are **not** stored in this repository. `Aerix-Launcher.apk` is
-around 118 MB, which is above GitHub's 100 MB per-file limit, so release builds
-live as assets on the GitHub Releases page and nowhere else.
+Public APKs are **not** stored in the Git repository. The universal APK is
+147 MB, above GitHub's 100 MB limit for repository files, so release builds live
+as assets on the GitHub Releases page and nowhere else.
 
-Current public release: **v1.5.6**, tag target `eb7f6b5`.
-
-A patch release over 1.5.5: the first-run guide stopped positioning its card from a component that
-could be off canvas, which made Compose reject a negative padding and close the launcher
-(`AerixGuide.kt:235`, reported on Android 9). No feature changed.
+Current public release: **v2.1.0**, tag target `ec82bd5` (notes in
+`docs/releases/v2.1.0.md`).
 
 | Asset | Size |
 |---|---|
-| `Aerix-Launcher-1.5.6-arm64-v8a.apk` | 75,446,672 |
-| `Aerix-Launcher-1.5.6-armeabi-v7a.apk` | 75,690,400 |
-| `Aerix-Launcher-1.5.6.apk` | 133,370,508 |
-| `Aerix-Launcher-1.5.6-noruntime-arm64-v8a.apk` | 46,336,179 |
-| `Aerix-Launcher-1.5.6-noruntime-armeabi-v7a.apk` | 46,579,888 |
-| `Aerix-Launcher-1.5.6-noruntime.apk` | 104,260,005 |
-| `Aerix-Launcher.apk` | same bytes as the 1.5.6 universal APK |
-| `Aerix-Launcher-noruntime.apk` | same bytes as the 1.5.6 no-runtime APK |
+| `Aerix-Launcher-2.1.0-arm64-v8a.apk` | 89,520,737 |
+| `Aerix-Launcher-2.1.0-armeabi-v7a.apk` | 89,765,275 |
+| `Aerix-Launcher-2.1.0.apk` | 147,446,205 |
+| `Aerix-Launcher-2.1.0-noruntime-arm64-v8a.apk` | 60,410,414 |
+| `Aerix-Launcher-2.1.0-noruntime-armeabi-v7a.apk` | 60,654,946 |
+| `Aerix-Launcher-2.1.0-noruntime.apk` | 118,335,900 |
+| `Aerix-Launcher.apk` | same bytes as the 2.1.0 universal APK |
+| `Aerix-Launcher-noruntime.apk` | same bytes as the 2.1.0 no-runtime APK |
 | `SHA256SUMS` | hashes of every file above — take them from the release, never retyped here |
 
 The unversioned names are copies of the same files. The download buttons on the
 website point at `releases/latest/download/<name>`, so a release has to carry
-them alongside the versioned names the in-app updater looks for.
+them alongside the versioned names the in-app updater looks for. The in-app
+updater only ever considers stable `vX.Y.Z` releases; Nightly updates are
+downloaded from the release page.
 
 Release notes for each version live in `docs/releases/`.
 
 ### Releasing
 
-Both publishing workflows take a confirmation input and do nothing without it:
-
-* `.github/workflows/release.yml` — needs `RELEASE` typed in. It builds both
-  editions, names them after `version.properties`, writes `SHA256SUMS`, then a
-  second job puts them on the Releases page as `v<version>` with
-  `docs/releases/v<version>.md` as the notes. It refuses to touch a tag that
-  already exists. Where the tooling has no Actions-write token, the same build
-  can be started by pushing a change to that file with `[build-release]` in the
-  commit message.
-* `.github/workflows/nightly.yml` — needs `NIGHTLY` typed in. This one creates a
-  prerelease on GitHub.
+`.github/workflows/release.yml` takes a confirmation input and does nothing
+without it. It needs `RELEASE` typed in, builds both editions, names them after
+`version.properties`, writes `SHA256SUMS`, then a second job puts them on the
+Releases page as `v<version>` with `docs/releases/v<version>.md` as the notes.
+It refuses to touch a tag that already exists. Where the tooling has no
+Actions-write token, the same build can be started by pushing a change to that
+file with `[build-release]` in the commit message.
 
 To release a new version: raise `versionName` in `version.properties`, add
 `docs/releases/v<version>.md`, and run the release workflow.
 
 A release happens when the owner says so, and not before. Until then, changes are
-verified on the debug APK.
+verified on Aerix Nightly.

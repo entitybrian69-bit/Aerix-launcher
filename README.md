@@ -35,7 +35,7 @@
 
 ## Android package and existing data
 
-To keep existing Aerix installs updatable, the release app retains the Android ID `net.kdt.pojavlaunch`; the debug app retains `net.kdt.pojavlaunch.debug`. Android can install an update over an existing app only when its package ID and signing certificate match and its version code is not lower. Debug and release are separate apps and cannot update each other. Back up your data before installing an update.
+To keep existing Aerix installs updatable, the release app retains the Android ID `net.kdt.pojavlaunch`; Aerix Nightly (the testing build) retains `net.kdt.pojavlaunch.debug`. Android can install an update over an existing app only when its package ID and signing certificate match and its version code is not lower. Nightly and release are separate apps and cannot update each other. Back up your data before installing an update.
 
 ## 🗺️ Quick Links
 <p align="center">
@@ -171,7 +171,7 @@ Aerix respects user privacy. Your worlds are yours. Your accounts are yours. Aer
 *   **100% Human-Coded:** Pure handcrafted layout structure. No automated wrappers, no AI passes filling in layouts, and no generated scrap.
 *   **Owner Maintained:** The person who writes the modules is the person tracking issues, fixing dependencies, and addressing community reports.
 *   **Multi-Device Validation:** Built builds are rigorously evaluated on a cluster of different hardware configurations before moving into stable branches.
-*   **Continuous Debugging:** Automated Debug CI compiles on every commit and incoming pull request to safeguard against silent deployment breaks.
+*   **Continuous Testing:** Aerix Nightly CI compiles on every commit and incoming pull request to safeguard against silent deployment breaks.
 
 ---
 
@@ -209,7 +209,7 @@ That is why the product stays coherent: the people who add offline capes are the
 
 **Requires Android 8.0+.** Best on 4 GB RAM or more.
 
-Debug builds from CI are for testing. Release builds are the ones to keep.
+**Aerix Nightly** builds from CI are for testing — all non-release updates and testing land on that APK: [Aerix-Nightly.apk](https://github.com/entitybrian69-bit/Aerix-launcher/releases/download/debug-latest/Aerix-Nightly.apk). Release builds are the ones to keep.
 
 🌐 **Website:** <https://entitybrian69-bit.github.io/Aerix-launcher/> — screenshots, the full renderer lineup, a setup guide and an FAQ.
 

@@ -85,6 +85,7 @@ jobs:
       - name: Verify launcher and FastClient smoke tests
         run: |
           python3 tests/branding_identity_smoke.py
+          python3 tests/nightly_channel_smoke.py
           python3 tests/social_profile_cosmetics_smoke.py
           python3 tests/client_background_smoke.py
           python3 tests/instance_renderer_smoke.py

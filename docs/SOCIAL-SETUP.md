@@ -4,7 +4,7 @@ Everything here can be done from the phone browser. Nothing needs a computer.
 Total time: **about 25 minutes**. Do the steps in order; the later ones depend on the earlier ones.
 
 What you end up with: Google sign-in that works for every user of the launcher, a free database that
-holds profiles, friend lists and messages, and a debug APK on your phone that you can test in.
+holds profiles, friend lists and messages, and an Aerix Nightly APK on your phone that you can test in.
 
 ---
 
@@ -161,16 +161,16 @@ works with any email. Part 2 only adds the Google button on top.
 
 ## Part 4 — Testing each stage · ~5 minutes each
 
-> **Warning:** this testing build installs alongside the real app as `net.kdt.pojavlaunch.debug`.
+> **Warning:** Aerix Nightly installs alongside the real app as `net.kdt.pojavlaunch.debug`.
 
 1. Tap the APK link I send →
-   `https://github.com/entitybrian69-bit/Aerix-launcher/releases/download/debug-latest/Aerix-Launcher-debug.apk`
+   `https://github.com/entitybrian69-bit/Aerix-launcher/releases/download/debug-latest/Aerix-Nightly.apk`
 2. When Android says the app is already installed, choose **Update / Install anyway**. Do **not**
-   uninstall your normal **Aerix Launcher** — only ever remove **Aerix Launcher (Debug)** if Android
-   refuses an update over an older debug signature/version.
-3. **Debug builds install next to your normal Aerix** (package `net.kdt.pojavlaunch.debug`), so you can
+   uninstall your normal **Aerix Launcher** — only ever remove **Aerix Nightly** (or an older
+   **Aerix Launcher (Debug)** install) if Android refuses an update over an older signature/version.
+3. **Aerix Nightly installs next to your normal Aerix** (package `net.kdt.pojavlaunch.debug`), so you can
    keep playing on the normal one while testing.
-4. Open the debug app → **Socials**, the first tile on the Home dashboard. It takes the whole
+4. Open **Aerix Nightly** → **Socials**, the first tile on the Home dashboard. It takes the whole
    window and brings its own sidebar (Friends, Messages, Activity, Settings); the arrow at the top
    of that sidebar comes back to the launcher.
 5. Tell me, in plain words, what happened. If something is broken, also send the launcher log:
@@ -193,7 +193,7 @@ rail with its own while it is up.
 ## Part 5 — When we release 1.5.7
 
 Nothing changes for Google. The browser flow in Part 2 has no package name and no certificate
-fingerprint in it, so the release build signs in exactly like the debug one — same project, same
+fingerprint in it, so the release build signs in exactly like the Nightly one — same project, same
 client, same redirect. The only thing to do at release time is the normal signing ritual you already
 have.
 

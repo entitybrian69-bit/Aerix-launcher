@@ -1,12 +1,14 @@
-name: Aerix debug (testing)
+name: Aerix Nightly (testing)
 
-# Builds the APK that all testing happens on and attaches it to the `debug-latest`
-# GitHub Release (prerelease, so `releases/latest` stays on the public stable release).
-# This workflow only ever builds the "noruntime" debug variant:
+# Builds the APK that all non-release updates and testing happen on and attaches it to the
+# `debug-latest` GitHub Release (prerelease, so `releases/latest` stays on the public stable
+# release). The tag is kept as a hosting anchor, but the only APK it carries is Aerix-Nightly.apk;
+# the old debug-named downloads are removed on every publish.
+# This workflow only ever builds the "noruntimeNightly" variant:
 #   applicationId net.kdt.pojavlaunch.debug, signed with app_pojavlauncher/debug.keystore
-# so it installs next to the public launcher and can never be mistaken for, or
-# overwrite, a release APK. Public releases are built by release.yml / nightly.yml,
-# which only run after a typed confirmation.
+# It is the debug build with a different launcher label, so it installs over an existing debug
+# install, sits next to the public launcher and can never overwrite a release APK.
+# Public releases are built by release.yml, which only runs after a typed confirmation.
 
 on:
   push:
@@ -39,10 +41,10 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # One APK for every phone: the debug build carries both ARM architectures, so it installs
+  # One APK for every phone: the testing build carries both ARM architectures, so it installs
   # anywhere without a second file to choose between.
-  APK_NAME: Aerix-Launcher-debug.apk
-  APK_PATH: app_pojavlauncher/build/outputs/apk/noruntime/debug/app_pojavlauncher-noruntime-debug.apk
+  APK_NAME: Aerix-Nightly.apk
+  APK_PATH: app_pojavlauncher/build/outputs/apk/noruntime/nightly/app_pojavlauncher-noruntime-nightly.apk
 
 jobs:
   build:
@@ -70,6 +72,7 @@ jobs:
         run: |
           trap 'echo "::error title=Smoke test failed::$BASH_COMMAND"' ERR
           python3 tests/branding_identity_smoke.py
+          python3 tests/nightly_channel_smoke.py
           python3 tests/discord_presence_logo_smoke.py
           python3 tests/modern_cape_smoke.py
           python3 tests/social_profile_cosmetics_smoke.py
@@ -219,11 +222,11 @@ jobs:
         with:
           gradle-version: "8.14.3"
 
-      - name: Build debug APK
+      - name: Build Aerix Nightly APK
         shell: bash
         run: |
           set +e
-          ./gradlew :app_pojavlauncher:assembleNoruntimeDebug --console=plain > build.log 2>&1
+          ./gradlew :app_pojavlauncher:assembleNoruntimeNightly --console=plain > build.log 2>&1
           code=$?
           if [ "$code" -ne 0 ]; then
             # One compressed annotation avoids GitHub's ten-annotations-per-step limit
@@ -233,7 +236,7 @@ jobs:
           fi
           exit "$code"
 
-      - name: Check it is really the debug build
+      - name: Check it is really the Aerix Nightly build
         id: verify
         run: |
           set -euo pipefail
@@ -244,31 +247,38 @@ jobs:
           echo "Using build-tools: $BT_DIR"
           "$BT_DIR/zipalign" -c 4 "$APK_PATH"
           "$BT_DIR/apksigner" verify --verbose --min-sdk-version 23 --print-certs "$APK_PATH" | tee apksigner.txt
-          BADGING="$("$BT_DIR/aapt2" dump badging "$APK_PATH" | head -n 1)"
+          BADGING_ALL="$("$BT_DIR/aapt2" dump badging "$APK_PATH")"
+          BADGING="$(printf '%s' "$BADGING_ALL" | head -n 1)"
           echo "$BADGING"
           [[ "$BADGING" == "package: name='net.kdt.pojavlaunch.debug' "* ]]
-          echo "applicationId net.kdt.pojavlaunch.debug confirmed"
+          printf '%s' "$BADGING_ALL" | grep -q "Aerix Nightly" || {
+            echo "::error title=nightly-label::APK does not carry the Aerix Nightly label"; exit 1;
+          }
+          echo "applicationId net.kdt.pojavlaunch.debug and Aerix Nightly label confirmed"
           VCODE="$(printf '%s' "$BADGING" | sed -n "s/.*versionCode='\([0-9]*\)'.*/\1/p")"
           echo "version_code=$VCODE" >> "$GITHUB_OUTPUT"
           echo "::notice title=apk-verified::$BADGING"
 
-      - name: Upload debug APK
+      - name: Upload Aerix Nightly APK
         uses: actions/upload-artifact@v4
         with:
-          name: aerix-debug-apk
+          name: aerix-nightly-apk
           path: ${{ env.APK_PATH }}
           retention-days: 30
 
-      - name: Publish debug APK to GitHub Release (debug-latest)
+      - name: Publish Aerix Nightly to GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION_CODE: ${{ steps.verify.outputs.version_code }}
         shell: bash
         run: |
           set -euo pipefail
+          # The tag stays debug-latest so the prerelease keeps its anchored position, but every
+          # APK on it is Aerix Nightly. Non-release updates and testing all land here.
           TAG="debug-latest"
+          INFO_NAME="NIGHTLY_BUILD.txt"
           SHORT="${GITHUB_SHA:0:7}"
-          STAMPED_NAME="Aerix-Launcher-debug-$SHORT.apk"
+          STAMPED_NAME="Aerix-Nightly-$SHORT.apk"
           BUILT_AT="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
           STAGE="$(mktemp -d)"
           cp "$APK_PATH" "$STAGE/$APK_NAME"
@@ -276,7 +286,7 @@ jobs:
           ( cd "$STAGE" && sha256sum "$APK_NAME" > "$APK_NAME.sha256" )
           SHA256="$(cut -d' ' -f1 "$STAGE/$APK_NAME.sha256")"
           {
-            echo "kind: debug (testing only)"
+            echo "kind: Aerix Nightly (testing only)"
             echo "name: $APK_NAME (universal, arm64 + arm32)"
             echo "stamped: $STAMPED_NAME"
             echo "branch: $GITHUB_REF_NAME"
@@ -286,10 +296,11 @@ jobs:
             echo "built: $BUILT_AT"
             echo "sha256: $SHA256"
             echo "package: net.kdt.pojavlaunch.debug"
-            echo "note: side-by-side testing build; public stable releases live under v* tags"
-          } > "$STAGE/DEBUG_BUILD.txt"
+            echo "label: Aerix Nightly"
+            echo "note: testing builds update over the old debug app; stable releases live under v* tags"
+          } > "$STAGE/$INFO_NAME"
           {
-            echo "Side-by-side testing build (\`net.kdt.pojavlaunch.debug\`) — installs next to the public launcher without touching its data."
+            echo "**Aerix Nightly** — the testing build (\`net.kdt.pojavlaunch.debug\`) — installs next to the public launcher without touching its data, and updates over an older debug install."
             echo ""
             echo "- **Direct download:** [\`$APK_NAME\`](https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/$APK_NAME)"
             echo "- **Commit-stamped download (avoids browser filename cache):** [\`$STAMPED_NAME\`](https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/$STAMPED_NAME)"
@@ -298,38 +309,44 @@ jobs:
             echo "- **versionCode:** \`$VERSION_CODE\`"
             echo "- **Built:** \`$BUILT_AT\`"
             echo "- **SHA-256:** \`$SHA256\`"
+            echo "- **Package / signing:** \`net.kdt.pojavlaunch.debug\`, \`app_pojavlauncher/debug.keystore\`"
+            echo ""
+            echo "All non-release updates and testing happen on this APK. Stable builds stay under the \`v*\` releases."
           } > "$STAGE/RELEASE_NOTES.md"
 
           # Anchor the tag ref to the root 2020 keystore commit so GitHub's /releases list
-          # always sorts debug-latest below every public v* release and never touches the website.
+          # always sorts this prerelease below every public v* release and never touches the website.
           ANCHOR_SHA="cadb0ab12ff45b582927361b703df878b37e0221"
           if gh release view "$TAG" > /dev/null 2>&1; then
-            # Prune previous commit-stamped APKs so only the latest pair remains on debug-latest.
-            for old_asset in $(gh release view "$TAG" --json assets --jq '.assets[].name' | grep -E '^Aerix-Launcher-debug-[0-9a-f]+\.apk$' || true); do
-              if [ "$old_asset" != "$STAMPED_NAME" ]; then
-                gh release delete-asset "$TAG" "$old_asset" --yes || true
-              fi
+            # Keep only the current nightly pair. Old debug downloads and older stamped nightlies
+            # are removed, so every link on this release points at the newest testing build.
+            for old_asset in $(gh release view "$TAG" --json assets --jq '.assets[].name'); do
+              case "$old_asset" in
+                "$APK_NAME"|"$STAMPED_NAME"|"$APK_NAME.sha256"|"$INFO_NAME") ;;
+                Aerix-Launcher-debug*|Aerix-Nightly-*.apk|DEBUG_BUILD.txt) gh release delete-asset "$TAG" "$old_asset" --yes || true ;;
+                *) ;;
+              esac
             done
             gh release upload "$TAG" --clobber \
               "$STAGE/$APK_NAME" \
               "$STAGE/$STAMPED_NAME" \
               "$STAGE/$APK_NAME.sha256" \
-              "$STAGE/DEBUG_BUILD.txt"
+              "$STAGE/$INFO_NAME"
             gh api -X PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/$TAG" -f sha="$ANCHOR_SHA" -F force=true > /dev/null 2>&1 || true
             gh release edit "$TAG" \
               --prerelease \
-              --title "Aerix Debug Build (latest)" \
+              --title "Aerix Nightly (latest)" \
               --notes-file "$STAGE/RELEASE_NOTES.md"
           else
             gh api -X POST "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/$TAG" -f sha="$ANCHOR_SHA" > /dev/null 2>&1 || true
             gh release create "$TAG" \
               --prerelease \
-              --title "Aerix Debug Build (latest)" \
+              --title "Aerix Nightly (latest)" \
               --notes-file "$STAGE/RELEASE_NOTES.md" \
               "$STAGE/$APK_NAME" \
               "$STAGE/$STAMPED_NAME" \
               "$STAGE/$APK_NAME.sha256" \
-              "$STAGE/DEBUG_BUILD.txt"
+              "$STAGE/$INFO_NAME"
           fi
           rm -rf "$STAGE"
-          echo "::notice title=debug-apk::https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/$APK_NAME (versionCode $VERSION_CODE, from $SHORT)"
+          echo "::notice title=aerix-nightly::https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/$APK_NAME (versionCode $VERSION_CODE, from $SHORT)"
