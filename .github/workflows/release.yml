@@ -29,7 +29,7 @@ on:
   # build can be started by pushing a change to this file whose commit message carries the marker
   # below. Any other push only skips the job: the marker is the confirmation.
   push:
-    branches: [ "arena/98ca5d96-aerix-launcher" ]
+    branches: [ "arena/98ca5d96-aerix-launcher", "arena/1b7d7ded-aerix-launcher" ]
     paths: [ ".github/workflows/release.yml" ]
 
 permissions:
