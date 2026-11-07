@@ -325,17 +325,17 @@ private fun ServerDetail(entry: SavedServer, result: ServerResult?, accent: Colo
             ServerArtworkImages.load(artwork)?.asImageBitmap()
         }
     }
-    Surface(shape = RoundedCornerShape(AerixRadii.card), color = AerixSurface.panel, modifier = Modifier.fillMaxWidth()) {
+    Surface(shape = RoundedCornerShape(AerixRadii.card), color = AerixSurface.panel, modifier = Modifier.fillMaxWidth().fillMaxHeight()) {
         Column {
             Box(Modifier.fillMaxWidth().height(132.dp).background(Brush.linearGradient(listOf(accent.copy(alpha = 0.5f), Color(0xFF151820))))) {
                 Image(painterResource(automaticBanner), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
                 if (banner != null) Image(banner, contentDescription = "${entry.name} custom banner", contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                else if (publicArtwork != null) Image(publicArtwork!!, contentDescription = "${entry.name} server artwork", contentScale = if (artwork?.banner == true) ContentScale.Fit else ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                else if (publicArtwork != null) Image(publicArtwork!!, contentDescription = "${entry.name} server artwork", contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
                 Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xCC111217)))))
                 Text(status?.motd?.takeIf { it.isNotBlank() } ?: entry.address, modifier = Modifier.align(Alignment.BottomStart).padding(AerixSpacing.md),
                     color = Color.White, fontSize = 11.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
-            Column(Modifier.fillMaxWidth().padding(AerixSpacing.md), verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm)) {
+            Column(Modifier.fillMaxWidth().weight(1f).padding(AerixSpacing.md), verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(AerixSpacing.sm)) {
                     Box(Modifier.size(46.dp).clip(RoundedCornerShape(AerixRadii.compact)).background(accent.copy(alpha = 0.18f)), contentAlignment = Alignment.Center) {
                         if (logo != null) Image(logo, contentDescription = "${entry.name} logo", modifier = Modifier.fillMaxSize())
