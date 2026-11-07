@@ -79,7 +79,7 @@ private enum class InGameSocialTab(val label: String) {
 }
 
 @Composable
-fun GameSocialsScreen(accent: Color, onBack: () -> Unit) {
+fun GameSocialsScreen(accent: Color, onBack: () -> Unit, chooseInviteRecipient: Boolean = false) {
     val context = LocalContext.current
     val activity = context as? Activity
     val scope = rememberCoroutineScope()
@@ -88,11 +88,10 @@ fun GameSocialsScreen(accent: Color, onBack: () -> Unit) {
     var tab by remember { mutableStateOf(InGameSocialTab.CHATS) }
     var selectedFriendId by remember {
         mutableStateOf(
-            SocialBackend.parties.firstOrNull()?.let { null }
-                ?: SocialBackend.friends.firstOrNull { !it.pendingIncoming && !it.pendingOutgoing }?.id
+            if (chooseInviteRecipient) null else SocialBackend.friends.firstOrNull { !it.pendingIncoming && !it.pendingOutgoing }?.id
         )
     }
-    var selectedPartyId by remember { mutableStateOf(SocialBackend.parties.firstOrNull()?.id) }
+    var selectedPartyId by remember { mutableStateOf(if (chooseInviteRecipient) null else SocialBackend.parties.firstOrNull()?.id) }
     var statusDialogOpen by remember { mutableStateOf(false) }
 
     if (statusDialogOpen && ready) {
@@ -118,7 +117,7 @@ fun GameSocialsScreen(accent: Color, onBack: () -> Unit) {
         ready = SocialBackend.signedIn
         if (ready) {
             SocialBackend.rememberMinecraftName(PojavAccountBridge.current?.username)
-            if (selectedPartyId == null && selectedFriendId == null) {
+            if (!chooseInviteRecipient && selectedPartyId == null && selectedFriendId == null) {
                 selectedPartyId = SocialBackend.parties.firstOrNull()?.id
                 if (selectedPartyId == null) {
                     selectedFriendId = SocialBackend.friends
@@ -141,7 +140,7 @@ fun GameSocialsScreen(accent: Color, onBack: () -> Unit) {
 
     // Auto-select first friend/party as soon as background refresh populates an initially empty cache
     LaunchedEffect(acceptedFriends, parties) {
-        if (selectedPartyId == null && selectedFriendId == null) {
+        if (!chooseInviteRecipient && selectedPartyId == null && selectedFriendId == null) {
             selectedPartyId = parties.firstOrNull()?.id
             if (selectedPartyId == null) {
                 selectedFriendId = acceptedFriends.firstOrNull()?.id
@@ -526,7 +525,7 @@ fun GameSocialsScreen(accent: Color, onBack: () -> Unit) {
                             ) {
                                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                     Text(
-                                        "Pick a party or friend on the left to chat live.",
+                                        if (chooseInviteRecipient) "Select a friend, then paste the copied world address into chat." else "Pick a party or friend on the left to chat live.",
                                         fontSize = 12.sp,
                                         color = AerixSurface.textMuted
                                     )

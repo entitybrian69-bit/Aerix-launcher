@@ -63,6 +63,26 @@ object RecordingOptions {
             (reportedHardware == true || lower.startsWith("omx.") || lower.startsWith("c2."))
     }
 
+    /** Compatible alternative encoders, in preference order, if the chosen vendor codec refuses setup. */
+    fun encoderCandidates(config: Config): List<String> {
+        val all = MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos.filter { codec ->
+            codec.isEncoder && codec.supportedTypes.any { it.equals("video/avc", true) } && runCatching {
+                val caps = codec.getCapabilitiesForType("video/avc")
+                MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface in caps.colorFormats &&
+                    caps.videoCapabilities.areSizeAndRateSupported(config.width, config.height, config.fps.toDouble())
+            }.getOrDefault(false)
+        }
+        val sorted = all.sortedBy { codec ->
+            when {
+                codec.name == config.encoder -> 0
+                hardware(codec.name, if (Build.VERSION.SDK_INT >= 29) codec.isHardwareAccelerated else null,
+                    if (Build.VERSION.SDK_INT >= 29) codec.isSoftwareOnly else null) -> 1
+                else -> 2
+            }
+        }.map { it.name }.distinct()
+        return (listOf(config.encoder) + sorted).distinct()
+    }
+
     /** Query off the UI thread. Hardware AVC first, with standard AVC fallback if vendor flags misreport. */
     fun supported(screenWidth: Int, screenHeight: Int): List<Config> {
         val allAvc = MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos.filter { codec ->
@@ -75,7 +95,8 @@ object RecordingOptions {
                 if (Build.VERSION.SDK_INT >= 29) codec.isSoftwareOnly else null
             )
         }
-        val codecs = hwCodecs.ifEmpty { allAvc }
+        // Try software AVC too when a hardware encoder exists but cannot handle a requested size.
+        val codecs = hwCodecs + allAvc.filterNot { candidate -> hwCodecs.any { it.name == candidate.name } }
         return qualities.flatMap { quality ->
             frameRates.mapNotNull { fps ->
                 codecs.firstNotNullOfOrNull { codec ->

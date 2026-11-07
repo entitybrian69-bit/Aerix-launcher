@@ -138,7 +138,8 @@ public class LauncherActivity extends BaseActivity {
                 this.getAssets(),
                 mcVersion,
                 normalizedVersionId,
-                new ContextAwareDoneListener(this, normalizedVersionId)
+                new ContextAwareDoneListener(this, normalizedVersionId, selectedInstance.getInstanceId(),
+                        LauncherPreferences.PREF_RENDERER)
         );
         return false;
     };
@@ -169,7 +170,7 @@ public class LauncherActivity extends BaseActivity {
     }
 
     /**
-     * The browser comes back here with the tokens of a Socials sign-in in the URI fragment.
+     * The browser returns a one-time PKCE authorization code to complete sign-in.
      *
      * Handled before {@link #onCreate} does its work so the session is already restored when the
      * Socials page is first drawn.
@@ -205,9 +206,10 @@ public class LauncherActivity extends BaseActivity {
         }
         if (!data.startsWith(net.kdt.pojavlaunch.aerix.social.SocialBackend.OAUTH_REDIRECT)) return;
         net.kdt.pojavlaunch.aerix.social.SocialBackend.attach(getApplicationContext());
-        boolean restored = net.kdt.pojavlaunch.aerix.social.SocialBackend.completeBrowserSession(data);
-        Toast.makeText(this, restored ? "Signed in to Socials" : "Sign-in did not complete",
-                Toast.LENGTH_LONG).show();
+        boolean pending = net.kdt.pojavlaunch.aerix.social.SocialBackend.completeBrowserSession(data, success ->
+                Toast.makeText(getApplicationContext(), success ? "Signed in to Aerix" : "Google sign-in did not complete",
+                        Toast.LENGTH_LONG).show());
+        if (!pending) Toast.makeText(this, "Sign-in did not complete; please try again", Toast.LENGTH_LONG).show();
     }
 
     @Override

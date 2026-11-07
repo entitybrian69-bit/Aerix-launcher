@@ -28,6 +28,8 @@ public class Instance extends DisplayInstance {
     public String selectedRuntime;
     public String controlLayout;
     public boolean sharedData;
+    /** Minecraft version of a FastClient instance created by the FastClient installer, if any. */
+    public String fastClientVersion;
     /**
      * The artwork the publisher of the modpack this instance was built from uses, and the pack it
      * belongs to. Kept so the pack's logo can be restored if the icon file is ever lost - the

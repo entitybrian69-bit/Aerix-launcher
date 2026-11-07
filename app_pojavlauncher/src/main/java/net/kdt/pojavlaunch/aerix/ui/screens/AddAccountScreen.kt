@@ -277,5 +277,6 @@ private fun AccountChip(account: AerixAccount, selected: Boolean, accent: Color,
 private fun labelFor(account: AerixAccount): String = when (account.authType.name.lowercase()) {
     "microsoft" -> "Microsoft"
     "ely_by", "elyby" -> "Ely.by"
+    "aerix" -> "Aerix Auth"
     else -> "Offline"
 }

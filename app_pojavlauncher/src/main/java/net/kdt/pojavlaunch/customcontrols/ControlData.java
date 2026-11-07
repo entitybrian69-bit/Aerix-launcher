@@ -1,7 +1,6 @@
 package net.kdt.pojavlaunch.customcontrols;
 
 import android.util.ArrayMap;
-import android.view.KeyEvent;
 
 import androidx.annotation.Keep;
 
@@ -54,7 +53,7 @@ public class ControlData {
     public String dynamicX, dynamicY;
     public boolean isToggle, passThruEnabled;
     public String name;
-    public int[] keycodes;      //Should store up to 4 keys
+    public int[] keycodes;      //The editor exposes four keys; imported layouts may contain more
     public float opacity;       //Alpha value from 0 to 1;
     public int bgColor;
     public int strokeColor;
@@ -203,9 +202,7 @@ public class ControlData {
     }
 
     private static int[] inflateKeycodeArray(int[] keycodes) {
-        int[] inflatedArray = new int[]{KeyEvent.KEYCODE_UNKNOWN, KeyEvent.KEYCODE_UNKNOWN, KeyEvent.KEYCODE_UNKNOWN, KeyEvent.KEYCODE_UNKNOWN};
-        System.arraycopy(keycodes, 0, inflatedArray, 0, keycodes.length);
-        return inflatedArray;
+        return ControlKeycodes.copyWithEditorSlots(keycodes);
     }
 
     /**

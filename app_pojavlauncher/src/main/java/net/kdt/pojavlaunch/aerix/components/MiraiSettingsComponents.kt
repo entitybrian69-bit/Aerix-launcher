@@ -364,7 +364,7 @@ fun MiraiSettingsCard(
 ) {
     val shape = rememberSettingsCardShape(position)
     Surface(
-        modifier = modifier,
+        modifier = modifier.liquidGlass(shape = shape, strength = 0.55f, elevation = AerixSpacing.zero),
         shape = shape,
         color = AerixSurface.panel,
         contentColor = Color.White,

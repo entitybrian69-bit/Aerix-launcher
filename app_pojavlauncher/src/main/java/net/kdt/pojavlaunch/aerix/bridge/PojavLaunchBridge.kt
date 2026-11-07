@@ -81,7 +81,44 @@ object PojavLaunchBridge {
             ?: runtimes.maxByOrNull { it.majorVersion }!!
     }
 
+    @Volatile private var aerixRefreshPending = false
+
     private fun fire(activity: Activity) {
+        val account = net.kdt.pojavlaunch.authenticator.accounts.Accounts.getCurrent()
+        if (account?.authType != net.kdt.pojavlaunch.authenticator.AuthType.AERIX) {
+            fireAfterAuth(activity)
+            return
+        }
+        if (!SocialBackend.signedIn || account.aerixOwnerId != SocialBackend.myUserId()) {
+            Toast.makeText(activity, "Sign in to the Aerix account linked to this player first", Toast.LENGTH_LONG).show()
+            return
+        }
+        if (account.expiresAt > System.currentTimeMillis() + 60_000) {
+            fireAfterAuth(activity)
+            return
+        }
+        if (aerixRefreshPending) return
+        aerixRefreshPending = true
+        account.authType.createAuth().refreshAccount(object : net.kdt.pojavlaunch.authenticator.listener.LoginListener {
+            override fun onLoginDone(refreshed: net.kdt.pojavlaunch.authenticator.accounts.Account) {
+                aerixRefreshPending = false
+                val current = net.kdt.pojavlaunch.authenticator.accounts.Accounts.getCurrent()
+                if (current?.mSaveLocation?.name == refreshed.mSaveLocation?.name &&
+                    SocialBackend.myUserId() == refreshed.aerixOwnerId) {
+                    PojavAccountBridge.reload()
+                    fireAfterAuth(activity)
+                } else Toast.makeText(activity, "Account changed; select it and try again", Toast.LENGTH_LONG).show()
+            }
+            override fun onLoginError(error: Throwable) {
+                aerixRefreshPending = false
+                Tools.showError(activity, error)
+            }
+            override fun onLoginProgress(step: Int) {}
+            override fun setMaxLoginProgress(max: Int) {}
+        }, account)
+    }
+
+    private fun fireAfterAuth(activity: Activity) {
         try {
             val runtimes = runCatching { MultiRTUtils.getRuntimes() }.getOrDefault(emptyList())
             if (runtimes.isEmpty()) {
@@ -116,7 +153,9 @@ object PojavLaunchBridge {
         }
     }
 
-    fun play(activity: Activity) {
+    fun play(activity: Activity, serverAddress: String? = null) {
+        // Ordinary Play must not inherit a server from an earlier cancelled join attempt.
+        setPendingServerAddress(serverAddress)
         try {
             val instance = Instances.loadSelectedInstance()
             if (instance == null) {
@@ -206,14 +245,13 @@ object PojavLaunchBridge {
                     } else {
                         Instances.setSelectedInstance(matchedBySpec)
                         PojavInstanceBridge.reload()
-                        setPendingServerAddress(cleanServer)
                         val label = matchedBySpec.name ?: matchedBySpec.versionId ?: "instance"
                         Toast.makeText(
                             activity,
                             if (cleanServer != null) "Launching $label -> $cleanServer" else "Launching $label",
                             Toast.LENGTH_SHORT
                         ).show()
-                        play(activity)
+                        play(activity, cleanServer)
                     }
                 }
                 return@execute
@@ -284,8 +322,7 @@ object PojavLaunchBridge {
                         icon = null
                     ) { ok ->
                         if (ok) {
-                            setPendingServerAddress(cleanServer)
-                            play(activity)
+                            play(activity, cleanServer)
                         }
                     }
                 }
@@ -299,8 +336,7 @@ object PojavLaunchBridge {
                     Tools.restartLauncherActivityToSocialTarget(activity, null, cleanServer)
                     Tools.MAIN_HANDLER.postDelayed({ Tools.fullyExit() }, 700L)
                 } else {
-                    setPendingServerAddress(cleanServer)
-                    play(activity)
+                    play(activity, cleanServer)
                 }
             }
         }

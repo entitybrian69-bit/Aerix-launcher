@@ -38,7 +38,8 @@ class GameDownloadTarget(
     val instanceName: String,
     val mcVersion: String?,
     val loader: String?,
-    val gameDirectory: File?
+    val gameDirectory: File?,
+    val sharedData: Boolean = false
 ) {
     /** Version line of the header, e.g. "1.21.4 · Fabric". */
     val versionLabel: String
@@ -49,7 +50,10 @@ class GameDownloadTarget(
 
     companion object {
         /** A Minecraft release version, as it appears in version ids and folder names. */
-        private val MC_RELEASE = Regex("""\b1\.\d{1,2}(?:\.\d{1,2})?\b""")
+        private val MC_RELEASE = Regex("""\b1\.\d{1,2}(?:\.\d{1,2})?(?:-(?:pre|rc)-?\d+)?\b""")
+
+        /** Modern snapshots must be kept intact; 26.4-snapshot-6 is not 26.4. */
+        private val MC_MODERN = Regex("""(?<![\d.])26\.\d+(?:\.\d+)?(?:-(?:snapshot|pre|rc)-?\d+)?(?![\d.])""")
 
         /** A Minecraft snapshot, e.g. 24w14a. */
         private val MC_SNAPSHOT = Regex("""\b\d{2}w\d{2}[a-z]\b""")
@@ -70,6 +74,7 @@ class GameDownloadTarget(
         fun minecraftVersionIn(text: String?): String? {
             val id = text.orEmpty()
             MC_RELEASE.find(id)?.let { return it.value }
+            MC_MODERN.find(id)?.let { return it.value }
             MC_SNAPSHOT.find(id)?.let { return it.value }
             return ANY_VERSION.find(id)?.value
         }
@@ -91,7 +96,8 @@ class GameDownloadTarget(
                 mcVersion = inherited?.let { minecraftVersionIn(it) ?: it }
                     ?: minecraftVersionIn(versionId),
                 loader = loaderIn(versionId),
-                gameDirectory = runCatching { instance?.gameDirectory }.getOrNull()
+                gameDirectory = runCatching { instance?.gameDirectory }.getOrNull(),
+                sharedData = instance?.sharedData == true
             )
         }
 

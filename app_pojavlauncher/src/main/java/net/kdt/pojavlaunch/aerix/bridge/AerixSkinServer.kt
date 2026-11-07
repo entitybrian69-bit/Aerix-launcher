@@ -24,15 +24,19 @@
 package net.kdt.pojavlaunch.aerix.bridge
 
 import android.content.Context
+import android.graphics.BitmapFactory
 import android.util.Base64
 import android.util.Log
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
+import com.google.gson.JsonParser
 import net.kdt.pojavlaunch.Logger
 import net.kdt.pojavlaunch.Tools
 import net.kdt.pojavlaunch.authenticator.AuthType
+import net.kdt.pojavlaunch.aerix.social.SocialBackend
 import net.kdt.pojavlaunch.authenticator.accounts.Account
 import java.io.BufferedInputStream
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.OutputStream
 import java.net.HttpURLConnection
@@ -83,6 +87,12 @@ object AerixSkinServer {
     private var port: Int = 0
     private val characters = ConcurrentHashMap<String, Character>()
     private val textures = ConcurrentHashMap<String, ByteArray>()
+    private data class RemoteEntry(val character: Character?, val expires: Long)
+    private val remoteCharacters = ConcurrentHashMap<String, RemoteEntry>()
+    private val remoteLock = Any()
+    private var remoteBytes = 0
+    private val remoteHashes = HashSet<String>()
+    @Volatile private var generation = 0
     @Volatile
     private var primaryCharacter: Character? = null
     /** True for accounts whose own session service still has to work (Microsoft). */
@@ -116,8 +126,14 @@ object AerixSkinServer {
     /** Stops the endpoint; called when the game activity goes away. */
     @JvmStatic
     fun stop() {
-        characters.clear()
-        textures.clear()
+        synchronized(remoteLock) {
+            generation++
+            characters.clear()
+            textures.clear()
+            remoteCharacters.clear()
+            remoteBytes = 0
+            remoteHashes.clear()
+        }
         primaryCharacter = null
         passThrough = false
         runCatching { serverSocket?.close() }
@@ -155,7 +171,8 @@ object AerixSkinServer {
         } else {
             if (capeFile.isFile && capeFile.length() > 0) capeFile.readBytes() else null
         }
-        if (skinBytes == null && capeBytes == null) return emptyList()
+        // Local accounts also need the bridge to resolve other players' shared appearances.
+        if (skinBytes == null && capeBytes == null && authType != AuthType.LOCAL) return emptyList()
 
         val jar = File(Tools.DIR_DATA, "$AUTHLIB_FOLDER/$AUTHLIB_JAR")
         if (!jar.isFile) {
@@ -218,11 +235,102 @@ object AerixSkinServer {
         )
     }
 
+    private fun textureHash(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256").digest(bytes)
+        .joinToString("") { "%02x".format(it) }
+
     private fun remember(bytes: ByteArray): String {
-        val hash = MessageDigest.getInstance("SHA-256").digest(bytes)
-            .joinToString("") { "%02x".format(it) }
+        val hash = textureHash(bytes)
         textures[hash] = bytes
         return hash
+    }
+
+    /** Resolve only offline UUIDs from the opt-in public directory, never Microsoft sessions. */
+    private fun resolveSharedCharacter(uuid: String): Character? {
+        if (passThrough || !uuid.matches(Regex("^[0-9a-f]{32}$")) || uuid == ZERO_UUID) return null
+        remoteCharacters[uuid]?.let { if (it.expires > System.currentTimeMillis()) return it.character }
+        val expectedGeneration = generation
+        val result = runCatching {
+            val body = JsonObject().apply { addProperty("p_uuid", uuid) }.toString().toByteArray(Charsets.UTF_8)
+            val connection = (URL(SocialBackend.PROJECT_URL + "/rest/v1/rpc/aerix_lookup_game_texture").openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"
+                connectTimeout = 3000
+                readTimeout = 3000
+                instanceFollowRedirects = false
+                doOutput = true
+                setRequestProperty("apikey", SocialBackend.PUBLISHABLE_KEY)
+                setRequestProperty("Content-Type", "application/json")
+            }
+            val raw = try {
+                connection.outputStream.use { it.write(body) }
+                if (connection.responseCode != 200) return@runCatching null
+                readBounded(connection, 16 * 1024) ?: return@runCatching null
+            } finally { connection.disconnect() }
+            val rows = JsonParser.parseString(String(raw, Charsets.UTF_8)).asJsonArray
+            val row = rows.firstOrNull()?.asJsonObject ?: return@runCatching null
+            val name = row.get("game_name")?.asString ?: return@runCatching null
+            if (!name.matches(Regex("^[A-Za-z0-9_]{3,16}$")) ||
+                PojavAccountBridge.offlineUuid(name).toString().replace("-", "") != uuid) return@runCatching null
+            fun image(key: String, skin: Boolean): ByteArray? {
+                val element = row.get(key) ?: return null
+                if (element.isJsonNull) return null
+                val url = element.asString
+                val prefix = SocialBackend.PROJECT_URL + "/storage/v1/object/public/social-media/"
+                if (!url.startsWith(prefix) || !url.removePrefix(prefix).matches(Regex("^[0-9a-f-]{36}/[A-Za-z0-9_-]+\\.png$"))) return null
+                val imageConnection = (URL(url).openConnection() as HttpURLConnection).apply {
+                    connectTimeout = 3000
+                    readTimeout = 3000
+                    instanceFollowRedirects = false
+                }
+                val bytes = try {
+                    if (imageConnection.responseCode != 200) return null
+                    readBounded(imageConnection, 2 * 1024 * 1024) ?: return null
+                } finally { imageConnection.disconnect() }
+                val signature = byteArrayOf(0x89.toByte(), 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)
+                if (bytes.size < signature.size || !bytes.copyOfRange(0, signature.size).contentEquals(signature)) return null
+                val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+                if (bounds.outWidth !in 1..1024 || bounds.outHeight !in 1..1024) return null
+                return if (skin) PojavAccountBridge.normalizeSkinBytesForGame(bytes) else bytes
+            }
+            val skin = image("skin_url", true)
+            val cape = image("cape_url", false)
+            if (skin == null && cape == null) return@runCatching null
+            synchronized(remoteLock) {
+                if (generation != expectedGeneration) return@synchronized null
+                val images = listOfNotNull(skin, cape).distinctBy { textureHash(it) }
+                val newImages = images.filter { textureHash(it) !in remoteHashes }
+                val size = newImages.sumOf { it.size }
+                if (remoteBytes + size > 16 * 1024 * 1024) return@synchronized null
+                remoteBytes += size
+                newImages.forEach { remoteHashes.add(textureHash(it)) }
+                val skinHash = skin?.let { textureHash(it).also { hash -> textures.putIfAbsent(hash, it) } }
+                val capeHash = cape?.let { textureHash(it).also { hash -> textures.putIfAbsent(hash, it) } }
+                Character(uuid, name, skinHash, skinHash?.let { textures[it] }, capeHash, capeHash?.let { textures[it] },
+                    row.get("slim")?.asBoolean == true)
+            }
+        }.getOrNull()
+        synchronized(remoteLock) {
+            if (generation != expectedGeneration) return null
+            if (remoteCharacters.size < 128 || remoteCharacters.containsKey(uuid)) {
+                remoteCharacters[uuid] = RemoteEntry(result, System.currentTimeMillis() + if (result == null) 20_000 else 60_000)
+            }
+        }
+        return result
+    }
+
+    private fun readBounded(connection: HttpURLConnection, limit: Int): ByteArray? {
+        if (connection.contentLength > limit) return null
+        val out = ByteArrayOutputStream()
+        connection.inputStream.use { input ->
+            val buffer = ByteArray(8192)
+            while (true) {
+                val count = input.read(buffer)
+                if (count < 0) break
+                if (out.size() + count > limit) return null
+                out.write(buffer, 0, count)
+            }
+        }
+        return out.toByteArray()
     }
 
     // ---- HTTP ------------------------------------------------------------------------------
@@ -334,7 +442,7 @@ object AerixSkinServer {
 
             path.startsWith("/minecraftservices/minecraft/profile/lookup/") -> {
                 val lookupUuid = path.substringAfterLast('/').lowercase().replace("-", "")
-                val character = characters[lookupUuid]
+                val character = characters[lookupUuid] ?: resolveSharedCharacter(lookupUuid)
                 if (character != null) {
                     val effectiveId = lookupUuid.takeIf { it.length == 32 } ?: character.uuid
                     val json = JsonObject().apply {
@@ -384,7 +492,7 @@ object AerixSkinServer {
 
             path.startsWith("/sessionserver/session/minecraft/profile/") -> {
                 val uuid = path.substringAfterLast('/').lowercase().replace("-", "")
-                val character = characters[uuid]
+                val character = characters[uuid] ?: resolveSharedCharacter(uuid)
                 Logger.appendToLog("Skin server: profile request ${uuid.take(8)}… served=${character != null}")
                 if (character != null) {
                     val profile = complete(character, requestedUuid = uuid)

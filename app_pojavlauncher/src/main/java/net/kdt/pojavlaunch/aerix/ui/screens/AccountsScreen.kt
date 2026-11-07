@@ -115,6 +115,7 @@ import net.kdt.pojavlaunch.Tools
 import net.kdt.pojavlaunch.aerix.bridge.AerixAccount
 import net.kdt.pojavlaunch.aerix.bridge.AerixSkinPreset
 import net.kdt.pojavlaunch.aerix.bridge.PojavAccountBridge
+import net.kdt.pojavlaunch.aerix.bridge.PojavAuthBridge
 import net.kdt.pojavlaunch.aerix.components.AerixImageWell
 import net.kdt.pojavlaunch.aerix.components.AerixPrimaryButton
 import net.kdt.pojavlaunch.aerix.components.AerixSkinPreview3D
@@ -164,6 +165,7 @@ fun AccountsScreen(activity: FragmentActivity) {
     }
 
     if (showOfflineDialog) {
+        val validOfflineName = PojavAuthBridge.isValidOfflineName(offlineUsername.trim())
         AlertDialog(
             onDismissRequest = { showOfflineDialog = false },
             containerColor = AerixSurface.panelRaised,
@@ -173,6 +175,8 @@ fun AccountsScreen(activity: FragmentActivity) {
                     value = offlineUsername,
                     onValueChange = { offlineUsername = it },
                     singleLine = true,
+                    isError = offlineUsername.isNotEmpty() && !validOfflineName,
+                    supportingText = { Text(stringResource(R.string.aerix_account_name_rule)) },
                     label = { Text("Username", color = AerixSurface.textSecondary) },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(14.dp),
@@ -187,16 +191,15 @@ fun AccountsScreen(activity: FragmentActivity) {
             },
             confirmButton = {
                 TextButton(
+                    enabled = validOfflineName,
                     onClick = {
-                        val clean = offlineUsername.trim()
-                        if (clean.isNotEmpty()) {
-                            PojavAccountBridge.createOfflineAccount(clean)
+                        if (PojavAccountBridge.createOfflineAccount(offlineUsername)) {
                             offlineUsername = ""
                             showOfflineDialog = false
                         }
                     }
                 ) {
-                    Text("Create", color = accent, fontWeight = FontWeight.Bold)
+                    Text("Create", color = if (validOfflineName) accent else AerixSurface.textSecondary, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
@@ -286,7 +289,8 @@ fun AccountsScreen(activity: FragmentActivity) {
     Surface(
         modifier = Modifier
             .fillMaxSize()
-            .padding(all = 12.dp),
+            .padding(all = 12.dp)
+            .liquidGlass(shape = RoundedCornerShape(22.dp), strength = 0.7f),
         shape = RoundedCornerShape(22.dp),
         color = AerixSurface.panel,
         border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft)
@@ -309,6 +313,17 @@ fun AccountsScreen(activity: FragmentActivity) {
                 MiraiTopAccountPill(
                     text = "Microsoft",
                     onClick = { AerixNav.navigate(LauncherSection.ADD_ACCOUNT) }
+                )
+                MiraiTopAccountPill(
+                    text = "Aerix",
+                    onClick = {
+                        if (net.kdt.pojavlaunch.aerix.social.SocialBackend.signedIn) {
+                            AuthType.AERIX.createAuth().createAccount(PojavAccountBridge, "")
+                        } else {
+                            Toast.makeText(activity, "Sign in to Aerix Social and choose a game name first", Toast.LENGTH_LONG).show()
+                            AerixNav.navigate(LauncherSection.SOCIALS)
+                        }
+                    }
                 )
                 MiraiTopAccountPill(
                     text = "Offline",
@@ -458,6 +473,7 @@ private fun MiraiAccountItemRow(
     val typeLabel = when (account.authType) {
         AuthType.MICROSOFT -> "Microsoft"
         AuthType.ELY_BY -> "Auth Server"
+        AuthType.AERIX -> "Aerix Auth"
         AuthType.LOCAL -> "Offline"
     }
     Surface(
@@ -1845,6 +1861,7 @@ private fun SkinPresetGridCard(
 private fun authTypeDisplayLabel(authType: AuthType): String = when (authType) {
     AuthType.MICROSOFT -> "Microsoft Account"
     AuthType.ELY_BY -> "Ely.by Account"
+    AuthType.AERIX -> "Aerix Account"
     AuthType.LOCAL -> "Local / Offline Account"
 }
 
@@ -1862,6 +1879,7 @@ private fun AccountCard(
     val typeLabel = when (account.authType) {
         AuthType.MICROSOFT -> stringResource(R.string.aerix_accounts_type_microsoft)
         AuthType.ELY_BY -> stringResource(R.string.aerix_accounts_type_elyby)
+        AuthType.AERIX -> "Aerix Auth"
         AuthType.LOCAL -> stringResource(R.string.aerix_accounts_type_local)
     }
     Column(

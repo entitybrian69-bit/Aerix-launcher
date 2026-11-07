@@ -53,7 +53,7 @@ import net.kdt.pojavlaunch.instances.Instances
  * and Liquid Glass client version download / launch cards below it.
  */
 @Composable
-fun AerixClientScreen(activity: FragmentActivity) {
+fun AerixClientScreen(activity: FragmentActivity, onBack: () -> Unit) {
     LaunchedEffect(Unit) {
         AerixClientStore.init(activity)
     }
@@ -65,7 +65,8 @@ fun AerixClientScreen(activity: FragmentActivity) {
 
     AerixPage(
         title = "Aerix Client",
-        subtitle = null
+        subtitle = null,
+        trailing = { ClientOwnerBackButton(onBack) }
     ) {
         // Active download progress banner in Liquid Glass
         if (AerixClientInstaller.isInstalling) {

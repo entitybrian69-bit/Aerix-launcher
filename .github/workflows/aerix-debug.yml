@@ -62,14 +62,82 @@ jobs:
           distribution: temurin
           java-version: "21"
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
       - name: Verify Client smoke tests
         run: |
+          trap 'echo "::error title=Smoke test failed::$BASH_COMMAND"' ERR
           python3 tests/branding_identity_smoke.py
           python3 tests/discord_presence_logo_smoke.py
           python3 tests/modern_cape_smoke.py
           python3 tests/social_profile_cosmetics_smoke.py
           python3 tests/client_background_smoke.py
+          python3 tests/instance_renderer_smoke.py
+          python3 tests/fastclient_assets_smoke.py
+          python3 tests/fastclient_performance_download_test.py
+          python3 tests/recorder_wiring_smoke.py
+          python3 tests/authlib_263_smoke.py
+          python3 tests/font_styles_smoke.py
+          python3 tests/glass_launcher_ui_smoke.py
+          python3 tests/rust_removed_smoke.py
+          python3 tests/offline_username_smoke.py
+          python3 tests/aerix_cloud_skin_smoke.py
+          python3 tests/game_auth_token_logging_smoke.py
+          node --experimental-strip-types tests/aerix_auth_edge_test.mjs
+          python3 tests/aerix_auth_live_test.py
+          python3 tests/aerix_account_setup_smoke.py
+          python3 tests/world_invite_chat_smoke.py
+          python3 tests/servers_ui_smoke.py
+          python3 tests/resourcepack_wiring_smoke.py
+          if [[ "${{ contains(github.event.head_commit.message, '[pack-fixture]') }}" == "true" ]]; then
+            AERIX_PACK_TEST_FILE="$RUNNER_TEMP/senpaider-animated.zip" python3 tests/senpaider_pack_diagnostics.py
+          fi
+          mkdir -p "$RUNNER_TEMP/aerix-pack-test"
+          javac -cp app_pojavlauncher/libs/gson-2.8.6.jar -d "$RUNNER_TEMP/aerix-pack-test" \
+            app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/resourcepack/ResourcePackOptimizer.java \
+            tests/ResourcePackOptimizerSmokeTest.java
+          java -Djava.awt.headless=true -cp "$RUNNER_TEMP/aerix-pack-test:app_pojavlauncher/libs/gson-2.8.6.jar" net.kdt.pojavlaunch.aerix.resourcepack.ResourcePackOptimizerSmokeTest "$RUNNER_TEMP/senpaider-animated.zip"
+          mkdir -p "$RUNNER_TEMP/aerix-servers-test"
+          javac -cp app_pojavlauncher/libs/gson-2.8.6.jar -d "$RUNNER_TEMP/aerix-servers-test" \
+            app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/servers/ServerAddress.java \
+            app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/servers/ServerStatusClient.java \
+            app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/servers/ServerArtworkCatalog.java \
+            app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/servers/SrvLookup.java \
+            tests/ServerStatusSmokeTest.java
+          java -cp "$RUNNER_TEMP/aerix-servers-test:app_pojavlauncher/libs/gson-2.8.6.jar" net.kdt.pojavlaunch.aerix.servers.ServerStatusSmokeTest
+          python3 tests/game_launch_handoff_smoke.py
+          mkdir -p "$RUNNER_TEMP/aerix-launch-test"
+          javac -d "$RUNNER_TEMP/aerix-launch-test" \
+            tests/launch_android_stubs/android/content/Context.java \
+            tests/launch_android_stubs/android/util/Log.java \
+            app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/lifecycle/LaunchDiagnostics.java \
+            tests/LaunchDiagnosticsSmokeTest.java
+          java -cp "$RUNNER_TEMP/aerix-launch-test" LaunchDiagnosticsSmokeTest
+          python3 tests/aerix_google_provider_live_test.py
+          mkdir -p "$RUNNER_TEMP/aerix-kotlin"
+          (cd "$RUNNER_TEMP/aerix-kotlin" && npm pack kotlin-compiler@2.2.10 --silent && tar -xzf kotlin-compiler-2.2.10.tgz --strip-components=1)
+          "$RUNNER_TEMP/aerix-kotlin/bin/kotlinc" tests/skinserver_stubs/*.kt \
+            app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/bridge/AerixSkinServer.kt \
+            tests/AerixSkinServerOfflineTest.kt -classpath app_pojavlauncher/libs/gson-2.8.6.jar \
+            -d "$RUNNER_TEMP/aerix-skinserver-test.jar"
+          java -cp "$RUNNER_TEMP/aerix-skinserver-test.jar:app_pojavlauncher/libs/gson-2.8.6.jar:$RUNNER_TEMP/aerix-kotlin/lib/kotlin-stdlib.jar" AerixSkinServerOfflineTestKt
+          mkdir -p "$RUNNER_TEMP/aerix-recorder-test"
+          javac -d "$RUNNER_TEMP/aerix-recorder-test" \
+            app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/recording/RecordingPaths.java \
+            tests/RecordingPathsSmokeTest.java
+          java -cp "$RUNNER_TEMP/aerix-recorder-test" RecordingPathsSmokeTest
+          mkdir -p "$RUNNER_TEMP/aerix-worldshare-test"
+          javac -d "$RUNNER_TEMP/aerix-worldshare-test" \
+            app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/worldshare/WorldSharePolicy.java \
+            tests/WorldSharePolicySmokeTest.java
+          java -cp "$RUNNER_TEMP/aerix-worldshare-test" WorldSharePolicySmokeTest
           mkdir -p "$RUNNER_TEMP/aerix-memory-test"
+          javac -d "$RUNNER_TEMP/aerix-memory-test" \
+            app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/customcontrols/ControlKeycodes.java \
+            tests/ControlKeycodesSmokeTest.java
+          java -cp "$RUNNER_TEMP/aerix-memory-test" ControlKeycodesSmokeTest
           javac -d "$RUNNER_TEMP/aerix-memory-test" \
             app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/utils/jre/InstanceMemory.java \
             tests/InstanceMemorySmokeTest.java
@@ -118,6 +186,13 @@ jobs:
           java -cp "$RUNNER_TEMP/aerix-memory-test" AdaptiveDistanceSmokeTest
           java -cp "$RUNNER_TEMP/aerix-memory-test" aerix.client.mod.ClientAdaptiveDistanceSmokeTest
 
+      - name: Live Minecraft authlib integration (temporary test identity)
+        if: contains(github.event.head_commit.message, '[auth-fixture]')
+        env:
+          AERIX_TEST_NAME: AxAuthTest482
+          AERIX_TEST_TOKEN: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        run: python3 tests/aerix_auth_server_integration.py
+
       - name: Get LTW
         uses: dawidd6/action-download-artifact@v6
         continue-on-error: true
@@ -151,9 +226,10 @@ jobs:
           ./gradlew :app_pojavlauncher:assembleNoruntimeDebug --console=plain > build.log 2>&1
           code=$?
           if [ "$code" -ne 0 ]; then
-            grep -E "^e: |error: |CMake Error|CMake Generate step failed|FAILURE: |What went wrong|Caused by" -A5 build.log | sort -u | head -40 |
-              while read -r l; do echo "::error title=gradle::$(printf '%s' "$l" | head -c 500)"; done
-            tail -20 build.log | while read -r l; do echo "::error title=tail::$(printf '%s' "$l" | head -c 500)"; done
+            # One compressed annotation avoids GitHub's ten-annotations-per-step limit
+            # and preserves compiler diagnostics even when the remote log host is blocked.
+            tail -200 build.log | gzip -9c | base64 -w0 | fold -w 3500 |
+              while IFS= read -r chunk || [ -n "$chunk" ]; do echo "::error title=build-log-gzip-base64::$chunk"; done
           fi
           exit "$code"
 
@@ -162,6 +238,7 @@ jobs:
         run: |
           set -euo pipefail
           test -f "$APK_PATH"
+          python3 tests/launcher_apk_verify.py "$APK_PATH"
           SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
           BT_DIR="$(ls -d "$SDK_ROOT"/build-tools/* | sort -V | tail -n 1)"
           echo "Using build-tools: $BT_DIR"

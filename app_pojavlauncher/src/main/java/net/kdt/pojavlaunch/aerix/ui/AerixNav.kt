@@ -30,6 +30,7 @@ import net.kdt.pojavlaunch.aerix.bridge.AerixPreferences
 
 object AerixNav {
     /** Settings tab ids (mirai NormalNavKey.Settings.*). */
+    const val TAB_STYLES = "styles"
     const val TAB_RENDERER = "renderer"
     const val TAB_GAME = "game"
     const val TAB_JAVA = "java"
@@ -47,6 +48,7 @@ object AerixNav {
         LauncherSection.INSTANCE_EDITOR,
         LauncherSection.ADD_ACCOUNT,
         LauncherSection.OFFLINE_ACCOUNT,
+        LauncherSection.AERIX_ACCOUNT,
         LauncherSection.FILES,
         LauncherSection.LOGS,
         LauncherSection.CONTRIBUTION_DETAIL
@@ -67,7 +69,9 @@ object AerixNav {
     fun init() {
         if (initialized) return
         initialized = true
-        val saved = runCatching { LauncherSection.valueOf(AerixPreferences.lastSection) }.getOrDefault(LauncherSection.HOME)
+        // Migrate the short-lived FastClient sidebar destination to the unified Clients page.
+        val last = if (AerixPreferences.lastSection == "FAST_CLIENT") "AERIX_CLIENT" else AerixPreferences.lastSection
+        val saved = runCatching { LauncherSection.valueOf(last) }.getOrDefault(LauncherSection.HOME)
         section = if (saved in pageSections) LauncherSection.HOME else saved
     }
 

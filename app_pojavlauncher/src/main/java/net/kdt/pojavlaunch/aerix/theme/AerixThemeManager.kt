@@ -86,7 +86,8 @@ object AerixThemeManager {
         AerixWallpaperPreset("wp_22_amethyst_geode", "Amethyst Geode Lake", "Amethyst Geode • Crystal Shaders", "wallpapers/wp_22_amethyst_geode.webp", "Amethyst Bloom", Color(0xFFA855F7)),
         AerixWallpaperPreset("wp_23_bamboo_dawn", "Bamboo Sunrise", "Bamboo Jungle • Sunrise Shaders", "wallpapers/wp_23_bamboo_dawn.webp", "Bamboo Dawn", Color(0xFF84CC16)),
         AerixWallpaperPreset("wp_24_badlands_canyon", "Badlands Canyon River", "Badlands Mesa • Canyon Shaders", "wallpapers/wp_24_badlands_canyon.webp", "Terracotta Sunset", Color(0xFFF97316)),
-        AerixWallpaperPreset("wp_25_deep_dark", "Deep Dark Sculk City", "Deep Dark • Sculk Shaders", "wallpapers/wp_25_deep_dark.webp", "Sculk Abyss", Color(0xFF06B6D4))
+        AerixWallpaperPreset("wp_25_deep_dark", "Deep Dark Sculk City", "Deep Dark • Sculk Shaders", "wallpapers/wp_25_deep_dark.webp", "Sculk Abyss", Color(0xFF06B6D4)),
+        AerixWallpaperPreset("aerix_twilight", "Aerix Twilight", "A cozy voxel village at dusk", "wallpapers/aerix_twilight.jpg", "Mint", AerixSurface.accentDefault),
     )
 
     val selectedWallpaperId: String

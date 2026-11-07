@@ -167,6 +167,7 @@ Your original layout is kept unchanged. Continue importing?</string>
     <string name="customctrl_size">Size</string>
 
     <string name="customctrl_mapping">Mapping</string>
+    <string name="customctrl_extra_mappings_preserved">Only the first four bindings can be edited here. Additional bindings are preserved.</string>
     <string name="customctrl_orientation">Orientation</string>
     <string name="customctrl_background_bitmap">Background image</string>
     <string name="customctrl_background_color">Background color</string>
@@ -660,4 +661,5 @@ Your original layout is kept unchanged. Continue importing?</string>
     <string name="ctrl_theme_static">Static</string>
     <string name="ctrl_theme_starcross">Star Cross</string>
     <string name="ctrl_theme_comet">Comet Grid</string>
+    <string name="aerix_instance_renderer_unavailable">The renderer selected for this instance is unavailable or could not start. Choose another renderer in the instance settings.</string>
 </resources>

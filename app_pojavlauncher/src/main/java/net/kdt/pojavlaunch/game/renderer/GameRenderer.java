@@ -52,9 +52,15 @@ public class GameRenderer {
     private final static String FALLBACK_RENDERER = GL4ES_RENDERER;
     private static volatile boolean pluginInitializationFailed;
     private RenderSpec currentRenderer;
+    private final boolean requireSelectedRenderer;
     private Map<String, String> environment = new HashMap<>();
 
     public GameRenderer(String currentRenderer) {
+        this(currentRenderer, false);
+    }
+
+    public GameRenderer(String currentRenderer, boolean requireSelectedRenderer) {
+        this.requireSelectedRenderer = requireSelectedRenderer;
         this.currentRenderer = getKnownRenderer(currentRenderer);
         if(this.currentRenderer == null) this.currentRenderer = getKnownRenderer(GL4ES_RENDERER);
         if(this.currentRenderer == null) throw new IllegalStateException("Failed to create the current renderer!");
@@ -106,14 +112,15 @@ public class GameRenderer {
      * Setup current selected renderer environment. Call before using {@link GameRenderer#maybeSetupRenderer()}
      *
      * @param context application context
+     * @param instance the instance being launched
      * @throws ErrnoException if underlying Os#setenv call threw an exception
      */
-    public void setupEnvironment(Context context) throws ErrnoException {
+    public void setupEnvironment(Context context, net.kdt.pojavlaunch.instances.Instance instance) throws ErrnoException {
         if(environment == null) {
             Log.w(TAG, "Tried to call setupEnvironment in already initialized environment");
             return;
         }
-        currentRenderer.setupEnvironment(context, environment);
+        currentRenderer.setupEnvironment(context, environment, instance);
         for(Map.Entry<String, String> e : environment.entrySet()) {
             Logger.appendToLog("Added renderer env: " + e.getKey() + '=' + e.getValue());
             try {
@@ -172,7 +179,7 @@ public class GameRenderer {
      * library is missing is replaced: the bundled Emesis first (the same renderer most plugins
      * provide), then the built-in fallback.
      *
-     * @return the renderer to launch with; never one that names a library that is not on disk
+     * @return the renderer to launch with, or null if a required instance renderer is unavailable
      */
     public RenderSpec getLaunchableRenderer() {
         RenderSpec spec = currentRenderer;
@@ -188,6 +195,7 @@ public class GameRenderer {
                 + "this process (" + (library.isEmpty() ? "<none>" : library)
                 + "); choosing a renderer that can actually load");
         Log.e(TAG, "Renderer " + spec.name() + " cannot launch: " + library + " is missing");
+        if (requireSelectedRenderer) return null;
         spec = replacementRenderer(null);
         currentRenderer = spec;
         return spec;
@@ -248,13 +256,14 @@ public class GameRenderer {
     }
 
     /**
-     * Set up the current renderer or fallback to {@link GameRenderer#FALLBACK_RENDERER} if failed
+     * Set up the current renderer, falling back only when it is not an explicit instance choice
      *
      * @return whether the renderer setup was successful
      */
     public boolean maybeSetupRenderer() {
         if (pluginInitializationFailed && currentRenderer instanceof net.kdt.pojavlaunch.aerix.bridge.AerixRendererPlugin) {
             // The plugin already failed once in this process; do not load it a second time.
+            if (requireSelectedRenderer) return false;
             Log.e(TAG, "A plugin failed native initialization in this process; using " + FALLBACK_RENDERER);
             currentRenderer = getKnownRenderer(FALLBACK_RENDERER);
         }
@@ -265,11 +274,12 @@ public class GameRenderer {
                 // remember it (so it is not retried in this process) and start the game on the
                 // built-in renderer, exactly like any other renderer that fails to set up.
                 pluginInitializationFailed = true;
-                Log.e(TAG, "Plugin renderer initialization failed; falling back to " + FALLBACK_RENDERER);
-                Logger.appendToLog("Renderer plugin failed to initialise; launched on " + FALLBACK_RENDERER);
+                Log.e(TAG, "Plugin renderer initialization failed");
+                Logger.appendToLog("Renderer plugin failed to initialise");
             } else {
-                Log.e(TAG, "Failed to setup renderer " + currentRenderer.name() + ", falling back to " + FALLBACK_RENDERER);
+                Log.e(TAG, "Failed to setup renderer " + currentRenderer.name());
             }
+            if (requireSelectedRenderer) return false;
             RenderSpec replacement = replacementRenderer(currentRenderer);
             if (replacement != null) currentRenderer = replacement;
             setRendererLibraryPath(Tools.NATIVE_LIB_DIR, currentRenderer.librarySearchPath());

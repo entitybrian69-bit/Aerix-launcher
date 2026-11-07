@@ -48,6 +48,10 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
@@ -77,10 +81,13 @@ import net.kdt.pojavlaunch.aerix.theme.AerixSurface
 import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
 import net.kdt.pojavlaunch.aerix.ui.screens.AboutScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.AccountsScreen
+import net.kdt.pojavlaunch.aerix.ui.screens.AerixAccountSetupScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.AddAccountScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.AerixContribution
 import net.kdt.pojavlaunch.aerix.ui.screens.ContributionDetailScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.ContributionScreen
+import net.kdt.pojavlaunch.aerix.ui.screens.ClientHubScreen
+import net.kdt.pojavlaunch.aerix.ui.screens.ClientOwnerPage
 import net.kdt.pojavlaunch.aerix.ui.screens.CreateInstanceScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.DiscoverScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.FileManagerScreen
@@ -93,6 +100,7 @@ import net.kdt.pojavlaunch.aerix.ui.screens.AerixInstallPill
 import net.kdt.pojavlaunch.aerix.ui.screens.LogScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.OfflineAccountScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.SettingsScreen
+import net.kdt.pojavlaunch.aerix.ui.screens.ServersScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.SocialsScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.WallpapersScreen
 
@@ -102,6 +110,7 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
     net.kdt.pojavlaunch.aerix.ui.screens.FirstRunNotificationPopupHost(activity)
     net.kdt.pojavlaunch.aerix.ui.screens.LauncherUpdateNoticeHost(activity)
     val section = AerixNav.section
+    var clientOwnerPage by rememberSaveable { mutableStateOf(ClientOwnerPage.OWNERS) }
     val navigate: (LauncherSection) -> Unit = { target ->
         when (target) {
             // The Wallpapers rail entry is the Wallpapers tab of the settings page, as in mirai's rail.
@@ -121,6 +130,10 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
             LauncherSection.CONTRIBUTION -> {
                 AerixContribution.openedId = null
                 AerixNav.navigate(LauncherSection.CONTRIBUTION)
+            }
+            LauncherSection.AERIX_CLIENT -> {
+                clientOwnerPage = ClientOwnerPage.OWNERS
+                AerixNav.navigate(LauncherSection.AERIX_CLIENT)
             }
             LauncherSection.DOWNLOADS -> AerixNav.navigate(LauncherSection.DISCOVER)
             LauncherSection.CONTENT -> AerixNav.navigate(LauncherSection.INSTANCE_EDITOR)
@@ -189,8 +202,9 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
                         when (target) {
                             LauncherSection.OTHER_RELEASES -> net.kdt.pojavlaunch.aerix.ui.screens.OtherReleasesScreen(activity, navigate)
                             LauncherSection.HOME -> HomeScreen(activity, navigate)
-                            LauncherSection.AERIX_CLIENT -> net.kdt.pojavlaunch.aerix.ui.screens.AerixClientScreen(activity)
+                            LauncherSection.AERIX_CLIENT -> ClientHubScreen(activity, clientOwnerPage) { clientOwnerPage = it }
                             LauncherSection.LIBRARY -> LibraryScreen(activity)
+                            LauncherSection.SERVERS -> ServersScreen(activity)
                             LauncherSection.SOCIALS -> SocialsScreen(activity) { AerixNav.finishTo(LauncherSection.HOME) }
                             LauncherSection.DISCOVER, LauncherSection.DOWNLOADS -> DiscoverScreen(activity, navigate)
                             LauncherSection.FILES -> FileManagerScreen(activity)
@@ -214,6 +228,7 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
                                 }
                             }
                             LauncherSection.ACCOUNTS -> AccountsScreen(activity)
+                            LauncherSection.AERIX_ACCOUNT -> AerixAccountSetupScreen(activity) { AerixNav.back() }
                             LauncherSection.ABOUT -> AboutScreen(activity)
                             LauncherSection.CREATE_INSTANCE -> CreateInstanceScreen(activity) {
                                 AerixNav.finishTo(LauncherSection.LIBRARY)

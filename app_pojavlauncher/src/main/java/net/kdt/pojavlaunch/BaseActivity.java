@@ -20,6 +20,11 @@ public abstract class BaseActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        // Compose updates immediately; apply the same font to native launcher/editor views when
+        // they inflate. Leave the game's own native controls and renderer untouched.
+        if (!(this instanceof net.kdt.pojavlaunch.game.GameActivity)) {
+            net.kdt.pojavlaunch.aerix.theme.AerixFonts.applyNativeTheme(this);
+        }
         LocaleUtils.setLocale(this);
         Tools.setInsetsMode(this, setFullscreen(), shouldIgnoreNotch());
         Tools.getDisplayMetrics(this);

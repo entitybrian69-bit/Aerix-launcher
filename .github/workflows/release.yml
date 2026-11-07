@@ -7,10 +7,7 @@ name: Release CI
 # A marked push has to touch this file to be seen at all, so each release cuts a
 # one line note here recording what it shipped.
 #
-# Last cut: v1.5.6 - the first-run guide no longer closes the launcher. The
-# tour's card was offset from a component that could be off canvas, which made
-# Compose reject a negative padding (report: Android 9, AerixGuide.kt:235).
-# Everything from 1.5.5 ships unchanged.
+# Last cut: v2.1.0 - FastClient, world sharing and recorder improvements.
 #
 # The publish job uploads the build artifacts after the build job succeeds.
 # Each edition goes up three times, named after version.properties:
@@ -32,7 +29,7 @@ on:
   # build can be started by pushing a change to this file whose commit message carries the marker
   # below. Any other push only skips the job: the marker is the confirmation.
   push:
-    branches: [ "arena/e95bf452-aerix-launcher" ]
+    branches: [ "arena/98ca5d96-aerix-launcher" ]
     paths: [ ".github/workflows/release.yml" ]
 
 permissions:
@@ -84,6 +81,25 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '21'
+
+      - name: Verify launcher and FastClient smoke tests
+        run: |
+          python3 tests/branding_identity_smoke.py
+          python3 tests/social_profile_cosmetics_smoke.py
+          python3 tests/client_background_smoke.py
+          python3 tests/instance_renderer_smoke.py
+          python3 tests/fastclient_assets_smoke.py
+          python3 tests/fastclient_performance_download_test.py
+          python3 tests/recorder_wiring_smoke.py
+          mkdir -p "$RUNNER_TEMP/aerix-release-smoke"
+          javac -d "$RUNNER_TEMP/aerix-release-smoke" \
+            app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/recording/RecordingPaths.java \
+            tests/RecordingPathsSmokeTest.java
+          java -cp "$RUNNER_TEMP/aerix-release-smoke" RecordingPathsSmokeTest
+          javac -d "$RUNNER_TEMP/aerix-release-smoke" \
+            app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/worldshare/WorldSharePolicy.java \
+            tests/WorldSharePolicySmokeTest.java
+          java -cp "$RUNNER_TEMP/aerix-release-smoke" WorldSharePolicySmokeTest
 
       - name: Create out directory
         run: mkdir out

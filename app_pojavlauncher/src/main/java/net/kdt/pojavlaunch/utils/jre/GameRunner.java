@@ -90,7 +90,14 @@ public class GameRunner {
         String host = raw;
         String port = "25565";
         int lastColon = raw.lastIndexOf(':');
-        if (lastColon > 0 && raw.indexOf(':') == lastColon && lastColon < raw.length() - 1) {
+        if (raw.startsWith("[") && raw.indexOf(']') > 0) {
+            int close = raw.indexOf(']');
+            host = raw.substring(1, close);
+            if (close + 1 < raw.length() && raw.charAt(close + 1) == ':') {
+                String maybePort = raw.substring(close + 2);
+                if (maybePort.matches("\\d{1,5}")) port = maybePort;
+            }
+        } else if (lastColon > 0 && raw.indexOf(':') == lastColon && lastColon < raw.length() - 1) {
             String maybePort = raw.substring(lastColon + 1);
             if (maybePort.matches("\\d{1,5}")) {
                 host = raw.substring(0, lastColon);
@@ -221,12 +228,10 @@ public class GameRunner {
     private static void switchRendererIfSupported(boolean support,
                                                   RenderSpec renderer,
                                                   GameRenderer gameRenderer,
-                                                  Instance instance,
                                                   AppCompatActivity activity,
                                                   int resId) throws InterruptedException, IOException {
         if(support) {
-            instance.renderer = renderer.tag();
-            instance.write();
+            // A compatibility adjustment for Follow Global is for this launch only.
             gameRenderer.setCurrentRenderer(renderer);
         }else {
             showDialog(activity, resId);
@@ -236,6 +241,13 @@ public class GameRunner {
 
     public static void launchGame(final AppCompatActivity activity, Account account,
                                   Instance instance, String versionId, File[] classpath, GameRenderer gameRenderer) throws Throwable {
+        if(account.authType == net.kdt.pojavlaunch.authenticator.AuthType.AERIX &&
+                (account.aerixOwnerId == null ||
+                 !account.aerixOwnerId.equals(net.kdt.pojavlaunch.aerix.social.SocialBackend.myUserId()) ||
+                 account.expiresAt <= System.currentTimeMillis() ||
+                 account.accessToken == null || !account.accessToken.matches("[0-9a-f]{64}"))) {
+            throw new java.io.IOException("Sign in to your Aerix account and renew the game session before launching");
+        }
         int freeDeviceMemory = Tools.getFreeDeviceMemory(activity);
         int localeString;
         int freeAddressSpace = Architecture.is32BitsDevice() ? Tools.getMaxContinuousAddressSpaceSize() : -1;
@@ -278,10 +290,12 @@ public class GameRunner {
 
         RenderSpec renderer = gameRenderer.getCurrentRenderer();
 
-        if(!versionInfo.disableRendererChecks) {
+        // Never silently replace an explicit per-instance choice. Follow Global retains the
+        // existing compatibility switches; unsupported explicit choices may fail at runtime.
+        if(!versionInfo.disableRendererChecks && !Tools.isValidString(instance.renderer)) {
             // Switch renderer to GL4ES when running a compat context version on LTW
             if(isCompatContext(versionInfo) && !hasAngelica(gamedir) && renderer instanceof GLESRenderSpec.LTWRenderSpec) {
-                switchRendererIfSupported(true, GameRenderer.getKnownRenderer(Renderers.GL4ES_RENDERER), gameRenderer, instance, activity, 0);
+                switchRendererIfSupported(true, GameRenderer.getKnownRenderer(Renderers.GL4ES_RENDERER), gameRenderer, activity, 0);
             }
 
             boolean isGl4es = renderer instanceof GLESRenderSpec.GL4ESRenderSpec;
@@ -289,15 +303,16 @@ public class GameRunner {
             boolean ltwSupported = ltw != null && ltw.compatibleDevice(activity);
             // Block Sodium from running with GL4ES on 1.17+
             if(!isCompatContext(versionInfo) && isGl4es && hasSodium(gamedir)) {
-                switchRendererIfSupported(ltwSupported, ltw, gameRenderer, instance, activity, R.string.compat_sodium_not_supported);
+                switchRendererIfSupported(ltwSupported, ltw, gameRenderer, activity, R.string.compat_sodium_not_supported);
             }
 
             // Switch renderer to LTW when running 1.21.5
             if(!isGl4esCompatible(versionInfo) && isGl4es) {
-                switchRendererIfSupported(ltwSupported, ltw, gameRenderer, instance, activity, R.string.compat_sodium_not_supported);
+                switchRendererIfSupported(ltwSupported, ltw, gameRenderer, activity, R.string.compat_sodium_not_supported);
             }
         }
 
+        renderer = gameRenderer.getCurrentRenderer();
         boolean isLtw = renderer instanceof GLESRenderSpec.LTWRenderSpec;
 
         if(isLtw && checkRenderDistance(versionInfo, gamedir)) {
@@ -389,12 +404,14 @@ public class GameRunner {
         Map<String, String> versionEnvMap = versionInfo.environment;
 
         // TODO: this should be decoupled from GameRunner completely
-        gameRenderer.setupEnvironment(activity);
+        gameRenderer.setupEnvironment(activity, instance);
         JREUtils.setGameEnvironment(activity, versionEnvMap);
         JREUtils.chdir(instance.getGameDirectory().getAbsolutePath());
 
         if(!gameRenderer.maybeSetupRenderer()) {
-            if(showDialog(activity, R.string.gr_err_renderer_load_Failed)) return;
+            int message = Tools.isValidString(instance.renderer)
+                    ? R.string.aerix_instance_renderer_unavailable : R.string.gr_err_renderer_load_Failed;
+            if(showDialog(activity, message)) return;
             System.exit(0);
         }
         // A renderer plugin may ship its own OpenGL library; built-in renderers keep the shim.
@@ -402,6 +419,11 @@ public class GameRunner {
         // resolve takes the whole launch down with an UnsatisfiedLinkError on the render thread,
         // so the renderer is only used when its library is really on disk.
         RenderSpec activeRenderer = gameRenderer.getLaunchableRenderer();
+        if (activeRenderer == null) {
+            if (showDialog(activity, R.string.aerix_instance_renderer_unavailable)) return;
+            System.exit(0);
+            return;
+        }
         Logger.appendToLog("LWJGL OpenGL library: " + activeRenderer.glLibraryPath()
                 + " (renderer " + activeRenderer.name() + ")");
         javaArgList.add("-Dorg.lwjgl.opengl.libname=" + activeRenderer.glLibraryPath());
@@ -429,7 +451,7 @@ public class GameRunner {
                 (InstanceMemory.overrideMb(instance.jvmArgs) > 0 ? " (instance override)" : " (launcher default)") + "\n");
         activity.runOnUiThread(() -> Toast.makeText(activity, activity.getString(R.string.autoram_info_msg, launchMemoryMb), Toast.LENGTH_SHORT).show());
 
-        Log.i("GameRunner", "Running with "+ launchArgs.toString());
+        Log.i("GameRunner", "Starting Minecraft");
 
         String mainClass = versionInfo.mainClass;
 

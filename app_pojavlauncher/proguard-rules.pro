@@ -23,5 +23,3 @@
  }
 # Option screens
  -keep class net.kdt.pojavlaunch.prefs.screens** {*;}
-
-

@@ -21,6 +21,7 @@ import android.graphics.drawable.ColorDrawable;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.os.ResultReceiver;
 import android.util.Log;
 import android.view.InputDevice;
 import android.view.KeyEvent;
@@ -72,6 +73,7 @@ import net.kdt.pojavlaunch.customcontrols.mouse.HotbarView;
 import net.kdt.pojavlaunch.instances.Instance;
 import net.kdt.pojavlaunch.instances.Instances;
 import net.kdt.pojavlaunch.lifecycle.ContextExecutor;
+import net.kdt.pojavlaunch.lifecycle.LaunchDiagnostics;
 import net.kdt.pojavlaunch.game.platform.Platform;
 import net.kdt.pojavlaunch.game.platform.backend.DummyBackend;
 import net.kdt.pojavlaunch.prefs.LauncherPreferences;
@@ -97,6 +99,10 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     public static final String INTENT_LAUNCH_VERSION = "intent_version";
     public static final String INTENT_LAUNCH_CLASSPATH = "intent_classpath";
     public static final String INTENT_LAUNCH_SERVER = "intent_launch_server";
+    public static final String INTENT_INSTANCE_ID = "intent_instance_id";
+    public static final String INTENT_GLOBAL_RENDERER = "intent_global_renderer";
+    public static final String INTENT_START_ACK = "intent_start_ack";
+    public static final int START_ACK_READY = 1;
 
     public static TouchCharInput touchCharInput;
     private GameView launcherGLView;
@@ -121,6 +127,9 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     public ArrayAdapter<String> ingameControlsEditorArrayAdapter;
     public AdapterView.OnItemClickListener ingameControlsEditorListener;
     private GameService.LocalBinder mServiceBinder;
+    private ResultReceiver mStartAck;
+    private boolean mStartupPrepared;
+    private boolean mResumedForLaunch;
 
     private QuickSettingSideDialog mQuickSettingSideDialog;
 
@@ -130,36 +139,75 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        LaunchDiagnostics.mark(this, "Game activity created");
+        mStartAck = getIntent().getParcelableExtra(INTENT_START_ACK);
+        getIntent().removeExtra(INTENT_START_ACK);
+        // Open the game log before instance, renderer, service and UI setup so early failures
+        // do not leave an old launch log behind. Native process death may still prevent a report.
+        try {
+            File latestLogFile = new File(Tools.DIR_GAME_HOME, "latestlog.txt");
+            if (!latestLogFile.exists() && !latestLogFile.createNewFile())
+                throw new IOException("Failed to create a new log file");
+            Logger.begin(latestLogFile.getAbsolutePath());
+            Logger.appendToLog("Aerix: game activity created; starting launch setup");
+        } catch (Throwable error) {
+            LaunchDiagnostics.mark(this, "Could not open game log");
+            Tools.showError(this, error, true);
+            return;
+        }
         try {
             net.kdt.pojavlaunch.aerix.social.SocialBackend.attach(getApplicationContext());
         } catch (Throwable ignored) {}
         // Explicit process policy before Minecraft creates its native audio tracks.
         // Per-track/backend restrictions and OEM privacy controls can still disallow capture.
         if (android.os.Build.VERSION.SDK_INT >= 29) {
-            android.media.AudioManager audioManager = getSystemService(android.media.AudioManager.class);
-            if (audioManager != null) audioManager.setAllowedCapturePolicy(android.media.AudioAttributes.ALLOW_CAPTURE_BY_ALL);
+            try {
+                android.media.AudioManager audioManager = getSystemService(android.media.AudioManager.class);
+                if (audioManager != null) audioManager.setAllowedCapturePolicy(android.media.AudioAttributes.ALLOW_CAPTURE_BY_ALL);
+            } catch (RuntimeException error) {
+                // Audio capture is optional; an OEM policy failure must not abort game startup.
+                Log.w("GameActivity", "Audio capture policy unavailable", error);
+                Logger.appendToLog("Aerix: audio capture policy unavailable; continuing game launch");
+            }
         }
-        instance = Instances.loadSelectedInstance();
+        String instanceId = getIntent().getStringExtra(INTENT_INSTANCE_ID);
+        try {
+            instance = instanceId != null ? Instances.loadInstance(instanceId) : Instances.loadSelectedInstance();
+        } catch (java.io.IOException error) {
+            android.util.Log.e("GameActivity", "Could not load the instance requested for this launch", error);
+            instance = null;
+        }
         account = Accounts.getCurrent();
         if(instance == null) {
+            LaunchDiagnostics.mark(this, "Instance unavailable");
+            Logger.appendToLog("Aerix: selected instance could not be loaded");
             Toast.makeText(this, R.string.instance_dir_missing, Toast.LENGTH_LONG).show();
             finish();
             return;
         }
-        // A saved renderer tag can point at a plugin that is no longer usable (an Emesis plugin the
-        // launcher now bundles itself, or one whose libraries have gone). Resolving it here keeps
-        // the game on the renderer the player expects instead of a silent fallback.
-        String launchRenderer = instance.getLaunchRenderer();
-        String resolvedRenderer = net.kdt.pojavlaunch.aerix.bridge.PojavPluginBridge.resolveLaunchTag(this, launchRenderer);
-        // The saved choice was a plugin that cannot be used on this device any more. Writing the
-        // replacement here means the renderer picker shows what the game actually runs on, instead
-        // of offering the same broken choice on the next launch.
-        if (resolvedRenderer != null && !resolvedRenderer.equals(launchRenderer)) {
-            instance.renderer = resolvedRenderer;
-            instance.maybeWrite();
+        // The instance choice is authoritative. An empty choice intentionally follows the global
+        // selection captured by the launcher, rather than a stale :game-process preference cache.
+        boolean instanceRenderer = Tools.isValidString(instance.renderer);
+        String globalRenderer = getIntent().getStringExtra(INTENT_GLOBAL_RENDERER);
+        String launchRenderer = instanceRenderer ? instance.renderer :
+                (Tools.isValidString(globalRenderer) ? globalRenderer : instance.getLaunchRenderer());
+        String resolvedRenderer = instanceRenderer ? launchRenderer :
+                net.kdt.pojavlaunch.aerix.bridge.PojavPluginBridge.resolveLaunchTag(this, launchRenderer);
+        if (resolvedRenderer == null) resolvedRenderer = launchRenderer;
+        boolean plugin = resolvedRenderer.startsWith("plugin:");
+        if (instanceRenderer && !plugin && GameRenderer.getKnownRenderer(resolvedRenderer) == null) {
+            Toast.makeText(this, R.string.aerix_instance_renderer_unavailable, Toast.LENGTH_LONG).show();
+            finish();
+            return;
         }
-        mGameRenderer = new GameRenderer(resolvedRenderer != null ? resolvedRenderer : launchRenderer);
-        net.kdt.pojavlaunch.aerix.bridge.PojavPluginBridge.applyLaunchOverride(this, mGameRenderer, instance.getLaunchRenderer());
+        LaunchDiagnostics.mark(this, "Preparing renderer and game window");
+        mGameRenderer = new GameRenderer(resolvedRenderer, instanceRenderer);
+        net.kdt.pojavlaunch.aerix.bridge.PojavPluginBridge.applyLaunchOverride(this, mGameRenderer, resolvedRenderer);
+        if (instanceRenderer && plugin && !resolvedRenderer.equals(mGameRenderer.getCurrentRenderer().tag())) {
+            Toast.makeText(this, R.string.aerix_instance_renderer_unavailable, Toast.LENGTH_LONG).show();
+            finish();
+            return;
+        }
 
         if(GpuUtils.getGlInfo().isAdreno() && !PREF_ZINK_PREFER_SYSTEM_DRIVER) {
             mGameRenderer.overrideVulkanDriver();
@@ -277,7 +325,8 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         mControlLayout.setMenuListener(this);
 
         mDrawerPullButton.setOnClickListener(v -> onClickedMenu());
-        mRecorder = new net.kdt.pojavlaunch.recording.RecorderController(this);
+        mRecorder = new net.kdt.pojavlaunch.recording.RecorderController(this, instance.getInstanceDirectory());
+        mGameMenuOverlay.setRunningInstance(instance);
         mGameMenuOverlay.setCallbacks(new GameMenuCallbacks() {
             @Override public void onScreenRecorder() {
                 hideGameMenu();
@@ -329,11 +378,6 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         weakCursor = new WeakReference<>(launcherGLView.mCursorView);
 
         try {
-            File latestLogFile = new File(Tools.DIR_GAME_HOME, "latestlog.txt");
-            if(!latestLogFile.exists() && !latestLogFile.createNewFile())
-                throw new IOException("Failed to create a new log file");
-            Logger.begin(latestLogFile.getAbsolutePath());
-
             Intent activityIntent = getIntent();
             Bundle extras = Objects.requireNonNull(activityIntent.getExtras());
             String version = extras.getString(INTENT_LAUNCH_VERSION);
@@ -384,12 +428,16 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
                         });
                         return;
                     }
+                    LaunchDiagnostics.mark(this, "Game surface ready; starting Minecraft");
                     runCraft(version, classpath);
                 }catch (Throwable e){
                     Tools.showErrorRemote(e);
                 }
             });
+            mStartupPrepared = true;
         } catch (Throwable e) {
+            LaunchDiagnostics.mark(this, "Game setup failed");
+            Logger.appendToLog("Aerix: game setup failed: " + e.getClass().getName());
             Tools.showError(this, e, true);
         }
     }
@@ -414,6 +462,8 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
 
     @Override
     public void onAttachedToWindow() {
+        // A missing instance or unavailable renderer can finish before views are bound.
+        if (mControlLayout == null) return;
         // Post to get the correct display dimensions after layout.
         mControlLayout.post(()->{
             Tools.getDisplayMetrics(this);
@@ -448,7 +498,7 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     public void onResume() {
         super.onResume();
         ContextExecutor.setActivity(this);
-        if(PREF_ENABLE_GYRO) mGyroControl.enable();
+        if(PREF_ENABLE_GYRO && mGyroControl != null) mGyroControl.enable();
         PLATFORM.setHovered(true);
         updateFpsViewVisibility();
     }
@@ -465,10 +515,11 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
 
     @Override
     protected void onPause() {
+        mResumedForLaunch = false;
         if (touchCharInput != null) touchCharInput.setKeyboardState(false);
         ContextExecutor.clearActivity();
         hideGameMenu();
-        mGyroControl.disable();
+        if (mGyroControl != null) mGyroControl.disable();
         // Avoid going through the JNI each time.
         if (Platform.isGrabbing()){
             CallbackBridge.sendKeyPress(KeyEvent.KEYCODE_ESCAPE);
@@ -534,6 +585,19 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         if(!(PLATFORM instanceof DummyBackend)) hideLoadingScreen();
         if(launcherGLView != null)  // Useful when backing out of the app
             Tools.MAIN_HANDLER.postDelayed(() -> launcherGLView.refreshSize(), 500);
+        mResumedForLaunch = true;
+        acknowledgeLaunchWhenReady();
+    }
+
+    private void acknowledgeLaunchWhenReady() {
+        if (!mResumedForLaunch || !mStartupPrepared || mServiceBinder == null || isFinishing()) return;
+        LaunchDiagnostics.mark(this, "Game window resumed and service connected");
+        ResultReceiver ack = mStartAck;
+        mStartAck = null;
+        if (ack != null) {
+            try { ack.send(START_ACK_READY, null); }
+            catch (Throwable error) { Log.w("GameActivity", "Could not acknowledge game launch", error); }
+        }
     }
 
     @Override
@@ -568,7 +632,6 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
 
         // Show Angelica + SFPEW notice
         RenderSpec renderer = mGameRenderer.getCurrentRenderer();
-        Instance instance = Instances.loadSelectedInstance();
         File gamedir = instance.getGameDirectory();
         if (GameRunner.hasAngelica(gamedir) && renderer instanceof GLESRenderSpec.SFPEWRenderSpec) {
             Toast.makeText(this, R.string.angelica_found_sfpew_notice, Toast.LENGTH_LONG).show();
@@ -635,6 +698,10 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
 
     /** Opens the existing in-game launcher settings (including resolution) from Aerix Client. */
     public void openAerixQuickSettings() { openQuickSettings(); }
+
+    public void openAerixScreenRecorder() {
+        if (mRecorder != null) mRecorder.show();
+    }
 
     private void openQuickSettings() {
         hideGameMenu();
@@ -849,6 +916,7 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         mServiceBinder = localBinder;
         launcherGLView.start(localBinder.isActive);
         localBinder.isActive = true;
+        acknowledgeLaunchWhenReady();
     }
 
     @Override

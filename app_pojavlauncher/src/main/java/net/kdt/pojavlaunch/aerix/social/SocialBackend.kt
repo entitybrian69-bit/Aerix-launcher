@@ -68,9 +68,6 @@ object SocialBackend {
     const val PROJECT_URL = "https://lktupxfszfefsoyksfkg.supabase.co"
     const val PUBLISHABLE_KEY = "sb_publishable_mA8stbSVwAg4Il3xgHDH5g_9a7WwojI"
 
-    /** Set once the Google Web client ID exists; until then the Google button explains itself. */
-    const val GOOGLE_WEB_CLIENT_ID = ""
-
     /** The scheme the browser comes back on after a Google sign-in (see the manifest). */
     const val OAUTH_REDIRECT = "aerix-social://auth"
 
@@ -1032,6 +1029,11 @@ object SocialBackend {
 
     @JvmStatic
     fun signOut() {
+        val owner = userId
+        val headers = owner?.let { ownerHeaders(it) }
+        if (headers != null) bgScope.launch {
+            callRaw("POST", "$PROJECT_URL/rest/v1/rpc/aerix_revoke_game_sessions", "{}", extraHeaders = headers)
+        }
         SocialRealtime.disconnect()
         accessToken = null
         refreshToken = null
@@ -1121,10 +1123,23 @@ object SocialBackend {
         return false
     }
 
+    /** Browser OAuth uses PKCE: intercepted custom-scheme codes cannot be redeemed without this verifier. */
     @JvmStatic
-    fun beginGoogleSignIn(context: Context): Boolean {
+    @JvmOverloads
+    fun beginGoogleSignIn(context: Context, openGameSetup: Boolean = false): Boolean {
+        val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val random = ByteArray(32).also { java.security.SecureRandom().nextBytes(it) }
+        val flags = android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP or android.util.Base64.NO_PADDING
+        val verifier = android.util.Base64.encodeToString(random, flags)
+        val challenge = android.util.Base64.encodeToString(
+            java.security.MessageDigest.getInstance("SHA-256").digest(verifier.toByteArray(Charsets.US_ASCII)), flags)
+        if (!prefs.edit().putString("oauth_pkce_verifier", verifier)
+                .putLong("oauth_pkce_started", System.currentTimeMillis())
+                .putBoolean("oauth_open_game_setup", openGameSetup).commit()) return false
         val url = "$PROJECT_URL/auth/v1/authorize?provider=google" +
             "&redirect_to=" + URLEncoder.encode(OAUTH_REDIRECT, "UTF-8") +
+            "&code_challenge=" + URLEncoder.encode(challenge, "UTF-8") +
+            "&code_challenge_method=s256" +
             "&apikey=" + URLEncoder.encode(PUBLISHABLE_KEY, "UTF-8")
         return try {
             val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, Uri.parse(url))
@@ -1132,37 +1147,52 @@ object SocialBackend {
             context.startActivity(intent)
             true
         } catch (error: Throwable) {
+            prefs.edit().remove("oauth_pkce_verifier").remove("oauth_pkce_started").remove("oauth_open_game_setup").apply()
             Log.w(TAG, "Could not open the Google sign-in page", error)
             false
         }
     }
 
+    fun interface BrowserSignInCallback { fun onComplete(success: Boolean) }
+
+    /** Accept only an outstanding PKCE callback, exchange it off the main thread, then update the UI. */
     @JvmStatic
-    fun completeBrowserSession(redirect: String?): Boolean {
-        if (redirect.isNullOrBlank()) return false
-        val fragment = redirect.substringAfter('#', "")
-        if (fragment.isEmpty()) return false
-        val values = fragment.split('&').mapNotNull { pair ->
-            val index = pair.indexOf('=')
-            if (index <= 0) null
-            else pair.substring(0, index) to Uri.decode(pair.substring(index + 1))
-        }.toMap()
-        val token = values["access_token"] ?: return false
-        val refresh = values["refresh_token"] ?: return false
-        accessToken = token
-        refreshToken = refresh
-        expiresAtMs = System.currentTimeMillis() + ((values["expires_in"]?.toLongOrNull() ?: 3600L) * 1000) - 60_000
-        applyJwtClaims(token)
-        signedIn = true
-        onboardingDismissedForSession = false
-        appContext?.getSharedPreferences(PREFS, Context.MODE_PRIVATE)?.edit()
-            ?.putString("refresh_token", refresh)
-            ?.putString("user_id", userId)
-            ?.putString("email", email)
-            ?.apply()
-        loadLocalCollections()
-        ensureRealtimeConnectedAsync()
-        appContext?.let { SocialMessagingService.ensureRunningIfSignedIn(it) }
+    fun completeBrowserSession(redirect: String?, callback: BrowserSignInCallback): Boolean {
+        val uri = runCatching { Uri.parse(redirect ?: return false) }.getOrNull() ?: return false
+        if (uri.scheme != "aerix-social" || uri.host != "auth" || !uri.path.isNullOrEmpty()) return false
+        val code = uri.getQueryParameter("code")?.takeIf { it.isNotBlank() && it.length <= 2048 } ?: return false
+        val prefs = appContext?.getSharedPreferences(PREFS, Context.MODE_PRIVATE) ?: return false
+        val verifier = prefs.getString("oauth_pkce_verifier", null) ?: return false
+        val age = System.currentTimeMillis() - prefs.getLong("oauth_pkce_started", 0L)
+        val openGameSetup = prefs.getBoolean("oauth_open_game_setup", false)
+        prefs.edit().remove("oauth_pkce_verifier").remove("oauth_pkce_started").remove("oauth_open_game_setup").commit()
+        if (age !in 0..600_000L) return false
+        bgScope.launch {
+            val json = attempt {
+                val body = JsonObject().apply { addProperty("auth_code", code); addProperty("code_verifier", verifier) }
+                asObject(call("POST", "$PROJECT_URL/auth/v1/token?grant_type=pkce", body.toString(), authenticated = false))
+            }
+            val ok = json != null && !json.stringOrNull("access_token").isNullOrBlank() &&
+                !json.stringOrNull("refresh_token").isNullOrBlank() &&
+                !asObject(json.get("user"))?.stringOrNull("id").isNullOrBlank()
+            if (ok && json != null) {
+                // Do not keep identity claims from a previously signed-in user.
+                userId = null
+                email = null
+                storeSession(json)
+                onboardingDismissedForSession = false
+                loadLocalCollections()
+                loadProfile()
+                ensureRealtimeConnectedAsync()
+            }
+            withContext(Dispatchers.Main) {
+                if (ok && openGameSetup) {
+                    net.kdt.pojavlaunch.aerix.ui.AerixNav.init()
+                    net.kdt.pojavlaunch.aerix.ui.AerixNav.navigate(net.kdt.pojavlaunch.aerix.ui.LauncherSection.AERIX_ACCOUNT)
+                }
+                callback.onComplete(ok)
+            }
+        }
         return true
     }
 
@@ -4012,7 +4042,7 @@ object SocialBackend {
         return saved != null
     }
 
-    suspend fun uploadImage(folder: String, bytes: ByteArray, extension: String = "png"): String? =
+    suspend fun uploadImage(folder: String, bytes: ByteArray, extension: String = "png", expectedUserId: String? = null): String? =
         withContext(Dispatchers.IO) {
             lastError = null
             ensureToken()
@@ -4020,6 +4050,10 @@ object SocialBackend {
             val token = accessToken
             if (me == null || token == null) {
                 if (lastError == null) lastError = "Sign in first"
+                return@withContext null
+            }
+            if (expectedUserId != null && (me != expectedUserId || ownerHeaders(expectedUserId)?.get("Authorization") != "Bearer $token")) {
+                lastError = "Your Aerix account changed; try again."
                 return@withContext null
             }
             val path = "$me/${folder}-${System.currentTimeMillis()}.$extension"
@@ -4054,6 +4088,202 @@ object SocialBackend {
                 null
             }
         }
+
+    private fun ownerHeaders(expectedOwner: String): Map<String, String>? {
+        val token = accessToken ?: return null
+        val subject = runCatching {
+            val part = token.split('.')[1]
+            val decoded = android.util.Base64.decode(part + "=".repeat((4 - part.length % 4) % 4), android.util.Base64.URL_SAFE)
+            (JsonParser.parseString(String(decoded, Charsets.UTF_8)) as JsonObject).stringOrNull("sub")
+        }.getOrNull()
+        if (userId != expectedOwner || subject != expectedOwner) {
+            lastError = "Your Aerix account changed; try again."
+            return null
+        }
+        return mapOf("Authorization" to "Bearer $token")
+    }
+
+    data class AerixGameAccount(val name: String, val offlineUuid: String, val slim: Boolean, val sharing: Boolean)
+
+    private fun parseGameAccount(json: JsonElement?): AerixGameAccount? {
+        val row = json?.takeIf { it.isJsonArray }?.asJsonArray?.firstOrNull()?.asJsonObject ?: return null
+        val name = row.stringOrNull("game_name") ?: return null
+        val uuid = row.stringOrNull("offline_uuid") ?: return null
+        return AerixGameAccount(name, uuid, row.get("slim")?.asBoolean == true, row.get("sharing")?.asBoolean == true)
+    }
+
+    suspend fun loadGameAccount(): AerixGameAccount? = attempt {
+        ensureToken()
+        if (!signedIn || userId == null) return@attempt null
+        val owner = userId ?: return@attempt null
+        val headers = ownerHeaders(owner) ?: return@attempt null
+        val result = parseGameAccount(call("POST", "$PROJECT_URL/rest/v1/rpc/aerix_my_game_account", "{}", extraHeaders = headers))
+        if (userId == owner) result else null
+    }
+
+    suspend fun claimGameAccount(name: String, expectedOwner: String): AerixGameAccount? = attempt {
+        ensureToken()
+        if (!signedIn || userId != expectedOwner) {
+            lastError = "Your Aerix account changed; try again."
+            return@attempt null
+        }
+        val headers = ownerHeaders(expectedOwner) ?: return@attempt null
+        val body = JsonObject().apply { addProperty("p_name", name) }
+        parseGameAccount(call("POST", "$PROJECT_URL/rest/v1/rpc/aerix_claim_game_name", body.toString(), extraHeaders = headers))
+    }
+
+    suspend fun setGameSharing(enabled: Boolean, expectedOwner: String): Boolean = attempt {
+        ensureToken()
+        if (!signedIn || userId != expectedOwner) {
+            lastError = "Your Aerix account changed; try again."
+            return@attempt false
+        }
+        val headers = ownerHeaders(expectedOwner) ?: return@attempt false
+        val body = JsonObject().apply { addProperty("p_enabled", enabled) }
+        call("POST", "$PROJECT_URL/rest/v1/rpc/aerix_set_game_sharing", body.toString(), extraHeaders = headers)?.asBoolean == true
+    } ?: false
+
+    suspend fun saveClientCape(capeId: String, expectedOwner: String): Boolean = attempt {
+        ensureToken()
+        val headers = ownerHeaders(expectedOwner) ?: return@attempt false
+        val body = JsonObject().apply { addProperty("p_cape_id", capeId) }
+        call("POST", "$PROJECT_URL/rest/v1/rpc/aerix_set_client_cape", body.toString(), extraHeaders = headers)?.asBoolean == true
+    } ?: false
+
+    suspend fun loadClientCape(expectedOwner: String): String? = attempt {
+        ensureToken()
+        val headers = ownerHeaders(expectedOwner) ?: return@attempt null
+        val result = call("POST", "$PROJECT_URL/rest/v1/rpc/aerix_get_client_cape", "{}", extraHeaders = headers)
+        if (userId != expectedOwner || result == null || result.isJsonNull) null else result.asString
+    }
+
+    data class GameSession(val name: String, val profileId: String, val token: String, val expiresAt: Long)
+
+    suspend fun issueGameSession(expectedOwner: String): GameSession? = attempt {
+        ensureToken()
+        val headers = ownerHeaders(expectedOwner) ?: return@attempt null
+        val result = call("POST", "$PROJECT_URL/rest/v1/rpc/aerix_issue_game_session", "{}", extraHeaders = headers)
+        if (userId != expectedOwner) return@attempt null
+        val row = result?.takeIf { it.isJsonArray }?.asJsonArray?.firstOrNull()?.asJsonObject ?: return@attempt null
+        val name = row.stringOrNull("game_name") ?: return@attempt null
+        val uuid = row.stringOrNull("profile_id") ?: return@attempt null
+        val token = row.stringOrNull("access_token") ?: return@attempt null
+        val expires = row.longOr("expires_at_ms", 0L)
+        if (!name.matches(Regex("^[A-Za-z0-9_]{3,16}$")) || !token.matches(Regex("^[0-9a-f]{64}$")) ||
+            expires <= System.currentTimeMillis() || runCatching { java.util.UUID.fromString(uuid) }.isFailure) return@attempt null
+        GameSession(name, uuid, token, expires)
+    }
+
+    enum class CloudTexture { SKIN, CAPE }
+    data class CloudAppearance(val bytes: ByteArray, val slim: Boolean?)
+
+    /** Publishes a texture only after the user has explicitly confirmed sharing it. */
+    suspend fun publishGameTexture(bytes: ByteArray, expectedOwner: String, kind: CloudTexture, slim: Boolean): Boolean {
+        if (!validGameTexturePng(bytes, kind)) {
+            lastError = "Choose a valid Minecraft PNG ${kind.name.lowercase()} first."
+            return false
+        }
+        val owner = myUserId()
+        if (!signedIn || owner == null || owner != expectedOwner) {
+            lastError = "Your Aerix account changed; sign in and try again."
+            return false
+        }
+        val folder = when (kind) {
+            CloudTexture.SKIN -> if (slim) "game-skin-slim" else "game-skin-wide"
+            CloudTexture.CAPE -> "game-cape"
+        }
+        val url = uploadImage(folder, bytes, "png", expectedUserId = expectedOwner) ?: return false
+        val saved = attempt {
+            ensureToken()
+            if (userId != owner) {
+                lastError = "Your Aerix account changed; try again."
+                return@attempt false
+            }
+            val headers = ownerHeaders(owner) ?: return@attempt false
+            val body = JsonObject().apply {
+                addProperty("p_kind", if (kind == CloudTexture.SKIN) "skin" else "cape")
+                addProperty("p_url", url)
+                addProperty("p_slim", slim)
+            }
+            val saved = call("POST", "$PROJECT_URL/rest/v1/rpc/aerix_publish_game_texture", body.toString(), extraHeaders = headers)?.asBoolean == true
+            if (!saved && lastError == null) lastError = "Could not update your Aerix profile."
+            saved
+        } ?: false
+        if (saved) loadMyProfile()
+        return saved
+    }
+
+    /** Reads only the signed-in user's own appearance from our public storage bucket. */
+    suspend fun downloadOwnGameTexture(kind: CloudTexture): CloudAppearance? = withContext(Dispatchers.IO) {
+        lastError = null
+        ensureToken()
+        val owner = userId
+        if (!signedIn || owner == null) {
+            lastError = "Sign in to your Aerix account first."
+            return@withContext null
+        }
+        val profile = loadMyProfile()
+        if (userId != owner) {
+            lastError = "Your Aerix account changed; try again."
+            return@withContext null
+        }
+        val url = if (kind == CloudTexture.SKIN) profile?.skinUrl else profile?.capeUrl
+        if (url.isNullOrBlank()) {
+            lastError = "There is no ${kind.name.lowercase()} on your Aerix profile yet."
+            return@withContext null
+        }
+        val allowed = "$PROJECT_URL/storage/v1/object/public/social-media/$owner/"
+        if (!url.startsWith(allowed) || url.substring(allowed.length).contains('/') ||
+            url.contains('?') || url.contains('#') || url.contains('%')) {
+            lastError = "The profile image is not stored in your Aerix account."
+            return@withContext null
+        }
+        try {
+            val request = Request.Builder().url(url).get().build()
+            val client = SocialRealtime.restClient.newBuilder().followRedirects(false).followSslRedirects(false).build()
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) throw java.io.IOException("Download failed (HTTP ${response.code})")
+                val body = response.body ?: throw java.io.IOException("Empty image download")
+                if (body.contentLength() > 2 * 1024 * 1024) throw java.io.IOException("Image is too large")
+                val buffer = ByteArray(8192)
+                val out = ByteArrayOutputStream()
+                body.byteStream().use { stream ->
+                    while (true) {
+                        val count = stream.read(buffer)
+                        if (count < 0) break
+                        if (out.size() + count > 2 * 1024 * 1024) throw java.io.IOException("Image is too large")
+                        out.write(buffer, 0, count)
+                    }
+                }
+                val bytes = out.toByteArray()
+                if (!validGameTexturePng(bytes, kind)) throw java.io.IOException("Invalid Minecraft PNG")
+                if (userId != owner) throw java.io.IOException("Your Aerix account changed; try again")
+                val filename = url.substring(allowed.length)
+                val slim = when {
+                    kind != CloudTexture.SKIN -> null
+                    filename.startsWith("game-skin-slim-") -> true
+                    filename.startsWith("game-skin-wide-") -> false
+                    else -> null // Older social uploads did not record the model.
+                }
+                CloudAppearance(bytes, slim)
+            }
+        } catch (error: Exception) {
+            lastError = error.message ?: "Unable to download your image"
+            null
+        }
+    }
+
+    private fun validGameTexturePng(bytes: ByteArray, kind: CloudTexture): Boolean {
+        if (bytes.size !in 8..(2 * 1024 * 1024)) return false
+        val png = byteArrayOf(0x89.toByte(), 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)
+        if (!bytes.copyOfRange(0, png.size).contentEquals(png)) return false
+        val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
+        val w = options.outWidth
+        val h = options.outHeight
+        if (w !in 1..1024 || h !in 1..1024) return false
+        return kind == CloudTexture.CAPE || (w >= 32 && (h == w || h * 2 == w))
+    }
 
     private fun writeOwnStorageJson(fileName: String, jsonContent: String): Boolean {
         val me = userId ?: return false

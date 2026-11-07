@@ -108,7 +108,7 @@ import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
 import net.kdt.pojavlaunch.aerix.loading.AerixLoadingWallpaper
 
 /** The pages of the in-game menu. */
-enum class GameMenuPage { MAIN, DOWNLOADS, SOCIALS }
+enum class GameMenuPage { MAIN, DOWNLOADS, SOCIALS, WORLD_SHARING }
 
 /** Everything the menu asks the game activity to do. */
 interface GameMenuCallbacks {
@@ -180,10 +180,12 @@ fun GameMenuScreen(
     // opens, and the panel has to fill in as soon as they arrive.
     val account = PojavAccountBridge.current
     var page by remember { mutableStateOf(GameMenuPage.MAIN) }
+    var choosingInviteRecipient by remember { mutableStateOf(false) }
     var shown by remember { mutableStateOf(false) }
 
     LaunchedEffect(revision) {
         page = GameMenuPage.MAIN
+        choosingInviteRecipient = false
         shown = false
         shown = true
     }
@@ -218,6 +220,7 @@ fun GameMenuScreen(
             ) {
                 GameSocialsScreen(
                     accent = palette.accent,
+                    chooseInviteRecipient = choosingInviteRecipient,
                     onBack = { page = GameMenuPage.MAIN }
                 )
             }
@@ -233,6 +236,15 @@ fun GameMenuScreen(
                     onStorageProblem = { callbacks.onRequestStoragePermission() }
                 )
             }
+            GameMenuPage.WORLD_SHARING -> Box(
+                modifier = Modifier.fillMaxSize().padding(horizontal = AerixSpacing.mdPlus, vertical = AerixSpacing.sm)
+            ) {
+                GameWorldSharingScreen(target = target, accent = palette.accent, onBack = { page = GameMenuPage.MAIN },
+                    onResumeGame = callbacks::onResumeGame, onOpenChats = {
+                        choosingInviteRecipient = true
+                        page = GameMenuPage.SOCIALS
+                    })
+            }
             GameMenuPage.MAIN -> AnimatedVisibility(
                 visible = shown,
                 enter = fadeIn(tween(140)) + scaleIn(tween(180), initialScale = 0.97f),
@@ -245,7 +257,8 @@ fun GameMenuScreen(
                     versionLine = versionLine,
                     onCloseRequest = onCloseRequest,
                     onOpenDownloads = { page = GameMenuPage.DOWNLOADS },
-                    onOpenSocials = { page = GameMenuPage.SOCIALS }
+                    onOpenSocials = { choosingInviteRecipient = false; page = GameMenuPage.SOCIALS },
+                    onOpenWorldSharing = { page = GameMenuPage.WORLD_SHARING }
                 )
             }
         }
@@ -260,7 +273,8 @@ private fun GameMenuMainPage(
     versionLine: String,
     onCloseRequest: () -> Unit,
     onOpenDownloads: () -> Unit,
-    onOpenSocials: () -> Unit
+    onOpenSocials: () -> Unit,
+    onOpenWorldSharing: () -> Unit
 ) {
     BoxWithConstraints(
         modifier = Modifier.fillMaxSize(),
@@ -338,6 +352,14 @@ private fun GameMenuMainPage(
                         height = rowHeight,
                         badgeCount = net.kdt.pojavlaunch.aerix.social.SocialBackend.totalActionableBadge,
                         onClick = onOpenSocials
+                    )
+                    CompactMenuButton(
+                        label = "World Sharing",
+                        iconRes = R.drawable.aerix_ic_public,
+                        color = palette.tiles[3],
+                        compact = compact,
+                        height = rowHeight,
+                        onClick = onOpenWorldSharing
                     )
                     CompactMenuButton(
                         label = stringResource(R.string.aerix_ingame_menu_downloads),
@@ -823,6 +845,7 @@ private fun AuthIcon(authType: AuthType?, accent: Color) {
 private fun authLabel(authType: AuthType?): String = when (authType) {
     AuthType.MICROSOFT -> stringResource(R.string.aerix_accounts_type_microsoft)
     AuthType.ELY_BY -> stringResource(R.string.aerix_accounts_type_elyby)
+    AuthType.AERIX -> "Aerix Auth"
     AuthType.LOCAL -> stringResource(R.string.aerix_accounts_type_local)
     null -> stringResource(R.string.aerix_ingame_menu_no_account)
 }

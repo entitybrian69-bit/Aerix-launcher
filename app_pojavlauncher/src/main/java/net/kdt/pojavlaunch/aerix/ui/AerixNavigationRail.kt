@@ -86,6 +86,7 @@ enum class LauncherSection {
     /** Dedicated Aerix Client (Minecraft 1.16.5 Testing Edition · Liquid Crystal Clear). */
     AERIX_CLIENT,
     LIBRARY,
+    SERVERS,
     /** Friends, messages and parties - the social launcher, opened from Home and the rail. */
     SOCIALS,
     DISCOVER,
@@ -105,6 +106,7 @@ enum class LauncherSection {
     INSTANCE_EDITOR,
     ADD_ACCOUNT,
     OFFLINE_ACCOUNT,
+    AERIX_ACCOUNT,
     /** One team member's page, opened from Contribution. */
     CONTRIBUTION_DETAIL
 }
@@ -192,6 +194,8 @@ fun AerixNavigationRail(
                 RailIconItem(R.drawable.aerix_ic_dashboard_filled, stringResource(R.string.aerix_nav_library),
                     librarySelected(selectedSection), activeAccent, expandedRail, compactRail,
                     onClick = { onNavigate(LauncherSection.LIBRARY) }, guideKey = AerixGuideState.LIBRARY)
+                RailIconItem(R.drawable.aerix_ic_sports_esports_outlined, "Servers",
+                    selectedSection == LauncherSection.SERVERS, activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.SERVERS) }
                 // Socials is not a rail entry: it opens from the Home dashboard and brings its own
                 // sidebar, so it is not listed next to the launcher's own sections.
                 RailIconItem(R.drawable.aerix_ic_public, stringResource(R.string.aerix_nav_discover),

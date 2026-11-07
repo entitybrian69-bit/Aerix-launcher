@@ -259,9 +259,27 @@ object PojavContentBridge {
             runCatching {
                 ZipFile(file).use { zip ->
                     zip.getEntry("pack.png")?.let { entry ->
-                        val bytes = zip.getInputStream(entry).use { it.readBytes() }
-                        BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.let {
-                            iconBitmap = it.asImageBitmap()
+                        if (entry.size in 1..(4L * 1024 * 1024)) {
+                            val bytes = zip.getInputStream(entry).use { input ->
+                                val out = java.io.ByteArrayOutputStream()
+                                val buffer = ByteArray(8192); var total = 0
+                                while (true) {
+                                    val n = input.read(buffer); if (n < 0) break
+                                    total += n
+                                    if (total > 4 * 1024 * 1024) throw IOException("Pack icon too large")
+                                    out.write(buffer, 0, n)
+                                }
+                                out.toByteArray()
+                            }
+                            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+                            if (bounds.outWidth in 1..8192 && bounds.outHeight in 1..8192) {
+                                var sample = 1
+                                while (bounds.outWidth / (sample * 2) >= 96 && bounds.outHeight / (sample * 2) >= 96) sample *= 2
+                                BitmapFactory.decodeByteArray(bytes, 0, bytes.size, BitmapFactory.Options().apply { inSampleSize = sample })?.let {
+                                    iconBitmap = it.asImageBitmap()
+                                }
+                            }
                         }
                     }
                 }

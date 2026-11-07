@@ -141,6 +141,7 @@ import net.kdt.pojavlaunch.aerix.components.liquidGlass
 import net.kdt.pojavlaunch.aerix.components.miraiRendererEntries
 import net.kdt.pojavlaunch.aerix.components.rememberSettingsCardShape
 import net.kdt.pojavlaunch.aerix.components.setMiraiGlobalRenderer
+import net.kdt.pojavlaunch.aerix.theme.AerixFonts
 import net.kdt.pojavlaunch.aerix.theme.AerixMetrics
 import net.kdt.pojavlaunch.aerix.theme.AerixRadii
 import net.kdt.pojavlaunch.aerix.theme.AerixSpacing
@@ -170,6 +171,7 @@ private data class SettingTabItem(
 )
 
 private val settingTabItems = listOf(
+    SettingTabItem(AerixNav.TAB_STYLES, R.drawable.aerix_ic_format_paint_outlined, "Styles"),
     SettingTabItem(AerixNav.TAB_RENDERER, R.drawable.aerix_ic_video_settings, "Renderer"),
     SettingTabItem(AerixNav.TAB_GAME, R.drawable.aerix_ic_rocket_launch_filled, "Game"),
     SettingTabItem(AerixNav.TAB_JAVA, R.drawable.aerix_ic_java, "Java"),
@@ -300,6 +302,7 @@ fun SettingsScreen(activity: FragmentActivity, tabKey: String, onTabChanged: (St
                 .weight(1f)
         ) {
             when (activeKey) {
+                AerixNav.TAB_STYLES -> FontStylesTab(activity)
                 AerixNav.TAB_RENDERER -> RendererTabContent(activity)
                 AerixNav.TAB_GAME -> GameTabContent(activity)
                 AerixNav.TAB_JAVA -> JavaManageTabContent(activity)
@@ -310,6 +313,49 @@ fun SettingsScreen(activity: FragmentActivity, tabKey: String, onTabChanged: (St
                 AerixNav.TAB_GAMEPAD -> GamepadTabContent(activity)
                 AerixNav.TAB_ABOUT -> AboutInfoTabContent(activity)
                 else -> RendererTabContent(activity)
+            }
+        }
+    }
+}
+
+
+/** A live, offline preview of the same families used by the launcher's global theme. */
+@Composable
+private fun FontStylesTab(activity: FragmentActivity) {
+    val selected = AerixFonts.selectedId
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm),
+        contentPadding = PaddingValues(bottom = AerixSpacing.xl)
+    ) {
+        item {
+            Text("Font styles", color = AerixSurface.textPrimary, style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold)
+            Text("Choose a font for the launcher. Your selection is saved and works offline.",
+                color = AerixSurface.textSecondary, style = MaterialTheme.typography.bodySmall)
+        }
+        items(AerixFonts.choices.size, key = { AerixFonts.choices[it].id }) { index ->
+            val choice = AerixFonts.choices[index]
+            val active = selected == choice.id
+            val previewFamily = remember(choice.id) { choice.family() }
+            Surface(
+                onClick = { AerixFonts.select(activity, choice) },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(AerixRadii.cardSmall),
+                color = if (active) AerixSurface.accent.copy(alpha = 0.22f) else AerixSurface.panel,
+                border = BorderStroke(1.dp, if (active) AerixSurface.accent else AerixSurface.borderSoft)
+            ) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(choice.label, fontFamily = previewFamily, fontSize = 16.sp,
+                            color = AerixSurface.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text("Aerix Launcher · Aa 123", fontFamily = previewFamily, fontSize = 12.sp,
+                            color = AerixSurface.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    RadioButton(selected = active, onClick = { AerixFonts.select(activity, choice) },
+                        colors = RadioButtonDefaults.colors(selectedColor = AerixSurface.accent))
+                }
             }
         }
     }

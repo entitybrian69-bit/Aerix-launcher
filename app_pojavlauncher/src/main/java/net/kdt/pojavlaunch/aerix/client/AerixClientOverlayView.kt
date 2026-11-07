@@ -154,7 +154,9 @@ private enum class ClientMenuSubPage {
     PACKS,
     KEY_PROFILES,
     TRANSFER,
-    GALLERY
+    GALLERY,
+    WORLD_SHARING,
+    SOCIALS
 }
 
 private enum class FeatureIconKind {
@@ -345,7 +347,11 @@ class AerixClientOverlayView @JvmOverloads constructor(
         }
         composeView.setContent {
             AerixLauncherTheme {
+                val worldSharingTarget = remember(activeClientInstance) {
+                    net.kdt.pojavlaunch.aerix.bridge.GameDownloadTarget.of(activeClientInstance)
+                }
                 AerixClientRootOverlay(
+                    worldSharingTarget = worldSharingTarget,
                     mcVersion = AerixClientPackGenerator.resolveMcVersionFromInstance(activeClientInstance?.versionId, AerixClientStore.selectedClientVersion),
                     gameDir = activeClientInstance?.gameDirectory,
                     bootVisible = bootOverlayVisible,
@@ -395,6 +401,7 @@ class AerixClientOverlayView @JvmOverloads constructor(
  * ═══════════════════════════════════════════════════════════════════════════ */
 @Composable
 private fun AerixClientRootOverlay(
+    worldSharingTarget: net.kdt.pojavlaunch.aerix.bridge.GameDownloadTarget,
     gameDir: File?,
     bootVisible: Boolean,
     isGrabbing: Boolean,
@@ -740,7 +747,8 @@ private fun AerixClientRootOverlay(
                 onSyncOptionsTxt = onSyncOptionsTxt,
                 onSyncCape = onSyncCape,
                 telemetry = telemetry,
-                gameDir = gameDir
+                gameDir = gameDir,
+                worldSharingTarget = worldSharingTarget
             )
         }
 
@@ -794,9 +802,11 @@ private fun FamousClientRectangleMenu(
     onSyncOptionsTxt: () -> Unit,
     onSyncCape: () -> Unit,
     telemetry: ClientTelemetrySnapshot?,
-    gameDir: File?
+    gameDir: File?,
+    worldSharingTarget: net.kdt.pojavlaunch.aerix.bridge.GameDownloadTarget
 ) {
     val context = LocalContext.current
+    var choosingInviteRecipient by remember { mutableStateOf(false) }
 
     Box(
         modifier = Modifier
@@ -886,6 +896,8 @@ private fun FamousClientRectangleMenu(
                             ClientMenuSubPage.KEY_PROFILES -> "AERIX CLIENT  ·  KEYBIND PROFILES"
                             ClientMenuSubPage.TRANSFER -> "AERIX CLIENT  ·  IMPORT / EXPORT"
                             ClientMenuSubPage.GALLERY -> "AERIX CLIENT  ·  SCREENSHOTS"
+                            ClientMenuSubPage.WORLD_SHARING -> "AERIX CLIENT  ·  WORLD SHARING"
+                            ClientMenuSubPage.SOCIALS -> "AERIX CLIENT  ·  CHATS"
                         },
                         color = Color.White,
                         fontSize = 15.sp,
@@ -968,6 +980,15 @@ private fun FamousClientRectangleMenu(
                         onOpenKeyProfiles = { onChangeSubPage(ClientMenuSubPage.KEY_PROFILES) },
                         onOpenTransfer = { onChangeSubPage(ClientMenuSubPage.TRANSFER) },
                         onOpenGallery = { onChangeSubPage(ClientMenuSubPage.GALLERY) },
+                        onOpenWorldSharing = { onChangeSubPage(ClientMenuSubPage.WORLD_SHARING) },
+                        onOpenSocials = { choosingInviteRecipient = false; onChangeSubPage(ClientMenuSubPage.SOCIALS) },
+                        onOpenRecorder = {
+                            var candidate: Context? = context
+                            while (candidate is ContextWrapper && candidate !is net.kdt.pojavlaunch.game.GameActivity) candidate = candidate.baseContext
+                            val game = candidate as? net.kdt.pojavlaunch.game.GameActivity
+                            if (game == null) Toast.makeText(context, "Screen recorder unavailable", Toast.LENGTH_SHORT).show()
+                            else { onClose(); game.openAerixScreenRecorder() }
+                        },
                         onOpenOledAfk = onOpenOledAfk,
                         onSyncOptionsTxt = onSyncOptionsTxt
                     )
@@ -985,6 +1006,18 @@ private fun FamousClientRectangleMenu(
                     ClientMenuSubPage.KEY_PROFILES -> ClientKeyProfilesPage(gameDir)
                     ClientMenuSubPage.TRANSFER -> ClientTransferPage()
                     ClientMenuSubPage.GALLERY -> ClientGalleryPage(gameDir)
+                    ClientMenuSubPage.WORLD_SHARING -> net.kdt.pojavlaunch.aerix.ui.game.GameWorldSharingScreen(
+                        target = worldSharingTarget,
+                        accent = LiquidCrystalPalette.CrimsonPrimary,
+                        onBack = { onChangeSubPage(ClientMenuSubPage.GRID) },
+                        onResumeGame = onClose,
+                        onOpenChats = { choosingInviteRecipient = true; onChangeSubPage(ClientMenuSubPage.SOCIALS) }
+                    )
+                    ClientMenuSubPage.SOCIALS -> net.kdt.pojavlaunch.aerix.ui.game.GameSocialsScreen(
+                        accent = LiquidCrystalPalette.CrimsonPrimary,
+                        onBack = { onChangeSubPage(ClientMenuSubPage.GRID) },
+                        chooseInviteRecipient = choosingInviteRecipient
+                    )
                 }
             }
         }
@@ -1008,10 +1041,20 @@ private fun ClientSquaresGridPage(
     onOpenKeyProfiles: () -> Unit,
     onOpenTransfer: () -> Unit,
     onOpenGallery: () -> Unit,
+    onOpenWorldSharing: () -> Unit,
+    onOpenSocials: () -> Unit,
+    onOpenRecorder: () -> Unit,
     onOpenOledAfk: () -> Unit,
     onSyncOptionsTxt: () -> Unit
 ) {
     val modules = listOf(
+        ClientSquareModule("screen_recorder", "Screen Recorder", FeatureIconKind.HOTBAR,
+            { net.kdt.pojavlaunch.recording.RecordingState.isActive() },
+            { if (net.kdt.pojavlaunch.recording.RecordingState.isActive()) "RECORDING" else "OPEN ›" }, onOpenRecorder),
+        ClientSquareModule("world_sharing", "World Sharing", FeatureIconKind.COMPASS,
+            { false }, { "OPEN ›" }, onOpenWorldSharing),
+        ClientSquareModule("socials", "Friend Chats", FeatureIconKind.AUTOGG,
+            { false }, { "OPEN ›" }, onOpenSocials),
         ClientSquareModule("gallery", "Screenshots", FeatureIconKind.HOTBAR,
             { false }, { "GALLERY ›" }, onOpenGallery),
         ClientSquareModule("transfer", "Import / Export", FeatureIconKind.HOTBAR,

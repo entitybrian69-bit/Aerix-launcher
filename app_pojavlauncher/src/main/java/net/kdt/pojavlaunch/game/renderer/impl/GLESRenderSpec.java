@@ -14,7 +14,6 @@ import net.kdt.pojavlaunch.prefs.LauncherPreferences;
 import net.kdt.pojavlaunch.utils.JREUtils;
 import net.kdt.pojavlaunch.utils.jre.GameRunner;
 import net.kdt.pojavlaunch.instances.Instance;
-import net.kdt.pojavlaunch.instances.Instances;
 
 import java.io.File;
 import java.util.Map;
@@ -164,8 +163,13 @@ public abstract class GLESRenderSpec implements RenderSpec {
        }
 
        public void setupEnvironment(Context context, Map<String, String> envMap) {
-         // Check if Angelica mod is present
-         Instance instance = Instances.loadSelectedInstance();
+         setupEnvironment(context, envMap, null);
+       }
+
+       @Override
+       public void setupEnvironment(Context context, Map<String, String> envMap, Instance instance) {
+         // Check the actual launch instance, which may differ from the cached selection.
+         if (instance == null) throw new IllegalArgumentException("SFPEW requires a launch instance");
          File gamedir = instance.getGameDirectory();
          boolean hasAngelica = GameRunner.hasAngelica(gamedir);
 

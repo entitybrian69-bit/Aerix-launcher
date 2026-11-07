@@ -56,12 +56,13 @@ fun Modifier.liquidGlass(
     return glassModifier.drawWithCache {
         val width = size.width.coerceAtLeast(1f)
         val height = size.height.coerceAtLeast(1f)
+        // A soft, neutral reflection and a delicate rim keep the wallpaper visible. The tint is
+        // intentionally restrained so custom accent colours do not paint the entire panel.
         val sheen = Brush.linearGradient(
             colors = listOf(
-                Color.White.copy(alpha = 0.15f * intensity),
-                tint.copy(alpha = 0.10f * intensity),
-                AerixSurface.glassBlue.copy(alpha = 0.075f * intensity),
-                AerixSurface.glassViolet.copy(alpha = 0.045f * intensity),
+                Color.White.copy(alpha = 0.13f * intensity),
+                tint.copy(alpha = 0.045f * intensity),
+                Color.White.copy(alpha = 0.018f * intensity),
                 Color.Transparent
             ),
             start = Offset.Zero,
@@ -69,10 +70,10 @@ fun Modifier.liquidGlass(
         )
         val rim = Brush.linearGradient(
             colors = listOf(
-                Color.White.copy(alpha = 0.58f * intensity),
-                AerixSurface.glassBlue.copy(alpha = 0.30f * intensity),
-                AerixSurface.glassViolet.copy(alpha = 0.22f * intensity),
-                Color.White.copy(alpha = 0.42f * intensity)
+                Color.White.copy(alpha = 0.38f * intensity),
+                Color.White.copy(alpha = 0.16f * intensity),
+                Color.White.copy(alpha = 0.10f * intensity),
+                Color.White.copy(alpha = 0.25f * intensity)
             ),
             start = Offset.Zero,
             end = Offset(width, height)
@@ -81,7 +82,10 @@ fun Modifier.liquidGlass(
         val rimWidth = AerixSpacing.hairline.toPx() * intensity
 
         onDrawWithContent {
-            drawRect(brush = sheen)
+            // Draw inside the outline even when clipContent is disabled; otherwise rounded
+            // panels would cast a rectangular sheen outside their corners.
+            drawOutline(outline = outline, color = Color.Black.copy(alpha = 0.16f * intensity))
+            drawOutline(outline = outline, brush = sheen)
             drawContent()
             if (rimWidth > 0f) {
                 drawOutline(outline = outline, brush = rim, style = Stroke(width = rimWidth))

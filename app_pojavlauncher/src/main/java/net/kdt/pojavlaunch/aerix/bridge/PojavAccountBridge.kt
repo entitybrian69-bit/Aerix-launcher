@@ -120,17 +120,23 @@ object PojavAccountBridge : LoginListener {
     private val microsoftLoginListener = LoginExtraListener(AuthType.MICROSOFT)
     private val elyByLoginListener = LoginExtraListener(AuthType.ELY_BY)
     private val localLoginListener = ExtraListener<Array<String>> { _, value ->
-        try {
-            val account = Accounts.create { acc ->
-                val name = value[0].trim().ifEmpty { "Steve" }
-                acc.username = name
-                acc.authType = AuthType.LOCAL
-                acc.profileId = offlineUuid(name).toString()
-                acc.accessToken = offlineAccessToken(name)
+        val name = value.firstOrNull()?.trim().orEmpty()
+        if (!PojavAuthBridge.isValidOfflineName(name)) {
+            Tools.runOnUiThread {
+                appContext?.let { Toast.makeText(it, R.string.local_login_bad_username_text, Toast.LENGTH_LONG).show() }
             }
-            onLoginDone(account)
-        } catch (e: IOException) {
-            onLoginError(e)
+        } else {
+            try {
+                val account = Accounts.create { acc ->
+                    acc.username = name
+                    acc.authType = AuthType.LOCAL
+                    acc.profileId = offlineUuid(name).toString()
+                    acc.accessToken = offlineAccessToken(name)
+                }
+                onLoginDone(account)
+            } catch (e: IOException) {
+                onLoginError(e)
+            }
         }
         false
     }
@@ -319,10 +325,11 @@ object PojavAccountBridge : LoginListener {
     }
 
     /** Creates an offline account directly from the Account Manage screen (+ Offline pill). */
-    fun createOfflineAccount(username: String) {
+    fun createOfflineAccount(username: String): Boolean {
         val trimmed = username.trim()
-        if (trimmed.isEmpty()) return
+        if (!PojavAuthBridge.isValidOfflineName(trimmed)) return false
         ExtraCore.setValue(ExtraConstants.MOJANG_LOGIN_TODO, arrayOf(trimmed, ""))
+        return true
     }
 
     /** Downloads a skin PNG from the first working URL in [candidateUrls], saves it to skins/, and equips it. */

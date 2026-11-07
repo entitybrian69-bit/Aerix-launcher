@@ -114,6 +114,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.fragment.app.FragmentActivity
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import net.kdt.pojavlaunch.aerix.resourcepack.ResourcePackOptimizer
+import net.kdt.pojavlaunch.aerix.resourcepack.AndroidPackImageScaler
 import net.kdt.pojavlaunch.R
 import net.kdt.pojavlaunch.Tools
 import net.kdt.pojavlaunch.aerix.bridge.AerixIconCropper
@@ -1017,6 +1021,9 @@ private fun InstanceContentPane(
     var loading by remember(kind) { mutableStateOf(true) }
     var revision by remember { mutableIntStateOf(0) }
     var query by rememberSaveable(kind) { mutableStateOf("") }
+    var optimizeTarget by remember(kind) { mutableStateOf<ContentEntry?>(null) }
+    var optimizing by remember(kind) { mutableStateOf(false) }
+    var optimizeMessage by remember(kind) { mutableStateOf<String?>(null) }
 
     val failedText = stringResource(R.string.aerix_content_failed)
     val importedText = stringResource(R.string.aerix_content_imported)
@@ -1139,6 +1146,10 @@ private fun InstanceContentPane(
             }
         }
 
+        if (kind == ContentKind.RESOURCE_PACKS) {
+            Text("Tap the wrench next to a ZIP to create a smaller copy. The original stays untouched.",
+                color = AerixSurface.textSecondary, fontSize = 10.sp, modifier = Modifier.padding(horizontal = AerixSpacing.md))
+        }
         ContentSelectionControls(kind, entries, shown, selection, loading) { revision++ }
         when {
             loading && entries.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -1197,8 +1208,13 @@ private fun InstanceContentPane(
                                     maxLines = 1
                                 )
                             }
+                            if (!selection.selecting && kind == ContentKind.RESOURCE_PACKS && entry.file.isFile && entry.name.endsWith(".zip", ignoreCase = true)) {
+                                IconButton(enabled = !selection.busy && !loading && !optimizing, onClick = { optimizeTarget = entry }) {
+                                    Icon(painter = painterResource(R.drawable.aerix_ic_build_outlined), contentDescription = "Make smaller pack copy", tint = accent, modifier = Modifier.size(18.dp))
+                                }
+                            }
                             if (!selection.selecting) IconButton(
-                                enabled = !selection.busy && !loading,
+                                enabled = !selection.busy && !loading && !optimizing,
                                 onClick = { selection.pendingDelete = listOf(entry) }
                             ) {
                                 Icon(
@@ -1213,6 +1229,29 @@ private fun InstanceContentPane(
                 }
             }
         }
+    }
+    optimizeTarget?.let { target ->
+        AlertDialog(onDismissRequest = { if (!optimizing) optimizeTarget = null },
+            title = { Text("Make a smaller pack copy?") },
+            text = { Text("Aerix will create a separate copy with smaller large menu textures. Animated textures stay unchanged, and the original pack is kept. If the copy still crashes, the cause may be something else. Select only the copy in Minecraft, not both.") },
+            confirmButton = { TextButton(enabled = !optimizing, onClick = {
+                optimizing = true
+                scope.launch {
+                    val result = withContext(Dispatchers.IO) { runCatching { ResourcePackOptimizer.createCopy(target.file, AndroidPackImageScaler) } }
+                    optimizing = false
+                    optimizeTarget = null
+                    optimizeMessage = result.fold(
+                        { "Created ${it.file.name}\n\nReduced ${it.resized} large static images${if (it.metadataRepaired) " and repaired extra characters in pack metadata" else ""}. In Minecraft Resource Packs, turn off the original and select this copy. Compatibility and crash relief aren't guaranteed." },
+                        { "Could not create a copy: ${it.message ?: "unknown error"}. The original was not changed." }
+                    )
+                    revision++
+                }
+            }) { Text(if (optimizing) "Creating…" else "Create copy") } },
+            dismissButton = { TextButton(enabled = !optimizing, onClick = { optimizeTarget = null }) { Text("Cancel") } })
+    }
+    optimizeMessage?.let { message ->
+        AlertDialog(onDismissRequest = { optimizeMessage = null }, title = { Text("Resource pack") }, text = { Text(message) },
+            confirmButton = { TextButton(onClick = { optimizeMessage = null }) { Text("OK") } })
     }
 }
 
