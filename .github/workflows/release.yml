@@ -7,7 +7,7 @@ name: Release CI
 # A marked push has to touch this file to be seen at all, so each release cuts a
 # one line note here recording what it shipped.
 #
-# Last cut: v2.1.0 - FastClient, world sharing and recorder improvements.
+# Last cut: v2.2.0 - Servers tab, Aerix accounts, e4all world sharing and Aerix Nightly.
 #
 # The publish job uploads the build artifacts after the build job succeeds.
 # Each edition goes up three times, named after version.properties:

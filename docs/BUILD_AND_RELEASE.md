@@ -14,7 +14,7 @@ APK is only built when the owner asks for a release and confirms it.
 | Build info | `https://github.com/entitybrian69-bit/Aerix-launcher/releases/download/debug-latest/NIGHTLY_BUILD.txt` |
 | CI workflow | **Aerix Nightly (testing)** (`aerix-debug.yml`) |
 | CI artifact | `aerix-nightly-apk` |
-| Source | this branch (`version.properties` = `2.1.0`) |
+| Source | this branch (`version.properties` = `2.2.0`) |
 | Variant | `noruntimeNightly` |
 | applicationId | `net.kdt.pojavlaunch.debug` |
 | Label | Aerix Nightly |
@@ -68,20 +68,15 @@ Public APKs are **not** stored in the Git repository. The universal APK is
 147 MB, above GitHub's 100 MB limit for repository files, so release builds live
 as assets on the GitHub Releases page and nowhere else.
 
-Current public release: **v2.1.0**, tag target `ec82bd5` (notes in
-`docs/releases/v2.1.0.md`).
+Current public release: **v2.2.0** (notes in
+`docs/releases/v2.2.0.md`).
 
-| Asset | Size |
-|---|---|
-| `Aerix-Launcher-2.1.0-arm64-v8a.apk` | 89,520,737 |
-| `Aerix-Launcher-2.1.0-armeabi-v7a.apk` | 89,765,275 |
-| `Aerix-Launcher-2.1.0.apk` | 147,446,205 |
-| `Aerix-Launcher-2.1.0-noruntime-arm64-v8a.apk` | 60,410,414 |
-| `Aerix-Launcher-2.1.0-noruntime-armeabi-v7a.apk` | 60,654,946 |
-| `Aerix-Launcher-2.1.0-noruntime.apk` | 118,335,900 |
-| `Aerix-Launcher.apk` | same bytes as the 2.1.0 universal APK |
-| `Aerix-Launcher-noruntime.apk` | same bytes as the 2.1.0 no-runtime APK |
-| `SHA256SUMS` | hashes of every file above — take them from the release, never retyped here |
+The release carries three builds per edition, named after `version.properties`:
+`Aerix-Launcher-<version>-arm64-v8a.apk`, `-armeabi-v7a.apk` and the universal
+`Aerix-Launcher-<version>.apk`, plus the three `-noruntime` equivalents.
+`Aerix-Launcher.apk` and `Aerix-Launcher-noruntime.apk` are copies of the
+universal builds. `SHA256SUMS` on the release carries the size and hash of every
+file — take them from there, never retype them here.
 
 The unversioned names are copies of the same files. The download buttons on the
 website point at `releases/latest/download/<name>`, so a release has to carry
