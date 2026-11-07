@@ -83,12 +83,7 @@ private fun decodeWallpaper(context: Context, id: String, softness: Int = 1): Im
  * the bitmap is cached process-wide, same as the Aerix CaveBackground.
  */
 @Composable
-fun AerixBackground(
-    modifier: Modifier = Modifier,
-    /** The Lobby draws its own voxel-village artwork, so the wallpaper decode is skipped. */
-    skipWallpaper: Boolean = false,
-    content: @Composable BoxScope.() -> Unit
-) {
+fun AerixBackground(modifier: Modifier = Modifier, content: @Composable BoxScope.() -> Unit) {
     val context = LocalContext.current
     val id = AerixPreferences.selectedWallpaper
     val revision = AerixThemeManager.wallpaperRevision
@@ -100,7 +95,6 @@ fun AerixBackground(
     val cacheKey = "$id|$revision|$softness"
     var image by remember(cacheKey) { mutableStateOf(wallpaperCacheBitmap.takeIf { wallpaperCacheKey == cacheKey }) }
     LaunchedEffect(cacheKey) {
-        if (skipWallpaper) return@LaunchedEffect
         if (animationById(id) != null) return@LaunchedEffect
         if (wallpaperCacheKey != cacheKey || wallpaperCacheBitmap == null) {
             val decoded = withContext(Dispatchers.IO) { runCatching { decodeWallpaper(context, id, softness) }.getOrNull() }
@@ -113,11 +107,6 @@ fun AerixBackground(
     val motion = ThemeMotion.rememberEnabled()
     val animation = animationById(id)
     Box(modifier.fillMaxSize().background(AerixSurface.canvas)) {
-        // The Lobby supplies its own full-bleed artwork; do not double-decode or double-scrim it.
-        if (skipWallpaper) {
-            content()
-            return@Box
-        }
         // Footage that ships with the launcher: played straight from the APK, no bitmap involved.
         if (AerixThemeManager.isBundledClipId(id)) {
             val clip = bundledClipById(id.removePrefix(AerixThemeManager.WALLPAPER_CLIP_ASSET_PREFIX))

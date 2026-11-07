@@ -88,8 +88,6 @@ object AerixThemeManager {
         AerixWallpaperPreset("wp_24_badlands_canyon", "Badlands Canyon River", "Badlands Mesa • Canyon Shaders", "wallpapers/wp_24_badlands_canyon.webp", "Terracotta Sunset", Color(0xFFF97316)),
         AerixWallpaperPreset("wp_25_deep_dark", "Deep Dark Sculk City", "Deep Dark • Sculk Shaders", "wallpapers/wp_25_deep_dark.webp", "Sculk Abyss", Color(0xFF06B6D4)),
         AerixWallpaperPreset("aerix_twilight", "Aerix Twilight", "A cozy voxel village at dusk", "wallpapers/aerix_twilight.jpg", "Mint", AerixSurface.accentDefault),
-        // The Lobby's own backdrop: golden-hour voxel village, also usable as a normal wallpaper.
-        AerixWallpaperPreset("wp_26_lobby_village", "Golden Village Lobby", "Golden hour • Voxel village", "wallpapers/wp_26_lobby_village.jpg", "Harvest Gold", Color(0xFFF5B841)),
     )
 
     val selectedWallpaperId: String

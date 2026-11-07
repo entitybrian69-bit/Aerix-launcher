@@ -78,10 +78,6 @@ object AerixPreferences {
     const val KEY_DISCORD_GAME_PROFILE_MODE = "aerixDiscordGameProfileMode"
     /** Attach modpack art, clickable info URLs, and action buttons to Discord Rich Presence cards. */
     const val KEY_DISCORD_CLICKABLE_LINKS = "aerixDiscordClickableLinks"
-    /** The full-bleed blocky Lobby home, instead of the glass dashboard. */
-    const val KEY_LOBBY_UI = "aerixLobbyUi"
-    /** Use the bundled voxel village behind the Lobby instead of the chosen wallpaper. */
-    const val KEY_LOBBY_VILLAGE_BACKDROP = "aerixLobbyVillageBackdrop"
 
     const val DEFAULT_CUSTOM_COLOR = 0xFF8DEFE0.toInt()
     const val DEFAULT_BACKGROUND_OPACITY = 60
@@ -182,13 +178,6 @@ object AerixPreferences {
     var discordClickableLinks by mutableStateOf(true)
         private set
 
-    /** Compose state, so switching the home screen takes effect without restarting. */
-    var lobbyUi by mutableStateOf(true)
-        private set
-    /** Compose state: the Lobby draws its own village artwork when true. */
-    var lobbyVillageBackdrop by mutableStateOf(true)
-        private set
-
     fun init(context: Context) {
         val p = context.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
         prefs = p
@@ -224,18 +213,6 @@ object AerixPreferences {
         discordAppId = p.getString(KEY_DISCORD_APP_ID, "") ?: ""
         discordGameProfileMode = p.getBoolean(KEY_DISCORD_GAME_PROFILE_MODE, true)
         discordClickableLinks = p.getBoolean(KEY_DISCORD_CLICKABLE_LINKS, true)
-        lobbyUi = p.getBoolean(KEY_LOBBY_UI, true)
-        lobbyVillageBackdrop = p.getBoolean(KEY_LOBBY_VILLAGE_BACKDROP, true)
-    }
-
-    fun saveLobbyUi(value: Boolean) {
-        lobbyUi = value
-        edit { putBoolean(KEY_LOBBY_UI, value) }
-    }
-
-    fun saveLobbyVillageBackdrop(value: Boolean) {
-        lobbyVillageBackdrop = value
-        edit { putBoolean(KEY_LOBBY_VILLAGE_BACKDROP, value) }
     }
 
     fun saveFavoritesJson(value: String) {
