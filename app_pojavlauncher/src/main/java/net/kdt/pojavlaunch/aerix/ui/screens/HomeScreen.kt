@@ -54,6 +54,8 @@ fun HomeScreen(activity: FragmentActivity, navigate: (LauncherSection) -> Unit) 
         instances = instances,
         selected = selected,
         taskCount = taskCount,
+        taskProgressPercent = PojavTaskBridge.taskProgressPercent,
+        taskProgressTitle = PojavTaskBridge.taskProgressTitle,
         accent = accent,
         onPlay = actions.play,
         onCreate = actions.create,

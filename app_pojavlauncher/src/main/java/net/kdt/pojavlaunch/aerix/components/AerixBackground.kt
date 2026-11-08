@@ -83,11 +83,17 @@ private fun decodeWallpaper(context: Context, id: String, softness: Int = 1): Im
  * the bitmap is cached process-wide, same as the Aerix CaveBackground.
  */
 @Composable
-fun AerixBackground(modifier: Modifier = Modifier, content: @Composable BoxScope.() -> Unit) {
+fun AerixBackground(
+    modifier: Modifier = Modifier,
+    forceBlurForDashboard: Boolean = false,
+    content: @Composable BoxScope.() -> Unit
+) {
     val context = LocalContext.current
     val id = AerixPreferences.selectedWallpaper
     val revision = AerixThemeManager.wallpaperRevision
-    val blurDp = AerixPreferences.backgroundBlur
+    // Keep the Minecraft dashboard's world scene softly defocused even when the user's global
+    // wallpaper blur preference is disabled; all other launcher pages retain that preference.
+    val blurDp = if (forceBlurForDashboard) maxOf(AerixPreferences.backgroundBlur, 8) else AerixPreferences.backgroundBlur
     // Android 12+ blurs with a render effect; below that the bitmap is decoded smaller, so the
     // meter still does something on every device this launcher supports.
     val renderBlur = blurDp > 0 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
@@ -111,7 +117,11 @@ fun AerixBackground(modifier: Modifier = Modifier, content: @Composable BoxScope
         if (AerixThemeManager.isBundledClipId(id)) {
             val clip = bundledClipById(id.removePrefix(AerixThemeManager.WALLPAPER_CLIP_ASSET_PREFIX))
             if (clip != null) {
-                RawVideoWallpaper(resId = clip.rawRes, motion = motion, modifier = Modifier.fillMaxSize())
+                RawVideoWallpaper(
+                    resId = clip.rawRes,
+                    motion = motion,
+                    modifier = Modifier.fillMaxSize().let { if (renderBlur) it.blur(blurDp.dp) else it }
+                )
                 Box(Modifier.fillMaxSize().background(AerixThemeManager.screenScrim()))
                 content()
                 return@Box
@@ -121,7 +131,11 @@ fun AerixBackground(modifier: Modifier = Modifier, content: @Composable BoxScope
         if (AerixThemeManager.isClipId(id)) {
             val file = AerixThemeManager.clipFile(context, id)
             if (file != null && file.isFile) {
-                MediaWallpaper(file = file, motion = motion, modifier = Modifier.fillMaxSize())
+                MediaWallpaper(
+                    file = file,
+                    motion = motion,
+                    modifier = Modifier.fillMaxSize().let { if (renderBlur) it.blur(blurDp.dp) else it }
+                )
                 Box(Modifier.fillMaxSize().background(AerixThemeManager.screenScrim()))
                 content()
                 return@Box

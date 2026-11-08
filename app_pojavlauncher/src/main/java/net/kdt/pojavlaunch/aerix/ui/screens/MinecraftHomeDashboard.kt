@@ -37,6 +37,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.CutCornerShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -76,17 +78,19 @@ import net.kdt.pojavlaunch.aerix.theme.AerixFonts
 import net.kdt.pojavlaunch.aerix.theme.ThemeMotion
 import net.kdt.pojavlaunch.aerix.ui.LauncherSection
 
-private val HomeRed = Color(0xFFB51F3B)
-private val HomeBlue = Color(0xFF267CC1)
-private val HomeGreen = Color(0xFF4EA83A)
-private val HomeGold = Color(0xFFF4C84F)
-private val HomeSoftWhite = Color(0xFFF5F5F2)
+private val HomeRed = Color(0x4D8B0000)
+private val HomeBlue = Color(0x4D004080)
+private val HomeGreen = Color(0x4D006400)
+private val HomeGold = Color(0xFFFFD54F)
+private val ReadyGreen = Color(0xFF4CAF50)
 
 @Composable
 fun MinecraftHomeDashboard(
     instances: List<AerixInstance>,
     selected: AerixInstance?,
     taskCount: Int,
+    taskProgressPercent: Int,
+    taskProgressTitle: String,
     accent: Color,
     onPlay: () -> Unit,
     onCreate: () -> Unit,
@@ -105,6 +109,11 @@ fun MinecraftHomeDashboard(
         it.online && !it.pendingIncoming && !it.pendingOutgoing
     }
     val friendsSubtitle = if (onlineFriends > 0) "$onlineFriends online now" else "Find your next world"
+    val selectedFont = AerixFonts.selected()
+    val fontFamily = remember(selectedFont.id) { selectedFont.family() }
+    var entered by remember { mutableStateOf(false) }
+    var progressDismissed by remember { mutableStateOf(false) }
+
     LaunchedEffect(Unit) {
         net.kdt.pojavlaunch.aerix.social.SocialBackend.attach(context.applicationContext)
         if (net.kdt.pojavlaunch.aerix.social.SocialBackend.signedIn) {
@@ -114,128 +123,81 @@ fun MinecraftHomeDashboard(
             net.kdt.pojavlaunch.aerix.social.SocialBackend.unreadCount()
         }
     }
-    var entered by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { entered = true }
+    LaunchedEffect(taskCount) {
+        if (taskCount == 0) progressDismissed = false
+    }
     val entryProgress by animateFloatAsState(
         targetValue = if (entered || !motionEnabled) 1f else 0f,
         animationSpec = tween(durationMillis = if (motionEnabled) 420 else 0, easing = FastOutSlowInEasing),
         label = "minecraftHomeEntry"
     )
-    val selectedFont = AerixFonts.selected()
-    val fontFamily = remember(selectedFont.id) { selectedFont.family() }
 
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-        val compactHeight = maxHeight < 300.dp
-        val compactWidth = maxWidth < 650.dp
-        val wideDashboard = maxWidth >= 700.dp
-        val showFriendsPanel = maxWidth >= 680.dp
-        val leftRailWidth = (maxWidth * 0.175f).coerceIn(112.dp, 154.dp)
-        val friendsPanelWidth = if (showFriendsPanel) (maxWidth * 0.205f).coerceIn(144.dp, 194.dp) else 0.dp
-        val edgePadding = if (compactHeight) 5.dp else 8.dp
+        val compact = maxHeight < 390.dp || maxWidth < 720.dp
+        val toolbarSize = if (compact) 36.dp else 40.dp
+        val dockHeight = if (compact) 74.dp else 84.dp
+        val socialHeight = if (compact) 32.dp else 38.dp
+        val sideWidth = maxOf(144.dp, minOf(220.dp, maxWidth * 0.28f))
+        val promoWidth = maxOf(132.dp, minOf(210.dp, maxWidth * 0.25f))
+        val stageStart = sideWidth + 22.dp
+        val stageEnd = promoWidth + 22.dp
 
         Box(modifier = Modifier.fillMaxSize()) {
-            // Keep the chosen Aerix wallpaper visible, but add the subtle side shade of the reference
-            // so the colorful cards and white labels stay legible on bright scenes.
+            // The selected Minecraft world wallpaper remains visible through the translucent panels.
             Box(
                 Modifier
                     .fillMaxSize()
                     .background(
                         Brush.horizontalGradient(
                             listOf(
-                                Color.Black.copy(alpha = 0.20f),
-                                Color.Transparent,
+                                Color.Black.copy(alpha = 0.29f),
                                 Color.Black.copy(alpha = 0.08f),
-                                Color.Black.copy(alpha = 0.27f)
+                                Color.Transparent,
+                                Color.Black.copy(alpha = 0.12f),
+                                Color.Black.copy(alpha = 0.32f)
                             )
                         )
                     )
             )
 
-            Row(
+            // Center stage is inset between the feature cards, right promo and launch dock.
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(
-                        start = if (wideDashboard) 34.dp else 16.dp,
-                        end = edgePadding,
-                        top = edgePadding,
-                        bottom = edgePadding
+                        start = stageStart,
+                        end = stageEnd,
+                        top = toolbarSize + 16.dp,
+                        bottom = dockHeight + 24.dp
                     )
                     .graphicsLayer {
                         alpha = entryProgress
                         translationY = (1f - entryProgress) * 10.dp.toPx()
-                    },
-                horizontalArrangement = Arrangement.spacedBy(if (compactHeight) 6.dp else 9.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(
-                    modifier = Modifier
-                        .width(leftRailWidth)
-                        .fillMaxHeight(),
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(if (compactHeight) 6.dp else 9.dp)) {
-                        FeatureCard(
-                            title = "Discover",
-                            subtitle = "New packs waiting",
-                            icon = R.drawable.aerix_ic_search,
-                            color = HomeRed,
-                            compact = compactHeight,
-                            fontFamily = fontFamily,
-                            onClick = onDiscover
-                        )
-                        FeatureCard(
-                            title = "My skin",
-                            subtitle = account?.username?.takeIf { it.isNotBlank() } ?: "Choose a look",
-                            icon = R.drawable.aerix_ic_person_outlined,
-                            color = HomeBlue,
-                            compact = compactHeight,
-                            face = account?.face,
-                            fontFamily = fontFamily,
-                            onClick = onAccounts
-                        )
-                        FeatureCard(
-                            title = "Play with friends",
-                            subtitle = friendsSubtitle,
-                            icon = R.drawable.aerix_ic_people,
-                            color = HomeGreen,
-                            compact = compactHeight,
-                            fontFamily = fontFamily,
-                            onClick = onSocials
-                        )
                     }
-                }
-
-                BoxWithConstraints(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                ) {
-                    val centerWidth = maxWidth
-                    val dockHeight = if (compactHeight) 63.dp else 76.dp
-                    val socialButtonsHeight = if (compactHeight) 30.dp else 36.dp
-                    val stageHeight = (maxHeight - dockHeight - socialButtonsHeight - 20.dp).coerceAtLeast(104.dp)
-                    val socialBottomInset = dockHeight + if (compactHeight) 7.dp else 10.dp
-
+            ) {
+                Column(modifier = Modifier.fillMaxSize()) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(stageHeight),
+                            .weight(1f),
                         contentAlignment = Alignment.Center
                     ) {
                         Box(
                             modifier = Modifier
                                 .align(Alignment.BottomCenter)
-                                .padding(bottom = 10.dp)
-                                .size(width = if (compactWidth) 128.dp else 190.dp, height = 21.dp)
+                                .padding(bottom = 8.dp)
+                                .size(width = 152.dp, height = 19.dp)
                                 .clip(CircleShape)
-                                .background(Color.Black.copy(alpha = 0.43f))
+                                .background(Color.Black.copy(alpha = 0.52f))
                         )
                         Box(
                             modifier = Modifier
-                                .align(Alignment.Center)
-                                .size(width = if (compactWidth) 136.dp else 228.dp, height = stageHeight * 0.92f)
+                                .size(width = 228.dp, height = 246.dp)
                                 .background(
-                                    Brush.radialGradient(listOf(accent.copy(alpha = 0.14f), Color.Transparent)),
+                                    Brush.radialGradient(
+                                        listOf(accent.copy(alpha = 0.22f), Color.Transparent)
+                                    ),
                                     CircleShape
                                 )
                         )
@@ -243,92 +205,135 @@ fun MinecraftHomeDashboard(
                             account = account,
                             modifier = Modifier
                                 .fillMaxSize()
-                                .padding(horizontal = if (compactWidth) 6.dp else 18.dp, vertical = 2.dp),
+                                .padding(horizontal = if (compact) 4.dp else 18.dp, vertical = 2.dp),
                             azimuth = 24,
                             pitch = 8,
-                            interactionEnabled = false,
+                            interactionEnabled = true,
                             isVisible = true
                         )
                     }
 
                     Row(
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .fillMaxWidth()
-                            .padding(bottom = socialBottomInset)
-                            .height(socialButtonsHeight),
-                        horizontalArrangement = Arrangement.Center,
+                        modifier = Modifier.fillMaxWidth().height(socialHeight),
+                        horizontalArrangement = Arrangement.spacedBy(if (compact) 6.dp else 8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        val socialButtonWidth = if (centerWidth < 360.dp) 0.47f else 0.39f
                         SocialActionButton(
                             label = "Find a party",
                             icon = R.drawable.aerix_ic_search,
-                            compact = compactWidth,
-                            modifier = Modifier.fillMaxWidth(socialButtonWidth).height(socialButtonsHeight),
+                            compact = compact,
+                            modifier = Modifier.weight(1f).fillMaxHeight(),
                             onClick = onSocials
                         )
-                        Spacer(Modifier.width(if (compactHeight) 5.dp else 8.dp))
                         SocialActionButton(
                             label = "Invite a friend",
                             icon = R.drawable.aerix_ic_people,
-                            compact = compactWidth,
-                            modifier = Modifier.fillMaxWidth(socialButtonWidth).height(socialButtonsHeight),
+                            compact = compact,
+                            modifier = Modifier.weight(1f).fillMaxHeight(),
                             onClick = onSocials
                         )
                     }
-
-                    InstancePlayDock(
-                        instances = instances,
-                        selected = selected,
-                        taskCount = taskCount,
-                        compact = compactHeight,
-                        fontFamily = fontFamily,
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .fillMaxWidth()
-                            .height(dockHeight),
-                        onChooseInstance = onLibrary,
-                        onPlay = when {
-                            selected != null -> onPlay
-                            instances.isEmpty() -> onCreate
-                            else -> onLibrary
-                        },
-                        onManage = onLibrary
-                    )
-                }
-
-                if (showFriendsPanel) {
-                    FriendsPromoPanel(
-                        modifier = Modifier
-                            .align(Alignment.Top)
-                            .width(friendsPanelWidth)
-                            .padding(top = if (compactHeight) 46.dp else 54.dp)
-                            .height(if (compactHeight) 88.dp else 116.dp),
-                        compact = compactHeight,
-                        fontFamily = fontFamily,
-                        onClick = onSocials
-                    )
                 }
             }
 
-            MinecraftToolbar(
-                face = account?.face,
-                compact = compactHeight,
+            Column(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(start = 16.dp, top = 16.dp)
+                    .width(sideWidth),
+                verticalArrangement = Arrangement.spacedBy(if (compact) 7.dp else 9.dp)
+            ) {
+                FeatureCard(
+                    title = "Shop",
+                    subtitle = "Bonus waiting",
+                    icon = R.drawable.aerix_ic_gift_filled,
+                    color = HomeRed,
+                    borderColor = Color(0xFFFF5151),
+                    badgeText = "!",
+                    compact = compact,
+                    fontFamily = fontFamily,
+                    onClick = onDiscover
+                )
+                FeatureCard(
+                    title = "My skin",
+                    subtitle = account?.username?.takeIf { it.isNotBlank() } ?: "Choose a look",
+                    icon = R.drawable.aerix_ic_person_outlined,
+                    color = HomeBlue,
+                    borderColor = Color(0xFF3A8DFF),
+                    face = account?.face,
+                    compact = compact,
+                    fontFamily = fontFamily,
+                    onClick = onAccounts
+                )
+                FeatureCard(
+                    title = "Play with friends",
+                    subtitle = friendsSubtitle,
+                    icon = R.drawable.aerix_group_pixel_art,
+                    color = HomeGreen,
+                    borderColor = Color(0xFF63D45C),
+                    compact = compact,
+                    fontFamily = fontFamily,
+                    onClick = onSocials
+                )
+            }
+
+            FriendsPromoPanel(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(top = edgePadding, end = edgePadding),
+                    .padding(
+                        top = maxOf(toolbarSize + 20.dp, maxHeight * 0.30f),
+                        end = 16.dp
+                    )
+                    .width(promoWidth)
+                    .height(if (compact) 106.dp else 124.dp)
+                    .clickable(role = Role.Button, onClick = onSocials),
+                compact = compact,
+                fontFamily = fontFamily
+            )
+
+            MinecraftToolbar(
+                face = account?.face,
+                compact = compact,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 16.dp, end = 16.dp),
                 onNavigate = onNavigate,
                 onSkin = onAccounts,
                 onGift = onSocials,
                 onSettings = onSettings
             )
 
+            InstancePlayDock(
+                instances = instances,
+                selected = selected,
+                taskCount = taskCount,
+                taskProgressPercent = taskProgressPercent,
+                taskProgressTitle = taskProgressTitle,
+                progressDismissed = progressDismissed,
+                compact = compact,
+                fontFamily = fontFamily,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
+                    .height(dockHeight),
+                onChooseInstance = onLibrary,
+                onPlay = when {
+                    selected != null -> onPlay
+                    instances.isEmpty() -> onCreate
+                    else -> onLibrary
+                },
+                onManage = onLibrary,
+                onDismissProgress = { progressDismissed = true },
+                onShowProgress = { progressDismissed = false }
+            )
+
+            // The floating help pill sits just above the footer so it never covers the chest action.
             HelpShortcut(
-                compact = compactHeight,
+                compact = compact,
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(end = edgePadding, bottom = edgePadding),
+                    .padding(end = 16.dp, bottom = dockHeight + 24.dp),
                 onClick = onHelp
             )
         }
@@ -341,82 +346,103 @@ private fun FeatureCard(
     subtitle: String,
     icon: Int,
     color: Color,
+    borderColor: Color,
     compact: Boolean,
     fontFamily: androidx.compose.ui.text.font.FontFamily,
     face: ImageBitmap? = null,
+    badgeText: String? = null,
     onClick: () -> Unit
 ) {
-    val shape = CutCornerShape(5.dp)
+    val shape = CutCornerShape(6.dp)
     BlockPanel(
         modifier = Modifier
             .fillMaxWidth()
-            .height(if (compact) 58.dp else 76.dp)
+            .height(if (compact) 68.dp else 78.dp)
             .clickable(role = Role.Button, onClick = onClick)
             .semantics { contentDescription = "$title. $subtitle" },
         color = color,
-        borderColor = color.copy(alpha = 0.98f),
+        borderColor = borderColor,
         shape = shape,
-        padding = 0.dp
+        padding = if (compact) 6.dp else 8.dp
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(color.copy(alpha = 0.70f), color.copy(alpha = 0.98f))
-                        )
-                    ),
-                contentAlignment = Alignment.Center
+        Box(Modifier.fillMaxSize()) {
+            Row(
+                modifier = Modifier.fillMaxSize(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .size(if (compact) 23.dp else 32.dp)
-                        .background(Color.White.copy(alpha = 0.08f), CutCornerShape(2.dp))
-                )
-                if (face != null) {
-                    Image(
-                        bitmap = face,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.size(if (compact) 26.dp else 34.dp).clip(CutCornerShape(3.dp))
-                    )
-                } else {
-                    Icon(
-                        painter = painterResource(icon),
-                        contentDescription = null,
-                        tint = HomeSoftWhite,
-                        modifier = Modifier.size(if (compact) 22.dp else 28.dp)
-                    )
-                }
-            }
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color.Black.copy(alpha = 0.20f))
-                    .padding(horizontal = 7.dp, vertical = if (compact) 3.dp else 4.dp),
-                verticalArrangement = Arrangement.Center
-            ) {
-                Text(
-                    text = title,
-                    color = Color.White,
-                    fontSize = if (compact) 9.sp else 11.sp,
-                    fontFamily = fontFamily,
-                    fontWeight = FontWeight.ExtraBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                if (!compact) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    if (badgeText != null) {
+                        Surface(
+                            shape = CutCornerShape(4.dp),
+                            color = Color(0xFFD6283A),
+                            contentColor = Color.White,
+                            border = BorderStroke(1.dp, Color(0xFFFF858C))
+                        ) {
+                            Text(
+                                text = badgeText,
+                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Black,
+                                lineHeight = 10.sp
+                            )
+                        }
+                    }
                     Text(
-                        text = subtitle,
-                        color = Color.White.copy(alpha = 0.88f),
-                        fontSize = 8.sp,
-                        fontWeight = FontWeight.SemiBold,
+                        text = title,
+                        color = Color.White,
+                        fontFamily = fontFamily,
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = if (compact) 11.sp else 13.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
+                    if (subtitle.isNotBlank()) {
+                        Text(
+                            text = subtitle,
+                            color = Color.White.copy(alpha = 0.75f),
+                            fontSize = if (compact) 8.sp else 9.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+                Box(
+                    modifier = Modifier
+                        .size(if (compact) 40.dp else 48.dp)
+                        .clip(CutCornerShape(5.dp))
+                        .background(
+                            Brush.radialGradient(
+                                listOf(borderColor.copy(alpha = 0.58f), color.copy(alpha = 0.10f))
+                            )
+                        )
+                        .border(1.dp, borderColor.copy(alpha = 0.48f), CutCornerShape(5.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    when {
+                        face != null -> Image(
+                            bitmap = face,
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize().padding(4.dp).clip(CutCornerShape(3.dp))
+                        )
+                        title == "My skin" -> Image(
+                            painter = painterResource(R.drawable.aerix_head_steve),
+                            contentDescription = null,
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier.fillMaxSize().padding(4.dp)
+                        )
+                        else -> Icon(
+                            painter = painterResource(icon),
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(if (compact) 23.dp else 28.dp)
+                        )
+                    }
                 }
             }
         }
@@ -428,121 +454,133 @@ private fun InstancePlayDock(
     instances: List<AerixInstance>,
     selected: AerixInstance?,
     taskCount: Int,
+    taskProgressPercent: Int,
+    taskProgressTitle: String,
+    progressDismissed: Boolean,
     compact: Boolean,
     fontFamily: androidx.compose.ui.text.font.FontFamily,
     modifier: Modifier,
     onChooseInstance: () -> Unit,
     onPlay: () -> Unit,
-    onManage: () -> Unit
+    onManage: () -> Unit,
+    onDismissProgress: () -> Unit,
+    onShowProgress: () -> Unit
 ) {
     Row(
         modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(if (compact) 5.dp else 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(if (compact) 6.dp else 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         BlockPanel(
             modifier = Modifier
-                .weight(1.25f)
+                .weight(65f)
                 .fillMaxHeight()
                 .clickable(role = Role.Button, onClick = onChooseInstance),
-            color = Color(0xFF205499),
-            borderColor = Color(0xFF76B3FF),
-            shape = CutCornerShape(7.dp),
+            color = Color(0xFF1A3A5A),
+            borderColor = Color(0xFF3A8DFF),
+            shape = RoundedCornerShape(8.dp),
             padding = if (compact) 7.dp else 10.dp
         ) {
             Row(
                 modifier = Modifier.fillMaxSize(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(if (compact) 7.dp else 10.dp)
+                horizontalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 11.dp)
             ) {
                 Box(
                     modifier = Modifier
-                        .size(if (compact) 32.dp else 42.dp)
-                        .clip(CutCornerShape(4.dp))
-                        .background(Color(0xFF183E70))
-                        .border(1.dp, Color.White.copy(alpha = 0.24f), CutCornerShape(4.dp)),
+                        .size(if (compact) 38.dp else 48.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Color(0xFF142F4B))
+                        .border(1.dp, Color(0xFF609EE3), RoundedCornerShape(6.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        painter = painterResource(R.drawable.aerix_ic_videogame_asset_outlined),
+                        painter = painterResource(R.drawable.aerix_ic_chest_filled),
                         contentDescription = null,
-                        tint = Color(0xFFFFD36A),
-                        modifier = Modifier.size(if (compact) 18.dp else 23.dp)
+                        tint = Color.Unspecified,
+                        modifier = Modifier.size(if (compact) 24.dp else 30.dp)
                     )
                 }
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
                     Text(
                         text = "START HERE",
-                        color = Color(0xFFB9D7FF),
+                        color = Color(0xFF8DD6FF),
                         fontSize = if (compact) 8.sp else 9.sp,
-                        letterSpacing = 1.1.sp,
+                        letterSpacing = 1.15.sp,
                         fontWeight = FontWeight.ExtraBold,
                         maxLines = 1
                     )
                     Text(
-                        text = selected?.name ?: "Choose an instance",
+                        text = selected?.name ?: if (instances.isEmpty()) "Create your first instance" else "Choose an instance",
                         color = Color.White,
                         fontFamily = fontFamily,
                         fontWeight = FontWeight.ExtraBold,
-                        fontSize = if (compact) 12.sp else 15.sp,
+                        fontSize = if (compact) 12.sp else 16.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    if (!compact || taskCount > 0) {
-                        val detail = when {
-                            taskCount > 0 -> "$taskCount setup task${if (taskCount == 1) "" else "s"} running"
-                            selected != null -> selected.versionId
-                            else -> "Browse versions and modpacks"
-                        }
-                        Text(
-                            text = detail,
-                            color = Color.White.copy(alpha = 0.86f),
-                            fontSize = if (compact) 8.sp else 10.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
+                    Text(
+                        text = instanceVersionLine(selected),
+                        color = Color(0xFFB8D2EC),
+                        fontSize = if (compact) 8.sp else 10.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
             }
         }
 
         Column(
-            modifier = Modifier
-                .weight(0.82f)
-                .fillMaxHeight(),
+            modifier = Modifier.weight(35f).fillMaxHeight(),
             verticalArrangement = Arrangement.spacedBy(if (compact) 4.dp else 5.dp)
         ) {
-            MinecraftPlayButton(
-                label = when {
-                    selected != null -> "Play"
-                    instances.isEmpty() -> "Create instance"
-                    else -> "Choose instance"
-                },
-                sublabel = when {
-                    taskCount > 0 -> "Preparing · $taskCount task${if (taskCount == 1) "" else "s"}"
-                    selected != null -> "Ready to launch"
-                    instances.isEmpty() -> "Start your library"
-                    else -> "Select from your library"
-                },
-                compact = compact,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .guideAnchor(AerixGuideState.PLAY)
-                    .semantics {
-                        contentDescription = when {
-                            selected != null -> "Play ${selected.name}"
-                            instances.isEmpty() -> "Create an instance"
-                            else -> "Choose an instance"
-                        }
+            if (taskCount > 0) {
+                if (progressDismissed) {
+                    TaskProgressHiddenCard(
+                        modifier = Modifier.fillMaxWidth().weight(1f),
+                        title = taskProgressTitle,
+                        onClick = onShowProgress
+                    )
+                } else {
+                    TaskProgressCard(
+                        modifier = Modifier.fillMaxWidth().weight(1f),
+                        title = taskProgressTitle,
+                        percent = taskProgressPercent,
+                        onDismiss = onDismissProgress
+                    )
+                }
+            } else {
+                MinecraftPlayButton(
+                    label = when {
+                        selected != null -> "Play"
+                        instances.isEmpty() -> "Create instance"
+                        else -> "Choose instance"
                     },
-                onClick = onPlay
-            )
+                    sublabel = when {
+                        selected != null -> "0 h"
+                        instances.isEmpty() -> "Start your library"
+                        else -> "Select from your library"
+                    },
+                    compact = compact,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .guideAnchor(AerixGuideState.PLAY)
+                        .semantics {
+                            contentDescription = when {
+                                selected != null -> "Play ${selected.name}, 0 hours"
+                                instances.isEmpty() -> "Create an instance"
+                                else -> "Choose an instance"
+                            }
+                        },
+                    onClick = onPlay
+                )
+            }
+
             Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(if (compact) 22.dp else 27.dp),
-                shape = CutCornerShape(4.dp),
+                modifier = Modifier.fillMaxWidth().height(if (compact) 25.dp else 29.dp),
+                shape = RoundedCornerShape(6.dp),
                 color = HomeGold,
                 contentColor = Color(0xFF30260E),
                 border = BorderStroke(1.dp, Color(0xFFFFE99B)),
@@ -554,22 +592,140 @@ private fun InstancePlayDock(
                     horizontalArrangement = Arrangement.Center
                 ) {
                     Icon(
-                        painter = painterResource(R.drawable.aerix_ic_folder_filled),
+                        painter = painterResource(R.drawable.aerix_ic_chest_filled),
                         contentDescription = null,
-                        tint = Color(0xFF5B4720),
-                        modifier = Modifier.size(if (compact) 13.dp else 16.dp)
+                        tint = Color.Unspecified,
+                        modifier = Modifier.size(if (compact) 17.dp else 19.dp)
                     )
-                    Spacer(Modifier.width(4.dp))
+                    Spacer(Modifier.width(5.dp))
                     Text(
                         text = "Open chest",
                         color = Color(0xFF30260E),
                         fontFamily = fontFamily,
-                        fontSize = if (compact) 8.sp else 10.sp,
+                        fontSize = if (compact) 9.sp else 10.sp,
                         fontWeight = FontWeight.ExtraBold,
                         maxLines = 1
                     )
                 }
             }
+        }
+    }
+}
+
+private fun instanceVersionLine(instance: AerixInstance?): String {
+    if (instance == null) return "Browse versions and modpacks"
+    val id = instance.versionId
+    val version = Regex("\\d+\\.\\d+(?:\\.\\d+)?").find(id)?.value ?: id.ifBlank { "Minecraft" }
+    val loader = when {
+        id.contains("neoforge", ignoreCase = true) -> "NeoForge"
+        id.contains("forge", ignoreCase = true) -> "Forge"
+        id.contains("quilt", ignoreCase = true) -> "Quilt"
+        id.contains("fabric", ignoreCase = true) -> "Fabric"
+        else -> "Minecraft"
+    }
+    return "$loader · $version"
+}
+
+@Composable
+private fun TaskProgressCard(
+    modifier: Modifier,
+    title: String,
+    percent: Int,
+    onDismiss: () -> Unit
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(6.dp),
+        color = Color(0xE5163421),
+        contentColor = Color.White,
+        border = BorderStroke(1.dp, Color(0xFF4CAF50))
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    painter = painterResource(R.drawable.aerix_ic_cloud_download),
+                    contentDescription = null,
+                    tint = Color(0xFF8DE398),
+                    modifier = Modifier.size(15.dp)
+                )
+                Spacer(Modifier.width(5.dp))
+                Text(
+                    text = if (percent in 1..100) "$title · $percent%" else "$title …",
+                    modifier = Modifier.weight(1f),
+                    color = Color.White,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Surface(
+                    modifier = Modifier.size(22.dp),
+                    shape = CutCornerShape(4.dp),
+                    color = Color.White.copy(alpha = 0.10f),
+                    contentColor = Color.White,
+                    onClick = onDismiss
+                ) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Icon(
+                            painter = painterResource(R.drawable.aerix_ic_close),
+                            contentDescription = "Hide task progress",
+                            tint = Color.White,
+                            modifier = Modifier.size(13.dp)
+                        )
+                    }
+                }
+            }
+            if (percent in 1..100) {
+                LinearProgressIndicator(
+                    progress = { percent / 100f },
+                    modifier = Modifier.fillMaxWidth().height(3.dp),
+                    color = Color(0xFF76E184),
+                    trackColor = Color.White.copy(alpha = 0.13f)
+                )
+            } else {
+                LinearProgressIndicator(
+                    modifier = Modifier.fillMaxWidth().height(3.dp),
+                    color = Color(0xFF76E184),
+                    trackColor = Color.White.copy(alpha = 0.13f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TaskProgressHiddenCard(modifier: Modifier, title: String, onClick: () -> Unit) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(6.dp),
+        color = Color(0xC9163421),
+        contentColor = Color.White,
+        border = BorderStroke(1.dp, Color(0xFF438D50)),
+        onClick = onClick
+    ) {
+        Row(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Icon(
+                painter = painterResource(R.drawable.aerix_ic_cloud_download),
+                contentDescription = null,
+                tint = Color(0xFF8DE398),
+                modifier = Modifier.size(14.dp)
+            )
+            Text(
+                text = "$title in background",
+                modifier = Modifier.weight(1f),
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text("SHOW", fontSize = 8.sp, fontWeight = FontWeight.Black, color = Color(0xFF9EECA6))
         }
     }
 }
@@ -582,7 +738,7 @@ private fun MinecraftPlayButton(
     modifier: Modifier,
     onClick: () -> Unit
 ) {
-    val green = ThemeMotion.rememberPulse(HomeGreen, active = true)
+    val green = ThemeMotion.rememberPulse(ReadyGreen, active = true)
     Surface(
         modifier = modifier,
         shape = CutCornerShape(6.dp),
@@ -611,16 +767,14 @@ private fun MinecraftPlayButton(
                     overflow = TextOverflow.Ellipsis
                 )
             }
-            if (!compact) {
-                Text(
-                    text = sublabel,
-                    fontSize = 8.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color(0xFF1E461E),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
+            Text(
+                text = sublabel,
+                fontSize = if (compact) 7.sp else 8.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Color(0xFF1E461E),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
 }
@@ -637,7 +791,7 @@ private fun SocialActionButton(
     Surface(
         modifier = modifier,
         shape = shape,
-        color = Color(0xE91A1C20),
+        color = Color(0xA6000000),
         contentColor = Color.White,
         border = BorderStroke(1.dp, Color.White.copy(alpha = 0.17f)),
         onClick = onClick
@@ -670,74 +824,73 @@ private fun SocialActionButton(
 private fun FriendsPromoPanel(
     modifier: Modifier,
     compact: Boolean,
-    fontFamily: androidx.compose.ui.text.font.FontFamily,
-    onClick: () -> Unit
+    fontFamily: androidx.compose.ui.text.font.FontFamily
 ) {
     BlockPanel(
-        modifier = modifier.fillMaxWidth(),
-        color = Color(0xF0101113),
-        borderColor = Color(0xFF393B3E),
+        modifier = modifier,
+        color = Color(0xD916171A),
+        borderColor = Color(0xFF4A4B4F),
         shape = CutCornerShape(7.dp),
         padding = if (compact) 9.dp else 12.dp
     ) {
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(
-                text = "BETTER TOGETHER",
-                color = Color(0xFFB5B5B5),
-                fontSize = 7.sp,
-                letterSpacing = 1.1.sp,
-                fontWeight = FontWeight.ExtraBold,
-                maxLines = 1
-            )
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Box(Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier.fillMaxWidth(0.78f).fillMaxHeight(),
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
                 Text(
-                    text = "FIND YOUR\nNEXT PARTY",
-                    color = Color.White,
-                    fontFamily = fontFamily,
-                    fontSize = if (compact) 12.sp else 15.sp,
-                    lineHeight = if (compact) 14.sp else 18.sp,
-                    fontWeight = FontWeight.Black,
-                    maxLines = 2
-                )
-                Text(
-                    text = "Invite a friend and jump in together.",
-                    color = Color(0xFFFFD15B),
-                    fontSize = if (compact) 8.sp else 9.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 2,
+                    text = "+1 D OF PLUS FOR EVERY FRIEND",
+                    color = Color(0xFFD4D1C8),
+                    fontSize = if (compact) 5.sp else 7.sp,
+                    letterSpacing = 0.35.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+                Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                    Text(
+                        text = "FREE PLUS",
+                        color = HomeGold,
+                        fontFamily = fontFamily,
+                        fontSize = if (compact) 12.sp else 16.sp,
+                        lineHeight = if (compact) 14.sp else 18.sp,
+                        fontWeight = FontWeight.Black,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = "FOR A FRIEND",
+                        color = Color.White,
+                        fontFamily = fontFamily,
+                        fontSize = if (compact) 10.sp else 13.sp,
+                        lineHeight = if (compact) 12.sp else 15.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
             Surface(
-                modifier = Modifier.fillMaxWidth().height(if (compact) 23.dp else 27.dp),
-                shape = CutCornerShape(3.dp),
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .size(if (compact) 42.dp else 52.dp),
+                shape = CutCornerShape(6.dp),
                 color = HomeGold,
-                contentColor = Color(0xFF251D08),
-                border = BorderStroke(1.dp, Color(0xFFFFE89B)),
-                onClick = onClick
+                contentColor = Color(0xFF4B3810),
+                border = BorderStroke(1.dp, Color(0xFFFFE998))
             ) {
-                Row(
-                    modifier = Modifier.fillMaxSize().padding(horizontal = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
+                Column(
+                    modifier = Modifier.fillMaxSize().padding(3.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
                 ) {
                     Icon(
-                        painter = painterResource(R.drawable.aerix_ic_people),
+                        painter = painterResource(R.drawable.aerix_ic_ticket_filled),
                         contentDescription = null,
-                        tint = Color(0xFF4A3912),
-                        modifier = Modifier.size(13.dp)
+                        tint = Color(0xFF8F6717),
+                        modifier = Modifier.size(if (compact) 19.dp else 24.dp)
                     )
-                    Spacer(Modifier.width(3.dp))
-                    Text(
-                        text = "OPEN SOCIALS",
-                        fontFamily = fontFamily,
-                        fontSize = 7.sp,
-                        fontWeight = FontWeight.Black,
-                        maxLines = 1
-                    )
+                    Text("PLUS", fontSize = 7.sp, fontWeight = FontWeight.Black, lineHeight = 8.sp)
                 }
             }
         }
@@ -779,7 +932,7 @@ private fun MinecraftToolbar(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box {
-            ToolbarSquare(R.drawable.aerix_ic_menu_launcher, "Navigation menu", size) {
+            ToolbarSquare(R.drawable.aerix_ic_person_outlined, "Profile and launcher navigation", size) {
                 menuExpanded = true
             }
             DropdownMenu(
@@ -800,19 +953,22 @@ private fun MinecraftToolbar(
         Surface(
             modifier = Modifier.size(size).semantics { contentDescription = "My skin and accounts" },
             shape = CutCornerShape(5.dp),
-            color = Color(0xE9222326),
+            color = Color(0x80000000),
             border = BorderStroke(1.dp, Color.White.copy(alpha = 0.20f)),
             onClick = onSkin
         ) {
             if (face != null) {
                 Image(bitmap = face, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
             } else {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Icon(painterResource(R.drawable.aerix_ic_person_outlined), null, tint = Color.White, modifier = Modifier.size(20.dp))
-                }
+                Image(
+                    painter = painterResource(R.drawable.aerix_head_steve),
+                    contentDescription = "Steve player avatar",
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.fillMaxSize().padding(3.dp)
+                )
             }
         }
-        ToolbarSquare(R.drawable.aerix_ic_gift_filled, "Invite a friend", size, onGift)
+        ToolbarSquare(R.drawable.aerix_ic_gift_filled, "Daily rewards and friend invites", size, onGift)
         ToolbarSquare(R.drawable.aerix_ic_settings_filled, "Settings", size, onSettings)
     }
 }
@@ -822,7 +978,7 @@ private fun ToolbarSquare(icon: Int, description: String, size: Dp, onClick: () 
     Surface(
         modifier = Modifier.size(size).semantics { contentDescription = description },
         shape = CutCornerShape(5.dp),
-        color = Color(0xE9222326),
+        color = Color(0x80000000),
         border = BorderStroke(1.dp, Color.White.copy(alpha = 0.20f)),
         onClick = onClick
     ) {
@@ -842,7 +998,7 @@ private fun HelpShortcut(compact: Boolean, modifier: Modifier, onClick: () -> Un
     Surface(
         modifier = modifier.height(if (compact) 31.dp else 36.dp),
         shape = CutCornerShape(5.dp),
-        color = Color(0xE9191A1D),
+        color = Color(0x80000000),
         contentColor = Color.White,
         border = BorderStroke(1.dp, Color.White.copy(alpha = 0.16f)),
         onClick = onClick
@@ -884,7 +1040,7 @@ private fun BlockPanel(
             modifier = Modifier
                 .fillMaxSize()
                 .clip(shape)
-                .background(Brush.verticalGradient(listOf(color.copy(alpha = 0.92f), color)))
+                .background(Brush.verticalGradient(listOf(color.copy(alpha = color.alpha * 0.82f), color)))
                 .border(1.dp, borderColor, shape)
                 .padding(padding),
             verticalArrangement = Arrangement.spacedBy(2.dp),

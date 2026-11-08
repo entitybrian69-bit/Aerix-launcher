@@ -29,11 +29,19 @@ assert 'CompactSkinStageCard' not in home
 for category in ('MODS', 'MODPACKS', 'RESOURCE_PACKS', 'SHADERS', 'WORLDS'):
     assert category in discover, category
 assert 'MinecraftHomeDashboard(' in home
-for feature in ('Discover', 'My skin', 'Play with friends', 'Find a party', 'Invite a friend',
-                'START HERE', 'Open chest', 'Help', 'Navigation menu', 'DropdownMenu(', 'Aerix Client', 'Aerix account',
-                'AerixSkinPreview3D(', 'ThemeMotion.rememberPulse'):
+for feature in ('Shop', 'Bonus waiting', 'My skin', 'Play with friends', 'Find a party', 'Invite a friend',
+                'START HERE', 'Open chest', 'FREE PLUS', 'FOR A FRIEND', '+1 D OF PLUS FOR EVERY FRIEND',
+                'taskProgressTitle', '0 h', 'Help', 'Profile and launcher navigation', 'DropdownMenu(', 'Aerix Client', 'Aerix account',
+                'AerixSkinPreview3D(', 'interactionEnabled = true', 'taskProgressPercent', 'ThemeMotion.rememberPulse',
+                '.weight(65f)', '.weight(35f)'):
     assert feature in mc_home, feature
 assert 'aerix_ic_gift_filled' in mc_home
+assert 'aerix_ic_ticket_filled' in mc_home
+assert 'aerix_ic_chest_filled' in mc_home
+assert 'aerix_group_pixel_art' in mc_home
+assert 'mutableStateOf("Assets")' in (main / 'java/net/kdt/pojavlaunch/aerix/bridge/PojavTaskBridge.kt').read_text()
+assert 'forceBlurForDashboard = section == LauncherSection.HOME' in shell
+assert 'android:screenOrientation="sensorLandscape"' in (root / 'app_pojavlauncher/src/main/AndroidManifest.xml').read_text()
 assert 'PojavAccountBridge.select(account)' in accounts and 'PojavAccountBridge.delete(account)' in accounts
 assert 'AerixNav.TAB_STYLES -> FontStylesTab(activity)' in settings
 assert 'drawOutline(outline = outline, brush = sheen)' in glass
