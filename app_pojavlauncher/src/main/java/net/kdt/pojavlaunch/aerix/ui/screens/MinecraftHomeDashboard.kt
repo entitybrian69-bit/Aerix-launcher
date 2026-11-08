@@ -31,7 +31,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.matchParentSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -128,6 +127,7 @@ fun MinecraftHomeDashboard(
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val compactHeight = maxHeight < 300.dp
         val compactWidth = maxWidth < 650.dp
+        val wideDashboard = maxWidth >= 700.dp
         val showFriendsPanel = maxWidth >= 680.dp
         val leftRailWidth = (maxWidth * 0.175f).coerceIn(112.dp, 154.dp)
         val friendsPanelWidth = if (showFriendsPanel) (maxWidth * 0.205f).coerceIn(144.dp, 194.dp) else 0.dp
@@ -155,7 +155,7 @@ fun MinecraftHomeDashboard(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(
-                        start = if (maxWidth >= 700.dp) 34.dp else 16.dp,
+                        start = if (wideDashboard) 34.dp else 16.dp,
                         end = edgePadding,
                         top = edgePadding,
                         bottom = edgePadding
@@ -210,6 +210,7 @@ fun MinecraftHomeDashboard(
                         .weight(1f)
                         .fillMaxHeight()
                 ) {
+                    val centerWidth = maxWidth
                     val dockHeight = if (compactHeight) 63.dp else 76.dp
                     val socialButtonsHeight = if (compactHeight) 30.dp else 36.dp
                     val stageHeight = (maxHeight - dockHeight - socialButtonsHeight - 20.dp).coerceAtLeast(104.dp)
@@ -259,7 +260,7 @@ fun MinecraftHomeDashboard(
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        val socialButtonWidth = if (maxWidth < 360.dp) 0.47f else 0.39f
+                        val socialButtonWidth = if (centerWidth < 360.dp) 0.47f else 0.39f
                         SocialActionButton(
                             label = "Find a party",
                             icon = R.drawable.aerix_ic_search,
@@ -278,6 +279,7 @@ fun MinecraftHomeDashboard(
                     }
 
                     InstancePlayDock(
+                        instances = instances,
                         selected = selected,
                         taskCount = taskCount,
                         compact = compactHeight,
@@ -423,6 +425,7 @@ private fun FeatureCard(
 
 @Composable
 private fun InstancePlayDock(
+    instances: List<AerixInstance>,
     selected: AerixInstance?,
     taskCount: Int,
     compact: Boolean,
