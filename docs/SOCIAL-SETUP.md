@@ -161,15 +161,17 @@ works with any email. Part 2 only adds the Google button on top.
 
 ## Part 4 — Testing each stage · ~5 minutes each
 
-> **Warning:** this testing build installs alongside the real app as `net.kdt.pojavlaunch.debug`.
+> **Warning:** this testing build installs alongside the current release as
+> `net.al.aerixlauncher.debug`. Older Aerix builds used `net.kdt.pojavlaunch.debug`;
+> that is a separate app ID and will not be updated by this APK.
 
 1. Tap the APK link I send →
    `https://github.com/entitybrian69-bit/Aerix-launcher/releases/download/debug-latest/Aerix-Launcher-debug.apk`
-2. When Android says the app is already installed, choose **Update / Install anyway**. Do **not**
-   uninstall your normal **Aerix Launcher** — only ever remove **Aerix Launcher (Debug)** if Android
-   refuses an update over an older debug signature/version.
-3. **Debug builds install next to your normal Aerix** (package `net.kdt.pojavlaunch.debug`), so you can
-   keep playing on the normal one while testing.
+2. When Android says this same-package app is already installed, choose **Update / Install anyway**. Do **not**
+   uninstall your normal **Aerix Launcher**. An older debug app under `net.kdt.pojavlaunch.debug` is a
+   different package; keep it until you have imported any data you need.
+3. **Debug builds install next to your normal Aerix** (package `net.al.aerixlauncher.debug`, versus
+   `net.al.aerixlauncher` for release), so you can keep playing on the normal one while testing.
 4. Open the debug app → **Socials**, the first tile on the Home dashboard. It takes the whole
    window and brings its own sidebar (Friends, Messages, Activity, Settings); the arrow at the top
    of that sidebar comes back to the launcher.

@@ -35,7 +35,7 @@
 
 ## Android package and existing data
 
-To keep existing Aerix installs updatable, the release app retains the Android ID `net.kdt.pojavlaunch`; the debug app retains `net.kdt.pojavlaunch.debug`. Android can install an update over an existing app only when its package ID and signing certificate match and its version code is not lower. Debug and release are separate apps and cannot update each other. Back up your data before installing an update.
+The current Android application IDs are `net.al.aerixlauncher` (release), `net.al.aerixlauncher.debug` (testing), and `net.al.aerixlauncher.pub` (nightly). This replaces the previous Aerix IDs under `net.kdt.pojavlaunch`. Android treats the new ID as a separate app: it will not update an old install or automatically copy its private app data. You can keep both installed and use **Settings → Miscellaneous → Import data** to bring over supported launcher data. Back up important data before switching. Debug and release builds also remain separate apps and cannot update each other.
 
 ## 🗺️ Quick Links
 <p align="center">

@@ -534,7 +534,7 @@ def build_install():
 
     <div class="note reveal">
       <h3>A note on package names</h3>
-      <p>The release build installs as <code>net.kdt.pojavlaunch</code>. The earlier test builds used the <code>.debug</code> package, so the two can sit side by side — but their instances and game data do not carry over, and an installed original PojavLauncher has to be removed first because the signature differs.</p>
+      <p>The release build installs as <code>net.al.aerixlauncher</code>, and its test build uses <code>net.al.aerixlauncher.debug</code>. Older Aerix builds used the separate <code>net.kdt.pojavlaunch</code> IDs, so they will remain installed rather than updating in place; use the launcher's data-import option to copy supported data before removing an older install.</p>
     </div>
 
     <div class="note reveal">

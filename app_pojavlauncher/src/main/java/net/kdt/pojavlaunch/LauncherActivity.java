@@ -462,7 +462,10 @@ public class LauncherActivity extends BaseActivity {
 
     // Call async
     private void checkPreviousInstalls(){
-        final String[] packages = {"net.kdt.pojavlaunch", "net.kdt.pojavlaunch.debug", "net.kdt.pojavlaunch.pub"};
+        final String[] packages = {
+                "net.al.aerixlauncher", "net.al.aerixlauncher.debug", "net.al.aerixlauncher.pub",
+                "net.kdt.pojavlaunch", "net.kdt.pojavlaunch.debug", "net.kdt.pojavlaunch.pub"
+        };
         for(String s : packages){
             if (s.equals(getPackageName())) continue;
             Intent i = getPackageManager().getLaunchIntentForPackage(s);

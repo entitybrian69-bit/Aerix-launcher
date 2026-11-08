@@ -14,13 +14,19 @@ asks for a release and confirms it.
 | CI artifact | Actions run of **Aerix debug (testing)**, artifact `aerix-debug-apk` |
 | Source | this branch (`version.properties` = `1.5.6`) |
 | Variant | `noruntimeDebug` |
-| applicationId | `net.kdt.pojavlaunch.debug` |
+| applicationId | `net.al.aerixlauncher.debug` |
 | Label | Aerix Launcher (Debug) |
 | Signing | `app_pojavlauncher/debug.keystore` (alias `androiddebugkey`) |
 
 Because the applicationId ends in `.debug`, this APK installs next to the public
 launcher on the same phone. Both can be open at once, and updating the debug
 build never touches the released app or its data.
+
+Aerix's IDs have changed from `net.kdt.pojavlaunch` to `net.al.aerixlauncher`.
+An older install remains a separate app and cannot be updated in place; use the
+launcher’s data-import option to copy supported data before removing an older
+install. A Google Play package ID is immutable, so publishing under the new ID
+requires a separate Play Console app entry.
 
 The `noruntime` flavor does not embed a Java runtime, keeping downloads smaller;
 the launcher downloads the runtime it needs on first launch. APKs are never
@@ -31,7 +37,7 @@ committed to Git (`apk/` is ignored).
 `.github/workflows/aerix-debug.yml` runs on every push to the working branch that
 touches the app sources, Gradle files, submodules or the workflow itself. It also
 has a manual trigger. The job builds the APK, checks that the package name really
-is `net.kdt.pojavlaunch.debug`, uploads it as an Actions artifact, and attaches
+is `net.al.aerixlauncher.debug`, uploads it as an Actions artifact, and attaches
 it to the `debug-latest` GitHub Release (marked as a prerelease so `releases/latest`
 remains the public stable release).
 
