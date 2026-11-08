@@ -83,9 +83,14 @@ private fun decodeWallpaper(context: Context, id: String, softness: Int = 1): Im
  * the bitmap is cached process-wide, same as the Aerix CaveBackground.
  */
 @Composable
-fun AerixBackground(modifier: Modifier = Modifier, content: @Composable BoxScope.() -> Unit) {
+fun AerixBackground(
+    modifier: Modifier = Modifier,
+    /** Blocky Shell draws its own crisp pixel plaza, so the glass wallpaper is skipped. */
+    skipWallpaper: Boolean = false,
+    content: @Composable BoxScope.() -> Unit
+) {
     val context = LocalContext.current
-    val id = AerixPreferences.selectedWallpaper
+    val id = if (skipWallpaper) AerixThemeManager.WALLPAPER_NONE else AerixPreferences.selectedWallpaper
     val revision = AerixThemeManager.wallpaperRevision
     val blurDp = AerixPreferences.backgroundBlur
     // Android 12+ blurs with a render effect; below that the bitmap is decoded smaller, so the

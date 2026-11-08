@@ -89,6 +89,186 @@ class IdleAnimation extends skinview3d.PlayerAnimation {
     }
 }
 
+/* ---------------------------------------------------------------------------------------------
+ * Blocky Shell emotes. These are real skinview3d PlayerAnimation subclasses, so the same
+ * smooth WebGL character (with the wardrobe skin and the client cape) acts on its own.
+ *
+ * Every joint touched by an emote is assigned on every frame: skinview3d resets the joints only
+ * when the animation object is swapped, so leaving a joint out would make the pose drift.
+ * Motion is quantised into a few discrete steps (Math.round / Math.floor) to keep the
+ * "blocky motions" rule even while the model itself stays smooth and rotatable.
+ * ------------------------------------------------------------------------------------------ */
+
+function quantize(value, steps) {
+    return Math.round(value * steps) / steps;
+}
+
+function zeroPose(player) {
+    const s = player.skin;
+    if (!s) return;
+    s.head.rotation.set(0, 0, 0);
+    s.body.rotation.set(0, 0, 0);
+    s.leftArm.rotation.set(0, 0, 0);
+    s.rightArm.rotation.set(0, 0, 0);
+    s.leftLeg.rotation.set(0, 0, 0);
+    s.rightLeg.rotation.set(0, 0, 0);
+    player.position.set(0, 0, 0);
+    if (player.cape) player.cape.rotation.set(0.1, 0, 0);
+}
+
+class BlockyDanceAnimation extends skinview3d.PlayerAnimation {
+    animate(player) {
+        const t = this.progress;
+        if (!player.skin) return;
+        zeroPose(player);
+        const s = player.skin;
+        const beat = Math.floor(t * 4) % 4;                 // four-step beat
+        const swing = quantize(Math.sin(t * 6), 3);
+        s.leftArm.rotation.x = swing * 1.15;
+        s.rightArm.rotation.x = -swing * 1.15;
+        s.leftArm.rotation.z = 0.35 + Math.abs(swing) * 0.4;
+        s.rightArm.rotation.z = -0.35 - Math.abs(swing) * 0.4;
+        s.leftLeg.rotation.x = -swing * 0.45;
+        s.rightLeg.rotation.x = swing * 0.45;
+        s.head.rotation.z = quantize(Math.sin(t * 3), 4) * 0.16;
+        s.body.rotation.y = swing * 0.2;
+        player.position.y = (beat === 1 || beat === 3) ? 1.4 : 0;   // stepped hop
+        if (player.cape) player.cape.rotation.x = 0.18 + Math.abs(swing) * 0.22;
+    }
+}
+
+class BlockyJumpAnimation extends skinview3d.PlayerAnimation {
+    animate(player) {
+        const t = this.progress;
+        if (!player.skin) return;
+        zeroPose(player);
+        const s = player.skin;
+        // Stepped parabola: 6 discrete heights, never a smooth glide.
+        const hop = Math.max(0, Math.sin(t * 3.4));
+        const height = Math.round(hop * 6) / 6;
+        player.position.y = height * 6;
+        const tuck = height;
+        s.leftLeg.rotation.x = tuck * 0.7;
+        s.rightLeg.rotation.x = tuck * 0.7;
+        s.leftArm.rotation.x = -tuck * 1.2;
+        s.rightArm.rotation.x = -tuck * 1.2;
+        s.leftArm.rotation.z = 0.3 * tuck;
+        s.rightArm.rotation.z = -0.3 * tuck;
+        s.head.rotation.x = -tuck * 0.12;
+        if (player.cape) player.cape.rotation.x = 0.1 + tuck * 0.4;
+    }
+}
+
+class BlockyWaveAnimation extends skinview3d.PlayerAnimation {
+    animate(player) {
+        const t = this.progress;
+        if (!player.skin) return;
+        zeroPose(player);
+        const s = player.skin;
+        const swing = quantize(Math.sin(t * 9), 3);
+        s.rightArm.rotation.z = -2.15 + swing * 0.45;
+        s.rightArm.rotation.x = -0.25;
+        s.leftArm.rotation.z = 0.08;
+        s.head.rotation.y = 0.12 + swing * 0.06;
+        s.head.rotation.z = -0.06;
+        s.body.rotation.y = -0.08;
+        if (player.cape) player.cape.rotation.x = 0.14 + Math.abs(swing) * 0.1;
+    }
+}
+
+class BlockyActionAnimation extends skinview3d.PlayerAnimation {
+    animate(player) {
+        const t = this.progress;
+        if (!player.skin) return;
+        zeroPose(player);
+        const s = player.skin;
+        // "Perform action": a repeated block-place / mine swing.
+        const swing = quantize(Math.sin(t * 7), 4);
+        s.rightArm.rotation.x = -1.35 + swing * 0.65;
+        s.rightArm.rotation.z = -0.18;
+        s.leftArm.rotation.x = swing * 0.18;
+        s.body.rotation.y = 0.22;
+        s.head.rotation.x = 0.16 + swing * 0.06;
+        if (player.cape) player.cape.rotation.x = 0.16 + Math.abs(swing) * 0.12;
+    }
+}
+
+class BlockyCheerAnimation extends skinview3d.PlayerAnimation {
+    animate(player) {
+        const t = this.progress;
+        if (!player.skin) return;
+        zeroPose(player);
+        const s = player.skin;
+        const hop = Math.max(0, Math.sin(t * 5));
+        const height = Math.round(hop * 4) / 4;
+        player.position.y = height * 3.2;
+        s.leftArm.rotation.z = 2.25 + height * 0.25;
+        s.rightArm.rotation.z = -2.25 - height * 0.25;
+        s.leftLeg.rotation.x = -height * 0.25;
+        s.rightLeg.rotation.x = height * 0.25;
+        s.head.rotation.x = -0.16;
+        if (player.cape) player.cape.rotation.x = 0.2 + height * 0.2;
+    }
+}
+
+function makeEmoteAnimation(name) {
+    switch (name) {
+        case 'dance': return new BlockyDanceAnimation();
+        case 'jump': return new BlockyJumpAnimation();
+        case 'wave': return new BlockyWaveAnimation();
+        case 'action': return new BlockyActionAnimation();
+        case 'cheer': return new BlockyCheerAnimation();
+        default: return null;
+    }
+}
+
+function notifyEmote(name) {
+    try {
+        if (window.AndroidSkinBridge && typeof window.AndroidSkinBridge.onEmote === 'function') {
+            window.AndroidSkinBridge.onEmote(String(name));
+        }
+    } catch (_) {}
+}
+
+let emoteTimer = null;
+let currentEmoteAnimation = null;
+
+/** Play an emote, then fall back to the living idle pose. */
+function playEmote(name, durationMs) {
+    if (!skinViewer) return;
+    const anim = makeEmoteAnimation(name);
+    if (!anim) return;
+    if (emoteTimer) clearTimeout(emoteTimer);
+    currentEmoteAnimation = anim;
+    skinViewer.animation = anim;
+    skinViewer.animation.speed = 1;
+    skinViewer.renderPaused = false;
+    notifyEmote(name);
+    const ms = (typeof durationMs === 'number' && durationMs > 0) ? durationMs : 2600;
+    emoteTimer = setTimeout(function () {
+        emoteTimer = null;
+        if (skinViewer && skinViewer.animation === currentEmoteAnimation) {
+            startIdleMotion(true);
+        }
+    }, ms);
+}
+
+/** The character is never a still image: this idle pose breathes and the cape moves. */
+function startIdleMotion(enabled) {
+    if (!skinViewer) return;
+    if (enabled) {
+        const idle = new IdleAnimation();
+        skinViewer.animation = idle;
+        skinViewer.animation.speed = 0.85;
+        skinViewer.renderPaused = false;
+        notifyEmote('idle');
+    } else {
+        skinViewer.renderPaused = true;
+        skinViewer.render();
+        notifyEmote('idle');
+    }
+}
+
 function startAnim(name, speed) {
     if (!skinViewer || typeof name !== 'string' || name.trim() === '') return;
 

@@ -78,6 +78,14 @@ object AerixPreferences {
     const val KEY_DISCORD_GAME_PROFILE_MODE = "aerixDiscordGameProfileMode"
     /** Attach modpack art, clickable info URLs, and action buttons to Discord Rich Presence cards. */
     const val KEY_DISCORD_CLICKABLE_LINKS = "aerixDiscordClickableLinks"
+    /** Blocky Shell: the whole new navigation / visual language on HOME. */
+    const val KEY_BLOCKY_UI = "aerixBlockyUi"
+    /** Blocky Shell: synthesised square-wave chiptune sound effects. */
+    const val KEY_BLOCKY_SOUND = "aerixBlockySound"
+    /** Blocky Shell: the character performs emotes on its own. */
+    const val KEY_BLOCKY_EMOTES = "aerixBlockyEmotes"
+    /** Blocky Shell: draw the crisp pixel plaza instead of the chosen wallpaper. */
+    const val KEY_BLOCKY_BACKDROP = "aerixBlockyBackdrop"
 
     const val DEFAULT_CUSTOM_COLOR = 0xFF8DEFE0.toInt()
     const val DEFAULT_BACKGROUND_OPACITY = 60
@@ -133,6 +141,19 @@ object AerixPreferences {
 
     /** Draw the launcher's wallpaper behind the controls while the game starts. */
     var loadingWallpaper by mutableStateOf(false)
+        private set
+
+    /** Blocky Shell on HOME. Off restores the classic glass dashboard immediately. */
+    var blockyUi by mutableStateOf(true)
+        private set
+    /** Blocky chiptune sounds on taps, transitions, emotes and rewards. */
+    var blockySound by mutableStateOf(true)
+        private set
+    /** The 3D character performs autonomous emotes when nothing else is happening. */
+    var blockyEmotes by mutableStateOf(true)
+        private set
+    /** Crisp pixel plaza backdrop; off shows the user's selected wallpaper. */
+    var blockyBackdrop by mutableStateOf(true)
         private set
 
     /** Aerix "logTextSize" (5..20 sp) used by the log viewer. */
@@ -213,6 +234,10 @@ object AerixPreferences {
         discordAppId = p.getString(KEY_DISCORD_APP_ID, "") ?: ""
         discordGameProfileMode = p.getBoolean(KEY_DISCORD_GAME_PROFILE_MODE, true)
         discordClickableLinks = p.getBoolean(KEY_DISCORD_CLICKABLE_LINKS, true)
+        blockyUi = p.getBoolean(KEY_BLOCKY_UI, true)
+        blockySound = p.getBoolean(KEY_BLOCKY_SOUND, true)
+        blockyEmotes = p.getBoolean(KEY_BLOCKY_EMOTES, true)
+        blockyBackdrop = p.getBoolean(KEY_BLOCKY_BACKDROP, true)
     }
 
     fun saveFavoritesJson(value: String) {
@@ -321,6 +346,26 @@ object AerixPreferences {
     fun saveGuidePlayed(value: Boolean) {
         guidePlayed = value
         edit { putBoolean(KEY_GUIDE_PLAYED, value) }
+    }
+
+    fun saveBlockyUi(value: Boolean) {
+        blockyUi = value
+        edit { putBoolean(KEY_BLOCKY_UI, value) }
+    }
+
+    fun saveBlockySound(value: Boolean) {
+        blockySound = value
+        edit { putBoolean(KEY_BLOCKY_SOUND, value) }
+    }
+
+    fun saveBlockyEmotes(value: Boolean) {
+        blockyEmotes = value
+        edit { putBoolean(KEY_BLOCKY_EMOTES, value) }
+    }
+
+    fun saveBlockyBackdrop(value: Boolean) {
+        blockyBackdrop = value
+        edit { putBoolean(KEY_BLOCKY_BACKDROP, value) }
     }
 
     fun saveNotificationPromptShown(value: Boolean) {

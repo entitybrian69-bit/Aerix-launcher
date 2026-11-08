@@ -90,11 +90,19 @@ class AerixPlayerSkin(private val context: Context) {
     var viewerReadyCallback: (() -> Unit)? = null
     var viewerErrorCallback: (() -> Unit)? = null
     var skinPaintedCallback: ((Boolean) -> Unit)? = null
+    /** Emote engine -> Compose: "wave", "dance", "jump", "action", "cheer", "idle". */
+    var emoteCallback: ((String) -> Unit)? = null
 
     private inner class SkinJsBridge {
         @JavascriptInterface
         fun onViewerReady() {
             mainHandler.post { viewerReadyCallback?.invoke() }
+        }
+
+        @JavascriptInterface
+        fun onEmote(name: String?) {
+            val value = name.orEmpty()
+            mainHandler.post { emoteCallback?.invoke(value) }
         }
 
         @JavascriptInterface
@@ -221,10 +229,23 @@ class AerixPlayerSkin(private val context: Context) {
         webview?.evaluateJavascript("if (typeof resize === 'function') resize();", null)
     }
 
+    /** Blocky Shell: play one of the character's emotes (see skinview.js playEmote). */
+    fun playEmote(name: String, durationMs: Int = 2600) {
+        val safe = name.filter { it.isLetterOrDigit() || it == '_' }
+        if (safe.isEmpty()) return
+        webview?.evaluateJavascript("playEmote('$safe', $durationMs)", null)
+    }
+
+    /** Blocky Shell: keep the WebGL loop alive so the character is never a still frame. */
+    fun startIdleMotion(enabled: Boolean = true) {
+        webview?.evaluateJavascript("startIdleMotion($enabled)", null)
+    }
+
     fun destroy() {
         viewerReadyCallback = null
         viewerErrorCallback = null
         skinPaintedCallback = null
+        emoteCallback = null
         webview?.apply {
             stopLoading()
             loadUrl("about:blank")
@@ -249,7 +270,13 @@ fun AerixSkinPreview3D(
     interactionEnabled: Boolean = false,
     isVisible: Boolean = true,
     useClientCape: Boolean = false,
-    showOfficialCape: Boolean = false
+    showOfficialCape: Boolean = false,
+    /** Blocky Shell: an emote id, replayed whenever [emoteNonce] changes. */
+    emote: String? = null,
+    emoteNonce: Int = 0,
+    /** Keep the render loop running with the living idle pose instead of a still frame. */
+    animated: Boolean = false,
+    onEmoteChanged: (String) -> Unit = {}
 ) {
     val context = LocalContext.current
     val playerSkin = remember { AerixPlayerSkin(context.applicationContext) }
@@ -278,6 +305,7 @@ fun AerixSkinPreview3D(
                 webglFailed = true
             }
         }
+        playerSkin.emoteCallback = { name -> onEmoteChanged(name) }
         onDispose { playerSkin.destroy() }
     }
 
@@ -355,9 +383,15 @@ fun AerixSkinPreview3D(
         }
 
         val ready = viewerReady
-        LaunchedEffect(ready, isVisible) {
+        // The Blocky Shell wants a living character: idle motion keeps the WebGL draw loop
+        // running so emotes, cape sway and rotation are continuous instead of a still frame.
+        LaunchedEffect(ready, isVisible, animated) {
             if (!ready) return@LaunchedEffect
-            playerSkin.setRenderPaused(true)
+            if (animated && isVisible) playerSkin.startIdleMotion(true) else playerSkin.setRenderPaused(true)
+        }
+        LaunchedEffect(ready, isVisible, animated, emote, emoteNonce) {
+            if (!ready || !animated || !isVisible || emote == null) return@LaunchedEffect
+            playerSkin.playEmote(emote)
         }
         LaunchedEffect(ready, azimuth, pitch, isVisible) {
             if (!ready || !isVisible) return@LaunchedEffect

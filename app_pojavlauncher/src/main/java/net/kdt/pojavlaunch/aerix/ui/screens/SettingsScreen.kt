@@ -1462,6 +1462,41 @@ private fun LauncherTabContent(activity: FragmentActivity) {
             DiscordPresenceSettingsCard()
         }
 
+        // Blocky Shell: the new launcher identity, its chiptune sound, autonomous emotes and
+        // crisp pixel backdrop. Every switch is a real opt-out back to the classic dashboard.
+        item {
+            SettingsCardColumn(modifier = Modifier.fillMaxWidth()) {
+                MiraiSwitchSettingsCard(
+                    position = CardPosition.Top,
+                    title = stringResource(R.string.aerix_settings_blocky_ui),
+                    summary = stringResource(R.string.aerix_settings_blocky_ui_sub),
+                    checked = AerixPreferences.blockyUi,
+                    onCheckedChange = { AerixPreferences.saveBlockyUi(it) }
+                )
+                MiraiSwitchSettingsCard(
+                    position = CardPosition.Middle,
+                    title = stringResource(R.string.aerix_settings_blocky_sound),
+                    summary = stringResource(R.string.aerix_settings_blocky_sound_sub),
+                    checked = AerixPreferences.blockySound,
+                    onCheckedChange = { AerixPreferences.saveBlockySound(it) }
+                )
+                MiraiSwitchSettingsCard(
+                    position = CardPosition.Middle,
+                    title = stringResource(R.string.aerix_settings_blocky_emotes),
+                    summary = stringResource(R.string.aerix_settings_blocky_emotes_sub),
+                    checked = AerixPreferences.blockyEmotes,
+                    onCheckedChange = { AerixPreferences.saveBlockyEmotes(it) }
+                )
+                MiraiSwitchSettingsCard(
+                    position = CardPosition.Bottom,
+                    title = stringResource(R.string.aerix_settings_blocky_backdrop),
+                    summary = stringResource(R.string.aerix_settings_blocky_backdrop_sub),
+                    checked = AerixPreferences.blockyBackdrop,
+                    onCheckedChange = { AerixPreferences.saveBlockyBackdrop(it) }
+                )
+            }
+        }
+
         // Group 1: Color theme, custom color, festival effects, full screen (Mirai LauncherSettingsScreen)
         item {
             SettingsCardColumn(modifier = Modifier.fillMaxWidth()) {
