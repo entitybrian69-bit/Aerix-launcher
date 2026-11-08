@@ -176,7 +176,6 @@ fun MillidaButton(
                 onClick()
             },
         fill = if (enabled) fill else MillidaPalette.PanelSoft,
-        outline = outline,
         pressed = pressed,
     ) {
         Row(
