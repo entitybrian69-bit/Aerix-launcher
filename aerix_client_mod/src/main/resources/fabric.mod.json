@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "id": "aerix_client_animator",
+  "id": "trinkies",
   "version": "1.0.0",
-  "name": "Aerix Client Animator",
-  "description": "Live animated 3D capes and instant client runtime bridge for Aerix Client.",
+  "name": "Trinkies",
+  "description": "Launcher-integrated client cosmetics bridge for animated capes and local player appearance.",
   "authors": [
     "Aerix"
   ],

@@ -113,6 +113,8 @@ import net.kdt.pojavlaunch.aerix.guide.guideAnchor
 import net.kdt.pojavlaunch.aerix.theme.AerixSpacing
 import net.kdt.pojavlaunch.aerix.theme.AerixSurface
 import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
+import net.kdt.pojavlaunch.aerix.client.TrinkiesInstaller
+import net.kdt.pojavlaunch.aerix.ui.AerixHomeUtilityRail
 import net.kdt.pojavlaunch.aerix.ui.AerixNav
 import net.kdt.pojavlaunch.aerix.ui.LauncherSection
 import net.kdt.pojavlaunch.contracts.OpenDocumentWithExtension
@@ -161,21 +163,22 @@ private class HomeActions(
     val fileManager: () -> Unit,
     val logs: () -> Unit,
     val accounts: () -> Unit,
-    val aerixAccount: () -> Unit
+    val aerixAccount: () -> Unit,
+    val quickTools: () -> Unit,
+    val instanceSelector: () -> Unit,
+    val wardrobe: () -> Unit
 )
 
 @Composable
 fun HomeScreen(activity: FragmentActivity, navigate: (LauncherSection) -> Unit) {
     LaunchedEffect(Unit) {
         PojavAccountBridge.ensureLoaded()
+        // Existing and newly-created Fabric-family instances receive Trinkies automatically;
+        // unsupported loaders are intentionally untouched.
+        TrinkiesInstaller.installIntoSupportedInstances(activity)
     }
     val instances = PojavInstanceBridge.instances
     val selected = PojavInstanceBridge.selected
-    val taskCount = PojavTaskBridge.taskCount
-    val accent = AerixThemeManager.currentAccent()
-    val recent = remember(instances, selected) {
-        instances.filterNot { it == selected }.take(8).ifEmpty { instances.take(8) }
-    }
     val jarLauncher = rememberLauncherForActivityResult(OpenDocumentWithExtension("jar")) { uri ->
         if (uri != null) PojavNavigator.runJar(activity, uri)
     }
@@ -203,49 +206,201 @@ fun HomeScreen(activity: FragmentActivity, navigate: (LauncherSection) -> Unit) 
         fileManager = { navigate(LauncherSection.FILES) },
         logs = { navigate(LauncherSection.LOGS) },
         accounts = { navigate(LauncherSection.ACCOUNTS) },
-        aerixAccount = { AerixNav.navigate(LauncherSection.AERIX_ACCOUNT) }
+        aerixAccount = { AerixNav.navigate(LauncherSection.AERIX_ACCOUNT) },
+        quickTools = { navigate(LauncherSection.QUICK_TOOLS) },
+        instanceSelector = { navigate(LauncherSection.INSTANCE_SELECTOR) },
+        wardrobe = { navigate(LauncherSection.TRINKIES_WARDROBE) }
     )
 
-    // Mirai LauncherScreen: content dashboard on the left (weight 7.4f) and the docked 3D skin
-    // ActionMenu card on the right (weight 2.6f) whenever maxWidth >= 500.dp.
-    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-        val showActionMenu = maxWidth >= 500.dp
-        Row(modifier = Modifier.fillMaxSize()) {
-            BoxWithConstraints(
-                modifier = Modifier
-                    .weight(if (showActionMenu) ContentWeight else 1f)
-                    .fillMaxHeight()
-                    .padding(start = AerixSpacing.mdPlus, end = AerixSpacing.smCompact, top = AerixSpacing.smPlus)
-            ) {
-                if (maxWidth >= 720.dp && maxWidth > maxHeight) {
-                    WideHomeDashboard(selected, recent, instances.size, accent, taskCount, actions)
-                } else {
-                    CompactHomeDashboard(selected, recent, instances.size, accent, taskCount, actions)
-                }
+    Row(modifier = Modifier.fillMaxSize()) {
+        HomeCharacterStage(
+            selected = selected,
+            actions = actions,
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight()
+                .padding(start = AerixSpacing.mdPlus, end = AerixSpacing.xs, top = AerixSpacing.smPlus, bottom = AerixSpacing.smPlus)
+        )
+        AerixHomeUtilityRail(
+            selectedSection = LauncherSection.HOME,
+            onNavigate = navigate,
+            onOpenProfile = {
+                SocialsNavigation.requestMyProfile()
+                navigate(LauncherSection.SOCIALS)
+            },
+            onQuickTools = actions.quickTools,
+            onInstances = actions.instanceSelector,
+            onWardrobe = actions.wardrobe
+        )
+    }
+}
+
+/** Empty launcher dashboard: the 360° character is the hero, with instance selection and Play
+ * directly below it. Everything else lives in the utility rails and their destinations. */
+@Composable
+private fun HomeCharacterStage(
+    selected: AerixInstance?,
+    actions: HomeActions,
+    modifier: Modifier = Modifier
+) {
+    val account = PojavAccountBridge.current
+    val accent = AerixThemeManager.currentAccent()
+    val vanilla = stringResource(R.string.aerix_home_vanilla)
+    var dollAzimuth by remember(account?.username) { mutableFloatStateOf(28f) }
+    val flingScope = rememberCoroutineScope()
+    val velocityTracker = remember(account?.username) { VelocityTracker() }
+    var flingJob by remember(account?.username) { mutableStateOf<Job?>(null) }
+    val versionLabel = remember(selected, vanilla) {
+        selected?.let { instanceVersionLabel(it.versionId, vanilla) } ?: "Choose a Minecraft instance"
+    }
+
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = AerixSpacing.smPlus, vertical = AerixSpacing.xs),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column {
+                Text("YOUR CHARACTER", color = AerixSurface.textSecondary, fontSize = 10.sp,
+                    fontWeight = FontWeight.ExtraBold, letterSpacing = 1.4.sp)
+                Text(account?.username ?: "Aerix", color = AerixSurface.textPrimary,
+                    style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1)
             }
-            if (showActionMenu) {
-                ActionMenuCard(
-                    selected = selected,
-                    instances = instances,
-                    actions = actions,
-                    modifier = Modifier
-                        .guideAnchor(AerixGuideState.PLAY)
-                        .weight(ActionMenuWeight)
-                        .fillMaxHeight()
-                        .padding(
-                            top = ActionMenuOuterPadding,
-                            bottom = ActionMenuOuterPadding,
-                            end = ActionMenuOuterPadding
-                        )
-                )
+            Surface(
+                shape = RoundedCornerShape(999.dp),
+                color = AerixSurface.panel.copy(alpha = 0.8f),
+                border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft)
+            ) {
+                Text("DRAG TO ROTATE", color = AerixSurface.textSecondary, fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp))
+            }
+        }
+
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .padding(horizontal = AerixSpacing.smPlus)
+                .clip(RoundedCornerShape(AerixRadii.card))
+                .background(AerixSurface.canvas.copy(alpha = 0.28f))
+                .drawWithCache {
+                    val glow = Brush.radialGradient(
+                        colors = listOf(accent.copy(alpha = 0.18f), Color.Transparent),
+                        center = Offset(size.width * 0.5f, size.height * 0.58f),
+                        radius = size.minDimension * 0.54f
+                    )
+                    onDrawBehind { drawRect(glow) }
+                }
+                .pointerInput(account?.username) {
+                    detectHorizontalDragGestures(
+                        onDragStart = {
+                            flingJob?.cancel()
+                            flingJob = null
+                            velocityTracker.resetTracking()
+                        },
+                        onDragEnd = {
+                            val releaseVelocity = velocityTracker.calculateVelocity().x * DOLL_DRAG_DEG_PER_PX
+                            flingJob?.cancel()
+                            if (abs(releaseVelocity) < DOLL_FLING_MIN_VELOCITY) {
+                                flingJob = null
+                                return@detectHorizontalDragGestures
+                            }
+                            flingJob = flingScope.launch {
+                                var velocity = releaseVelocity
+                                var lastFrame = withFrameNanos { it }
+                                while (abs(velocity) > DOLL_FLING_STOP_VELOCITY) {
+                                    ensureActive()
+                                    val now = withFrameNanos { it }
+                                    val dt = ((now - lastFrame) / 1_000_000_000f).coerceIn(0f, 0.05f)
+                                    lastFrame = now
+                                    dollAzimuth = (dollAzimuth + velocity * dt).mod(360f)
+                                    velocity *= exp(-DOLL_FLING_FRICTION * dt)
+                                }
+                                flingJob = null
+                            }
+                        },
+                        onDragCancel = { flingJob?.cancel(); flingJob = null },
+                        onHorizontalDrag = { change, dragAmount ->
+                            velocityTracker.addPosition(change.uptimeMillis, change.position)
+                            dollAzimuth = (dollAzimuth + dragAmount * DOLL_DRAG_DEG_PER_PX).mod(360f)
+                        }
+                    )
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            AerixSkinPreview3D(
+                account = account,
+                azimuth = dollAzimuth.roundToInt(),
+                interactionEnabled = false,
+                useClientCape = true,
+                showOfficialCape = true,
+                animationName = "NewIdle",
+                applyClientHat = true,
+                modifier = Modifier.fillMaxSize().padding(horizontal = 18.dp, vertical = 8.dp)
+            )
+            Surface(
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = AerixSpacing.sm),
+                shape = RoundedCornerShape(AerixRadii.compact),
+                color = AerixSurface.canvas.copy(alpha = 0.92f),
+                border = BorderStroke(AerixSpacing.hairline, accent.copy(alpha = 0.48f)),
+                onClick = actions.accounts
+            ) {
+                Text(account?.username ?: "Add Minecraft account", color = if (account == null) accent else Color.White,
+                    fontSize = 10.sp, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = AerixSpacing.smPlus, vertical = AerixSpacing.tiny))
+            }
+        }
+
+        Surface(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = AerixSpacing.smPlus),
+            shape = RoundedCornerShape(AerixRadii.cardSmall),
+            color = AerixSurface.panel.copy(alpha = 0.8f),
+            border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft),
+            onClick = actions.instanceSelector
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = AerixSpacing.smPlus, vertical = AerixSpacing.xs),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Icon(painterResource(R.drawable.aerix_ic_videogame_asset_outlined), contentDescription = null,
+                    tint = accent, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(AerixSpacing.xs))
+                Text(selected?.name ?: "Select instance", color = AerixSurface.textPrimary,
+                    fontWeight = FontWeight.Bold, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Spacer(Modifier.width(AerixSpacing.xs))
+                Text(versionLabel, color = accent, fontWeight = FontWeight.SemiBold,
+                    fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+
+        Surface(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = AerixSpacing.smPlus).height(46.dp)
+                .guideAnchor(AerixGuideState.PLAY),
+            shape = RoundedCornerShape(999.dp),
+            color = accent,
+            contentColor = AerixSurface.onAccent,
+            onClick = if (selected != null) actions.play else actions.instanceSelector
+        ) {
+            Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center) {
+                Text("PLAY", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.ExtraBold,
+                    color = AerixSurface.onAccent)
+                Spacer(Modifier.width(AerixSpacing.xs))
+                Icon(painterResource(R.drawable.aerix_ic_play_arrow_filled), contentDescription = "Play",
+                    tint = AerixSurface.onAccent, modifier = Modifier.size(18.dp))
             }
         }
     }
 }
 
 /**
- * Right-hand ActionMenu card from Mirai's LauncherScreen.kt: 3D rotatable skin stage on a dark
- * pedestal with the username pill, the two-line instance selector pill and the PLAY button.
+ * Kept as a fallback/reference component for older dashboards: the 3D rotatable skin stage, an
+ * instance menu and the PLAY button. Home now uses [HomeCharacterStage] and the right utility rail.
  */
 @Composable
 private fun ActionMenuCard(

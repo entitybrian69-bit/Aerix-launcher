@@ -113,26 +113,36 @@ object AerixClientInstaller {
         return out
     }
 
-    /**
-     * Copies our bundled `aerix_client_mod.jar` (`AerixClientMod`) into `<modsDir>/aerix-client-animator.jar`
-     * and deletes any legacy FPS-heavy shaders/dynamic-light jars (`iris`, `lambdynamiclights`).
-     */
-    fun deployBundledAnimatorAndPurgeBloat(context: Context, modsDir: File) {
+    /** Installs the Java-8 Trinkies client bridge bundled in the launcher APK. */
+    @Synchronized
+    fun deployBundledTrinkies(context: Context, modsDir: File) {
         modsDir.mkdirs()
-        // 2. Extract bundled Java-8 `aerix_client_mod.jar` from APK assets into `mods/aerix-client-animator.jar`
         runCatching {
-            val target = File(modsDir, "aerix-client-animator.jar")
-            context.assets.open("components/aerix_client/aerix_client_mod.jar").use { input ->
-                FileOutputStream(target).use { out ->
-                    input.copyTo(out)
+            val target = File(modsDir, "trinkies.jar")
+            val temporary = File(modsDir, ".trinkies.jar.tmp")
+            val bundled = context.assets.open("components/aerix_client/aerix_client_mod.jar").use { it.readBytes() }
+            val alreadyCurrent = target.isFile && target.length() == bundled.size.toLong() &&
+                runCatching { target.readBytes().contentEquals(bundled) }.getOrDefault(false)
+            if (!alreadyCurrent) {
+                FileOutputStream(temporary).use { it.write(bundled) }
+                if (!temporary.renameTo(target)) {
+                    temporary.copyTo(target, overwrite = true)
+                    temporary.delete()
                 }
             }
+            // The Fabric mod id changed from aerix_client_animator to trinkies. Keeping both
+            // copies would make Fabric reject the duplicate old/new entrypoints on upgrade.
+            File(modsDir, "aerix-client-animator.jar").delete()
         }
     }
 
+    /** Kept as a source-compatible entrypoint for the older Aerix Client installation path. */
+    fun deployBundledAnimatorAndPurgeBloat(context: Context, modsDir: File) =
+        deployBundledTrinkies(context, modsDir)
+
     /**
      * Upgrades an already-installed Client instance right before Launch so users immediately get
-     * `wavey-capes`, `immediatelyfast`, `aerix-client-animator.jar`, `iris` removal, `AERIX CLIENT`
+     * `wavey-capes`, `immediatelyfast`, `trinkies.jar`, `iris` removal, `AERIX CLIENT`
      * title logo, `images.jpeg` forest background, and genuine vanilla animated gear!
      */
     suspend fun syncExistingInstanceForLaunch(context: Context, instance: Instance, mcVersion: String) =

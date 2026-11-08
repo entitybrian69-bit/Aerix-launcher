@@ -732,6 +732,11 @@ object PojavAccountBridge : LoginListener {
         wardrobeRevision++
     }
 
+    /** Refreshes skin-preview consumers after a non-account cosmetic changes the rendered skin. */
+    fun notifyWardrobeChanged() {
+        wardrobeRevision++
+    }
+
     fun activePresetId(context: Context, account: AerixAccount?): String {
         if (account == null) return "default"
         val prefs = context.applicationContext.getSharedPreferences(WARDROBE_PREFS, Context.MODE_PRIVATE)
@@ -979,9 +984,12 @@ object PojavAccountBridge : LoginListener {
             val ok = runCatching {
                 val bytes = appCtx.contentResolver.openInputStream(uri)?.use { it.readBytes() }
                     ?: return@runCatching false
+                if (bytes.size > 8 * 1024 * 1024) return@runCatching false
                 val decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
                     ?: return@runCatching false
+                val validCape = decoded.width in 22..1024 && decoded.height in 17..1024
                 decoded.recycle()
+                if (!validCape) return@runCatching false
                 val target = customCapeFile(account.source)
                 target.parentFile?.mkdirs()
                 target.writeBytes(bytes)

@@ -213,6 +213,13 @@ class AerixPlayerSkin(private val context: Context) {
         webview?.evaluateJavascript("setInteractionEnabled($enabled)", null)
     }
 
+    fun startAnimation(name: String, speed: Float = 1f) {
+        val allowed = setOf("DefaultIdle", "NewIdle", "Walking", "Running", "Flying", "Wave", "Crouch", "Hit")
+        if (name !in allowed) return
+        val safeSpeed = speed.takeIf { it.isFinite() }?.coerceIn(0.1f, 3f) ?: 1f
+        webview?.evaluateJavascript("startAnim('$name', $safeSpeed)", null)
+    }
+
     fun setRenderPaused(paused: Boolean) {
         webview?.evaluateJavascript("setRenderPaused($paused)", null)
     }
@@ -249,7 +256,9 @@ fun AerixSkinPreview3D(
     interactionEnabled: Boolean = false,
     isVisible: Boolean = true,
     useClientCape: Boolean = false,
-    showOfficialCape: Boolean = false
+    showOfficialCape: Boolean = false,
+    animationName: String? = null,
+    applyClientHat: Boolean = false
 ) {
     val context = LocalContext.current
     val playerSkin = remember { AerixPlayerSkin(context.applicationContext) }
@@ -284,6 +293,11 @@ fun AerixSkinPreview3D(
     val wardrobeRevision = PojavAccountBridge.wardrobeRevision
     val clientCapeId = if (useClientCape) net.kdt.pojavlaunch.aerix.client.AerixClientStore.equippedCapeId else null
     val capeOwner = if (useClientCape) net.kdt.pojavlaunch.aerix.social.SocialBackend.email else null
+    val clientHatId = if (applyClientHat) net.kdt.pojavlaunch.aerix.client.AerixClientStore.equippedHatId else null
+
+    LaunchedEffect(applyClientHat) {
+        if (applyClientHat) net.kdt.pojavlaunch.aerix.client.AerixClientStore.init(context)
+    }
 
     // Always decode the crisp 2D full-body preview immediately so the skin shows up on the very
     // first frame after returning to Dashboard — and stays visible on devices without WebGL.
@@ -355,9 +369,13 @@ fun AerixSkinPreview3D(
         }
 
         val ready = viewerReady
-        LaunchedEffect(ready, isVisible) {
+        LaunchedEffect(ready, isVisible, animationName) {
             if (!ready) return@LaunchedEffect
-            playerSkin.setRenderPaused(true)
+            if (isVisible && !animationName.isNullOrBlank()) {
+                playerSkin.startAnimation(animationName)
+            } else {
+                playerSkin.setRenderPaused(true)
+            }
         }
         LaunchedEffect(ready, azimuth, pitch, isVisible) {
             if (!ready || !isVisible) return@LaunchedEffect
@@ -374,12 +392,19 @@ fun AerixSkinPreview3D(
             if (!ready) return@LaunchedEffect
             playerSkin.setInteractionEnabled(interactionEnabled && isVisible)
         }
-        LaunchedEffect(ready, skinLoadTrigger, account?.key, account?.username, account?.authType, wardrobeRevision, useClientCape, clientCapeId, capeOwner, showOfficialCape) {
+        LaunchedEffect(ready, skinLoadTrigger, account?.key, account?.username, account?.authType, wardrobeRevision, useClientCape, clientCapeId, capeOwner, showOfficialCape, applyClientHat, clientHatId) {
             if (!ready || webglFailed) return@LaunchedEffect
             val (skinBytes, capeBytes, model) = withContext(Dispatchers.IO) {
+                val baseSkin = PojavAccountBridge.resolveAccountSkinBytes(account)
+                val selectedSkin = if (applyClientHat) {
+                    val sourceSkin = baseSkin ?: context.assets.open("steve.png").use { it.readBytes() }
+                    net.kdt.pojavlaunch.aerix.client.AerixClientCosmetics.applyHatAccessoryToSkin(
+                        context, sourceSkin, PojavAccountBridge.isSlimModel(account)
+                    )
+                } else baseSkin
                 Triple(
-                    PojavAccountBridge.resolveAccountSkinBytes(account),
-                    if (useClientCape && account != null)
+                    selectedSkin,
+                    if (useClientCape)
                         net.kdt.pojavlaunch.aerix.client.AerixClientCosmetics.resolveInGameCapeBytes(context)
                     else PojavAccountBridge.resolveCapeBytes(account, includeOfficial = showOfficialCape),
                     if (PojavAccountBridge.isSlimModel(account)) "slim" else "default"

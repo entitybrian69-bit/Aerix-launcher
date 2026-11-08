@@ -93,6 +93,9 @@ import net.kdt.pojavlaunch.aerix.ui.screens.DiscoverScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.FileManagerScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.HomeScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.InstanceEditorScreen
+import net.kdt.pojavlaunch.aerix.ui.screens.InstanceSelectorScreen
+import net.kdt.pojavlaunch.aerix.ui.screens.QuickToolsScreen
+import net.kdt.pojavlaunch.aerix.ui.screens.TrinkiesWardrobeScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.LibraryScreen
 import net.kdt.pojavlaunch.aerix.bridge.AerixInstallQueue
 import net.kdt.pojavlaunch.aerix.ui.screens.AerixInstallPanel
@@ -202,6 +205,9 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
                         when (target) {
                             LauncherSection.OTHER_RELEASES -> net.kdt.pojavlaunch.aerix.ui.screens.OtherReleasesScreen(activity, navigate)
                             LauncherSection.HOME -> HomeScreen(activity, navigate)
+                            LauncherSection.QUICK_TOOLS -> QuickToolsScreen(activity, navigate)
+                            LauncherSection.INSTANCE_SELECTOR -> InstanceSelectorScreen(activity, navigate)
+                            LauncherSection.TRINKIES_WARDROBE -> TrinkiesWardrobeScreen(activity, navigate)
                             LauncherSection.AERIX_CLIENT -> ClientHubScreen(activity, clientOwnerPage) { clientOwnerPage = it }
                             LauncherSection.LIBRARY -> LibraryScreen(activity)
                             LauncherSection.SERVERS -> ServersScreen(activity)

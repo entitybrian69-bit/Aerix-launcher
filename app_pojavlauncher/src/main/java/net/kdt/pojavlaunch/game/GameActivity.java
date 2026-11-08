@@ -649,6 +649,8 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
 
         if (instance.isAerixClient) {
             net.kdt.pojavlaunch.aerix.client.AerixClientInstaller.syncLocalAssetsAtGameStart(this, instance);
+        } else if (net.kdt.pojavlaunch.aerix.client.TrinkiesInstaller.isSupportedInstance(instance)) {
+            net.kdt.pojavlaunch.aerix.client.TrinkiesInstaller.syncLocalAssetsAtGameStart(this, instance);
         }
         GameRunner.launchGame(this, account, instance, versionId, classpath, mGameRenderer);
         //Note that we actually stall in the above function, even if the game crashes. But let's be safe.

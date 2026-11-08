@@ -148,15 +148,17 @@ object AerixSkinServer {
         if (authType.injectorUrl != null) return emptyList()
 
         val isSlim = PojavAccountBridge.isSlimModelFor(context, account)
-        val isClientSession = runCatching {
-            net.kdt.pojavlaunch.instances.Instances.loadSelectedInstance()?.isAerixClient == true
+        val isTrinkiesSession = runCatching {
+            net.kdt.pojavlaunch.aerix.client.TrinkiesInstaller.isSupportedInstance(
+                net.kdt.pojavlaunch.instances.Instances.loadSelectedInstance()
+            )
         }.getOrDefault(false)
 
         val skinFile = PojavAccountBridge.customSkinFile(account)
         val capeFile = PojavAccountBridge.customCapeFile(account)
         val rawSkinBytes = if (skinFile.isFile && skinFile.length() > 0) skinFile.readBytes() else null
         val normalizedSkin = rawSkinBytes?.let { PojavAccountBridge.normalizeSkinBytesForGame(it) }
-        val skinBytes = if (isClientSession) {
+        val skinBytes = if (isTrinkiesSession) {
             net.kdt.pojavlaunch.aerix.client.AerixClientCosmetics.applyHatAccessoryToSkin(
                 context,
                 normalizedSkin,
@@ -165,7 +167,7 @@ object AerixSkinServer {
         } else {
             normalizedSkin
         }
-        val capeBytes = if (isClientSession) {
+        val capeBytes = if (isTrinkiesSession) {
             net.kdt.pojavlaunch.aerix.client.AerixClientCosmetics.resolveInGameCapeBytes(context)
                 ?: (if (capeFile.isFile && capeFile.length() > 0) capeFile.readBytes() else null)
         } else {

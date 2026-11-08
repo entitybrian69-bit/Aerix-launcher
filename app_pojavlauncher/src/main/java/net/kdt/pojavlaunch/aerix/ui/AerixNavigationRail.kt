@@ -105,6 +105,10 @@ enum class LauncherSection {
     /** Pages opened on top of a section (Mirai "Create New Instance", instance settings, account sign-in). */
     CREATE_INSTANCE,
     INSTANCE_EDITOR,
+    /** Home utility destinations; Back returns to the dashboard. */
+    QUICK_TOOLS,
+    INSTANCE_SELECTOR,
+    TRINKIES_WARDROBE,
     ADD_ACCOUNT,
     OFFLINE_ACCOUNT,
     AERIX_ACCOUNT,
@@ -210,22 +214,142 @@ fun AerixNavigationRail(
 
                 HorizontalDivider(modifier = Modifier.width(28.dp).padding(vertical = AerixSpacing.xxs), color = AerixSurface.borderSoft)
 
-                RailIconItem(R.drawable.aerix_ic_settings_filled, stringResource(R.string.aerix_nav_settings),
-                    settingsSelected(selectedSection), activeAccent, expandedRail, compactRail,
-                    onClick = { onNavigate(LauncherSection.SETTINGS) }, guideKey = AerixGuideState.SETTINGS)
+                // On Home these two utility destinations move to the right rail. The team entry
+                // remains here, so it is still reachable from every screen without duplicating the
+                // profile shortcut.
+                if (selectedSection != LauncherSection.HOME) {
+                    RailIconItem(R.drawable.aerix_ic_settings_filled, stringResource(R.string.aerix_nav_settings),
+                        settingsSelected(selectedSection), activeAccent, expandedRail, compactRail,
+                        onClick = { onNavigate(LauncherSection.SETTINGS) }, guideKey = AerixGuideState.SETTINGS)
+                }
 
                 RailIconItem(R.drawable.aerix_ic_group_outlined, stringResource(R.string.aerix_nav_contribution),
                     selectedSection == LauncherSection.CONTRIBUTION || selectedSection == LauncherSection.CONTRIBUTION_DETAIL,
                     activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.CONTRIBUTION) }
 
-                AccountAvatarRailButton(
-                    account = account,
-                    selected = selectedSection == LauncherSection.ACCOUNTS || selectedSection == LauncherSection.ADD_ACCOUNT || selectedSection == LauncherSection.OFFLINE_ACCOUNT,
-                    expanded = expandedRail,
-                    compact = compactRail,
-                    onClick = { onNavigate(LauncherSection.ACCOUNTS) }
-                )
+                if (selectedSection != LauncherSection.HOME) {
+                    AccountAvatarRailButton(
+                        account = account,
+                        selected = selectedSection == LauncherSection.ACCOUNTS || selectedSection == LauncherSection.ADD_ACCOUNT || selectedSection == LauncherSection.OFFLINE_ACCOUNT,
+                        expanded = expandedRail,
+                        compact = compactRail,
+                        onClick = { onNavigate(LauncherSection.ACCOUNTS) }
+                    )
+                }
             }
+        }
+    }
+}
+
+/** Utility rail shown beside the centered character on Home. The first three match the
+ * settings, profile and avatar destinations called out in the dashboard reference. */
+@Composable
+fun AerixHomeUtilityRail(
+    selectedSection: LauncherSection,
+    onNavigate: (LauncherSection) -> Unit,
+    onOpenProfile: () -> Unit,
+    onQuickTools: () -> Unit,
+    onInstances: () -> Unit,
+    onWardrobe: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val account = PojavAccountBridge.current
+    val activeAccent = AerixThemeManager.currentAccent()
+    val scrollState = rememberScrollState()
+    val configuration = LocalConfiguration.current
+    val compactRail = configuration.screenHeightDp < AERIX_COMPACT_HEIGHT_THRESHOLD_DP
+    val expandedRail = configuration.screenWidthDp >= 900 && !compactRail
+
+    Surface(
+        modifier = modifier
+            .width(if (expandedRail) AerixMetrics.expandedNavigationRailWidth else AerixMetrics.navigationRailWidth)
+            .fillMaxHeight()
+            .padding(start = AerixSpacing.xs, end = 2.dp, top = AerixSpacing.smPlus, bottom = AerixSpacing.smPlus)
+            .liquidGlass(shape = CircleShape, tint = AerixSurface.glassTint, strength = 0.94f, elevation = AerixMetrics.glassRailElevation),
+        shape = CircleShape,
+        color = Color.Transparent,
+        contentColor = Color.White
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxHeight()
+                .verticalScroll(scrollState)
+                .padding(vertical = if (compactRail) AerixSpacing.xs else AerixSpacing.smPlus),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(if (compactRail) AerixSpacing.xs else AerixSpacing.sm)
+        ) {
+            RailIconItem(
+                R.drawable.aerix_ic_settings_filled,
+                stringResource(R.string.aerix_nav_settings),
+                settingsSelected(selectedSection), activeAccent, expandedRail, compactRail,
+                guideKey = AerixGuideState.SETTINGS
+            ) { onNavigate(LauncherSection.SETTINGS) }
+            RailIconItem(
+                R.drawable.aerix_ic_person_outlined,
+                "Profile",
+                selectedSection == LauncherSection.SOCIALS,
+                activeAccent, expandedRail, compactRail
+            ) { onOpenProfile() }
+            AccountAvatarRailButton(
+                account = account,
+                selected = selectedSection == LauncherSection.ACCOUNTS ||
+                    selectedSection == LauncherSection.ADD_ACCOUNT ||
+                    selectedSection == LauncherSection.OFFLINE_ACCOUNT,
+                expanded = expandedRail,
+                compact = compactRail,
+                onClick = { onNavigate(LauncherSection.ACCOUNTS) }
+            )
+
+            HorizontalDivider(
+                modifier = Modifier.width(28.dp).padding(vertical = AerixSpacing.xxs),
+                color = AerixSurface.borderSoft
+            )
+
+            RailIconItem(
+                R.drawable.aerix_ic_build_outlined,
+                "Quick Tools",
+                selectedSection == LauncherSection.QUICK_TOOLS,
+                activeAccent, expandedRail, compactRail
+            ) { onQuickTools() }
+            RailIconItem(
+                R.drawable.aerix_ic_videogame_asset_outlined,
+                "Instances",
+                selectedSection == LauncherSection.INSTANCE_SELECTOR,
+                activeAccent, expandedRail, compactRail
+            ) { onInstances() }
+            RailIconItem(
+                R.drawable.aerix_ic_style_outlined,
+                "Cosmetics & Wardrobe",
+                selectedSection == LauncherSection.TRINKIES_WARDROBE,
+                activeAccent, expandedRail, compactRail
+            ) { onWardrobe() }
+            RailIconItem(
+                R.drawable.aerix_ic_dashboard_filled,
+                stringResource(R.string.aerix_nav_library),
+                librarySelected(selectedSection), activeAccent, expandedRail, compactRail
+            ) { onNavigate(LauncherSection.LIBRARY) }
+            RailIconItem(
+                R.drawable.aerix_ic_sports_esports_outlined,
+                "Servers",
+                selectedSection == LauncherSection.SERVERS,
+                activeAccent, expandedRail, compactRail
+            ) { onNavigate(LauncherSection.SERVERS) }
+            RailIconItem(
+                R.drawable.aerix_ic_public,
+                stringResource(R.string.aerix_nav_discover),
+                discoverSelected(selectedSection), activeAccent, expandedRail, compactRail
+            ) { onNavigate(LauncherSection.DISCOVER) }
+            RailIconItem(
+                R.drawable.aerix_ic_folder_outlined,
+                "Files",
+                selectedSection == LauncherSection.FILES,
+                activeAccent, expandedRail, compactRail
+            ) { onNavigate(LauncherSection.FILES) }
+            RailIconItem(
+                R.drawable.aerix_ic_description_outlined,
+                "Logs",
+                settingsSelected(selectedSection), activeAccent, expandedRail, compactRail
+            ) { onNavigate(LauncherSection.LOGS) }
         }
     }
 }

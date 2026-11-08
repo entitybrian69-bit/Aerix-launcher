@@ -3,9 +3,7 @@ package net.kdt.pojavlaunch.aerix.client
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.graphics.Canvas
 import android.graphics.Color as AndroidColor
-import android.graphics.Paint
 import net.kdt.pojavlaunch.aerix.social.SocialBackend
 import net.kdt.pojavlaunch.instances.Instances
 import java.io.ByteArrayOutputStream
@@ -210,6 +208,17 @@ object AerixClientCosmetics {
         return capes.first()
     }
 
+    private fun resolveImportedCapeBytes(): ByteArray? = runCatching {
+        val account = net.kdt.pojavlaunch.aerix.bridge.PojavAccountBridge.current ?: return@runCatching null
+        val file = net.kdt.pojavlaunch.aerix.bridge.PojavAccountBridge.customCapeFile(account.source)
+        if (!file.isFile || file.length() <= 0L) return@runCatching null
+        val bytes = file.readBytes()
+        val decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return@runCatching null
+        val valid = decoded.width in 22..1024 && decoded.height in 17..1024
+        decoded.recycle()
+        bytes.takeIf { valid }
+    }.getOrNull()
+
     /**
      * Generates a genuine `64×32` Minecraft Cape + Elytra PNG byte array served by `AerixSkinServer`:
      * - Front/Back/Sides Cape UV: `(0..21, 0..16)` (Front visible face = `1..10, 1..16`)
@@ -217,8 +226,11 @@ object AerixClientCosmetics {
      */
     fun resolveInGameCapeBytes(context: Context): ByteArray? = runCatching {
         AerixClientStore.init(context)
-        val spec = effectiveCapeSpec()
-        val bmp = buildAnimatedCapeFrameBitmap(spec, frameIndex = 0, totalFrames = 12)
+        if (AerixClientStore.equippedCapeId == "custom") {
+            resolveImportedCapeBytes()?.let { return@runCatching it }
+        }
+
+        val bmp = buildAnimatedCapeFrameBitmap(effectiveCapeSpec(), frameIndex = 0, totalFrames = 12)
         ByteArrayOutputStream().use { out ->
             bmp.compress(Bitmap.CompressFormat.PNG, 100, out)
             out.toByteArray()
@@ -234,22 +246,25 @@ object AerixClientCosmetics {
         runCatching {
             AerixClientStore.init(context)
             val spec = effectiveCapeSpec()
+            val importedCape = if (AerixClientStore.equippedCapeId == "custom") resolveImportedCapeBytes() else null
             val configDir = File(instanceGameDir, "config").apply { mkdirs() }
             val framesDir = File(configDir, "aerix_cape_frames").apply { mkdirs() }
 
             val total = 12
             for (i in 0 until total) {
-                val bmp = buildAnimatedCapeFrameBitmap(spec, frameIndex = i, totalFrames = total)
                 val outFile = File(framesDir, String.format(java.util.Locale.ROOT, "frame_%02d.png", i))
-                FileOutputStream(outFile).use { fos ->
-                    bmp.compress(Bitmap.CompressFormat.PNG, 100, fos)
+                if (importedCape != null) {
+                    FileOutputStream(outFile).use { it.write(importedCape) }
+                } else {
+                    val bmp = buildAnimatedCapeFrameBitmap(spec, frameIndex = i, totalFrames = total)
+                    FileOutputStream(outFile).use { fos -> bmp.compress(Bitmap.CompressFormat.PNG, 100, fos) }
                 }
             }
             val now = System.currentTimeMillis()
             val metaFile = File(framesDir, "meta.properties")
             metaFile.writeText(
                 buildString {
-                    appendLine("capeId=${spec.id}")
+                    appendLine("capeId=${if (importedCape != null) "custom" else spec.id}")
                     appendLine("frames=$total")
                     appendLine("waving=${AerixClientStore.wavingCapeEnabled}")
                     appendLine("updatedAtMs=$now")
@@ -280,7 +295,7 @@ object AerixClientCosmetics {
         runCatching {
             val all = Instances.loadAllInstances()
             for (inst in all) {
-                if (inst.isAerixClient || inst.name?.startsWith("Aerix Client", ignoreCase = true) == true) {
+                if (TrinkiesInstaller.isSupportedInstance(inst)) {
                     inst.gameDirectory?.let { syncCapeAssetsToInstance(context, it) }
                 }
             }
@@ -397,21 +412,78 @@ object AerixClientCosmetics {
         return bmp
     }
 
-    /**
-     * Preserved hook for `AerixSkinServer.kt`; returns [existingSkinPng] untouched when no hat is equipped.
-     */
+    /** Adds a small pixel-art headwear layer to the skin's outer head UV. */
     fun applyHatAccessoryToSkin(
         context: Context,
         existingSkinPng: ByteArray?,
         @Suppress("UNUSED_PARAMETER") slim: Boolean
     ): ByteArray? {
         AerixClientStore.init(context)
-        if (AerixClientStore.equippedHatId == "none" || existingSkinPng == null) return existingSkinPng
+        val hatId = AerixClientStore.equippedHatId
+        if (hatId == "none" || existingSkinPng == null) return existingSkinPng
         val decoded = BitmapFactory.decodeByteArray(existingSkinPng, 0, existingSkinPng.size) ?: return existingSkinPng
-        val copy = Bitmap.createBitmap(64, 64, Bitmap.Config.ARGB_8888)
-        Canvas(copy).drawBitmap(decoded, 0f, 0f, Paint().apply { isFilterBitmap = false })
+        if (decoded.width < 64 || decoded.height < 64) {
+            decoded.recycle()
+            return existingSkinPng
+        }
+        val copy = decoded.copy(Bitmap.Config.ARGB_8888, true) ?: run {
+            decoded.recycle()
+            return existingSkinPng
+        }
+        decoded.recycle()
+
+        fun px(x: Int, y: Int, color: Int) {
+            if (x in 32..63 && y in 0..15) copy.setPixel(x, y, color)
+        }
+        fun strip(color: Int, highlight: Int) {
+            // The four head-side UV faces form a wraparound band in the outer skin layer.
+            for (x in 32..63) {
+                px(x, 8, highlight)
+                px(x, 9, color)
+            }
+        }
+
+        when (hatId) {
+            "crimson_crown" -> {
+                strip(AndroidColor.rgb(128, 22, 43), AndroidColor.rgb(255, 209, 102))
+                for (x in 40..47) px(x, 10, AndroidColor.rgb(128, 22, 43))
+                listOf(40, 42, 45, 47).forEach { px(it, 7, AndroidColor.rgb(255, 209, 102)) }
+                px(43, 9, AndroidColor.WHITE)
+                px(44, 9, AndroidColor.rgb(255, 209, 102))
+            }
+            "void_horns" -> {
+                strip(AndroidColor.rgb(45, 24, 72), AndroidColor.rgb(184, 112, 255))
+                listOf(40 to 7, 40 to 6, 41 to 6, 46 to 7, 47 to 6, 46 to 6).forEach { (x, y) ->
+                    px(x, y, AndroidColor.rgb(205, 173, 255))
+                }
+                px(40, 8, AndroidColor.rgb(184, 112, 255))
+                px(47, 8, AndroidColor.rgb(184, 112, 255))
+            }
+            "frost_circlet" -> {
+                strip(AndroidColor.rgb(19, 72, 100), AndroidColor.rgb(145, 236, 255))
+                for (x in 41..46) px(x, 0, AndroidColor.rgb(204, 248, 255))
+                px(43, 1, AndroidColor.WHITE)
+                px(44, 1, AndroidColor.WHITE)
+            }
+            "sakura_bow" -> {
+                // A dark rose wrap plus a bright two-petal bow on the front head face.
+                strip(AndroidColor.rgb(110, 32, 68), AndroidColor.rgb(255, 179, 217))
+                px(41, 8, AndroidColor.rgb(255, 116, 176))
+                px(42, 7, AndroidColor.rgb(255, 179, 217))
+                px(43, 8, AndroidColor.rgb(255, 179, 217))
+                px(44, 7, AndroidColor.rgb(255, 179, 217))
+                px(45, 8, AndroidColor.rgb(255, 116, 176))
+                px(43, 9, AndroidColor.rgb(255, 235, 245))
+            }
+            else -> {
+                copy.recycle()
+                return existingSkinPng
+            }
+        }
+
         return ByteArrayOutputStream().use { out ->
             copy.compress(Bitmap.CompressFormat.PNG, 100, out)
+            copy.recycle()
             out.toByteArray()
         }
     }

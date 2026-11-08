@@ -46,6 +46,9 @@ object AerixNav {
     private val pageSections = setOf(
         LauncherSection.CREATE_INSTANCE,
         LauncherSection.INSTANCE_EDITOR,
+        LauncherSection.QUICK_TOOLS,
+        LauncherSection.INSTANCE_SELECTOR,
+        LauncherSection.TRINKIES_WARDROBE,
         LauncherSection.ADD_ACCOUNT,
         LauncherSection.OFFLINE_ACCOUNT,
         LauncherSection.AERIX_ACCOUNT,

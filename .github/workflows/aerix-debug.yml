@@ -74,6 +74,7 @@ jobs:
           python3 tests/discord_presence_logo_smoke.py
           python3 tests/modern_cape_smoke.py
           python3 tests/social_profile_cosmetics_smoke.py
+          python3 tests/trinkies_integration_smoke.py
           python3 tests/client_background_smoke.py
           python3 tests/instance_renderer_smoke.py
           python3 tests/fastclient_assets_smoke.py
