@@ -31,6 +31,7 @@
 package net.kdt.pojavlaunch.aerix.ui.screens
 
 import net.kdt.pojavlaunch.aerix.bridge.rememberControlLayoutCatalog
+import net.kdt.pojavlaunch.aerix.vulkan.VulkanDriverManager
 import android.text.format.DateFormat
 import android.text.format.Formatter
 import android.widget.Toast
@@ -1298,15 +1299,20 @@ private fun InstanceSettingsPane(
     }
 
     val vulkanDriverEntries = remember {
-        listOf(
-            "" to "Follow Global",
-            "default driver" to "default driver",
-            "turnip" to "Turnip (Adreno)",
-            "freedreno" to "Freedreno (KGSL)"
-        )
+        buildList {
+            add("" to "Follow Global")
+            add(VulkanDriverManager.SYSTEM_DRIVER to "System Vulkan driver")
+            add(VulkanDriverManager.TURNIP_DRIVER to "Turnip (built-in)")
+            VulkanDriverManager.installedDrivers(activity).forEach { driver -> add(driver.id to driver.name) }
+        }
     }
     var vulkanDriver by remember(instanceKey) {
-        mutableStateOf(prefs.getString("aerix_inst_vulkan_$instanceKey", "") ?: "")
+        mutableStateOf(
+            VulkanDriverManager.normalizeInstanceSelection(
+                activity,
+                prefs.getString("aerix_inst_vulkan_$instanceKey", "") ?: ""
+            )
+        )
     }
 
     val graphicsApiEntries = remember {

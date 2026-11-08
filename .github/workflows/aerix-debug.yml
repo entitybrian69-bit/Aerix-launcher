@@ -91,6 +91,7 @@ jobs:
           python3 tests/world_invite_chat_smoke.py
           python3 tests/servers_ui_smoke.py
           python3 tests/resourcepack_wiring_smoke.py
+          python3 tests/vulkan_driver_import_smoke.py
           if [[ "${{ contains(github.event.head_commit.message, '[pack-fixture]') }}" == "true" ]]; then
             AERIX_PACK_TEST_FILE="$RUNNER_TEMP/senpaider-animated.zip" python3 tests/senpaider_pack_diagnostics.py
           fi

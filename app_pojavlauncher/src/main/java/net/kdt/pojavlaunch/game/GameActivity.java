@@ -7,7 +7,6 @@ import static net.kdt.pojavlaunch.prefs.LauncherPreferences.PREF_ENABLE_GYRO;
 import static net.kdt.pojavlaunch.prefs.LauncherPreferences.PREF_SUSTAINED_PERFORMANCE;
 import static net.kdt.pojavlaunch.prefs.LauncherPreferences.PREF_USE_ALTERNATE_SURFACE;
 import static net.kdt.pojavlaunch.prefs.LauncherPreferences.PREF_VIRTUAL_MOUSE_START;
-import static net.kdt.pojavlaunch.prefs.LauncherPreferences.PREF_ZINK_PREFER_SYSTEM_DRIVER;
 
 import android.app.Activity;
 import android.app.AlertDialog;
@@ -58,6 +57,7 @@ import net.kdt.pojavlaunch.Tools;
 import net.kdt.pojavlaunch.authenticator.accounts.Accounts;
 import net.kdt.pojavlaunch.aerix.bridge.AerixPreferences;
 import net.kdt.pojavlaunch.aerix.bridge.AerixAccount;
+import net.kdt.pojavlaunch.aerix.vulkan.VulkanDriverManager;
 import net.kdt.pojavlaunch.aerix.ui.game.GameMenuCallbacks;
 import net.kdt.pojavlaunch.aerix.ui.game.GameMenuOverlayView;
 import net.kdt.pojavlaunch.customcontrols.ControlButtonMenuListener;
@@ -209,9 +209,19 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
             return;
         }
 
-        if(GpuUtils.getGlInfo().isAdreno() && !PREF_ZINK_PREFER_SYSTEM_DRIVER) {
-            mGameRenderer.overrideVulkanDriver();
+        String instanceDriverKey = instance.name != null ? instance.name : instance.versionId;
+        String vulkanDriverId = VulkanDriverManager.selectedDriverId(this, instanceDriverKey);
+        boolean useTurnip = !VulkanDriverManager.isSystemDriver(vulkanDriverId);
+        boolean adrenoGpu = GpuUtils.getGlInfo().isAdreno();
+        String customVulkanDriverPath = VulkanDriverManager.libraryDirectory(this, vulkanDriverId);
+        if (useTurnip && !adrenoGpu) {
+            Logger.appendToLog("Vulkan driver: Turnip is Adreno-only; falling back to the system Vulkan driver");
+            useTurnip = false;
+            customVulkanDriverPath = null;
         }
+        GameRenderer.configureVulkanDriver(customVulkanDriverPath, useTurnip);
+        if (useTurnip) mGameRenderer.overrideVulkanDriver();
+        Logger.appendToLog("Vulkan driver selection: " + (useTurnip ? vulkanDriverId : VulkanDriverManager.SYSTEM_DRIVER));
 
         AsyncAssetManager.extractDefaultSettings(this, instance.getGameDirectory());
         MCOptionUtils.load(instance.getGameDirectory().getAbsolutePath());

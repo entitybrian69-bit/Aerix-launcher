@@ -124,6 +124,7 @@ import net.kdt.pojavlaunch.aerix.bridge.PojavSetting
 import net.kdt.pojavlaunch.aerix.bridge.PojavSettingCategory
 import net.kdt.pojavlaunch.aerix.bridge.AerixRendererBrands
 import net.kdt.pojavlaunch.aerix.bridge.PojavSettingsBridge
+import net.kdt.pojavlaunch.aerix.vulkan.VulkanDriverManager
 import net.kdt.pojavlaunch.aerix.components.AerixGhostButton
 import net.kdt.pojavlaunch.aerix.components.AerixPillTab
 import net.kdt.pojavlaunch.aerix.components.AerixPillTabRow
@@ -383,9 +384,49 @@ private fun RendererTabContent(activity: FragmentActivity) {
     var currentMiraiRendererId by remember(revision) { mutableStateOf(getMiraiGlobalRendererId(activity)) }
     var autoSelected by remember(revision) { mutableStateOf(currentRenderer == defaultRendererId) }
     var globalVulkanDriver by remember(revision) {
-        mutableStateOf(
-            LauncherPreferences.DEFAULT_PREF.getString("aerix_global_vulkan_driver", "default driver")
-                ?: "default driver"
+        mutableStateOf(VulkanDriverManager.globalDriverId(activity))
+    }
+    val installedVulkanDrivers = remember(revision) { VulkanDriverManager.installedDrivers(activity) }
+    var showVulkanDriverImportWarning by remember { mutableStateOf(false) }
+    val vulkanDriverPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            PojavApplication.sExecutorService.execute {
+                val result = runCatching { VulkanDriverManager.importDriver(activity, uri) }
+                Tools.runOnUiThread {
+                    result.onSuccess { driver ->
+                        LauncherPreferences.DEFAULT_PREF.edit()
+                            .putString("aerix_global_vulkan_driver", driver.id)
+                            .apply()
+                        globalVulkanDriver = driver.id
+                        PojavSettingsBridge.writeBoolean(activity, "zinkPreferSystemDriver", false)
+                        Toast.makeText(activity, "Added and selected ${driver.name}.", Toast.LENGTH_LONG).show()
+                    }.onFailure { error ->
+                        Toast.makeText(
+                            activity,
+                            "Could not add Vulkan driver: ${error.message ?: "unsupported package"}",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
+            }
+        }
+    }
+    if (showVulkanDriverImportWarning) {
+        AlertDialog(
+            onDismissRequest = { showVulkanDriverImportWarning = false },
+            title = { Text("Add Vulkan driver") },
+            text = {
+                Text("Choose a compatible AdrenoTools or Turnip driver APK/ZIP. Only import native drivers from sources you trust; an incompatible driver can make Minecraft crash.")
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showVulkanDriverImportWarning = false
+                    vulkanDriverPicker.launch(arrayOf("*/*"))
+                }) { Text("Choose file") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showVulkanDriverImportWarning = false }) { Text("Cancel") }
+            }
         )
     }
     var globalGraphicsApi by remember(revision) {
@@ -741,12 +782,12 @@ private fun RendererTabContent(activity: FragmentActivity) {
         item {
             val showMgSettings = currentRenderer == Renderers.MOBILEGLUES_RENDERER ||
                 currentMiraiRendererId == Renderers.MOBILEGLUES_RENDERER
-            val vulkanDrivers = remember {
-                listOf(
-                    "default driver" to "default driver",
-                    "turnip" to "Turnip (Adreno)",
-                    "freedreno" to "Freedreno (KGSL)"
-                )
+            val vulkanDrivers = remember(installedVulkanDrivers) {
+                buildList {
+                    add(VulkanDriverManager.SYSTEM_DRIVER to "System Vulkan driver")
+                    add(VulkanDriverManager.TURNIP_DRIVER to "Turnip (built-in)")
+                    installedVulkanDrivers.forEach { driver -> add(driver.id to driver.name) }
+                }
             }
             val graphicsApis = remember {
                 listOf(
@@ -822,9 +863,9 @@ private fun RendererTabContent(activity: FragmentActivity) {
                     position = CardPosition.Middle,
                     items = vulkanDrivers,
                     currentId = globalVulkanDriver,
-                    defaultId = "default driver",
+                    defaultId = VulkanDriverManager.TURNIP_DRIVER,
                     title = "Global Vulkan Driver",
-                    summary = "Define the Vulkan driver to be used globally",
+                    summary = "Choose the Vulkan driver used by Zink and Vulkan mods",
                     getItemText = { it.second },
                     getItemId = { it.first },
                     trailingIcon = {
@@ -845,15 +886,26 @@ private fun RendererTabContent(activity: FragmentActivity) {
                     },
                     onValueChange = { item ->
                         globalVulkanDriver = item.first
-                        LauncherPreferences.DEFAULT_PREF.edit()
-                            .putString("aerix_global_vulkan_driver", item.first)
-                            .apply()
+                        val preferences = LauncherPreferences.DEFAULT_PREF.edit()
+                        if (item.first == VulkanDriverManager.SYSTEM_DRIVER || item.first == VulkanDriverManager.TURNIP_DRIVER) {
+                            preferences.remove("aerix_global_vulkan_driver")
+                        } else {
+                            preferences.putString("aerix_global_vulkan_driver", item.first)
+                        }
+                        preferences.apply()
                         PojavSettingsBridge.writeBoolean(
                             activity,
                             "zinkPreferSystemDriver",
-                            item.first == "default driver"
+                            item.first == VulkanDriverManager.SYSTEM_DRIVER
                         )
                     }
+                )
+                MiraiActionSettingsCard(
+                    position = CardPosition.Middle,
+                    title = "Add Vulkan Driver",
+                    summary = "Import a compatible AdrenoTools or Turnip APK/ZIP, then select it above",
+                    value = "Add",
+                    onClick = { showVulkanDriverImportWarning = true }
                 )
                 MiraiListSettingsCard(
                     position = CardPosition.Middle,
@@ -921,7 +973,7 @@ private fun RendererTabContent(activity: FragmentActivity) {
                     position = CardPosition.Middle,
                     title = "Use System Vulkan Driver",
                     summary = "When enabled, the launcher will force the use of the system's built-in Vulkan driver (for Adreno GPUs) instead of the default Turnip driver. This setting only affects the Zink backend and related mods that use Vulkan rendering",
-                    checked = LauncherPreferences.PREF_ZINK_PREFER_SYSTEM_DRIVER,
+                    checked = globalVulkanDriver == VulkanDriverManager.SYSTEM_DRIVER,
                     onCheckedChange = { PojavSettingsBridge.writeBoolean(activity, "zinkPreferSystemDriver", it) }
                 )
                 MiraiSwitchSettingsCard(
