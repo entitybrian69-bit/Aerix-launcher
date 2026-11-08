@@ -174,15 +174,15 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
     BackHandler(enabled = AerixNav.canGoBack) { AerixNav.back() }
 
     CompositionLocalProvider(LocalGuideRegistry provides guideRegistry) {
-    AerixBackground(forceBlurForDashboard = section == LauncherSection.HOME) {
+    AerixBackground {
       FestivalEffectsHost(festivals = festivals, modifier = Modifier.fillMaxSize()) {
         // The wallpaper and the festival effects run to the edges of the display; the shell
         // itself stays clear of the camera cutout and of the system bars.
         Box(modifier = Modifier.fillMaxSize().padding(AerixWindowInsets.padding())) {
             Row(modifier = Modifier.fillMaxSize()) {
-                // Socials owns its navigation, while Home uses a full-bleed game-menu layout with
-                // destinations in its compact top-right menu. The other pages keep the launcher rail.
-                if (section != LauncherSection.SOCIALS && section != LauncherSection.HOME) {
+                // The social space has its own sidebar and takes the whole window; every other
+                // section keeps the launcher's rail.
+                if (section != LauncherSection.SOCIALS) {
                     AerixNavigationRail(
                         selectedSection = section,
                         onNavigate = navigate,

@@ -7,10 +7,8 @@ page = (root/'aerix/ui/screens/AerixAccountSetupScreen.kt').read_text()
 cosmetics = (root/'aerix/ui/screens/SocialProfileScreen.kt').read_text()
 nav = (root/'aerix/ui/AerixLauncherScreen.kt').read_text()
 backend = (root/'aerix/social/SocialBackend.kt').read_text()
-dashboard = (root/'aerix/ui/screens/MinecraftHomeDashboard.kt').read_text()
-assert 'MinecraftHomeDashboard(' in home
-assert '"Accounts" to LauncherSection.ACCOUNTS' in dashboard
-assert '"Aerix account" to LauncherSection.AERIX_ACCOUNT' in dashboard
+assert home.count('AerixAccountHomeCard(accent, actions.aerixAccount)') == 2
+assert 'Sign in to Aerix account' in home
 assert 'LauncherSection.AERIX_ACCOUNT -> AerixAccountSetupScreen' in nav
 assert 'beginGoogleSignIn(activity, true)' in page and 'ProfileCosmeticsPage(activity, setupFlow = true' in page
 assert 'claimed != null && setupFlow' in cosmetics
