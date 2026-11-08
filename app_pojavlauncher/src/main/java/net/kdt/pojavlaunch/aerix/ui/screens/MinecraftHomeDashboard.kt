@@ -135,6 +135,7 @@ fun MinecraftHomeDashboard(
 
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val compact = maxHeight < 390.dp || maxWidth < 720.dp
+        val dashboardHeight = maxHeight
         val toolbarSize = if (compact) 36.dp else 40.dp
         val dockHeight = if (compact) 74.dp else 84.dp
         val socialHeight = if (compact) 32.dp else 38.dp
@@ -281,7 +282,7 @@ fun MinecraftHomeDashboard(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(
-                        top = maxOf(toolbarSize + 20.dp, maxHeight * 0.30f),
+                        top = maxOf(toolbarSize + 20.dp, dashboardHeight * 0.30f),
                         end = 16.dp
                     )
                     .width(promoWidth)
