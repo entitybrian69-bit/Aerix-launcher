@@ -30,7 +30,7 @@ for category in ('MODS', 'MODPACKS', 'RESOURCE_PACKS', 'SHADERS', 'WORLDS'):
     assert category in discover, category
 assert 'MinecraftHomeDashboard(' in home
 for feature in ('Discover', 'My skin', 'Play with friends', 'Find a party', 'Invite a friend',
-                'START HERE', 'Open chest', 'Help', 'Navigation menu', 'DropdownMenu(', 'Aerix Client',
+                'START HERE', 'Open chest', 'Help', 'Navigation menu', 'DropdownMenu(', 'Aerix Client', 'Aerix account',
                 'AerixSkinPreview3D(', 'ThemeMotion.rememberPulse'):
     assert feature in mc_home, feature
 assert 'aerix_ic_gift_filled' in mc_home

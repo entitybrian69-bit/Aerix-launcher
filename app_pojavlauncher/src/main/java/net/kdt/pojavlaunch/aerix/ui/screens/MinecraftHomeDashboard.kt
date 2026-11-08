@@ -765,6 +765,7 @@ private fun MinecraftToolbar(
             "Wallpapers" to LauncherSection.WALLPAPERS,
             "Logs" to LauncherSection.LOGS,
             "Accounts" to LauncherSection.ACCOUNTS,
+            "Aerix account" to LauncherSection.AERIX_ACCOUNT,
             "Settings" to LauncherSection.SETTINGS,
             "About" to LauncherSection.ABOUT
         )
