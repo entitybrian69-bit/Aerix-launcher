@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.CircularProgressIndicator
@@ -132,7 +131,7 @@ private fun InstanceSelectorRow(
             modifier = Modifier.fillMaxWidth().padding(horizontal = AerixSpacing.sm, vertical = AerixSpacing.xs),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            AerixImageWell(instance.icon, R.drawable.aerix_ic_videogame_asset_outlined, 38.dp, AerixRadii.tiny)
+            AerixImageWell(instance.icon, R.drawable.aerix_ic_videogame_asset_outlined, 38.dp, radius = AerixRadii.tiny)
             Spacer(Modifier.width(AerixSpacing.sm))
             Column(Modifier.weight(1f).clickable(onClick = onSelect).padding(vertical = AerixSpacing.xs)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {

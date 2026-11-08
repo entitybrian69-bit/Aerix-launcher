@@ -223,7 +223,7 @@ private fun RecentInstanceRow(
             modifier = Modifier.fillMaxWidth().padding(horizontal = AerixSpacing.sm, vertical = AerixSpacing.xs),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            AerixImageWell(instance.icon, R.drawable.aerix_ic_videogame_asset_outlined, 32.dp, AerixRadii.tiny)
+            AerixImageWell(instance.icon, R.drawable.aerix_ic_videogame_asset_outlined, 32.dp, radius = AerixRadii.tiny)
             Spacer(Modifier.width(AerixSpacing.sm))
             Column(Modifier.weight(1f).clickable(onClick = onSelect).padding(vertical = 4.dp)) {
                 Text(instance.name, color = AerixSurface.textPrimary, fontSize = 12.sp,
