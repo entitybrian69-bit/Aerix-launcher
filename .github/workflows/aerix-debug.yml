@@ -85,6 +85,7 @@ jobs:
           python3 tests/font_styles_smoke.py
           python3 tests/glass_launcher_ui_smoke.py
           python3 tests/blocky_shell_smoke.py
+          python3 tests/millida_shell_smoke.py
           python3 tests/rust_removed_smoke.py
           python3 tests/offline_username_smoke.py
           python3 tests/aerix_cloud_skin_smoke.py

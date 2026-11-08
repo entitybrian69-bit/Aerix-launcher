@@ -3,6 +3,12 @@
 > This file is the **"Remember this"** record for the launcher's new identity. It is not a
 > proposal or a roadmap: it is the set of rules the shell is built to, and the checklist to
 > re-apply whenever the UI changes again.
+>
+> **Update (2026-11-08):** the user then asked to "Make the ui like the millida launcher one".
+> The Millida-style shell in `docs/millida-shell.md` is now the default HOME look. This Blocky
+> Shell remains intact as the second appearance option (turn off `millidaUi` in Settings); its
+> living 3D character, emote engine, square-wave sound, stepped motion and real-action wiring
+> are shared with the Millida shell, so nothing in this contract was deleted.
 
 ## 1. The rules, as given
 

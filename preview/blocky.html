@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aerix · Blocky Shell preview</title>
+<style>
+@font-face {
+  font-family: "Blocky";
+  src: url("/app_pojavlauncher/src/main/res/font/minecraft_ten.ttf") format("truetype");
+  font-display: swap;
+}
+:root {
+  --ink: #07090d;
+  --panel: rgba(17, 24, 36, .93);
+  --white: #f7faff;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  font-family: "Blocky", "Courier New", monospace;
+  background: #0b1a24;
+  color: var(--white);
+  overflow: hidden;
+}
+.bg {
+  position: fixed; inset: 0;
+  background-image: url("/app_pojavlauncher/src/main/assets/wallpapers/wp_27_blocky_plaza.jpg");
+  background-size: cover;
+  background-position: center;
+  image-rendering: pixelated;
+}
+.scrim {
+  position: fixed; inset: 0;
+  background: linear-gradient(180deg, rgba(7,12,20,.42) 0%, rgba(7,12,20,.10) 45%, rgba(7,12,20,.72) 100%);
+}
+.shell {
+  position: relative;
+  height: 100%;
+  padding: 8px 14px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sunburst {
+  height: 12px; flex: none;
+  background-image: url("/app_pojavlauncher/src/main/res/drawable-nodpi/aerix_blocky_sun.png");
+  background-repeat: repeat-x;
+  background-size: auto 12px;
+  image-rendering: pixelated;
+}
+.panel {
+  background: var(--panel);
+  border: 4px solid var(--ink);
+  box-shadow: 7px 7px 0 rgba(5,7,11,.86);
+}
+header {
+  flex: none; height: 58px;
+  display: flex; align-items: center; gap: 8px;
+}
+.brand {
+  width: 58px; height: 58px; flex: none;
+  display: grid; place-items: center;
+  background: #5a64d8; border: 4px solid var(--ink);
+  box-shadow: 4px 4px 0 rgba(5,7,11,.86);
+}
+.brand img { width: 36px; image-rendering: pixelated; }
+.brand-copy { flex: 1; min-width: 0; }
+.brand-copy h1 { margin: 0; font-size: 19px; letter-spacing: 1px; }
+.brand-copy p { margin: 2px 0 0; font-size: 8px; opacity: .85; }
+.chrome {
+  width: 44px; height: 44px; flex: none;
+  display: grid; place-items: center;
+  border: 4px solid var(--ink);
+  box-shadow: 4px 4px 0 rgba(5,7,11,.86);
+  cursor: pointer;
+  transition: transform 140ms steps(6, end), box-shadow 140ms steps(6, end);
+}
+.chrome img { width: 24px; image-rendering: pixelated; }
+.chrome:active, .card:active, .emote:active, .dock-tile:active, .chip:active {
+  transform: translate(4px, 4px);
+  box-shadow: 0 0 0 rgba(5,7,11,0);
+}
+main { flex: 1; min-height: 0; display: flex; gap: 12px; }
+.stage { flex: 0 0 44%; display: flex; flex-direction: column; min-height: 0; }
+.char { flex: 1; min-height: 0; position: relative; }
+#skin-container { position: absolute; inset: 6px; display: flex; align-items: center; justify-content: center; }
+#skin-container canvas { display: block; width: 100%; height: 100%; }
+.fallback {
+  position: absolute; inset: 0; margin: auto; height: 86%;
+  image-rendering: pixelated; pointer-events: none; display: none;
+}
+.tag {
+  position: absolute; top: 10px; padding: 5px 8px;
+  background: rgba(17,24,36,.95); border: 3px solid var(--ink);
+  font-size: 9px; white-space: nowrap;
+}
+.tag.left { left: 10px; }
+.tag.right { right: 10px; background: #22b8d6; }
+.divide { height: 5px; flex: none; background: var(--ink); }
+.deck { flex: none; padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+.deck-row { display: flex; gap: 6px; }
+.chip {
+  padding: 5px 8px; font-size: 9px; white-space: nowrap;
+  background: #8b5cf6; border: 3px solid var(--ink); cursor: pointer;
+  transition: transform 140ms steps(6, end), box-shadow 140ms steps(6, end);
+  box-shadow: 3px 3px 0 rgba(5,7,11,.86);
+}
+.chip.auto { background: #4ea83c; }
+.chip.auto.off { background: #54637a; }
+.emote {
+  flex: 1; min-width: 0; height: 40px;
+  display: flex; align-items: center; justify-content: center; gap: 4px;
+  border: 4px solid var(--ink); box-shadow: 5px 5px 0 rgba(5,7,11,.86);
+  cursor: pointer; font-size: 8px; white-space: nowrap;
+  transition: transform 140ms steps(6, end), box-shadow 140ms steps(6, end);
+}
+.emote img { width: 18px; image-rendering: pixelated; }
+.options { flex: 1; min-width: 0; padding: 9px; }
+.grid { height: 100%; display: grid; grid-template-columns: 1fr 1fr; grid-auto-rows: 1fr; gap: 9px; }
+.card {
+  position: relative; overflow: hidden;
+  display: flex; align-items: center; gap: 9px;
+  padding: 8px 10px; min-width: 0;
+  border: 4px solid var(--ink); box-shadow: 6px 6px 0 rgba(5,7,11,.86);
+  cursor: pointer;
+  transition: transform 140ms steps(6, end), box-shadow 140ms steps(6, end);
+}
+.card::before { content: ""; position: absolute; inset: 0; opacity: .38; pointer-events: none; }
+.card img, .card .copy { position: relative; z-index: 1; }
+.card img { width: 26px; height: 26px; flex: none; image-rendering: pixelated; }
+.card .copy { min-width: 0; }
+.card .copy b { display: block; font-size: 12px; font-weight: normal; white-space: nowrap; overflow: hidden; }
+.card .copy span { display: block; font-size: 8px; opacity: .95; white-space: nowrap; overflow: hidden; }
+.card .bang {
+  position: relative; z-index: 1; margin-left: auto; flex: none;
+  width: 20px; height: 20px; display: grid; place-items: center;
+  background: #f4f6fa; border: 2px solid var(--ink); font-size: 12px; color: #dc4351;
+}
+.spikes { height: 16px; flex: none; background: repeating-linear-gradient(90deg,
+  #3f9a3a 0 4px, transparent 4px 12px, #3f9a3a 12px 18px, transparent 18px 24px);
+  border-bottom: 3px solid var(--ink); }
+footer { flex: none; height: 84px; padding: 8px; display: flex; align-items: center; gap: 8px; }
+.dock-tile {
+  height: 100%; display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; border: 4px solid var(--ink);
+  box-shadow: 5px 5px 0 rgba(5,7,11,.86); cursor: pointer;
+  transition: transform 140ms steps(6, end), box-shadow 140ms steps(6, end);
+}
+.dock-tile.instance { flex: 1.25; }
+.dock-tile.play { flex: .9; }
+.dock-tile.square { width: 58px; flex: none; justify-content: center; }
+.dock-tile img { width: 26px; image-rendering: pixelated; }
+.dock-tile .copy { min-width: 0; }
+.dock-tile .copy b { display: block; font-size: 13px; font-weight: normal; white-space: nowrap; }
+.dock-tile .copy span { display: block; font-size: 8px; opacity: .9; white-space: nowrap; }
+.progress { display: flex; gap: 2px; margin-top: 5px; height: 9px; }
+.progress i { flex: 1; background: #1b2735; border: 1px solid var(--ink); }
+.progress i.on { background: #f2b933; }
+.note {
+  position: fixed; right: 12px; bottom: 8px; font-size: 8px; opacity: .55;
+}
+@media (max-width: 900px) {
+  body { overflow: auto; }
+  .shell { height: auto; min-height: 100%; }
+  main { flex-direction: column; }
+  .stage { flex: none; height: 400px; }
+  .options { flex: none; height: 480px; }
+  footer { flex-wrap: wrap; height: auto; }
+}
+</style>
+</head>
+<body>
+<div class="bg"></div><div class="scrim"></div>
+<div class="shell">
+  <div class="sunburst"></div>
+  <header>
+    <div class="brand"><img src="/app_pojavlauncher/src/main/res/drawable-nodpi/aerix_blocky_ic_sun.png" alt=""></div>
+    <div class="brand-copy"><h1>AERIX</h1><p>BLOCKY LAUNCHER · PICK A BLOCK</p></div>
+    <div class="chrome" style="background:#dc4351" data-emote="action"><img src="/app_pojavlauncher/src/main/res/drawable-nodpi/aerix_blocky_ic_grid.png" alt="All blocks"></div>
+    <div class="chrome" style="background:#2e7ad4" data-emote="wave"><img src="/app_pojavlauncher/src/main/res/drawable-nodpi/aerix_blocky_ic_accounts.png" alt="Accounts"></div>
+    <div class="chrome" style="background:#54637a" data-emote="action"><img src="/app_pojavlauncher/src/main/res/drawable-nodpi/aerix_blocky_ic_settings.png" alt="Settings"></div>
+    <div class="chrome" style="background:#f2b933" data-emote="jump"><img src="/app_pojavlauncher/src/main/res/drawable-nodpi/aerix_blocky_ic_sound.png" alt="Sound"></div>
+    <div class="chrome" style="background:#18a98d" data-emote="wave"><img src="/app_pojavlauncher/src/main/res/drawable-nodpi/aerix_blocky_ic_help.png" alt="Help"></div>
+  </header>
+  <main>
+    <section class="stage panel">
+      <div class="char">
+        <div id="skin-container"></div>
+        <img class="fallback" id="fallback" src="/preview/blocky-player.png" alt="Player">
+        <div class="tag left" id="nameTag">STEVE</div>
+        <div class="tag right">3D</div>
+      </div>
+      <div class="divide"></div>
+      <div class="deck">
+        <div class="deck-row">
+          <div class="chip" id="status">IDLE</div>
+          <div class="chip auto" id="auto">AUTO</div>
+        </div>
+        <div class="deck-row" id="emoteDeck"></div>
+      </div>
+    </section>
+    <section class="options panel"><div class="grid" id="grid"></div></section>
+  </main>
+  <div class="spikes"></div>
+  <footer class="panel">
+    <div class="dock-tile instance" style="background:#2e7ad4" data-emote="action">
+      <img src="/app_pojavlauncher/src/main/res/drawable-nodpi/aerix_blocky_ic_mod.png" alt="">
+      <div class="copy"><span>START HERE</span><b>Aerix Client 1.16.5</b><span>1.16.5 · Fabric</span></div>
+    </div>
+    <div class="dock-tile play" style="background:#4ea83c" data-emote="cheer">
+      <img src="/app_pojavlauncher/src/main/res/drawable-nodpi/aerix_blocky_ic_play.png" alt="">
+      <div class="copy"><b>PLAY</b><div class="progress" id="progress"></div></div>
+    </div>
+    <div class="dock-tile square" style="background:#f2b933" data-emote="dance"><img src="/app_pojavlauncher/src/main/res/drawable-nodpi/aerix_blocky_ic_gift.png" alt="Chest"></div>
+    <div class="dock-tile square" style="background:#18a98d" data-emote="wave"><img src="/app_pojavlauncher/src/main/res/drawable-nodpi/aerix_blocky_ic_help.png" alt="Help"></div>
+  </footer>
+</div>
+<div class="note">LIVE PREVIEW · real WebGL character · tap any block</div>
+
+<script src="/app_pojavlauncher/src/main/assets/skinview/skinview3d.bundle.js"></script>
+<script src="/app_pojavlauncher/src/main/assets/skinview/skinview.js"></script>
+<script>
+const ICON = "/app_pojavlauncher/src/main/res/drawable-nodpi/aerix_blocky_ic_";
+const P = {
+  CHECKER: "repeating-conic-gradient(#000 0 25%, transparent 0 50%) 0 0 / 32px 32px",
+  STRIPES: "repeating-linear-gradient(90deg, #000 0 8px, transparent 8px 16px)",
+  DOTS: "radial-gradient(#000 35%, transparent 36%) 0 0 / 16px 16px",
+  STEPS: "repeating-linear-gradient(0deg, #000 0 8px, transparent 8px 24px)",
+  GRID: "repeating-linear-gradient(90deg, #000 0 2px, transparent 2px 16px), repeating-linear-gradient(0deg, #000 0 2px, transparent 2px 16px)",
+  BRICKS: "repeating-linear-gradient(90deg, #000 0 2px, transparent 2px 16px), repeating-linear-gradient(0deg, #000 0 2px, transparent 2px 16px)",
+  BOLTS: "repeating-linear-gradient(45deg, #000 0 6px, transparent 6px 18px)"
+};
+const OPTIONS = [
+  ["PLAY", "Launch your instance", "play", "#4ea83c", "CHECKER", "cheer"],
+  ["LIBRARY", "Instances & versions", "library", "#2e7ad4", "STEPS", "action"],
+  ["WARDROBE", "Skins, capes & hats", "wardrobe", "#8b5cf6", "CHECKER", "wave"],
+  ["COMPANION MOD", "Client & cosmetics", "mod", "#f07b2f", "STEPS", "action"],
+  ["FRIENDS", "Party & messages", "friends", "#22b8d6", "BOLTS", "wave"],
+  ["DISCOVER", "Mods & modpacks", "discover", "#ee6fa8", "DOTS", "wave"],
+  ["SERVERS", "Play together", "globe", "#5a64d8", "STRIPES", "jump"],
+  ["ACCOUNTS", "Sign in & profiles", "accounts", "#c744b8", "BOLTS", "wave"],
+  ["SETTINGS", "Launcher options", "settings", "#54637a", "BRICKS", "action"],
+  ["CONTENT", "Mods, packs & saves", "folder", "#18a98d", "GRID", "action"],
+  ["WALLPAPERS", "Themes & backdrops", "sun", "#f2b933", "STRIPES", "jump"],
+  ["CHEST", "Unlock a wallpaper", "gift", "#a26a46", "CHECKER", "dance"]
+];
+const EMOTES = [
+  ["wave", "WAVING", "#22b8d6", "BOLTS"],
+  ["dance", "DANCING", "#ee6fa8", "DOTS"],
+  ["jump", "JUMPING", "#8cc63f", "DOTS"],
+  ["action", "ACTION", "#f07b2f", "STEPS"]
+];
+const LABEL = {wave:"WAVING", dance:"DANCING", jump:"JUMPING", action:"ACTION", cheer:"CHEERING", idle:"IDLE"};
+const FREQ = {wave:[523,659,784], dance:[392,523,659,784], jump:[294,440,587,880],
+              action:[196,294,392], cheer:[523,659,784,1046], idle:[330]};
+
+let audio = null;
+function beep(name) {
+  try {
+    if (!audio) audio = new (window.AudioContext || window.webkitAudioContext)();
+    const notes = FREQ[name] || FREQ.wave;
+    notes.forEach((f, i) => {
+      const o = audio.createOscillator(), g = audio.createGain();
+      o.type = "square"; o.frequency.value = f;
+      // Four-step envelope: blocky, never a smooth fade.
+      g.gain.setValueAtTime(0.05, audio.currentTime + i * 0.06);
+      g.gain.setValueAtTime(0.035, audio.currentTime + i * 0.06 + 0.02);
+      g.gain.setValueAtTime(0.02, audio.currentTime + i * 0.06 + 0.04);
+      g.gain.setValueAtTime(0, audio.currentTime + i * 0.06 + 0.06);
+      o.connect(g); g.connect(audio.destination);
+      o.start(audio.currentTime + i * 0.06);
+      o.stop(audio.currentTime + i * 0.06 + 0.07);
+    });
+  } catch (_) {}
+}
+
+function emote(name) {
+  const id = LABEL[name] ? name : "wave";
+  document.getElementById("status").textContent = LABEL[id];
+  beep(id);
+  try { playEmote(id, 2600); } catch (_) {}
+  window.clearTimeout(window.__idleTimer);
+  window.__idleTimer = window.setTimeout(() => {
+    document.getElementById("status").textContent = "IDLE";
+    try { startIdleMotion(true); } catch (_) {}
+  }, 2700);
+}
+
+const grid = document.getElementById("grid");
+OPTIONS.forEach(([title, sub, icon, fill, pattern, reaction], i) => {
+  const el = document.createElement("div");
+  el.className = "card";
+  el.style.background = fill;
+  el.innerHTML = '<div class="card-bg" style="position:absolute;inset:0;opacity:.30;background:' + P[pattern] + '"></div>' +
+    '<img src="' + ICON + icon + '.png" alt="">' +
+    '<div class="copy"><b>' + title + '</b><span>' + sub + '</span></div>' +
+    (i === 11 ? '<div class="bang">!</div>' : '');
+  el.addEventListener("click", () => emote(reaction));
+  grid.appendChild(el);
+});
+
+const deck = document.getElementById("emoteDeck");
+EMOTES.forEach(([id, label, fill, pattern]) => {
+  const el = document.createElement("div");
+  el.className = "emote";
+  el.style.background = fill;
+  el.innerHTML = '<div style="position:absolute;inset:0;opacity:.3;background:' + P[pattern] + '"></div>' +
+    '<img src="' + ICON + id + '.png" alt=""><span>' + label + '</span>';
+  el.style.position = "relative";
+  el.addEventListener("click", () => emote(id));
+  deck.appendChild(el);
+});
+
+const progress = document.getElementById("progress");
+for (let i = 0; i < 10; i++) progress.appendChild(document.createElement("i"));
+let step = 0;
+setInterval(() => {
+  step = (step + 1) % 11;
+  [...progress.children].forEach((el, i) => el.className = i < step ? "on" : "");
+}, 700);
+
+document.querySelectorAll("[data-emote]").forEach(el =>
+  el.addEventListener("click", () => emote(el.dataset.emote)));
+
+let auto = true;
+const autoChip = document.getElementById("auto");
+autoChip.addEventListener("click", () => {
+  auto = !auto;
+  autoChip.classList.toggle("off", !auto);
+  beep(auto ? "jump" : "action");
+  if (auto) emote("jump");
+});
+
+// Load the real skin and keep the render loop alive. loadSkin() is fire-and-forget in
+// skinview.js, so the idle loop is started once the texture has had a moment to decode.
+let hasViewer = false;
+try { hasViewer = typeof skinViewer !== "undefined" && skinViewer !== null; } catch (_) {}
+if (hasViewer) {
+  try {
+    loadSkin("/app_pojavlauncher/src/main/assets/steve.png");
+    setTimeout(() => { try { startIdleMotion(true); } catch (_) {} }, 500);
+  } catch (_) {
+    document.getElementById("fallback").style.display = "block";
+  }
+} else {
+  document.getElementById("fallback").style.display = "block";
+}
+
+// The character emotes on its own, exactly like the app.
+setInterval(() => { if (auto) emote(["wave","dance","jump","action","cheer"][Math.floor(Math.random()*5)]); }, 8000);
+setTimeout(() => emote("wave"), 1200);
+</script>
+</body>
+</html>

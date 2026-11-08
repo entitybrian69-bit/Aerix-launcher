@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aerix · Millida-style shell preview</title>
+<style>
+@font-face {
+  font-family: "Pixel";
+  src: url("/app_pojavlauncher/src/main/res/font/minecraft_ten.ttf") format("truetype");
+  font-display: swap;
+}
+:root {
+  --bg: #141416;
+  --bar: #101012;
+  --panel: #1e1e21;
+  --soft: #29292d;
+  --chip: #333337;
+  --ink: #08080a;
+  --shadow: #070708;
+  --text: #f4f4f6;
+  --muted: #a6a6ae;
+  --green: #5cd65c;
+  --green-dark: #2f8a34;
+  --blue: #1d4ea8;
+  --blue-dark: #102f6c;
+  --orange: #b8791a;
+  --pink: #b3204b;
+  --purple: #5b3d9e;
+  --teal: #177a7a;
+  --yellow: #e8c84a;
+  --notch: 7px;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  font-family: "Pixel", "Courier New", monospace;
+  background: var(--bg);
+  color: var(--text);
+  overflow: hidden;
+  -webkit-font-smoothing: none;
+}
+img { image-rendering: pixelated; }
+/* Millida's signature: four corners cut away by one square step, hard offset shadow. */
+.notch {
+  position: relative;
+  background: var(--fill, var(--panel));
+  clip-path: polygon(
+    var(--notch) 0, calc(100% - var(--notch)) 0,
+    calc(100% - var(--notch)) var(--notch), 100% var(--notch),
+    100% calc(100% - var(--notch)), calc(100% - var(--notch)) calc(100% - var(--notch)),
+    calc(100% - var(--notch)) 100%, var(--notch) 100%,
+    var(--notch) calc(100% - var(--notch)), 0 calc(100% - var(--notch)),
+    0 var(--notch), var(--notch) var(--notch)
+  );
+  box-shadow: inset 0 0 0 2px var(--ink);
+  filter: drop-shadow(5px 5px 0 var(--shadow));
+}
+.press { transition: transform 140ms steps(6, end), filter 140ms steps(6, end); cursor: pointer; }
+.press:active { transform: translate(4px, 4px); filter: drop-shadow(0 0 0 transparent); }
+.shell { height: 100%; display: flex; flex-direction: column; padding: 8px 12px 0; gap: 10px; }
+.topbar { flex: none; height: 52px; display: flex; align-items: center; gap: 8px; }
+.account { height: 48px; min-width: 210px; display: flex; align-items: center; gap: 9px; padding: 0 12px; --fill: var(--panel); }
+.account img { width: 32px; height: 32px; }
+.account b { display: block; font-size: 13px; }
+.account small { display: block; font-size: 9px; color: var(--muted); margin-top: 3px; }
+.spacer { flex: 1; }
+.square { width: 46px; height: 46px; display: grid; place-items: center; --fill: var(--soft); }
+.square img { width: 24px; height: 24px; }
+.body { flex: 1; min-height: 0; display: flex; gap: 12px; }
+.col { display: flex; flex-direction: column; gap: 10px; }
+.left, .right { width: 210px; flex: none; }
+.center { flex: 1; min-width: 0; }
+.hdr { font-size: 15px; flex: none; }
+.hdr span { float: right; color: var(--green); font-size: 10px; cursor: pointer; }
+.promo { flex: 1; min-height: 88px; display: flex; flex-direction: column; overflow: hidden; }
+.promo .art { flex: 1; display: grid; place-items: center; position: relative; overflow: hidden; }
+.promo .art::before {
+  content: ""; position: absolute; width: 260px; height: 260px; left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  background: repeating-conic-gradient(from 0deg, rgba(255,255,255,.13) 0deg 7deg, transparent 7deg 15deg);
+}
+.promo .art img { width: 46px; height: 46px; position: relative; z-index: 1; }
+.promo .label { flex: none; background: var(--tone); padding: 7px 10px; }
+.promo .label b { display: block; font-size: 11px; }
+.promo .label small { display: block; font-size: 9px; color: #ececf0; margin-top: 2px; }
+.stage { flex: 1; min-height: 0; position: relative; overflow: hidden; background: #103a18; }
+.stage::before {
+  content: ""; position: absolute; width: 900px; height: 900px; left: 50%; top: 54%;
+  transform: translate(-50%, -50%);
+  background: repeating-conic-gradient(from 0deg, #2c7a32 0deg 8deg, #103a18 8deg 16deg);
+}
+.spark { position: absolute; width: 5px; height: 5px; background: rgba(120,255,150,.3); }
+#skin-container { position: absolute; inset: 8px 0 42px; display: flex; align-items: center; justify-content: center; z-index: 2; }
+#skin-container canvas { display: block; width: 100%; height: 100%; }
+.fallback { position: absolute; inset: 0; margin: auto; height: 78%; display: none; z-index: 2; }
+.grass { position: absolute; bottom: 0; left: 0; right: 0; height: 40px; background: #1d5a22; z-index: 1; }
+.grass::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 10px; background: #3c9c3e; }
+.grass::after {
+  content: ""; position: absolute; top: 15px; left: 0; right: 0; height: 7px;
+  background: repeating-linear-gradient(90deg, #1d5a22 0 7px, transparent 7px 24px);
+}
+.pose { position: absolute; top: 10px; right: 10px; display: flex; flex-direction: column; gap: 6px; z-index: 3; align-items: flex-end; }
+.pose .chip { padding: 7px 10px; font-size: 9px; --fill: var(--chip); }
+.pose .chip.on { --fill: var(--green); color: var(--ink); }
+.stage-tags { position: absolute; top: 10px; left: 10px; display: flex; flex-direction: column; gap: 6px; z-index: 3; align-items: flex-start; }
+.stage-tags .chip { padding: 7px 10px; font-size: 9px; --fill: var(--chip); }
+.stage-tags .chip.auto { --fill: var(--green); color: var(--ink); }
+.party { position: absolute; bottom: 48px; left: 50%; transform: translateX(-50%); display: flex; gap: 6px; z-index: 3; }
+.party .chip { padding: 6px 9px; font-size: 9px; display: flex; align-items: center; gap: 5px; --fill: var(--soft); white-space: nowrap; }
+.party .chip img { width: 14px; height: 14px; }
+.dock { flex: none; height: 88px; display: flex; gap: 10px; }
+.start { flex: 1.3; display: flex; align-items: center; gap: 10px; padding: 0 10px; --fill: var(--blue); }
+.start .chest { width: 58px; height: 60px; display: grid; place-items: center; --fill: var(--blue-dark); --notch: 5px; }
+.start .chest img { width: 34px; height: 34px; }
+.start .line { min-width: 0; }
+.start small { display: block; font-size: 9px; color: var(--yellow); }
+.start b { display: block; font-size: 15px; margin: 3px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.start em { display: block; font-size: 9px; color: #d8e2f8; font-style: normal; }
+.play { flex: 0.85; display: flex; align-items: center; justify-content: center; gap: 10px; --fill: var(--green); color: var(--ink); font-size: 20px; font-weight: bold; }
+.play img { width: 26px; height: 26px; }
+.play small { display: block; font-size: 9px; font-weight: normal; }
+.build { width: 100%; flex: none; height: 132px; display: flex; flex-direction: column; padding: 9px; }
+.build .tile { flex: 1; display: grid; place-items: center; }
+.build .tile img { width: 42px; height: 42px; }
+.build .cap { background: var(--blue-dark); padding: 6px; }
+.build .cap b { display: block; font-size: 10px; }
+.build .cap small { display: block; font-size: 9px; color: #e2e2e8; }
+.tabbar { flex: none; height: 64px; display: flex; align-items: flex-end; gap: 4px; background: var(--bar); margin: 0 -12px; padding: 0 10px 4px; }
+.tab { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; cursor: pointer; }
+.tab .box { width: 100%; height: 40px; display: grid; place-items: center; --notch: 5px; --fill: transparent; box-shadow: none; filter: none; }
+.tab.on .box { --fill: var(--green); box-shadow: inset 0 0 0 2px var(--ink); filter: drop-shadow(4px 4px 0 var(--shadow)); height: 46px; }
+.tab img { width: 24px; height: 24px; }
+.tab span { font-size: 9px; color: var(--muted); }
+.tab.on span { color: var(--ink); }
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="topbar">
+    <div class="account notch">
+      <img src="/app_pojavlauncher/src/main/res/drawable-nodpi/aerix_millida_ic_player.png" alt="">
+      <div><b>Player2773</b><small>Ready to play</small></div>
+    </div>
+    <div class="spacer"></div>
+    <div class="square notch press" data-emote="wave"><img src="/app_pojavlauncher/src/main/res/drawable-nodpi/aerix_millida_ic_friends.png" alt=""></div>
+    <div class="square notch press" data-emote="action"><img src="/app_pojavlauncher/src/main/res/drawable-nodpi/aerix_millida_ic_settings.png" alt=""></div>
+  </div>
+
+  <div class="body">
+    <div class="col left">
+      <div class="promo notch press" style="--tone:var(--pink);--fill:#741431" data-emote="dance">
+        <div class="art"><img src="/app_pojavlauncher/src/main/res/drawable-nodpi/aerix_millida_ic_gift.png" alt=""></div>
+        <div class="label"><b>Shop</b><small>Capes &amp; cosmetics</small></div>
+      </div>
+      <div class="promo notch press" style="--tone:var(--blue);--fill:var(--blue-dark)" data-emote="wave">
+        <div class="art"><img src="/app_pojavlauncher/src/main/res/drawable-nodpi/aerix_millida_ic_skin.png" alt=""></div>
+        <div class="label"><b>My skin</b><small>Upload your own</small></div>
+      </div>
+      <div class="promo notch press" style="--tone:var(--green);--fill:var(--green-dark)" data-emote="cheer">
+        <div class="art"><img src="/app_pojavlauncher/src/main/res/drawable-nodpi/aerix_millida_ic_friends.png" alt=""></div>
+        <div class="label"><b>Play with friends</b><small>Free · parties</small></div>
+      </div>
+    </div>
+
+    <div class="col center">
+      <div class="stage">
+        <div id="skin-container"></div>
+        <img id="fallback" class="fallback" src="/app_pojavlauncher/src/main/res/drawable-nodpi/aerix_millida_ic_player.png" alt="">
+        <div class="grass"></div>
+        <div class="stage-tags">
+          <div class="chip notch auto" id="auto">AUTO</div>
+          <div class="chip notch" id="status">IDLE</div>
+        </div>
+        <div class="pose">
+          <div class="chip notch on" data-pose="idle">STAND</div>
+          <div class="chip notch" data-pose="wave">WAVE</div>
+          <div class="chip notch" data-pose="dance">DANCE</div>
+        </div>
+        <div class="party">
+          <div class="chip notch" data-emote="wave"><img src="/app_pojavlauncher/src/main/res/drawable-nodpi/aerix_millida_ic_friends.png" alt="">FIND A PARTY</div>
+          <div class="chip notch" data-emote="cheer"><img src="/app_pojavlauncher/src/main/res/drawable-nodpi/aerix_millida_ic_gift.png" alt="">INVITE A FRIEND</div>
+        </div>
+      </div>
+      <div class="dock">
+        <div class="start notch press" data-emote="action">
+          <div class="chest notch"><img src="/app_pojavlauncher/src/main/res/drawable-nodpi/aerix_millida_ic_chest.png" alt=""></div>
+          <div class="line"><small>START HERE</small><b>Aerix Client 1.21.4</b><em>Fabric · 1.21.4</em></div>
+        </div>
+        <div class="play notch press" data-emote="cheer">
+          <img src="/app_pojavlauncher/src/main/res/drawable-nodpi/aerix_millida_ic_arrow.png" alt="">
+          <div>PLAY<small>0h played</small></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col right">
+      <div class="hdr">MY BUILDS <span data-emote="action">ALL &gt;</span></div>
+      <div class="build notch press" style="--fill:var(--panel)" data-emote="jump">
+        <div class="tile"><img src="/app_pojavlauncher/src/main/res/drawable-nodpi/aerix_millida_ic_plus.png" alt=""></div>
+        <b style="font-size:10px">NEW BUILD</b>
+      </div>
+      <div class="build notch press" style="--fill:var(--orange)" data-emote="action">
+        <div class="tile"><img src="/app_pojavlauncher/src/main/res/drawable-nodpi/aerix_millida_ic_chest.png" alt=""></div>
+        <div class="cap"><b>Aerix Client 1.21.4</b><small>Fabric · 1.21.4</small></div>
+      </div>
+      <div class="build notch press" style="--fill:var(--teal)" data-emote="wave">
+        <div class="tile"><img src="/app_pojavlauncher/src/main/res/drawable-nodpi/aerix_millida_ic_controller.png" alt=""></div>
+        <div class="cap" style="background:#0e4f4f"><b>Companion mod</b><small>Client &amp; HUD</small></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tabbar" id="tabs">
+    <div class="tab on" data-tab="play"><div class="box notch"><img src="/app_pojavlauncher/src/main/res/drawable-nodpi/aerix_millida_ic_grass.png" alt=""></div><span>Play</span></div>
+    <div class="tab" data-tab="catalog"><div class="box notch"><img src="/app_pojavlauncher/src/main/res/drawable-nodpi/aerix_millida_ic_book.png" alt=""></div><span>Catalog</span></div>
+    <div class="tab" data-tab="character"><div class="box notch"><img src="/app_pojavlauncher/src/main/res/drawable-nodpi/aerix_millida_ic_player.png" alt=""></div><span>Character</span></div>
+    <div class="tab" data-tab="shop"><div class="box notch"><img src="/app_pojavlauncher/src/main/res/drawable-nodpi/aerix_millida_ic_emerald.png" alt=""></div><span>Shop</span></div>
+    <div class="tab" data-tab="more"><div class="box notch"><img src="/app_pojavlauncher/src/main/res/drawable-nodpi/aerix_millida_ic_dots.png" alt=""></div><span>More</span></div>
+  </div>
+</div>
+
+<script src="/app_pojavlauncher/src/main/assets/skinview/skinview3d.bundle.js"></script>
+<script src="/app_pojavlauncher/src/main/assets/skinview/skinview.js"></script>
+<script>
+const ICON = "/app_pojavlauncher/src/main/res/drawable-nodpi/aerix_millida_ic_";
+const LABEL = {wave:"WAVING", dance:"DANCING", jump:"JUMPING", action:"ACTION", cheer:"CHEERING", idle:"IDLE"};
+const FREQ = {wave:[523,659,784], dance:[392,523,659,784], jump:[294,440,587,880],
+              action:[196,294,392], cheer:[523,659,784,1046], idle:[330]};
+
+let audio = null;
+function beep(name) {
+  try {
+    if (!audio) audio = new (window.AudioContext || window.webkitAudioContext)();
+    const notes = FREQ[name] || FREQ.wave;
+    notes.forEach((f, i) => {
+      const o = audio.createOscillator(), g = audio.createGain();
+      o.type = "square"; o.frequency.value = f;
+      // Four-step envelope: blocky, never a smooth fade.
+      g.gain.setValueAtTime(0.05, audio.currentTime + i * 0.06);
+      g.gain.setValueAtTime(0.035, audio.currentTime + i * 0.06 + 0.02);
+      g.gain.setValueAtTime(0.02, audio.currentTime + i * 0.06 + 0.04);
+      g.gain.setValueAtTime(0, audio.currentTime + i * 0.06 + 0.06);
+      o.connect(g); g.connect(audio.destination);
+      o.start(audio.currentTime + i * 0.06);
+      o.stop(audio.currentTime + i * 0.06 + 0.07);
+    });
+  } catch (_) {}
+}
+
+function emote(name) {
+  const id = LABEL[name] ? name : "wave";
+  document.getElementById("status").textContent = LABEL[id];
+  document.querySelectorAll(".pose .chip").forEach(el =>
+    el.classList.toggle("on", el.dataset.pose === id || (id === "idle" && el.dataset.pose === "idle")));
+  beep(id);
+  try { playEmote(id, 2600); } catch (_) {}
+  window.clearTimeout(window.__idleTimer);
+  window.__idleTimer = window.setTimeout(() => {
+    document.getElementById("status").textContent = "IDLE";
+    document.querySelectorAll(".pose .chip").forEach(el =>
+      el.classList.toggle("on", el.dataset.pose === "idle"));
+    try { startIdleMotion(true); } catch (_) {}
+  }, 2700);
+}
+
+document.querySelectorAll("[data-emote]").forEach(el =>
+  el.addEventListener("click", () => emote(el.dataset.emote)));
+document.querySelectorAll("[data-pose]").forEach(el =>
+  el.addEventListener("click", () => emote(el.dataset.pose)));
+document.querySelectorAll("#tabs .tab").forEach(el =>
+  el.addEventListener("click", () => {
+    document.querySelectorAll("#tabs .tab").forEach(t => t.classList.remove("on"));
+    el.classList.add("on");
+    beep("action");
+    emote("wave");
+  }));
+let auto = true;
+document.getElementById("auto").addEventListener("click", () => {
+  auto = !auto;
+  document.getElementById("auto").classList.toggle("auto", auto);
+  document.getElementById("auto").textContent = auto ? "AUTO" : "AUTO OFF";
+  beep(auto ? "jump" : "action");
+  if (auto) emote("jump");
+});
+
+// Sparkles over the grass stage, in hard square pixels.
+const stage = document.querySelector(".stage");
+[[.12,.18],[.27,.34],[.74,.14],[.86,.31],[.18,.63],[.81,.68],[.41,.09],[.63,.79],[.07,.44],[.94,.52]]
+  .forEach(([x,y]) => {
+    const s = document.createElement("div");
+    s.className = "spark";
+    s.style.left = (x*100) + "%"; s.style.top = (y*100) + "%";
+    stage.appendChild(s);
+  });
+
+// Load the real skin and keep the render loop alive. loadSkin() is fire-and-forget in
+// skinview.js, so the idle loop is started once the texture has had a moment to decode.
+let hasViewer = false;
+try { hasViewer = typeof skinViewer !== "undefined" && skinViewer !== null; } catch (_) {}
+if (hasViewer) {
+  try {
+    loadSkin("/app_pojavlauncher/src/main/assets/steve.png");
+    setTimeout(() => { try { startIdleMotion(true); } catch (_) {} }, 500);
+  } catch (_) {
+    document.getElementById("fallback").style.display = "block";
+  }
+} else {
+  document.getElementById("fallback").style.display = "block";
+}
+
+// The character emotes on its own, exactly like the app.
+setInterval(() => { if (auto) emote(["wave","dance","jump","action","cheer"][Math.floor(Math.random()*5)]); }, 8000);
+setTimeout(() => emote("wave"), 1200);
+</script>
+</body>
+</html>

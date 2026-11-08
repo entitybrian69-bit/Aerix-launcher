@@ -163,9 +163,10 @@ assert "guideAnchor(AerixGuideState.PLAY)" in shell_src
 # --------------------------------------------------------------------------------------
 assert "val blockyActive = section == LauncherSection.HOME" in launcher_src
 assert "AerixPreferences.blockyUi && !AerixGuideState.running" in launcher_src
-assert "!blockyActive" in launcher_src
-assert "AerixBackground(skipWallpaper = blockyActive && AerixPreferences.blockyBackdrop)" in launcher_src
-assert "if (blockyActive) BlockyShellScreen(activity, navigate)" in launcher_src
+assert "!shellActive" in launcher_src  # the Millida shell also hides the rail
+assert ("AerixBackground(skipWallpaper = shellActive && "
+            "(millidaActive || AerixPreferences.blockyBackdrop))") in launcher_src
+assert "blockyActive -> BlockyShellScreen(activity, navigate)" in launcher_src
 assert "skipWallpaper: Boolean = false" in bg_src and "AerixThemeManager.WALLPAPER_NONE" in bg_src
 assert "wp_27_blocky_plaza" in read(theme_manager)
 for key in ("KEY_BLOCKY_UI", "KEY_BLOCKY_SOUND", "KEY_BLOCKY_EMOTES", "KEY_BLOCKY_BACKDROP"):

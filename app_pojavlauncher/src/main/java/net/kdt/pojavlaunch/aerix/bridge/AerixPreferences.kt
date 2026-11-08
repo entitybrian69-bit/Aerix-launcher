@@ -86,6 +86,8 @@ object AerixPreferences {
     const val KEY_BLOCKY_EMOTES = "aerixBlockyEmotes"
     /** Blocky Shell: draw the crisp pixel plaza instead of the chosen wallpaper. */
     const val KEY_BLOCKY_BACKDROP = "aerixBlockyBackdrop"
+    /** Millida-style shell: notched pixel panels, grass stage and a five-tab bottom bar. */
+    const val KEY_MILLIDA_UI = "aerixMillidaUi"
 
     const val DEFAULT_CUSTOM_COLOR = 0xFF8DEFE0.toInt()
     const val DEFAULT_BACKGROUND_OPACITY = 60
@@ -143,6 +145,9 @@ object AerixPreferences {
     var loadingWallpaper by mutableStateOf(false)
         private set
 
+    /** Millida-style shell on HOME. Takes precedence over the Blocky Shell when both are on. */
+    var millidaUi by mutableStateOf(true)
+        private set
     /** Blocky Shell on HOME. Off restores the classic glass dashboard immediately. */
     var blockyUi by mutableStateOf(true)
         private set
@@ -234,6 +239,7 @@ object AerixPreferences {
         discordAppId = p.getString(KEY_DISCORD_APP_ID, "") ?: ""
         discordGameProfileMode = p.getBoolean(KEY_DISCORD_GAME_PROFILE_MODE, true)
         discordClickableLinks = p.getBoolean(KEY_DISCORD_CLICKABLE_LINKS, true)
+        millidaUi = p.getBoolean(KEY_MILLIDA_UI, true)
         blockyUi = p.getBoolean(KEY_BLOCKY_UI, true)
         blockySound = p.getBoolean(KEY_BLOCKY_SOUND, true)
         blockyEmotes = p.getBoolean(KEY_BLOCKY_EMOTES, true)
@@ -346,6 +352,11 @@ object AerixPreferences {
     fun saveGuidePlayed(value: Boolean) {
         guidePlayed = value
         edit { putBoolean(KEY_GUIDE_PLAYED, value) }
+    }
+
+    fun saveMillidaUi(value: Boolean) {
+        millidaUi = value
+        edit { putBoolean(KEY_MILLIDA_UI, value) }
     }
 
     fun saveBlockyUi(value: Boolean) {

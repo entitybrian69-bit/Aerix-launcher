@@ -661,4 +661,86 @@
     <string name="aerix_settings_blocky_emotes_sub">Let the 3D character dance, jump, wave and perform actions on its own.</string>
     <string name="aerix_settings_blocky_backdrop">Pixel plaza backdrop</string>
     <string name="aerix_settings_blocky_backdrop_sub">Draw the crisp blocky plaza instead of the selected wallpaper.</string>
+
+    <!-- Millida-style shell: near-black chrome, notched pixel panels, lime-green Play. -->
+    <string name="aerix_settings_millida_ui">Millida-style shell</string>
+    <string name="aerix_settings_millida_ui_sub">Use notched pixel panels, a grass character stage and a five-tab bottom bar on Home. Turn off for the Blocky Shell or the classic dashboard.</string>
+
+    <string name="aerix_millida_tab_play">Play</string>
+    <string name="aerix_millida_tab_catalog">Catalog</string>
+    <string name="aerix_millida_tab_character">Character</string>
+    <string name="aerix_millida_tab_shop">Shop</string>
+    <string name="aerix_millida_tab_more">More</string>
+
+    <string name="aerix_millida_start_here">START HERE</string>
+    <string name="aerix_millida_no_instance">No build yet</string>
+    <string name="aerix_millida_instance_hint">Tap to choose a build</string>
+    <string name="aerix_millida_play">PLAY</string>
+    <string name="aerix_millida_downloading">DOWNLOADING</string>
+    <string name="aerix_millida_build">BUILD</string>
+    <string name="aerix_millida_manage">Manage builds</string>
+    <string name="aerix_millida_my_builds">MY BUILDS</string>
+    <string name="aerix_millida_all">ALL</string>
+    <string name="aerix_millida_new_build">NEW BUILD</string>
+    <string name="aerix_millida_where_to_play">WHERE TO PLAY</string>
+    <string name="aerix_millida_servers_sub">Public server list</string>
+    <string name="aerix_millida_pose_stand">STAND</string>
+    <string name="aerix_millida_pose_wave">WAVE</string>
+    <string name="aerix_millida_pose_dance">DANCE</string>
+    <string name="aerix_millida_auto">AUTO</string>
+    <string name="aerix_millida_3d">3D</string>
+    <string name="aerix_millida_no_account">No account</string>
+    <string name="aerix_millida_account_ready">Ready to play</string>
+    <string name="aerix_millida_account_signin">Add an account</string>
+    <string name="aerix_millida_account_expired">Session expired</string>
+    <string name="aerix_millida_find_party">FIND A PARTY</string>
+    <string name="aerix_millida_invite">INVITE A FRIEND</string>
+    <string name="aerix_millida_more_title">MORE</string>
+    <string name="aerix_millida_help_title">HOW TO PLAY</string>
+    <string name="aerix_millida_close">CLOSE</string>
+    <string name="aerix_millida_classic">Back to classic dashboard</string>
+    <string name="aerix_millida_sound">Sound</string>
+    <string name="aerix_millida_reward_title">CHEST UNLOCKED</string>
+    <string name="aerix_millida_chest">DAILY CHEST</string>
+    <string name="aerix_millida_help">HELP</string>
+
+    <string name="aerix_millida_card_shop">Shop</string>
+    <string name="aerix_millida_card_shop_sub">Capes &amp; cosmetics</string>
+    <string name="aerix_millida_card_skin">My skin</string>
+    <string name="aerix_millida_card_skin_sub">Upload your own</string>
+    <string name="aerix_millida_card_friends">Play with friends</string>
+    <string name="aerix_millida_card_friends_sub">Free · parties</string>
+    <string name="aerix_millida_card_discord">Join our Discord</string>
+    <string name="aerix_millida_card_discord_sub">Community &amp; help</string>
+    <string name="aerix_millida_card_servers">Servers</string>
+    <string name="aerix_millida_card_client">Companion mod</string>
+    <string name="aerix_millida_card_client_sub">Client &amp; HUD</string>
+    <string name="aerix_millida_card_news">Rewards</string>
+    <string name="aerix_millida_card_news_sub">Chest &amp; news</string>
+
+    <string name="aerix_millida_entry_library">Build codes</string>
+    <string name="aerix_millida_entry_library_sub">Instances &amp; loaders</string>
+    <string name="aerix_millida_entry_discover">Catalog</string>
+    <string name="aerix_millida_entry_discover_sub">Mods &amp; modpacks</string>
+    <string name="aerix_millida_entry_content">Content</string>
+    <string name="aerix_millida_entry_content_sub">Packs, saves &amp; mods</string>
+    <string name="aerix_millida_entry_wallpapers">Wallpapers</string>
+    <string name="aerix_millida_entry_wallpapers_sub">Themes &amp; backdrops</string>
+    <string name="aerix_millida_entry_downloads">Downloads</string>
+    <string name="aerix_millida_entry_downloads_sub">Queue &amp; progress</string>
+    <string name="aerix_millida_entry_logs">Settings</string>
+    <string name="aerix_millida_entry_logs_sub">Sound, theme, memory</string>
+    <string name="aerix_millida_entry_chest">Screenshots</string>
+    <string name="aerix_millida_entry_chest_sub">Daily reward chest</string>
+    <string name="aerix_millida_entry_help">Help</string>
+    <string name="aerix_millida_entry_help_sub">Guide &amp; invite</string>
+
+    <string name="aerix_millida_tone_play">Play</string>
+    <string name="aerix_millida_tone_instance">Start here</string>
+    <string name="aerix_millida_tone_builds">Builds</string>
+    <string name="aerix_millida_tone_shop">Shop</string>
+    <string name="aerix_millida_tone_character">Character</string>
+    <string name="aerix_millida_tone_social">Friends</string>
+    <string name="aerix_millida_tone_servers">Servers</string>
+    <string name="aerix_millida_tone_news">News</string>
 </resources>

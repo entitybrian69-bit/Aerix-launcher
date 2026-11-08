@@ -236,6 +236,15 @@ let currentEmoteAnimation = null;
 /** Play an emote, then fall back to the living idle pose. */
 function playEmote(name, durationMs) {
     if (!skinViewer) return;
+    // Millida-style pose chips include a STAND chip: go straight back to the living idle pose.
+    if (name === 'idle') {
+        if (emoteTimer) clearTimeout(emoteTimer);
+        emoteTimer = null;
+        currentEmoteAnimation = null;
+        startIdleMotion(true);
+        notifyEmote('idle');
+        return;
+    }
     const anim = makeEmoteAnimation(name);
     if (!anim) return;
     if (emoteTimer) clearTimeout(emoteTimer);

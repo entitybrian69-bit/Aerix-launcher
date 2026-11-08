@@ -1462,12 +1462,20 @@ private fun LauncherTabContent(activity: FragmentActivity) {
             DiscordPresenceSettingsCard()
         }
 
-        // Blocky Shell: the new launcher identity, its chiptune sound, autonomous emotes and
-        // crisp pixel backdrop. Every switch is a real opt-out back to the classic dashboard.
+        // Home appearance: the Millida-style shell is the default; turning it off reveals the
+        // Blocky Shell, and turning both off restores the classic glass dashboard. The chiptune
+        // sound, autonomous emotes and crisp pixel backdrop are shared by both shells.
         item {
             SettingsCardColumn(modifier = Modifier.fillMaxWidth()) {
                 MiraiSwitchSettingsCard(
                     position = CardPosition.Top,
+                    title = stringResource(R.string.aerix_settings_millida_ui),
+                    summary = stringResource(R.string.aerix_settings_millida_ui_sub),
+                    checked = AerixPreferences.millidaUi,
+                    onCheckedChange = { AerixPreferences.saveMillidaUi(it) }
+                )
+                MiraiSwitchSettingsCard(
+                    position = CardPosition.Middle,
                     title = stringResource(R.string.aerix_settings_blocky_ui),
                     summary = stringResource(R.string.aerix_settings_blocky_ui_sub),
                     checked = AerixPreferences.blockyUi,

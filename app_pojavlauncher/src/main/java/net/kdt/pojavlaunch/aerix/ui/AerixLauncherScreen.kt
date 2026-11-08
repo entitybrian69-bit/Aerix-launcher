@@ -83,6 +83,7 @@ import net.kdt.pojavlaunch.aerix.ui.screens.AboutScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.AccountsScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.AerixAccountSetupScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.BlockyShellScreen
+import net.kdt.pojavlaunch.aerix.ui.screens.MillidaShellScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.AddAccountScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.AerixContribution
 import net.kdt.pojavlaunch.aerix.ui.screens.ContributionDetailScreen
@@ -145,10 +146,15 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
     val transitionType = AerixPreferences.swapAnimateType
     val extent = AerixPreferences.extentScale()
     val festivals = rememberTodayFestivals()
-    // The Blocky Shell replaces the whole shell (rail included) on HOME. During the first-run
-    // tour the classic dashboard comes back so the guide's anchors stay where they were authored.
-    val blockyActive = section == LauncherSection.HOME &&
+    // The Millida-style shell (default) and the Blocky Shell both replace the whole shell
+    // (rail included) on HOME. Millida takes precedence; turning it off falls back to the
+    // Blocky Shell, and turning both off restores the classic glass dashboard. During the
+    // first-run tour the classic dashboard comes back so the guide anchors stay as authored.
+    val millidaActive = section == LauncherSection.HOME &&
+        AerixPreferences.millidaUi && !AerixGuideState.running
+    val blockyActive = section == LauncherSection.HOME && !millidaActive &&
         AerixPreferences.blockyUi && !AerixGuideState.running
+    val shellActive = millidaActive || blockyActive
     // The first-run tour: components register where they are, the overlay highlights them.
     // Wait until the first-time Notification ON/OFF popup has been answered so they never overlap.
     val guideRegistry = remember { GuideRegistry() }
@@ -179,7 +185,7 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
     BackHandler(enabled = AerixNav.canGoBack) { AerixNav.back() }
 
     CompositionLocalProvider(LocalGuideRegistry provides guideRegistry) {
-    AerixBackground(skipWallpaper = blockyActive && AerixPreferences.blockyBackdrop) {
+    AerixBackground(skipWallpaper = shellActive && (millidaActive || AerixPreferences.blockyBackdrop)) {
       FestivalEffectsHost(festivals = festivals, modifier = Modifier.fillMaxSize()) {
         // The wallpaper and the festival effects run to the edges of the display; the shell
         // itself stays clear of the camera cutout and of the system bars.
@@ -187,7 +193,7 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
             Row(modifier = Modifier.fillMaxSize()) {
                 // The social space has its own sidebar and takes the whole window; every other
                 // section keeps the launcher's rail.
-                if (section != LauncherSection.SOCIALS && !blockyActive) {
+                if (section != LauncherSection.SOCIALS && !shellActive) {
                     AerixNavigationRail(
                         selectedSection = section,
                         onNavigate = navigate,
@@ -201,13 +207,16 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
                 ) {
                     AnimatedContent(
                         targetState = section,
-                        transitionSpec = { sectionTransition(transitionType, duration, extent, blockyActive) },
+                        transitionSpec = { sectionTransition(transitionType, duration, extent, shellActive) },
                         label = "aerixSection"
                     ) { target ->
                         when (target) {
                             LauncherSection.OTHER_RELEASES -> net.kdt.pojavlaunch.aerix.ui.screens.OtherReleasesScreen(activity, navigate)
-                            LauncherSection.HOME -> if (blockyActive) BlockyShellScreen(activity, navigate)
-                            else HomeScreen(activity, navigate)
+                            LauncherSection.HOME -> when {
+                                millidaActive -> MillidaShellScreen(activity, navigate)
+                                blockyActive -> BlockyShellScreen(activity, navigate)
+                                else -> HomeScreen(activity, navigate)
+                            }
                             LauncherSection.AERIX_CLIENT -> ClientHubScreen(activity, clientOwnerPage) { clientOwnerPage = it }
                             LauncherSection.LIBRARY -> LibraryScreen(activity)
                             LauncherSection.SERVERS -> ServersScreen(activity)
