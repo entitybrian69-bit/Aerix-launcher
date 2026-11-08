@@ -17,7 +17,7 @@ import android.widget.Toast;
 
 import com.kdt.mcgui.ProgressLayout;
 
-import net.kdt.pojavlaunch.LauncherPreferences;
+import net.kdt.pojavlaunch.prefs.LauncherPreferences;
 import net.kdt.pojavlaunch.R;
 import net.kdt.pojavlaunch.Tools;
 
