@@ -22,12 +22,13 @@ public class GamepadMapStore {
         return mapStore;
     }
 
-    private static void loadIfNecessary() {
-        if(sMapStore == null) return;
-        load();
+    /** Load the stored maps once, before the first controller event is dispatched. */
+    public static synchronized void ensureLoaded() {
+        if (sMapStore == null) load();
     }
 
-    public static void load() {
+    /** Force a reload after the user changes mappings. */
+    public static synchronized void load() {
         GamepadMapStore mapStore = null;
         if(STORE_FILE.exists() && STORE_FILE.canRead()) {
             try {
@@ -41,20 +42,20 @@ public class GamepadMapStore {
         sMapStore = mapStore;
     }
 
-    public static void save() throws IOException {
-        if(sMapStore == null) throw new RuntimeException("Must load map store first!");
+    public static synchronized void save() throws IOException {
+        ensureLoaded();
         FileUtils.ensureParentDirectory(STORE_FILE);
         String jsonData = Tools.GLOBAL_GSON.toJson(sMapStore);
         Tools.write(STORE_FILE, jsonData);
     }
 
-    public static GamepadMap getGameMap() {
-        loadIfNecessary();
+    public static synchronized GamepadMap getGameMap() {
+        ensureLoaded();
         return sMapStore.mInGameMap;
     }
 
-    public static GamepadMap getMenuMap() {
-        loadIfNecessary();
+    public static synchronized GamepadMap getMenuMap() {
+        ensureLoaded();
         return sMapStore.mInMenuMap;
     }
 }

@@ -118,6 +118,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 import net.kdt.pojavlaunch.R
+import net.kdt.pojavlaunch.aerix.components.bringFocusedItemIntoView
 import net.kdt.pojavlaunch.aerix.bridge.AerixPreferences
 import net.kdt.pojavlaunch.aerix.bridge.PojavAccountBridge
 import net.kdt.pojavlaunch.aerix.theme.AerixLauncherTheme
@@ -1720,7 +1721,7 @@ private fun ClientResourcePacksPage(gameDir: File?) {
                     Text(pack.name, color = Color.White, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(if (pack.queued != null) "Queued: ${if (selected) "on" else "off"}" else if (pack.active) "Selected" else "Not selected", color = LiquidCrystalPalette.TextMuted, fontSize = 10.sp)
                 }
-                Switch(checked = selected, onCheckedChange = { value ->
+                Switch(modifier = Modifier.bringFocusedItemIntoView(), checked = selected, onCheckedChange = { value ->
                     if (gameDir != null) scope.launch {
                         val result = withContext(Dispatchers.IO) { runCatching { ClientInstanceOptions.queuePack(gameDir, pack.name, value) } }
                         result.exceptionOrNull()?.let { Toast.makeText(context, it.message ?: "Could not queue pack", Toast.LENGTH_LONG).show() }
@@ -1938,7 +1939,7 @@ private fun ClientInformationToggle(label: String, checked: Boolean, onChange: (
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween) {
         Text(label, color = Color.White, fontSize = 12.sp)
-        Switch(checked = checked, onCheckedChange = { onChange(it); AerixClientStore.persist() })
+        Switch(modifier = Modifier.bringFocusedItemIntoView(), checked = checked, onCheckedChange = { onChange(it); AerixClientStore.persist() })
     }
 }
 
@@ -2065,7 +2066,7 @@ private fun ClientPerformancePage(gameDir: File?, onClose: () -> Unit) {
         PerformanceChoice("FPS limit", "maxFps", options, listOf("30" to "30", "60" to "60", "120" to "120", "260" to "Unlimited"))
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Animated item textures · next launch", color = Color.White, fontSize = 11.sp)
-            Switch(checked = AerixClientStore.packVanillaAnimatedGear, onCheckedChange = {
+            Switch(modifier = Modifier.bringFocusedItemIntoView(), checked = AerixClientStore.packVanillaAnimatedGear, onCheckedChange = {
                 AerixClientStore.packVanillaAnimatedGear = it
                 AerixClientStore.persist()
             })

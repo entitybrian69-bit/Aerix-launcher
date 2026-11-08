@@ -67,6 +67,7 @@ import net.kdt.pojavlaunch.R
 import net.kdt.pojavlaunch.aerix.bridge.AerixAccount
 import net.kdt.pojavlaunch.aerix.bridge.PojavAccountBridge
 import net.kdt.pojavlaunch.aerix.components.AerixImageWell
+import net.kdt.pojavlaunch.aerix.components.bringFocusedItemIntoView
 import net.kdt.pojavlaunch.aerix.components.liquidGlass
 import net.kdt.pojavlaunch.aerix.theme.AERIX_COMPACT_HEIGHT_THRESHOLD_DP
 import net.kdt.pojavlaunch.aerix.theme.AerixMetrics
@@ -151,6 +152,7 @@ fun AerixNavigationRail(
                 Column(
                     modifier = Modifier
                         .clip(RoundedCornerShape(AerixRadii.panelSmall))
+                        .bringFocusedItemIntoView()
                         .clickable(role = Role.Button) { onNavigate(LauncherSection.HOME) }
                         .semantics { contentDescription = "Aerix Home" }
                         .padding(vertical = AerixSpacing.xs),
@@ -295,6 +297,7 @@ private fun RailIconItem(
             .accentGlow(liveAccent, selected, motionOn)
             .accentRing(liveAccent, itemShape, selected, motionOn, AerixSpacing.hairline)
             .border(BorderStroke(AerixSpacing.hairline, if (selected) liveAccent else AerixSurface.borderSoft), itemShape)
+            .bringFocusedItemIntoView()
             .clickable(role = Role.Tab, onClick = onClick)
             .semantics { contentDescription = label },
         contentAlignment = Alignment.Center
@@ -335,6 +338,7 @@ private fun AccountAvatarRailButton(
     Column(
         modifier = Modifier
             .clip(RoundedCornerShape(AerixRadii.panelSmall))
+            .bringFocusedItemIntoView()
             .clickable(role = Role.Button, onClick = onClick)
             .semantics { contentDescription = account?.username ?: accountsLabel }
             .padding(AerixSpacing.xs),

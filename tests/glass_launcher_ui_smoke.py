@@ -10,6 +10,10 @@ home = (ui / 'screens/HomeScreen.kt').read_text()
 discover = (ui / 'screens/DiscoverScreen.kt').read_text()
 accounts = (ui / 'screens/AccountsScreen.kt').read_text()
 settings = (ui / 'screens/SettingsScreen.kt').read_text()
+game_menu = (ui / 'game/GameMenuScreen.kt').read_text()
+settings_components = (main / 'java/net/kdt/pojavlaunch/aerix/components/MiraiSettingsComponents.kt').read_text()
+client_components = (main / 'java/net/kdt/pojavlaunch/aerix/client/LiquidCrystalComponents.kt').read_text()
+focus_scroll = (main / 'java/net/kdt/pojavlaunch/aerix/components/BringFocusedItemIntoView.kt').read_text()
 glass = (main / 'java/net/kdt/pojavlaunch/aerix/components/LiquidGlass.kt').read_text()
 surfaces = (main / 'java/net/kdt/pojavlaunch/aerix/theme/AerixSurface.kt').read_text()
 for section in ('HOME', 'LIBRARY', 'DISCOVER', 'AERIX_CLIENT', 'SOCIALS', 'SETTINGS', 'ACCOUNTS', 'INSTANCE_EDITOR'):
@@ -25,6 +29,11 @@ for category in ('MODS', 'MODPACKS', 'RESOURCE_PACKS', 'SHADERS', 'WORLDS'):
     assert category in discover, category
 assert 'PojavAccountBridge.select(account)' in accounts and 'PojavAccountBridge.delete(account)' in accounts
 assert 'AerixNav.TAB_STYLES -> FontStylesTab(activity)' in settings
+assert 'itemsIndexed(items)' in settings_components and 'heightIn(max = 280.dp)' in settings_components
+assert '.selectable(selected = selected, role = Role.RadioButton' in settings_components
+assert '.bringFocusedItemIntoView()' in settings_components and 'requester.bringIntoView()' in focus_scroll
+assert '.bringFocusedItemIntoView()' in nav
+assert '.bringFocusedItemIntoView()' in game_menu and '.bringFocusedItemIntoView()' in client_components
 assert 'drawOutline(outline = outline, brush = sheen)' in glass
 assert 'drawOutline(outline = outline, brush = rim' in glass
 assert 'val accentDefault = Color(0xFF8DEFE0)' in surfaces # The old Aerix accent stays intact.

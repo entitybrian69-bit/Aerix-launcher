@@ -54,10 +54,14 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
@@ -535,22 +539,26 @@ fun <E> MiraiListSettingsCard(
                 }
             }
 
+            val optionListState = rememberLazyListState()
             AnimatedVisibility(
                 modifier = Modifier.fillMaxWidth(),
                 visible = expanded,
                 enter = expandVertically(animationSpec = tween(durationMillis = 220)),
                 exit = shrinkVertically(animationSpec = tween(durationMillis = 200)) + fadeOut()
             ) {
-                Column(
+                LazyColumn(
+                    state = optionListState,
                     modifier = Modifier
                         .fillMaxWidth()
+                        .heightIn(max = 280.dp)
                         .padding(
                             start = AerixSpacing.sm,
                             end = AerixSpacing.sm,
                             bottom = AerixSpacing.sm
-                        )
+                        ),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
-                    items.forEach { item ->
+                    itemsIndexed(items) { _, item ->
                         val itemId = getItemId(item)
                         val isSelected = itemId == currentId || (items.none { getItemId(it) == currentId } && item == selectedItem)
                         val itemName = getItemText(item)
@@ -586,13 +594,14 @@ fun MiraiSimpleListItem(
         modifier = modifier
             .fillMaxWidth()
             .clip(shape = MaterialTheme.shapes.large)
-            .clickable(onClick = onClick)
+            .bringFocusedItemIntoView()
+            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
             .padding(horizontal = AerixSpacing.sm, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         RadioButton(
             selected = selected,
-            onClick = onClick,
+            onClick = null,
             colors = RadioButtonDefaults.colors(
                 selectedColor = accent,
                 unselectedColor = Color.White.copy(alpha = 0.70f)

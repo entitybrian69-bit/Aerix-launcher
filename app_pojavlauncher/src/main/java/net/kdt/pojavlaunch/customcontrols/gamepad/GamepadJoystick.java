@@ -67,8 +67,12 @@ public class GamepadJoystick {
     }
 
     public static boolean isJoystickEvent(MotionEvent event){
-        return (event.getSource() & InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK
-                && event.getAction() == MotionEvent.ACTION_MOVE;
+        if (event.getActionMasked() != MotionEvent.ACTION_MOVE) return false;
+        int sources = event.getSource();
+        InputDevice device = event.getDevice();
+        if (device != null) sources |= device.getSources();
+        return (sources & InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK
+                || (sources & InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD;
     }
 
 

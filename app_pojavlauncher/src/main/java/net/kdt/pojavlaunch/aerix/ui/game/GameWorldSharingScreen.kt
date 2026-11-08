@@ -40,6 +40,7 @@ import kotlinx.coroutines.withContext
 import net.kdt.pojavlaunch.Tools
 import net.kdt.pojavlaunch.aerix.bridge.GameDownloadTarget
 import net.kdt.pojavlaunch.aerix.client.AerixClientInputBridge
+import net.kdt.pojavlaunch.aerix.components.bringFocusedItemIntoView
 import net.kdt.pojavlaunch.game.platform.Platform
 import net.kdt.pojavlaunch.aerix.theme.AerixSurface
 import net.kdt.pojavlaunch.aerix.worldshare.WorldShareInstaller
@@ -172,7 +173,7 @@ fun GameWorldSharingScreen(
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            OutlinedButton(onClick = onBack) { Text("Back") }
+            OutlinedButton(modifier = Modifier.bringFocusedItemIntoView(), onClick = onBack) { Text("Back") }
             Text("World Sharing", color = accent, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 12.dp))
         }
         Text("${target.instanceName} · ${target.versionLabel}", color = AerixSurface.textSecondary)
@@ -184,7 +185,7 @@ fun GameWorldSharingScreen(
             installed -> Text("e4all is installed. If you installed it in this session, restart Minecraft before using it.", color = AerixSurface.textPrimary)
             else -> {
                 Text("Install e4all to share a LAN world over the internet. A restart is required.", color = AerixSurface.textPrimary)
-                Button(onClick = { confirmation = true }, enabled = !busy) { Text(if (busy) "Installing…" else "Install world sharing") }
+                Button(modifier = Modifier.bringFocusedItemIntoView(), onClick = { confirmation = true }, enabled = !busy) { Text(if (busy) "Installing…" else "Install world sharing") }
             }
         }
         if (message.isNotEmpty()) Text(message, color = AerixSurface.textSecondary)
@@ -194,20 +195,20 @@ fun GameWorldSharingScreen(
             val value = address!!
             Text("Public address: $value", color = accent, fontWeight = FontWeight.Bold)
             Text("Detected from the game log. Verify it matches e4all's chat message before sharing; log detection can be stale or incorrect.", color = AerixSurface.textSecondary)
-            OutlinedButton(onClick = { stopConfirmation = true }) { Text("Stop sharing") }
-            Button(onClick = {
+            OutlinedButton(modifier = Modifier.bringFocusedItemIntoView(), onClick = { stopConfirmation = true }) { Text("Stop sharing") }
+            Button(modifier = Modifier.bringFocusedItemIntoView(), onClick = {
                 val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                 clipboard.setPrimaryClip(ClipData.newPlainText("Minecraft world address", value))
                 Toast.makeText(context, "Address copied. Select a friend and paste it into chat.", Toast.LENGTH_LONG).show()
                 onOpenChats()
             }) { Text("Copy address & open chats") }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = {
+                OutlinedButton(modifier = Modifier.bringFocusedItemIntoView(), onClick = {
                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                     clipboard.setPrimaryClip(ClipData.newPlainText("Minecraft world address", value))
                     Toast.makeText(context, "Address copied", Toast.LENGTH_SHORT).show()
                 }) { Text("Copy address") }
-                OutlinedButton(onClick = {
+                OutlinedButton(modifier = Modifier.bringFocusedItemIntoView(), onClick = {
                     val intent = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, "Join my Minecraft Java world: $value")
                     context.startActivity(Intent.createChooser(intent, "Share world address"))
                 }) { Text("Invite / Share") }
