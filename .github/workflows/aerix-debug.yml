@@ -70,6 +70,7 @@ jobs:
         run: |
           trap 'echo "::error title=Smoke test failed::$BASH_COMMAND"' ERR
           python3 tests/branding_identity_smoke.py
+          python3 tests/data_migration_smoke.py
           python3 tests/discord_presence_logo_smoke.py
           python3 tests/modern_cape_smoke.py
           python3 tests/social_profile_cosmetics_smoke.py
@@ -91,6 +92,11 @@ jobs:
           python3 tests/aerix_account_setup_smoke.py
           python3 tests/world_invite_chat_smoke.py
           python3 tests/servers_ui_smoke.py
+          mkdir -p "$RUNNER_TEMP/aerix-migration-test"
+          javac -d "$RUNNER_TEMP/aerix-migration-test" \
+            app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/tasks/DataMigrationPolicy.java \
+            tests/DataMigrationPolicySmokeTest.java
+          java -cp "$RUNNER_TEMP/aerix-migration-test" net.kdt.pojavlaunch.tasks.DataMigrationPolicySmokeTest
           python3 tests/resourcepack_wiring_smoke.py
           python3 tests/vulkan_driver_import_smoke.py
           if [[ "${{ contains(github.event.head_commit.message, '[pack-fixture]') }}" == "true" ]]; then

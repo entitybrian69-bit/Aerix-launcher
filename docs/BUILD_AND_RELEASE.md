@@ -23,10 +23,12 @@ launcher on the same phone. Both can be open at once, and updating the debug
 build never touches the released app or its data.
 
 Aerix's IDs have changed from `net.kdt.pojavlaunch` to `net.al.aerixlauncher`.
-An older install remains a separate app and cannot be updated in place; use the
-launcher’s data-import option to copy supported data before removing an older
-install. A Google Play package ID is immutable, so publishing under the new ID
-requires a separate Play Console app entry.
+An older install remains a separate app and cannot be updated in place. On
+Android 10 and newer, the optional first-run prompt or Settings import action
+copies supported game data; accounts, preferences, and runtimes stay with the
+old app. Keep it installed until the new one is verified. A Google Play package
+ID is immutable, so publishing under the new ID requires a separate Play Console
+app entry.
 
 The `noruntime` flavor does not embed a Java runtime, keeping downloads smaller;
 the launcher downloads the runtime it needs on first launch. APKs are never

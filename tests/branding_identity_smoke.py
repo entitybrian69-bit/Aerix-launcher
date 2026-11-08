@@ -57,9 +57,11 @@ class BrandingIdentitySmoke(unittest.TestCase):
         self.assertTrue((ACTIVE_PACKAGES | LEGACY_PACKAGES) <= packages)
 
         activity = (APP / "src/main/java/net/kdt/pojavlaunch/LauncherActivity.java").read_text()
-        for package in ACTIVE_PACKAGES | LEGACY_PACKAGES:
+        for package in LEGACY_PACKAGES:
             self.assertIn(f'"{package}"', activity)
-        self.assertIn("s.equals(getPackageName())", activity)
+        for package in ACTIVE_PACKAGES:
+            self.assertNotIn(f'"{package}"', activity)
+        self.assertIn("getLaunchIntentForPackage(packageName)", activity)
         self.assertIn("R.string.migration_notice", activity)
 
         angle_provider = (

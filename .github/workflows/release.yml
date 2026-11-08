@@ -85,6 +85,7 @@ jobs:
       - name: Verify launcher and FastClient smoke tests
         run: |
           python3 tests/branding_identity_smoke.py
+          python3 tests/data_migration_smoke.py
           python3 tests/social_profile_cosmetics_smoke.py
           python3 tests/client_background_smoke.py
           python3 tests/instance_renderer_smoke.py
@@ -92,6 +93,11 @@ jobs:
           python3 tests/fastclient_assets_smoke.py
           python3 tests/fastclient_performance_download_test.py
           python3 tests/recorder_wiring_smoke.py
+          mkdir -p "$RUNNER_TEMP/aerix-migration-smoke"
+          javac -d "$RUNNER_TEMP/aerix-migration-smoke" \
+            app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/tasks/DataMigrationPolicy.java \
+            tests/DataMigrationPolicySmokeTest.java
+          java -cp "$RUNNER_TEMP/aerix-migration-smoke" net.kdt.pojavlaunch.tasks.DataMigrationPolicySmokeTest
           mkdir -p "$RUNNER_TEMP/aerix-release-smoke"
           javac -d "$RUNNER_TEMP/aerix-release-smoke" \
             app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/recording/RecordingPaths.java \

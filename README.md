@@ -35,7 +35,7 @@
 
 ## Android package and existing data
 
-The current Android application IDs are `net.al.aerixlauncher` (release), `net.al.aerixlauncher.debug` (testing), and `net.al.aerixlauncher.pub` (nightly). This replaces the previous Aerix IDs under `net.kdt.pojavlaunch`. Android treats the new ID as a separate app: it will not update an old install or automatically copy its private app data. You can keep both installed and use **Settings → Miscellaneous → Import data** to bring over supported launcher data. Back up important data before switching. Debug and release builds also remain separate apps and cannot update each other.
+The current Android application IDs are `net.al.aerixlauncher` (release), `net.al.aerixlauncher.debug` (testing), and `net.al.aerixlauncher.pub` (nightly). This replaces the previous Aerix IDs under `net.kdt.pojavlaunch`. Android treats the new ID as a separate app: it will not update an old install or automatically copy private app data. On Android 10 and newer, use the first-run import prompt or **Settings → Import data** to copy supported game files, instances, and control maps; Android 9 and older already share the game-data folder. Accounts, sign-in tokens, preferences, and runtimes do not transfer, so sign in again and download runtimes as needed. Keep the old app installed until the new one is verified. Debug and release builds also remain separate apps and cannot update each other. See [the migration guide](docs/APP_ID_MIGRATION.md) for step-by-step instructions.
 
 ## 🗺️ Quick Links
 <p align="center">
