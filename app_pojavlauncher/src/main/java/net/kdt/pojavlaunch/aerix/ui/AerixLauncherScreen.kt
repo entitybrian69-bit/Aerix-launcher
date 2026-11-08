@@ -180,9 +180,9 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
         // itself stays clear of the camera cutout and of the system bars.
         Box(modifier = Modifier.fillMaxSize().padding(AerixWindowInsets.padding())) {
             Row(modifier = Modifier.fillMaxSize()) {
-                // The social space has its own sidebar and takes the whole window; every other
-                // section keeps the launcher's rail.
-                if (section != LauncherSection.SOCIALS) {
+                // Socials owns its navigation, while Home uses a full-bleed game-menu layout with
+                // destinations in its compact top-right menu. The other pages keep the launcher rail.
+                if (section != LauncherSection.SOCIALS && section != LauncherSection.HOME) {
                     AerixNavigationRail(
                         selectedSection = section,
                         onNavigate = navigate,
