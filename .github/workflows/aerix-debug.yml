@@ -255,9 +255,28 @@ jobs:
         run: echo "TRINKIES_JDK_25=$JAVA_HOME" >> "$GITHUB_ENV"
 
       - name: Set up Gradle 9.8.0 for Fabric Loom matrix build
+        id: setup_gradle_98
+        uses: gradle/actions/setup-gradle@v4
+        continue-on-error: true
+        with:
+          gradle-version: "9.8.0"
+
+      - name: Retry Gradle 9.8.0 setup after transient download failure
+        if: steps.setup_gradle_98.outcome == 'failure'
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "9.8.0"
+
+      - name: Verify Gradle 9.8.0 is active for the Loom matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(gradle --version | sed -n 's/^Gradle //p' | head -n 1)"
+          if [[ "$version" != "9.8.0" ]]; then
+            echo "::error title=Wrong Gradle version::Expected Gradle 9.8.0 for Loom, but found ${version:-unknown}"
+            exit 1
+          fi
+          echo "Gradle $version is active for the isolated Fabric test project."
 
       - name: Set up JDK 21 for Minecraft 1.21.11 runtime
         uses: actions/setup-java@v4
