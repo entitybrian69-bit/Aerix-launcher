@@ -49,16 +49,23 @@ run_target() {
     mkdir -p "$target_dir"
     echo "=== Trinkies baseline: Minecraft $version / Java $java_version / Fabric API $fabric_api ==="
 
+    echo "Gradle client task has a 14-minute limit for $version; filtered progress is streamed below."
     set +e
-    xvfb-run -a gradle \
+    timeout --signal=TERM --kill-after=30s 14m xvfb-run -a gradle \
         -p "$PROJECT_DIR" \
         "-Pminecraft_version=$version" \
         -Ploader_version=0.20.1 \
         -Ploom_version=1.19-SNAPSHOT \
         "-Pfabric_api_version=$fabric_api" \
         "-Ptest_runtime_java=$java_version" \
-        "$task" --console=plain > "$log_file" 2>&1
-    code=$?
+        "$task" --console=plain 2>&1 \
+        | tee "$log_file" \
+        | grep --line-buffered -E '(^> Task|^BUILD|^FAILURE:|TRINKIES_CLIENT_GAMETEST_STARTED|ERROR|FATAL|Exception|Caused by:|Timeout|Fabric Loom:)'
+    pipeline_status=("${PIPESTATUS[@]}")
+    code="${pipeline_status[0]}"
+    if (( code == 0 && ${pipeline_status[1]:-0} != 0 )); then
+        code="${pipeline_status[1]}"
+    fi
     set -e
 
     tail -50 "$log_file"
