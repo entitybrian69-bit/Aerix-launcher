@@ -205,6 +205,35 @@ class TrinkiesIntegrationSmoke(unittest.TestCase):
             all("cape_texture" in item for item in catalog["items"] if item["category"] == "back")
         )
 
+    def test_the_catalog_is_the_only_thing_that_knows_what_an_item_looks_like(self):
+        """No catalog item may be named by launcher code.
+
+        Per-item painting is how the old hat overlay ended up as a `when` block that covered five
+        ids out of three hundred, so the rule is enforced mechanically instead of by convention:
+        every slug in the shipped catalog is searched for across the launcher's whole Aerix package.
+        A new item therefore cannot be "supported" by adding Kotlin, only by adding assets.
+        """
+        catalog = json.loads(CATALOG_PATH.read_text())
+        slugs = sorted(item["id"].split(":", 1)[1] for item in catalog["items"])
+        sources = sorted(APP.rglob("*.kt"))
+        self.assertEqual(len(sources), len([path for path in sources if path.is_file()]))
+        self.assertGreater(len(sources), 100)
+        hits = [
+            f"{path.name}:{slug}"
+            for path in sources
+            for slug in slugs
+            if slug in path.read_text()
+        ]
+        self.assertEqual(hits, [], f"launcher Kotlin names catalog items directly: {hits}")
+
+        # The bake call is the only cosmetic paint path left in the skin helper: no brush helpers,
+        # no per-id colour tables, and nothing equipped is guessable from an id alone.
+        cosmetics = (APP / "client/AerixClientCosmetics.kt").read_text()
+        self.assertNotIn("legacyHat", cosmetics)
+        self.assertNotIn("fun strip(color: Int, highlight: Int)", cosmetics)
+        self.assertIn("if (patches.isEmpty()) return existingSkinPng", cosmetics)
+        self.assertIn("AerixClientStore.equippedIdFor(category)", cosmetics)
+
     def test_dashboard_wardrobe_and_compatibility_copy_are_present(self):
         rail = (APP / "ui/AerixNavigationRail.kt").read_text()
         for destination in ("QUICK_TOOLS", "INSTANCE_SELECTOR", "TRINKIES_WARDROBE"):

@@ -2,6 +2,14 @@
 
 Updated: 2026-11-09 (UTC)
 
+## 2026-11-09 (later again): the last per-item drawing in the launcher is gone
+
+**Status: CI green on `67a3183` (Android CI, Aerix debug incl. JAR verify + smoke tests, Site preview shots); this change still needs its own compile pass.**
+
+- `applyWardrobeToSkin` kept a `when (legacyHat)` block that hand-painted four pre-catalog hat ids (`crimson_crown`, `void_horns`, `frost_circlet`, `sakura_bow`) plus two local brush helpers. Nothing else in the repo referenced those ids, and the wardrobe can only equip catalog ids, so the block was unreachable dead art for 4 of 300 items and a standing exception to "no per-item hardcoded drawing in the launcher". It is deleted; the bake call is now the whole function, and a persisted legacy id simply paints nothing.
+- The rule is now enforced rather than documented: a new smoke test reads every item slug out of the shipped catalog and asserts none of them appear in any `.kt` under `net/kdt/pojavlaunch/aerix` (146 files scanned, zero hits). Adding an item can therefore only mean adding assets.
+- Correction to the earlier note in this file: `tools/trinkies_assets/validate_item.py` does not exist on this branch, so the "preview size 128 vs 192" drift was stale bookkeeping, not work left behind. `validate_catalog.py` already pins `PREVIEW_SIZE = 192`.
+
 ## 2026-11-09 (later): what CI found, and the cape catching up
 
 **Status: both fixes are on the branch; Android CI is green on `4ef169e`, so the wardrobe bake compiles.**

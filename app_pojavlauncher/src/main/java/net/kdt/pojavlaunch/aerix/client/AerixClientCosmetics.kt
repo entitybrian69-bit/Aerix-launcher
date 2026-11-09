@@ -467,8 +467,8 @@ object AerixClientCosmetics {
      *
      * Each catalog item ships a `garment.png` patch laid out in the player's own UV space, so
      * equipping anything is one source-over pass in that space — the same pass the launcher's
-     * preview and the client mod run — and no per-item drawing code has to live here. Hat ids that
-     * predate the catalog have no patch, so they keep the hand-painted fallback further down.
+     * preview and the client mod run. Nothing here knows what any individual item looks like: the
+     * catalog is the renderer, so an id the catalog does not carry simply paints nothing.
      */
     fun applyWardrobeToSkin(
         context: Context,
@@ -477,10 +477,8 @@ object AerixClientCosmetics {
     ): ByteArray? {
         AerixClientStore.init(context)
         if (existingSkinPng == null) return null
-        val hatId = AerixClientStore.equippedHatId
         val patches = trinkiesGarmentPatches(context)
-        val legacyHat = hatId.takeIf { it != "none" && !it.startsWith("trinkies:") }
-        if (patches.isEmpty() && legacyHat == null) return existingSkinPng
+        if (patches.isEmpty()) return existingSkinPng
         val decoded = BitmapFactory.decodeByteArray(existingSkinPng, 0, existingSkinPng.size) ?: return existingSkinPng
         if (decoded.width < 64 || decoded.height < 64) {
             decoded.recycle()
@@ -492,53 +490,9 @@ object AerixClientCosmetics {
         }
         decoded.recycle()
 
-        fun px(x: Int, y: Int, color: Int) {
-            if (x in 32..63 && y in 0..15) copy.setPixel(x, y, color)
-        }
-        fun strip(color: Int, highlight: Int) {
-            // The four head-side UV faces form a wraparound band in the outer skin layer.
-            for (x in 32..63) {
-                px(x, 8, highlight)
-                px(x, 9, color)
-            }
-        }
-
-        if (patches.isNotEmpty() && !TrinkiesGarmentComposite.bakeInto(copy, patches) && legacyHat == null) {
+        if (!TrinkiesGarmentComposite.bakeInto(copy, patches)) {
             copy.recycle()
             return existingSkinPng
-        }
-        if (legacyHat != null) when (legacyHat) {
-            "crimson_crown" -> {
-                strip(AndroidColor.rgb(128, 22, 43), AndroidColor.rgb(255, 209, 102))
-                for (x in 40..47) px(x, 10, AndroidColor.rgb(128, 22, 43))
-                listOf(40, 42, 45, 47).forEach { px(it, 7, AndroidColor.rgb(255, 209, 102)) }
-                px(43, 9, AndroidColor.WHITE)
-                px(44, 9, AndroidColor.rgb(255, 209, 102))
-            }
-            "void_horns" -> {
-                strip(AndroidColor.rgb(45, 24, 72), AndroidColor.rgb(184, 112, 255))
-                listOf(40 to 7, 40 to 6, 41 to 6, 46 to 7, 47 to 6, 46 to 6).forEach { (x, y) ->
-                    px(x, y, AndroidColor.rgb(205, 173, 255))
-                }
-                px(40, 8, AndroidColor.rgb(184, 112, 255))
-                px(47, 8, AndroidColor.rgb(184, 112, 255))
-            }
-            "frost_circlet" -> {
-                strip(AndroidColor.rgb(19, 72, 100), AndroidColor.rgb(145, 236, 255))
-                for (x in 41..46) px(x, 0, AndroidColor.rgb(204, 248, 255))
-                px(43, 1, AndroidColor.WHITE)
-                px(44, 1, AndroidColor.WHITE)
-            }
-            "sakura_bow" -> {
-                strip(AndroidColor.rgb(110, 32, 68), AndroidColor.rgb(255, 179, 217))
-                px(41, 8, AndroidColor.rgb(255, 116, 176))
-                px(42, 7, AndroidColor.rgb(255, 179, 217))
-                px(43, 8, AndroidColor.rgb(255, 179, 217))
-                px(44, 7, AndroidColor.rgb(255, 179, 217))
-                px(45, 8, AndroidColor.rgb(255, 116, 176))
-                px(43, 9, AndroidColor.rgb(255, 235, 245))
-            }
-            else -> Unit
         }
 
         return ByteArrayOutputStream().use { out ->
