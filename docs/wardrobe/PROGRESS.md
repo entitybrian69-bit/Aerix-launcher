@@ -2,6 +2,16 @@
 
 Updated: 2026-11-09 (UTC)
 
+## 2026-11-09 (later again): the client mod consumes the loadout
+
+**Status: implemented; CI is the compile gate, and the reader's logic now executes in CI.**
+
+- New `aerix_client_mod/.../TrinkiesLoadout.java`: a dependency-free reader for `<instance>/trinkies/equipped.json` (its own strict JSON parser, no Gson/AWT/Android). It mirrors the shipped `equipped.schema.json`: `schema: 1`, the six slots, `emote_wheel` as exactly eight ids-or-null, `^trinkies:[a-z0-9_]+$` ids, and no unknown fields. Anything rejected becomes a reported problem *and* an empty slot, so a bad value can never half-apply - notably a hat id in the `back` slot is refused rather than baked as a cape.
+- `AerixClientMod` polls the file every ~1.5 s (mtime-gated, whole path inside `catch (Throwable)`), derives the cape frame cadence from the equipped back/aura item's own `animations.json` idle clip, cross-checks `config/aerix_cape_frames/meta.properties` `trinkiesBack=` against the loadout, and writes `trinkies/applied.json` with the same atomic rename the launcher uses. A stale bake keeps the neutral cadence and is reported to the launcher instead of pacing frames to art that is not on disk.
+- Launcher side: `TrinkiesLoadout.describeGameConfirmation()` reads the newest receipt across supported instances (ignoring a receipt whose `schema` it does not know, and probing raw values because `optString()` renders JSON null as the string `"null"`), and the Wardrobe preview panel shows it off the composition thread - "GAME READ n OF 6 SLOTS" plus either the cape pace or a stale-bake restart hint. Absent rather than optimistic is deliberate.
+- Verification: `tests/trinkies_loadout_jvm.py` compiles the reader with `javac -source 8 -target 8` and runs `tests/TrinkiesLoadoutSmokeTest.java` against the real 300-item catalog - ~30 checks covering acceptance, each documented rejection, cadence banding (1..8 ticks), bake cross-check, and receipt round-trip. `tests/trinkies_integration_smoke.py` pins the call sites on both sides. This is the first loadout logic executed rather than only compiled.
+- Not done, and not pretend-done: no in-world attachment rendering, pet follower, particles, or emote wheel; nothing verified on a device or in real Minecraft. The receipt proves the client *read and validated* the wardrobe, not that a renderer drew it.
+
 ## 2026-11-09 (later again): the last per-item drawing in the launcher is gone
 
 **Status: CI green on `67a3183` (Android CI, Aerix debug incl. JAR verify + smoke tests, Site preview shots); this change still needs its own compile pass.**

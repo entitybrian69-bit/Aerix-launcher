@@ -71,6 +71,14 @@ public final class AerixClientMod implements ClientModInitializer {
     private int frameIndex = 0;
     private int slowCounter = 0;
 
+    // Trinkies wardrobe state: what the launcher says the player wears, the frame cadence the worn
+    // item's own animation clip asks for, and the mtime of the file that last produced them.
+    private TrinkiesLoadout.Snapshot trinkiesSnapshot;
+    private int trinkiesFrameTicks = 1;
+    private int trinkiesFrameDwell = 0;
+    private int trinkiesPollCounter = 0;
+    private long lastTrinkiesMtime = Long.MIN_VALUE;
+
     @Override
     public void onInitializeClient() {
         if (!STARTED.compareAndSet(false, true)) return;
@@ -180,6 +188,12 @@ public final class AerixClientMod implements ClientModInitializer {
 
     private void onRenderThreadTick(Object mc) throws Exception {
         File runDir = resolveRunDir(mc);
+        // Polled rather than watched: two stat() calls every ~1.5 s is cheaper than a file watcher,
+        // and it keeps the wardrobe live if the launcher rewrites the loadout while the game runs.
+        if (++trinkiesPollCounter >= 16) {
+            trinkiesPollCounter = 0;
+            refreshTrinkiesLoadout(runDir);
+        }
         if (!modernRuntime) visualOverrides.tick(mc, runDir);
         adaptiveDistance.tick(mc, runDir);
         boolean assetSkin = modernRuntime || (handlesResolved && mSkinCompCape != null &&
@@ -210,7 +224,12 @@ public final class AerixClientMod implements ClientModInitializer {
         Object texMgr = mGetTextureManager.invoke(mc);
         if (texMgr == null) return;
 
-        frameIndex = (frameIndex + 1) % frameNativeImages.size();
+        // The equipped item's idle clip decides how long a full cycle takes, so the frame step is
+        // paced by the asset instead of by a constant in this mod.
+        if (++trinkiesFrameDwell >= trinkiesFrameTicks) {
+            trinkiesFrameDwell = 0;
+            frameIndex = (frameIndex + 1) % frameNativeImages.size();
+        }
         Object srcImage = frameNativeImages.get(frameIndex);
 
         Object existingTex = mTexGet != null ? mTexGet.invoke(texMgr, capeId) : null;
@@ -283,6 +302,63 @@ public final class AerixClientMod implements ClientModInitializer {
         } catch (Throwable ignored) {
         }
         return null;
+    }
+
+    /**
+     * Re-read {@code trinkies/equipped.json} when it changed, take the animation cadence from what
+     * the player is actually wearing, and leave a receipt for the launcher.
+     *
+     * Every step degrades to "no Trinkies state", because a malformed cosmetic file must never reach
+     * the render path: the cape animator and the live client options are independent of the wardrobe.
+     */
+    private void refreshTrinkiesLoadout(File runDir) {
+        try {
+            File trinkiesDir = new File(runDir, "trinkies");
+            File equipped = new File(trinkiesDir, TrinkiesLoadout.FILE_NAME);
+            long mtime = equipped.isFile() ? equipped.lastModified() : -1L;
+            if (mtime == lastTrinkiesMtime && trinkiesSnapshot != null) return;
+            lastTrinkiesMtime = mtime;
+
+            TrinkiesLoadout.Snapshot snapshot = TrinkiesLoadout.read(equipped, TrinkiesLoadout.catalogFromJar());
+            trinkiesSnapshot = snapshot;
+            trinkiesFrameTicks = 1;
+            trinkiesFrameDwell = 0;
+            if (!snapshot.isPresent()) {
+                return;
+            }
+
+            // A back or aura item owns the visible cycle on the cape; anything else is skin-only and
+            // leaves the animator at one tick per frame.
+            TrinkiesLoadout.Entry animated = snapshot.entryFor("back");
+            if (animated == null) animated = snapshot.entryFor("aura");
+            if (animated != null) {
+                trinkiesFrameTicks = TrinkiesLoadout.frameTicksFromAnimation(
+                        TrinkiesLoadout.readJarText(animated.animationsJsonPath()),
+                        Math.max(1, framePngBytes.size()), 95L);
+            }
+
+            File meta = new File(new File(runDir, "config"), "aerix_cape_frames/meta.properties");
+            boolean matchesBake = TrinkiesLoadout.bakeMatchesLoadout(
+                    meta.isFile() ? readTextFile(meta) : null, snapshot);
+            if (!matchesBake) {
+                // The deployed frames were baked for a different wardrobe, so pacing them to the new
+                // item would describe art that is not on disk yet. Keep the neutral cadence and let
+                // the launcher ask for a restart.
+                trinkiesFrameTicks = 1;
+            }
+            TrinkiesLoadout.writeApplied(trinkiesDir, TrinkiesLoadout.buildAppliedJson(
+                    snapshot, trinkiesFrameTicks, matchesBake, System.currentTimeMillis()));
+        } catch (Throwable ignored) {
+            // Cosmetic state is optional here, the frame loop is not.
+        }
+    }
+
+    private static String readTextFile(File file) {
+        try {
+            return new String(java.nio.file.Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8);
+        } catch (Throwable ignored) {
+            return null;
+        }
     }
 
     private void reloadCapeFramesIfNeeded(File runDir) {

@@ -182,6 +182,12 @@ class TrinkiesIntegrationSmoke(unittest.TestCase):
         self.assertIn("if (width != CAPE_WIDTH || height != CAPE_HEIGHT) return false", composite)
         self.assertIn("if (cape.size < area || patch.size < area) return false", composite)
         self.assertIn("AerixClientCosmetics.applyWardrobeToSkin(", skin_server)
+        # The other half of the contract: the client mod reads the loadout back and answers, and the
+        # launcher surfaces that answer instead of assuming the wardrobe landed.
+        mod_loop = (ROOT / "aerix_client_mod/src/main/java/aerix/client/mod/AerixClientMod.java").read_text()
+        self.assertIn("refreshTrinkiesLoadout(runDir)", mod_loop)
+        self.assertIn("new File(runDir, \"trinkies\")", mod_loop)
+        self.assertIn('private const val APPLIED_FILE_NAME = "applied.json"', loadout)
         self.assertIn("applyClientCosmetics = true", wardrobe)
         self.assertIn("item?.description", wardrobe)
         self.assertIn('AerixClientStore.setEquippedId(category, item?.id ?: "none")', wardrobe)
@@ -196,6 +202,7 @@ class TrinkiesIntegrationSmoke(unittest.TestCase):
         self.assertIn('put("emote_wheel"', loadout)
         self.assertIn("TrinkiesCatalog.hasId(context, id, category)", loadout)
         self.assertIn("stream.fd.sync()", loadout)
+        self.assertIn("fun describeGameConfirmation(context: Context): String?", loadout)
         self.assertIn("Os.rename(temporary.absolutePath, target.absolutePath)", loadout)
         self.assertIn('File(canonicalDir, FILE_NAME)', loadout)
         self.assertEqual(len(catalog["items"]), 300)

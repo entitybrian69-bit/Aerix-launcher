@@ -36,3 +36,20 @@ The current generated roster is a fixed **300-item catalog**: 50 entries in each
 ## Gate before marking done
 
 A passing schema/linter is only a structural pass. Also require: Blockbench opens the file; silhouette and palette are distinct; texture/UV/emissive checks pass; animation loops cleanly at the render partial tick; classic and slim players render correctly while standing, sneaking, swimming, wearing armor, and turning; no renderer-specific APIs are used; in-game screenshots exist; and device performance is measured. Record failures instead of marking the item complete.
+
+## What the game side does with a new item
+
+Nothing per item. The client mod reads `trinkies/equipped.json`, checks each id against the packaged
+catalog, and acts only on data the item already ships:
+
+- A `back` or `aura` item's `animations.json` sets the cape frame cadence: `clips.idle.duration` is
+  how long one 12-frame cycle should take, and only `loop_mode: "loop"` stretches it (a one-shot keeps
+  the default pace, because stretching a single play reads as a stutter). A missing or unreadable
+  clip is a non-event, not an error.
+- The mod writes `trinkies/applied.json` next to the loadout. The Wardrobe shows it as the game's
+  confirmation, including a stale-bake warning when the deployed cape frames were baked for a
+  different loadout - which is fixed by restarting the instance, not by re-equipping.
+
+So a new item needs no mod or launcher change to be wearable, paced, and confirmed. Rendering its 3D
+geometry in world is still not implemented, which is why `preview.png` stays the only place a pet,
+wing, or prop is visible.

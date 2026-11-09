@@ -3,6 +3,7 @@ package net.kdt.pojavlaunch.aerix.client
 import android.content.Context
 import android.system.Os
 import android.util.Log
+import net.kdt.pojavlaunch.instances.Instances
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -13,6 +14,9 @@ object TrinkiesLoadout {
     private const val TAG = "TrinkiesLoadout"
     private const val SCHEMA = 1
     private const val FILE_NAME = "equipped.json"
+
+    /** The client writes this after it has read [FILE_NAME]; it is the game's side of the receipt. */
+    private const val APPLIED_FILE_NAME = "applied.json"
 
     /**
      * Categories the mod can consume, in bake order. `emote` here is the worn sleeve/cuff look; the
@@ -78,4 +82,43 @@ object TrinkiesLoadout {
     }.onFailure { error ->
         Log.w(TAG, "Could not atomically write the local Trinkies loadout", error)
     }.getOrDefault(false)
+
+    /**
+     * One line describing what a Fabric-enabled instance read back from its loadout, or null when no
+     * supported instance has run with Trinkies yet.
+     *
+     * The client validates [FILE_NAME] against the packaged catalog and drops `applied.json` next to
+     * it, so this is the game confirming the wardrobe rather than the launcher assuming it. The newest
+     * receipt across supported instances wins, because the store is shared by every instance.
+     */
+    @JvmStatic
+    fun describeGameConfirmation(context: Context): String? = runCatching {
+        val receipts = Instances.loadAllInstances()
+            .filter { TrinkiesInstaller.isSupportedInstance(it) }
+            .mapNotNull { instance ->
+                runCatching {
+                    val directory = instance.gameDirectory ?: return@runCatching null
+                    val file = File(File(directory, "trinkies"), APPLIED_FILE_NAME)
+                    if (!file.isFile) return@runCatching null
+                    JSONObject(file.readText(Charsets.UTF_8))
+                        .takeIf { it.optInt("schema", -1) == SCHEMA }
+                }.getOrNull()
+            }
+        val receipt = receipts.maxByOrNull { it.optLong("confirmedAtMs") } ?: return null
+        val equipped = receipt.optJSONObject("equipped")
+        // optString() turns a JSON null into the string "null", so the raw value is what to inspect.
+        val worn = CATEGORIES.count { category ->
+            equipped?.opt(category)?.let { it != JSONObject.NULL && it.toString().startsWith("trinkies:") } == true
+        }
+        buildString {
+            append("GAME READ ").append(worn).append(" OF ").append(CATEGORIES.size).append(" SLOTS")
+            if (!receipt.optBoolean("bake_matches_loadout", true)) {
+                append(" · BAKE IS STALE, RESTART THE INSTANCE")
+            } else {
+                append(" · CAPE PACE ").append(receipt.optInt("frameTicks", 1)).append(" TICKS/FRAME")
+            }
+        }
+    }.onFailure { error ->
+        Log.w(TAG, "Could not read the client's Trinkies confirmation", error)
+    }.getOrNull()
 }

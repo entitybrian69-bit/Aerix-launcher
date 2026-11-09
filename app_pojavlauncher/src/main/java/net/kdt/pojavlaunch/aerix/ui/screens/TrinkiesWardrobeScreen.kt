@@ -431,6 +431,20 @@ private fun WardrobePreviewPanel(
         }
         Text("DRAG TO ROTATE · POSES ARE LOCAL PREVIEWS", color = Color(0xFF9A9B9E),
             fontFamily = FontFamily.Monospace, fontSize = 6.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        // The game's own reply, read from the receipt a Fabric-enabled instance leaves behind. It is
+        // deliberately absent rather than optimistic when no instance has confirmed the wardrobe yet.
+        val appContext = androidx.compose.ui.platform.LocalContext.current
+        // Read off the main thread: it touches every supported instance's game directory.
+        val confirmation by androidx.compose.runtime.produceState<String?>(null, appContext) {
+            value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                net.kdt.pojavlaunch.aerix.client.TrinkiesLoadout.describeGameConfirmation(appContext)
+            }
+        }
+        // A delegated local has no smart cast, so the nullable read goes through let.
+        confirmation?.let { worn ->
+            Text(worn, color = wardrobeGreen, fontFamily = FontFamily.Monospace,
+                fontSize = 6.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
     }
 }
 
