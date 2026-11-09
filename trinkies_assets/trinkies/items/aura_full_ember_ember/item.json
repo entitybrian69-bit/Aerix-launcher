@@ -28,7 +28,7 @@
     "#FFF3A5"
   ],
   "particle_sheet": "texture.png",
-  "rarity": "legendary",
+  "rarity": "mythic",
   "shape": "full_aura_ember_2",
   "tags": [
     "ember",

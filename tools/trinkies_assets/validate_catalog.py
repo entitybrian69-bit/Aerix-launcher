@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+from collections import Counter
 import json
 import math
 import sys
@@ -20,8 +21,10 @@ ITEM_ROOT = ASSET_ROOT / "items"
 SCHEMAS = ROOT / "docs" / "wardrobe" / "schema"
 ITEM_SCHEMA = json.loads((SCHEMAS / "item.schema.json").read_text(encoding="utf-8"))
 ANIMATION_SCHEMA = json.loads((SCHEMAS / "animation.schema.json").read_text(encoding="utf-8"))
+CATALOG_SCHEMA = json.loads((SCHEMAS / "catalog.schema.json").read_text(encoding="utf-8"))
 ITEM_VALIDATOR = Draft202012Validator(ITEM_SCHEMA)
 ANIMATION_VALIDATOR = Draft202012Validator(ANIMATION_SCHEMA)
+CATALOG_VALIDATOR = Draft202012Validator(CATALOG_SCHEMA)
 
 EXPECTED_CATEGORIES = ("hat", "suit", "back", "pet", "emote", "aura")
 CATEGORY_TEXTURE_SIZE = {"hat": 64, "suit": 128, "back": 128, "pet": 128, "emote": 64, "aura": 32}
@@ -80,7 +83,7 @@ def luminance(hex_color: str) -> float:
     return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
 
 
-def validate_item(item_path: Path, seen_ids: set[str]) -> tuple[str, int, int]:
+def validate_item(item_path: Path, seen_ids: set[str]) -> tuple[str, int, int, str]:
     item_dir = item_path.parent
     item = json.loads(item_path.read_text(encoding="utf-8"))
     errors = sorted(ITEM_VALIDATOR.iter_errors(item), key=lambda e: list(e.path))
@@ -128,6 +131,15 @@ def validate_item(item_path: Path, seen_ids: set[str]) -> tuple[str, int, int]:
         fail(f"no texture budget declared for category {category}")
     if (resolution.get("width"), resolution.get("height")) != (texture_size, texture_size):
         fail(f"texture/model resolution for {item_id} must be {texture_size}×{texture_size}")
+    preview_path = item_dir / "preview.png"
+    if not preview_path.is_file():
+        fail(f"missing shaded 3D model preview: {preview_path}")
+    with Image.open(preview_path) as preview:
+        preview.load()
+        if preview.size != (128, 128) or preview.mode != "RGBA":
+            fail(f"model preview must be a transparent 128×128 RGBA image: {item_id}")
+        if preview.getchannel("A").getbbox() is None:
+            fail(f"model preview is fully transparent: {item_id}")
     with Image.open(texture_path) as texture:
         texture.load()
         if texture.size != (texture_size, texture_size):
@@ -193,7 +205,7 @@ def validate_item(item_path: Path, seen_ids: set[str]) -> tuple[str, int, int]:
     grouped_ids = {child for group in outliner for child in group.get("children", []) if isinstance(child, str)}
     if cube_ids != grouped_ids:
         fail(f"model outliner does not contain every cube exactly once: {item_id}")
-    return category, len(elements), texture_size
+    return category, len(elements), texture_size, item["rarity"]
 
 
 def validate_manifest() -> None:
@@ -227,10 +239,12 @@ def validate(require_slice: bool, require_full: bool) -> None:
     seen: set[str] = set()
     counts = {category: 0 for category in EXPECTED_CATEGORIES}
     names: set[tuple[str, str]] = set()
+    rarities: Counter[str] = Counter()
     shapes: set[tuple[str, str]] = set()
     geometry: set[tuple[str, str]] = set()
     for item_path in item_paths:
-        category, cubes, _ = validate_item(item_path, seen)
+        category, cubes, _, rarity = validate_item(item_path, seen)
+        rarities[rarity] += 1
         if category not in counts:
             fail(f"unregistered catalog category: {category}")
         counts[category] += 1
@@ -255,9 +269,34 @@ def validate(require_slice: bool, require_full: bool) -> None:
         print(f"OK {item_path.parent.name}: {cubes} cubes")
 
     catalog = json.loads((ASSET_ROOT / "catalog.json").read_text(encoding="utf-8"))
+    catalog_errors = sorted(CATALOG_VALIDATOR.iter_errors(catalog), key=lambda error: list(error.path))
+    if catalog_errors:
+        fail(f"catalog.json: {catalog_errors[0].message} at {list(catalog_errors[0].path)}")
     catalog_ids = [entry.get("id") for entry in catalog.get("items", [])]
     if set(catalog_ids) != seen or len(catalog_ids) != len(seen):
         fail("catalog.json item IDs do not match the validated item set")
+    rarity_by_id = {entry.get("id"): entry.get("rarity") for entry in catalog.get("items", [])}
+    if any(entry.get("rarity") != json.loads((ITEM_ROOT / entry["id"].split(":", 1)[1] / "item.json").read_text(encoding="utf-8"))["rarity"]
+           for entry in catalog.get("items", [])):
+        fail("catalog rarity values do not match item.json")
+    if Counter(rarity_by_id.values()) != rarities:
+        fail("catalog rarity distribution does not match the item assets")
+    if require_full or catalog.get("item_count") == 300:
+        if rarities.get("eternal", 0) != 5:
+            fail(f"full catalog must contain exactly five Eternal items, found {rarities.get('eternal', 0)}")
+        expected_eternal = {
+            "trinkies:hat_full_frost_circlet",
+            "trinkies:suit_full_crimson_mechanist",
+            "trinkies:back_full_aurora_drone",
+            "trinkies:pet_full_moss_crab",
+            "trinkies:aura_full_aurora_spectrum",
+        }
+        actual_eternal = {item_id for item_id, rarity in rarity_by_id.items() if rarity == "eternal"}
+        if actual_eternal != expected_eternal:
+            fail(f"Eternal item IDs changed unexpectedly: {sorted(actual_eternal)}")
+    if any(entry.get("preview") != f"items/{entry['id'].split(':', 1)[1]}/preview.png"
+           for entry in catalog.get("items", [])):
+        fail("catalog preview paths must match the transparent per-item model renders")
     item_count = catalog.get("item_count")
     if item_count is not None and item_count != len(seen):
         fail("catalog item_count does not match the validated items")

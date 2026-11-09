@@ -1,6 +1,6 @@
 # Trinkies contract and asset specification
 
-**Status:** The v1 contract and full 300-item asset catalog exist. The launcher has a cached catalog reader and an atomic per-instance equipped-state writer; hats are currently applied as launcher-side skin overlays. The Android source changes are not yet build-verified, the Fabric mod does not yet consume equipped state, and model samplers/renderers for catalog accessories remain unimplemented. The catalog is still marked unverified in-game.
+**Status:** The v1 contract and full 300-item asset catalog exist. The wardrobe displays a transparent, shaded 3D preview rasterized from each item's Blockbench cube geometry and rarity-colored cards; these are UI previews, not Minecraft renders. The catalog has exactly five Eternal items. The launcher has a cached catalog reader and an atomic per-instance equipped-state writer; hats use a launcher-side skin-overlay path whose in-game appearance is not visually verified. Non-hat gameplay renderers, the Fabric mod's equipped-state consumer, and cosmetic game verification remain unimplemented. The catalog is still marked unverified in-game.
 
 ## Cosmetic item JSON
 
@@ -9,7 +9,7 @@ Each item lives in `trinkies_assets/trinkies/items/<category>_<slug>/`. `item.js
 Required fields:
 
 - `id`: globally unique namespaced string, for example `trinkies:hat_copper_aviator`.
-- `category`, `name`, `description`, `rarity`, and `tags`. Rarity is a display grouping only; it never controls ownership, price, or unlocks.
+- `category`, `name`, `description`, `rarity`, and `tags`. Rarity is a display grouping only; it never controls ownership, price, or unlocks. The card backgrounds are Common green, Epic purple, Legendary gold, Mythic red, and Eternal silver; the full roster has exactly five Eternal items.
 - `model`: relative Blockbench `.bbmodel` path; `texture`: separate PNG path; optional `emissive_mask` and `particle_sheet` paths.
 - `attach`: player rig bone name and a three-number local offset.
 - `animations`: named clip IDs present in `animation_file`.
@@ -24,7 +24,7 @@ Example (shortened):
   "category": "hat",
   "name": "Copper Aviator",
   "description": "A riveted sky-pilot cap with twin teal lenses and a low wind brim.",
-  "rarity": "uncommon",
+  "rarity": "common",
   "tags": ["flight", "metal", "goggles"],
   "model": "model.bbmodel",
   "texture": "texture.png",
@@ -36,7 +36,7 @@ Example (shortened):
 }
 ```
 
-The full generated files and actual palette values are in the repository. They are source data, not screenshots or claims that the game renderer is complete.
+`catalog.json` is validated against [`schema/catalog.schema.json`](schema/catalog.schema.json); every entry contains a `preview` path to a transparent 128×128 shaded isometric PNG rendered from the item's actual cube geometry. This is a static launcher UI preview, not an in-game accessory renderer. The full generated files and actual palette values are in the repository.
 
 ## Blockbench model and rig contract
 

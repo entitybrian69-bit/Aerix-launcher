@@ -2,6 +2,7 @@
 """Verify the built client-only Trinkies JAR contains the full shared catalog pack."""
 import hashlib
 import json
+from collections import Counter
 import sys
 import zipfile
 from pathlib import Path
@@ -37,7 +38,7 @@ def main() -> int:
             for item in items:
                 category = item.get("category")
                 counts[category] = counts.get(category, 0) + 1
-                for field in ("item", "texture"):
+                for field in ("item", "texture", "preview"):
                     relative_path = item.get(field)
                     if not isinstance(relative_path, str) or not relative_path.startswith("items/"):
                         raise ValueError(f"invalid {field} asset path for {item.get('id')}")
@@ -46,6 +47,19 @@ def main() -> int:
                         raise ValueError(f"catalog asset is missing from the JAR: {jar_pathname}")
             if counts != EXPECTED_COUNTS or catalog.get("category_counts") != EXPECTED_COUNTS:
                 raise ValueError(f"unexpected category counts: {counts}")
+            rarity_counts = Counter(item.get("rarity") for item in items)
+            if rarity_counts != Counter({"common": 121, "epic": 64, "legendary": 61, "mythic": 49, "eternal": 5}):
+                raise ValueError(f"unexpected rarity distribution: {rarity_counts}")
+            eternal_ids = {item.get("id") for item in items if item.get("rarity") == "eternal"}
+            expected_eternal_ids = {
+                "trinkies:hat_full_frost_circlet",
+                "trinkies:suit_full_crimson_mechanist",
+                "trinkies:back_full_aurora_drone",
+                "trinkies:pet_full_moss_crab",
+                "trinkies:aura_full_aurora_spectrum",
+            }
+            if eternal_ids != expected_eternal_ids:
+                raise ValueError(f"unexpected Eternal items: {sorted(eternal_ids)}")
 
             manifest_name = "assets/trinkies/manifest.json"
             if manifest_name not in names:

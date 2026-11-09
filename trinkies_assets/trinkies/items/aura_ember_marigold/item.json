@@ -28,7 +28,7 @@
     "#FFF3A5"
   ],
   "particle_sheet": "texture.png",
-  "rarity": "uncommon",
+  "rarity": "common",
   "shape": "marigold_aura",
   "tags": [
     "ember",

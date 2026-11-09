@@ -4,7 +4,7 @@
 The original 30-row vertical slice stays hand-authored in generate_slice.py. This tool adds
 45 new family/theme combinations per category (270 additional items), reuses the shared
 Blockbench/texture/animation serializer, then writes the full catalog, SHA-256 manifest,
-300-row roster, and an all-item texture contact sheet.
+300-row roster, and transparent shaded 3D model preview icons/sheet.
 """
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ CATEGORY_LABEL = {
 }
 
 
-def draw_full_texture_sheet(records: list[dict[str, Any]]) -> Path:
+def draw_full_model_preview_sheet(records: list[dict[str, Any]]) -> Path:
     columns, cell_w, cell_h = 10, 174, 106
     margin, header = 12, 34
     rows = (len(records) + columns - 1) // columns
@@ -45,27 +45,26 @@ def draw_full_texture_sheet(records: list[dict[str, Any]]) -> Path:
         detail_font = ImageFont.truetype("DejaVuSans.ttf", 8)
     except OSError:
         title_font = name_font = detail_font = ImageFont.load_default()
-    draw.text((margin, 7), "TRINKIES · FULL 300 · GENERATED TEXTURE SWATCHES · NOT IN-GAME RENDERS",
+    draw.text((margin, 7), "TRINKIES · FULL 300 · SHADED 3D MODEL PREVIEWS · NOT IN-GAME RENDERS",
               fill=(231, 239, 236), font=title_font)
-    rarity_color = {"common": (113, 133, 145), "uncommon": (88, 182, 121), "rare": (98, 137, 230),
-                    "epic": (179, 111, 227), "legendary": (235, 179, 79)}
+    rarity_color = base.RARITY_ACCENT_RGB
     for index, record in enumerate(records):
         item = record["item"]
         x = margin + (index % columns) * cell_w
         y = margin + header + (index // columns) * cell_h
         color = rarity_color[item["rarity"]]
         draw.rectangle((x + 2, y + 2, x + cell_w - 3, y + cell_h - 3), fill=(31, 35, 41), outline=color, width=1)
-        texture_path = ITEM_ROOT / item["id"].split(":", 1)[1] / item["texture"]
-        with Image.open(texture_path) as source_texture:
-            texture = source_texture.convert("RGB")
-            texture.thumbnail((58, 58), Image.Resampling.NEAREST)
-            image.paste(texture, (x + 6, y + 6))
+        preview_path = ITEM_ROOT / item["id"].split(":", 1)[1] / "preview.png"
+        with Image.open(preview_path) as source_preview:
+            preview = source_preview.convert("RGBA")
+            preview.thumbnail((58, 58), Image.Resampling.NEAREST)
+            image.paste(preview, (x + 6, y + 6), preview)
         draw.text((x + 70, y + 7), item["name"][:17], fill=(243, 245, 240), font=name_font)
         draw.text((x + 70, y + 25), item["id"].split(":", 1)[1][:18], fill=(164, 180, 185), font=detail_font)
         draw.text((x + 70, y + 41), f"{CATEGORY_LABEL[item['category']]} · {item['rarity'].upper()}",
                   fill=color, font=detail_font)
         draw.text((x + 70, y + 56), f"{item['shape'][:18]}", fill=(130, 146, 151), font=detail_font)
-    output = DOCS_ROOT / "full-catalog-texture-sheet.png"
+    output = DOCS_ROOT / "full-catalog-model-preview-sheet.png"
     image.save(output, format="PNG", optimize=True, compress_level=9)
     return output
 
@@ -88,7 +87,7 @@ def write_roster(records: list[dict[str, Any]]) -> Path:
                 f"| {category} | `{item['id']}` | {item['name']} | `{item['shape']}` · "
                 f"{', '.join(item['palette'][:2])} | {item['rarity']} |"
             )
-    lines += ["", "See `full-catalog-texture-sheet.png` for generator texture swatches. These are texture samples, not model turnarounds or Minecraft screenshots.", ""]
+    lines += ["", "See `full-catalog-model-preview-sheet.png` for shaded 3D renders of the generated cube models. These are launcher/catalog previews, not Minecraft screenshots.", ""]
     output = DOCS_ROOT / "ROSTER.md"
     output.write_text("\n".join(lines), encoding="utf-8")
     return output
@@ -143,8 +142,10 @@ def generate() -> None:
             "id": item["id"], "category": item["category"], "name": item["name"],
             "rarity": item["rarity"], "description": item["description"],
             "item": (folder / "item.json").as_posix(),
-            "texture": (folder / item["texture"]).as_posix(), "shape": item["shape"],
-            "palette": item["palette"], "local_render_support": item["category"] == "hat",
+            "texture": (folder / item["texture"]).as_posix(),
+            "preview": (folder / "preview.png").as_posix(),
+            "shape": item["shape"], "palette": item["palette"],
+            "local_render_support": item["category"] == "hat",
         })
     if category_counts != {category: 50 for category in CATEGORY_ORDER}:
         raise SystemExit(f"Unexpected category counts: {category_counts}")
@@ -162,16 +163,16 @@ def generate() -> None:
     manifest = {"schema": base.SCHEMA_VERSION, "item_count": len(records), "sha256": file_hashes}
     (ASSET_ROOT / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     # Preserve the original 30-item model/animation illustration as a vertical-slice reference;
-    # the 300-entry roster and swatch sheet are generated separately above.
+    # the 300-entry roster and model-preview sheet are generated separately above.
     base.write_turnaround_sheet(records[:30])
     base.write_animation_strip(records[:30])
     roster_path = write_roster(records)
-    sheet_path = draw_full_texture_sheet(records)
+    sheet_path = draw_full_model_preview_sheet(records)
     print(f"Generated {len(records)} items with category counts {category_counts}")
     print(f"Catalog: {ASSET_ROOT / 'catalog.json'}")
     print(f"Manifest: {ASSET_ROOT / 'manifest.json'}")
     print(f"Roster: {roster_path}")
-    print(f"Texture swatches: {sheet_path}")
+    print(f"Model-preview sheet: {sheet_path}")
 
 
 if __name__ == "__main__":

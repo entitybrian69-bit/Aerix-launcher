@@ -28,7 +28,7 @@
     "#B6FFF7"
   ],
   "particle_sheet": "texture.png",
-  "rarity": "legendary",
+  "rarity": "mythic",
   "shape": "full_aura_rune_1",
   "tags": [
     "aurora",

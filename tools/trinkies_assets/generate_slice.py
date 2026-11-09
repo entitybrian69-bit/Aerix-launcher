@@ -23,6 +23,31 @@ ASSET_ROOT = ROOT / "trinkies_assets" / "trinkies"
 ITEM_ROOT = ASSET_ROOT / "items"
 DOCS_ROOT = ROOT / "docs" / "wardrobe"
 SCHEMA_VERSION = 1
+PREVIEW_SIZE = 128
+
+# The current wardrobe uses four named tiers plus exactly five one-off Eternal items.
+# The legacy source labels are normalized when item.json/catalog.json are written.
+RARITY_REMAP = {
+    "common": "common",
+    "uncommon": "common",
+    "rare": "epic",
+    "epic": "legendary",
+    "legendary": "mythic",
+}
+ETERNAL_ITEM_IDS = frozenset({
+    "trinkies:hat_full_frost_circlet",
+    "trinkies:suit_full_crimson_mechanist",
+    "trinkies:back_full_aurora_drone",
+    "trinkies:pet_full_moss_crab",
+    "trinkies:aura_full_aurora_spectrum",
+})
+RARITY_ACCENT_RGB = {
+    "common": (116, 232, 132),
+    "epic": (206, 151, 255),
+    "legendary": (255, 221, 112),
+    "mythic": (255, 112, 112),
+    "eternal": (225, 233, 240),
+}
 
 # Slug, display name, description, rarity, tags, shape, base colour, accent,
 # material recipe, attachment bone, animation recipe, emissive mask, suit mode.
@@ -533,6 +558,10 @@ def build_animations(category: str, motion: str, bones: list[str]) -> dict[str, 
 def item_record(row: tuple[Any, ...]) -> dict[str, Any]:
     category, slug, name, description, rarity, tags, shape, base, accent, material, bone, motion, emissive, suit_mode = row
     item_id = f"trinkies:{category}_{slug}"
+    source_rarity = rarity
+    rarity = "eternal" if item_id in ETERNAL_ITEM_IDS else RARITY_REMAP.get(source_rarity, "")
+    if not rarity:
+        raise ValueError(f"unsupported source rarity {source_rarity!r} for {item_id}")
     size = 32 if category == "aura" else (64 if category in ("hat", "emote") else 128)
     parts = shape_parts(shape)
     seed = stable_seed(item_id)
@@ -574,7 +603,9 @@ def item_record(row: tuple[Any, ...]) -> dict[str, Any]:
     if suit_mode:
         item["suit_mode"] = suit_mode
     (item_dir / "item.json").write_text(json.dumps(item, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    return {"item": item, "parts": parts, "palette_rgb": palette, "texture_size": size, "seed": seed, "animation": animation}
+    record = {"item": item, "parts": parts, "palette_rgb": palette, "texture_size": size, "seed": seed, "animation": animation}
+    write_model_preview(record)
+    return record
 
 
 def transform_point(point: tuple[float, float, float], bone: str, clip_data: dict[str, Any], time: float) -> tuple[float, float, float]:
@@ -639,6 +670,54 @@ def draw_cube_preview(draw: ImageDraw.ImageDraw, part: dict[str, Any], palette: 
         poly(indices, color)
 
 
+def write_model_preview(record: dict[str, Any]) -> Path:
+    """Rasterize one transparent, shaded isometric icon from the item's actual cube geometry."""
+    item = record["item"]
+    clips = record["animation"]["clips"]
+    clip_name = "idle" if "idle" in clips else ("play" if "play" in clips else next(iter(clips)))
+    clip_data = clips[clip_name]
+    yaw = math.radians(34)
+    projected: list[tuple[float, float, float]] = []
+    for part in record["parts"]:
+        x0, y0, z0 = part["from"]
+        x1, y1, z1 = part["to"]
+        for point in ((x, y, z) for x in (x0, x1) for y in (y0, y1) for z in (z0, z1)):
+            wx, wy, wz = transform_point(point, part["bone"], clip_data, 0.0)
+            rx = wx * math.cos(yaw) + wz * math.sin(yaw)
+            rz = -wx * math.sin(yaw) + wz * math.cos(yaw)
+            projected.append(((rx - rz) * 0.47, -wy * 0.72 + (rx + rz) * 0.25, rx + rz + wy * 0.2))
+    if not projected:
+        raise ValueError(f"cannot render empty Trinkies model: {item['id']}")
+    min_x = min(point[0] for point in projected)
+    max_x = max(point[0] for point in projected)
+    min_y = min(point[1] for point in projected)
+    max_y = max(point[1] for point in projected)
+    projected_width = max(max_x - min_x, 1.0)
+    projected_height = max(max_y - min_y, 1.0)
+    scale = min((PREVIEW_SIZE - 18) / projected_width,
+                (PREVIEW_SIZE - 18) / projected_height, 8.0)
+    center = (
+        (PREVIEW_SIZE - projected_width * scale) / 2 - min_x * scale,
+        (PREVIEW_SIZE - projected_height * scale) / 2 - min_y * scale,
+    )
+
+    image = Image.new("RGBA", (PREVIEW_SIZE, PREVIEW_SIZE), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(image)
+    bottom = center[1] + max_y * scale
+    shadow_width = max(10, min(44, projected_width * scale * 0.38))
+    shadow_height = max(4, shadow_width * 0.24)
+    shadow_center = center[0] + (min_x + max_x) * scale / 2
+    draw.ellipse((shadow_center - shadow_width / 2, bottom - shadow_height / 2 + 2,
+                  shadow_center + shadow_width / 2, bottom + shadow_height / 2 + 2),
+                 fill=(12, 16, 20, 56))
+    for part in sorted(record["parts"], key=lambda p: sum(p["from"]) + sum(p["to"])):
+        draw_cube_preview(draw, part, record["palette_rgb"], clip_data, 0.0, center, scale, yaw)
+
+    output = ITEM_ROOT / item["id"].split(":", 1)[1] / "preview.png"
+    image.save(output, format="PNG", optimize=False, compress_level=9)
+    return output
+
+
 def font(size: int = 12) -> ImageFont.ImageFont:
     try:
         return ImageFont.truetype("DejaVuSans.ttf", size)
@@ -662,7 +741,7 @@ def write_turnaround_sheet(records: list[dict[str, Any]]) -> Path:
         for col, record in enumerate(by_category[category]):
             x = margin + category_gutter + col * cell_w
             tile = record["texture_size"]
-            rarity_color = {"common": (113, 133, 145), "uncommon": (88, 182, 121), "rare": (98, 137, 230), "epic": (179, 111, 227), "legendary": (235, 179, 79)}[record["item"]["rarity"]]
+            rarity_color = RARITY_ACCENT_RGB[record["item"]["rarity"]]
             draw.rounded_rectangle((x + 50, y + 2, x + cell_w - 4, y + cell_h - 4), radius=5, fill=(31, 35, 41), outline=rarity_color, width=2)
             draw.text((x + 58, y + 7), record["item"]["name"], fill=(243, 245, 240), font=font(12))
             clip_name = "play" if "play" in record["animation"]["clips"] else ("signature" if "signature" in record["animation"]["clips"] else "idle")
@@ -731,7 +810,8 @@ def generate() -> None:
         folder = Path("items") / item["id"].split(":", 1)[1]
         catalog_items.append({"id": item["id"], "category": item["category"], "name": item["name"],
                               "rarity": item["rarity"], "item": (folder / "item.json").as_posix(),
-                              "texture": (folder / item["texture"]).as_posix()})
+                              "texture": (folder / item["texture"]).as_posix(),
+                              "preview": (folder / "preview.png").as_posix()})
     catalog = {"schema": SCHEMA_VERSION, "status": "vertical_slice_unverified_in_game", "items": catalog_items}
     (ASSET_ROOT / "catalog.json").write_text(json.dumps(catalog, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     file_hashes = {}

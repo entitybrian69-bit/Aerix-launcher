@@ -14,7 +14,7 @@
     "category": {"type": "string", "pattern": "^[a-z][a-z0-9_-]*$"},
     "name": {"type": "string", "minLength": 1, "maxLength": 64},
     "description": {"type": "string", "minLength": 1, "maxLength": 240},
-    "rarity": {"enum": ["common", "uncommon", "rare", "epic", "legendary"]},
+    "rarity": {"enum": ["common", "epic", "legendary", "mythic", "eternal"]},
     "tags": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-z0-9-]+$", "maxLength": 32}},
     "model": {"type": "string", "pattern": "^[a-zA-Z0-9_./-]+\\.bbmodel$"},
     "texture": {"type": "string", "pattern": "^[a-zA-Z0-9_./-]+\\.png$"},

@@ -28,7 +28,7 @@
     "#EACFFF"
   ],
   "particle_sheet": "texture.png",
-  "rarity": "uncommon",
+  "rarity": "common",
   "shape": "full_aura_rune_3",
   "tags": [
     "moonstone",

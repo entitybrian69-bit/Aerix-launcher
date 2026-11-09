@@ -1,4 +1,5 @@
 """Structural checks for Trinkies assets, local hat wiring and honest limitations."""
+from collections import Counter
 from pathlib import Path
 import json
 import unittest
@@ -33,12 +34,24 @@ class TrinkiesIntegrationSmoke(unittest.TestCase):
         self.assertEqual(catalog["category_counts"], expected_counts)
         self.assertEqual(catalog["status"], "full_catalog_unverified_in_game")
         self.assertTrue(all(item.get("description") for item in catalog["items"]))
+        self.assertEqual(Counter(item["rarity"] for item in catalog["items"]), {
+            "common": 121, "epic": 64, "legendary": 61, "mythic": 49, "eternal": 5
+        })
+        self.assertEqual({item["id"] for item in catalog["items"] if item["rarity"] == "eternal"}, {
+            "trinkies:hat_full_frost_circlet",
+            "trinkies:suit_full_crimson_mechanist",
+            "trinkies:back_full_aurora_drone",
+            "trinkies:pet_full_moss_crab",
+            "trinkies:aura_full_aurora_spectrum",
+        })
         hats = [item for item in catalog["items"] if item["category"] == "hat"]
         self.assertEqual(len(hats), 50)
         self.assertTrue(all(item["local_render_support"] for item in hats))
         self.assertTrue(all(not item["local_render_support"] for item in catalog["items"] if item["category"] != "hat"))
         for item in catalog["items"]:
             self.assertTrue((ROOT / "trinkies_assets/trinkies" / item["texture"]).is_file(), item["id"])
+            self.assertEqual(item["preview"], f"items/{item['id'].split(':', 1)[1]}/preview.png")
+            self.assertTrue((ROOT / "trinkies_assets/trinkies" / item["preview"]).is_file(), item["id"])
 
         app_gradle = (ROOT / "app_pojavlauncher/build.gradle").read_text()
         mod_gradle = (ROOT / "aerix_client_mod/build.gradle").read_text()
@@ -70,6 +83,9 @@ class TrinkiesIntegrationSmoke(unittest.TestCase):
 
         self.assertIn('assets.open(ASSET_CATALOG)', reader)
         self.assertIn('textureAsset = "trinkies/$relativeTexture"', reader)
+        self.assertIn('previewAsset = "trinkies/$relativePreview"', reader)
+        self.assertIn("context.assets.open(it.previewAsset)", wardrobe)
+        self.assertIn('"eternal" to TrinkiesRarityStyle', wardrobe)
         self.assertIn('TrinkiesCatalog.find(context, hatId)', cosmetics)
         self.assertIn('catalogHat.shape.lowercase()', cosmetics)
         for family in ("spire", "hood", "halo", "aviator", "circlet", "visor", "antlers", "wreath", "mask"):
@@ -121,7 +137,9 @@ class TrinkiesIntegrationSmoke(unittest.TestCase):
         self.assertIn("Vanilla, Forge and NeoForge instances are not modified", wardrobe)
         self.assertIn("when it and the server allow", wardrobe)
         self.assertIn("remote viewers are not guaranteed to see them", wardrobe)
-        self.assertIn("in-game renderer is not enabled in this build", wardrobe)
+        self.assertIn("shaded 3D model previews", wardrobe)
+        self.assertIn("In-game equip support for this category is in progress", wardrobe)
+        self.assertNotIn("CATALOG ONLY · NO RENDERER", wardrobe)
 
 
 if __name__ == "__main__":

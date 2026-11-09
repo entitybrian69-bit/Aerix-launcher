@@ -28,7 +28,7 @@
     "#FFFDC6"
   ],
   "particle_sheet": "texture.png",
-  "rarity": "uncommon",
+  "rarity": "common",
   "shape": "full_aura_ember_4",
   "tags": [
     "stardust",

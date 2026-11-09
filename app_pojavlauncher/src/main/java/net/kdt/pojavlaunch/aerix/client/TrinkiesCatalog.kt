@@ -11,8 +11,10 @@ data class TrinkiesCatalogItem(
     val name: String,
     val description: String,
     val rarity: String,
-    /** Android asset path, e.g. `trinkies/items/hat_full_frost_spire/texture.png`. */
+    /** Source texture atlas used by skin overlays and model previews. */
     val textureAsset: String,
+    /** Transparent, shaded isometric render of the Blockbench cubes for the wardrobe card. */
+    val previewAsset: String,
     val shape: String,
     val palette: List<String>,
     val locallyRendered: Boolean
@@ -43,8 +45,10 @@ object TrinkiesCatalog {
                         val id = item.optString("id")
                         val category = item.optString("category")
                         val relativeTexture = item.optString("texture")
+                        val relativePreview = item.optString("preview", relativeTexture)
                         if (!id.startsWith("trinkies:") || category !in CATEGORIES ||
-                            !ID_PATTERN.matches(id) || !ASSET_PATH_PATTERN.matches(relativeTexture)) {
+                            !ID_PATTERN.matches(id) || !ASSET_PATH_PATTERN.matches(relativeTexture) ||
+                            !PREVIEW_PATH_PATTERN.matches(relativePreview)) {
                             throw IllegalArgumentException("Invalid Trinkies catalog entry at index $index")
                         }
                         val paletteJson = item.optJSONArray("palette")
@@ -66,6 +70,7 @@ object TrinkiesCatalog {
                                 description = item.optString("description"),
                                 rarity = item.optString("rarity", "common"),
                                 textureAsset = "trinkies/$relativeTexture",
+                                previewAsset = "trinkies/$relativePreview",
                                 shape = item.optString("shape"),
                                 palette = palette,
                                 locallyRendered = item.optBoolean("local_render_support", false)
@@ -96,5 +101,6 @@ object TrinkiesCatalog {
     private val CATEGORIES = setOf("hat", "suit", "back", "pet", "emote", "aura")
     private val ID_PATTERN = Regex("trinkies:[a-z0-9_]+")
     private val ASSET_PATH_PATTERN = Regex("items/[a-z0-9_]+/texture\\.png")
+    private val PREVIEW_PATH_PATTERN = Regex("items/[a-z0-9_]+/(?:preview|texture)\\.png")
     private val COLOR_PATTERN = Regex("#[0-9A-Fa-f]{6}")
 }

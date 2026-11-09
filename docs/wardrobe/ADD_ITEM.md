@@ -20,7 +20,7 @@ The current generated roster is a fixed **300-item catalog**: 50 entries in each
    python tools/trinkies_assets/validate_catalog.py --require-full
    ```
 
-   `generate_full_catalog.py` emits all item folders, `catalog.json`, the SHA-256 manifest, `docs/wardrobe/ROSTER.md`, and the 300-item texture sheet. It also regenerates the original vertical-slice reference sheets. `generate_slice.py` alone writes only the original 30-item slice and must not be used to refresh the full pack.
+   `generate_full_catalog.py` emits all item folders, transparent shaded 3D previews, `catalog.json`, the SHA-256 manifest, `docs/wardrobe/ROSTER.md`, and the 300-item model-preview sheet. It also regenerates the original vertical-slice reference sheets. `generate_slice.py` alone writes only the original 30-item slice and must not be used to refresh the full pack.
 4. Inspect the generated diffs, ensure no user-authored files were pruned, and keep the compressed asset pack below 15 MiB. The full generator prunes only item folders listed in the previous manifest.
 5. Open changed `.bbmodel` files in Blockbench, inspect the UVs and pivots, then render and review them in Minecraft on classic/slim players before calling them accepted. The offline validator is structural only; it does not review art or render in-game.
 

@@ -28,7 +28,7 @@
     "#FFFDC6"
   ],
   "particle_sheet": "texture.png",
-  "rarity": "legendary",
+  "rarity": "mythic",
   "shape": "full_aura_snow_4",
   "tags": [
     "stardust",

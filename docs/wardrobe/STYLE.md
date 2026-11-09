@@ -4,7 +4,7 @@
 
 The vertical slice uses small, deliberately readable silhouettes with one strong focal accent and a compact palette. The catalog should feel like one handmade voxel collection, not a stack of hue-swapped templates. Use clean cube edges, directional lighting from above-left, cooler shadows, warmer highlights, and restrained glow. Distinguish siblings by silhouette, negative space, material and motion first; color is secondary.
 
-All current art is procedural output from `tools/trinkies_assets/generate_slice.py` plus the hand-authored cube recipes in that file. It is original work for this repository. No Minecraft skin atlas, Mojang character/mob art, Millida assets, scraped images, or third-party models are sampled. The procedural icons/contact sheet are engineering previews, not final in-game screenshots.
+All current art is procedural output from `tools/trinkies_assets/generate_slice.py` plus the hand-authored cube recipes in that file. It is original work for this repository. No Minecraft skin atlas, Mojang character/mob art, Millida assets, scraped images, or third-party models are sampled. The transparent per-item 3D preview icons and model-preview sheet are engineering previews rasterized from the generated cube geometry, not final in-game renders or screenshots.
 
 ## Palette and material recipes
 

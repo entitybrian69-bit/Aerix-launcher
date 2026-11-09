@@ -28,7 +28,7 @@
     "#D3EEFF"
   ],
   "particle_sheet": "texture.png",
-  "rarity": "uncommon",
+  "rarity": "common",
   "shape": "full_aura_leaf_0",
   "tags": [
     "monsoon",

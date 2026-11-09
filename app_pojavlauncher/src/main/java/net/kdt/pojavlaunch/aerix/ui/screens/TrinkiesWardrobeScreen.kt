@@ -111,6 +111,19 @@ private val wardrobePanel = Color(0xFF222427)
 private val wardrobePanelRaised = Color(0xFF2A2C30)
 private val wardrobePixelFont = FontFamily(Font(R.font.minecraft_ten))
 
+private data class TrinkiesRarityStyle(val background: Color, val accent: Color)
+
+private val trinkiesRarityStyles = mapOf(
+    "common" to TrinkiesRarityStyle(Color(0xFF1D6233), Color(0xFF82E394)),
+    "epic" to TrinkiesRarityStyle(Color(0xFF4D2674), Color(0xFFD0A0FF)),
+    "legendary" to TrinkiesRarityStyle(Color(0xFF76540C), Color(0xFFFFDF75)),
+    "mythic" to TrinkiesRarityStyle(Color(0xFF7A2028), Color(0xFFFF8989)),
+    "eternal" to TrinkiesRarityStyle(Color(0xFF59646F), Color(0xFFE5EBF0))
+)
+
+private fun trinkiesRarityStyle(rarity: String): TrinkiesRarityStyle =
+    trinkiesRarityStyles[rarity.lowercase()] ?: TrinkiesRarityStyle(wardrobePanelRaised, wardrobeGreen)
+
 private data class WardrobePose(val label: String, val animation: String)
 
 private val wardrobePoses = listOf(
@@ -545,12 +558,12 @@ private fun categorySubtitle(category: WardrobeCategory, context: android.conten
     WardrobeCategory.SHOP -> "Online catalog · unavailable in this build"
     WardrobeCategory.SKINS -> "Minecraft skins and saved presets"
     WardrobeCategory.CAPES -> "Animated client capes and imported PNGs"
-    WardrobeCategory.HEADWEAR -> "${TrinkiesCatalog.category(context, "hat").size} hats · overlay unverified in-game"
-    WardrobeCategory.SUITS -> "${TrinkiesCatalog.category(context, "suit").size} catalog assets · renderer not yet enabled"
-    WardrobeCategory.BACK_ITEMS -> "Animated capes work · ${TrinkiesCatalog.category(context, "back").size} models are catalog-only"
-    WardrobeCategory.PETS -> "${TrinkiesCatalog.category(context, "pet").size} catalog assets · pet follower renderer not yet enabled"
-    WardrobeCategory.EMOTES -> "${TrinkiesCatalog.category(context, "emote").size} catalog assets · emote animation renderer not yet enabled"
-    WardrobeCategory.AURAS -> "${TrinkiesCatalog.category(context, "aura").size} catalog assets · particle renderer not yet enabled"
+    WardrobeCategory.HEADWEAR -> "${TrinkiesCatalog.category(context, "hat").size} hats · 3D previews · local skin overlay"
+    WardrobeCategory.SUITS -> "${TrinkiesCatalog.category(context, "suit").size} shaded 3D previews · in-game equip support in progress"
+    WardrobeCategory.BACK_ITEMS -> "Animated capes work · ${TrinkiesCatalog.category(context, "back").size} shaded 3D previews"
+    WardrobeCategory.PETS -> "${TrinkiesCatalog.category(context, "pet").size} shaded 3D previews · follower support in progress"
+    WardrobeCategory.EMOTES -> "${TrinkiesCatalog.category(context, "emote").size} shaded 3D previews · in-game emotes in progress"
+    WardrobeCategory.AURAS -> "${TrinkiesCatalog.category(context, "aura").size} shaded 3D previews · in-game effects in progress"
 }
 
 @Composable
@@ -781,7 +794,7 @@ private fun HeadwearCollection(activity: FragmentActivity, accent: Color) {
     val context = LocalContext.current
     val hats = remember { TrinkiesCatalog.category(context, "hat") }
     Text(
-        "${hats.size} hats from the bundled catalog. The launcher applies a pixel-art outer-head skin overlay; its in-game appearance is not yet visually verified, and remote visibility is not guaranteed.",
+        "${hats.size} hats with shaded 3D model previews. Hats can use the local outer-head skin overlay when a custom/imported skin is available; in-game appearance is not yet visually verified, and remote visibility is not guaranteed.",
         color = AerixSurface.textSecondary, fontSize = 9.sp, lineHeight = 12.sp
     )
     TrinkiesCatalogGrid(activity, hats, accent, includeNone = true)
@@ -791,11 +804,8 @@ private fun HeadwearCollection(activity: FragmentActivity, accent: Color) {
 private fun TrinkiesCatalogCollection(activity: FragmentActivity, category: String, accent: Color) {
     val context = LocalContext.current
     val items = remember(category) { TrinkiesCatalog.category(context, category) }
-    val rendererAvailable = items.any { it.locallyRendered }
     Text(
-        "${items.size} original ${category.replaceFirstChar { it.uppercase() }} catalog items. " +
-            if (rendererAvailable) "Choose a supported item to equip it locally."
-            else "Assets and previews are available; this category's in-game renderer is not enabled in this build.",
+        "${items.size} ${category.replaceFirstChar { it.uppercase() }} items with shaded 3D model previews. In-game equip support for this category is in progress.",
         color = AerixSurface.textSecondary, fontSize = 9.sp, lineHeight = 12.sp
     )
     TrinkiesCatalogGrid(activity, items, accent)
@@ -855,7 +865,7 @@ private fun CatalogItemCard(
         value = withContext(Dispatchers.IO) {
             item?.let {
                 runCatching {
-                    context.assets.open(it.textureAsset).use { stream ->
+                    context.assets.open(it.previewAsset).use { stream ->
                         BitmapFactory.decodeStream(stream)?.asImageBitmap()
                     }
                 }.getOrNull()
@@ -864,11 +874,12 @@ private fun CatalogItemCard(
     }
     val imageBitmap = bitmap
     val equipped = item == null || item.locallyRendered
+    val rarityStyle = item?.let { trinkiesRarityStyle(it.rarity) }
     Surface(
         modifier = modifier.clickable(enabled = equipped, onClick = onClick),
         shape = RoundedCornerShape(0.dp),
-        color = if (selected) accent.copy(alpha = 0.18f) else AerixSurface.panelRaised.copy(alpha = if (equipped) 0.72f else 0.45f),
-        border = BorderStroke(AerixSpacing.hairline, if (selected) accent else AerixSurface.borderSoft)
+        color = rarityStyle?.background ?: AerixSurface.panelRaised,
+        border = BorderStroke(AerixSpacing.hairline, if (selected) Color.White else rarityStyle?.accent ?: AerixSurface.borderSoft)
     ) {
         Column(
             Modifier.fillMaxWidth().padding(6.dp),
@@ -877,9 +888,9 @@ private fun CatalogItemCard(
         ) {
             if (imageBitmap != null) {
                 Image(imageBitmap, contentDescription = item?.name, contentScale = ContentScale.Fit,
-                    modifier = Modifier.size(48.dp).clip(RoundedCornerShape(0.dp)))
+                    modifier = Modifier.size(68.dp).clip(RoundedCornerShape(0.dp)))
             } else {
-                Box(Modifier.size(48.dp).background(accent.copy(alpha = 0.13f)), contentAlignment = Alignment.Center) {
+                Box(Modifier.size(68.dp).background(accent.copy(alpha = 0.13f)), contentAlignment = Alignment.Center) {
                     Icon(painterResource(R.drawable.aerix_ic_styler_outlined), contentDescription = null,
                         tint = if (selected) accent else AerixSurface.textSecondary, modifier = Modifier.size(24.dp))
                 }
@@ -894,10 +905,10 @@ private fun CatalogItemCard(
                 when {
                     selected -> "EQUIPPED · LOCAL"
                     item == null -> "RESTORE ORIGINAL SKIN"
-                    item.locallyRendered -> item.rarity.uppercase()
-                    else -> "CATALOG ONLY · NO RENDERER"
+                    item.locallyRendered -> "${item.rarity.uppercase()} · HAT"
+                    else -> "3D PREVIEW · ${item.rarity.uppercase()}"
                 },
-                color = if (selected) accent else AerixSurface.textSecondary,
+                color = if (selected) accent else rarityStyle?.accent ?: AerixSurface.textSecondary,
                 fontSize = 6.sp, fontFamily = FontFamily.Monospace, maxLines = 1, overflow = TextOverflow.Ellipsis
             )
         }
