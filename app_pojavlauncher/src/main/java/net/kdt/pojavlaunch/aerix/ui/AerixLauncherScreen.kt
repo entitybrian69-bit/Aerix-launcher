@@ -105,6 +105,7 @@ import net.kdt.pojavlaunch.aerix.ui.screens.OfflineAccountScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.SettingsScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.ServersScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.SocialsScreen
+import net.kdt.pojavlaunch.aerix.ui.screens.SocialsNavigation
 import net.kdt.pojavlaunch.aerix.ui.screens.WallpapersScreen
 
 @Composable
@@ -183,9 +184,9 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
         // itself stays clear of the camera cutout and of the system bars.
         Box(modifier = Modifier.fillMaxSize().padding(AerixWindowInsets.padding())) {
             Row(modifier = Modifier.fillMaxSize()) {
-                // The social space has its own sidebar and takes the whole window; every other
-                // section keeps the launcher's rail.
-                if (section != LauncherSection.SOCIALS) {
+                // Socials has its own navigation; the wardrobe uses its Lobby header. The utility
+                // rail at the far right stays in the shell for every destination.
+                if (section != LauncherSection.SOCIALS && section != LauncherSection.TRINKIES_WARDROBE) {
                     AerixNavigationRail(
                         selectedSection = section,
                         onNavigate = navigate,
@@ -270,6 +271,19 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
                         )
                     }
                 }
+                // Keep Home's utility shortcuts pinned to the launcher shell so they remain
+                // available while any destination from this rail is open.
+                AerixHomeUtilityRail(
+                    selectedSection = section,
+                    onNavigate = navigate,
+                    onOpenProfile = {
+                        SocialsNavigation.requestMyProfile()
+                        navigate(LauncherSection.SOCIALS)
+                    },
+                    onQuickTools = { navigate(LauncherSection.QUICK_TOOLS) },
+                    onInstances = { navigate(LauncherSection.INSTANCE_SELECTOR) },
+                    onWardrobe = { navigate(LauncherSection.TRINKIES_WARDROBE) }
+                )
             }
 
             FestivalTitleText(

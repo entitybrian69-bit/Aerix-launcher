@@ -258,7 +258,8 @@ fun AerixSkinPreview3D(
     useClientCape: Boolean = false,
     showOfficialCape: Boolean = false,
     animationName: String? = null,
-    applyClientHat: Boolean = false
+    applyClientHat: Boolean = false,
+    cameraDistance: Int = 60
 ) {
     val context = LocalContext.current
     val playerSkin = remember { AerixPlayerSkin(context.applicationContext) }
@@ -268,7 +269,7 @@ fun AerixSkinPreview3D(
     var webglPainted by remember { mutableStateOf(false) }
     var fallbackBody by remember { mutableStateOf<ImageBitmap?>(null) }
     var skinLoadTrigger by remember { mutableIntStateOf(0) }
-    val cameraAngles = remember { Channel<Pair<Int, Int>>(Channel.CONFLATED) }
+    val cameraAngles = remember { Channel<Triple<Int, Int, Int>>(Channel.CONFLATED) }
 
     DisposableEffect(playerSkin) {
         playerSkin.viewerReadyCallback = {
@@ -377,14 +378,14 @@ fun AerixSkinPreview3D(
                 playerSkin.setRenderPaused(true)
             }
         }
-        LaunchedEffect(ready, azimuth, pitch, isVisible) {
+        LaunchedEffect(ready, azimuth, pitch, cameraDistance, isVisible) {
             if (!ready || !isVisible) return@LaunchedEffect
-            cameraAngles.trySend(azimuth to pitch)
+            cameraAngles.trySend(Triple(azimuth, pitch, cameraDistance.coerceIn(24, 120)))
         }
         LaunchedEffect(ready, isVisible) {
             if (!ready || !isVisible) return@LaunchedEffect
-            for ((azimuthDeg, pitchDeg) in cameraAngles) {
-                playerSkin.setAzimuthAndPitch(azimuthDeg, pitchDeg)
+            for ((azimuthDeg, pitchDeg, distance) in cameraAngles) {
+                playerSkin.setAzimuthAndPitch(azimuthDeg, pitchDeg, distance)
                 delay(16)
             }
         }

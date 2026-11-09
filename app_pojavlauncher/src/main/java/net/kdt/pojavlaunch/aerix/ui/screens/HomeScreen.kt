@@ -114,7 +114,6 @@ import net.kdt.pojavlaunch.aerix.theme.AerixSpacing
 import net.kdt.pojavlaunch.aerix.theme.AerixSurface
 import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
 import net.kdt.pojavlaunch.aerix.client.TrinkiesInstaller
-import net.kdt.pojavlaunch.aerix.ui.AerixHomeUtilityRail
 import net.kdt.pojavlaunch.aerix.ui.AerixNav
 import net.kdt.pojavlaunch.aerix.ui.LauncherSection
 import net.kdt.pojavlaunch.contracts.OpenDocumentWithExtension
@@ -212,27 +211,13 @@ fun HomeScreen(activity: FragmentActivity, navigate: (LauncherSection) -> Unit) 
         wardrobe = { navigate(LauncherSection.TRINKIES_WARDROBE) }
     )
 
-    Row(modifier = Modifier.fillMaxSize()) {
-        HomeCharacterStage(
-            selected = selected,
-            actions = actions,
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxHeight()
-                .padding(start = AerixSpacing.mdPlus, end = AerixSpacing.xs, top = AerixSpacing.smPlus, bottom = AerixSpacing.smPlus)
-        )
-        AerixHomeUtilityRail(
-            selectedSection = LauncherSection.HOME,
-            onNavigate = navigate,
-            onOpenProfile = {
-                SocialsNavigation.requestMyProfile()
-                navigate(LauncherSection.SOCIALS)
-            },
-            onQuickTools = actions.quickTools,
-            onInstances = actions.instanceSelector,
-            onWardrobe = actions.wardrobe
-        )
-    }
+    HomeCharacterStage(
+        selected = selected,
+        actions = actions,
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(start = AerixSpacing.mdPlus, end = AerixSpacing.xs, top = AerixSpacing.smPlus, bottom = AerixSpacing.smPlus)
+    )
 }
 
 /** Empty launcher dashboard: the 360° character is the hero, with instance selection and Play
@@ -271,12 +256,18 @@ private fun HomeCharacterStage(
                     style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1)
             }
             Surface(
+                onClick = actions.accounts,
                 shape = RoundedCornerShape(999.dp),
-                color = AerixSurface.panel.copy(alpha = 0.8f),
-                border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft)
+                color = if (account == null) accent.copy(alpha = 0.16f) else AerixSurface.panel.copy(alpha = 0.8f),
+                border = BorderStroke(AerixSpacing.hairline, if (account == null) accent.copy(alpha = 0.7f) else AerixSurface.borderSoft)
             ) {
-                Text("DRAG TO ROTATE", color = AerixSurface.textSecondary, fontSize = 9.sp,
-                    fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp))
+                Text(
+                    if (account == null) "ADD MINECRAFT ACCOUNT" else "DRAG TO ROTATE",
+                    color = if (account == null) accent else AerixSurface.textSecondary,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                )
             }
         }
 
@@ -285,8 +276,6 @@ private fun HomeCharacterStage(
                 .weight(1f)
                 .fillMaxWidth()
                 .padding(horizontal = AerixSpacing.smPlus)
-                .clip(RoundedCornerShape(AerixRadii.card))
-                .background(AerixSurface.canvas.copy(alpha = 0.28f))
                 .drawWithCache {
                     val glow = Brush.radialGradient(
                         colors = listOf(accent.copy(alpha = 0.18f), Color.Transparent),
@@ -303,7 +292,7 @@ private fun HomeCharacterStage(
                             velocityTracker.resetTracking()
                         },
                         onDragEnd = {
-                            val releaseVelocity = velocityTracker.calculateVelocity().x * DOLL_DRAG_DEG_PER_PX
+                            val releaseVelocity = -velocityTracker.calculateVelocity().x * DOLL_DRAG_DEG_PER_PX
                             flingJob?.cancel()
                             if (abs(releaseVelocity) < DOLL_FLING_MIN_VELOCITY) {
                                 flingJob = null
@@ -326,7 +315,7 @@ private fun HomeCharacterStage(
                         onDragCancel = { flingJob?.cancel(); flingJob = null },
                         onHorizontalDrag = { change, dragAmount ->
                             velocityTracker.addPosition(change.uptimeMillis, change.position)
-                            dollAzimuth = (dollAzimuth + dragAmount * DOLL_DRAG_DEG_PER_PX).mod(360f)
+                            dollAzimuth = (dollAzimuth - dragAmount * DOLL_DRAG_DEG_PER_PX).mod(360f)
                         }
                     )
                 },
@@ -340,19 +329,9 @@ private fun HomeCharacterStage(
                 showOfficialCape = true,
                 animationName = "NewIdle",
                 applyClientHat = true,
+                cameraDistance = 34,
                 modifier = Modifier.fillMaxSize().padding(horizontal = 18.dp, vertical = 8.dp)
             )
-            Surface(
-                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = AerixSpacing.sm),
-                shape = RoundedCornerShape(AerixRadii.compact),
-                color = AerixSurface.canvas.copy(alpha = 0.92f),
-                border = BorderStroke(AerixSpacing.hairline, accent.copy(alpha = 0.48f)),
-                onClick = actions.accounts
-            ) {
-                Text(account?.username ?: "Add Minecraft account", color = if (account == null) accent else Color.White,
-                    fontSize = 10.sp, fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = AerixSpacing.smPlus, vertical = AerixSpacing.tiny))
-            }
         }
 
         Surface(
@@ -458,7 +437,7 @@ private fun ActionMenuCard(
                                 dollVelocityTracker.resetTracking()
                             },
                             onDragEnd = {
-                                val releaseVelocity = dollVelocityTracker.calculateVelocity().x * DOLL_DRAG_DEG_PER_PX
+                                val releaseVelocity = -dollVelocityTracker.calculateVelocity().x * DOLL_DRAG_DEG_PER_PX
                                 dollFlingJob?.cancel()
                                 if (abs(releaseVelocity) < DOLL_FLING_MIN_VELOCITY) {
                                     dollFlingJob = null
@@ -484,7 +463,7 @@ private fun ActionMenuCard(
                             },
                             onHorizontalDrag = { change, dragAmount ->
                                 dollVelocityTracker.addPosition(change.uptimeMillis, change.position)
-                                dollAzimuth = (dollAzimuth + dragAmount * DOLL_DRAG_DEG_PER_PX).mod(360f)
+                                dollAzimuth = (dollAzimuth - dragAmount * DOLL_DRAG_DEG_PER_PX).mod(360f)
                             }
                         )
                     },

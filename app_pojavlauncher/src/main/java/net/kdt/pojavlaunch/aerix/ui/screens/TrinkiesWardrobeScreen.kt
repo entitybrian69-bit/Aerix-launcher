@@ -1,5 +1,6 @@
 package net.kdt.pojavlaunch.aerix.ui.screens
 
+import android.content.res.Configuration
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -15,7 +16,6 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -30,7 +30,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -46,7 +45,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -63,22 +64,43 @@ import net.kdt.pojavlaunch.aerix.client.AerixClientCosmetics
 import net.kdt.pojavlaunch.aerix.client.AerixClientStore
 import net.kdt.pojavlaunch.aerix.components.AerixSkinPreview3D
 import net.kdt.pojavlaunch.aerix.social.SocialBackend
-import net.kdt.pojavlaunch.aerix.theme.AerixRadii
 import net.kdt.pojavlaunch.aerix.theme.AerixSpacing
 import net.kdt.pojavlaunch.aerix.theme.AerixSurface
-import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
+import net.kdt.pojavlaunch.aerix.ui.AerixNav
 import net.kdt.pojavlaunch.aerix.ui.LauncherSection
 import java.util.concurrent.atomic.AtomicBoolean
 
 private enum class WardrobeCategory(val title: String, val icon: Int) {
+    LOOKS("Looks", R.drawable.aerix_ic_style_outlined),
+    SHOP("Shop", R.drawable.aerix_ic_cloud_download),
     SKINS("Skins", R.drawable.aerix_ic_person_outlined),
     CAPES("Capes", R.drawable.aerix_ic_style_outlined),
-    HEADWEAR("Headwear", R.drawable.aerix_ic_styler_outlined),
-    SUITS("Suits / Body", R.drawable.aerix_ic_format_paint_outlined),
-    BACK_ITEMS("Back Items", R.drawable.aerix_ic_favorite_outlined),
-    PETS("Pets", R.drawable.aerix_ic_people),
-    EMOTES("Emotes", R.drawable.aerix_ic_touch_app_outlined)
+    HEADWEAR("Head", R.drawable.aerix_ic_styler_outlined),
+    SUITS("Body", R.drawable.aerix_ic_format_paint_outlined),
+    BACK_ITEMS("Back", R.drawable.aerix_ic_favorite_outlined),
+    PETS("Pets", R.drawable.aerix_ic_people)
 }
+
+private enum class WardrobeFilter(val title: String) {
+    MINE("Mine"), POPULAR("Popular"), NEW("New"), RANDOM("Random")
+}
+
+private val wardrobeCategories = listOf(
+    WardrobeCategory.LOOKS,
+    WardrobeCategory.SHOP,
+    WardrobeCategory.SKINS,
+    WardrobeCategory.CAPES,
+    WardrobeCategory.HEADWEAR,
+    WardrobeCategory.SUITS,
+    WardrobeCategory.BACK_ITEMS,
+    WardrobeCategory.PETS
+)
+
+private val wardrobeGreen = Color(0xFF5CC84B)
+private val wardrobeCanvas = Color(0xFF18191B)
+private val wardrobePanel = Color(0xFF222427)
+private val wardrobePanelRaised = Color(0xFF2A2C30)
+private val wardrobePixelFont = FontFamily(Font(R.font.minecraft_ten))
 
 private data class WardrobePose(val label: String, val animation: String)
 
@@ -106,16 +128,18 @@ private val trinkiesHats = listOf(
     TrinkiesHat("sakura_bow", "Sakura Bow", "Rose-pink pixel bow", Color(0xFFFF79B0))
 )
 
-/** Trinkies cosmetics hub: existing account skins, animated client capes, headwear and preview poses. */
+/** Trinkies cosmetics hub, arranged like the compact pixel-art wardrobe reference. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun TrinkiesWardrobeScreen(activity: FragmentActivity, navigate: (LauncherSection) -> Unit) {
-    val accent = AerixThemeManager.currentAccent()
+    val accent = wardrobeGreen
     val account = PojavAccountBridge.current
-    var category by remember { mutableStateOf(WardrobeCategory.CAPES) }
+    var category by remember { mutableStateOf(WardrobeCategory.SKINS) }
+    var filter by remember { mutableStateOf(WardrobeFilter.MINE) }
     var pose by remember { mutableStateOf("NewIdle") }
     var savedSkins by remember { mutableStateOf<List<AerixSkinPreset>>(emptyList()) }
     val wardrobeRevision = PojavAccountBridge.wardrobeRevision
+    val configuration = LocalConfiguration.current
 
     LaunchedEffect(Unit) {
         PojavAccountBridge.ensureLoaded()
@@ -153,66 +177,85 @@ fun TrinkiesWardrobeScreen(activity: FragmentActivity, navigate: (LauncherSectio
         }
     }
 
-    AerixPage(
-        title = "Trinkies · Cosmetics & Wardrobe",
-        subtitle = "Build a look, preview it in 3D, and choose what your client can display"
+    BoxWithConstraints(
+        modifier = Modifier.fillMaxSize().background(wardrobeCanvas).padding(5.dp)
     ) {
-        BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
-            val compact = maxWidth < 680.dp || maxHeight < 560.dp
-            if (compact) {
-                Column(
-                    Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
+        val wideLayout = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE || maxWidth >= 760.dp
+        Column(
+            modifier = Modifier.fillMaxSize()
+                .border(1.dp, Color(0xFF37393C), RoundedCornerShape(0.dp))
+                .background(wardrobeCanvas)
+                .padding(5.dp),
+            verticalArrangement = Arrangement.spacedBy(5.dp)
+        ) {
+            WardrobeTopBar(
+                onLobby = { AerixNav.finishTo(LauncherSection.HOME) },
+                onImport = {
+                    if (account == null) navigate(LauncherSection.ACCOUNTS)
+                    else skinPicker.launch(arrayOf("image/png"))
+                },
+                onUploadSkin = {
+                    if (account == null) navigate(LauncherSection.ACCOUNTS)
+                    else {
+                        SocialsNavigation.requestMyProfile()
+                        navigate(LauncherSection.SOCIALS)
+                    }
+                }
+            )
+
+            if (wideLayout) {
+                Row(
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    TrinkiesCompatibilityBanner(accent)
-                    WardrobeCategoryTabs(category, accent) { category = it }
                     WardrobePreviewPanel(
                         account = account,
-                        category = category,
                         pose = pose,
                         onPose = { pose = it },
-                        modifier = Modifier.fillMaxWidth().height(270.dp)
+                        modifier = Modifier.weight(0.40f).fillMaxHeight()
                     )
                     WardrobeCollectionPanel(
                         activity = activity,
                         account = account,
                         category = category,
+                        onCategory = { category = it },
+                        filter = filter,
+                        onFilter = { filter = it },
                         accent = accent,
                         savedSkins = savedSkins,
                         onImportSkin = { skinPicker.launch(arrayOf("image/png")) },
                         onImportCape = { capePicker.launch(arrayOf("image/png")) },
                         onOpenAccounts = { navigate(LauncherSection.ACCOUNTS) },
-                        onPose = { pose = it },
-                        scrollable = false,
-                        modifier = Modifier.fillMaxWidth().heightIn(min = 240.dp)
+                        scrollable = true,
+                        modifier = Modifier.weight(0.60f).fillMaxHeight()
                     )
                 }
             } else {
-                Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm)) {
-                    TrinkiesCompatibilityBanner(accent)
-                    WardrobeCategoryTabs(category, accent) { category = it }
-                    Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(AerixSpacing.sm)) {
-                        WardrobePreviewPanel(
-                            account = account,
-                            category = category,
-                            pose = pose,
-                            onPose = { pose = it },
-                            modifier = Modifier.weight(0.92f).fillMaxHeight()
-                        )
-                        WardrobeCollectionPanel(
-                            activity = activity,
-                            account = account,
-                            category = category,
-                            accent = accent,
-                            savedSkins = savedSkins,
-                            onImportSkin = { skinPicker.launch(arrayOf("image/png")) },
-                            onImportCape = { capePicker.launch(arrayOf("image/png")) },
-                            onOpenAccounts = { navigate(LauncherSection.ACCOUNTS) },
-                            onPose = { pose = it },
-                            scrollable = true,
-                            modifier = Modifier.weight(1.38f).fillMaxHeight()
-                        )
-                    }
+                Column(
+                    modifier = Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    WardrobePreviewPanel(
+                        account = account,
+                        pose = pose,
+                        onPose = { pose = it },
+                        modifier = Modifier.fillMaxWidth().height(250.dp)
+                    )
+                    WardrobeCollectionPanel(
+                        activity = activity,
+                        account = account,
+                        category = category,
+                        onCategory = { category = it },
+                        filter = filter,
+                        onFilter = { filter = it },
+                        accent = accent,
+                        savedSkins = savedSkins,
+                        onImportSkin = { skinPicker.launch(arrayOf("image/png")) },
+                        onImportCape = { capePicker.launch(arrayOf("image/png")) },
+                        onOpenAccounts = { navigate(LauncherSection.ACCOUNTS) },
+                        scrollable = false,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 290.dp)
+                    )
                 }
             }
         }
@@ -220,27 +263,51 @@ fun TrinkiesWardrobeScreen(activity: FragmentActivity, navigate: (LauncherSectio
 }
 
 @Composable
-private fun TrinkiesCompatibilityBanner(accent: Color) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(6.dp),
-        color = AerixSurface.panelRaised.copy(alpha = 0.82f),
-        border = BorderStroke(AerixSpacing.hairline, accent.copy(alpha = 0.44f))
+private fun WardrobeTopBar(onLobby: () -> Unit, onImport: () -> Unit, onUploadSkin: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().heightIn(min = 34.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                Icon(painterResource(R.drawable.aerix_ic_check), contentDescription = null, tint = accent, modifier = Modifier.size(15.dp))
-                Text("TRINKIES AUTO-INSTALL · FABRIC / QUILT / LEGACY FABRIC",
-                    color = AerixSurface.textPrimary, fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-            Text(
-                "Vanilla, Forge and NeoForge instances are not modified. Account skins and standard capes may work through the active skin service when it and the server allow; remote viewers are not guaranteed to see them. Hats, animated capes, pets and emotes need Trinkies-capable clients, and multiplayer visibility also needs server support.",
-                color = AerixSurface.textSecondary, fontSize = 10.sp, lineHeight = 13.sp
-            )
+        PixelWardrobeButton("‹ Lobby", tone = true, onClick = onLobby)
+        Spacer(Modifier.weight(1f))
+        PixelWardrobeButton("Import", R.drawable.aerix_ic_download_2_outlined, onClick = onImport)
+        PixelWardrobeButton("Upload skin", R.drawable.aerix_ic_upload, tone = true, onClick = onUploadSkin)
+    }
+}
+
+@Composable
+private fun PixelWardrobeButton(
+    label: String,
+    icon: Int? = null,
+    tone: Boolean = false,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        modifier = Modifier,
+        shape = RoundedCornerShape(0.dp),
+        color = if (tone) wardrobeGreen else wardrobePanelRaised,
+        contentColor = if (tone) Color(0xFF101510) else Color(0xFFE8E8E8),
+        border = BorderStroke(2.dp, if (tone) Color(0xFF2C7A30) else Color(0xFF424449))
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(5.dp)
+        ) {
+            if (icon != null) Icon(painterResource(icon), contentDescription = null, modifier = Modifier.size(14.dp))
+            Text(label, fontFamily = wardrobePixelFont, fontWeight = FontWeight.ExtraBold, fontSize = 8.sp, maxLines = 1)
         }
     }
+}
+
+@Composable
+private fun WardrobeCompatibilityNote() {
+    Text(
+        "Trinkies auto-installs only to Fabric-family instances. Vanilla, Forge and NeoForge instances are not modified. Skins and standard capes may work through the active skin service when it and the server allow; remote viewers are not guaranteed to see them. Trinkies-only attachments need compatible clients/server support.",
+        color = Color(0xFF9A9B9E), fontSize = 7.sp, lineHeight = 9.sp
+    )
 }
 
 @Composable
@@ -251,23 +318,53 @@ private fun WardrobeCategoryTabs(
 ) {
     Row(
         Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        WardrobeCategory.values().forEach { tab ->
+        wardrobeCategories.forEach { tab ->
             val active = selected == tab
             Surface(
-                modifier = Modifier.clickable { onSelect(tab) },
-                shape = RoundedCornerShape(5.dp),
-                color = if (active) accent.copy(alpha = 0.20f) else AerixSurface.panel.copy(alpha = 0.8f),
-                border = BorderStroke(AerixSpacing.hairline, if (active) accent.copy(alpha = 0.8f) else AerixSurface.borderSoft)
+                onClick = { onSelect(tab) },
+                modifier = Modifier.width(42.dp).height(42.dp),
+                shape = RoundedCornerShape(0.dp),
+                color = if (active) accent else wardrobePanelRaised,
+                contentColor = if (active) Color(0xFF101510) else Color(0xFFC7C8CA),
+                border = BorderStroke(2.dp, if (active) Color(0xFF2C7A30) else Color(0xFF191A1C))
             ) {
-                Row(Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                    Icon(painterResource(tab.icon), contentDescription = null,
-                        tint = if (active) accent else AerixSurface.textSecondary, modifier = Modifier.size(14.dp))
-                    Text(tab.title, color = if (active) AerixSurface.textPrimary else AerixSurface.textSecondary,
-                        fontSize = 10.sp, fontWeight = if (active) FontWeight.Bold else FontWeight.Medium, maxLines = 1)
+                Column(
+                    modifier = Modifier.fillMaxSize().padding(vertical = 2.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Icon(painterResource(tab.icon), contentDescription = null, modifier = Modifier.size(13.dp))
+                    Text(tab.title, fontFamily = wardrobePixelFont, fontSize = 6.sp, fontWeight = FontWeight.Bold,
+                        maxLines = 1, overflow = TextOverflow.Clip)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WardrobeFilterTabs(
+    selected: WardrobeFilter,
+    accent: Color,
+    onSelect: (WardrobeFilter) -> Unit
+) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+        WardrobeFilter.values().forEach { filter ->
+            val active = selected == filter
+            Surface(
+                onClick = { onSelect(filter) },
+                modifier = Modifier.weight(1f).height(23.dp),
+                shape = RoundedCornerShape(0.dp),
+                color = if (active) Color(0xFF233523) else wardrobePanelRaised,
+                contentColor = if (active) accent else Color(0xFFD0D0D0),
+                border = BorderStroke(1.dp, if (active) Color(0xFF397D3A) else Color(0xFF191A1C))
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(filter.title, fontFamily = wardrobePixelFont,
+                        fontWeight = if (active) FontWeight.ExtraBold else FontWeight.Medium, fontSize = 7.sp)
                 }
             }
         }
@@ -277,29 +374,29 @@ private fun WardrobeCategoryTabs(
 @Composable
 private fun WardrobePreviewPanel(
     account: net.kdt.pojavlaunch.aerix.bridge.AerixAccount?,
-    category: WardrobeCategory,
     pose: String,
     onPose: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val accent = AerixThemeManager.currentAccent()
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(6.dp))
-            .background(AerixSurface.panel.copy(alpha = 0.78f))
-            .border(AerixSpacing.hairline, AerixSurface.borderSoft, RoundedCornerShape(6.dp))
-            .padding(10.dp),
-        verticalArrangement = Arrangement.spacedBy(7.dp)
+            .clip(RoundedCornerShape(0.dp))
+            .background(wardrobePanel)
+            .border(2.dp, Color(0xFF3B3D40), RoundedCornerShape(0.dp))
+            .padding(4.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("AVATAR PREVIEW", color = AerixSurface.textPrimary, fontWeight = FontWeight.ExtraBold,
-                fontFamily = FontFamily.Monospace, fontSize = 10.sp)
-            Text("360°", color = accent, fontWeight = FontWeight.ExtraBold, fontSize = 10.sp)
+            Text("PREVIEW", color = Color(0xFFE3E3E3), fontWeight = FontWeight.ExtraBold,
+                fontFamily = wardrobePixelFont, fontSize = 8.sp)
+            Text(account?.username?.uppercase() ?: "LOCAL PLAYER", color = wardrobeGreen,
+                fontWeight = FontWeight.Bold, fontSize = 7.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         Box(
-            modifier = Modifier.weight(1f).fillMaxWidth().clip(RoundedCornerShape(4.dp))
-                .background(AerixSurface.canvas.copy(alpha = 0.54f)),
+            modifier = Modifier.weight(1f).fillMaxWidth()
+                .border(1.dp, Color(0xFF303236), RoundedCornerShape(0.dp))
+                .background(wardrobeCanvas),
             contentAlignment = Alignment.Center
         ) {
             AerixSkinPreview3D(
@@ -310,38 +407,36 @@ private fun WardrobePreviewPanel(
                 showOfficialCape = true,
                 animationName = pose,
                 applyClientHat = true,
-                modifier = Modifier.fillMaxSize().padding(6.dp)
+                cameraDistance = 32,
+                modifier = Modifier.fillMaxSize().padding(2.dp)
             )
-            Surface(
-                modifier = Modifier.align(Alignment.TopStart).padding(6.dp),
-                shape = RoundedCornerShape(3.dp),
-                color = AerixSurface.canvas.copy(alpha = 0.88f)
+            Column(
+                modifier = Modifier.align(Alignment.TopEnd).padding(3.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+                horizontalAlignment = Alignment.End
             ) {
-                Text(account?.username ?: "STEVE · LOCAL PREVIEW", color = AerixSurface.textSecondary,
-                    fontFamily = FontFamily.Monospace, fontSize = 8.sp,
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp), maxLines = 1,
-                    overflow = TextOverflow.Ellipsis)
+                WardrobePoseButton("Standing", "NewIdle", pose, onPose)
+                WardrobePoseButton("Walking", "Walking", pose, onPose)
+                WardrobePoseButton("Waving", "Wave", pose, onPose)
             }
         }
-        Text("POSE / EMOTE PREVIEW", color = AerixSurface.textSecondary, fontFamily = FontFamily.Monospace,
-            fontWeight = FontWeight.Bold, fontSize = 8.sp)
-        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-            wardrobePoses.forEach { item ->
-                val active = pose == item.animation
-                Surface(
-                    modifier = Modifier.clickable { onPose(item.animation) },
-                    shape = RoundedCornerShape(4.dp),
-                    color = if (active) accent.copy(alpha = 0.18f) else AerixSurface.panelRaised,
-                    border = BorderStroke(AerixSpacing.hairline, if (active) accent else AerixSurface.borderSoft)
-                ) {
-                    Text(item.label, color = if (active) AerixSurface.textPrimary else AerixSurface.textSecondary,
-                        fontSize = 9.sp, fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp))
-                }
-            }
-        }
-        Text("Drag the character to rotate. Poses are launcher previews; a server must explicitly support synced emotes.",
-            color = AerixSurface.textSecondary, fontSize = 9.sp, lineHeight = 12.sp)
+        Text("DRAG TO ROTATE · POSES ARE LOCAL PREVIEWS", color = Color(0xFF9A9B9E),
+            fontFamily = FontFamily.Monospace, fontSize = 6.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+@Composable
+private fun WardrobePoseButton(label: String, animation: String, pose: String, onPose: (String) -> Unit) {
+    val selected = pose == animation
+    Surface(
+        onClick = { onPose(animation) },
+        shape = RoundedCornerShape(0.dp),
+        color = if (selected) Color(0xFF234325) else Color(0xFF292B2E),
+        contentColor = if (selected) wardrobeGreen else Color(0xFFD1D1D1),
+        border = BorderStroke(1.dp, if (selected) Color(0xFF3A853D) else Color(0xFF141517))
+    ) {
+        Text(label, modifier = Modifier.padding(horizontal = 5.dp, vertical = 4.dp),
+            fontFamily = wardrobePixelFont, fontSize = 6.sp, fontWeight = FontWeight.Bold, maxLines = 1)
     }
 }
 
@@ -350,75 +445,110 @@ private fun WardrobeCollectionPanel(
     activity: FragmentActivity,
     account: net.kdt.pojavlaunch.aerix.bridge.AerixAccount?,
     category: WardrobeCategory,
+    onCategory: (WardrobeCategory) -> Unit,
+    filter: WardrobeFilter,
+    onFilter: (WardrobeFilter) -> Unit,
     accent: Color,
     savedSkins: List<AerixSkinPreset>,
     onImportSkin: () -> Unit,
     onImportCape: () -> Unit,
     onOpenAccounts: () -> Unit,
-    onPose: (String) -> Unit,
     scrollable: Boolean,
     modifier: Modifier = Modifier
 ) {
-    val collectionModifier = if (scrollable) Modifier.verticalScroll(rememberScrollState()) else Modifier
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(6.dp))
-            .background(AerixSurface.panel.copy(alpha = 0.84f))
-            .border(AerixSpacing.hairline, AerixSurface.borderSoft, RoundedCornerShape(6.dp))
-            .then(collectionModifier)
-            .padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(9.dp)
+            .clip(RoundedCornerShape(0.dp))
+            .background(wardrobePanel)
+            .border(2.dp, Color(0xFF3B3D40), RoundedCornerShape(0.dp))
+            .padding(4.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween) {
-            Column(Modifier.weight(1f)) {
-                Text("COLLECTION / ${category.title.uppercase()}", color = AerixSurface.textPrimary,
-                    fontFamily = FontFamily.Monospace, fontWeight = FontWeight.ExtraBold, fontSize = 11.sp)
-                Text(categorySubtitle(category), color = AerixSurface.textSecondary, fontSize = 9.sp,
-                    maxLines = 2, overflow = TextOverflow.Ellipsis)
+        WardrobeCategoryTabs(category, accent, onCategory)
+        WardrobeFilterTabs(filter, accent, onFilter)
+        Column(
+            modifier = if (scrollable) Modifier.weight(1f).verticalScroll(rememberScrollState()) else Modifier,
+            verticalArrangement = Arrangement.spacedBy(5.dp)
+        ) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween) {
+                Column(Modifier.weight(1f)) {
+                    Text(collectionTitle(category), color = Color(0xFFF0F0F0),
+                        fontFamily = wardrobePixelFont, fontWeight = FontWeight.ExtraBold, fontSize = 10.sp, maxLines = 1,
+                        overflow = TextOverflow.Ellipsis)
+                    Text(categorySubtitle(category), color = Color(0xFF9A9B9E), fontSize = 7.sp,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                Text(categoryCount(category, savedSkins.size), color = accent,
+                    fontWeight = FontWeight.ExtraBold, fontFamily = FontFamily.Monospace,
+                    fontSize = 9.sp, modifier = Modifier.padding(start = 5.dp))
             }
-            Text(
-                when (category) {
-                    WardrobeCategory.CAPES, WardrobeCategory.BACK_ITEMS -> "15+"
-                    WardrobeCategory.HEADWEAR -> "4"
-                    WardrobeCategory.SKINS, WardrobeCategory.SUITS -> savedSkins.size.toString()
-                    WardrobeCategory.EMOTES -> wardrobePoses.size.toString()
-                    WardrobeCategory.PETS -> "0"
-                },
-                color = accent, fontWeight = FontWeight.ExtraBold, fontFamily = FontFamily.Monospace,
-                fontSize = 11.sp, modifier = Modifier.padding(start = 8.dp)
-            )
-        }
-        when (category) {
-            WardrobeCategory.SKINS -> SkinCollection(
-                activity, account, accent, savedSkins, onImportSkin, onOpenAccounts, suitsMode = false
-            )
-            WardrobeCategory.SUITS -> SkinCollection(
-                activity, account, accent, savedSkins, onImportSkin, onOpenAccounts, suitsMode = true
-            )
-            WardrobeCategory.CAPES -> CapeCollection(activity, account, accent, onImportCape, backItems = false)
-            WardrobeCategory.BACK_ITEMS -> CapeCollection(activity, account, accent, onImportCape, backItems = true)
-            WardrobeCategory.HEADWEAR -> HeadwearCollection(activity, accent)
-            WardrobeCategory.PETS -> UnsupportedCollection(
-                title = "Pet companions",
-                detail = "Pet rendering and remote presence need a compatible Trinkies client and server pack. No pet pack is bundled in this APK yet.",
-                icon = R.drawable.aerix_ic_people,
-                accent = accent,
-                cards = listOf("Companion", "Shoulder pet", "Trail effect")
-            )
-            WardrobeCategory.EMOTES -> EmoteCollection(accent, onPose)
+
+            if (filter != WardrobeFilter.MINE) {
+                Text(
+                    "${filter.title} online collections are not connected in this build. Your local items are available under Mine.",
+                    color = Color(0xFFB0B1B3), fontSize = 8.sp, lineHeight = 10.sp
+                )
+            } else when (category) {
+                WardrobeCategory.LOOKS -> SkinCollection(
+                    activity, account, accent, savedSkins, onImportSkin, onOpenAccounts, suitsMode = false
+                )
+                WardrobeCategory.SHOP -> UnsupportedCollection(
+                    title = "Trinkies shop",
+                    detail = "An online catalog and purchase flow are not connected in this build.",
+                    icon = R.drawable.aerix_ic_cloud_download,
+                    accent = accent,
+                    cards = listOf("Looks", "Capes", "Headwear")
+                )
+                WardrobeCategory.SKINS -> SkinCollection(
+                    activity, account, accent, savedSkins, onImportSkin, onOpenAccounts, suitsMode = false
+                )
+                WardrobeCategory.SUITS -> SkinCollection(
+                    activity, account, accent, savedSkins, onImportSkin, onOpenAccounts, suitsMode = true
+                )
+                WardrobeCategory.CAPES -> CapeCollection(activity, account, accent, onImportCape, backItems = false)
+                WardrobeCategory.BACK_ITEMS -> CapeCollection(activity, account, accent, onImportCape, backItems = true)
+                WardrobeCategory.HEADWEAR -> HeadwearCollection(activity, accent)
+                WardrobeCategory.PETS -> UnsupportedCollection(
+                    title = "Pet companions",
+                    detail = "Pet rendering and remote presence need a compatible Trinkies client and server pack. No pet pack is bundled in this APK yet.",
+                    icon = R.drawable.aerix_ic_people,
+                    accent = accent,
+                    cards = listOf("Companion", "Shoulder pet", "Trail effect")
+                )
+            }
+            WardrobeCompatibilityNote()
         }
     }
 }
 
+private fun collectionTitle(category: WardrobeCategory): String = when (category) {
+    WardrobeCategory.LOOKS -> "My looks"
+    WardrobeCategory.SHOP -> "Shop"
+    WardrobeCategory.SKINS -> "My skins"
+    WardrobeCategory.CAPES -> "My capes"
+    WardrobeCategory.HEADWEAR -> "Headwear"
+    WardrobeCategory.SUITS -> "Body outfits"
+    WardrobeCategory.BACK_ITEMS -> "Back items"
+    WardrobeCategory.PETS -> "Pets"
+}
+
+private fun categoryCount(category: WardrobeCategory, skinCount: Int): String = when (category) {
+    WardrobeCategory.LOOKS, WardrobeCategory.SKINS, WardrobeCategory.SUITS -> skinCount.toString()
+    WardrobeCategory.CAPES, WardrobeCategory.BACK_ITEMS -> "15+"
+    WardrobeCategory.HEADWEAR -> "4"
+    WardrobeCategory.SHOP, WardrobeCategory.PETS -> "—"
+}
+
 private fun categorySubtitle(category: WardrobeCategory): String = when (category) {
-    WardrobeCategory.SKINS -> "Minecraft skin files and saved presets"
-    WardrobeCategory.CAPES -> "Animated Trinkies capes and imported PNG capes"
+    WardrobeCategory.LOOKS -> "Saved player styles"
+    WardrobeCategory.SHOP -> "Online catalog · unavailable in this build"
+    WardrobeCategory.SKINS -> "Minecraft skins and saved presets"
+    WardrobeCategory.CAPES -> "Animated client capes and imported PNGs"
     WardrobeCategory.HEADWEAR -> "Pixel-art overlays on the outer skin layer"
-    WardrobeCategory.SUITS -> "Full-body appearance uses the Minecraft skin texture"
-    WardrobeCategory.BACK_ITEMS -> "Capes work now; other back attachments need server support"
+    WardrobeCategory.SUITS -> "Full-body looks use Minecraft skin textures"
+    WardrobeCategory.BACK_ITEMS -> "Capes work; other attachments need server support"
     WardrobeCategory.PETS -> "Collection slot · server/client support required"
-    WardrobeCategory.EMOTES -> "Preview poses · synced emotes require server support"
 }
 
 @Composable
@@ -456,7 +586,7 @@ private fun SkinCollection(
                 fontWeight = FontWeight.Bold, fontSize = 9.sp)
             Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                 val slim = PojavAccountBridge.isSlimModel(account)
-                ModelChoice("WIDE", !slim, accent) { PojavAccountBridge.setSlimModel(activity, account, false) }
+                ModelChoice("CLASSIC", !slim, accent) { PojavAccountBridge.setSlimModel(activity, account, false) }
                 ModelChoice("SLIM", slim, accent) { PojavAccountBridge.setSlimModel(activity, account, true) }
             }
         }
@@ -496,7 +626,7 @@ private fun SkinCollection(
 private fun ModelChoice(label: String, selected: Boolean, accent: Color, onClick: () -> Unit) {
     Surface(
         modifier = Modifier.clickable(onClick = onClick),
-        shape = RoundedCornerShape(4.dp),
+        shape = RoundedCornerShape(0.dp),
         color = if (selected) accent.copy(alpha = 0.2f) else AerixSurface.panelRaised,
         border = BorderStroke(AerixSpacing.hairline, if (selected) accent else AerixSurface.borderSoft)
     ) {
@@ -515,7 +645,7 @@ private fun SkinPresetCard(
 ) {
     Surface(
         modifier = modifier.clickable(onClick = onClick),
-        shape = RoundedCornerShape(4.dp),
+        shape = RoundedCornerShape(0.dp),
         color = if (selected) accent.copy(alpha = 0.16f) else AerixSurface.panelRaised.copy(alpha = 0.72f),
         border = BorderStroke(AerixSpacing.hairline, if (selected) accent else AerixSurface.borderSoft)
     ) {
@@ -556,7 +686,7 @@ private fun CapeCollection(
                 AerixClientStore.persist()
                 syncTrinkiesCosmetics(activity)
             },
-            shape = RoundedCornerShape(4.dp),
+            shape = RoundedCornerShape(0.dp),
             color = if (customSelected) accent.copy(alpha = 0.16f) else AerixSurface.panelRaised.copy(alpha = 0.7f),
             border = BorderStroke(AerixSpacing.hairline, if (customSelected) accent else AerixSurface.borderSoft)
         ) {
@@ -620,7 +750,7 @@ private fun CapeCard(
     }
     Surface(
         modifier = modifier.clickable(onClick = onClick),
-        shape = RoundedCornerShape(4.dp),
+        shape = RoundedCornerShape(0.dp),
         color = if (selected) accent.copy(alpha = 0.18f) else AerixSurface.panelRaised.copy(alpha = 0.68f),
         border = BorderStroke(AerixSpacing.hairline, when {
             selected -> accent
@@ -631,7 +761,7 @@ private fun CapeCard(
         Column(Modifier.fillMaxWidth().padding(5.dp), horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Image(preview, contentDescription = spec.title, contentScale = ContentScale.Fit,
-                modifier = Modifier.fillMaxWidth().height(34.dp).clip(RoundedCornerShape(2.dp)))
+                modifier = Modifier.fillMaxWidth().height(34.dp).clip(RoundedCornerShape(0.dp)))
             Text(spec.title, color = if (unlocked) AerixSurface.textPrimary else AerixSurface.textSecondary,
                 fontSize = 8.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(when {
@@ -662,13 +792,13 @@ private fun HeadwearCollection(activity: FragmentActivity, accent: Color) {
                                 PojavAccountBridge.notifyWardrobeChanged()
                                 Toast.makeText(activity, "${hat.name} applied to the preview", Toast.LENGTH_SHORT).show()
                             },
-                            shape = RoundedCornerShape(4.dp),
+                            shape = RoundedCornerShape(0.dp),
                             color = if (selected) accent.copy(alpha = 0.18f) else AerixSurface.panelRaised.copy(alpha = 0.72f),
                             border = BorderStroke(AerixSpacing.hairline, if (selected) accent else AerixSurface.borderSoft)
                         ) {
                             Column(Modifier.fillMaxWidth().padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally,
                                 verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                                Box(Modifier.size(34.dp).clip(RoundedCornerShape(4.dp)).background(hat.color.copy(alpha = 0.18f)),
+                                Box(Modifier.size(34.dp).clip(RoundedCornerShape(0.dp)).background(hat.color.copy(alpha = 0.18f)),
                                     contentAlignment = Alignment.Center) {
                                     Icon(painterResource(R.drawable.aerix_ic_styler_outlined), contentDescription = null,
                                         tint = hat.color, modifier = Modifier.size(22.dp))
@@ -700,7 +830,7 @@ private fun EmoteCollection(accent: Color, onPose: (String) -> Unit) {
         wardrobePoses.forEach { item ->
             Surface(
                 modifier = Modifier.clickable { onPose(item.animation) },
-                shape = RoundedCornerShape(4.dp),
+                shape = RoundedCornerShape(0.dp),
                 color = AerixSurface.panelRaised,
                 border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft)
             ) {
@@ -730,7 +860,7 @@ private fun UnsupportedCollection(title: String, detail: String, icon: Int, acce
         cards.forEach { card ->
             Surface(
                 modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(4.dp),
+                shape = RoundedCornerShape(0.dp),
                 color = AerixSurface.panelRaised.copy(alpha = 0.5f),
                 border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft.copy(alpha = 0.7f))
             ) {
@@ -751,7 +881,7 @@ private fun UnsupportedCollection(title: String, detail: String, icon: Int, acce
 private fun EmptyWardrobeState(title: String, detail: String, icon: Int, accent: Color, onClick: () -> Unit) {
     Surface(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
-        shape = RoundedCornerShape(4.dp),
+        shape = RoundedCornerShape(0.dp),
         color = AerixSurface.panelRaised.copy(alpha = 0.58f),
         border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft)
     ) {
@@ -776,7 +906,7 @@ private fun WardrobeAction(
 ) {
     Surface(
         modifier = Modifier.clickable(enabled = enabled, onClick = onClick),
-        shape = RoundedCornerShape(4.dp),
+        shape = RoundedCornerShape(0.dp),
         color = if (enabled) accent.copy(alpha = 0.16f) else AerixSurface.panelRaised.copy(alpha = 0.45f),
         border = BorderStroke(AerixSpacing.hairline, if (enabled) accent.copy(alpha = 0.75f) else AerixSurface.borderSoft)
     ) {

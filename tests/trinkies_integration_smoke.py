@@ -36,11 +36,27 @@ class TrinkiesIntegrationSmoke(unittest.TestCase):
         for destination in ("QUICK_TOOLS", "INSTANCE_SELECTOR", "TRINKIES_WARDROBE"):
             self.assertIn(destination, rail)
         home = (APP / "ui/screens/HomeScreen.kt").read_text()
-        self.assertIn("AerixHomeUtilityRail", home)
+        shell = (APP / "ui/AerixLauncherScreen.kt").read_text()
         self.assertIn('animationName = "NewIdle"', home)
+        self.assertIn("cameraDistance = 34", home)
+        # Both the live stage and its retained fallback must follow the same world-rotation
+        # convention: dragging right subtracts azimuth, while its negated release velocity is
+        # integrated positively so the fling continues in the same direction.
+        self.assertEqual(home.count("dollAzimuth - dragAmount"), 2)
+        self.assertEqual(home.count("val releaseVelocity = -"), 2)
+        self.assertEqual(home.count("dollAzimuth = (dollAzimuth + velocity * dt)"), 2)
+        self.assertNotIn(".background(AerixSurface.canvas.copy(alpha = 0.28f))", home)
+        rail_position = shell.index("AerixHomeUtilityRail(")
+        content_position = shell.index("AnimatedContent(")
+        self.assertGreater(rail_position, content_position)
+        self.assertIn("section != LauncherSection.TRINKIES_WARDROBE", shell)
+
         wardrobe = (APP / "ui/screens/TrinkiesWardrobeScreen.kt").read_text()
-        for category in ("SKINS", "CAPES", "HEADWEAR", "SUITS", "BACK_ITEMS", "PETS", "EMOTES"):
+        for category in ("LOOKS", "SHOP", "SKINS", "CAPES", "HEADWEAR", "SUITS", "BACK_ITEMS", "PETS"):
             self.assertIn(f"{category}(\"", wardrobe)
+        self.assertIn('WardrobeTopBar(', wardrobe)
+        self.assertIn('WardrobeFilterTabs(', wardrobe)
+        self.assertIn('Font(R.font.minecraft_ten)', wardrobe)
         self.assertIn("Vanilla, Forge and NeoForge instances are not modified", wardrobe)
         self.assertIn("when it and the server allow", wardrobe)
         self.assertIn("remote viewers are not guaranteed to see them", wardrobe)
