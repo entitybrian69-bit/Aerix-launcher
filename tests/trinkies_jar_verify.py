@@ -67,6 +67,19 @@ def main() -> int:
             if eternal_ids != expected_eternal_ids:
                 raise ValueError(f"unexpected Eternal items: {sorted(eternal_ids)}")
 
+            # A JAR with the wrong classes is worse than no JAR: the catalog would validate and the
+            # wardrobe would still do nothing in game. Only a resources-only jar (no classes at all)
+            # may skip this, which is what a fixture looks like.
+            packaged_classes = {name for name in names if name.endswith(".class")}
+            if packaged_classes:
+                for required in (
+                    "aerix/client/mod/AerixClientMod.class",
+                    "aerix/client/mod/TrinkiesLoadout.class",
+                    "aerix/client/mod/ModernCapeBridge.class",
+                ):
+                    if required not in packaged_classes:
+                        raise ValueError(f"built JAR is missing the class that consumes the wardrobe: {required}")
+
             manifest_name = "assets/trinkies/manifest.json"
             if manifest_name not in names:
                 raise ValueError("asset manifest is missing from the mod JAR")
