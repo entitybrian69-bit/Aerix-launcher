@@ -1,0 +1,246 @@
+{
+  "items": [
+    {
+      "category": "hat",
+      "id": "trinkies:hat_copper_aviator",
+      "item": "items/hat_copper_aviator/item.json",
+      "name": "Copper Aviator",
+      "rarity": "uncommon",
+      "texture": "items/hat_copper_aviator/texture.png"
+    },
+    {
+      "category": "hat",
+      "id": "trinkies:hat_tideglass_circlet",
+      "item": "items/hat_tideglass_circlet/item.json",
+      "name": "Tideglass Circlet",
+      "rarity": "rare",
+      "texture": "items/hat_tideglass_circlet/texture.png"
+    },
+    {
+      "category": "hat",
+      "id": "trinkies:hat_mosscap_hood",
+      "item": "items/hat_mosscap_hood/item.json",
+      "name": "Mosscap Hood",
+      "rarity": "common",
+      "texture": "items/hat_mosscap_hood/texture.png"
+    },
+    {
+      "category": "hat",
+      "id": "trinkies:hat_orbit_lantern_halo",
+      "item": "items/hat_orbit_lantern_halo/item.json",
+      "name": "Orbit Lantern Halo",
+      "rarity": "epic",
+      "texture": "items/hat_orbit_lantern_halo/texture.png"
+    },
+    {
+      "category": "hat",
+      "id": "trinkies:hat_basalt_horn_circlet",
+      "item": "items/hat_basalt_horn_circlet/item.json",
+      "name": "Basalt Horn Circlet",
+      "rarity": "rare",
+      "texture": "items/hat_basalt_horn_circlet/texture.png"
+    },
+    {
+      "category": "suit",
+      "id": "trinkies:suit_copper_diver",
+      "item": "items/suit_copper_diver/item.json",
+      "name": "Copper Diver Suit",
+      "rarity": "rare",
+      "texture": "items/suit_copper_diver/texture.png"
+    },
+    {
+      "category": "suit",
+      "id": "trinkies:suit_willow_wayfinder",
+      "item": "items/suit_willow_wayfinder/item.json",
+      "name": "Willow Wayfinder",
+      "rarity": "uncommon",
+      "texture": "items/suit_willow_wayfinder/texture.png"
+    },
+    {
+      "category": "suit",
+      "id": "trinkies:suit_prism_cartographer",
+      "item": "items/suit_prism_cartographer/item.json",
+      "name": "Prism Cartographer",
+      "rarity": "epic",
+      "texture": "items/suit_prism_cartographer/texture.png"
+    },
+    {
+      "category": "suit",
+      "id": "trinkies:suit_basalt_stargazer",
+      "item": "items/suit_basalt_stargazer/item.json",
+      "name": "Basalt Stargazer",
+      "rarity": "rare",
+      "texture": "items/suit_basalt_stargazer/texture.png"
+    },
+    {
+      "category": "suit",
+      "id": "trinkies:suit_tidal_mechanist",
+      "item": "items/suit_tidal_mechanist/item.json",
+      "name": "Tidal Mechanist",
+      "rarity": "uncommon",
+      "texture": "items/suit_tidal_mechanist/texture.png"
+    },
+    {
+      "category": "back",
+      "id": "trinkies:back_cicada_glasswings",
+      "item": "items/back_cicada_glasswings/item.json",
+      "name": "Cicada Glasswings",
+      "rarity": "epic",
+      "texture": "items/back_cicada_glasswings/texture.png"
+    },
+    {
+      "category": "back",
+      "id": "trinkies:back_windup_satchel",
+      "item": "items/back_windup_satchel/item.json",
+      "name": "Windup Satchel",
+      "rarity": "uncommon",
+      "texture": "items/back_windup_satchel/texture.png"
+    },
+    {
+      "category": "back",
+      "id": "trinkies:back_ribbon_kite_banner",
+      "item": "items/back_ribbon_kite_banner/item.json",
+      "name": "Ribbon Kite Banner",
+      "rarity": "common",
+      "texture": "items/back_ribbon_kite_banner/texture.png"
+    },
+    {
+      "category": "back",
+      "id": "trinkies:back_emberleaf_glider",
+      "item": "items/back_emberleaf_glider/item.json",
+      "name": "Emberleaf Glider",
+      "rarity": "rare",
+      "texture": "items/back_emberleaf_glider/texture.png"
+    },
+    {
+      "category": "back",
+      "id": "trinkies:back_tidal_bell_drone",
+      "item": "items/back_tidal_bell_drone/item.json",
+      "name": "Tidal Bell Drone",
+      "rarity": "epic",
+      "texture": "items/back_tidal_bell_drone/texture.png"
+    },
+    {
+      "category": "pet",
+      "id": "trinkies:pet_amethyst_wisp",
+      "item": "items/pet_amethyst_wisp/item.json",
+      "name": "Amethyst Wisp",
+      "rarity": "rare",
+      "texture": "items/pet_amethyst_wisp/texture.png"
+    },
+    {
+      "category": "pet",
+      "id": "trinkies:pet_sootbubble",
+      "item": "items/pet_sootbubble/item.json",
+      "name": "Sootbubble",
+      "rarity": "common",
+      "texture": "items/pet_sootbubble/texture.png"
+    },
+    {
+      "category": "pet",
+      "id": "trinkies:pet_moss_lantern_moth",
+      "item": "items/pet_moss_lantern_moth/item.json",
+      "name": "Moss Lantern Moth",
+      "rarity": "epic",
+      "texture": "items/pet_moss_lantern_moth/texture.png"
+    },
+    {
+      "category": "pet",
+      "id": "trinkies:pet_paper_comet_sprite",
+      "item": "items/pet_paper_comet_sprite/item.json",
+      "name": "Paper Comet Sprite",
+      "rarity": "uncommon",
+      "texture": "items/pet_paper_comet_sprite/texture.png"
+    },
+    {
+      "category": "pet",
+      "id": "trinkies:pet_clockwork_pebble_crab",
+      "item": "items/pet_clockwork_pebble_crab/item.json",
+      "name": "Clockwork Pebble Crab",
+      "rarity": "rare",
+      "texture": "items/pet_clockwork_pebble_crab/texture.png"
+    },
+    {
+      "category": "emote",
+      "id": "trinkies:emote_origami_greeting",
+      "item": "items/emote_origami_greeting/item.json",
+      "name": "Origami Greeting",
+      "rarity": "common",
+      "texture": "items/emote_origami_greeting/texture.png"
+    },
+    {
+      "category": "emote",
+      "id": "trinkies:emote_spark_wand_cheer",
+      "item": "items/emote_spark_wand_cheer/item.json",
+      "name": "Spark Wand Cheer",
+      "rarity": "uncommon",
+      "texture": "items/emote_spark_wand_cheer/texture.png"
+    },
+    {
+      "category": "emote",
+      "id": "trinkies:emote_marigold_curtain_call",
+      "item": "items/emote_marigold_curtain_call/item.json",
+      "name": "Marigold Curtain Call",
+      "rarity": "rare",
+      "texture": "items/emote_marigold_curtain_call/texture.png"
+    },
+    {
+      "category": "emote",
+      "id": "trinkies:emote_pocket_drumline",
+      "item": "items/emote_pocket_drumline/item.json",
+      "name": "Pocket Drumline",
+      "rarity": "uncommon",
+      "texture": "items/emote_pocket_drumline/texture.png"
+    },
+    {
+      "category": "emote",
+      "id": "trinkies:emote_moonlit_ribbon_bow",
+      "item": "items/emote_moonlit_ribbon_bow/item.json",
+      "name": "Moonlit Ribbon Bow",
+      "rarity": "epic",
+      "texture": "items/emote_moonlit_ribbon_bow/texture.png"
+    },
+    {
+      "category": "aura",
+      "id": "trinkies:aura_monsoon_motes",
+      "item": "items/aura_monsoon_motes/item.json",
+      "name": "Monsoon Motes",
+      "rarity": "common",
+      "texture": "items/aura_monsoon_motes/texture.png"
+    },
+    {
+      "category": "aura",
+      "id": "trinkies:aura_aurora_chime",
+      "item": "items/aura_aurora_chime/item.json",
+      "name": "Aurora Chime",
+      "rarity": "rare",
+      "texture": "items/aura_aurora_chime/texture.png"
+    },
+    {
+      "category": "aura",
+      "id": "trinkies:aura_ember_marigold",
+      "item": "items/aura_ember_marigold/item.json",
+      "name": "Ember Marigold",
+      "rarity": "uncommon",
+      "texture": "items/aura_ember_marigold/texture.png"
+    },
+    {
+      "category": "aura",
+      "id": "trinkies:aura_glass_rune_ring",
+      "item": "items/aura_glass_rune_ring/item.json",
+      "name": "Glass Rune Ring",
+      "rarity": "epic",
+      "texture": "items/aura_glass_rune_ring/texture.png"
+    },
+    {
+      "category": "aura",
+      "id": "trinkies:aura_star_silt_trail",
+      "item": "items/aura_star_silt_trail/item.json",
+      "name": "Star Silt Trail",
+      "rarity": "rare",
+      "texture": "items/aura_star_silt_trail/texture.png"
+    }
+  ],
+  "schema": 1,
+  "status": "vertical_slice_unverified_in_game"
+}

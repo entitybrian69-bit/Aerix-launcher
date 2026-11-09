@@ -1,0 +1,40 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip"
+  ],
+  "attach": {
+    "bone": "root",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "aura",
+  "description": "Three quiet arcs drift behind the shoulders like a windless aurora.",
+  "emissive_mask": "emissive.png",
+  "id": "trinkies:aura_aurora_chime",
+  "model": "model.bbmodel",
+  "name": "Aurora Chime",
+  "palette": [
+    "#192834",
+    "#27374D",
+    "#425B91",
+    "#5E6EAA",
+    "#8986C7",
+    "#8CF2D2",
+    "#B6FFF7"
+  ],
+  "particle_sheet": "texture.png",
+  "rarity": "rare",
+  "shape": "aurora_arcs",
+  "tags": [
+    "aurora",
+    "arcs",
+    "particles"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

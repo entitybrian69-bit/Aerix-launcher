@@ -1,0 +1,40 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip"
+  ],
+  "attach": {
+    "bone": "root",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "aura",
+  "description": "A slow orbit of cool droplets with sparse, low-brightness glints.",
+  "emissive_mask": "emissive.png",
+  "id": "trinkies:aura_monsoon_motes",
+  "model": "model.bbmodel",
+  "name": "Monsoon Motes",
+  "palette": [
+    "#18353A",
+    "#264A55",
+    "#3D7EA1",
+    "#5C90BC",
+    "#8AA2DD",
+    "#B9ECF7",
+    "#D3EEFF"
+  ],
+  "particle_sheet": "texture.png",
+  "rarity": "common",
+  "shape": "monsoon_ring",
+  "tags": [
+    "water",
+    "orbit",
+    "particles"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

@@ -1,0 +1,40 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip"
+  ],
+  "attach": {
+    "bone": "root",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "aura",
+  "description": "A faint trail of angular star-dust motes follows the player's last steps.",
+  "emissive_mask": "emissive.png",
+  "id": "trinkies:aura_star_silt_trail",
+  "model": "model.bbmodel",
+  "name": "Star Silt Trail",
+  "palette": [
+    "#252C33",
+    "#373F4B",
+    "#63708D",
+    "#7D85A5",
+    "#A09FC1",
+    "#F1DEA2",
+    "#FFFDC6"
+  ],
+  "particle_sheet": "texture.png",
+  "rarity": "rare",
+  "shape": "star_silt",
+  "tags": [
+    "stars",
+    "trail",
+    "particles"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

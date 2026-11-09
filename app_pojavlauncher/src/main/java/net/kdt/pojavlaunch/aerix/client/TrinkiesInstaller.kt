@@ -1,7 +1,10 @@
 package net.kdt.pojavlaunch.aerix.client
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
+import android.widget.Toast
 import net.kdt.pojavlaunch.PojavApplication
 import net.kdt.pojavlaunch.instances.Instance
 import net.kdt.pojavlaunch.instances.Instances
@@ -41,12 +44,28 @@ object TrinkiesInstaller {
                 val compatible = runCatching { Instances.loadAllInstances() }
                     .getOrDefault(emptyList())
                     .filter(::isSupportedInstance)
+                val conflicts = mutableListOf<String>()
                 compatible.forEach { instance ->
                     runCatching {
                         val gameDir = instance.gameDirectory ?: return@runCatching
-                        AerixClientInstaller.deployBundledTrinkies(appContext, File(gameDir, "mods"))
+                        val result = AerixClientInstaller.deployBundledTrinkies(appContext, File(gameDir, "mods"))
+                        if (result.status == TrinkiesDeploymentStatus.CONFLICT || result.status == TrinkiesDeploymentStatus.FAILED) {
+                            conflicts += "${instance.name}: ${result.detail}"
+                            Log.w(TAG, "Trinkies not changed for ${instance.name}: ${result.detail}")
+                        }
                     }.onFailure { error ->
+                        conflicts += "${instance.name}: ${error.message ?: "install failed"}"
                         Log.w(TAG, "Could not update Trinkies for ${instance.name}", error)
+                    }
+                }
+                if (conflicts.isNotEmpty()) {
+                    val first = conflicts.first().take(120)
+                    Handler(Looper.getMainLooper()).post {
+                        Toast.makeText(
+                            appContext,
+                            "Trinkies skipped for ${conflicts.size} instance(s) to protect existing files. First: $first",
+                            Toast.LENGTH_LONG
+                        ).show()
                     }
                 }
                 Log.i(TAG, "Checked ${compatible.size} Fabric-family instance(s) for Trinkies")
@@ -62,7 +81,17 @@ object TrinkiesInstaller {
         if (!isSupportedInstance(instance)) return
         runCatching {
             val gameDir = instance.gameDirectory?.apply { mkdirs() } ?: return
-            AerixClientInstaller.deployBundledTrinkies(context, File(gameDir, "mods"))
+            val result = AerixClientInstaller.deployBundledTrinkies(context, File(gameDir, "mods"))
+            if (result.status == TrinkiesDeploymentStatus.CONFLICT || result.status == TrinkiesDeploymentStatus.FAILED) {
+                Log.w(TAG, "Trinkies not changed for ${instance.name}: ${result.detail}")
+                Handler(Looper.getMainLooper()).post {
+                    Toast.makeText(
+                        context.applicationContext,
+                        "Trinkies was not changed for ${instance.name}; existing mods were protected. ${result.detail}",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
             AerixClientCosmetics.syncCapeAssetsToInstance(context, gameDir)
         }.onFailure { error ->
             Log.w(TAG, "Trinkies local sync failed for ${instance.name}; continuing launch", error)

@@ -67,6 +67,13 @@ configurations {
 android {
     namespace 'net.kdt.pojavlaunch'
 
+    sourceSets {
+        main {
+            // Shared Trinkies catalog is available to the launcher preview and packaged unchanged.
+            assets.srcDir rootProject.file('trinkies_assets')
+        }
+    }
+
     compileSdk = 36
 
     lintOptions {

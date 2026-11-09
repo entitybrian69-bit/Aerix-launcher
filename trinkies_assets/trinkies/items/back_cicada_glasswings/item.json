@@ -1,0 +1,39 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip"
+  ],
+  "attach": {
+    "bone": "body",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "back",
+  "description": "Four translucent geometric wings held by a small jade-and-copper harness.",
+  "emissive_mask": "emissive.png",
+  "id": "trinkies:back_cicada_glasswings",
+  "model": "model.bbmodel",
+  "name": "Cicada Glasswings",
+  "palette": [
+    "#132C21",
+    "#1D4134",
+    "#307B68",
+    "#489085",
+    "#6BA2A9",
+    "#C8FFE9",
+    "#DAFFF8"
+  ],
+  "rarity": "epic",
+  "shape": "cicada_wings",
+  "tags": [
+    "wings",
+    "insect",
+    "glass"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

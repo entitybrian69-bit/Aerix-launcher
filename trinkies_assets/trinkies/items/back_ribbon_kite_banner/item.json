@@ -1,0 +1,38 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip"
+  ],
+  "attach": {
+    "bone": "body",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "back",
+  "description": "A compact banner pack trailing two cut-paper ribbons and a tiny kite tail.",
+  "id": "trinkies:back_ribbon_kite_banner",
+  "model": "model.bbmodel",
+  "name": "Ribbon Kite Banner",
+  "palette": [
+    "#472222",
+    "#683934",
+    "#C56E58",
+    "#E69E7E",
+    "#FFDAAA",
+    "#F4DDB0",
+    "#FFF9CF"
+  ],
+  "rarity": "common",
+  "shape": "kite_banner",
+  "tags": [
+    "wind",
+    "paper",
+    "ribbon"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

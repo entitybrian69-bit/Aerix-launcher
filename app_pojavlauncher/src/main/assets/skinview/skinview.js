@@ -2,6 +2,21 @@ const container = document.getElementById("skin-container");
 
 const getWidth = () => container.clientWidth || window.innerWidth || 240;
 const getHeight = () => container.clientHeight || window.innerHeight || 340;
+const MAX_RENDER_PIXELS = 1_200_000;
+const MAX_PREVIEW_PIXEL_RATIO = 1.25;
+const PLAYER_BOUNDING_RADIUS = 18.75;
+const CAMERA_FIT_MARGIN = 1.08;
+
+// WebView DPR can be 2–3 on a phone. Rendering a tiny skin preview at full DPR wastes GPU
+// bandwidth, so cap its pixel budget while keeping the crisp nearest-filtered skin texture.
+function previewPixelRatio(width = getWidth(), height = getHeight()) {
+    const w = Math.max(1, Number(width) || 1);
+    const h = Math.max(1, Number(height) || 1);
+    const dpr = Number.isFinite(window.devicePixelRatio) && window.devicePixelRatio > 0
+        ? window.devicePixelRatio : 1;
+    const areaLimit = Math.sqrt(MAX_RENDER_PIXELS / (w * h));
+    return Math.max(0.25, Math.min(dpr, MAX_PREVIEW_PIXEL_RATIO, areaLimit));
+}
 
 function notifyReady(ok, reason) {
     try {
@@ -20,9 +35,9 @@ try {
     skinViewer = new skinview3d.SkinViewer({
         canvas: document.createElement("canvas"),
         width: getWidth(),
-        height: getHeight()
+        height: getHeight(),
+        pixelRatio: previewPixelRatio()
     });
-    skinViewer.pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
     skinViewer.renderPaused = true;
     container.appendChild(skinViewer.canvas);
 } catch (err) {
@@ -145,17 +160,38 @@ function updateDefaultCameraPosition() {
     else defaultControlsTarget.copy(skinViewer.controls.target);
 }
 
-function setAzimuthAndPitch(azimuthDeg, pitchDeg, distance = 60) {
+function minimumCameraDistance() {
+    if (!skinViewer) return 48;
+    const aspect = Math.max(0.15, getWidth() / Math.max(1, getHeight()));
+    const verticalHalfFov = skinViewer.fov * Math.PI / 360;
+    const horizontalHalfFov = Math.atan(Math.tan(verticalHalfFov) * aspect);
+    const limitingHalfFov = Math.max(0.05, Math.min(verticalHalfFov, horizontalHalfFov));
+    // The player (including outer-layer hat/cape) fits as a conservative bounding sphere.
+    return Math.max(42, Math.min(120,
+        PLAYER_BOUNDING_RADIUS / Math.sin(limitingHalfFov) * CAMERA_FIT_MARGIN));
+}
+
+function configureCameraLimits() {
+    if (!skinViewer) return 48;
+    const fitDistance = minimumCameraDistance();
+    skinViewer.controls.minDistance = fitDistance * 0.98;
+    skinViewer.controls.maxDistance = Math.max(fitDistance + 24, Math.min(120, fitDistance * 2.4));
+    return fitDistance;
+}
+
+function setAzimuthAndPitch(azimuthDeg, pitchDeg, distance = 48) {
     if (!skinViewer) return;
     const controls = skinViewer.controls;
     const target = controls.target;
+    const fitDistance = configureCameraLimits();
+    const safeDistance = Math.max(fitDistance, Number(distance) || fitDistance);
 
     const azimuth = azimuthDeg * Math.PI / 180;
     const pitch = pitchDeg * Math.PI / 180;
 
-    const x = distance * Math.cos(pitch) * Math.sin(azimuth);
-    const y = distance * Math.sin(pitch);
-    const z = distance * Math.cos(pitch) * Math.cos(azimuth);
+    const x = safeDistance * Math.cos(pitch) * Math.sin(azimuth);
+    const y = safeDistance * Math.sin(pitch);
+    const z = safeDistance * Math.cos(pitch) * Math.cos(azimuth);
 
     skinViewer.camera.position.set(target.x + x, target.y + y, target.z + z);
     controls.update();
@@ -169,8 +205,24 @@ function resize() {
     const w = getWidth();
     const h = getHeight();
     if (w > 4 && h > 4) {
+        const ratio = previewPixelRatio(w, h);
+        if (Math.abs((skinViewer.pixelRatio || 1) - ratio) > 0.02) {
+            skinViewer.pixelRatio = ratio;
+        }
         skinViewer.width = w;
         skinViewer.height = h;
+        const fitDistance = configureCameraLimits();
+        const controls = skinViewer.controls;
+        const currentDistance = controls.getDistance();
+        if (currentDistance < fitDistance) {
+            const offset = skinViewer.camera.position.clone().sub(controls.target);
+            if (offset.lengthSq() > 0.0001) {
+                skinViewer.camera.position.copy(controls.target)
+                    .addScaledVector(offset.normalize(), fitDistance);
+                controls.update();
+                updateDefaultCameraPosition();
+            }
+        }
         skinViewer.render();
     }
 }
@@ -227,8 +279,28 @@ function loadSkin(skinUrl, model = "auto-detect") {
 function loadCape(capeUrl) {
     if (!skinViewer) return;
     Promise.resolve(skinViewer.loadCape(capeUrl))
-        .then(() => skinViewer.render())
+        .then(() => {
+            resize();
+            skinViewer.render();
+        })
         .catch(error => console.warn("Unable to render cape preview", error));
+}
+
+let autoRotateRequested = false;
+let userInteracting = false;
+let autoRotateResumeTimeout = null;
+
+function setAutoRotate(enabled, speed = 0.3) {
+    if (!skinViewer) return;
+    const safeSpeed = Number.isFinite(speed) ? Math.max(0.05, Math.min(1.5, speed)) : 0.3;
+    autoRotateRequested = enabled === true;
+    skinViewer.autoRotateSpeed = safeSpeed;
+    skinViewer.autoRotate = autoRotateRequested && !userInteracting;
+    if (autoRotateRequested) skinViewer.renderPaused = false;
+    if (autoRotateResumeTimeout !== null) {
+        clearTimeout(autoRotateResumeTimeout);
+        autoRotateResumeTimeout = null;
+    }
 }
 
 function setRenderPaused(paused) {
@@ -242,6 +314,13 @@ function setInteractionEnabled(enabled) {
     if (!skinViewer) return;
     const interactive = enabled !== false;
     skinViewer.controls.enableRotate = interactive;
+    // Wardrobe supports pinch zoom, bounded so the head/feet cannot be accidentally cropped.
+    skinViewer.controls.enableZoom = interactive;
+    skinViewer.controls.zoomSpeed = 0.8;
+    skinViewer.controls.enableDamping = interactive;
+    skinViewer.controls.dampingFactor = 0.08;
+    skinViewer.controls.enablePan = false;
+    configureCameraLimits();
     container.style.pointerEvents = interactive ? 'auto' : 'none';
 }
 
@@ -334,10 +413,26 @@ if (skinViewer) {
     });
 
     skinViewer.controls.addEventListener("start", () => {
+        userInteracting = true;
+        skinViewer.autoRotate = false;
+        if (autoRotateResumeTimeout !== null) {
+            clearTimeout(autoRotateResumeTimeout);
+            autoRotateResumeTimeout = null;
+        }
         if (resetAnimationId) {
             cancelAnimationFrame(resetAnimationId);
             resetAnimationId = null;
         }
+    });
+    skinViewer.controls.addEventListener("end", () => {
+        userInteracting = false;
+        if (!autoRotateRequested) return;
+        autoRotateResumeTimeout = window.setTimeout(() => {
+            autoRotateResumeTimeout = null;
+            if (autoRotateRequested && !userInteracting && skinViewer) {
+                skinViewer.autoRotate = true;
+            }
+        }, 1100);
     });
 
     skinViewer.canvas.addEventListener("webglcontextlost", (e) => {

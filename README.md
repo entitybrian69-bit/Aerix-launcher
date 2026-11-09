@@ -116,9 +116,9 @@ Aerix natively organizes launcher layouts, renderer stacks, and instance folders
 Aerix respects user privacy. Your worlds are yours. Your accounts are yours. Aerix does not take a cut or a look at either.
 
 *   🚫 **No Ads:** No popups, banners, or monetization layers.
-*   🚫 **No Telemetry:** Zero analytics trackers, hidden logs, or user reporting data streams.
-*   🚫 **No Harvesting:** No profiling, credential logging, or account caching.
-*   🔒 **Local-First Security:** Profiles, custom skins, and capes remain strictly isolated on your device storage unless you deliberately initiate a login that explicitly requests a remote server connection.
+*   🚫 **No Network Telemetry:** Trinkies adds no analytics upload or cosmetic-state network sync. The optional Aerix Client HUD snapshot is disabled by default, requires a local opt-in file, and remains in that instance's `config/` folder; it is not uploaded by Trinkies.
+*   🚫 **No Harvesting:** No credential logging or advertising profile is created by Trinkies.
+*   🔒 **Local-First Security:** Profiles, custom skins, and capes remain on device unless you deliberately use an account, skin service, or social feature that requests a remote connection. The wardrobe asset slice does not add a new network endpoint.
 *   📦 **GPL-3.0 Verification:** Fully open-source code so the internal application mechanics are completely inspectable by anyone.
 
 ---
@@ -130,6 +130,16 @@ Aerix respects user privacy. Your worlds are yours. Your accounts are yours. Aer
 *   **🌐 Microsoft Integration:** Secure OAuth login endpoints for native Java Edition accounts that legitimately own the game.
 *   **🔑 Yggdrasil Support:** Native integration for authenticating against alternative third-party login/auth servers.
 *   **🖼️ 3D Previews:** Includes a fully animated 3D skin viewer so you can check your character cosmetics before spinning up the Java engine.
+
+---
+
+## 👗 Wardrobe and Trinkies
+
+The Wardrobe is a client-side cosmetic hub. The existing shipped paths include account skins, standard/imported capes, and four local headwear overlays. Skin/cape visibility to other players depends on the selected account service and server; pets, wearable attachments, aura particles, and synchronized emotes are not currently shipped in-game.
+
+This repository now contains a **30-item generated asset slice** (five concepts in each of six categories), JSON schemas, deterministic original-art generation, and offline budget/UV checks under `trinkies_assets/`, `tools/trinkies_assets/`, and `docs/wardrobe/`. The slice is **not yet wired into the Wardrobe's equip flow or rendered by Trinkies in Minecraft**; the remaining 270 concepts were intentionally not generated before the in-game rendering gate. See [`docs/wardrobe/PLAN.md`](docs/wardrobe/PLAN.md) for the status and pending owner decisions.
+
+The client installer now uses a SHA-256 sidecar manifest and skips unowned/duplicate mods instead of silently overwriting or deleting them. Its bundled mod is client-only; no cosmetics sync endpoint or client-to-client cosmetics protocol is enabled. No 60-fps or device-compatibility claim is made for the preview changes without measurements.
 
 ---
 

@@ -1,0 +1,39 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip"
+  ],
+  "attach": {
+    "bone": "head",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "hat",
+  "description": "A riveted sky-pilot cap with twin teal lenses and a low wind brim.",
+  "emissive_mask": "emissive.png",
+  "id": "trinkies:hat_copper_aviator",
+  "model": "model.bbmodel",
+  "name": "Copper Aviator",
+  "palette": [
+    "#3C1C16",
+    "#593123",
+    "#A76036",
+    "#C38B57",
+    "#E5CC88",
+    "#7FE6D2",
+    "#B1FEFF"
+  ],
+  "rarity": "uncommon",
+  "shape": "aviator_cap",
+  "tags": [
+    "flight",
+    "metal",
+    "goggles"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

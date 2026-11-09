@@ -1,0 +1,40 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip",
+    "signature"
+  ],
+  "attach": {
+    "bone": "root",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "pet",
+  "description": "A pocket-sized pebble crab with copper feet, a shell dial, and bead eyes.",
+  "emissive_mask": "emissive.png",
+  "id": "trinkies:pet_clockwork_pebble_crab",
+  "model": "model.bbmodel",
+  "name": "Clockwork Pebble Crab",
+  "palette": [
+    "#281B18",
+    "#3B2B24",
+    "#70523F",
+    "#836B54",
+    "#998F71",
+    "#F3A963",
+    "#FFE098"
+  ],
+  "rarity": "rare",
+  "shape": "pebble_crab",
+  "tags": [
+    "crab",
+    "clockwork",
+    "pebble"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

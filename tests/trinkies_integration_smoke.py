@@ -16,8 +16,23 @@ class TrinkiesIntegrationSmoke(unittest.TestCase):
         self.assertIn("aerix.client.mod.AerixClientMod", descriptor["entrypoints"]["client"])
 
         installer = (APP / "client/AerixClientInstaller.kt").read_text()
-        self.assertIn('File(modsDir, "trinkies.jar")', installer)
-        self.assertIn('File(modsDir, "aerix-client-animator.jar").delete()', installer)
+        self.assertIn('TRINKIES_ARTIFACT_NAME = "trinkies-aerix.jar"', installer)
+        self.assertIn('TRINKIES_MANIFEST_NAME = "trinkies-aerix.manifest.json"', installer)
+        self.assertIn("sha256(target)", installer)
+        self.assertIn("findFabricModJar(modsDir, \"trinkies\", target)", installer)
+        self.assertIn("TrinkiesDeploymentStatus.CONFLICT", installer)
+        self.assertNotIn('File(modsDir, "aerix-client-animator.jar").delete()', installer)
+        self.assertNotIn("temporary.copyTo(target, overwrite = true)", installer)
+
+    def test_shared_cosmetic_assets_are_packaged_from_one_source(self):
+        catalog = json.loads((ROOT / "trinkies_assets/trinkies/catalog.json").read_text())
+        self.assertEqual(len(catalog["items"]), 30)
+        self.assertEqual(catalog["status"], "vertical_slice_unverified_in_game")
+        app_gradle = (ROOT / "app_pojavlauncher/build.gradle").read_text()
+        mod_gradle = (ROOT / "aerix_client_mod/build.gradle").read_text()
+        self.assertIn("assets.srcDir rootProject.file('trinkies_assets')", app_gradle)
+        self.assertIn("from(rootProject.file('trinkies_assets/trinkies'))", mod_gradle)
+        self.assertIn("into 'assets/trinkies'", mod_gradle)
 
     def test_auto_install_is_limited_to_supported_fabric_family_instances(self):
         installer = (APP / "client/TrinkiesInstaller.kt").read_text()
@@ -38,7 +53,8 @@ class TrinkiesIntegrationSmoke(unittest.TestCase):
         home = (APP / "ui/screens/HomeScreen.kt").read_text()
         shell = (APP / "ui/AerixLauncherScreen.kt").read_text()
         self.assertIn('animationName = "NewIdle"', home)
-        self.assertIn("cameraDistance = 34", home)
+        self.assertIn("cameraDistance = 48", home)
+        self.assertIn(".clipToBounds()", home)
         # Both the live stage and its retained fallback must follow the same world-rotation
         # convention: dragging right subtracts azimuth, while its negated release velocity is
         # integrated positively so the fling continues in the same direction.
@@ -56,6 +72,8 @@ class TrinkiesIntegrationSmoke(unittest.TestCase):
             self.assertIn(f"{category}(\"", wardrobe)
         self.assertIn('WardrobeTopBar(', wardrobe)
         self.assertIn('WardrobeFilterTabs(', wardrobe)
+        self.assertIn("cameraDistance = 48", wardrobe)
+        self.assertIn("autoRotate = true", wardrobe)
         self.assertIn('Font(R.font.minecraft_ten)', wardrobe)
         self.assertIn("Vanilla, Forge and NeoForge instances are not modified", wardrobe)
         self.assertIn("when it and the server allow", wardrobe)

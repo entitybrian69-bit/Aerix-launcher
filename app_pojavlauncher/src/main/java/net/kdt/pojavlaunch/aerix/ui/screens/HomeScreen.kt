@@ -74,6 +74,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -276,6 +277,7 @@ private fun HomeCharacterStage(
                 .weight(1f)
                 .fillMaxWidth()
                 .padding(horizontal = AerixSpacing.smPlus)
+                .clipToBounds()
                 .drawWithCache {
                     val glow = Brush.radialGradient(
                         colors = listOf(accent.copy(alpha = 0.18f), Color.Transparent),
@@ -329,7 +331,7 @@ private fun HomeCharacterStage(
                 showOfficialCape = true,
                 animationName = "NewIdle",
                 applyClientHat = true,
-                cameraDistance = 34,
+                cameraDistance = 48,
                 modifier = Modifier.fillMaxSize().padding(horizontal = 18.dp, vertical = 8.dp)
             )
         }

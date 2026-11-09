@@ -1,0 +1,40 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip",
+    "play"
+  ],
+  "attach": {
+    "bone": "body",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "emote",
+  "description": "A formal bow traced by two pale ribbons that settle at the shoulders.",
+  "emissive_mask": "emissive.png",
+  "id": "trinkies:emote_moonlit_ribbon_bow",
+  "model": "model.bbmodel",
+  "name": "Moonlit Ribbon Bow",
+  "palette": [
+    "#151E28",
+    "#212B3B",
+    "#38476F",
+    "#4D5682",
+    "#6F6B98",
+    "#BDD8FF",
+    "#D2DBFF"
+  ],
+  "rarity": "epic",
+  "shape": "moon_ribbons",
+  "tags": [
+    "moon",
+    "ribbon",
+    "one-shot"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

@@ -1,21 +1,23 @@
 # Trinkies cosmetics integration
 
-Trinkies is the client-side cosmetics bridge bundled with Aerix Launcher. The Fabric mod metadata uses the `trinkies` ID and is built from `aerix_client_mod`; the APK carries the mod JAR as an asset.
+Trinkies is Aerix Launcher's client-side cosmetics bridge. Gradle is configured to build the Fabric JAR from `:aerix_client_mod`, include it in the Android APK as `components/aerix_client/aerix_client_mod.jar`, and package the generated item source under `assets/trinkies/`. The launcher is configured to package the same source directory as `trinkies/` assets. **These new Gradle resource paths have not been verified by an Android or mod-JAR build in this environment.**
 
-## Install scope
+## Install scope and file safety
 
-- Existing Fabric, Quilt, and Legacy Fabric instances are updated locally when the Home screen opens.
-- Newly created/imported supported instances are repaired again immediately before launch.
-- Aerix Client instances keep their existing install/update path.
-- Vanilla, Forge, and NeoForge instances are not modified and no loader is silently installed for them.
+- Existing Fabric-family and Aerix Client instances are checked locally when Home opens; a supported instance is checked again before launch. Vanilla, Forge, and NeoForge are not modified and Fabric is not silently installed for them.
+- The managed artifact path is `<instance>/mods/trinkies-aerix.jar`. `<instance>/mods/trinkies-aerix.manifest.json` records schema, mod ID, version, artifact name, and SHA-256 for the exact managed JAR.
+- An existing JAR is only updated when the manifest proves it is the prior managed byte sequence. A duplicate `trinkies` mod ID, legacy `aerix-client-animator.jar`, malformed manifest, or unowned target is left untouched and reported. The installer does not delete legacy JARs and does not fall back to overwriting a target after an atomic rename failure.
+- The sidecar is an ownership/hash record, not a malware scan. Review unexpected mod conflicts manually. Per-instance disable UI and version-matched JAR selection remain unfinished.
 
-## Available in this build
+## Current source-tree behavior
 
-- The launcher character is a touch-rotatable 3D preview with idle, wave, walk, run, fly, and crouch poses.
-- Existing account skin import, saved skins, wide/slim model selection, and standard cape import are reused.
-- Fifteen existing animated cape designs sync to supported instance folders. An imported cape can also be selected for Trinkies.
-- Four pixel-art headwear overlays are applied to the skin's outer head layer and to the local preview/compatible skin-service response.
+- The launcher preview uses the account's local/cached/service skin where available, supports classic/slim model selection, existing cape paths, and a 2D fallback when WebGL is unavailable.
+- Existing account skins, saved skin presets, 15 original animated cape designs, imported capes, and four pixel-art headwear overlays are reused. The headwear overlay modifies the outer skin layer; visibility to remote players depends on the account/skin service and server.
+- `trinkies_assets/` now holds 30 deterministic original slice assets: five hats, suits, back items, pets, emotes, and auras/trails. JSON Schema, texture/model budget, palette, UV, animation-clip, and pack-size checks are in `tools/trinkies_assets/validate_catalog.py`.
+- **The generated 30-item slice is not yet connected to Wardrobe equip state or the in-game renderer.** Its contact sheets are procedural model projections, not Minecraft screenshots. It is not accepted as a finished item set.
 
-## Visibility limits
+## Visibility, sync, and privacy limits
 
-The bundled mod is client-only. It can render the equipped appearance in that player's own Trinkies-compatible game client; it does not implement a server plugin or client-to-client cosmetic packet protocol. Other players are not guaranteed to see custom skins or capes, and pets, attached back items, and synchronized multiplayer emotes are collection placeholders rather than shipped in-game features. A vanilla-compatible skin/cape path depends on the authentication/skin service and server configuration; unmodified vanilla clients and servers cannot display Trinkies-only attachments or animations.
+The current Fabric mod is client-only. It includes existing local cape/texture bridges and client display overrides; it does not include the requested feature-renderer implementation for the generated hats/suits/wings/pets/auras, a pet follower, emote wheel, or synchronized multiplayer cosmetics protocol. Other players are not guaranteed to see custom skins/capes, and unmodified vanilla clients/servers cannot display Trinkies-only attachments or animations.
+
+No Trinkies cosmetic state is sent to Supabase and no cosmetics sharing opt-in/delete UI exists yet. Existing Aerix social features use Supabase separately. Offline account cosmetics remain local; no UUID sharing is added by this integration. See [`wardrobe/SPEC.md`](wardrobe/SPEC.md) before any future sync work.

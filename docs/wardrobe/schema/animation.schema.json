@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aerix.invalid/trinkies/schema/animation.schema.json",
+  "title": "Trinkies keyframed animation file",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "clips"],
+  "properties": {
+    "schema": {"type": "integer", "const": 1},
+    "clips": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {"pattern": "^[a-z][a-z0-9_]*$"},
+      "additionalProperties": {"$ref": "#/$defs/clip"}
+    }
+  },
+  "$defs": {
+    "vector3": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {"type": "number"}
+    },
+    "keyframe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["time", "position", "rotation", "scale", "easing"],
+      "properties": {
+        "time": {"type": "number", "minimum": 0},
+        "position": {"$ref": "#/$defs/vector3"},
+        "rotation": {"$ref": "#/$defs/vector3", "description": "Euler degrees, XYZ order"},
+        "scale": {"$ref": "#/$defs/vector3"},
+        "easing": {"enum": ["linear", "ease_in_out", "cubic", "spring"]}
+      }
+    },
+    "track": {
+      "type": "array",
+      "minItems": 2,
+      "items": {"$ref": "#/$defs/keyframe"}
+    },
+    "clip": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["duration", "loop_mode", "blend_in", "blend_out", "bones"],
+      "properties": {
+        "duration": {"type": "number", "exclusiveMinimum": 0, "maximum": 8},
+        "loop_mode": {"enum": ["loop", "once", "ping_pong"]},
+        "blend_in": {"type": "number", "minimum": 0, "maximum": 2},
+        "blend_out": {"type": "number", "minimum": 0, "maximum": 2},
+        "bones": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": {"pattern": "^[a-z][a-z0-9_]*$"},
+          "additionalProperties": {"$ref": "#/$defs/track"}
+        }
+      }
+    }
+  }
+}

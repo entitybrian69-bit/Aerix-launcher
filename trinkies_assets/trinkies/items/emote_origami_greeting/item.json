@@ -1,0 +1,39 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip",
+    "play"
+  ],
+  "attach": {
+    "bone": "right_arm",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "emote",
+  "description": "A quick greeting that unfolds a small paper pennant and tucks it away.",
+  "id": "trinkies:emote_origami_greeting",
+  "model": "model.bbmodel",
+  "name": "Origami Greeting",
+  "palette": [
+    "#4E4840",
+    "#736C5F",
+    "#D9CFAF",
+    "#FEF9D6",
+    "#FBFFE1",
+    "#5E9D8C",
+    "#89BCB9"
+  ],
+  "rarity": "common",
+  "shape": "origami_prop",
+  "tags": [
+    "greeting",
+    "paper",
+    "one-shot"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

@@ -54,6 +54,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -213,6 +214,11 @@ class AerixPlayerSkin(private val context: Context) {
         webview?.evaluateJavascript("setInteractionEnabled($enabled)", null)
     }
 
+    fun setAutoRotate(enabled: Boolean, speed: Float = 0.3f) {
+        val safeSpeed = speed.takeIf { it.isFinite() }?.coerceIn(0.05f, 1.5f) ?: 0.3f
+        webview?.evaluateJavascript("setAutoRotate($enabled, $safeSpeed)", null)
+    }
+
     fun startAnimation(name: String, speed: Float = 1f) {
         val allowed = setOf("DefaultIdle", "NewIdle", "Walking", "Running", "Flying", "Wave", "Crouch", "Hit")
         if (name !in allowed) return
@@ -259,7 +265,9 @@ fun AerixSkinPreview3D(
     showOfficialCape: Boolean = false,
     animationName: String? = null,
     applyClientHat: Boolean = false,
-    cameraDistance: Int = 60
+    cameraDistance: Int = 48,
+    autoRotate: Boolean = false,
+    autoRotateSpeed: Float = 0.3f
 ) {
     val context = LocalContext.current
     val playerSkin = remember { AerixPlayerSkin(context.applicationContext) }
@@ -370,13 +378,18 @@ fun AerixSkinPreview3D(
         }
 
         val ready = viewerReady
-        LaunchedEffect(ready, isVisible, animationName) {
+        LaunchedEffect(ready, isVisible, animationName, autoRotate) {
             if (!ready) return@LaunchedEffect
-            if (isVisible && !animationName.isNullOrBlank()) {
-                playerSkin.startAnimation(animationName)
-            } else {
-                playerSkin.setRenderPaused(true)
+            when {
+                !isVisible -> playerSkin.setRenderPaused(true)
+                !animationName.isNullOrBlank() -> playerSkin.startAnimation(animationName)
+                autoRotate -> playerSkin.setRenderPaused(false)
+                else -> playerSkin.setRenderPaused(true)
             }
+        }
+        LaunchedEffect(ready, autoRotate, autoRotateSpeed, isVisible) {
+            if (!ready) return@LaunchedEffect
+            playerSkin.setAutoRotate(autoRotate && isVisible, autoRotateSpeed)
         }
         LaunchedEffect(ready, azimuth, pitch, cameraDistance, isVisible) {
             if (!ready || !isVisible) return@LaunchedEffect
@@ -385,8 +398,9 @@ fun AerixSkinPreview3D(
         LaunchedEffect(ready, isVisible) {
             if (!ready || !isVisible) return@LaunchedEffect
             for ((azimuthDeg, pitchDeg, distance) in cameraAngles) {
+                // Consume only the latest pointer-driven camera state once per display frame.
+                withFrameNanos { }
                 playerSkin.setAzimuthAndPitch(azimuthDeg, pitchDeg, distance)
-                delay(16)
             }
         }
         LaunchedEffect(ready, interactionEnabled, isVisible) {

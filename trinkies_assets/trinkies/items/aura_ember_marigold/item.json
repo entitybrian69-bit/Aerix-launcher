@@ -1,0 +1,40 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip"
+  ],
+  "attach": {
+    "bone": "root",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "aura",
+  "description": "Warm petal-shaped pixels rise in a sparse loop and fade before the head.",
+  "emissive_mask": "emissive.png",
+  "id": "trinkies:aura_ember_marigold",
+  "model": "model.bbmodel",
+  "name": "Ember Marigold",
+  "palette": [
+    "#3B1716",
+    "#572923",
+    "#A44F37",
+    "#C07A57",
+    "#E1BB87",
+    "#FFD27A",
+    "#FFF3A5"
+  ],
+  "particle_sheet": "texture.png",
+  "rarity": "uncommon",
+  "shape": "marigold_aura",
+  "tags": [
+    "ember",
+    "petals",
+    "particles"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

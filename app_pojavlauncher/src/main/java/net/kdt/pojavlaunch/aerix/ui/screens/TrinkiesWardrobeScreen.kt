@@ -395,6 +395,7 @@ private fun WardrobePreviewPanel(
         }
         Box(
             modifier = Modifier.weight(1f).fillMaxWidth()
+                .clip(RoundedCornerShape(0.dp))
                 .border(1.dp, Color(0xFF303236), RoundedCornerShape(0.dp))
                 .background(wardrobeCanvas),
             contentAlignment = Alignment.Center
@@ -407,7 +408,8 @@ private fun WardrobePreviewPanel(
                 showOfficialCape = true,
                 animationName = pose,
                 applyClientHat = true,
-                cameraDistance = 32,
+                cameraDistance = 48,
+                autoRotate = true,
                 modifier = Modifier.fillMaxSize().padding(2.dp)
             )
             Column(

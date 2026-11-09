@@ -1,0 +1,40 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip"
+  ],
+  "attach": {
+    "bone": "body",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "suit",
+  "description": "A geometer's suit with a faceted compass, bright shoulder tabs, and glass vials.",
+  "emissive_mask": "emissive.png",
+  "id": "trinkies:suit_prism_cartographer",
+  "model": "model.bbmodel",
+  "name": "Prism Cartographer",
+  "palette": [
+    "#1D2234",
+    "#2C304D",
+    "#4D4E91",
+    "#6E68AA",
+    "#A28FC7",
+    "#F5CC69",
+    "#FFF79C"
+  ],
+  "rarity": "epic",
+  "shape": "prism_suit",
+  "suit_mode": "overlay",
+  "tags": [
+    "prism",
+    "maps",
+    "glass"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

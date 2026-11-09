@@ -1,0 +1,39 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip"
+  ],
+  "attach": {
+    "bone": "body",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "back",
+  "description": "A floating brass bell drone with three stabilizer fins and a blue glass lens.",
+  "emissive_mask": "emissive.png",
+  "id": "trinkies:back_tidal_bell_drone",
+  "model": "model.bbmodel",
+  "name": "Tidal Bell Drone",
+  "palette": [
+    "#162A2E",
+    "#223B44",
+    "#3A6680",
+    "#537696",
+    "#7685AF",
+    "#A0ECF5",
+    "#C3ECFF"
+  ],
+  "rarity": "epic",
+  "shape": "bell_drone",
+  "tags": [
+    "drone",
+    "bell",
+    "ocean"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

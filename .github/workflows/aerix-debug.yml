@@ -11,23 +11,6 @@ name: Aerix debug (testing)
 on:
   push:
     branches: [ "v3_openjdk", "arena/**" ]
-    paths:
-      - "app_pojavlauncher/src/**"
-      - "app_pojavlauncher/*.gradle"
-      - "app_pojavlauncher/proguard-rules.pro"
-      - "app_pojavlauncher/libs/**"
-      - "forge_installer/**"
-      - "aerix_client_mod/**"
-      - "tests/**"
-      - "glfw/**"
-      - "sdl/**"
-      - "mojoexec/**"
-      - "*.gradle"
-      - "gradle/**"
-      - "gradle.properties"
-      - "version.properties"
-      - "settings.gradle"
-      - ".github/workflows/aerix-debug.yml"
   workflow_dispatch:
 
 permissions:
@@ -66,15 +49,23 @@ jobs:
         with:
           node-version: "22"
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
       - name: Verify Client smoke tests
         run: |
           trap 'echo "::error title=Smoke test failed::$BASH_COMMAND"' ERR
+          python3 -m pip install --disable-pip-version-check -r tools/trinkies_assets/requirements.txt
+          python3 tools/trinkies_assets/validate_catalog.py --require-slice
+          node --check app_pojavlauncher/src/main/assets/skinview/skinview.js
           python3 tests/branding_identity_smoke.py
           python3 tests/data_migration_smoke.py
           python3 tests/discord_presence_logo_smoke.py
           python3 tests/modern_cape_smoke.py
           python3 tests/social_profile_cosmetics_smoke.py
           python3 tests/trinkies_integration_smoke.py
+          python3 tests/skin_preview_camera_smoke.py
           python3 tests/client_background_smoke.py
           python3 tests/instance_renderer_smoke.py
           python3 tests/fastclient_assets_smoke.py
@@ -228,11 +219,11 @@ jobs:
         with:
           gradle-version: "8.14.3"
 
-      - name: Build debug APK
+      - name: Build debug APK and Trinkies Fabric JAR
         shell: bash
         run: |
           set +e
-          ./gradlew :app_pojavlauncher:assembleNoruntimeDebug --console=plain > build.log 2>&1
+          ./gradlew :aerix_client_mod:jar :app_pojavlauncher:assembleNoruntimeDebug --console=plain > build.log 2>&1
           code=$?
           if [ "$code" -ne 0 ]; then
             # One compressed annotation avoids GitHub's ten-annotations-per-step limit
@@ -241,6 +232,12 @@ jobs:
               while IFS= read -r chunk || [ -n "$chunk" ]; do echo "::error title=build-log-gzip-base64::$chunk"; done
           fi
           exit "$code"
+
+      - name: Verify built Trinkies JAR contents
+        run: |
+          MOD_JAR_PATH="$(find aerix_client_mod/build/libs -maxdepth 1 -type f -name '*.jar' -print -quit)"
+          test -n "$MOD_JAR_PATH"
+          python3 tests/trinkies_jar_verify.py "$MOD_JAR_PATH"
 
       - name: Check it is really the debug build
         id: verify
@@ -266,6 +263,13 @@ jobs:
         with:
           name: aerix-debug-apk
           path: ${{ env.APK_PATH }}
+          retention-days: 30
+
+      - name: Upload Trinkies Fabric JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: trinkies-fabric-client-jar
+          path: aerix_client_mod/build/libs/*.jar
           retention-days: 30
 
       - name: Publish debug APK to GitHub Release (debug-latest)
