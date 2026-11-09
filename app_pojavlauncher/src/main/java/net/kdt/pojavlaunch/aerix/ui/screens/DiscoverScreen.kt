@@ -8,7 +8,7 @@
  *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/ui/screens/content/download/assets/elements/DownloadAssetsElements.kt
  * Top pill bar (Modpacks, Mods, Resource Packs, Shaders, Worlds, Install Vanilla, Favorites),
  * filter bar (Search..., Modrinth/CurseForge dropdown, Category dropdown, MC version dropdown,
- * Loader dropdown, Sort dropdown), 3-column ResultProjectLayout cards with Installed/Install button
+ * Loader dropdown), big search field + scrollable filter pills, 3-column ResultProjectLayout cards
  * and Favorite toggle, floating PageController ("1 / N  <  >"), and the in-page project detail
  * view with hero card, screenshots carousel between the hero and the grouped version list, and
  * project links rail.
@@ -129,7 +129,6 @@ import net.kdt.pojavlaunch.aerix.bridge.AssetProject
 import net.kdt.pojavlaunch.aerix.bridge.AssetProjectDetails
 import net.kdt.pojavlaunch.aerix.bridge.AssetScreenshot
 import net.kdt.pojavlaunch.aerix.bridge.AssetTarget
-import net.kdt.pojavlaunch.aerix.bridge.AssetSort
 import net.kdt.pojavlaunch.aerix.bridge.AssetType
 import net.kdt.pojavlaunch.aerix.bridge.InstanceTarget
 import net.kdt.pojavlaunch.aerix.bridge.PojavAssetBridge
@@ -367,7 +366,6 @@ private fun SearchAssetsContent(
     val resultsState = rememberLazyListState()
     var mcVersion by rememberSaveable(type) { mutableStateOf<String?>(null) }
     var loader by rememberSaveable(type) { mutableStateOf<String?>(null) }
-    var sort by rememberSaveable(type) { mutableStateOf(AssetSort.RELEVANCE) }
     var pageIndex by rememberSaveable(type) { mutableIntStateOf(1) }
 
     var page by remember { mutableStateOf<AssetPage?>(null) }
@@ -407,7 +405,7 @@ private fun SearchAssetsContent(
         facets = PojavAssetBridge.facets(context, platform, type)
     }
 
-    LaunchedEffect(type, platform, submittedQuery, selectedCategories, mcVersion, loader, sort, pageIndex, reloadNonce) {
+    LaunchedEffect(type, platform, submittedQuery, selectedCategories, mcVersion, loader, pageIndex, reloadNonce) {
         loading = true
         failed = false
         val offset = (pageIndex - 1).coerceAtLeast(0) * PojavAssetBridge.PAGE_SIZE
@@ -419,8 +417,7 @@ private fun SearchAssetsContent(
             mcVersion = mcVersion,
             loader = if (type.supportsLoaderFilter) loader else null,
             offset = offset,
-            categories = selectedCategories,
-            sort = sort
+            categories = selectedCategories
         )
         page = result
         failed = result == null
@@ -433,88 +430,92 @@ private fun SearchAssetsContent(
     var showCategoryPicker by remember { mutableStateOf(false) }
     var showVersionPicker by remember { mutableStateOf(false) }
     var showLoaderMenu by remember { mutableStateOf(false) }
-    var showSortMenu by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
     ) {
-        // Compact Horizontal Search & Filter Bar (Mirai SearchAssetsScreen.kt lines 357-609)
+        // The search field is the primary control on this screen, so it gets a full-width row of
+        // its own at touch-field height instead of sharing a cramped strip with the filter pills.
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(58.dp)
+                .clip(RoundedCornerShape(AerixRadii.control))
+                .background(AerixSurface.panelRaised)
+                .border(AerixSpacing.hairline, AerixSurface.borderSoft, RoundedCornerShape(AerixRadii.control))
+                .padding(horizontal = AerixSpacing.md),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(AerixSpacing.smCompact)
+            horizontalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
         ) {
-            // Search Box
-            Row(
+            Icon(
+                painter = painterResource(R.drawable.aerix_ic_search),
+                contentDescription = null,
+                tint = AerixSurface.textSecondary,
                 modifier = Modifier
-                    .weight(1f)
-                    .height(36.dp)
-                    .clip(RoundedCornerShape(AerixRadii.controlSmall))
-                    .background(AerixSurface.panelRaised)
-                    .border(AerixSpacing.hairline, AerixSurface.borderSoft, RoundedCornerShape(AerixRadii.controlSmall))
-                    .padding(horizontal = AerixSpacing.smPlus),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(AerixSpacing.smCompact)
+                    .size(22.dp)
+                    .clickable {
+                        pageIndex = 1
+                        submittedQuery = query
+                    }
+            )
+            Box(
+                modifier = Modifier.weight(1f),
+                contentAlignment = Alignment.CenterStart
             ) {
+                if (query.isEmpty()) {
+                    Text(
+                        text = "Search mods, packs, shaders...",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Normal,
+                        color = AerixSurface.textMuted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                BasicTextField(
+                    value = query,
+                    onValueChange = {
+                        query = it
+                        pageIndex = 1
+                        submittedQuery = it
+                    },
+                    singleLine = true,
+                    textStyle = TextStyle(color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Medium),
+                    cursorBrush = SolidColor(AerixThemeManager.currentAccent()),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = {
+                        pageIndex = 1
+                        submittedQuery = query
+                    }),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+            if (query.isNotEmpty()) {
                 Icon(
-                    painter = painterResource(R.drawable.aerix_ic_search),
+                    painter = painterResource(R.drawable.aerix_ic_close),
                     contentDescription = null,
                     tint = AerixSurface.textSecondary,
                     modifier = Modifier
-                        .size(16.dp)
+                        .size(20.dp)
                         .clickable {
+                            query = ""
+                            submittedQuery = ""
                             pageIndex = 1
-                            submittedQuery = query
                         }
                 )
-                Box(
-                    modifier = Modifier.weight(1f),
-                    contentAlignment = Alignment.CenterStart
-                ) {
-                    if (query.isEmpty()) {
-                        Text(
-                            text = "Search...",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = AerixSurface.textMuted,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                    BasicTextField(
-                        value = query,
-                        onValueChange = {
-                            query = it
-                            pageIndex = 1
-                            submittedQuery = it
-                        },
-                        singleLine = true,
-                        textStyle = TextStyle(color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium),
-                        cursorBrush = SolidColor(AerixThemeManager.currentAccent()),
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                        keyboardActions = KeyboardActions(onSearch = {
-                            pageIndex = 1
-                            submittedQuery = query
-                        }),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-                if (query.isNotEmpty()) {
-                    Icon(
-                        painter = painterResource(R.drawable.aerix_ic_close),
-                        contentDescription = null,
-                        tint = AerixSurface.textSecondary,
-                        modifier = Modifier
-                            .size(15.dp)
-                            .clickable {
-                                query = ""
-                                submittedQuery = ""
-                                pageIndex = 1
-                            }
-                    )
-                }
             }
+        }
 
+        // Filter pills, in a scrollable strip under the search field. Sorting is not offered:
+        // results follow the query, so there is no sort control to tune first.
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(AerixSpacing.smCompact)
+        ) {
             // Platform Dropdown Pill (Modrinth / CurseForge)
             Box {
                 DiscoverFilterDropdownPill(
@@ -593,28 +594,6 @@ private fun SearchAssetsContent(
                 }
             }
 
-            // Sort Dropdown Pill ("Sort: Relevance ▾")
-            Box {
-                DiscoverFilterDropdownPill(
-                    label = "Sort: ${sort.label}",
-                    onClick = { showSortMenu = true }
-                )
-                DropdownMenu(
-                    expanded = showSortMenu,
-                    onDismissRequest = { showSortMenu = false }
-                ) {
-                    AssetSort.entries.forEach { s ->
-                        DropdownMenuItem(
-                            text = { Text(s.label) },
-                            onClick = {
-                                showSortMenu = false
-                                sort = s
-                                pageIndex = 1
-                            }
-                        )
-                    }
-                }
-            }
         }
 
         // Outside the scrolling pill row, because a dialog is a window of its own.
