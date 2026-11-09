@@ -53,6 +53,10 @@ object AerixClientCosmetics {
     /** The UV grid every catalog garment patch is authored on. */
     private const val GARMENT_PATCH_SIZE = 64
 
+    /** The Minecraft cape sheet every back item's `cape_patch.png` is authored on. */
+    private const val CAPE_PATCH_WIDTH = 64
+    private const val CAPE_PATCH_HEIGHT = 32
+
     const val OWNER_EMAIL = "entitybrian69@gmail.com"
     const val CO_OWNER_EMAIL = "kushaladhikari982648@gmail.com"
 
@@ -222,6 +226,46 @@ object AerixClientCosmetics {
     }.getOrNull()
 
     /**
+     * The equipped back item's `cape_patch.png` as cape-sheet pixels.
+     *
+     * Back items are authored in the cape's own UV space, so the patch lands texel-for-texel and
+     * needs no geometry of its own here - the same data-driven rule the skin bake follows. A patch
+     * that is not exactly `64x32` is dropped rather than stretched, because a stretched cape reads
+     * as a torn one, and an unknown or unrenderable id simply means "no Trinkies cape".
+     */
+    private fun trinkiesCapePatchPixels(context: Context): IntArray? {
+        val id = AerixClientStore.equippedIdFor("back")
+        if (!id.startsWith("trinkies:")) return null
+        val item = TrinkiesCatalog.find(context, id)?.takeIf { it.locallyRendered } ?: return null
+        val asset = item.capeAsset ?: return null
+        return runCatching {
+            context.applicationContext.assets.open(asset).use { stream ->
+                BitmapFactory.decodeStream(stream)
+            }?.let { bitmap ->
+                if (bitmap.width != CAPE_PATCH_WIDTH || bitmap.height != CAPE_PATCH_HEIGHT) {
+                    bitmap.recycle()
+                    return@let null
+                }
+                val pixels = IntArray(CAPE_PATCH_WIDTH * CAPE_PATCH_HEIGHT)
+                bitmap.getPixels(
+                    pixels, 0, CAPE_PATCH_WIDTH, 0, 0, CAPE_PATCH_WIDTH, CAPE_PATCH_HEIGHT
+                )
+                bitmap.recycle()
+                pixels
+            }
+        }.getOrNull()
+    }
+
+    /**
+     * Bakes a cape patch onto a generated frame. A null patch - nothing equipped, or an asset that
+     * did not load - leaves the launcher's own cape standing, which is also what keeps elytra wings
+     * intact wherever a back item only covers the cape panel.
+     */
+    private fun overlayCapePatch(frame: Bitmap, patch: IntArray?) {
+        if (patch != null) TrinkiesGarmentComposite.bakeCapeInto(frame, patch)
+    }
+
+    /**
      * Generates a genuine `64×32` Minecraft Cape + Elytra PNG byte array served by `AerixSkinServer`:
      * - Front/Back/Sides Cape UV: `(0..21, 0..16)` (Front visible face = `1..10, 1..16`)
      * - Elytra Wing UV: `(22..45, 0..21)` so wearing an Elytra renders matching custom wings too!
@@ -233,6 +277,7 @@ object AerixClientCosmetics {
         }
 
         val bmp = buildAnimatedCapeFrameBitmap(effectiveCapeSpec(), frameIndex = 0, totalFrames = 12)
+        overlayCapePatch(bmp, trinkiesCapePatchPixels(context))
         ByteArrayOutputStream().use { out ->
             bmp.compress(Bitmap.CompressFormat.PNG, 100, out)
             out.toByteArray()
@@ -249,6 +294,7 @@ object AerixClientCosmetics {
             AerixClientStore.init(context)
             val spec = effectiveCapeSpec()
             val importedCape = if (AerixClientStore.equippedCapeId == "custom") resolveImportedCapeBytes() else null
+            val trinkiesCape = if (importedCape == null) trinkiesCapePatchPixels(context) else null
             val configDir = File(instanceGameDir, "config").apply { mkdirs() }
             val framesDir = File(configDir, "aerix_cape_frames").apply { mkdirs() }
 
@@ -259,6 +305,7 @@ object AerixClientCosmetics {
                     FileOutputStream(outFile).use { it.write(importedCape) }
                 } else {
                     val bmp = buildAnimatedCapeFrameBitmap(spec, frameIndex = i, totalFrames = total)
+                    overlayCapePatch(bmp, trinkiesCape)
                     FileOutputStream(outFile).use { fos -> bmp.compress(Bitmap.CompressFormat.PNG, 100, fos) }
                 }
             }
@@ -267,6 +314,7 @@ object AerixClientCosmetics {
             metaFile.writeText(
                 buildString {
                     appendLine("capeId=${if (importedCape != null) "custom" else spec.id}")
+                    appendLine("trinkiesBack=${AerixClientStore.equippedIdFor("back")}")
                     appendLine("frames=$total")
                     appendLine("waving=${AerixClientStore.wavingCapeEnabled}")
                     appendLine("updatedAtMs=$now")

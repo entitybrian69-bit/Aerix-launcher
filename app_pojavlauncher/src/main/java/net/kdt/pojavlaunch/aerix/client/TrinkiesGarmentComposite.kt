@@ -16,6 +16,10 @@ object TrinkiesGarmentComposite {
     /** The layout every patch is authored against, in UV units. */
     private const val PATCH_SIZE = 64
 
+    /** The cape sheet's own grid, which is where back items are authored. */
+    private const val CAPE_WIDTH = 64
+    private const val CAPE_HEIGHT = 32
+
     /**
      * UV blocks of the classic skin as `u, v, width, height, depth`. These are the game's own
      * regions — the same table `tools/trinkies_assets/mc_skin_render.py` draws with, which is why a
@@ -120,6 +124,49 @@ object TrinkiesGarmentComposite {
             }
         }
         return false
+    }
+
+    /**
+     * Source-over a back item's `cape_patch.png` onto a `64x32` cape sheet.
+     *
+     * A cape patch is authored in the cape's own UV space instead of the skin's, so there is no
+     * footprint to police here: every texel of the sheet is fair game, which is what lets one asset
+     * dress the elytra wings as well as the cape panel.
+     *
+     * @param cape the cape sheet's pixels, row-major, length `64 * 32`
+     * @param patch the cape patch's pixels in the same layout
+     * @return true when at least one texel was painted
+     */
+    @JvmStatic
+    fun bakeCape(cape: IntArray, patch: IntArray): Boolean {
+        val area = CAPE_WIDTH * CAPE_HEIGHT
+        if (cape.size < area || patch.size < area) return false
+        var painted = false
+        for (y in 0 until CAPE_HEIGHT) {
+            val row = y * CAPE_WIDTH
+            for (x in 0 until CAPE_WIDTH) {
+                val argb = patch[row + x]
+                val alpha = argb ushr 24
+                if (alpha == 0) continue
+                painted = paintBlock(cape, CAPE_WIDTH, CAPE_HEIGHT, x, y, 1, argb, alpha) || painted
+            }
+        }
+        return painted
+    }
+
+    /**
+     * The same cape bake, applied to a mutable [Bitmap]. Sheets of any other size are refused
+     * rather than stretched, because a stretched cape reads as a torn one.
+     */
+    fun bakeCapeInto(bitmap: Bitmap, patch: IntArray): Boolean {
+        val width = bitmap.width
+        val height = bitmap.height
+        if (width != CAPE_WIDTH || height != CAPE_HEIGHT) return false
+        val pixels = IntArray(width * height)
+        bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
+        if (!bakeCape(pixels, patch)) return false
+        bitmap.setPixels(pixels, 0, width, 0, 0, width, height)
+        return true
     }
 
     private fun categoryParts(category: String): List<String>? = CATEGORY_BLOCKS[category]

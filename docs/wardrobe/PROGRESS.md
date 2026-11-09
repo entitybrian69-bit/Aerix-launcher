@@ -2,6 +2,16 @@
 
 Updated: 2026-11-09 (UTC)
 
+## 2026-11-09 (later): what CI found, and the cape catching up
+
+**Status: both fixes are on the branch; Android CI is green on `4ef169e`, so the wardrobe bake compiles.**
+
+- CI could not be read from this sandbox (log endpoints blocked), so the first build failure was found by review: `AerixClientCosmetics.trinkiesGarmentPatches` called `Bitmap.getPixels` with six arguments. Android's signature is `(colors, offset, stride, x, y, width, height)`; the fix passes offset 0 and a full-row stride, which is what `TrinkiesGarmentComposite.bakeInto` already did. A wrong stride would also have thrown on the first equipped item, so the arity is now asserted for the cape path too.
+- The second CI failure (`Verify built Trinkies JAR contents`) was real and on my side: `generate_full_catalog.py` wrote `garment` for every row but never `cape_texture`, so the JAR gate rejected the first back item and the launcher parsed an empty cape path for all fifty. Back rows now carry `cape_texture` re-anchored to `items/<id>/cape_patch.png`, slice rows included, so nothing depends on how an `item.json` spells its filename.
+- That gap was load-bearing for equip, not just packaging, so the cape is now baked: `trinkiesCapePatchPixels` reads the equipped back item's patch and `TrinkiesGarmentComposite.bakeCapeInto` source-overs it onto the 64×32 sheet in `resolveInGameCapeBytes` and in all twelve `syncCapeAssetsToInstance` frames. A cape patch needs no footprint audit because it is authored in cape UV space, but it is refused unless the sheet is exactly 64×32; `meta.properties` gained a `trinkiesBack=` line for debugging. An imported custom cape still wins over a wardrobe cape.
+- Evidence: regenerated pack is byte-stable across two runs, `validate_catalog.py --require-full` is green (6,335,932 bytes), `tests/trinkies_jar_verify.py` passes against a locally rebuilt JAR, and `tests/trinkies_integration_smoke.py` (7 tests) passes with new assertions for the cape wiring and the `cape_texture` rows. All 50 back patches paint 320 texels inside the cape panel and zero anywhere else, so the elytra region is provably untouched.
+- Still not done: the mod does not consume `equipped.json`; 3D attachments, pet followers, particles, and the emote wheel remain preview-only; `tools/trinkies_assets/validate_item.py` still checks previews at 128 while the catalog ships 192. Nothing here is verified in Minecraft.
+
 ## 2026-11-09: garment patches, a real equip path for every category, and Discover UI clean-up
 
 **Status: implemented in source, locally validated, NOT compiled and NOT verified in-game.**

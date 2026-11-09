@@ -166,6 +166,21 @@ class TrinkiesIntegrationSmoke(unittest.TestCase):
         self.assertIn("TrinkiesGarmentComposite.BAKE_ORDER", cosmetics)
         self.assertIn("TrinkiesGarmentComposite.bakeInto(copy, patches)", cosmetics)
         self.assertIn("isUsableGarment(pixels, category)", cosmetics)
+        # Back items are the one category with a second sheet, so their patch has to reach the cape
+        # the game reads: the served PNG and every animation frame written into the instance.
+        self.assertIn('AerixClientStore.equippedIdFor("back")', cosmetics)
+        self.assertIn("overlayCapePatch(bmp, trinkiesCapePatchPixels(context))", cosmetics)
+        self.assertIn(
+            "val trinkiesCape = if (importedCape == null) trinkiesCapePatchPixels(context) else null",
+            cosmetics,
+        )
+        self.assertIn("overlayCapePatch(bmp, trinkiesCape)", cosmetics)
+        self.assertIn("TrinkiesGarmentComposite.bakeCapeInto(frame, patch)", cosmetics)
+        composite = (APP / "client/TrinkiesGarmentComposite.kt").read_text()
+        # A cape patch is authored in the cape's own UV space, so the bake trusts only an exact
+        # sheet: anything else is refused rather than stretched across the wings.
+        self.assertIn("if (width != CAPE_WIDTH || height != CAPE_HEIGHT) return false", composite)
+        self.assertIn("if (cape.size < area || patch.size < area) return false", composite)
         self.assertIn("AerixClientCosmetics.applyWardrobeToSkin(", skin_server)
         self.assertIn("applyClientCosmetics = true", wardrobe)
         self.assertIn("item?.description", wardrobe)
@@ -184,6 +199,11 @@ class TrinkiesIntegrationSmoke(unittest.TestCase):
         self.assertIn("Os.rename(temporary.absolutePath, target.absolutePath)", loadout)
         self.assertIn('File(canonicalDir, FILE_NAME)', loadout)
         self.assertEqual(len(catalog["items"]), 300)
+        # A back row without cape_texture parses as an empty path, so equipping it would silently
+        # change nothing in game; the catalog has to carry it for all fifty.
+        self.assertTrue(
+            all("cape_texture" in item for item in catalog["items"] if item["category"] == "back")
+        )
 
     def test_dashboard_wardrobe_and_compatibility_copy_are_present(self):
         rail = (APP / "ui/AerixNavigationRail.kt").read_text()
