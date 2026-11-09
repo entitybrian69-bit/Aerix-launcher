@@ -862,6 +862,7 @@ private fun CatalogItemCard(
             }
         }
     }
+    val imageBitmap = bitmap
     val equipped = item == null || item.locallyRendered
     Surface(
         modifier = modifier.clickable(enabled = equipped, onClick = onClick),
@@ -874,8 +875,8 @@ private fun CatalogItemCard(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            if (bitmap != null) {
-                Image(bitmap, contentDescription = item?.name, contentScale = ContentScale.Fit,
+            if (imageBitmap != null) {
+                Image(imageBitmap, contentDescription = item?.name, contentScale = ContentScale.Fit,
                     modifier = Modifier.size(48.dp).clip(RoundedCornerShape(0.dp)))
             } else {
                 Box(Modifier.size(48.dp).background(accent.copy(alpha = 0.13f)), contentAlignment = Alignment.Center) {

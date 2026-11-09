@@ -61,12 +61,18 @@ jobs:
           python3 -m pip install --disable-pip-version-check -r tools/trinkies_assets/requirements.txt
           export PYTHONDONTWRITEBYTECODE=1
           python3 tools/trinkies_assets/generate_full_catalog.py
-          git diff --exit-code -- \
-            trinkies_assets/trinkies \
-            docs/wardrobe/ROSTER.md \
-            docs/wardrobe/full-catalog-texture-sheet.png \
-            docs/wardrobe/vertical-slice-contact-sheet.png \
+          GENERATED_PATHS=(
+            trinkies_assets/trinkies
+            docs/wardrobe/ROSTER.md
+            docs/wardrobe/full-catalog-texture-sheet.png
+            docs/wardrobe/vertical-slice-contact-sheet.png
             docs/wardrobe/vertical-slice-animation-strip.png
+          )
+          if ! git diff --quiet -- "${GENERATED_PATHS[@]}"; then
+            CHANGED_GENERATED_FILES="$(git diff --name-only -- "${GENERATED_PATHS[@]}" | tr '\n' ' ' | cut -c1-3500)"
+            echo "::error title=Generated catalog is stale::$CHANGED_GENERATED_FILES"
+            exit 1
+          fi
           python3 tools/trinkies_assets/validate_catalog.py --require-full
           node --check app_pojavlauncher/src/main/assets/skinview/skinview.js
           python3 tests/branding_identity_smoke.py
