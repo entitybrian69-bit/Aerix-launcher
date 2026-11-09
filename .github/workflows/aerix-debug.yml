@@ -244,6 +244,12 @@ jobs:
           fi
           python3 tests/trinkies_jar_verify.py "$MOD_JAR_PATH"
 
+      - name: Set up JDK 25 for Fabric Loom GameTest
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+
       - name: Set up Gradle 9.8.0 for Fabric Loom GameTest
         uses: gradle/actions/setup-gradle@v4
         with:
