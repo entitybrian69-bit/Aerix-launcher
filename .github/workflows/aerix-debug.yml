@@ -30,7 +30,8 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    # Pin the desktop test runner to the Ubuntu image used by Fabric's 26.3 client-test workflow.
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
       CURSEFORGE_API_KEY: ${{ secrets.CURSEFORGE_API_KEY }}
@@ -66,6 +67,7 @@ jobs:
           python3 tests/modern_cape_smoke.py
           python3 tests/social_profile_cosmetics_smoke.py
           python3 tests/trinkies_integration_smoke.py
+          python3 tests/trinkies_client_gametest_harness_smoke.py
           python3 tests/skin_preview_camera_smoke.py
           python3 tests/client_background_smoke.py
           python3 tests/instance_renderer_smoke.py
@@ -298,6 +300,12 @@ jobs:
         shell: bash
         run: echo "TRINKIES_JDK_17=$JAVA_HOME" >> "$GITHUB_ENV"
 
+      - name: Install Linux headless graphics stack for Fabric client tests
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            libgl1-mesa-dri libglx-mesa0 libvulkan1 mesa-utils mesa-vulkan-drivers xauth xvfb
+
       - name: Run approved Fabric client runtime matrix (Xvfb + llvmpipe)
         shell: bash
         env:
@@ -311,7 +319,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: trinkies-fabric-client-matrix-smoke
-          path: tools/trinkies_client_gametest/build/matrix-artifacts/**/*
+          path: tools/trinkies_client_gametest/build/matrix-artifacts
           if-no-files-found: warn
           retention-days: 30
 

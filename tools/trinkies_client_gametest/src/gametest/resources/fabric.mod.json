@@ -6,7 +6,7 @@
   "environment": "client",
   "entrypoints": {
     "fabric-client-gametest": [
-      "net.aerix.trinkies.gametest.BaselinePlayerGameTest"
+      "net.aerix.trinkies.gametest.BaselineClientGameTest"
     ]
   },
   "depends": {
