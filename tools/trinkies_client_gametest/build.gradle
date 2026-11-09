@@ -3,15 +3,16 @@ plugins {
     id 'net.fabricmc.fabric-loom' version "${loom_version}" apply false
 }
 
-group = 'net.aerix.trinkies.tests'
-version = '1.0.0'
-base.archivesName = 'trinkies-client-gametest'
-
 def minecraftVersion = providers.gradleProperty('minecraft_version').get()
 def testRuntimeJava = Integer.parseInt(providers.gradleProperty('test_runtime_java').getOrElse('21'))
 def clientGameTestsAvailable = minecraftVersion != '1.20.1'
 def usesRemappedLoom = minecraftVersion != '26.3'
 apply plugin: (usesRemappedLoom ? 'net.fabricmc.fabric-loom-remap' : 'net.fabricmc.fabric-loom')
+
+group = 'net.aerix.trinkies.tests'
+version = '1.0.0'
+base.archivesName = 'trinkies-client-gametest'
+
 def modDependencyConfiguration = usesRemappedLoom ? 'modImplementation' : 'implementation'
 def testRuntimeLauncher = javaToolchains.launcherFor {
     languageVersion = JavaLanguageVersion.of(testRuntimeJava)
