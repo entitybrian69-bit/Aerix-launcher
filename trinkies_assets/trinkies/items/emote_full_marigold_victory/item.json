@@ -1,0 +1,40 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip",
+    "play"
+  ],
+  "attach": {
+    "bone": "right_arm",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "emote",
+  "description": "An original victory pennant with a marigold paper finish, family-specific silhouette, and a emote wave accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "id": "trinkies:emote_full_marigold_victory",
+  "model": "model.bbmodel",
+  "name": "Marigold Victory Pennant",
+  "palette": [
+    "#381D2B",
+    "#522D3C",
+    "#9B4D65",
+    "#B56B79",
+    "#D49894",
+    "#FFD36B",
+    "#FFF69A"
+  ],
+  "rarity": "rare",
+  "shape": "full_emote_victory_0",
+  "tags": [
+    "marigold",
+    "victory",
+    "banner",
+    "paper"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

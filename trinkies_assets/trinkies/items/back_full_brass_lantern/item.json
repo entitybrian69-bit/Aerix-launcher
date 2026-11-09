@@ -1,0 +1,39 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip"
+  ],
+  "attach": {
+    "bone": "body",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "back",
+  "description": "An original beacon lantern pack with a brass metal finish, family-specific silhouette, and a pack tick accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "id": "trinkies:back_full_brass_lantern",
+  "model": "model.bbmodel",
+  "name": "Brass Beacon Lantern Pack",
+  "palette": [
+    "#2F1F14",
+    "#453220",
+    "#826334",
+    "#98824D",
+    "#B2B072",
+    "#FFE08A",
+    "#FFFBAF"
+  ],
+  "rarity": "uncommon",
+  "shape": "full_back_lantern_4",
+  "tags": [
+    "brass",
+    "lantern",
+    "light",
+    "metal"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

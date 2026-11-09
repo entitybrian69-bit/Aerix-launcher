@@ -1,0 +1,41 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip"
+  ],
+  "attach": {
+    "bone": "body",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "suit",
+  "description": "An original wayfinder coat with a glacier cloth finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "emissive_mask": "emissive.png",
+  "id": "trinkies:suit_full_glacier_wayfinder",
+  "model": "model.bbmodel",
+  "name": "Glacier Wayfinder Coat",
+  "palette": [
+    "#192D30",
+    "#273F47",
+    "#426D86",
+    "#5C7E9D",
+    "#808FB8",
+    "#C4F1F4",
+    "#DDF6FF"
+  ],
+  "rarity": "rare",
+  "shape": "full_suit_wayfinder_1",
+  "suit_mode": "overlay",
+  "tags": [
+    "glacier",
+    "travel",
+    "coat",
+    "cloth"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

@@ -17,13 +17,13 @@
 
 ## Cosmetics or synchronization seem missing
 
-- Only existing local skin/cape/headwear paths are currently equipped by the app. The generated 30-item JSON/PNG/model catalog is not yet connected to the Wardrobe equip flow or game renderer.
-- Other-player custom skins/capes depend on the account/skin service and server configuration. Pets, back attachments, aura particles, and emote network events are not shipped as game features.
-- No Trinkies cosmetics state sync is active. Existing Aerix social presence is not a substitute for a verified Minecraft UUID protocol.
+- The Wardrobe reads the generated 300-item catalog and provides item previews. All 50 hats can be selected and are rasterized into the head's outer skin layer through the launcher skin path. If no eligible 64×64 skin PNG reaches that path, no overlay can be applied; the in-game result is not yet visually verified.
+- The launcher writes the selected hat ID to `<instance game directory>/trinkies/equipped.json` before supported launches. The bundled mod does not yet consume that loadout file or render catalog models. Suits, catalog back items beyond existing capes, pets, auras, and synchronized emotes are not shipped as in-game features.
+- Other-player custom skins/capes depend on the account/skin service and server configuration. No Trinkies cosmetics state sync is active. Existing Aerix social presence is not a substitute for a verified Minecraft UUID protocol.
 
 ## Asset validation fails
 
 1. Use Python 3.11+ and `pip install -r tools/trinkies_assets/requirements.txt`.
-2. Run `python tools/trinkies_assets/validate_catalog.py --require-slice` and fix the first reported item/path.
-3. For generator-owned slice files, rerun `python tools/trinkies_assets/generate_slice.py`, then validate again. The generator rewrites those 30 assets and preview sheets deterministically; it is not safe to use as a general manual-asset importer.
+2. Run `python tools/trinkies_assets/validate_catalog.py --require-full` and fix the first reported item/path.
+3. For generator-owned full-catalog files, rerun `python tools/trinkies_assets/generate_full_catalog.py`, then validate again. Do not run `generate_slice.py` by itself when refreshing the full pack; it writes only the original 30-item slice.
 4. Check `trinkies_assets/trinkies/manifest.json` after any asset change. Do not update the hash manifest to conceal a failed model/UV/schema check.

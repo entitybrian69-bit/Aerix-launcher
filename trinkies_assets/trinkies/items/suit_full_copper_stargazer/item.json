@@ -1,0 +1,40 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip"
+  ],
+  "attach": {
+    "bone": "body",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "suit",
+  "description": "An original stargazer robe with a copper wool finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "id": "trinkies:suit_full_copper_stargazer",
+  "model": "model.bbmodel",
+  "name": "Copper Stargazer Robe",
+  "palette": [
+    "#311F1A",
+    "#493128",
+    "#896044",
+    "#A0805E",
+    "#BCAE83",
+    "#F2C57A",
+    "#FFF1A9"
+  ],
+  "rarity": "rare",
+  "shape": "full_suit_stargazer_4",
+  "suit_mode": "overlay",
+  "tags": [
+    "copper",
+    "night",
+    "stars",
+    "wool"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

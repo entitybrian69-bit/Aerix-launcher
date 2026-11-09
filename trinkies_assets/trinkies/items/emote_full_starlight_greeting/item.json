@@ -1,0 +1,40 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip",
+    "play"
+  ],
+  "attach": {
+    "bone": "right_arm",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "emote",
+  "description": "An original paper greeting with a starlight paper finish, family-specific silhouette, and a emote wave accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "emissive_mask": "emissive.png",
+  "id": "trinkies:emote_full_starlight_greeting",
+  "model": "model.bbmodel",
+  "name": "Starlight Paper Greeting",
+  "palette": [
+    "#1D2430",
+    "#2B3447",
+    "#4C5786",
+    "#656A9D",
+    "#9088B8",
+    "#F4E2A0",
+    "#FFFFC3"
+  ],
+  "rarity": "rare",
+  "shape": "full_emote_greeting_2",
+  "tags": [
+    "starlight",
+    "greeting",
+    "paper"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

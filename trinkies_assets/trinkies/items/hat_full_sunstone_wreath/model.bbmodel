@@ -1,0 +1,860 @@
+{
+  "elements": [
+    {
+      "autouv": 0,
+      "color": 0,
+      "faces": {
+        "down": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            16,
+            16,
+            32,
+            32
+          ]
+        },
+        "east": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            16,
+            0,
+            32,
+            16
+          ]
+        },
+        "north": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ]
+        },
+        "south": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            32,
+            0,
+            48,
+            16
+          ]
+        },
+        "up": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            0,
+            16,
+            16,
+            32
+          ]
+        },
+        "west": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            48,
+            0,
+            64,
+            16
+          ]
+        }
+      },
+      "from": [
+        -3.9200000000000004,
+        -0.2,
+        -3.75
+      ],
+      "name": "band",
+      "origin": [
+        0.0,
+        12.0,
+        0.0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "to": [
+        3.9200000000000004,
+        0.8,
+        3.75
+      ],
+      "uuid": "69b59b71-0f7f-f301-413a-d430b0cd9835"
+    },
+    {
+      "autouv": 0,
+      "color": 1,
+      "faces": {
+        "down": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            48,
+            32,
+            64,
+            48
+          ]
+        },
+        "east": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            48,
+            16,
+            64,
+            32
+          ]
+        },
+        "north": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            32,
+            16,
+            48,
+            32
+          ]
+        },
+        "south": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            0,
+            32,
+            16,
+            48
+          ]
+        },
+        "up": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            32,
+            32,
+            48,
+            48
+          ]
+        },
+        "west": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            16,
+            32,
+            32,
+            48
+          ]
+        }
+      },
+      "from": [
+        -3.4499999999999997,
+        1.0,
+        3.6
+      ],
+      "name": "petal_0",
+      "origin": [
+        0.0,
+        12.0,
+        0.0
+      ],
+      "rotation": [
+        0,
+        0,
+        -14
+      ],
+      "to": [
+        -2.15,
+        2.49,
+        4.4
+      ],
+      "uuid": "c986a265-bc3d-a5d9-80a7-97636661ed79"
+    },
+    {
+      "autouv": 0,
+      "color": 2,
+      "faces": {
+        "down": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            16,
+            0,
+            32,
+            16
+          ]
+        },
+        "east": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            16,
+            48,
+            32,
+            64
+          ]
+        },
+        "north": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            0,
+            48,
+            16,
+            64
+          ]
+        },
+        "south": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            32,
+            48,
+            48,
+            64
+          ]
+        },
+        "up": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ]
+        },
+        "west": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            48,
+            48,
+            64,
+            64
+          ]
+        }
+      },
+      "from": [
+        -2.05,
+        1.35,
+        3.6
+      ],
+      "name": "petal_1",
+      "origin": [
+        0.0,
+        12.0,
+        0.0
+      ],
+      "rotation": [
+        0,
+        0,
+        -7
+      ],
+      "to": [
+        -0.7499999999999999,
+        2.49,
+        4.4
+      ],
+      "uuid": "dee6a03e-072b-126e-dfa4-90d9b1b5f3dc"
+    },
+    {
+      "autouv": 0,
+      "color": 3,
+      "faces": {
+        "down": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            48,
+            16,
+            64,
+            32
+          ]
+        },
+        "east": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            48,
+            0,
+            64,
+            16
+          ]
+        },
+        "north": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            32,
+            0,
+            48,
+            16
+          ]
+        },
+        "south": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            0,
+            16,
+            16,
+            32
+          ]
+        },
+        "up": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            32,
+            16,
+            48,
+            32
+          ]
+        },
+        "west": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            16,
+            16,
+            32,
+            32
+          ]
+        }
+      },
+      "from": [
+        -0.65,
+        1.0,
+        3.6
+      ],
+      "name": "petal_2",
+      "origin": [
+        0.0,
+        12.0,
+        0.0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "to": [
+        0.65,
+        2.49,
+        4.4
+      ],
+      "uuid": "19a21899-a0a2-380a-9440-b13b441cdfc3"
+    },
+    {
+      "autouv": 0,
+      "color": 4,
+      "faces": {
+        "down": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            16,
+            48,
+            32,
+            64
+          ]
+        },
+        "east": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            16,
+            32,
+            32,
+            48
+          ]
+        },
+        "north": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            0,
+            32,
+            16,
+            48
+          ]
+        },
+        "south": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            32,
+            32,
+            48,
+            48
+          ]
+        },
+        "up": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            0,
+            48,
+            16,
+            64
+          ]
+        },
+        "west": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            48,
+            32,
+            64,
+            48
+          ]
+        }
+      },
+      "from": [
+        0.7499999999999999,
+        1.35,
+        3.6
+      ],
+      "name": "petal_3",
+      "origin": [
+        0.0,
+        12.0,
+        0.0
+      ],
+      "rotation": [
+        0,
+        0,
+        7
+      ],
+      "to": [
+        2.05,
+        2.49,
+        4.4
+      ],
+      "uuid": "933b23d4-64d4-f09e-3263-38686895a8d6"
+    },
+    {
+      "autouv": 0,
+      "color": 5,
+      "faces": {
+        "down": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            48,
+            0,
+            64,
+            16
+          ]
+        },
+        "east": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            48,
+            48,
+            64,
+            64
+          ]
+        },
+        "north": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            32,
+            48,
+            48,
+            64
+          ]
+        },
+        "south": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ]
+        },
+        "up": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            32,
+            0,
+            48,
+            16
+          ]
+        },
+        "west": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            16,
+            0,
+            32,
+            16
+          ]
+        }
+      },
+      "from": [
+        2.15,
+        1.0,
+        3.6
+      ],
+      "name": "petal_4",
+      "origin": [
+        0.0,
+        12.0,
+        0.0
+      ],
+      "rotation": [
+        0,
+        0,
+        14
+      ],
+      "to": [
+        3.4499999999999997,
+        2.49,
+        4.4
+      ],
+      "uuid": "db9efdbe-792c-6dae-abfc-93e8e79e7049"
+    },
+    {
+      "autouv": 0,
+      "color": 6,
+      "faces": {
+        "down": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            16,
+            32,
+            32,
+            48
+          ]
+        },
+        "east": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            16,
+            16,
+            32,
+            32
+          ]
+        },
+        "north": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            0,
+            16,
+            16,
+            32
+          ]
+        },
+        "south": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            32,
+            16,
+            48,
+            32
+          ]
+        },
+        "up": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            0,
+            32,
+            16,
+            48
+          ]
+        },
+        "west": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            48,
+            16,
+            64,
+            32
+          ]
+        }
+      },
+      "from": [
+        -3.9200000000000004,
+        0.2,
+        -1
+      ],
+      "name": "leaf_side",
+      "origin": [
+        0.0,
+        12.0,
+        0.0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "to": [
+        3.9200000000000004,
+        0.8,
+        1
+      ],
+      "uuid": "d7569f1d-ccdb-37f8-3b4a-02f426300065"
+    },
+    {
+      "autouv": 0,
+      "color": 7,
+      "faces": {
+        "down": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            48,
+            48,
+            64,
+            64
+          ]
+        },
+        "east": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            48,
+            32,
+            64,
+            48
+          ]
+        },
+        "north": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            32,
+            32,
+            48,
+            48
+          ]
+        },
+        "south": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            0,
+            48,
+            16,
+            64
+          ]
+        },
+        "up": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            32,
+            48,
+            48,
+            64
+          ]
+        },
+        "west": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            16,
+            48,
+            32,
+            64
+          ]
+        }
+      },
+      "from": [
+        -1.15,
+        2.4,
+        3.95
+      ],
+      "name": "theme_detail_1",
+      "origin": [
+        0.0,
+        12.0,
+        0.0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "to": [
+        -0.6199999999999999,
+        3.4299999999999997,
+        4.45
+      ],
+      "uuid": "68aca5ee-98f5-6160-3ca7-46e7b99e6ae7"
+    }
+  ],
+  "meta": {
+    "box_uv": false,
+    "format_version": "4.9",
+    "model_format": "free"
+  },
+  "model_identifier": "trinkies:hat_full_sunstone_wreath",
+  "name": "Sunstone Petal Wreath",
+  "outliner": [
+    {
+      "autouv": 0,
+      "children": [],
+      "color": 0,
+      "export": true,
+      "locked": false,
+      "name": "body",
+      "origin": [
+        0.0,
+        2.0,
+        0.0
+      ],
+      "uuid": "a313f49d-8083-f128-104c-be8cef7f1712",
+      "visibility": true
+    },
+    {
+      "autouv": 0,
+      "children": [
+        "69b59b71-0f7f-f301-413a-d430b0cd9835",
+        "c986a265-bc3d-a5d9-80a7-97636661ed79",
+        "dee6a03e-072b-126e-dfa4-90d9b1b5f3dc",
+        "19a21899-a0a2-380a-9440-b13b441cdfc3",
+        "933b23d4-64d4-f09e-3263-38686895a8d6",
+        "db9efdbe-792c-6dae-abfc-93e8e79e7049",
+        "d7569f1d-ccdb-37f8-3b4a-02f426300065",
+        "68aca5ee-98f5-6160-3ca7-46e7b99e6ae7"
+      ],
+      "color": 1,
+      "export": true,
+      "locked": false,
+      "name": "head",
+      "origin": [
+        0.0,
+        12.0,
+        0.0
+      ],
+      "uuid": "a05bfd87-aaca-3c31-5abb-2e7e4c27cf7f",
+      "visibility": true
+    },
+    {
+      "autouv": 0,
+      "children": [],
+      "color": 2,
+      "export": true,
+      "locked": false,
+      "name": "left_arm",
+      "origin": [
+        5.0,
+        6.0,
+        0.0
+      ],
+      "uuid": "7e572fdb-df4c-06d7-a2d0-b81b5f789e52",
+      "visibility": true
+    },
+    {
+      "autouv": 0,
+      "children": [],
+      "color": 3,
+      "export": true,
+      "locked": false,
+      "name": "left_leg",
+      "origin": [
+        1.9,
+        -4.0,
+        -0.1
+      ],
+      "uuid": "d0d0e382-011d-4578-58fc-da0b96a3a5d4",
+      "visibility": true
+    },
+    {
+      "autouv": 0,
+      "children": [],
+      "color": 4,
+      "export": true,
+      "locked": false,
+      "name": "right_arm",
+      "origin": [
+        -5.0,
+        6.0,
+        0.0
+      ],
+      "uuid": "40abe76a-3dfd-a4f5-4498-423bbae7dc2c",
+      "visibility": true
+    },
+    {
+      "autouv": 0,
+      "children": [],
+      "color": 5,
+      "export": true,
+      "locked": false,
+      "name": "right_leg",
+      "origin": [
+        -1.9,
+        -4.0,
+        -0.1
+      ],
+      "uuid": "29713d6b-2f4d-5224-b0b8-8b2f69358a76",
+      "visibility": true
+    },
+    {
+      "autouv": 0,
+      "children": [],
+      "color": 6,
+      "export": true,
+      "locked": false,
+      "name": "root",
+      "origin": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "uuid": "8a014e42-ffd3-df38-c425-4b6ffc18a582",
+      "visibility": true
+    }
+  ],
+  "resolution": {
+    "height": 64,
+    "width": 64
+  },
+  "textures": [
+    {
+      "folder": "",
+      "group": "",
+      "height": 64,
+      "id": "0",
+      "name": "texture.png",
+      "namespace": "",
+      "particle": false,
+      "path": "texture.png",
+      "saved": true,
+      "source": "data:image/png;base64,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",
+      "use_as_default": true,
+      "uuid": "44923d3b-482f-807f-b77e-2ef20448c5ec",
+      "uv_height": 64,
+      "uv_width": 64,
+      "width": 64
+    }
+  ],
+  "variable_placeholders": "",
+  "visible_box": [
+    1,
+    1,
+    1
+  ]
+}

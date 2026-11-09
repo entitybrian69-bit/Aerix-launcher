@@ -1,0 +1,40 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip"
+  ],
+  "attach": {
+    "bone": "body",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "back",
+  "description": "An original bell drone with a aurora metal finish, family-specific silhouette, and a drone orbit accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "emissive_mask": "emissive.png",
+  "id": "trinkies:back_full_aurora_drone",
+  "model": "model.bbmodel",
+  "name": "Aurora Bell Drone",
+  "palette": [
+    "#162A24",
+    "#223D38",
+    "#3B746E",
+    "#518888",
+    "#70939F",
+    "#9BF0D2",
+    "#C2FFF6"
+  ],
+  "rarity": "legendary",
+  "shape": "full_back_drone_0",
+  "tags": [
+    "aurora",
+    "drone",
+    "clockwork",
+    "metal"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

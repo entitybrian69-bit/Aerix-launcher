@@ -1,0 +1,39 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip"
+  ],
+  "attach": {
+    "bone": "head",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "hat",
+  "description": "An original relic mask with a sunstone stone finish, family-specific silhouette, and a hood bob accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "id": "trinkies:hat_full_sunstone_mask",
+  "model": "model.bbmodel",
+  "name": "Sunstone Relic Mask",
+  "palette": [
+    "#421F16",
+    "#603623",
+    "#B66A35",
+    "#D59959",
+    "#F9E18F",
+    "#FFD079",
+    "#FFF2A4"
+  ],
+  "rarity": "legendary",
+  "shape": "full_hat_mask_1",
+  "tags": [
+    "sunstone",
+    "mask",
+    "relic",
+    "stone"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

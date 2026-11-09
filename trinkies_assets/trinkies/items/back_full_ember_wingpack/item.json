@@ -1,0 +1,39 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip"
+  ],
+  "attach": {
+    "bone": "body",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "back",
+  "description": "An original clockwork wingpack with a ember metal finish, family-specific silhouette, and a wing flutter accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "id": "trinkies:back_full_ember_wingpack",
+  "model": "model.bbmodel",
+  "name": "Ember Clockwork Wingpack",
+  "palette": [
+    "#331716",
+    "#4B2822",
+    "#8D4D37",
+    "#A57052",
+    "#C1A67A",
+    "#FFC36F",
+    "#FFEB9D"
+  ],
+  "rarity": "legendary",
+  "shape": "full_back_wingpack_1",
+  "tags": [
+    "ember",
+    "wingpack",
+    "gear",
+    "metal"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

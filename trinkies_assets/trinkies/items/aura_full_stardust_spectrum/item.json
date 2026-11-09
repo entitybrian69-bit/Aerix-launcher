@@ -1,0 +1,41 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip"
+  ],
+  "attach": {
+    "bone": "root",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "aura",
+  "description": "An original prism spectrum with a stardust glass finish, family-specific silhouette, and a aura trail accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "emissive_mask": "emissive.png",
+  "id": "trinkies:aura_full_stardust_spectrum",
+  "model": "model.bbmodel",
+  "name": "Stardust Prism Spectrum",
+  "palette": [
+    "#252C33",
+    "#373F4B",
+    "#63708D",
+    "#7D85A5",
+    "#A09FC1",
+    "#F1DEA2",
+    "#FFFDC6"
+  ],
+  "particle_sheet": "texture.png",
+  "rarity": "rare",
+  "shape": "full_aura_spectrum_4",
+  "tags": [
+    "stardust",
+    "prism",
+    "spectrum",
+    "glass"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

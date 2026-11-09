@@ -1,0 +1,39 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip"
+  ],
+  "attach": {
+    "bone": "body",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "back",
+  "description": "An original sky banner with a ember cloth finish, family-specific silhouette, and a ribbon sway accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "id": "trinkies:back_full_ember_banner",
+  "model": "model.bbmodel",
+  "name": "Ember Sky Banner",
+  "palette": [
+    "#331716",
+    "#4B2822",
+    "#8D4D37",
+    "#A57052",
+    "#C1A67A",
+    "#FFC36F",
+    "#FFEB9D"
+  ],
+  "rarity": "epic",
+  "shape": "full_back_banner_1",
+  "tags": [
+    "ember",
+    "banner",
+    "ribbon",
+    "cloth"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

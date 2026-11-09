@@ -1,0 +1,40 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip"
+  ],
+  "attach": {
+    "bone": "head",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "hat",
+  "description": "An original tide circlet with a frost glass finish, family-specific silhouette, and a circlet glint accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "emissive_mask": "emissive.png",
+  "id": "trinkies:hat_full_frost_circlet",
+  "model": "model.bbmodel",
+  "name": "Frost Tide Circlet",
+  "palette": [
+    "#153438",
+    "#214853",
+    "#347A9C",
+    "#538BB7",
+    "#809BD6",
+    "#D2F7FF",
+    "#E0F3FF"
+  ],
+  "rarity": "legendary",
+  "shape": "full_hat_circlet_0",
+  "tags": [
+    "frost",
+    "circlet",
+    "jewel",
+    "glass"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

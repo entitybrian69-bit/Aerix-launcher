@@ -1,0 +1,41 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip",
+    "play"
+  ],
+  "attach": {
+    "bone": "right_arm",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "emote",
+  "description": "An original star wand cheer with a carnival gem finish, family-specific silhouette, and a emote cheer accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "emissive_mask": "emissive.png",
+  "id": "trinkies:emote_full_carnival_cheer",
+  "model": "model.bbmodel",
+  "name": "Carnival Star Wand Cheer",
+  "palette": [
+    "#2F1D32",
+    "#482C49",
+    "#8A4C86",
+    "#A16697",
+    "#BD8AA7",
+    "#F2A75C",
+    "#FFE094"
+  ],
+  "rarity": "legendary",
+  "shape": "full_emote_cheer_3",
+  "tags": [
+    "carnival",
+    "cheer",
+    "star",
+    "gem"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

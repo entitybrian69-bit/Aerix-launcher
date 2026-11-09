@@ -1,0 +1,41 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip",
+    "signature"
+  ],
+  "attach": {
+    "bone": "root",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "pet",
+  "description": "An original mossback turtle with a cinder stone finish, family-specific silhouette, and a pet bounce accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "emissive_mask": "emissive.png",
+  "id": "trinkies:pet_full_cinder_turtle",
+  "model": "model.bbmodel",
+  "name": "Cinder Mossback Turtle",
+  "palette": [
+    "#1C1F21",
+    "#2A2C31",
+    "#4D515D",
+    "#5D606D",
+    "#74727F",
+    "#E0A68C",
+    "#FFE0BE"
+  ],
+  "rarity": "epic",
+  "shape": "full_pet_turtle_2",
+  "tags": [
+    "cinder",
+    "turtle",
+    "shell",
+    "stone"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

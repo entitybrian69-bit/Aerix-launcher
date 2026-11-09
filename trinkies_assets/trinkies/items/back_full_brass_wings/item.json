@@ -1,0 +1,40 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip"
+  ],
+  "attach": {
+    "bone": "body",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "back",
+  "description": "An original glasswing harness with a brass glass finish, family-specific silhouette, and a wing flutter accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "emissive_mask": "emissive.png",
+  "id": "trinkies:back_full_brass_wings",
+  "model": "model.bbmodel",
+  "name": "Brass Glasswing Harness",
+  "palette": [
+    "#2F1F14",
+    "#453220",
+    "#826334",
+    "#98824D",
+    "#B2B072",
+    "#FFE08A",
+    "#FFFBAF"
+  ],
+  "rarity": "legendary",
+  "shape": "full_back_wings_4",
+  "tags": [
+    "brass",
+    "wings",
+    "flight",
+    "glass"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

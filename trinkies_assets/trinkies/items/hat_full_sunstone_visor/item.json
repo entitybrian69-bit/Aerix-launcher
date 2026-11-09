@@ -1,0 +1,40 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip"
+  ],
+  "attach": {
+    "bone": "head",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "hat",
+  "description": "An original skyguard visor with a sunstone enamel finish, family-specific silhouette, and a hat wind accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "emissive_mask": "emissive.png",
+  "id": "trinkies:hat_full_sunstone_visor",
+  "model": "model.bbmodel",
+  "name": "Sunstone Skyguard Visor",
+  "palette": [
+    "#421F16",
+    "#603623",
+    "#B66A35",
+    "#D59959",
+    "#F9E18F",
+    "#FFD079",
+    "#FFF2A4"
+  ],
+  "rarity": "uncommon",
+  "shape": "full_hat_visor_1",
+  "tags": [
+    "sunstone",
+    "visor",
+    "guard",
+    "enamel"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

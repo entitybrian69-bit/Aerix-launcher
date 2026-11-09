@@ -1,0 +1,41 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip"
+  ],
+  "attach": {
+    "bone": "root",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "aura",
+  "description": "An original violet vortex with a stardust crystal finish, family-specific silhouette, and a aura orbit accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "emissive_mask": "emissive.png",
+  "id": "trinkies:aura_full_stardust_vortex",
+  "model": "model.bbmodel",
+  "name": "Stardust Violet Vortex",
+  "palette": [
+    "#252C33",
+    "#373F4B",
+    "#63708D",
+    "#7D85A5",
+    "#A09FC1",
+    "#F1DEA2",
+    "#FFFDC6"
+  ],
+  "particle_sheet": "texture.png",
+  "rarity": "uncommon",
+  "shape": "full_aura_vortex_4",
+  "tags": [
+    "stardust",
+    "vortex",
+    "spiral",
+    "crystal"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

@@ -1,0 +1,40 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip"
+  ],
+  "attach": {
+    "bone": "body",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "suit",
+  "description": "An original wayfinder coat with a crimson cloth finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "id": "trinkies:suit_full_crimson_wayfinder",
+  "model": "model.bbmodel",
+  "name": "Crimson Wayfinder Coat",
+  "palette": [
+    "#2D141E",
+    "#421F29",
+    "#7D3340",
+    "#924B50",
+    "#AB7A6E",
+    "#F4B96F",
+    "#FFE9A0"
+  ],
+  "rarity": "uncommon",
+  "shape": "full_suit_wayfinder_0",
+  "suit_mode": "overlay",
+  "tags": [
+    "crimson",
+    "travel",
+    "coat",
+    "cloth"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

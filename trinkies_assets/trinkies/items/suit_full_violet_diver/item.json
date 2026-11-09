@@ -1,0 +1,40 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip"
+  ],
+  "attach": {
+    "bone": "body",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "suit",
+  "description": "An original pressure diver suit with a violet metal finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "id": "trinkies:suit_full_violet_diver",
+  "model": "model.bbmodel",
+  "name": "Violet Pressure Diver Suit",
+  "palette": [
+    "#1B1A28",
+    "#2A273B",
+    "#51466F",
+    "#695B82",
+    "#8C7698",
+    "#D0A8F5",
+    "#F0C9FF"
+  ],
+  "rarity": "epic",
+  "shape": "full_suit_diver_3",
+  "suit_mode": "overlay",
+  "tags": [
+    "violet",
+    "diver",
+    "pressure",
+    "metal"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

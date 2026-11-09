@@ -1,0 +1,41 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip",
+    "signature"
+  ],
+  "attach": {
+    "bone": "root",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "pet",
+  "description": "An original mossback turtle with a amethyst stone finish, family-specific silhouette, and a pet bounce accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "emissive_mask": "emissive.png",
+  "id": "trinkies:pet_full_amethyst_turtle",
+  "model": "model.bbmodel",
+  "name": "Amethyst Mossback Turtle",
+  "palette": [
+    "#201E37",
+    "#342E51",
+    "#654F99",
+    "#896CB3",
+    "#BD95D2",
+    "#E6D5FF",
+    "#F4E2FF"
+  ],
+  "rarity": "uncommon",
+  "shape": "full_pet_turtle_0",
+  "tags": [
+    "amethyst",
+    "turtle",
+    "shell",
+    "stone"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

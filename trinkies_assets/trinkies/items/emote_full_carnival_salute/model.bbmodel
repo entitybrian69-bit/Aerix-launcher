@@ -1,0 +1,504 @@
+{
+  "elements": [
+    {
+      "autouv": 0,
+      "color": 0,
+      "faces": {
+        "down": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            16,
+            16,
+            32,
+            32
+          ]
+        },
+        "east": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            16,
+            0,
+            32,
+            16
+          ]
+        },
+        "north": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ]
+        },
+        "south": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            32,
+            0,
+            48,
+            16
+          ]
+        },
+        "up": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            0,
+            16,
+            16,
+            32
+          ]
+        },
+        "west": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            48,
+            0,
+            64,
+            16
+          ]
+        }
+      },
+      "from": [
+        -2.3,
+        -1.8,
+        2
+      ],
+      "name": "badge_plate",
+      "origin": [
+        -5.0,
+        6.0,
+        0.0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "to": [
+        2.3,
+        3.3480000000000003,
+        3
+      ],
+      "uuid": "5eb04f3c-944b-c90b-8a60-f861653df10a"
+    },
+    {
+      "autouv": 0,
+      "color": 1,
+      "faces": {
+        "down": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            48,
+            32,
+            64,
+            48
+          ]
+        },
+        "east": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            48,
+            16,
+            64,
+            32
+          ]
+        },
+        "north": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            32,
+            16,
+            48,
+            32
+          ]
+        },
+        "south": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            0,
+            32,
+            16,
+            48
+          ]
+        },
+        "up": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            32,
+            32,
+            48,
+            48
+          ]
+        },
+        "west": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            16,
+            32,
+            32,
+            48
+          ]
+        }
+      },
+      "from": [
+        -1.0,
+        0.2,
+        3
+      ],
+      "name": "badge_star",
+      "origin": [
+        -5.0,
+        6.0,
+        0.0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "to": [
+        1.0,
+        2.2,
+        3.8
+      ],
+      "uuid": "5403a9da-b4d9-031b-a627-9c17fe295f9e"
+    },
+    {
+      "autouv": 0,
+      "color": 2,
+      "faces": {
+        "down": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            16,
+            0,
+            32,
+            16
+          ]
+        },
+        "east": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            16,
+            48,
+            32,
+            64
+          ]
+        },
+        "north": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            0,
+            48,
+            16,
+            64
+          ]
+        },
+        "south": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            32,
+            48,
+            48,
+            64
+          ]
+        },
+        "up": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ]
+        },
+        "west": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            48,
+            48,
+            64,
+            64
+          ]
+        }
+      },
+      "from": [
+        -0.3,
+        -2.4,
+        3
+      ],
+      "name": "badge_pin",
+      "origin": [
+        -5.0,
+        6.0,
+        0.0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "to": [
+        0.3,
+        -0.2,
+        3.7
+      ],
+      "uuid": "4383e8e2-eba2-b0eb-a6f1-c52646340517"
+    },
+    {
+      "autouv": 0,
+      "color": 3,
+      "faces": {
+        "down": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            48,
+            16,
+            64,
+            32
+          ]
+        },
+        "east": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            48,
+            0,
+            64,
+            16
+          ]
+        },
+        "north": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            32,
+            0,
+            48,
+            16
+          ]
+        },
+        "south": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            0,
+            16,
+            16,
+            32
+          ]
+        },
+        "up": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            32,
+            16,
+            48,
+            32
+          ]
+        },
+        "west": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            16,
+            16,
+            32,
+            32
+          ]
+        }
+      },
+      "from": [
+        0.2749999999999999,
+        3.3,
+        3.0
+      ],
+      "name": "theme_detail_3",
+      "origin": [
+        -5.0,
+        6.0,
+        0.0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "to": [
+        0.9649999999999999,
+        4.390000000000001,
+        3.5
+      ],
+      "uuid": "58e809d1-a93a-3b52-9c49-740c8adb7d4a"
+    }
+  ],
+  "meta": {
+    "box_uv": false,
+    "format_version": "4.9",
+    "model_format": "free"
+  },
+  "model_identifier": "trinkies:emote_full_carnival_salute",
+  "name": "Carnival Wayfinder Salute",
+  "outliner": [
+    {
+      "autouv": 0,
+      "children": [],
+      "color": 0,
+      "export": true,
+      "locked": false,
+      "name": "body",
+      "origin": [
+        0.0,
+        2.0,
+        0.0
+      ],
+      "uuid": "1032902f-c2f7-df85-00ba-8e829bf6ad96",
+      "visibility": true
+    },
+    {
+      "autouv": 0,
+      "children": [],
+      "color": 1,
+      "export": true,
+      "locked": false,
+      "name": "head",
+      "origin": [
+        0.0,
+        12.0,
+        0.0
+      ],
+      "uuid": "ac97bab1-a332-b50e-fba7-e33898e4b73d",
+      "visibility": true
+    },
+    {
+      "autouv": 0,
+      "children": [],
+      "color": 2,
+      "export": true,
+      "locked": false,
+      "name": "left_arm",
+      "origin": [
+        5.0,
+        6.0,
+        0.0
+      ],
+      "uuid": "600d216b-562b-c66d-7c54-fed5e2949a76",
+      "visibility": true
+    },
+    {
+      "autouv": 0,
+      "children": [],
+      "color": 3,
+      "export": true,
+      "locked": false,
+      "name": "left_leg",
+      "origin": [
+        1.9,
+        -4.0,
+        -0.1
+      ],
+      "uuid": "4ffa86e0-85e0-c036-3e64-308e66eeeedb",
+      "visibility": true
+    },
+    {
+      "autouv": 0,
+      "children": [
+        "5eb04f3c-944b-c90b-8a60-f861653df10a",
+        "5403a9da-b4d9-031b-a627-9c17fe295f9e",
+        "4383e8e2-eba2-b0eb-a6f1-c52646340517",
+        "58e809d1-a93a-3b52-9c49-740c8adb7d4a"
+      ],
+      "color": 4,
+      "export": true,
+      "locked": false,
+      "name": "right_arm",
+      "origin": [
+        -5.0,
+        6.0,
+        0.0
+      ],
+      "uuid": "02de46fe-b43b-e782-723b-5f12656930cb",
+      "visibility": true
+    },
+    {
+      "autouv": 0,
+      "children": [],
+      "color": 5,
+      "export": true,
+      "locked": false,
+      "name": "right_leg",
+      "origin": [
+        -1.9,
+        -4.0,
+        -0.1
+      ],
+      "uuid": "a59d1d9d-1fa9-a583-7071-8c11df4010ea",
+      "visibility": true
+    },
+    {
+      "autouv": 0,
+      "children": [],
+      "color": 6,
+      "export": true,
+      "locked": false,
+      "name": "root",
+      "origin": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "uuid": "fdff8103-0fc1-f342-925a-19923327eca7",
+      "visibility": true
+    }
+  ],
+  "resolution": {
+    "height": 64,
+    "width": 64
+  },
+  "textures": [
+    {
+      "folder": "",
+      "group": "",
+      "height": 64,
+      "id": "0",
+      "name": "texture.png",
+      "namespace": "",
+      "particle": false,
+      "path": "texture.png",
+      "saved": true,
+      "source": "data:image/png;base64,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",
+      "use_as_default": true,
+      "uuid": "3848961d-b69b-0371-d45b-ca3eac9fb613",
+      "uv_height": 64,
+      "uv_width": 64,
+      "width": 64
+    }
+  ],
+  "variable_placeholders": "",
+  "visible_box": [
+    1,
+    1,
+    1
+  ]
+}

@@ -1,0 +1,301 @@
+{
+  "clips": {
+    "equip": {
+      "blend_in": 0.05,
+      "blend_out": 0.18,
+      "bones": {
+        "root": [
+          {
+            "easing": "spring",
+            "position": [
+              0,
+              0,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              0.88,
+              0.88,
+              0.88
+            ],
+            "time": 0
+          },
+          {
+            "easing": "cubic",
+            "position": [
+              0,
+              0,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1.06,
+              1.06,
+              1.06
+            ],
+            "time": 0.22
+          },
+          {
+            "easing": "ease_in_out",
+            "position": [
+              0,
+              0,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "time": 0.55
+          }
+        ]
+      },
+      "duration": 0.55,
+      "loop_mode": "once"
+    },
+    "idle": {
+      "blend_in": 0.18,
+      "blend_out": 0.2,
+      "bones": {
+        "right_arm": [
+          {
+            "easing": "ease_in_out",
+            "position": [
+              0,
+              0,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "time": 0
+          },
+          {
+            "easing": "ease_in_out",
+            "position": [
+              0,
+              0,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "time": 0.5
+          },
+          {
+            "easing": "ease_in_out",
+            "position": [
+              0,
+              0,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "time": 1.0
+          },
+          {
+            "easing": "ease_in_out",
+            "position": [
+              0,
+              0,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "time": 1.5
+          },
+          {
+            "easing": "ease_in_out",
+            "position": [
+              0,
+              0,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "time": 2.0
+          }
+        ]
+      },
+      "duration": 2.0,
+      "loop_mode": "loop"
+    },
+    "play": {
+      "blend_in": 0.12,
+      "blend_out": 0.24,
+      "bones": {
+        "right_arm": [
+          {
+            "easing": "ease_in_out",
+            "position": [
+              0,
+              0,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "time": 0
+          },
+          {
+            "easing": "ease_in_out",
+            "position": [
+              0,
+              0,
+              0
+            ],
+            "rotation": [
+              -45,
+              0,
+              -35
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "time": 0.45
+          },
+          {
+            "easing": "ease_in_out",
+            "position": [
+              0,
+              0,
+              0
+            ],
+            "rotation": [
+              -45,
+              0,
+              35
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "time": 0.8
+          },
+          {
+            "easing": "ease_in_out",
+            "position": [
+              0,
+              0,
+              0
+            ],
+            "rotation": [
+              -45,
+              0,
+              -35
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "time": 1.15
+          },
+          {
+            "easing": "ease_in_out",
+            "position": [
+              0,
+              0,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "time": 1.5
+          },
+          {
+            "easing": "ease_in_out",
+            "position": [
+              0,
+              0,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "time": 3.0
+          }
+        ]
+      },
+      "duration": 3.0,
+      "loop_mode": "once"
+    }
+  },
+  "schema": 1
+}

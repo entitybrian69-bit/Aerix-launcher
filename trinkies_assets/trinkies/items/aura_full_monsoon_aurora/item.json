@@ -1,0 +1,41 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip"
+  ],
+  "attach": {
+    "bone": "root",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "aura",
+  "description": "An original aurora veil with a monsoon glass finish, family-specific silhouette, and a aura sweep accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "emissive_mask": "emissive.png",
+  "id": "trinkies:aura_full_monsoon_aurora",
+  "model": "model.bbmodel",
+  "name": "Monsoon Aurora Veil",
+  "palette": [
+    "#18353A",
+    "#264A55",
+    "#3D7EA1",
+    "#5C90BC",
+    "#8AA2DD",
+    "#B9ECF7",
+    "#D3EEFF"
+  ],
+  "particle_sheet": "texture.png",
+  "rarity": "uncommon",
+  "shape": "full_aura_aurora_0",
+  "tags": [
+    "monsoon",
+    "aurora",
+    "arc",
+    "glass"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

@@ -1,0 +1,40 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip",
+    "play"
+  ],
+  "attach": {
+    "bone": "right_arm",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "emote",
+  "description": "An original star wand cheer with a breeze gem finish, family-specific silhouette, and a emote cheer accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "id": "trinkies:emote_full_breeze_cheer",
+  "model": "model.bbmodel",
+  "name": "Breeze Star Wand Cheer",
+  "palette": [
+    "#183032",
+    "#24434A",
+    "#3D758B",
+    "#5885A3",
+    "#7E95BE",
+    "#D8F4E5",
+    "#EBFFF9"
+  ],
+  "rarity": "common",
+  "shape": "full_emote_cheer_4",
+  "tags": [
+    "breeze",
+    "cheer",
+    "star",
+    "gem"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

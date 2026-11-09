@@ -1,0 +1,40 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip",
+    "signature"
+  ],
+  "attach": {
+    "bone": "root",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "pet",
+  "description": "An original mossback turtle with a moss stone finish, family-specific silhouette, and a pet bounce accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "id": "trinkies:pet_full_moss_turtle",
+  "model": "model.bbmodel",
+  "name": "Moss Mossback Turtle",
+  "palette": [
+    "#23281B",
+    "#323B28",
+    "#587048",
+    "#68835D",
+    "#7A9979",
+    "#D4E68D",
+    "#E3FFBC"
+  ],
+  "rarity": "rare",
+  "shape": "full_pet_turtle_1",
+  "tags": [
+    "moss",
+    "turtle",
+    "shell",
+    "stone"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

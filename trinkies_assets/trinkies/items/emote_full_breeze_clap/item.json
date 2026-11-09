@@ -1,0 +1,41 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip",
+    "play"
+  ],
+  "attach": {
+    "bone": "body",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "emote",
+  "description": "An original spark clap with a breeze enamel finish, family-specific silhouette, and a emote cheer accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "emissive_mask": "emissive.png",
+  "id": "trinkies:emote_full_breeze_clap",
+  "model": "model.bbmodel",
+  "name": "Breeze Spark Clap",
+  "palette": [
+    "#183032",
+    "#24434A",
+    "#3D758B",
+    "#5885A3",
+    "#7E95BE",
+    "#D8F4E5",
+    "#EBFFF9"
+  ],
+  "rarity": "common",
+  "shape": "full_emote_clap_4",
+  "tags": [
+    "breeze",
+    "clap",
+    "spark",
+    "enamel"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

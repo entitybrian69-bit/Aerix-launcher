@@ -1,0 +1,41 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip"
+  ],
+  "attach": {
+    "bone": "root",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "aura",
+  "description": "An original star silt trail with a monsoon dust finish, family-specific silhouette, and a aura trail accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "emissive_mask": "emissive.png",
+  "id": "trinkies:aura_full_monsoon_star",
+  "model": "model.bbmodel",
+  "name": "Monsoon Star Silt Trail",
+  "palette": [
+    "#18353A",
+    "#264A55",
+    "#3D7EA1",
+    "#5C90BC",
+    "#8AA2DD",
+    "#B9ECF7",
+    "#D3EEFF"
+  ],
+  "particle_sheet": "texture.png",
+  "rarity": "legendary",
+  "shape": "full_aura_star_0",
+  "tags": [
+    "monsoon",
+    "stars",
+    "trail",
+    "dust"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

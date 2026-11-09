@@ -1,0 +1,39 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip",
+    "play"
+  ],
+  "attach": {
+    "bone": "right_arm",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "emote",
+  "description": "An original paper greeting with a carnival paper finish, family-specific silhouette, and a emote wave accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "id": "trinkies:emote_full_carnival_greeting",
+  "model": "model.bbmodel",
+  "name": "Carnival Paper Greeting",
+  "palette": [
+    "#2F1D32",
+    "#482C49",
+    "#8A4C86",
+    "#A16697",
+    "#BD8AA7",
+    "#F2A75C",
+    "#FFE094"
+  ],
+  "rarity": "epic",
+  "shape": "full_emote_greeting_3",
+  "tags": [
+    "carnival",
+    "greeting",
+    "paper"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

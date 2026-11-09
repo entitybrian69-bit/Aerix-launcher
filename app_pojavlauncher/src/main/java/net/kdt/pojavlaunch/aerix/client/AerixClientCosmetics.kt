@@ -421,6 +421,8 @@ object AerixClientCosmetics {
         AerixClientStore.init(context)
         val hatId = AerixClientStore.equippedHatId
         if (hatId == "none" || existingSkinPng == null) return existingSkinPng
+        val catalogHat = if (hatId.startsWith("trinkies:hat_")) TrinkiesCatalog.find(context, hatId) else null
+        if (hatId.startsWith("trinkies:hat_") && (catalogHat == null || !catalogHat.locallyRendered)) return existingSkinPng
         val decoded = BitmapFactory.decodeByteArray(existingSkinPng, 0, existingSkinPng.size) ?: return existingSkinPng
         if (decoded.width < 64 || decoded.height < 64) {
             decoded.recycle()
@@ -443,7 +445,108 @@ object AerixClientCosmetics {
             }
         }
 
-        when (hatId) {
+        if (catalogHat != null) {
+            val palette = catalogHat.palette.mapNotNull { runCatching { AndroidColor.parseColor(it) }.getOrNull() }
+            if (palette.size < 5) {
+                copy.recycle()
+                return existingSkinPng
+            }
+            val shade = palette.first()
+            val base = palette[2]
+            val accent = palette.getOrElse(5) { palette.last() }
+            val highlight = palette.last()
+            fun rect(x0: Int, y0: Int, x1: Int, y1: Int, color: Int) {
+                for (y in y0..y1) for (x in x0..x1) px(x, y, color)
+            }
+            // Minecraft's head outer-layer UV: four side faces wrap x=32..63/y=8..15;
+            // the top face is x=40..47/y=0..7. Keep the base face and eyes untouched.
+            for (x in 32..63) {
+                px(x, 9, base)
+                px(x, 10, base)
+                if (x % 4 == 0) px(x, 8, highlight)
+                if (x % 5 == 0) px(x, 11, shade)
+            }
+            val shape = catalogHat.shape.lowercase()
+            val family = when {
+                "spire" in shape -> "spire"
+                "hood" in shape -> "hood"
+                "halo" in shape -> "halo"
+                "aviator" in shape || "cap" in shape -> "aviator"
+                "circlet" in shape -> "circlet"
+                "visor" in shape || "helm" in shape -> "visor"
+                "antler" in shape || "horn" in shape -> "antlers"
+                "wreath" in shape -> "wreath"
+                "mask" in shape -> "mask"
+                else -> "circlet"
+            }
+            when (family) {
+                "spire" -> {
+                    rect(40, 0, 47, 3, base)
+                    rect(43, 0, 44, 6, accent)
+                    rect(42, 8, 45, 9, accent)
+                    listOf(40 to 1, 47 to 1, 41 to 0, 46 to 0).forEach { (x, y) -> px(x, y, highlight) }
+                }
+                "hood" -> {
+                    rect(40, 0, 47, 4, base)
+                    rect(39, 5, 48, 6, shade)
+                    rect(40, 8, 47, 9, base)
+                    rect(40, 10, 41, 12, shade)
+                    rect(46, 10, 47, 12, shade)
+                    px(43, 8, highlight); px(44, 8, highlight)
+                }
+                "halo" -> {
+                    rect(40, 0, 47, 0, accent)
+                    rect(40, 6, 47, 6, accent)
+                    rect(40, 1, 40, 5, base)
+                    rect(47, 1, 47, 5, base)
+                    px(43, 0, highlight); px(44, 0, highlight)
+                }
+                "aviator" -> {
+                    rect(40, 0, 47, 2, base)
+                    rect(41, 8, 42, 9, accent)
+                    rect(45, 8, 46, 9, accent)
+                    rect(41, 10, 42, 10, shade)
+                    rect(45, 10, 46, 10, shade)
+                    px(40, 8, highlight); px(47, 8, highlight)
+                }
+                "circlet" -> {
+                    rect(40, 0, 47, 0, highlight)
+                    rect(40, 8, 47, 8, highlight)
+                    rect(43, 1, 44, 2, accent)
+                    rect(43, 9, 44, 10, accent)
+                    px(42, 9, highlight); px(45, 9, highlight)
+                }
+                "visor" -> {
+                    rect(40, 0, 47, 3, base)
+                    rect(40, 8, 47, 9, shade)
+                    rect(41, 8, 46, 8, highlight)
+                    rect(40, 10, 41, 12, base)
+                    rect(46, 10, 47, 12, base)
+                }
+                "antlers" -> {
+                    rect(40, 0, 41, 3, accent)
+                    rect(46, 0, 47, 3, accent)
+                    px(39, 1, highlight); px(42, 2, highlight)
+                    px(45, 2, highlight); px(48, 1, highlight)
+                    px(32, 8, accent); px(63, 8, accent)
+                }
+                "wreath" -> {
+                    for (x in listOf(40, 42, 45, 47)) {
+                        px(x, 0, accent); px(x, 1, highlight)
+                    }
+                    px(43, 0, highlight); px(44, 0, highlight)
+                    px(42, 8, accent); px(45, 8, accent)
+                    px(43, 9, highlight); px(44, 9, highlight)
+                }
+                else -> {
+                    rect(40, 8, 47, 9, base)
+                    rect(40, 10, 41, 13, shade)
+                    rect(46, 10, 47, 13, shade)
+                    rect(43, 10, 44, 12, accent)
+                    px(43, 9, highlight); px(44, 9, highlight)
+                }
+            }
+        } else when (hatId) {
             "crimson_crown" -> {
                 strip(AndroidColor.rgb(128, 22, 43), AndroidColor.rgb(255, 209, 102))
                 for (x in 40..47) px(x, 10, AndroidColor.rgb(128, 22, 43))
@@ -466,7 +569,6 @@ object AerixClientCosmetics {
                 px(44, 1, AndroidColor.WHITE)
             }
             "sakura_bow" -> {
-                // A dark rose wrap plus a bright two-petal bow on the front head face.
                 strip(AndroidColor.rgb(110, 32, 68), AndroidColor.rgb(255, 179, 217))
                 px(41, 8, AndroidColor.rgb(255, 116, 176))
                 px(42, 7, AndroidColor.rgb(255, 179, 217))

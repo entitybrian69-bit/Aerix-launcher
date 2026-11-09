@@ -1,0 +1,39 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip"
+  ],
+  "attach": {
+    "bone": "head",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "hat",
+  "description": "An original petal wreath with a tide cloth finish, family-specific silhouette, and a circlet glint accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "id": "trinkies:hat_full_tide_wreath",
+  "model": "model.bbmodel",
+  "name": "Tide Petal Wreath",
+  "palette": [
+    "#102F2B",
+    "#1A4545",
+    "#287B83",
+    "#428899",
+    "#6992B3",
+    "#9AE8E1",
+    "#C5F8FF"
+  ],
+  "rarity": "uncommon",
+  "shape": "full_hat_wreath_4",
+  "tags": [
+    "tide",
+    "wreath",
+    "petal",
+    "cloth"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

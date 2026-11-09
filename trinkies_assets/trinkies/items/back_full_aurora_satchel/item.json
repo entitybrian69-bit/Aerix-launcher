@@ -1,0 +1,39 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip"
+  ],
+  "attach": {
+    "bone": "body",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "back",
+  "description": "An original courier satchel with a aurora leather finish, family-specific silhouette, and a pack tick accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "id": "trinkies:back_full_aurora_satchel",
+  "model": "model.bbmodel",
+  "name": "Aurora Courier Satchel",
+  "palette": [
+    "#162A24",
+    "#223D38",
+    "#3B746E",
+    "#518888",
+    "#70939F",
+    "#9BF0D2",
+    "#C2FFF6"
+  ],
+  "rarity": "uncommon",
+  "shape": "full_back_satchel_0",
+  "tags": [
+    "aurora",
+    "courier",
+    "pack",
+    "leather"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

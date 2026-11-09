@@ -1,0 +1,39 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip"
+  ],
+  "attach": {
+    "bone": "head",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "hat",
+  "description": "An original canopy hood with a frost cloth finish, family-specific silhouette, and a hood bob accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "id": "trinkies:hat_full_frost_hood",
+  "model": "model.bbmodel",
+  "name": "Frost Canopy Hood",
+  "palette": [
+    "#153438",
+    "#214853",
+    "#347A9C",
+    "#538BB7",
+    "#809BD6",
+    "#D2F7FF",
+    "#E0F3FF"
+  ],
+  "rarity": "uncommon",
+  "shape": "full_hat_hood_0",
+  "tags": [
+    "frost",
+    "hood",
+    "canopy",
+    "cloth"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

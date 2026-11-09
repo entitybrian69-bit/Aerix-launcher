@@ -1,0 +1,40 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip"
+  ],
+  "attach": {
+    "bone": "body",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "suit",
+  "description": "An original lamellar guard suit with a willow enamel finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "id": "trinkies:suit_full_willow_samurai",
+  "model": "model.bbmodel",
+  "name": "Willow Lamellar Guard Suit",
+  "palette": [
+    "#1E251A",
+    "#2B3726",
+    "#4B6845",
+    "#5A7A58",
+    "#728E77",
+    "#D4BE79",
+    "#FEFCB4"
+  ],
+  "rarity": "rare",
+  "shape": "full_suit_samurai_2",
+  "suit_mode": "overlay",
+  "tags": [
+    "willow",
+    "lamellar",
+    "guard",
+    "enamel"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

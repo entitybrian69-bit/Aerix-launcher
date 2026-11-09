@@ -1,0 +1,41 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip",
+    "play"
+  ],
+  "attach": {
+    "bone": "body",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "emote",
+  "description": "An original moonlit twirl with a breeze glass finish, family-specific silhouette, and a emote bow accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "emissive_mask": "emissive.png",
+  "id": "trinkies:emote_full_breeze_twirl",
+  "model": "model.bbmodel",
+  "name": "Breeze Moonlit Twirl",
+  "palette": [
+    "#183032",
+    "#24434A",
+    "#3D758B",
+    "#5885A3",
+    "#7E95BE",
+    "#D8F4E5",
+    "#EBFFF9"
+  ],
+  "rarity": "rare",
+  "shape": "full_emote_twirl_4",
+  "tags": [
+    "breeze",
+    "twirl",
+    "moon",
+    "glass"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

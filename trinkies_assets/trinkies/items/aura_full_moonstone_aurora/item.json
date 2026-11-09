@@ -1,0 +1,41 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip"
+  ],
+  "attach": {
+    "bone": "root",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "aura",
+  "description": "An original aurora veil with a moonstone glass finish, family-specific silhouette, and a aura sweep accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "emissive_mask": "emissive.png",
+  "id": "trinkies:aura_full_moonstone_aurora",
+  "model": "model.bbmodel",
+  "name": "Moonstone Aurora Veil",
+  "palette": [
+    "#1D1B30",
+    "#2F2946",
+    "#5A4785",
+    "#79609C",
+    "#A583B6",
+    "#D2B9FF",
+    "#EACFFF"
+  ],
+  "particle_sheet": "texture.png",
+  "rarity": "legendary",
+  "shape": "full_aura_aurora_3",
+  "tags": [
+    "moonstone",
+    "aurora",
+    "arc",
+    "glass"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

@@ -1,0 +1,41 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip"
+  ],
+  "attach": {
+    "bone": "body",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "suit",
+  "description": "An original stargazer robe with a glacier wool finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "emissive_mask": "emissive.png",
+  "id": "trinkies:suit_full_glacier_stargazer",
+  "model": "model.bbmodel",
+  "name": "Glacier Stargazer Robe",
+  "palette": [
+    "#192D30",
+    "#273F47",
+    "#426D86",
+    "#5C7E9D",
+    "#808FB8",
+    "#C4F1F4",
+    "#DDF6FF"
+  ],
+  "rarity": "legendary",
+  "shape": "full_suit_stargazer_1",
+  "suit_mode": "overlay",
+  "tags": [
+    "glacier",
+    "night",
+    "stars",
+    "wool"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

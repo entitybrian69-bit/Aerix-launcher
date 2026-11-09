@@ -1,0 +1,41 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip",
+    "signature"
+  ],
+  "attach": {
+    "bone": "root",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "pet",
+  "description": "An original cloudfox cub with a saffron fur finish, family-specific silhouette, and a pet glide accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "emissive_mask": "emissive.png",
+  "id": "trinkies:pet_full_saffron_fox",
+  "model": "model.bbmodel",
+  "name": "Saffron Cloudfox Cub",
+  "palette": [
+    "#3C2015",
+    "#583621",
+    "#A66B32",
+    "#C29653",
+    "#E3D584",
+    "#FFE083",
+    "#FFFCAB"
+  ],
+  "rarity": "rare",
+  "shape": "full_pet_fox_4",
+  "tags": [
+    "saffron",
+    "fox",
+    "forest",
+    "fur"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

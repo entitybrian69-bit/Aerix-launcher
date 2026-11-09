@@ -1,0 +1,39 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip"
+  ],
+  "attach": {
+    "bone": "body",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "back",
+  "description": "An original courier satchel with a brass leather finish, family-specific silhouette, and a pack tick accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "id": "trinkies:back_full_brass_satchel",
+  "model": "model.bbmodel",
+  "name": "Brass Courier Satchel",
+  "palette": [
+    "#2F1F14",
+    "#453220",
+    "#826334",
+    "#98824D",
+    "#B2B072",
+    "#FFE08A",
+    "#FFFBAF"
+  ],
+  "rarity": "common",
+  "shape": "full_back_satchel_4",
+  "tags": [
+    "brass",
+    "courier",
+    "pack",
+    "leather"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

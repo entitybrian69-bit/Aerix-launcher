@@ -12,9 +12,9 @@ Trinkies is Aerix Launcher's client-side cosmetics bridge. Gradle is configured 
 ## Current source-tree behavior
 
 - The launcher preview uses the account's local/cached/service skin where available, supports classic/slim model selection, existing cape paths, and a 2D fallback when WebGL is unavailable.
-- Existing account skins, saved skin presets, 15 original animated cape designs, imported capes, and four pixel-art headwear overlays are reused. The headwear overlay modifies the outer skin layer; visibility to remote players depends on the account/skin service and server.
-- `trinkies_assets/` now holds 30 deterministic original slice assets: five hats, suits, back items, pets, emotes, and auras/trails. JSON Schema, texture/model budget, palette, UV, animation-clip, and pack-size checks are in `tools/trinkies_assets/validate_catalog.py`.
-- **The generated 30-item slice is not yet connected to Wardrobe equip state or the in-game renderer.** Its contact sheets are procedural model projections, not Minecraft screenshots. It is not accepted as a finished item set.
+- Existing account skins, saved skin presets, 15 original animated cape designs, imported capes, and the shared catalog are retained. All 50 catalog hats are selectable and use a palette/shape-driven pixel overlay on the outer skin layer. The same selected hat ID is written atomically to `<instance game directory>/trinkies/equipped.json` before a supported instance starts. Hat rendering in Minecraft has not been visually verified; skin/cape visibility to other players depends on the account/skin service and server.
+- `trinkies_assets/` contains 300 deterministic original assets: 50 hats, suits, back items, pets, emotes, and auras/trails each. The launcher loads their catalog data and item textures. Non-hat model assets are catalog/previews only; the client does not yet have their feature renderers, an equipped-state consumer, a pet follower, or an emote wheel. JSON Schema, texture/model budget, palette, UV, animation-clip, manifest, and pack-size checks are in `tools/trinkies_assets/validate_catalog.py`.
+- The full catalog passes offline structural validation, but remains marked unverified in-game. The generated contact sheets are texture/model previews, not Minecraft screenshots or art approval. The current branch's Android/mod-JAR build and real in-game hat check are still pending.
 
 ## Visibility, sync, and privacy limits
 

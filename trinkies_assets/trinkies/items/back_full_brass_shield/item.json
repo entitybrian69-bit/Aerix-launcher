@@ -1,0 +1,39 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip"
+  ],
+  "attach": {
+    "bone": "body",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "back",
+  "description": "An original wayfarer shield with a brass stone finish, family-specific silhouette, and a pack tick accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "id": "trinkies:back_full_brass_shield",
+  "model": "model.bbmodel",
+  "name": "Brass Wayfarer Shield",
+  "palette": [
+    "#2F1F14",
+    "#453220",
+    "#826334",
+    "#98824D",
+    "#B2B072",
+    "#FFE08A",
+    "#FFFBAF"
+  ],
+  "rarity": "legendary",
+  "shape": "full_back_shield_4",
+  "tags": [
+    "brass",
+    "shield",
+    "crest",
+    "stone"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

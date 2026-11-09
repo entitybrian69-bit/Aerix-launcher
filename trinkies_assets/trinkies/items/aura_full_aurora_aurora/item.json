@@ -1,0 +1,40 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip"
+  ],
+  "attach": {
+    "bone": "root",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "aura",
+  "description": "An original aurora veil with a aurora glass finish, family-specific silhouette, and a aura sweep accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "emissive_mask": "emissive.png",
+  "id": "trinkies:aura_full_aurora_aurora",
+  "model": "model.bbmodel",
+  "name": "Aurora Aurora Veil",
+  "palette": [
+    "#192834",
+    "#27374D",
+    "#425B91",
+    "#5E6EAA",
+    "#8986C7",
+    "#8CF2D2",
+    "#B6FFF7"
+  ],
+  "particle_sheet": "texture.png",
+  "rarity": "rare",
+  "shape": "full_aura_aurora_1",
+  "tags": [
+    "aurora",
+    "arc",
+    "glass"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

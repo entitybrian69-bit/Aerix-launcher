@@ -204,7 +204,7 @@ def validate_manifest() -> None:
         for path in sorted(ASSET_ROOT.rglob("*")) if path.is_file() and path.name != "manifest.json"
     }
     if manifest.get("sha256") != actual:
-        fail("asset manifest SHA-256 list does not match files; run generate_slice.py")
+        fail("asset manifest SHA-256 list does not match files; rerun the matching deterministic catalog generator")
 
 
 def packed_size() -> int:
@@ -218,28 +218,69 @@ def packed_size() -> int:
         archive.unlink(missing_ok=True)
 
 
-def validate(require_slice: bool) -> None:
+def validate(require_slice: bool, require_full: bool) -> None:
+    if require_slice and require_full:
+        fail("choose only one of --require-slice or --require-full")
     item_paths = sorted(ITEM_ROOT.glob("*/item.json"))
     if not item_paths:
         fail("no generated item.json files found")
     seen: set[str] = set()
     counts = {category: 0 for category in EXPECTED_CATEGORIES}
+    names: set[tuple[str, str]] = set()
+    shapes: set[tuple[str, str]] = set()
+    geometry: set[tuple[str, str]] = set()
     for item_path in item_paths:
         category, cubes, _ = validate_item(item_path, seen)
         if category not in counts:
-            fail(f"unregistered slice category: {category}")
+            fail(f"unregistered catalog category: {category}")
         counts[category] += 1
+        item = json.loads(item_path.read_text(encoding="utf-8"))
+        name_key = (category, item["name"].casefold())
+        if name_key in names:
+            fail(f"duplicate display name within {category}: {item['name']}")
+        names.add(name_key)
+        shape_key = (category, item["shape"])
+        if shape_key in shapes:
+            fail(f"duplicate silhouette recipe within {category}: {item['shape']}")
+        shapes.add(shape_key)
+        model = json.loads(safe_item_path(item_path.parent, item["model"]).read_text(encoding="utf-8"))
+        signature = tuple(sorted((
+            element["name"], tuple(element["from"]), tuple(element["to"]),
+            tuple(element["rotation"]), element.get("bone", "")
+        ) for element in model.get("elements", [])))
+        geometry_key = (category, repr(signature))
+        if geometry_key in geometry:
+            fail(f"duplicate generated model geometry within {category}: {item['id']}")
+        geometry.add(geometry_key)
         print(f"OK {item_path.parent.name}: {cubes} cubes")
-    if require_slice and counts != {category: 5 for category in EXPECTED_CATEGORIES}:
-        fail(f"vertical slice must contain exactly five items/category: {counts}")
+
     catalog = json.loads((ASSET_ROOT / "catalog.json").read_text(encoding="utf-8"))
     catalog_ids = [entry.get("id") for entry in catalog.get("items", [])]
     if set(catalog_ids) != seen or len(catalog_ids) != len(seen):
         fail("catalog.json item IDs do not match the validated item set")
-    if catalog.get("status") != "vertical_slice_unverified_in_game":
-        fail("catalog must retain the in-game verification status")
-    if len(seen) != 30 and require_slice:
-        fail(f"expected exactly 30 slice items, found {len(seen)}")
+    item_count = catalog.get("item_count")
+    if item_count is not None and item_count != len(seen):
+        fail("catalog item_count does not match the validated items")
+    if require_full and item_count != len(seen):
+        fail("full catalog must declare its item_count")
+    catalog_counts = catalog.get("category_counts")
+    if catalog_counts is not None and catalog_counts != counts:
+        fail("catalog category_counts does not match the validated items")
+    if require_full and catalog_counts != counts:
+        fail("full catalog must declare its category_counts")
+    status = catalog.get("status")
+    if require_slice:
+        if counts != {category: 5 for category in EXPECTED_CATEGORIES} or len(seen) != 30:
+            fail(f"vertical slice must contain exactly 30 items (five/category): {counts}")
+        if status != "vertical_slice_unverified_in_game":
+            fail("slice catalog must retain the in-game verification status")
+    elif require_full:
+        if counts != {category: 50 for category in EXPECTED_CATEGORIES} or len(seen) != 300:
+            fail(f"full catalog must contain exactly 300 items (50/category): {counts}")
+        if status != "full_catalog_unverified_in_game":
+            fail("full catalog must remain marked unverified in-game")
+    elif status not in ("vertical_slice_unverified_in_game", "full_catalog_unverified_in_game"):
+        fail("catalog must retain an explicit unverified-in-game status")
     validate_manifest()
     size = packed_size()
     if size >= MAX_COMPRESSED_BYTES:
@@ -251,10 +292,11 @@ def validate(require_slice: bool) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--require-slice", action="store_true", help="require exactly five items in each of six categories")
+    parser.add_argument("--require-slice", action="store_true", help="require the original 30-item, five-per-category slice")
+    parser.add_argument("--require-full", action="store_true", help="require all 300 catalog items, fifty per category")
     args = parser.parse_args()
     try:
-        validate(args.require_slice)
+        validate(args.require_slice, args.require_full)
     except (ValidationError, OSError, json.JSONDecodeError, ValueError) as error:
         print(f"ERROR: {error}", file=sys.stderr)
         return 1

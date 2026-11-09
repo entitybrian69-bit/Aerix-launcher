@@ -1,0 +1,41 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip"
+  ],
+  "attach": {
+    "bone": "root",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "aura",
+  "description": "An original willow whorl with a stardust wood finish, family-specific silhouette, and a aura sweep accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "emissive_mask": "emissive.png",
+  "id": "trinkies:aura_full_stardust_leaf",
+  "model": "model.bbmodel",
+  "name": "Stardust Willow Whorl",
+  "palette": [
+    "#252C33",
+    "#373F4B",
+    "#63708D",
+    "#7D85A5",
+    "#A09FC1",
+    "#F1DEA2",
+    "#FFFDC6"
+  ],
+  "particle_sheet": "texture.png",
+  "rarity": "common",
+  "shape": "full_aura_leaf_4",
+  "tags": [
+    "stardust",
+    "leaf",
+    "whorl",
+    "wood"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

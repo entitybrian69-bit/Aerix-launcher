@@ -1,0 +1,41 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip"
+  ],
+  "attach": {
+    "bone": "body",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "suit",
+  "description": "An original pressure diver suit with a crimson metal finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "emissive_mask": "emissive.png",
+  "id": "trinkies:suit_full_crimson_diver",
+  "model": "model.bbmodel",
+  "name": "Crimson Pressure Diver Suit",
+  "palette": [
+    "#2D141E",
+    "#421F29",
+    "#7D3340",
+    "#924B50",
+    "#AB7A6E",
+    "#F4B96F",
+    "#FFE9A0"
+  ],
+  "rarity": "common",
+  "shape": "full_suit_diver_0",
+  "suit_mode": "overlay",
+  "tags": [
+    "crimson",
+    "diver",
+    "pressure",
+    "metal"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

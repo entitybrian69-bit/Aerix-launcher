@@ -1,0 +1,40 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip",
+    "play"
+  ],
+  "attach": {
+    "bone": "body",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "emote",
+  "description": "An original marigold bow with a carnival cloth finish, family-specific silhouette, and a emote bow accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "id": "trinkies:emote_full_carnival_bow",
+  "model": "model.bbmodel",
+  "name": "Carnival Marigold Bow",
+  "palette": [
+    "#2F1D32",
+    "#482C49",
+    "#8A4C86",
+    "#A16697",
+    "#BD8AA7",
+    "#F2A75C",
+    "#FFE094"
+  ],
+  "rarity": "common",
+  "shape": "full_emote_bow_3",
+  "tags": [
+    "carnival",
+    "bow",
+    "flower",
+    "cloth"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

@@ -1,6 +1,7 @@
 package net.kdt.pojavlaunch.aerix.ui.screens
 
 import android.content.res.Configuration
+import android.graphics.BitmapFactory
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -36,6 +37,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -46,6 +48,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
@@ -62,6 +65,8 @@ import net.kdt.pojavlaunch.aerix.bridge.AerixSkinPreset
 import net.kdt.pojavlaunch.aerix.bridge.PojavAccountBridge
 import net.kdt.pojavlaunch.aerix.client.AerixClientCosmetics
 import net.kdt.pojavlaunch.aerix.client.AerixClientStore
+import net.kdt.pojavlaunch.aerix.client.TrinkiesCatalog
+import net.kdt.pojavlaunch.aerix.client.TrinkiesCatalogItem
 import net.kdt.pojavlaunch.aerix.components.AerixSkinPreview3D
 import net.kdt.pojavlaunch.aerix.social.SocialBackend
 import net.kdt.pojavlaunch.aerix.theme.AerixSpacing
@@ -78,7 +83,9 @@ private enum class WardrobeCategory(val title: String, val icon: Int) {
     HEADWEAR("Head", R.drawable.aerix_ic_styler_outlined),
     SUITS("Body", R.drawable.aerix_ic_format_paint_outlined),
     BACK_ITEMS("Back", R.drawable.aerix_ic_favorite_outlined),
-    PETS("Pets", R.drawable.aerix_ic_people)
+    PETS("Pets", R.drawable.aerix_ic_people),
+    EMOTES("Emotes", R.drawable.aerix_ic_touch_app_outlined),
+    AURAS("Auras", R.drawable.aerix_ic_styler_outlined)
 }
 
 private enum class WardrobeFilter(val title: String) {
@@ -93,7 +100,9 @@ private val wardrobeCategories = listOf(
     WardrobeCategory.HEADWEAR,
     WardrobeCategory.SUITS,
     WardrobeCategory.BACK_ITEMS,
-    WardrobeCategory.PETS
+    WardrobeCategory.PETS,
+    WardrobeCategory.EMOTES,
+    WardrobeCategory.AURAS
 )
 
 private val wardrobeGreen = Color(0xFF5CC84B)
@@ -111,21 +120,6 @@ private val wardrobePoses = listOf(
     WardrobePose("Run", "Running"),
     WardrobePose("Fly", "Flying"),
     WardrobePose("Crouch", "Crouch")
-)
-
-private data class TrinkiesHat(
-    val id: String,
-    val name: String,
-    val detail: String,
-    val color: Color
-)
-
-private val trinkiesHats = listOf(
-    TrinkiesHat("none", "No headwear", "Use the original skin layer", Color(0xFF75808A)),
-    TrinkiesHat("crimson_crown", "Crimson Crown", "Gold-trimmed pixel crown", Color(0xFFDC1E3A)),
-    TrinkiesHat("void_horns", "Void Horns", "Violet outer-layer horns", Color(0xFF9B5DE5)),
-    TrinkiesHat("frost_circlet", "Frost Circlet", "Ice-blue circlet", Color(0xFF45C7E8)),
-    TrinkiesHat("sakura_bow", "Sakura Bow", "Rose-pink pixel bow", Color(0xFFFF79B0))
 )
 
 /** Trinkies cosmetics hub, arranged like the compact pixel-art wardrobe reference. */
@@ -478,10 +472,10 @@ private fun WardrobeCollectionPanel(
                     Text(collectionTitle(category), color = Color(0xFFF0F0F0),
                         fontFamily = wardrobePixelFont, fontWeight = FontWeight.ExtraBold, fontSize = 10.sp, maxLines = 1,
                         overflow = TextOverflow.Ellipsis)
-                    Text(categorySubtitle(category), color = Color(0xFF9A9B9E), fontSize = 7.sp,
+                    Text(categorySubtitle(category, activity.applicationContext), color = Color(0xFF9A9B9E), fontSize = 7.sp,
                         maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
-                Text(categoryCount(category, savedSkins.size), color = accent,
+                Text(categoryCount(category, savedSkins.size, activity.applicationContext), color = accent,
                     fontWeight = FontWeight.ExtraBold, fontFamily = FontFamily.Monospace,
                     fontSize = 9.sp, modifier = Modifier.padding(start = 5.dp))
             }
@@ -505,19 +499,16 @@ private fun WardrobeCollectionPanel(
                 WardrobeCategory.SKINS -> SkinCollection(
                     activity, account, accent, savedSkins, onImportSkin, onOpenAccounts, suitsMode = false
                 )
-                WardrobeCategory.SUITS -> SkinCollection(
-                    activity, account, accent, savedSkins, onImportSkin, onOpenAccounts, suitsMode = true
-                )
+                WardrobeCategory.SUITS -> TrinkiesCatalogCollection(activity, "suit", accent)
                 WardrobeCategory.CAPES -> CapeCollection(activity, account, accent, onImportCape, backItems = false)
-                WardrobeCategory.BACK_ITEMS -> CapeCollection(activity, account, accent, onImportCape, backItems = true)
+                WardrobeCategory.BACK_ITEMS -> Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                    CapeCollection(activity, account, accent, onImportCape, backItems = true)
+                    TrinkiesCatalogCollection(activity, "back", accent)
+                }
                 WardrobeCategory.HEADWEAR -> HeadwearCollection(activity, accent)
-                WardrobeCategory.PETS -> UnsupportedCollection(
-                    title = "Pet companions",
-                    detail = "Pet rendering and remote presence need a compatible Trinkies client and server pack. No pet pack is bundled in this APK yet.",
-                    icon = R.drawable.aerix_ic_people,
-                    accent = accent,
-                    cards = listOf("Companion", "Shoulder pet", "Trail effect")
-                )
+                WardrobeCategory.PETS -> TrinkiesCatalogCollection(activity, "pet", accent)
+                WardrobeCategory.EMOTES -> TrinkiesCatalogCollection(activity, "emote", accent)
+                WardrobeCategory.AURAS -> TrinkiesCatalogCollection(activity, "aura", accent)
             }
             WardrobeCompatibilityNote()
         }
@@ -530,27 +521,36 @@ private fun collectionTitle(category: WardrobeCategory): String = when (category
     WardrobeCategory.SKINS -> "My skins"
     WardrobeCategory.CAPES -> "My capes"
     WardrobeCategory.HEADWEAR -> "Headwear"
-    WardrobeCategory.SUITS -> "Body outfits"
+    WardrobeCategory.SUITS -> "Trinkies suits"
     WardrobeCategory.BACK_ITEMS -> "Back items"
-    WardrobeCategory.PETS -> "Pets"
+    WardrobeCategory.PETS -> "Trinkies pets"
+    WardrobeCategory.EMOTES -> "Trinkies emotes"
+    WardrobeCategory.AURAS -> "Trinkies auras"
 }
 
-private fun categoryCount(category: WardrobeCategory, skinCount: Int): String = when (category) {
-    WardrobeCategory.LOOKS, WardrobeCategory.SKINS, WardrobeCategory.SUITS -> skinCount.toString()
-    WardrobeCategory.CAPES, WardrobeCategory.BACK_ITEMS -> "15+"
-    WardrobeCategory.HEADWEAR -> "4"
-    WardrobeCategory.SHOP, WardrobeCategory.PETS -> "—"
+private fun categoryCount(category: WardrobeCategory, skinCount: Int, context: android.content.Context): String = when (category) {
+    WardrobeCategory.LOOKS, WardrobeCategory.SKINS -> skinCount.toString()
+    WardrobeCategory.HEADWEAR -> TrinkiesCatalog.category(context, "hat").size.toString()
+    WardrobeCategory.SUITS -> TrinkiesCatalog.category(context, "suit").size.toString()
+    WardrobeCategory.PETS -> TrinkiesCatalog.category(context, "pet").size.toString()
+    WardrobeCategory.EMOTES -> TrinkiesCatalog.category(context, "emote").size.toString()
+    WardrobeCategory.AURAS -> TrinkiesCatalog.category(context, "aura").size.toString()
+    WardrobeCategory.CAPES -> "15+"
+    WardrobeCategory.BACK_ITEMS -> "${TrinkiesCatalog.category(context, "back").size}+"
+    WardrobeCategory.SHOP -> "—"
 }
 
-private fun categorySubtitle(category: WardrobeCategory): String = when (category) {
+private fun categorySubtitle(category: WardrobeCategory, context: android.content.Context): String = when (category) {
     WardrobeCategory.LOOKS -> "Saved player styles"
     WardrobeCategory.SHOP -> "Online catalog · unavailable in this build"
     WardrobeCategory.SKINS -> "Minecraft skins and saved presets"
     WardrobeCategory.CAPES -> "Animated client capes and imported PNGs"
-    WardrobeCategory.HEADWEAR -> "Pixel-art overlays on the outer skin layer"
-    WardrobeCategory.SUITS -> "Full-body looks use Minecraft skin textures"
-    WardrobeCategory.BACK_ITEMS -> "Capes work; other attachments need server support"
-    WardrobeCategory.PETS -> "Collection slot · server/client support required"
+    WardrobeCategory.HEADWEAR -> "${TrinkiesCatalog.category(context, "hat").size} hats · overlay unverified in-game"
+    WardrobeCategory.SUITS -> "${TrinkiesCatalog.category(context, "suit").size} catalog assets · renderer not yet enabled"
+    WardrobeCategory.BACK_ITEMS -> "Animated capes work · ${TrinkiesCatalog.category(context, "back").size} models are catalog-only"
+    WardrobeCategory.PETS -> "${TrinkiesCatalog.category(context, "pet").size} catalog assets · pet follower renderer not yet enabled"
+    WardrobeCategory.EMOTES -> "${TrinkiesCatalog.category(context, "emote").size} catalog assets · emote animation renderer not yet enabled"
+    WardrobeCategory.AURAS -> "${TrinkiesCatalog.category(context, "aura").size} catalog assets · particle renderer not yet enabled"
 }
 
 @Composable
@@ -778,43 +778,127 @@ private fun CapeCard(
 
 @Composable
 private fun HeadwearCollection(activity: FragmentActivity, accent: Color) {
-    Text("Headwear is drawn onto the skin's outer head layer. This is a local cosmetic; remote players need a compatible texture/server path.",
-        color = AerixSurface.textSecondary, fontSize = 9.sp, lineHeight = 12.sp)
+    val context = LocalContext.current
+    val hats = remember { TrinkiesCatalog.category(context, "hat") }
+    Text(
+        "${hats.size} hats from the bundled catalog. The launcher applies a pixel-art outer-head skin overlay; its in-game appearance is not yet visually verified, and remote visibility is not guaranteed.",
+        color = AerixSurface.textSecondary, fontSize = 9.sp, lineHeight = 12.sp
+    )
+    TrinkiesCatalogGrid(activity, hats, accent, includeNone = true)
+}
+
+@Composable
+private fun TrinkiesCatalogCollection(activity: FragmentActivity, category: String, accent: Color) {
+    val context = LocalContext.current
+    val items = remember(category) { TrinkiesCatalog.category(context, category) }
+    val rendererAvailable = items.any { it.locallyRendered }
+    Text(
+        "${items.size} original ${category.replaceFirstChar { it.uppercase() }} catalog items. " +
+            if (rendererAvailable) "Choose a supported item to equip it locally."
+            else "Assets and previews are available; this category's in-game renderer is not enabled in this build.",
+        color = AerixSurface.textSecondary, fontSize = 9.sp, lineHeight = 12.sp
+    )
+    TrinkiesCatalogGrid(activity, items, accent)
+}
+
+@Composable
+private fun TrinkiesCatalogGrid(
+    activity: FragmentActivity,
+    items: List<TrinkiesCatalogItem>,
+    accent: Color,
+    includeNone: Boolean = false
+) {
+    val entries: List<TrinkiesCatalogItem?> = remember(items, includeNone) {
+        if (includeNone) listOf(null) + items else items.map { it }
+    }
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val columns = if (maxWidth < 390.dp) 2 else 3
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            trinkiesHats.chunked(columns).forEach { rowHats ->
+            entries.chunked(columns).forEach { rowItems ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    rowHats.forEach { hat ->
-                        val selected = AerixClientStore.equippedHatId == hat.id
-                        Surface(
-                            modifier = Modifier.weight(1f).clickable {
-                                AerixClientStore.equippedHatId = hat.id
+                    rowItems.forEach { item ->
+                        CatalogItemCard(
+                            activity = activity,
+                            item = item,
+                            selected = if (item == null) AerixClientStore.equippedHatId == "none"
+                                else item.category == "hat" && AerixClientStore.equippedHatId == item.id,
+                            accent = accent,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            if (item == null || item.locallyRendered) {
+                                AerixClientStore.equippedHatId = item?.id ?: "none"
                                 AerixClientStore.persist()
                                 PojavAccountBridge.notifyWardrobeChanged()
-                                Toast.makeText(activity, "${hat.name} applied to the preview", Toast.LENGTH_SHORT).show()
-                            },
-                            shape = RoundedCornerShape(0.dp),
-                            color = if (selected) accent.copy(alpha = 0.18f) else AerixSurface.panelRaised.copy(alpha = 0.72f),
-                            border = BorderStroke(AerixSpacing.hairline, if (selected) accent else AerixSurface.borderSoft)
-                        ) {
-                            Column(Modifier.fillMaxWidth().padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                                Box(Modifier.size(34.dp).clip(RoundedCornerShape(0.dp)).background(hat.color.copy(alpha = 0.18f)),
-                                    contentAlignment = Alignment.Center) {
-                                    Icon(painterResource(R.drawable.aerix_ic_styler_outlined), contentDescription = null,
-                                        tint = hat.color, modifier = Modifier.size(22.dp))
-                                }
-                                Text(hat.name, color = AerixSurface.textPrimary, fontSize = 9.sp, fontWeight = FontWeight.Bold,
-                                    maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Text(if (selected) "EQUIPPED" else hat.detail, color = if (selected) accent else AerixSurface.textSecondary,
-                                    fontSize = 7.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                val selection = item?.name ?: "No headwear"
+                                Toast.makeText(activity, "$selection saved locally for the next supported launch", Toast.LENGTH_SHORT).show()
                             }
                         }
                     }
-                    repeat(columns - rowHats.size) { Spacer(Modifier.weight(1f)) }
+                    repeat(columns - rowItems.size) { Spacer(Modifier.weight(1f)) }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun CatalogItemCard(
+    activity: FragmentActivity,
+    item: TrinkiesCatalogItem?,
+    selected: Boolean,
+    accent: Color,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    val context = LocalContext.current
+    val bitmap by produceState<ImageBitmap?>(null, item?.id, context) {
+        value = withContext(Dispatchers.IO) {
+            item?.let {
+                runCatching {
+                    context.assets.open(it.textureAsset).use { stream ->
+                        BitmapFactory.decodeStream(stream)?.asImageBitmap()
+                    }
+                }.getOrNull()
+            }
+        }
+    }
+    val equipped = item == null || item.locallyRendered
+    Surface(
+        modifier = modifier.clickable(enabled = equipped, onClick = onClick),
+        shape = RoundedCornerShape(0.dp),
+        color = if (selected) accent.copy(alpha = 0.18f) else AerixSurface.panelRaised.copy(alpha = if (equipped) 0.72f else 0.45f),
+        border = BorderStroke(AerixSpacing.hairline, if (selected) accent else AerixSurface.borderSoft)
+    ) {
+        Column(
+            Modifier.fillMaxWidth().padding(6.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            if (bitmap != null) {
+                Image(bitmap, contentDescription = item?.name, contentScale = ContentScale.Fit,
+                    modifier = Modifier.size(48.dp).clip(RoundedCornerShape(0.dp)))
+            } else {
+                Box(Modifier.size(48.dp).background(accent.copy(alpha = 0.13f)), contentAlignment = Alignment.Center) {
+                    Icon(painterResource(R.drawable.aerix_ic_styler_outlined), contentDescription = null,
+                        tint = if (selected) accent else AerixSurface.textSecondary, modifier = Modifier.size(24.dp))
+                }
+            }
+            Text(item?.name ?: "No headwear", color = AerixSurface.textPrimary, fontSize = 8.sp,
+                fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            item?.description?.takeIf { it.isNotBlank() }?.let { description ->
+                Text(description, color = AerixSurface.textSecondary, fontSize = 6.sp, lineHeight = 7.sp,
+                    maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
+            Text(
+                when {
+                    selected -> "EQUIPPED · LOCAL"
+                    item == null -> "RESTORE ORIGINAL SKIN"
+                    item.locallyRendered -> item.rarity.uppercase()
+                    else -> "CATALOG ONLY · NO RENDERER"
+                },
+                color = if (selected) accent else AerixSurface.textSecondary,
+                fontSize = 6.sp, fontFamily = FontFamily.Monospace, maxLines = 1, overflow = TextOverflow.Ellipsis
+            )
         }
     }
 }

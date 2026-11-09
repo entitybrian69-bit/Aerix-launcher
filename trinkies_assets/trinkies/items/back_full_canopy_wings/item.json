@@ -1,0 +1,39 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip"
+  ],
+  "attach": {
+    "bone": "body",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "back",
+  "description": "An original glasswing harness with a canopy glass finish, family-specific silhouette, and a wing flutter accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "id": "trinkies:back_full_canopy_wings",
+  "model": "model.bbmodel",
+  "name": "Canopy Glasswing Harness",
+  "palette": [
+    "#20281B",
+    "#2D3B28",
+    "#4E7048",
+    "#5E835D",
+    "#79997F",
+    "#D1DE83",
+    "#E6FFB8"
+  ],
+  "rarity": "epic",
+  "shape": "full_back_wings_3",
+  "tags": [
+    "canopy",
+    "wings",
+    "flight",
+    "glass"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

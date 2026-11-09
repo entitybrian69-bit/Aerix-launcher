@@ -1,0 +1,41 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip"
+  ],
+  "attach": {
+    "bone": "root",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "aura",
+  "description": "An original snowfall halo with a stardust glass finish, family-specific silhouette, and a aura rise accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "emissive_mask": "emissive.png",
+  "id": "trinkies:aura_full_stardust_snow",
+  "model": "model.bbmodel",
+  "name": "Stardust Snowfall Halo",
+  "palette": [
+    "#252C33",
+    "#373F4B",
+    "#63708D",
+    "#7D85A5",
+    "#A09FC1",
+    "#F1DEA2",
+    "#FFFDC6"
+  ],
+  "particle_sheet": "texture.png",
+  "rarity": "legendary",
+  "shape": "full_aura_snow_4",
+  "tags": [
+    "stardust",
+    "snow",
+    "halo",
+    "glass"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

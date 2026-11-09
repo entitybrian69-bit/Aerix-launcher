@@ -1,0 +1,609 @@
+{
+  "elements": [
+    {
+      "autouv": 0,
+      "color": 0,
+      "faces": {
+        "down": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            8,
+            8,
+            16,
+            16
+          ]
+        },
+        "east": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            8,
+            0,
+            16,
+            8
+          ]
+        },
+        "north": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            0,
+            0,
+            8,
+            8
+          ]
+        },
+        "south": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            16,
+            0,
+            24,
+            8
+          ]
+        },
+        "up": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            0,
+            8,
+            8,
+            16
+          ]
+        },
+        "west": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            24,
+            0,
+            32,
+            8
+          ]
+        }
+      },
+      "from": [
+        -4.5600000000000005,
+        -1,
+        -1
+      ],
+      "name": "vortex_low",
+      "origin": [
+        0.0,
+        2.0,
+        0.0
+      ],
+      "rotation": [
+        0,
+        0,
+        18
+      ],
+      "to": [
+        4.5600000000000005,
+        -0.4,
+        1
+      ],
+      "uuid": "f0183323-96d4-3dd9-3e57-c1eaf27bcee6"
+    },
+    {
+      "autouv": 0,
+      "color": 1,
+      "faces": {
+        "down": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            24,
+            16,
+            32,
+            24
+          ]
+        },
+        "east": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            24,
+            8,
+            32,
+            16
+          ]
+        },
+        "north": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            16,
+            8,
+            24,
+            16
+          ]
+        },
+        "south": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            0,
+            16,
+            8,
+            24
+          ]
+        },
+        "up": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            16,
+            16,
+            24,
+            24
+          ]
+        },
+        "west": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            8,
+            16,
+            16,
+            24
+          ]
+        }
+      },
+      "from": [
+        -3.5600000000000005,
+        2.3,
+        -1
+      ],
+      "name": "vortex_mid",
+      "origin": [
+        0.0,
+        2.0,
+        0.0
+      ],
+      "rotation": [
+        0,
+        0,
+        -18
+      ],
+      "to": [
+        3.5600000000000005,
+        2.9000000000000004,
+        1
+      ],
+      "uuid": "2642ee19-0373-a1da-c06d-e42e9f4f0f41"
+    },
+    {
+      "autouv": 0,
+      "color": 2,
+      "faces": {
+        "down": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            8,
+            0,
+            16,
+            8
+          ]
+        },
+        "east": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            8,
+            24,
+            16,
+            32
+          ]
+        },
+        "north": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            0,
+            24,
+            8,
+            32
+          ]
+        },
+        "south": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            16,
+            24,
+            24,
+            32
+          ]
+        },
+        "up": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            0,
+            0,
+            8,
+            8
+          ]
+        },
+        "west": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            24,
+            24,
+            32,
+            32
+          ]
+        }
+      },
+      "from": [
+        -2.5600000000000005,
+        4.3,
+        -1
+      ],
+      "name": "vortex_high",
+      "origin": [
+        0.0,
+        2.0,
+        0.0
+      ],
+      "rotation": [
+        0,
+        0,
+        18
+      ],
+      "to": [
+        2.5600000000000005,
+        4.9,
+        1
+      ],
+      "uuid": "44076ba7-9ec7-80fc-f222-143e26712910"
+    },
+    {
+      "autouv": 0,
+      "color": 3,
+      "faces": {
+        "down": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            24,
+            8,
+            32,
+            16
+          ]
+        },
+        "east": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            24,
+            0,
+            32,
+            8
+          ]
+        },
+        "north": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            16,
+            0,
+            24,
+            8
+          ]
+        },
+        "south": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            0,
+            8,
+            8,
+            16
+          ]
+        },
+        "up": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            16,
+            8,
+            24,
+            16
+          ]
+        },
+        "west": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            8,
+            8,
+            16,
+            16
+          ]
+        }
+      },
+      "from": [
+        -0.6,
+        2.3,
+        1.5
+      ],
+      "name": "vortex_core",
+      "origin": [
+        0.0,
+        2.0,
+        0.0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "to": [
+        0.6,
+        3.5999999999999996,
+        2.2
+      ],
+      "uuid": "7e8d7509-b2a2-dda8-fb04-75c90533d173"
+    },
+    {
+      "autouv": 0,
+      "color": 4,
+      "faces": {
+        "down": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            8,
+            24,
+            16,
+            32
+          ]
+        },
+        "east": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            8,
+            16,
+            16,
+            24
+          ]
+        },
+        "north": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            0,
+            16,
+            8,
+            24
+          ]
+        },
+        "south": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            16,
+            16,
+            24,
+            24
+          ]
+        },
+        "up": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            0,
+            24,
+            8,
+            32
+          ]
+        },
+        "west": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            24,
+            16,
+            32,
+            24
+          ]
+        }
+      },
+      "from": [
+        -0.30000000000000004,
+        2.4,
+        3.15
+      ],
+      "name": "theme_detail_2",
+      "origin": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "to": [
+        0.30999999999999994,
+        2.9,
+        3.65
+      ],
+      "uuid": "ae9f6f72-503f-c407-8656-d79c49d43d29"
+    }
+  ],
+  "meta": {
+    "box_uv": false,
+    "format_version": "4.9",
+    "model_format": "free"
+  },
+  "model_identifier": "trinkies:aura_full_ember_vortex",
+  "name": "Ember Violet Vortex",
+  "outliner": [
+    {
+      "autouv": 0,
+      "children": [
+        "f0183323-96d4-3dd9-3e57-c1eaf27bcee6",
+        "2642ee19-0373-a1da-c06d-e42e9f4f0f41",
+        "44076ba7-9ec7-80fc-f222-143e26712910",
+        "7e8d7509-b2a2-dda8-fb04-75c90533d173"
+      ],
+      "color": 0,
+      "export": true,
+      "locked": false,
+      "name": "aura_orbit",
+      "origin": [
+        0.0,
+        2.0,
+        0.0
+      ],
+      "uuid": "eb8227bc-f019-93ba-5532-52ab662a9f2b",
+      "visibility": true
+    },
+    {
+      "autouv": 0,
+      "children": [],
+      "color": 1,
+      "export": true,
+      "locked": false,
+      "name": "body",
+      "origin": [
+        0.0,
+        2.0,
+        0.0
+      ],
+      "uuid": "3f7c1416-87b3-4c39-5687-2d9464ef4b87",
+      "visibility": true
+    },
+    {
+      "autouv": 0,
+      "children": [],
+      "color": 2,
+      "export": true,
+      "locked": false,
+      "name": "head",
+      "origin": [
+        0.0,
+        12.0,
+        0.0
+      ],
+      "uuid": "7ba20d05-6395-3a7a-e9a7-91f6e55b5698",
+      "visibility": true
+    },
+    {
+      "autouv": 0,
+      "children": [],
+      "color": 3,
+      "export": true,
+      "locked": false,
+      "name": "left_arm",
+      "origin": [
+        5.0,
+        6.0,
+        0.0
+      ],
+      "uuid": "b71c3e4a-8aaa-44e8-371d-729f8f7b90f0",
+      "visibility": true
+    },
+    {
+      "autouv": 0,
+      "children": [],
+      "color": 4,
+      "export": true,
+      "locked": false,
+      "name": "left_leg",
+      "origin": [
+        1.9,
+        -4.0,
+        -0.1
+      ],
+      "uuid": "575dd5eb-566e-caf0-2d04-78f9be4d992b",
+      "visibility": true
+    },
+    {
+      "autouv": 0,
+      "children": [],
+      "color": 5,
+      "export": true,
+      "locked": false,
+      "name": "right_arm",
+      "origin": [
+        -5.0,
+        6.0,
+        0.0
+      ],
+      "uuid": "257406d4-372a-b25d-b00b-9de24147fca1",
+      "visibility": true
+    },
+    {
+      "autouv": 0,
+      "children": [],
+      "color": 6,
+      "export": true,
+      "locked": false,
+      "name": "right_leg",
+      "origin": [
+        -1.9,
+        -4.0,
+        -0.1
+      ],
+      "uuid": "c5979e2b-ccd5-7ab6-128c-69fa2459624b",
+      "visibility": true
+    },
+    {
+      "autouv": 0,
+      "children": [
+        "ae9f6f72-503f-c407-8656-d79c49d43d29"
+      ],
+      "color": 7,
+      "export": true,
+      "locked": false,
+      "name": "root",
+      "origin": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "uuid": "0b393c33-fff2-5328-d58e-16da12be0849",
+      "visibility": true
+    }
+  ],
+  "resolution": {
+    "height": 32,
+    "width": 32
+  },
+  "textures": [
+    {
+      "folder": "",
+      "group": "",
+      "height": 32,
+      "id": "0",
+      "name": "texture.png",
+      "namespace": "",
+      "particle": false,
+      "path": "texture.png",
+      "saved": true,
+      "source": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAADNklEQVR42s1XMWvbUBD+JLJ6MSZehIhpMZQsGUowxMWE4NGmnWRwRy+BEsjoQDIkQ8ZACWTxmIA8NVSjCamJhhA6hIIXkWDXaDEYLfoB6hA/5fx0kt24pT0QNhx639297747KT87x4Ge9cHZcJTCzekltNUV1u/2BtBWV5DbXGP9/et7nH35jko+w/otZ4yl/vU9wBygF3RgNITljFGRfPXzHVx8/BwGQa3UrKJ7/BW5zTW4vQFcz4flPPnMu0PU1g9QyWdgOWO4ng+Vi0wv6BjeDtmoBbi2ugLLGceC96/vp3wyuDA1DlzP+pFDKHhS5vOCRwKg4MNR6o+A251GLLjdaTwH8FLw+tFWLHj9aAvFcosFN+8OUSy3ngJIAjfbRiy42TZwsX/FgpeaVVzsX0FLp1jw2voBAEAx3rwKktrE9fgWpaalU3ybzvGuspFdDpIO2C7kEnXg3af3WERHVAFk3h2GEbueH/63nDFKzWpYfrc3CB/LGU9d23CUmnr0rB+Wn77n9gYoNauwnPFTAPbDCWrrB9DSqUjZZnGgaz6y3NELOrrmIyr5TJS4RMhUu9NA8fUue2d2p4Ga0ebZf76DmtFGbnONBRdCJhOQggOAWiy32Mzth5OwhZIykNk/j4pGhIgFn1RlVgZJ4HRIye8JYkakmILPyoC2rwxOpZwDF1VVNrLLARYwLZ3CIjqifNszgkXmuev5WERHljgilZrV53lP5nmo4a93p4grfrnrE/tE/XwnHErUp8ZNNm7eCw0XGdPM5+EOV0mVAxe2/eEtO0BkrZfBaWBCyCgBRWJm23gOQAYXK1UcOBUrOfMwsImQyeyv5DOhkKlx4IIXYqHgWs/uNFAst/jAJkLGtZ64EtfzoYqFggMXCwUFD8s3WSi4skeuhAEX78wcx3/blP/iu0AnS6V8QP1oCzWjzR4ifNvM9ZWaVdycXkZ0hJLa9XwowY+9QB6nVM9jwSVhoVUSpHZ7A5zd9qfbknSU6/lQu+Zj7GSL88VNNq6jKJe4dn7xl9G84ILtcVqiilL/DjiVaNFetOyy0TuXA1PpSjVv5jInaOby+kaFjA6wSj4Ds238+++CX9Ryxsy7kYRIAAAAAElFTkSuQmCC",
+      "use_as_default": true,
+      "uuid": "25229688-7084-7a9e-6229-99f55295ab37",
+      "uv_height": 32,
+      "uv_width": 32,
+      "width": 32
+    }
+  ],
+  "variable_placeholders": "",
+  "visible_box": [
+    1,
+    1,
+    1
+  ]
+}

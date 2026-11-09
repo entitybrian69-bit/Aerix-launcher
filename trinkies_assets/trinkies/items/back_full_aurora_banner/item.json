@@ -1,0 +1,40 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip"
+  ],
+  "attach": {
+    "bone": "body",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "back",
+  "description": "An original sky banner with a aurora cloth finish, family-specific silhouette, and a ribbon sway accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "emissive_mask": "emissive.png",
+  "id": "trinkies:back_full_aurora_banner",
+  "model": "model.bbmodel",
+  "name": "Aurora Sky Banner",
+  "palette": [
+    "#162A24",
+    "#223D38",
+    "#3B746E",
+    "#518888",
+    "#70939F",
+    "#9BF0D2",
+    "#C2FFF6"
+  ],
+  "rarity": "rare",
+  "shape": "full_back_banner_0",
+  "tags": [
+    "aurora",
+    "banner",
+    "ribbon",
+    "cloth"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

@@ -1,0 +1,40 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip",
+    "signature"
+  ],
+  "attach": {
+    "bone": "root",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "pet",
+  "description": "An original clockwork sprout bot with a saffron metal finish, family-specific silhouette, and a pet scuttle accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "id": "trinkies:pet_full_saffron_bot",
+  "model": "model.bbmodel",
+  "name": "Saffron Clockwork Sprout Bot",
+  "palette": [
+    "#3C2015",
+    "#583621",
+    "#A66B32",
+    "#C29653",
+    "#E3D584",
+    "#FFE083",
+    "#FFFCAB"
+  ],
+  "rarity": "uncommon",
+  "shape": "full_pet_bot_4",
+  "tags": [
+    "saffron",
+    "robot",
+    "sprout",
+    "metal"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

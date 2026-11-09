@@ -1,0 +1,41 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip"
+  ],
+  "attach": {
+    "bone": "root",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "aura",
+  "description": "An original violet vortex with a ember crystal finish, family-specific silhouette, and a aura orbit accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "emissive_mask": "emissive.png",
+  "id": "trinkies:aura_full_ember_vortex",
+  "model": "model.bbmodel",
+  "name": "Ember Violet Vortex",
+  "palette": [
+    "#3B1716",
+    "#572923",
+    "#A44F37",
+    "#C07A57",
+    "#E1BB87",
+    "#FFD27A",
+    "#FFF3A5"
+  ],
+  "particle_sheet": "texture.png",
+  "rarity": "legendary",
+  "shape": "full_aura_vortex_2",
+  "tags": [
+    "ember",
+    "vortex",
+    "spiral",
+    "crystal"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

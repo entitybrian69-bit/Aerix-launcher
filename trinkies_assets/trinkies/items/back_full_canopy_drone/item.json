@@ -1,0 +1,39 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip"
+  ],
+  "attach": {
+    "bone": "body",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "back",
+  "description": "An original bell drone with a canopy metal finish, family-specific silhouette, and a drone orbit accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "id": "trinkies:back_full_canopy_drone",
+  "model": "model.bbmodel",
+  "name": "Canopy Bell Drone",
+  "palette": [
+    "#20281B",
+    "#2D3B28",
+    "#4E7048",
+    "#5E835D",
+    "#79997F",
+    "#D1DE83",
+    "#E6FFB8"
+  ],
+  "rarity": "rare",
+  "shape": "full_back_drone_3",
+  "tags": [
+    "canopy",
+    "drone",
+    "clockwork",
+    "metal"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

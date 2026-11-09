@@ -1,0 +1,40 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip",
+    "play"
+  ],
+  "attach": {
+    "bone": "right_arm",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "emote",
+  "description": "An original ribbon dance with a origami cloth finish, family-specific silhouette, and a emote cheer accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "id": "trinkies:emote_full_origami_dance",
+  "model": "model.bbmodel",
+  "name": "Origami Ribbon Dance",
+  "palette": [
+    "#332B24",
+    "#4B4235",
+    "#8D8060",
+    "#A59D7A",
+    "#BFC19C",
+    "#C4ECD1",
+    "#E2FFF1"
+  ],
+  "rarity": "common",
+  "shape": "full_emote_dance_1",
+  "tags": [
+    "origami",
+    "dance",
+    "ribbon",
+    "cloth"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

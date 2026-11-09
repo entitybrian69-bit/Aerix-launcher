@@ -1,0 +1,40 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip"
+  ],
+  "attach": {
+    "bone": "body",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "back",
+  "description": "An original clockwork wingpack with a aurora metal finish, family-specific silhouette, and a wing flutter accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "emissive_mask": "emissive.png",
+  "id": "trinkies:back_full_aurora_wingpack",
+  "model": "model.bbmodel",
+  "name": "Aurora Clockwork Wingpack",
+  "palette": [
+    "#162A24",
+    "#223D38",
+    "#3B746E",
+    "#518888",
+    "#70939F",
+    "#9BF0D2",
+    "#C2FFF6"
+  ],
+  "rarity": "epic",
+  "shape": "full_back_wingpack_0",
+  "tags": [
+    "aurora",
+    "wingpack",
+    "gear",
+    "metal"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

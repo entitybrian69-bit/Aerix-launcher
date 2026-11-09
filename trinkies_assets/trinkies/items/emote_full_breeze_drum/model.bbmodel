@@ -1,0 +1,593 @@
+{
+  "elements": [
+    {
+      "autouv": 0,
+      "color": 0,
+      "faces": {
+        "down": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            16,
+            16,
+            32,
+            32
+          ]
+        },
+        "east": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            16,
+            0,
+            32,
+            16
+          ]
+        },
+        "north": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ]
+        },
+        "south": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            32,
+            0,
+            48,
+            16
+          ]
+        },
+        "up": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            0,
+            16,
+            16,
+            32
+          ]
+        },
+        "west": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            48,
+            0,
+            64,
+            16
+          ]
+        }
+      },
+      "from": [
+        -3.4320000000000004,
+        -2.6,
+        1.5
+      ],
+      "name": "drum_body",
+      "origin": [
+        0.0,
+        2.0,
+        0.0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "to": [
+        3.4320000000000004,
+        2.6,
+        4.0
+      ],
+      "uuid": "ed84f4c4-8efc-19e2-0d18-f1ddd7dd5f9f"
+    },
+    {
+      "autouv": 0,
+      "color": 1,
+      "faces": {
+        "down": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            48,
+            32,
+            64,
+            48
+          ]
+        },
+        "east": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            48,
+            16,
+            64,
+            32
+          ]
+        },
+        "north": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            32,
+            16,
+            48,
+            32
+          ]
+        },
+        "south": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            0,
+            32,
+            16,
+            48
+          ]
+        },
+        "up": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            32,
+            32,
+            48,
+            48
+          ]
+        },
+        "west": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            16,
+            32,
+            32,
+            48
+          ]
+        }
+      },
+      "from": [
+        -3.6959999999999997,
+        2.2,
+        1.6
+      ],
+      "name": "drum_head",
+      "origin": [
+        0.0,
+        2.0,
+        0.0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "to": [
+        3.6959999999999997,
+        2.9,
+        4.1
+      ],
+      "uuid": "d67f7cc4-e9b0-fd8f-ebba-ff371e736ea2"
+    },
+    {
+      "autouv": 0,
+      "color": 2,
+      "faces": {
+        "down": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            16,
+            0,
+            32,
+            16
+          ]
+        },
+        "east": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            16,
+            48,
+            32,
+            64
+          ]
+        },
+        "north": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            0,
+            48,
+            16,
+            64
+          ]
+        },
+        "south": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            32,
+            48,
+            48,
+            64
+          ]
+        },
+        "up": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ]
+        },
+        "west": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            48,
+            48,
+            64,
+            64
+          ]
+        }
+      },
+      "from": [
+        -3.2,
+        2.8,
+        1.0
+      ],
+      "name": "stick_left",
+      "origin": [
+        0.0,
+        2.0,
+        0.0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "to": [
+        -2.7,
+        7.260000000000001,
+        1.4
+      ],
+      "uuid": "70c1e3dc-9d93-c453-48a1-21f999897706"
+    },
+    {
+      "autouv": 0,
+      "color": 3,
+      "faces": {
+        "down": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            48,
+            16,
+            64,
+            32
+          ]
+        },
+        "east": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            48,
+            0,
+            64,
+            16
+          ]
+        },
+        "north": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            32,
+            0,
+            48,
+            16
+          ]
+        },
+        "south": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            0,
+            16,
+            16,
+            32
+          ]
+        },
+        "up": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            32,
+            16,
+            48,
+            32
+          ]
+        },
+        "west": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            16,
+            16,
+            32,
+            32
+          ]
+        }
+      },
+      "from": [
+        2.7,
+        2.8,
+        1.0
+      ],
+      "name": "stick_right",
+      "origin": [
+        0.0,
+        2.0,
+        0.0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "to": [
+        3.2,
+        7.260000000000001,
+        1.4
+      ],
+      "uuid": "a0f53e94-25f9-f1ed-706e-88288ae69705"
+    },
+    {
+      "autouv": 0,
+      "color": 4,
+      "faces": {
+        "down": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            16,
+            48,
+            32,
+            64
+          ]
+        },
+        "east": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            16,
+            32,
+            32,
+            48
+          ]
+        },
+        "north": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            0,
+            32,
+            16,
+            48
+          ]
+        },
+        "south": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            32,
+            32,
+            48,
+            48
+          ]
+        },
+        "up": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            0,
+            48,
+            16,
+            64
+          ]
+        },
+        "west": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            48,
+            32,
+            64,
+            48
+          ]
+        }
+      },
+      "from": [
+        0.7,
+        3.3,
+        3.0
+      ],
+      "name": "theme_detail_4",
+      "origin": [
+        0.0,
+        2.0,
+        0.0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "to": [
+        1.47,
+        4.470000000000001,
+        3.5
+      ],
+      "uuid": "8c9cacee-1c13-2143-784d-c6e55963b1dd"
+    }
+  ],
+  "meta": {
+    "box_uv": false,
+    "format_version": "4.9",
+    "model_format": "free"
+  },
+  "model_identifier": "trinkies:emote_full_breeze_drum",
+  "name": "Breeze Pocket Drumline",
+  "outliner": [
+    {
+      "autouv": 0,
+      "children": [
+        "ed84f4c4-8efc-19e2-0d18-f1ddd7dd5f9f",
+        "d67f7cc4-e9b0-fd8f-ebba-ff371e736ea2",
+        "70c1e3dc-9d93-c453-48a1-21f999897706",
+        "a0f53e94-25f9-f1ed-706e-88288ae69705",
+        "8c9cacee-1c13-2143-784d-c6e55963b1dd"
+      ],
+      "color": 0,
+      "export": true,
+      "locked": false,
+      "name": "body",
+      "origin": [
+        0.0,
+        2.0,
+        0.0
+      ],
+      "uuid": "44f76565-9929-f2c9-4d7a-360150efbd0f",
+      "visibility": true
+    },
+    {
+      "autouv": 0,
+      "children": [],
+      "color": 1,
+      "export": true,
+      "locked": false,
+      "name": "head",
+      "origin": [
+        0.0,
+        12.0,
+        0.0
+      ],
+      "uuid": "e13424eb-4bfe-c024-9416-c4d6508a8eac",
+      "visibility": true
+    },
+    {
+      "autouv": 0,
+      "children": [],
+      "color": 2,
+      "export": true,
+      "locked": false,
+      "name": "left_arm",
+      "origin": [
+        5.0,
+        6.0,
+        0.0
+      ],
+      "uuid": "a99d8ff5-6802-1f0b-7f9b-cfcf6aca78c4",
+      "visibility": true
+    },
+    {
+      "autouv": 0,
+      "children": [],
+      "color": 3,
+      "export": true,
+      "locked": false,
+      "name": "left_leg",
+      "origin": [
+        1.9,
+        -4.0,
+        -0.1
+      ],
+      "uuid": "75d0c44f-d9f9-f5b0-230d-f954811e5446",
+      "visibility": true
+    },
+    {
+      "autouv": 0,
+      "children": [],
+      "color": 4,
+      "export": true,
+      "locked": false,
+      "name": "right_arm",
+      "origin": [
+        -5.0,
+        6.0,
+        0.0
+      ],
+      "uuid": "43050f24-7e37-7fae-af36-6805eee0994d",
+      "visibility": true
+    },
+    {
+      "autouv": 0,
+      "children": [],
+      "color": 5,
+      "export": true,
+      "locked": false,
+      "name": "right_leg",
+      "origin": [
+        -1.9,
+        -4.0,
+        -0.1
+      ],
+      "uuid": "3d8cd74d-c693-165b-0878-1831c9997909",
+      "visibility": true
+    },
+    {
+      "autouv": 0,
+      "children": [],
+      "color": 6,
+      "export": true,
+      "locked": false,
+      "name": "root",
+      "origin": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "uuid": "cccbcafa-9791-3245-2f54-baed02830b3f",
+      "visibility": true
+    }
+  ],
+  "resolution": {
+    "height": 64,
+    "width": 64
+  },
+  "textures": [
+    {
+      "folder": "",
+      "group": "",
+      "height": 64,
+      "id": "0",
+      "name": "texture.png",
+      "namespace": "",
+      "particle": false,
+      "path": "texture.png",
+      "saved": true,
+      "source": "data:image/png;base64,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",
+      "use_as_default": true,
+      "uuid": "5127e079-9245-0087-eb64-a3e0b65b929f",
+      "uv_height": 64,
+      "uv_width": 64,
+      "width": 64
+    }
+  ],
+  "variable_placeholders": "",
+  "visible_box": [
+    1,
+    1,
+    1
+  ]
+}

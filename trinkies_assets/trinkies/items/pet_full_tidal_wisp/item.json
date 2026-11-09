@@ -1,0 +1,39 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip",
+    "signature"
+  ],
+  "attach": {
+    "bone": "root",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "pet",
+  "description": "An original crystal wisp with a tidal crystal finish, family-specific silhouette, and a pet float accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "id": "trinkies:pet_full_tidal_wisp",
+  "model": "model.bbmodel",
+  "name": "Tidal Crystal Wisp",
+  "palette": [
+    "#153131",
+    "#214549",
+    "#367889",
+    "#5187A0",
+    "#7795BC",
+    "#B9F3EF",
+    "#D6F9FF"
+  ],
+  "rarity": "epic",
+  "shape": "full_pet_wisp_3",
+  "tags": [
+    "tidal",
+    "wisp",
+    "crystal"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

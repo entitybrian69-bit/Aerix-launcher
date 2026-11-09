@@ -1,0 +1,41 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip"
+  ],
+  "attach": {
+    "bone": "root",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "aura",
+  "description": "An original star silt trail with a ember dust finish, family-specific silhouette, and a aura trail accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "emissive_mask": "emissive.png",
+  "id": "trinkies:aura_full_ember_star",
+  "model": "model.bbmodel",
+  "name": "Ember Star Silt Trail",
+  "palette": [
+    "#3B1716",
+    "#572923",
+    "#A44F37",
+    "#C07A57",
+    "#E1BB87",
+    "#FFD27A",
+    "#FFF3A5"
+  ],
+  "particle_sheet": "texture.png",
+  "rarity": "uncommon",
+  "shape": "full_aura_star_2",
+  "tags": [
+    "ember",
+    "stars",
+    "trail",
+    "dust"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

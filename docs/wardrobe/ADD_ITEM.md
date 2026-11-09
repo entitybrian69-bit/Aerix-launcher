@@ -1,10 +1,10 @@
-# Adding a Trinkies item
+# Adding or revising a Trinkies item
 
-The current generator is intentionally gated to the 30-item vertical slice. Hold new catalog entries and the remaining 270 until Steps 1–3 in the continuation prompt are verified or explicitly BLOCKED with documented attempts and reasons. Step 4 additionally requires the style lock, full roster, variety lint, and batch-level validation before generation.
+The current generated roster is a fixed **300-item catalog**: 50 entries in each of six categories. The full pack passes structural validation, but generated assets are not automatically considered art-approved or verified in Minecraft. Do not edit generated `trinkies_assets/trinkies/items/**` files directly; the deterministic Python sources are authoritative.
 
-## Generator workflow (current supported path)
+## Regenerate the full catalog
 
-1. Install the pinned toolchain in an isolated environment:
+1. Set up Python 3.11+ and install the pinned asset dependencies:
 
    ```sh
    python3 -m venv .venv-trinkies
@@ -12,26 +12,26 @@ The current generator is intentionally gated to the 30-item vertical slice. Hold
    python -m pip install -r tools/trinkies_assets/requirements.txt
    ```
 
-2. Add an original hand-authored row in `tools/trinkies_assets/generate_slice.py`: choose a unique category/slug, short concept, tags, material recipe, two curated base/accent colors, attachment, animation recipe, and whether it needs emissive output. Add a distinct cube silhouette to `shape_parts()`; do not produce a palette-only variant.
-3. Keep the linter budgets in mind: Hats 40 cubes/64×64, Suits 80/128×128, Back & Wings 60/128×128, Pets 70/128×128, Emote props 30/64×64, Auras 32×32 particle sheet (the current slice additionally caps its model at 24 cubes). Provide at least five ramp colors and a loop or one-shot animation appropriate to the item.
-4. Generate and validate:
+2. Revise an original slice concept in `tools/trinkies_assets/generate_slice.py`, or revise one of the 270 additional family/theme recipes in `tools/trinkies_assets/full_catalog.py`. For a new row or category, update the fixed 300-item/50-per-category invariants in `full_catalog.py`, `generate_full_catalog.py`, `validate_catalog.py`, the smoke tests, and the CI workflow together. New designs need distinct silhouettes/geometry, not only palette changes.
+3. Regenerate and validate the **full** roster:
 
    ```sh
-   python tools/trinkies_assets/generate_slice.py
-   python tools/trinkies_assets/validate_catalog.py --require-slice
+   python tools/trinkies_assets/generate_full_catalog.py
+   python tools/trinkies_assets/validate_catalog.py --require-full
    ```
 
-   The first command regenerates the fixed 30-item slice and contact sheets; it is not yet a general-purpose append-only CLI. Review `trinkies_assets/trinkies/manifest.json` and keep the compressed pack below 15 MiB.
-5. Open the `.bbmodel` in Blockbench, inspect the external PNG and pivots, and render the item in the real launcher preview and Minecraft on classic/slim players before marking it accepted. The current offline test does not do those steps.
+   `generate_full_catalog.py` emits all item folders, `catalog.json`, the SHA-256 manifest, `docs/wardrobe/ROSTER.md`, and the 300-item texture sheet. It also regenerates the original vertical-slice reference sheets. `generate_slice.py` alone writes only the original 30-item slice and must not be used to refresh the full pack.
+4. Inspect the generated diffs, ensure no user-authored files were pruned, and keep the compressed asset pack below 15 MiB. The full generator prunes only item folders listed in the previous manifest.
+5. Open changed `.bbmodel` files in Blockbench, inspect the UVs and pivots, then render and review them in Minecraft on classic/slim players before calling them accepted. The offline validator is structural only; it does not review art or render in-game.
 
 ## Hand-editing a model in Blockbench
 
-- Copy an item directory as a starting point only for the file structure; create a distinct silhouette and palette.
+- Treat a generated directory as the file structure only; create a distinct silhouette and palette.
 - Use free-format cubes grouped under the shared rig bones (`head`, `body`, arms, legs, `root`) or named extra bones. Keep coordinates in model pixels and update `attach` offsets.
-- Save a standalone `texture.png` in the item directory. The `.bbmodel` must embed byte-identical texture data as well as use the same UV texture size; `validate_catalog.py` checks equality and UV bounds/coverage.
-- Keep six faces defined per cube, avoid zero-volume/duplicate cubes, check z-fighting and unintended intersections, and update the named animation tracks after changing bones.
-- Update `item.json`, `animations.json`, `catalog.json`, and the SHA-256 manifest through a reviewed catalog build step. A generic hand-edit/build command is not provided yet; do not edit only one copy of the texture.
+- Save a standalone `texture.png` in the item directory. The `.bbmodel` must embed byte-identical texture data and use the same UV texture size; `validate_catalog.py` checks equality and UV bounds/coverage.
+- Keep six faces defined per cube, avoid zero-volume/duplicate cubes, check z-fighting and unintended intersections, and update named animation tracks after changing bones.
+- Update catalog output only through the generator. Do not edit one copy of a texture or a manifest hash by hand.
 
 ## Gate before marking done
 
-A passing schema/linter is only a structural pass. Also require: Blockbench opens the file; silhouette and palette are distinct; texture/UV/emissive checks pass; animation loops cleanly at the render partial tick; classic and slim player render correctly while standing, sneaking, swimming, wearing armor, and turning; no renderer-specific APIs are used; in-game screenshots exist; and device performance is measured. Record failures instead of marking the item complete.
+A passing schema/linter is only a structural pass. Also require: Blockbench opens the file; silhouette and palette are distinct; texture/UV/emissive checks pass; animation loops cleanly at the render partial tick; classic and slim players render correctly while standing, sneaking, swimming, wearing armor, and turning; no renderer-specific APIs are used; in-game screenshots exist; and device performance is measured. Record failures instead of marking the item complete.

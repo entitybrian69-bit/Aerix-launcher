@@ -1,0 +1,504 @@
+{
+  "elements": [
+    {
+      "autouv": 0,
+      "color": 0,
+      "faces": {
+        "down": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            16,
+            16,
+            32,
+            32
+          ]
+        },
+        "east": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            16,
+            0,
+            32,
+            16
+          ]
+        },
+        "north": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ]
+        },
+        "south": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            32,
+            0,
+            48,
+            16
+          ]
+        },
+        "up": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            0,
+            16,
+            16,
+            32
+          ]
+        },
+        "west": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            48,
+            0,
+            64,
+            16
+          ]
+        }
+      },
+      "from": [
+        -1.3,
+        -1.3,
+        2
+      ],
+      "name": "twirl_core",
+      "origin": [
+        0.0,
+        2.0,
+        0.0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "to": [
+        1.3,
+        1.3,
+        3
+      ],
+      "uuid": "0a15b3d2-b9b3-ad5d-c06e-3fcda8314ae8"
+    },
+    {
+      "autouv": 0,
+      "color": 1,
+      "faces": {
+        "down": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            48,
+            32,
+            64,
+            48
+          ]
+        },
+        "east": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            48,
+            16,
+            64,
+            32
+          ]
+        },
+        "north": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            32,
+            16,
+            48,
+            32
+          ]
+        },
+        "south": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            0,
+            32,
+            16,
+            48
+          ]
+        },
+        "up": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            32,
+            32,
+            48,
+            48
+          ]
+        },
+        "west": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            16,
+            32,
+            32,
+            48
+          ]
+        }
+      },
+      "from": [
+        -4.64,
+        -0.5,
+        2
+      ],
+      "name": "twirl_ribbon_a",
+      "origin": [
+        0.0,
+        2.0,
+        0.0
+      ],
+      "rotation": [
+        0,
+        0,
+        25
+      ],
+      "to": [
+        4.64,
+        0.5,
+        2.7
+      ],
+      "uuid": "436257a7-cb99-463f-30ea-e4b49be6cdd5"
+    },
+    {
+      "autouv": 0,
+      "color": 2,
+      "faces": {
+        "down": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            16,
+            0,
+            32,
+            16
+          ]
+        },
+        "east": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            16,
+            48,
+            32,
+            64
+          ]
+        },
+        "north": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            0,
+            48,
+            16,
+            64
+          ]
+        },
+        "south": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            32,
+            48,
+            48,
+            64
+          ]
+        },
+        "up": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ]
+        },
+        "west": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            48,
+            48,
+            64,
+            64
+          ]
+        }
+      },
+      "from": [
+        -0.5,
+        -4.64,
+        2
+      ],
+      "name": "twirl_ribbon_b",
+      "origin": [
+        0.0,
+        2.0,
+        0.0
+      ],
+      "rotation": [
+        0,
+        0,
+        -25
+      ],
+      "to": [
+        0.5,
+        4.64,
+        2.7
+      ],
+      "uuid": "35a5a0a5-e99b-553b-a362-73886356284e"
+    },
+    {
+      "autouv": 0,
+      "color": 3,
+      "faces": {
+        "down": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            48,
+            16,
+            64,
+            32
+          ]
+        },
+        "east": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            48,
+            0,
+            64,
+            16
+          ]
+        },
+        "north": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            32,
+            0,
+            48,
+            16
+          ]
+        },
+        "south": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            0,
+            16,
+            16,
+            32
+          ]
+        },
+        "up": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            32,
+            16,
+            48,
+            32
+          ]
+        },
+        "west": {
+          "rotation": 0,
+          "texture": 0,
+          "uv": [
+            16,
+            16,
+            32,
+            32
+          ]
+        }
+      },
+      "from": [
+        -0.15000000000000002,
+        3.3,
+        3.0
+      ],
+      "name": "theme_detail_2",
+      "origin": [
+        0.0,
+        2.0,
+        0.0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "to": [
+        0.45999999999999996,
+        4.3100000000000005,
+        3.5
+      ],
+      "uuid": "550ab3dd-c809-2547-744a-61b25f6a275d"
+    }
+  ],
+  "meta": {
+    "box_uv": false,
+    "format_version": "4.9",
+    "model_format": "free"
+  },
+  "model_identifier": "trinkies:emote_full_starlight_twirl",
+  "name": "Starlight Moonlit Twirl",
+  "outliner": [
+    {
+      "autouv": 0,
+      "children": [
+        "0a15b3d2-b9b3-ad5d-c06e-3fcda8314ae8",
+        "436257a7-cb99-463f-30ea-e4b49be6cdd5",
+        "35a5a0a5-e99b-553b-a362-73886356284e",
+        "550ab3dd-c809-2547-744a-61b25f6a275d"
+      ],
+      "color": 0,
+      "export": true,
+      "locked": false,
+      "name": "body",
+      "origin": [
+        0.0,
+        2.0,
+        0.0
+      ],
+      "uuid": "f465264f-90d1-9931-d794-283149321eec",
+      "visibility": true
+    },
+    {
+      "autouv": 0,
+      "children": [],
+      "color": 1,
+      "export": true,
+      "locked": false,
+      "name": "head",
+      "origin": [
+        0.0,
+        12.0,
+        0.0
+      ],
+      "uuid": "97740087-e731-9701-25b4-d0ad2869980a",
+      "visibility": true
+    },
+    {
+      "autouv": 0,
+      "children": [],
+      "color": 2,
+      "export": true,
+      "locked": false,
+      "name": "left_arm",
+      "origin": [
+        5.0,
+        6.0,
+        0.0
+      ],
+      "uuid": "d0525370-4610-56dc-ddee-8a2eea9ae5e4",
+      "visibility": true
+    },
+    {
+      "autouv": 0,
+      "children": [],
+      "color": 3,
+      "export": true,
+      "locked": false,
+      "name": "left_leg",
+      "origin": [
+        1.9,
+        -4.0,
+        -0.1
+      ],
+      "uuid": "8ae15a50-3f3a-a421-2272-60696d88eefc",
+      "visibility": true
+    },
+    {
+      "autouv": 0,
+      "children": [],
+      "color": 4,
+      "export": true,
+      "locked": false,
+      "name": "right_arm",
+      "origin": [
+        -5.0,
+        6.0,
+        0.0
+      ],
+      "uuid": "b41fe9cc-ffd6-82e4-59df-cd0a54ddf2ed",
+      "visibility": true
+    },
+    {
+      "autouv": 0,
+      "children": [],
+      "color": 5,
+      "export": true,
+      "locked": false,
+      "name": "right_leg",
+      "origin": [
+        -1.9,
+        -4.0,
+        -0.1
+      ],
+      "uuid": "38c7cad2-4d71-804b-034a-e376c1189bf6",
+      "visibility": true
+    },
+    {
+      "autouv": 0,
+      "children": [],
+      "color": 6,
+      "export": true,
+      "locked": false,
+      "name": "root",
+      "origin": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "uuid": "edebd4cf-f2ce-035b-b736-b9efb77a7def",
+      "visibility": true
+    }
+  ],
+  "resolution": {
+    "height": 64,
+    "width": 64
+  },
+  "textures": [
+    {
+      "folder": "",
+      "group": "",
+      "height": 64,
+      "id": "0",
+      "name": "texture.png",
+      "namespace": "",
+      "particle": false,
+      "path": "texture.png",
+      "saved": true,
+      "source": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAHGUlEQVR42u2bT0jcRxTH3/7WmyALe/i5ioKYCGKgSdq0UJAFCfTkpYew69nm0FCiB8kePPZg8LAG8WLt1S5L2YuXHoIgQmAjSQgoQmRZ2OKfPQgieBR7sG95O783M2/mt81S2t8pcea38/vMe7833/dmfomVpT9uZmfOwOfa2OyH1x/eQyYdet1/et6ETDqEieFBr/sPGsfw5m0ZRkazXvfXazvQc9A4ho1N/gGev+iFqz9rsLHZz7bPzpzBL7/vAED0AbZKk/D02Sc4PW+y926VJuHeozJ77/raGLx6eQUHjWP23vW1MXj67BMAAFxeNKFe22m17e8twnRut+1veF1eNKFxtAr3Hv3c+n+gmx0b/PMXvTC/dK2Fs8FP53ZZy0nhJ4YHI79vggeAFjwdN/CFf/XyinVdKXwmHcLHd2VveLWPDX5/b7EFT/sEvvCzM2eRh0B43YXw+P73pcKuwV9eNKMT4AKv9qGW56xPLR/H7dU+h9tzXpbHyQ9c4TH6+7q92qe0PCAOeFyfb77/TetxOng6eYGr5dWrWslr4TPp0AgPADC/dC2yPHeVlgciq4AUfn9vEcanViAoFpLebg8AkFs40Vp+fW3MCF+t5I336twe23MLJ0bL41pvag82Nvu94YuFpPbds1l+qzSpdV+b29N2k+VtkwMAEOjczwZv0wE2eFwNXN1eBz8ymhW5PYU36gAbPAbEOPCqlSRuj/DqBN0qSzd4rQ6QwnMPIYXPpMO2B1Xh1d9W4ekE+VienQAXeFUIucLTPpzl6W+b4A+357zhIzrABZ72iQNfWh5wcnu1z/jUigieC4qH23OQmPjqu5s46SRKyjgXlcQuVyfGTgzduX8T5wG++PJJrHrA4wcPoZv1iB46k5gu6ma2cbQKw3d/gr5U2Opz63pZoxyu13ZaCQu9Pr4rQyYdQu/QmFiGqwWR0vIAzC9dW2W4zoMDNVd2gZfmAgivWqovFYJEiZoyTJMSxaVR5yHVSv52AuLAm3IB1QJv3pZZN7ZZvlhIsgFSokS//foJOy4q0QCXER94iQWo+6nRulrJg02J4iSpK4BEieJ7ro5L24PxqRVv+MPtOVEuoErWem3HmAvosk+cBKkS5d551SjamqANvnG0CuNTKyIL6GKCjwzH4omrDMdcQR03MMHr1lra7mIBW1T+XDmIcQKo5W2T08ks0Acex4gzbtBpy+vcXgLPldtMls+kQ6hW8t7jtk2Ai+XVPnHcvlhIasttNrfHmqDPuBEdYAt4FJ72QQv4uB/WBH3eeZy8kdGs17htOsAXnlrA5yGqlTxMDA96waMO4JZhCXybDpDAc3HhcHtOZAHORdECnBBCeK5NqgMk8K0YILG8TgfYLJBJhxEpKg2InASW6AAqfGzKNDF05/4NdPHqS4XQzXpE4ocff73p5v785UUTulmP6NHV3k/Pm9bNzmIhCeNT0Z0Zug9vKlcN3y2zscWkN9R2rEd4xwCfQoJtZ4YeQnAtVLrA6/J/CTxWpQPT5sPjBw/ZCC/ZmdFdtF11/U6IMZ3H6QqzgW1bSlfC5pY3Dp66t9pO2+KIMS66S6vSgWRbCkHVEjX9IZ3l8WFNJWqXHESnRHVB1gTfNgGSbSk6kG5nxua6qotSJSpxe06JSl43Lllq5QLSPTluuZHuzCCg2qcTSpT+Jv7bdBCrLRdw2ZnhLtedGQpxuD0ndnuTEqWQI6NZkQxv5QK4lPnAl5YHxEsd9kEYPKHh4/bSugTn9hEdoFNRNnjpCQ3OBV10QBx4SZU6sK3znEx20QGqd/yTIsgFXiuEVDguG+uECFLfbVd4eq8PPCuEdHDYWW2nr48r/Mhotm1P0hbwVHi816QDbPCsDuCuTDqMtFMhZFJ4Onh8NVAHSN95NShSHWDL/1X4aiUff3v8334l/v9e4O/vBQ4ax61yk8sZoXptB+o183aXLiHBXF6y5HLHZE7Pm1Ct5MVyWBVsbd8L0EFczwjZAqDtjNB0bld0LlB3RsgHHuNPQOF0ctgEj1HYpLlN2Vhu4QQy6RBef3jvDI9KlItFNvi2s8K0ysrtw+vguWxMtw/PwVcreW2EtsFTJaoGcQl866wwd8iA24fn4IuFZOReuv9vgufOB3B1hzhizAbPVoS4QTh40wkNGhB18LazwnFluAS+LxWazwrjA3Dw0s0JX3iJ5U1K1AaPSjSwBTxTu892mK5257IUmpSoJPuk3hFIoz0HT13UxfKZdNh2WNoHHr0DK1JSt9d+NeYKTw9Lu2ZjdIKwIuUDr+oAV/iIDqAS1waPfeJmYyYVZ4NHHeDq9kYdYHvnVe8wAUiysZHRrCjaq/CoA/pSodjyOFERHSA5rMjBFwtJbUZog6c6wBbtOXj67bDU8nhmOaIDOKVlg0cdwFlAAo/t6r0u8D5ur+Ys//nvBf4CNW9Tanrd0hAAAAAASUVORK5CYII=",
+      "use_as_default": true,
+      "uuid": "160f0887-140f-90a0-5b16-e9d766d88c5e",
+      "uv_height": 64,
+      "uv_width": 64,
+      "width": 64
+    }
+  ],
+  "variable_placeholders": "",
+  "visible_box": [
+    1,
+    1,
+    1
+  ]
+}

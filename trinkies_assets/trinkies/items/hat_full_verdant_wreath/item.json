@@ -1,0 +1,39 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip"
+  ],
+  "attach": {
+    "bone": "head",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "hat",
+  "description": "An original petal wreath with a verdant cloth finish, family-specific silhouette, and a circlet glint accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "id": "trinkies:hat_full_verdant_wreath",
+  "model": "model.bbmodel",
+  "name": "Verdant Petal Wreath",
+  "palette": [
+    "#19281B",
+    "#253B2B",
+    "#426F52",
+    "#57826B",
+    "#73988E",
+    "#D7ED8A",
+    "#E0FFB7"
+  ],
+  "rarity": "legendary",
+  "shape": "full_hat_wreath_2",
+  "tags": [
+    "verdant",
+    "wreath",
+    "petal",
+    "cloth"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

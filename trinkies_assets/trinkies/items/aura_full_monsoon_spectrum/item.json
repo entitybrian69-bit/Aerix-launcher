@@ -1,0 +1,41 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip"
+  ],
+  "attach": {
+    "bone": "root",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "aura",
+  "description": "An original prism spectrum with a monsoon glass finish, family-specific silhouette, and a aura trail accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "emissive_mask": "emissive.png",
+  "id": "trinkies:aura_full_monsoon_spectrum",
+  "model": "model.bbmodel",
+  "name": "Monsoon Prism Spectrum",
+  "palette": [
+    "#18353A",
+    "#264A55",
+    "#3D7EA1",
+    "#5C90BC",
+    "#8AA2DD",
+    "#B9ECF7",
+    "#D3EEFF"
+  ],
+  "particle_sheet": "texture.png",
+  "rarity": "epic",
+  "shape": "full_aura_spectrum_0",
+  "tags": [
+    "monsoon",
+    "prism",
+    "spectrum",
+    "glass"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

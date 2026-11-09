@@ -1,0 +1,39 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip"
+  ],
+  "attach": {
+    "bone": "body",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "back",
+  "description": "An original leaf glider with a aurora wood finish, family-specific silhouette, and a wing flutter accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "id": "trinkies:back_full_aurora_glider",
+  "model": "model.bbmodel",
+  "name": "Aurora Leaf Glider",
+  "palette": [
+    "#162A24",
+    "#223D38",
+    "#3B746E",
+    "#518888",
+    "#70939F",
+    "#9BF0D2",
+    "#C2FFF6"
+  ],
+  "rarity": "epic",
+  "shape": "full_back_glider_0",
+  "tags": [
+    "aurora",
+    "glider",
+    "leaves",
+    "wood"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

@@ -1,0 +1,41 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip",
+    "signature"
+  ],
+  "attach": {
+    "bone": "root",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "pet",
+  "description": "An original clockwork sprout bot with a moss metal finish, family-specific silhouette, and a pet scuttle accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "emissive_mask": "emissive.png",
+  "id": "trinkies:pet_full_moss_bot",
+  "model": "model.bbmodel",
+  "name": "Moss Clockwork Sprout Bot",
+  "palette": [
+    "#23281B",
+    "#323B28",
+    "#587048",
+    "#68835D",
+    "#7A9979",
+    "#D4E68D",
+    "#E3FFBC"
+  ],
+  "rarity": "epic",
+  "shape": "full_pet_bot_1",
+  "tags": [
+    "moss",
+    "robot",
+    "sprout",
+    "metal"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

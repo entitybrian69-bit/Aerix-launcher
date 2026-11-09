@@ -1,0 +1,41 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip",
+    "signature"
+  ],
+  "attach": {
+    "bone": "root",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "pet",
+  "description": "An original kite finch with a cinder feather finish, family-specific silhouette, and a pet flutter accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "emissive_mask": "emissive.png",
+  "id": "trinkies:pet_full_cinder_bird",
+  "model": "model.bbmodel",
+  "name": "Cinder Kite Finch",
+  "palette": [
+    "#1C1F21",
+    "#2A2C31",
+    "#4D515D",
+    "#5D606D",
+    "#74727F",
+    "#E0A68C",
+    "#FFE0BE"
+  ],
+  "rarity": "uncommon",
+  "shape": "full_pet_bird_2",
+  "tags": [
+    "cinder",
+    "bird",
+    "flight",
+    "feather"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

@@ -1,0 +1,41 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip",
+    "play"
+  ],
+  "attach": {
+    "bone": "right_arm",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "emote",
+  "description": "An original wayfinder salute with a origami leather finish, family-specific silhouette, and a emote wave accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "emissive_mask": "emissive.png",
+  "id": "trinkies:emote_full_origami_salute",
+  "model": "model.bbmodel",
+  "name": "Origami Wayfinder Salute",
+  "palette": [
+    "#332B24",
+    "#4B4235",
+    "#8D8060",
+    "#A59D7A",
+    "#BFC19C",
+    "#C4ECD1",
+    "#E2FFF1"
+  ],
+  "rarity": "uncommon",
+  "shape": "full_emote_salute_1",
+  "tags": [
+    "origami",
+    "salute",
+    "badge",
+    "leather"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

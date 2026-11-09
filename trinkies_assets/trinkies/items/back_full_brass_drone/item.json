@@ -1,0 +1,40 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip"
+  ],
+  "attach": {
+    "bone": "body",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "back",
+  "description": "An original bell drone with a brass metal finish, family-specific silhouette, and a drone orbit accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "emissive_mask": "emissive.png",
+  "id": "trinkies:back_full_brass_drone",
+  "model": "model.bbmodel",
+  "name": "Brass Bell Drone",
+  "palette": [
+    "#2F1F14",
+    "#453220",
+    "#826334",
+    "#98824D",
+    "#B2B072",
+    "#FFE08A",
+    "#FFFBAF"
+  ],
+  "rarity": "epic",
+  "shape": "full_back_drone_4",
+  "tags": [
+    "brass",
+    "drone",
+    "clockwork",
+    "metal"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

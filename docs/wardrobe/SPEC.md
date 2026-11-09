@@ -1,6 +1,6 @@
 # Trinkies contract and asset specification
 
-**Status:** v1 asset contract and generated JSON assets exist. Runtime readers, sampler, equipped-state writer, and in-game renderer are not yet implemented. The contract is deliberately versioned so the launcher and mod can share one catalog without quietly changing meanings.
+**Status:** The v1 contract and full 300-item asset catalog exist. The launcher has a cached catalog reader and an atomic per-instance equipped-state writer; hats are currently applied as launcher-side skin overlays. The Android source changes are not yet build-verified, the Fabric mod does not yet consume equipped state, and model samplers/renderers for catalog accessories remain unimplemented. The catalog is still marked unverified in-game.
 
 ## Cosmetic item JSON
 
@@ -57,7 +57,7 @@ Runtime requirements before any item can pass the game gate:
 4. Avoid per-frame allocations: cache parsed clips, bone tracks, and baked vertices when loading; keep render calls on the render thread.
 5. For loop clips, the linter checks equivalent start/end poses (rotation is compared modulo 360°). A passing structural loop test is not a visual animation review.
 
-The current 30-item pack has animation JSON and generated keyframe strips only. No runtime sampler is shipped yet.
+The full 300-item pack has animation JSON, generated model/texture assets, and slice-reference keyframe sheets. No runtime animation sampler is shipped yet; generated animation data is structural source material, not proof of in-game motion.
 
 ## Equipped state
 
@@ -75,7 +75,7 @@ The launcher's target path is `<instance game directory>/trinkies/equipped.json`
 }
 ```
 
-The launcher must validate each ID against `catalog.json`, write a sibling temporary file, flush it, and atomically rename it before launch. The mod must watch for changes with debounce and preserve the last valid state on parse failure. Current code does not yet write this file or consume it in-game.
+Before launching a supported instance, the launcher validates the selected hat ID against `catalog.json`, writes `<instance game directory>/trinkies/equipped.json` through a sibling temporary file, flushes and fsyncs it, then atomically renames it. The current writer snapshots the locally selected hat and leaves the other categories null until their renderers exist. The Fabric mod does not yet read/watch this file or preserve last-good state on parse failure; currently it is a validated launcher-side per-instance snapshot, not an in-game renderer input.
 
 ## Budgets
 

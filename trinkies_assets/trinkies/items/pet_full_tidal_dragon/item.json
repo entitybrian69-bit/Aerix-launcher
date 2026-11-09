@@ -1,0 +1,41 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip",
+    "signature"
+  ],
+  "attach": {
+    "bone": "root",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "pet",
+  "description": "An original pocket drake with a tidal scale finish, family-specific silhouette, and a pet glide accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "emissive_mask": "emissive.png",
+  "id": "trinkies:pet_full_tidal_dragon",
+  "model": "model.bbmodel",
+  "name": "Tidal Pocket Drake",
+  "palette": [
+    "#153131",
+    "#214549",
+    "#367889",
+    "#5187A0",
+    "#7795BC",
+    "#B9F3EF",
+    "#D6F9FF"
+  ],
+  "rarity": "epic",
+  "shape": "full_pet_dragon_3",
+  "tags": [
+    "tidal",
+    "dragon",
+    "tail",
+    "scale"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

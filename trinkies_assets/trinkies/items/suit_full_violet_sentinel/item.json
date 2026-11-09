@@ -1,0 +1,40 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip"
+  ],
+  "attach": {
+    "bone": "body",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "suit",
+  "description": "An original sentinel plate suit with a violet stone finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "id": "trinkies:suit_full_violet_sentinel",
+  "model": "model.bbmodel",
+  "name": "Violet Sentinel Plate Suit",
+  "palette": [
+    "#1B1A28",
+    "#2A273B",
+    "#51466F",
+    "#695B82",
+    "#8C7698",
+    "#D0A8F5",
+    "#F0C9FF"
+  ],
+  "rarity": "uncommon",
+  "shape": "full_suit_sentinel_3",
+  "suit_mode": "overlay",
+  "tags": [
+    "violet",
+    "sentinel",
+    "armor",
+    "stone"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

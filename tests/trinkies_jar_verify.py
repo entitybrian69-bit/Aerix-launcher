@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
-"""Verify the built client-only Trinkies JAR includes the shared vertical-slice catalog."""
+"""Verify the built client-only Trinkies JAR contains the full shared catalog pack."""
+import hashlib
 import json
 import sys
 import zipfile
 from pathlib import Path
+
+EXPECTED_COUNTS = {"hat": 50, "suit": 50, "back": 50, "pet": 50, "emote": 50, "aura": 50}
 
 
 def main() -> int:
@@ -14,6 +17,7 @@ def main() -> int:
     jar_path = Path(sys.argv[1])
     try:
         with zipfile.ZipFile(jar_path) as jar:
+            names = set(jar.namelist())
             descriptor = json.loads(jar.read("fabric.mod.json"))
             if descriptor.get("id") != "trinkies":
                 raise ValueError("fabric.mod.json has an unexpected mod ID")
@@ -24,19 +28,48 @@ def main() -> int:
                 raise ValueError("client entrypoint is missing")
 
             catalog = json.loads(jar.read("assets/trinkies/catalog.json"))
-            if catalog.get("status") != "vertical_slice_unverified_in_game":
-                raise ValueError("catalog does not declare its unverified vertical-slice status")
+            if catalog.get("status") != "full_catalog_unverified_in_game":
+                raise ValueError("catalog does not declare its unverified full-catalog status")
             items = catalog.get("items")
-            if not isinstance(items, list) or len(items) != 30:
-                raise ValueError("expected exactly 30 catalog entries")
+            if not isinstance(items, list) or len(items) != 300 or catalog.get("item_count") != 300:
+                raise ValueError("expected exactly 300 catalog entries")
             counts: dict[str, int] = {}
             for item in items:
                 category = item.get("category")
                 counts[category] = counts.get(category, 0) + 1
-            if counts != {"hat": 5, "suit": 5, "back": 5, "pet": 5, "emote": 5, "aura": 5}:
+                for field in ("item", "texture"):
+                    relative_path = item.get(field)
+                    if not isinstance(relative_path, str) or not relative_path.startswith("items/"):
+                        raise ValueError(f"invalid {field} asset path for {item.get('id')}")
+                    jar_pathname = f"assets/trinkies/{relative_path}"
+                    if jar_pathname not in names:
+                        raise ValueError(f"catalog asset is missing from the JAR: {jar_pathname}")
+            if counts != EXPECTED_COUNTS or catalog.get("category_counts") != EXPECTED_COUNTS:
                 raise ValueError(f"unexpected category counts: {counts}")
-            if "assets/trinkies/manifest.json" not in jar.namelist():
+
+            manifest_name = "assets/trinkies/manifest.json"
+            if manifest_name not in names:
                 raise ValueError("asset manifest is missing from the mod JAR")
+            manifest = json.loads(jar.read(manifest_name))
+            hashes = manifest.get("sha256")
+            if manifest.get("item_count") != 300 or not isinstance(hashes, dict):
+                raise ValueError("asset manifest is missing the generated full-catalog file hashes")
+            packaged_paths = {
+                name.removeprefix("assets/trinkies/")
+                for name in names
+                if name.startswith("assets/trinkies/") and not name.endswith("/") and name != manifest_name
+            }
+            if set(hashes) != packaged_paths:
+                raise ValueError("asset manifest paths do not match the files packaged in the JAR")
+            for relative_path, expected_hash in hashes.items():
+                if not isinstance(relative_path, str) or relative_path.startswith("/") or ".." in Path(relative_path).parts:
+                    raise ValueError(f"invalid manifest path: {relative_path}")
+                pathname = f"assets/trinkies/{relative_path}"
+                if pathname not in names:
+                    raise ValueError(f"manifest asset is missing from the JAR: {pathname}")
+                actual_hash = hashlib.sha256(jar.read(pathname)).hexdigest()
+                if actual_hash != expected_hash:
+                    raise ValueError(f"asset hash mismatch in JAR: {pathname}")
     except (OSError, KeyError, json.JSONDecodeError, zipfile.BadZipFile, ValueError) as error:
         message = f"Trinkies JAR verification failed: {error}"
         try:
@@ -50,7 +83,7 @@ def main() -> int:
         print(f"::error title=Trinkies JAR verification failed::{escaped}")
         return 1
 
-    print(f"Verified {jar_path}: client-only Trinkies, 30 catalog assets, categories={counts}")
+    print(f"Verified {jar_path}: client-only Trinkies, 300 catalog items, categories={counts}")
     return 0
 
 

@@ -1,0 +1,39 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip"
+  ],
+  "attach": {
+    "bone": "head",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "hat",
+  "description": "An original skyguard visor with a verdant enamel finish, family-specific silhouette, and a hat wind accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "id": "trinkies:hat_full_verdant_visor",
+  "model": "model.bbmodel",
+  "name": "Verdant Skyguard Visor",
+  "palette": [
+    "#19281B",
+    "#253B2B",
+    "#426F52",
+    "#57826B",
+    "#73988E",
+    "#D7ED8A",
+    "#E0FFB7"
+  ],
+  "rarity": "rare",
+  "shape": "full_hat_visor_2",
+  "tags": [
+    "verdant",
+    "visor",
+    "guard",
+    "enamel"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

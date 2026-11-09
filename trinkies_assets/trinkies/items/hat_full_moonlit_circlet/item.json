@@ -1,0 +1,39 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip"
+  ],
+  "attach": {
+    "bone": "head",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "hat",
+  "description": "An original tide circlet with a moonlit glass finish, family-specific silhouette, and a circlet glint accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "id": "trinkies:hat_full_moonlit_circlet",
+  "model": "model.bbmodel",
+  "name": "Moonlit Tide Circlet",
+  "palette": [
+    "#1D2532",
+    "#2C344A",
+    "#4D568B",
+    "#6769A3",
+    "#968BBE",
+    "#D0C8FF",
+    "#E7DAFF"
+  ],
+  "rarity": "rare",
+  "shape": "full_hat_circlet_3",
+  "tags": [
+    "moonlit",
+    "circlet",
+    "jewel",
+    "glass"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

@@ -1,0 +1,40 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip"
+  ],
+  "attach": {
+    "bone": "body",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "suit",
+  "description": "An original mechanist harness with a glacier metal finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "id": "trinkies:suit_full_glacier_mechanist",
+  "model": "model.bbmodel",
+  "name": "Glacier Mechanist Harness",
+  "palette": [
+    "#192D30",
+    "#273F47",
+    "#426D86",
+    "#5C7E9D",
+    "#808FB8",
+    "#C4F1F4",
+    "#DDF6FF"
+  ],
+  "rarity": "common",
+  "shape": "full_suit_mechanist_1",
+  "suit_mode": "overlay",
+  "tags": [
+    "glacier",
+    "tools",
+    "workshop",
+    "metal"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}

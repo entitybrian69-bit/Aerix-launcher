@@ -1,0 +1,40 @@
+{
+  "animation_file": "animations.json",
+  "animations": [
+    "idle",
+    "equip",
+    "play"
+  ],
+  "attach": {
+    "bone": "body",
+    "offset": [
+      0,
+      0,
+      0
+    ]
+  },
+  "category": "emote",
+  "description": "An original spark clap with a carnival enamel finish, family-specific silhouette, and a emote cheer accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "id": "trinkies:emote_full_carnival_clap",
+  "model": "model.bbmodel",
+  "name": "Carnival Spark Clap",
+  "palette": [
+    "#2F1D32",
+    "#482C49",
+    "#8A4C86",
+    "#A16697",
+    "#BD8AA7",
+    "#F2A75C",
+    "#FFE094"
+  ],
+  "rarity": "legendary",
+  "shape": "full_emote_clap_3",
+  "tags": [
+    "carnival",
+    "clap",
+    "spark",
+    "enamel"
+  ],
+  "texture": "texture.png",
+  "version": 1
+}
