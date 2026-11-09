@@ -244,10 +244,10 @@ jobs:
           fi
           python3 tests/trinkies_jar_verify.py "$MOD_JAR_PATH"
 
-      - name: Set up Gradle 9.8 for Fabric Loom GameTest
+      - name: Set up Gradle 9.8.0 for Fabric Loom GameTest
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: "9.8"
+          gradle-version: "9.8.0"
 
       - name: Run 1.21.11 Fabric client GameTest (Xvfb + llvmpipe)
         shell: bash

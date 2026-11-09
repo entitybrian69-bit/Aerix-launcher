@@ -1,6 +1,6 @@
 # Wardrobe + Trinkies verification checklist
 
-**Status: UNVERIFIED.** This is a test plan, not evidence that any Trinkies renderer or device has passed. The Fabric client gametest API exists for 1.21.11. A separate Loom-based CI smoke harness is configured to load the packaged Trinkies JAR, create a local player, and capture a baseline third-person screenshot under Xvfb/Mesa llvmpipe; that harness has not yet run. It deliberately does not claim cosmetic rendering. If it cannot launch a client, use the manual checklist below and attach unedited screenshots/logs.
+**Status: UNVERIFIED.** This is a test plan, not evidence that any Trinkies renderer or device has passed. The Fabric client gametest API exists for 1.21.11. A separate Loom-based CI smoke harness is configured to load the packaged Trinkies JAR, create a local player, and capture a baseline third-person screenshot under Xvfb/Mesa llvmpipe; no Minecraft client has launched yet. Run [42561704155](https://github.com/entitybrian69-bit/Aerix-launcher/actions/runs/42561704155) stopped at Loom configuration because the nested build used Gradle 8.14.3; run [42562329477](https://github.com/entitybrian69-bit/Aerix-launcher/actions/runs/42562329477) stopped because setup-gradle rejected the shorthand version `9.8`. The workflow now requests `9.8.0`, pending CI verification. The harness deliberately does not claim cosmetic rendering. If it cannot launch a client, use the manual checklist below and attach unedited screenshots/logs.
 
 ## Automated prerequisites
 
