@@ -244,6 +244,11 @@ jobs:
           fi
           python3 tests/trinkies_jar_verify.py "$MOD_JAR_PATH"
 
+      - name: Set up Gradle 9.8 for Fabric Loom GameTest
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.8"
+
       - name: Run 1.21.11 Fabric client GameTest (Xvfb + llvmpipe)
         shell: bash
         env:
@@ -252,7 +257,7 @@ jobs:
           GALLIUM_DRIVER: llvmpipe
         run: |
           set +e
-          xvfb-run -a ./gradlew -p tools/trinkies_client_gametest runClientGameTest --console=plain > gametest.log 2>&1
+          xvfb-run -a gradle -p tools/trinkies_client_gametest runClientGameTest --console=plain > gametest.log 2>&1
           code=$?
           if [ "$code" -ne 0 ]; then
             tail -200 gametest.log | gzip -9c | base64 -w0 | fold -w 3500 |
