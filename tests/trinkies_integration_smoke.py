@@ -1,10 +1,20 @@
-"""Structural checks for Trinkies assets, local hat wiring and honest limitations."""
+"""Structural checks for Trinkies assets, the wardrobe bake path and honest limitations."""
 from collections import Counter
 from pathlib import Path
 import json
+import re
+import sys
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from PIL import Image  # noqa: E402
+
+# The bake is only correct while the launcher and the asset tooling agree on the skin layout, so the
+# checks below read the layout from the tooling itself instead of restating the numbers.
+from tools.trinkies_assets.mc_skin_render import CATEGORY_PATCH_PARTS, FACES, SKIN_PARTS  # noqa: E402
 APP = ROOT / "app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix"
 CATALOG_PATH = ROOT / "trinkies_assets/trinkies/catalog.json"
 
@@ -44,14 +54,27 @@ class TrinkiesIntegrationSmoke(unittest.TestCase):
             "trinkies:pet_full_moss_crab",
             "trinkies:aura_full_aurora_spectrum",
         })
-        hats = [item for item in catalog["items"] if item["category"] == "hat"]
-        self.assertEqual(len(hats), 50)
-        self.assertTrue(all(item["local_render_support"] for item in hats))
-        self.assertTrue(all(not item["local_render_support"] for item in catalog["items"] if item["category"] != "hat"))
+        # Every category ships a garment patch, so every one is locally baked into the served skin.
+        self.assertTrue(all(item["local_render_support"] for item in catalog["items"]))
         for item in catalog["items"]:
+            folder = f"items/{item['id'].split(':', 1)[1]}"
             self.assertTrue((ROOT / "trinkies_assets/trinkies" / item["texture"]).is_file(), item["id"])
-            self.assertEqual(item["preview"], f"items/{item['id'].split(':', 1)[1]}/preview.png")
-            self.assertTrue((ROOT / "trinkies_assets/trinkies" / item["preview"]).is_file(), item["id"])
+            self.assertEqual(item["preview"], f"{folder}/preview.png")
+            self.assertEqual(item["garment"], f"{folder}/garment.png")
+            preview = ROOT / "trinkies_assets/trinkies" / item["preview"]
+            self.assertTrue(preview.is_file(), item["id"])
+            with Image.open(preview) as image:
+                # The card is the mannequin wearing the item, not an isolated prop render.
+                self.assertEqual(image.size, (192, 192))
+                self.assertEqual(image.mode, "RGBA")
+                bbox = image.getchannel("A").getbbox()
+                self.assertIsNotNone(bbox)
+                self.assertGreater(bbox[3] - bbox[1], bbox[2] - bbox[0], item["id"])
+            with Image.open(ROOT / "trinkies_assets/trinkies" / item["garment"]) as garment:
+                self.assertEqual(garment.size, (64, 64))
+                self.assertEqual(garment.mode, "RGBA")
+            cape = ROOT / "trinkies_assets/trinkies" / folder / "cape_patch.png"
+            self.assertEqual(cape.is_file(), item["category"] == "back", item["id"])
 
         app_gradle = (ROOT / "app_pojavlauncher/build.gradle").read_text()
         mod_gradle = (ROOT / "aerix_client_mod/build.gradle").read_text()
@@ -72,7 +95,49 @@ class TrinkiesIntegrationSmoke(unittest.TestCase):
         self.assertIn("TrinkiesLoadout.writeForInstance(this, gamedir)", game)
         self.assertIn("TrinkiesInstaller.installIntoSupportedInstances(activity)", (APP / "ui/screens/HomeScreen.kt").read_text())
 
-    def test_selected_hat_reaches_preview_skin_overlay_and_per_instance_loadout(self):
+    def test_garment_patch_footprint_matches_the_launcher_bake_table(self):
+        """The bake is only correct while both sides agree on the skin layout. The Kotlin table is
+        the one that runs on device, so assert against it rather than against a copy of it here."""
+        composite = (APP / "client/TrinkiesGarmentComposite.kt").read_text()
+        blocks = dict(re.findall(r'"(\w+)" to intArrayOf\(([-0-9, ]+)\)', composite))
+        self.assertEqual(len(blocks), 12, "expected one UV block per player part")
+        for part, values in blocks.items():
+            expected = SKIN_PARTS[part]
+            self.assertEqual([int(v) for v in values.split(",")],
+                             [expected.u, expected.v, expected.width, expected.height, expected.depth], part)
+        kotlin_categories = {
+            category: set(re.findall(r'"([a-z_]+)"', match))
+            for category, match in re.findall(
+                r'"(hat|suit|back|pet|emote|aura)" to listOf\(([^)]*)\)', composite)
+        }
+        for category, allowed in CATEGORY_PATCH_PARTS.items():
+            self.assertEqual(kotlin_categories[category], set(allowed), category)
+        self.assertEqual(re.search(r'BAKE_ORDER: List<String> = listOf\(([^)]*)\)', composite)[1]
+                         .replace('"', "").replace(",", " ").split(),
+                         ["suit", "back", "pet", "emote", "aura", "hat"])
+
+    def test_baked_garments_stay_inside_their_category_footprint(self):
+        """A patch that painted the face or the legs would rewrite the player's own skin rather than
+        a cosmetic, so both the generator and the bake refuse it. This checks the shipped files
+        satisfy the rule, using the layout the renderer itself exposes."""
+        footprints = {}
+        for category, parts in CATEGORY_PATCH_PARTS.items():
+            cells = set()
+            for part in parts:
+                for face in FACES:
+                    u, v, w, h = SKIN_PARTS[part].face_rect(face)
+                    cells.update((x, y) for y in range(v, v + h) for x in range(u, u + w))
+            footprints[category] = cells
+        for item_dir in sorted((ROOT / "trinkies_assets/trinkies/items").iterdir()):
+            category = item_dir.name.split("_", 1)[0]
+            with Image.open(item_dir / "garment.png") as image:
+                alpha = list(image.convert("RGBA").getchannel("A").getdata())
+            allowed = footprints[category]
+            stray = [index for index, value in enumerate(alpha)
+                     if value and (index % 64, index // 64) not in allowed]
+            self.assertFalse(stray, f"{item_dir.name} paints outside its {category} regions")
+
+    def test_equipped_wardrobe_reaches_baked_skin_and_per_instance_loadout(self):
         catalog = json.loads(CATALOG_PATH.read_text())
         reader = (APP / "client/TrinkiesCatalog.kt").read_text()
         cosmetics = (APP / "client/AerixClientCosmetics.kt").read_text()
@@ -86,20 +151,27 @@ class TrinkiesIntegrationSmoke(unittest.TestCase):
         self.assertIn('previewAsset = "trinkies/$relativePreview"', reader)
         self.assertIn("context.assets.open(it.previewAsset)", wardrobe)
         self.assertIn('"eternal" to TrinkiesRarityStyle', wardrobe)
-        self.assertIn('TrinkiesCatalog.find(context, hatId)', cosmetics)
-        self.assertIn('catalogHat.shape.lowercase()', cosmetics)
-        for family in ("spire", "hood", "halo", "aviator", "circlet", "visor", "antlers", "wreath", "mask"):
-            self.assertIn(f'"{family}"', cosmetics)
-        self.assertIn("AerixClientCosmetics.applyHatAccessoryToSkin(", skin_server)
-        self.assertIn("applyClientHat = true", wardrobe)
+        self.assertIn('assets.open(ASSET_CATALOG)', reader)
+        self.assertIn('garmentAsset = "trinkies/$relativeGarment"', reader)
+        self.assertIn('capeAsset = relativeCape.takeIf { it.isNotEmpty() }', reader)
+        self.assertIn("TrinkiesCatalog.find(context, id)?.takeIf { it.locallyRendered }", cosmetics)
+        self.assertIn("TrinkiesGarmentComposite.BAKE_ORDER", cosmetics)
+        self.assertIn("TrinkiesGarmentComposite.bakeInto(copy, patches)", cosmetics)
+        self.assertIn("isUsableGarment(pixels, category)", cosmetics)
+        self.assertIn("AerixClientCosmetics.applyWardrobeToSkin(", skin_server)
+        self.assertIn("applyClientCosmetics = true", wardrobe)
         self.assertIn("item?.description", wardrobe)
-        self.assertIn("AerixClientStore.equippedHatId = item?.id ?: \"none\"", wardrobe)
+        self.assertIn('AerixClientStore.setEquippedId(category, item?.id ?: "none")', wardrobe)
+        # The bespoke per-family pixel painting is gone: the asset is the renderer now.
+        self.assertNotIn("catalogHat.shape.lowercase()", cosmetics)
 
-        expected_state_fields = set(schema["required"])
-        for field in expected_state_fields - {"schema", "emote_wheel"}:
-            self.assertIn(f'.put("{field}"', loadout)
+        state_fields = set(schema["required"])
+        self.assertEqual(state_fields - {"schema", "emote_wheel"}, {"hat", "suit", "back", "pet", "emote", "aura"})
+        # The writer enumerates the same list, so a new schema field cannot go unwritten silently.
+        self.assertIn('private val CATEGORIES = listOf("hat", "suit", "back", "pet", "emote", "aura")', loadout)
+        self.assertIn("put(category, id ?: JSONObject.NULL)", loadout)
         self.assertIn('put("emote_wheel"', loadout)
-        self.assertIn("TrinkiesCatalog.hasId(context, id, \"hat\")", loadout)
+        self.assertIn("TrinkiesCatalog.hasId(context, id, category)", loadout)
         self.assertIn("stream.fd.sync()", loadout)
         self.assertIn("Os.rename(temporary.absolutePath, target.absolutePath)", loadout)
         self.assertIn('File(canonicalDir, FILE_NAME)', loadout)
@@ -137,8 +209,10 @@ class TrinkiesIntegrationSmoke(unittest.TestCase):
         self.assertIn("Vanilla, Forge and NeoForge instances are not modified", wardrobe)
         self.assertIn("when it and the server allow", wardrobe)
         self.assertIn("remote viewers are not guaranteed to see them", wardrobe)
-        self.assertIn("shaded 3D model previews", wardrobe)
-        self.assertIn("In-game equip support for this category is in progress", wardrobe)
+        # The copy must keep the boundary honest: the bake is real, the 3D extras are not.
+        self.assertIn("bakes the item's garment patch into the skin", wardrobe)
+        self.assertIn("are not in game yet", wardrobe)
+        self.assertIn("In-game appearance has not been visually verified on device yet", wardrobe)
         self.assertNotIn("CATALOG ONLY · NO RENDERER", wardrobe)
 
 

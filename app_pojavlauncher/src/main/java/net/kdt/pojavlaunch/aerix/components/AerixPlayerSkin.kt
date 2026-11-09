@@ -264,7 +264,7 @@ fun AerixSkinPreview3D(
     useClientCape: Boolean = false,
     showOfficialCape: Boolean = false,
     animationName: String? = null,
-    applyClientHat: Boolean = false,
+    applyClientCosmetics: Boolean = false,
     cameraDistance: Int = 48,
     autoRotate: Boolean = false,
     autoRotateSpeed: Float = 0.3f
@@ -302,10 +302,18 @@ fun AerixSkinPreview3D(
     val wardrobeRevision = PojavAccountBridge.wardrobeRevision
     val clientCapeId = if (useClientCape) net.kdt.pojavlaunch.aerix.client.AerixClientStore.equippedCapeId else null
     val capeOwner = if (useClientCape) net.kdt.pojavlaunch.aerix.social.SocialBackend.email else null
-    val clientHatId = if (applyClientHat) net.kdt.pojavlaunch.aerix.client.AerixClientStore.equippedHatId else null
+    // Any equipped wardrobe slot can change the baked skin, so the preview keys on all of them.
+    val clientCosmetics = if (applyClientCosmetics) {
+        with(net.kdt.pojavlaunch.aerix.client.AerixClientStore) {
+            listOf(equippedHatId, equippedSuitId, equippedBackId, equippedPetId, equippedEmoteId,
+                equippedAuraId).joinToString("|")
+        }
+    } else {
+        null
+    }
 
-    LaunchedEffect(applyClientHat) {
-        if (applyClientHat) net.kdt.pojavlaunch.aerix.client.AerixClientStore.init(context)
+    LaunchedEffect(applyClientCosmetics) {
+        if (applyClientCosmetics) net.kdt.pojavlaunch.aerix.client.AerixClientStore.init(context)
     }
 
     // Always decode the crisp 2D full-body preview immediately so the skin shows up on the very
@@ -407,13 +415,13 @@ fun AerixSkinPreview3D(
             if (!ready) return@LaunchedEffect
             playerSkin.setInteractionEnabled(interactionEnabled && isVisible)
         }
-        LaunchedEffect(ready, skinLoadTrigger, account?.key, account?.username, account?.authType, wardrobeRevision, useClientCape, clientCapeId, capeOwner, showOfficialCape, applyClientHat, clientHatId) {
+        LaunchedEffect(ready, skinLoadTrigger, account?.key, account?.username, account?.authType, wardrobeRevision, useClientCape, clientCapeId, capeOwner, showOfficialCape, applyClientCosmetics, clientCosmetics) {
             if (!ready || webglFailed) return@LaunchedEffect
             val (skinBytes, capeBytes, model) = withContext(Dispatchers.IO) {
                 val baseSkin = PojavAccountBridge.resolveAccountSkinBytes(account)
-                val selectedSkin = if (applyClientHat) {
+                val selectedSkin = if (applyClientCosmetics) {
                     val sourceSkin = baseSkin ?: context.assets.open("steve.png").use { it.readBytes() }
-                    net.kdt.pojavlaunch.aerix.client.AerixClientCosmetics.applyHatAccessoryToSkin(
+                    net.kdt.pojavlaunch.aerix.client.AerixClientCosmetics.applyWardrobeToSkin(
                         context, sourceSkin, PojavAccountBridge.isSlimModel(account)
                     )
                 } else baseSkin

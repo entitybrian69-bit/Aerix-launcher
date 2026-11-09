@@ -50,6 +50,8 @@ data class ClientCapeSpec(
 }
 
 object AerixClientCosmetics {
+    /** The UV grid every catalog garment patch is authored on. */
+    private const val GARMENT_PATCH_SIZE = 64
 
     const val OWNER_EMAIL = "entitybrian69@gmail.com"
     const val CO_OWNER_EMAIL = "kushaladhikari982648@gmail.com"
@@ -412,17 +414,25 @@ object AerixClientCosmetics {
         return bmp
     }
 
-    /** Adds a small pixel-art headwear layer to the skin's outer head UV. */
-    fun applyHatAccessoryToSkin(
+    /**
+     * Bakes the equipped Trinkies wardrobe onto the skin that is served to the game.
+     *
+     * Each catalog item ships a `garment.png` patch laid out in the player's own UV space, so
+     * equipping anything is one source-over pass in that space — the same pass the launcher's
+     * preview and the client mod run — and no per-item drawing code has to live here. Hat ids that
+     * predate the catalog have no patch, so they keep the hand-painted fallback further down.
+     */
+    fun applyWardrobeToSkin(
         context: Context,
         existingSkinPng: ByteArray?,
         @Suppress("UNUSED_PARAMETER") slim: Boolean
     ): ByteArray? {
         AerixClientStore.init(context)
+        if (existingSkinPng == null) return null
         val hatId = AerixClientStore.equippedHatId
-        if (hatId == "none" || existingSkinPng == null) return existingSkinPng
-        val catalogHat = if (hatId.startsWith("trinkies:hat_")) TrinkiesCatalog.find(context, hatId) else null
-        if (hatId.startsWith("trinkies:hat_") && (catalogHat == null || !catalogHat.locallyRendered)) return existingSkinPng
+        val patches = trinkiesGarmentPatches(context)
+        val legacyHat = hatId.takeIf { it != "none" && !it.startsWith("trinkies:") }
+        if (patches.isEmpty() && legacyHat == null) return existingSkinPng
         val decoded = BitmapFactory.decodeByteArray(existingSkinPng, 0, existingSkinPng.size) ?: return existingSkinPng
         if (decoded.width < 64 || decoded.height < 64) {
             decoded.recycle()
@@ -445,108 +455,11 @@ object AerixClientCosmetics {
             }
         }
 
-        if (catalogHat != null) {
-            val palette = catalogHat.palette.mapNotNull { runCatching { AndroidColor.parseColor(it) }.getOrNull() }
-            if (palette.size < 5) {
-                copy.recycle()
-                return existingSkinPng
-            }
-            val shade = palette.first()
-            val base = palette[2]
-            val accent = palette.getOrElse(5) { palette.last() }
-            val highlight = palette.last()
-            fun rect(x0: Int, y0: Int, x1: Int, y1: Int, color: Int) {
-                for (y in y0..y1) for (x in x0..x1) px(x, y, color)
-            }
-            // Minecraft's head outer-layer UV: four side faces wrap x=32..63/y=8..15;
-            // the top face is x=40..47/y=0..7. Keep the base face and eyes untouched.
-            for (x in 32..63) {
-                px(x, 9, base)
-                px(x, 10, base)
-                if (x % 4 == 0) px(x, 8, highlight)
-                if (x % 5 == 0) px(x, 11, shade)
-            }
-            val shape = catalogHat.shape.lowercase()
-            val family = when {
-                "spire" in shape -> "spire"
-                "hood" in shape -> "hood"
-                "halo" in shape -> "halo"
-                "aviator" in shape || "cap" in shape -> "aviator"
-                "circlet" in shape -> "circlet"
-                "visor" in shape || "helm" in shape -> "visor"
-                "antler" in shape || "horn" in shape -> "antlers"
-                "wreath" in shape -> "wreath"
-                "mask" in shape -> "mask"
-                else -> "circlet"
-            }
-            when (family) {
-                "spire" -> {
-                    rect(40, 0, 47, 3, base)
-                    rect(43, 0, 44, 6, accent)
-                    rect(42, 8, 45, 9, accent)
-                    listOf(40 to 1, 47 to 1, 41 to 0, 46 to 0).forEach { (x, y) -> px(x, y, highlight) }
-                }
-                "hood" -> {
-                    rect(40, 0, 47, 4, base)
-                    rect(39, 5, 48, 6, shade)
-                    rect(40, 8, 47, 9, base)
-                    rect(40, 10, 41, 12, shade)
-                    rect(46, 10, 47, 12, shade)
-                    px(43, 8, highlight); px(44, 8, highlight)
-                }
-                "halo" -> {
-                    rect(40, 0, 47, 0, accent)
-                    rect(40, 6, 47, 6, accent)
-                    rect(40, 1, 40, 5, base)
-                    rect(47, 1, 47, 5, base)
-                    px(43, 0, highlight); px(44, 0, highlight)
-                }
-                "aviator" -> {
-                    rect(40, 0, 47, 2, base)
-                    rect(41, 8, 42, 9, accent)
-                    rect(45, 8, 46, 9, accent)
-                    rect(41, 10, 42, 10, shade)
-                    rect(45, 10, 46, 10, shade)
-                    px(40, 8, highlight); px(47, 8, highlight)
-                }
-                "circlet" -> {
-                    rect(40, 0, 47, 0, highlight)
-                    rect(40, 8, 47, 8, highlight)
-                    rect(43, 1, 44, 2, accent)
-                    rect(43, 9, 44, 10, accent)
-                    px(42, 9, highlight); px(45, 9, highlight)
-                }
-                "visor" -> {
-                    rect(40, 0, 47, 3, base)
-                    rect(40, 8, 47, 9, shade)
-                    rect(41, 8, 46, 8, highlight)
-                    rect(40, 10, 41, 12, base)
-                    rect(46, 10, 47, 12, base)
-                }
-                "antlers" -> {
-                    rect(40, 0, 41, 3, accent)
-                    rect(46, 0, 47, 3, accent)
-                    px(39, 1, highlight); px(42, 2, highlight)
-                    px(45, 2, highlight); px(48, 1, highlight)
-                    px(32, 8, accent); px(63, 8, accent)
-                }
-                "wreath" -> {
-                    for (x in listOf(40, 42, 45, 47)) {
-                        px(x, 0, accent); px(x, 1, highlight)
-                    }
-                    px(43, 0, highlight); px(44, 0, highlight)
-                    px(42, 8, accent); px(45, 8, accent)
-                    px(43, 9, highlight); px(44, 9, highlight)
-                }
-                else -> {
-                    rect(40, 8, 47, 9, base)
-                    rect(40, 10, 41, 13, shade)
-                    rect(46, 10, 47, 13, shade)
-                    rect(43, 10, 44, 12, accent)
-                    px(43, 9, highlight); px(44, 9, highlight)
-                }
-            }
-        } else when (hatId) {
+        if (patches.isNotEmpty() && !TrinkiesGarmentComposite.bakeInto(copy, patches) && legacyHat == null) {
+            copy.recycle()
+            return existingSkinPng
+        }
+        if (legacyHat != null) when (legacyHat) {
             "crimson_crown" -> {
                 strip(AndroidColor.rgb(128, 22, 43), AndroidColor.rgb(255, 209, 102))
                 for (x in 40..47) px(x, 10, AndroidColor.rgb(128, 22, 43))
@@ -577,10 +490,7 @@ object AerixClientCosmetics {
                 px(45, 8, AndroidColor.rgb(255, 116, 176))
                 px(43, 9, AndroidColor.rgb(255, 235, 245))
             }
-            else -> {
-                copy.recycle()
-                return existingSkinPng
-            }
+            else -> Unit
         }
 
         return ByteArrayOutputStream().use { out ->
@@ -589,6 +499,32 @@ object AerixClientCosmetics {
             out.toByteArray()
         }
     }
+
+    /**
+     * The garment patch of every equipped catalog item, in composite order. A category whose item
+     * is unknown, not locally rendered, or whose patch is missing/misplaced is skipped rather than
+     * guessed at, so a broken asset can only ever drop one layer.
+     */
+    private fun trinkiesGarmentPatches(context: Context): List<Pair<String, IntArray>> =
+        TrinkiesGarmentComposite.BAKE_ORDER.mapNotNull { category ->
+            val id = AerixClientStore.equippedIdFor(category)
+            if (!id.startsWith("trinkies:")) return@mapNotNull null
+            val item = TrinkiesCatalog.find(context, id)?.takeIf { it.locallyRendered } ?: return@mapNotNull null
+            runCatching {
+                context.applicationContext.assets.open(item.garmentAsset).use { stream ->
+                    BitmapFactory.decodeStream(stream)
+                }?.let { bitmap ->
+                    if (bitmap.width != GARMENT_PATCH_SIZE || bitmap.height != GARMENT_PATCH_SIZE) {
+                        bitmap.recycle()
+                        return@let null
+                    }
+                    val pixels = IntArray(GARMENT_PATCH_SIZE * GARMENT_PATCH_SIZE)
+                    bitmap.getPixels(pixels, GARMENT_PATCH_SIZE, 0, 0, GARMENT_PATCH_SIZE, GARMENT_PATCH_SIZE)
+                    bitmap.recycle()
+                    if (TrinkiesGarmentComposite.isUsableGarment(pixels, category)) pixels else null
+                }
+            }.getOrNull()?.let { category to it }
+        }
 
     fun buildCapeAndElytraBitmap(spec: ClientCapeSpec): Bitmap {
         val bmp = Bitmap.createBitmap(64, 32, Bitmap.Config.ARGB_8888)

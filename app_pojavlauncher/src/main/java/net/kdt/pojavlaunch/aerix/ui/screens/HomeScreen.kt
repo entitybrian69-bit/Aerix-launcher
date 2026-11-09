@@ -330,7 +330,7 @@ private fun HomeCharacterStage(
                 useClientCape = true,
                 showOfficialCape = true,
                 animationName = "NewIdle",
-                applyClientHat = true,
+                applyClientCosmetics = true,
                 cameraDistance = 48,
                 modifier = Modifier.fillMaxSize().padding(horizontal = 18.dp, vertical = 8.dp)
             )

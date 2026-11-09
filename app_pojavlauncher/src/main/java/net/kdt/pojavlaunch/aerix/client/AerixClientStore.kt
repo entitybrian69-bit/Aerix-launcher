@@ -129,6 +129,39 @@ object AerixClientStore {
     /* ── Capes State (3D Character + Waving Cape + 15 Animated Capes) ─────── */
     var equippedCapeId by mutableStateOf("crimson_sovereign")
     var equippedHatId by mutableStateOf("none")
+
+    /**
+     * The rest of the wardrobe. Each one is a catalog id or "none"; every category bakes onto the
+     * served skin, so an equipped id here is what the player actually wears in game.
+     */
+    var equippedSuitId by mutableStateOf("none")
+    var equippedBackId by mutableStateOf("none")
+    var equippedPetId by mutableStateOf("none")
+    var equippedEmoteId by mutableStateOf("none")
+    var equippedAuraId by mutableStateOf("none")
+
+    /** The equipped catalog id for one wardrobe category, or "none". */
+    fun equippedIdFor(category: String): String = when (category) {
+        "hat" -> equippedHatId
+        "suit" -> equippedSuitId
+        "back" -> equippedBackId
+        "pet" -> equippedPetId
+        "emote" -> equippedEmoteId
+        "aura" -> equippedAuraId
+        else -> "none"
+    }
+
+    /** Sets the equipped id for one wardrobe category; unknown categories are ignored. */
+    fun setEquippedId(category: String, id: String) {
+        when (category) {
+            "hat" -> equippedHatId = id
+            "suit" -> equippedSuitId = id
+            "back" -> equippedBackId = id
+            "pet" -> equippedPetId = id
+            "emote" -> equippedEmoteId = id
+            "aura" -> equippedAuraId = id
+        }
+    }
     var wavingCapeEnabled by mutableStateOf(true)
     var animatedCapeShimmer by mutableStateOf(true)
 
@@ -237,6 +270,11 @@ object AerixClientStore {
 
         equippedCapeId = p.getString("equippedCapeId", "crimson_sovereign") ?: "crimson_sovereign"
         equippedHatId = p.getString("equippedHatId", "none") ?: "none"
+        equippedSuitId = p.getString("equippedSuitId", "none") ?: "none"
+        equippedBackId = p.getString("equippedBackId", "none") ?: "none"
+        equippedPetId = p.getString("equippedPetId", "none") ?: "none"
+        equippedEmoteId = p.getString("equippedEmoteId", "none") ?: "none"
+        equippedAuraId = p.getString("equippedAuraId", "none") ?: "none"
         wavingCapeEnabled = p.getBoolean("wavingCapeEnabled", true)
         animatedCapeShimmer = true
 
@@ -340,6 +378,11 @@ object AerixClientStore {
 
             putString("equippedCapeId", equippedCapeId)
             putString("equippedHatId", equippedHatId)
+            putString("equippedSuitId", equippedSuitId)
+            putString("equippedBackId", equippedBackId)
+            putString("equippedPetId", equippedPetId)
+            putString("equippedEmoteId", equippedEmoteId)
+            putString("equippedAuraId", equippedAuraId)
             putBoolean("wavingCapeEnabled", wavingCapeEnabled)
 
             putBoolean("crosshairEnabled", crosshairEnabled)

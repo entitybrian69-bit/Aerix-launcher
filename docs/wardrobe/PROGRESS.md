@@ -2,7 +2,19 @@
 
 Updated: 2026-11-09 (UTC)
 
-## Current status: model previews generated, committed (`e0daf9e`), and verified by CI; gameplay cosmetics remain unverified
+## 2026-11-09: garment patches, a real equip path for every category, and Discover UI clean-up
+
+**Status: implemented in source, locally validated, NOT compiled and NOT verified in-game.**
+
+- Asset source of truth for wearable art is now `tools/trinkies_assets/mc_skin_render.py` (the skin/cape UV layout, the mannequin, and a z-buffered quad renderer) plus `tools/trinkies_assets/garments.py` (per-family patch painting, card geometry, poses). Fixing the layout's face-unfold (`band = u`) was a real bug: patches were being painted one `depth` to the right of the region the game reads, so they would have landed on the wrong limb in game.
+- Every item now emits `garment.png` (64×64, skin layout); back items also emit `cape_patch.png` (64×32). `item.schema.json` requires `garment`, `catalog.schema.json` accepts `garment`/`cape_texture` paths, `equipped.schema.json` gained an `emote` field for the worn emote look, and `validate_catalog.py` enforces size, colour budget, non-emptiness, and "no painted texel outside the category's parts" for both patch kinds.
+- Previews are 192×192 renders of the mannequin wearing the item, per-category framing (a back item turns away, an emote holds its pose, an aura keeps its motes), with a silhouette rim and a ground shadow.
+- Launcher side: `TrinkiesGarmentComposite` bakes the equipped patches in UV space with an explicit per-category footprint check; `AerixClientCosmetics.applyWardrobeToSkin` (was `applyHatAccessoryToSkin`) runs it for all six categories; `AerixClientStore` keeps one equipped id per slot; `TrinkiesLoadout` writes them all; the wardrobe grid equips any category and its copy now states what is and is not rendered.
+- Renderer/layout follow-on in the same pass, from user feedback on the asset browser: the Discover grid no longer offers a sort control (the catalog order is the curation), and its search field is now a full-width row of its own above the category pills instead of competing with them for space.
+- Unverified in this environment, as before: any Gradle/Android compile, the JAR build, and all in-game appearance. `javac` and `sdkmanager` are still unavailable here, so the Kotlin/Java changes are source-only until CI runs.
+- Evidence: `generate_full_catalog.py` → `validate_catalog.py --require-full` (300 items, 50/category, 6,335,734-byte pack), two consecutive regenerations produced an identical manifest, and `tests/trinkies_integration_smoke.py` (7 tests, now including the Kotlin↔Python UV table agreement and a per-file footprint audit of all 300 shipped patches) passes locally.
+
+## Earlier: model previews generated, committed (`e0daf9e`), and verified by CI; gameplay cosmetics remain unverified
 
 The preview/rarity change is committed as `e0daf9e`. The Aerix debug workflow (run [42615214751](https://github.com/entitybrian69-bit/Aerix-launcher/actions/runs/42615214751)) **PASSED**: regeneration clean-diff gate (including all 300 preview PNGs under `trinkies_assets/trinkies`, byte-stable across hosts with pinned Pillow 10.4.0), `validate_catalog.py --require-full`, all smoke tests, APK/JAR build, built-JAR content verification (300 items, 50/category, exact rarity distribution, five Eternal IDs, per-item previews), approved client runtime matrix, and artifact uploads. Android CI run [42615214614](https://github.com/entitybrian69-bit/Aerix-launcher/actions/runs/42615214614) and Site preview shots run [42615214624](https://github.com/entitybrian69-bit/Aerix-launcher/actions/runs/42615214624) also passed. These prove compilation, packaging, and the matrix's narrow startup/mod-load contract, not cosmetic appearance.
 

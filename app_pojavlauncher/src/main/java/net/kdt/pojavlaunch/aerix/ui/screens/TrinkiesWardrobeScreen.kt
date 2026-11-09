@@ -414,7 +414,7 @@ private fun WardrobePreviewPanel(
                 useClientCape = true,
                 showOfficialCape = true,
                 animationName = pose,
-                applyClientHat = true,
+                applyClientCosmetics = true,
                 cameraDistance = 48,
                 autoRotate = true,
                 modifier = Modifier.fillMaxSize().padding(2.dp)
@@ -558,12 +558,12 @@ private fun categorySubtitle(category: WardrobeCategory, context: android.conten
     WardrobeCategory.SHOP -> "Online catalog · unavailable in this build"
     WardrobeCategory.SKINS -> "Minecraft skins and saved presets"
     WardrobeCategory.CAPES -> "Animated client capes and imported PNGs"
-    WardrobeCategory.HEADWEAR -> "${TrinkiesCatalog.category(context, "hat").size} hats · 3D previews · local skin overlay"
-    WardrobeCategory.SUITS -> "${TrinkiesCatalog.category(context, "suit").size} shaded 3D previews · in-game equip support in progress"
-    WardrobeCategory.BACK_ITEMS -> "Animated capes work · ${TrinkiesCatalog.category(context, "back").size} shaded 3D previews"
-    WardrobeCategory.PETS -> "${TrinkiesCatalog.category(context, "pet").size} shaded 3D previews · follower support in progress"
-    WardrobeCategory.EMOTES -> "${TrinkiesCatalog.category(context, "emote").size} shaded 3D previews · in-game emotes in progress"
-    WardrobeCategory.AURAS -> "${TrinkiesCatalog.category(context, "aura").size} shaded 3D previews · in-game effects in progress"
+    WardrobeCategory.HEADWEAR -> "${TrinkiesCatalog.category(context, "hat").size} hats · baked into your served skin"
+    WardrobeCategory.SUITS -> "${TrinkiesCatalog.category(context, "suit").size} suits · baked into your served skin"
+    WardrobeCategory.BACK_ITEMS -> "Animated capes work · ${TrinkiesCatalog.category(context, "back").size} back items · jacket bake"
+    WardrobeCategory.PETS -> "${TrinkiesCatalog.category(context, "pet").size} pets · shoulder bake only, no follower yet"
+    WardrobeCategory.EMOTES -> "${TrinkiesCatalog.category(context, "emote").size} emote looks · cuff/sleeve bake, no wheel yet"
+    WardrobeCategory.AURAS -> "${TrinkiesCatalog.category(context, "aura").size} auras · emissive trim bake, no particles yet"
 }
 
 @Composable
@@ -789,15 +789,23 @@ private fun CapeCard(
     }
 }
 
+/** What the "nothing equipped" card is called, per wardrobe category. */
+private val NONE_LABELS = mapOf(
+    "hat" to "No headwear", "suit" to "Default outfit", "back" to "Nothing on your back",
+    "pet" to "No companion", "emote" to "No emote look", "aura" to "No aura trim",
+)
+
 @Composable
 private fun HeadwearCollection(activity: FragmentActivity, accent: Color) {
     val context = LocalContext.current
     val hats = remember { TrinkiesCatalog.category(context, "hat") }
     Text(
-        "${hats.size} hats with shaded 3D model previews. Hats can use the local outer-head skin overlay when a custom/imported skin is available; in-game appearance is not yet visually verified, and remote visibility is not guaranteed.",
+        "${hats.size} hats. A hat is baked into the outer head layer of the skin that gets served to the game, so it needs a " +
+            "custom skin to paint on; on a plain account skin there is nothing to overlay and the choice stays in the launcher. " +
+            "In-game appearance has not been visually verified on device yet.",
         color = AerixSurface.textSecondary, fontSize = 9.sp, lineHeight = 12.sp
     )
-    TrinkiesCatalogGrid(activity, hats, accent, includeNone = true)
+    TrinkiesCatalogGrid(activity, hats, accent, "hat", includeNone = true)
 }
 
 @Composable
@@ -805,10 +813,12 @@ private fun TrinkiesCatalogCollection(activity: FragmentActivity, category: Stri
     val context = LocalContext.current
     val items = remember(category) { TrinkiesCatalog.category(context, category) }
     Text(
-        "${items.size} ${category.replaceFirstChar { it.uppercase() }} items with shaded 3D model previews. In-game equip support for this category is in progress.",
+        "${items.size} ${category.replaceFirstChar { it.uppercase() }} items. Equipping bakes the item's garment patch into the skin " +
+            "the launcher serves to the game, so it shows up as worn pixels on you and on anyone else who can see your skin. " +
+            "Free-floating 3D extras for this category (followers, prop rigs, particle trails) are not in game yet.",
         color = AerixSurface.textSecondary, fontSize = 9.sp, lineHeight = 12.sp
     )
-    TrinkiesCatalogGrid(activity, items, accent)
+    TrinkiesCatalogGrid(activity, items, accent, category)
 }
 
 @Composable
@@ -816,6 +826,7 @@ private fun TrinkiesCatalogGrid(
     activity: FragmentActivity,
     items: List<TrinkiesCatalogItem>,
     accent: Color,
+    category: String,
     includeNone: Boolean = false
 ) {
     val entries: List<TrinkiesCatalogItem?> = remember(items, includeNone) {
@@ -830,17 +841,18 @@ private fun TrinkiesCatalogGrid(
                         CatalogItemCard(
                             activity = activity,
                             item = item,
-                            selected = if (item == null) AerixClientStore.equippedHatId == "none"
-                                else item.category == "hat" && AerixClientStore.equippedHatId == item.id,
+                            category = category,
+                            selected = (item?.id ?: "none") == AerixClientStore.equippedIdFor(category),
                             accent = accent,
                             modifier = Modifier.weight(1f)
                         ) {
                             if (item == null || item.locallyRendered) {
-                                AerixClientStore.equippedHatId = item?.id ?: "none"
+                                AerixClientStore.setEquippedId(category, item?.id ?: "none")
                                 AerixClientStore.persist()
                                 PojavAccountBridge.notifyWardrobeChanged()
-                                val selection = item?.name ?: "No headwear"
-                                Toast.makeText(activity, "$selection saved locally for the next supported launch", Toast.LENGTH_SHORT).show()
+                                val selection = item?.name ?: NONE_LABELS[category].orEmpty()
+                                Toast.makeText(activity, "$selection is worn the next time the skin is served",
+                                    Toast.LENGTH_SHORT).show()
                             }
                         }
                     }
@@ -855,6 +867,7 @@ private fun TrinkiesCatalogGrid(
 private fun CatalogItemCard(
     activity: FragmentActivity,
     item: TrinkiesCatalogItem?,
+    category: String,
     selected: Boolean,
     accent: Color,
     modifier: Modifier = Modifier,
@@ -895,7 +908,7 @@ private fun CatalogItemCard(
                         tint = if (selected) accent else AerixSurface.textSecondary, modifier = Modifier.size(24.dp))
                 }
             }
-            Text(item?.name ?: "No headwear", color = AerixSurface.textPrimary, fontSize = 8.sp,
+            Text(item?.name ?: NONE_LABELS[category].orEmpty(), color = AerixSurface.textPrimary, fontSize = 8.sp,
                 fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             item?.description?.takeIf { it.isNotBlank() }?.let { description ->
                 Text(description, color = AerixSurface.textSecondary, fontSize = 6.sp, lineHeight = 7.sp,
@@ -905,7 +918,7 @@ private fun CatalogItemCard(
                 when {
                     selected -> "EQUIPPED · LOCAL"
                     item == null -> "RESTORE ORIGINAL SKIN"
-                    item.locallyRendered -> "${item.rarity.uppercase()} · HAT"
+                    item.locallyRendered -> "${item.rarity.uppercase()} · ${category.uppercase()}"
                     else -> "3D PREVIEW · ${item.rarity.uppercase()}"
                 },
                 color = if (selected) accent else rarityStyle?.accent ?: AerixSurface.textSecondary,

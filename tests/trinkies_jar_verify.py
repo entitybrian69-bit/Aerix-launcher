@@ -38,13 +38,19 @@ def main() -> int:
             for item in items:
                 category = item.get("category")
                 counts[category] = counts.get(category, 0) + 1
-                for field in ("item", "texture", "preview"):
+                # `garment.png` is the bake input; without it the mod cannot wear the item.
+                fields = ["item", "texture", "preview", "garment"]
+                if category == "back":
+                    fields.append("cape_texture")
+                for field in fields:
                     relative_path = item.get(field)
                     if not isinstance(relative_path, str) or not relative_path.startswith("items/"):
                         raise ValueError(f"invalid {field} asset path for {item.get('id')}")
                     jar_pathname = f"assets/trinkies/{relative_path}"
                     if jar_pathname not in names:
                         raise ValueError(f"catalog asset is missing from the JAR: {jar_pathname}")
+                if not item.get("local_render_support"):
+                    raise ValueError(f"catalog entry is not marked as locally renderable: {item.get('id')}")
             if counts != EXPECTED_COUNTS or catalog.get("category_counts") != EXPECTED_COUNTS:
                 raise ValueError(f"unexpected category counts: {counts}")
             rarity_counts = Counter(item.get("rarity") for item in items)

@@ -159,7 +159,7 @@ object AerixSkinServer {
         val rawSkinBytes = if (skinFile.isFile && skinFile.length() > 0) skinFile.readBytes() else null
         val normalizedSkin = rawSkinBytes?.let { PojavAccountBridge.normalizeSkinBytesForGame(it) }
         val skinBytes = if (isTrinkiesSession) {
-            net.kdt.pojavlaunch.aerix.client.AerixClientCosmetics.applyHatAccessoryToSkin(
+            net.kdt.pojavlaunch.aerix.client.AerixClientCosmetics.applyWardrobeToSkin(
                 context,
                 normalizedSkin,
                 isSlim

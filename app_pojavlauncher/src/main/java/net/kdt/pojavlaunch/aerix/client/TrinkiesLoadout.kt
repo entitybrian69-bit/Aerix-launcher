@@ -15,8 +15,15 @@ object TrinkiesLoadout {
     private const val FILE_NAME = "equipped.json"
 
     /**
-     * Writes `<instance>/trinkies/equipped.json`. Other catalog categories are null until their
-     * renderer has a verified equip path; this prevents the UI from silently claiming support.
+     * Categories the mod can consume, in bake order. `emote` here is the worn sleeve/cuff look; the
+     * keybound wheel is the separate `emote_wheel` array below.
+     */
+    private val CATEGORIES = listOf("hat", "suit", "back", "pet", "emote", "aura")
+
+    /**
+     * Writes `<instance>/trinkies/equipped.json`. Every category carries the catalog id the player
+     * picked, or null when nothing is equipped, and each id is re-checked against the catalog before
+     * it is written so a stale preference cannot point the mod at a missing item.
      */
     @JvmStatic
     fun writeForInstance(context: Context, gameDirectory: File): Boolean = runCatching {
@@ -42,16 +49,16 @@ object TrinkiesLoadout {
             return false
         }
 
-        val hat = AerixClientStore.equippedHatId.takeIf { id ->
-            id != "none" && TrinkiesCatalog.hasId(context, id, "hat")
+        val equipped = CATEGORIES.associateWith { category ->
+            AerixClientStore.equippedIdFor(category).takeIf { id ->
+                id != "none" && TrinkiesCatalog.hasId(context, id, category)
+            }
         }
         val json = JSONObject()
             .put("schema", SCHEMA)
-            .put("hat", hat ?: JSONObject.NULL)
-            .put("suit", JSONObject.NULL)
-            .put("back", JSONObject.NULL)
-            .put("aura", JSONObject.NULL)
-            .put("pet", JSONObject.NULL)
+            .apply { equipped.forEach { (category, id) -> put(category, id ?: JSONObject.NULL) } }
+            // The wheel is the keybound list, which no launcher UI feeds yet; it is written as eight
+            // explicit nulls so a reader can tell "nothing bound" from "field never existed".
             .put("emote_wheel", JSONArray().apply { repeat(8) { put(JSONObject.NULL) } })
             .toString(2) + "\n"
 
