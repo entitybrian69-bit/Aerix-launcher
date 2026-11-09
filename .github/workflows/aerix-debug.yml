@@ -61,12 +61,12 @@ jobs:
           python3 -m pip install --disable-pip-version-check -r tools/trinkies_assets/requirements.txt
           export PYTHONDONTWRITEBYTECODE=1
           python3 tools/trinkies_assets/generate_full_catalog.py
+          # Doc preview PNGs differ across the authoring and Ubuntu CI hosts and are not packaged
+          # assets. Gate the catalog data, binary item assets, manifest,
+          # and text roster, while still regenerating the preview sheets for local review.
           GENERATED_PATHS=(
             trinkies_assets/trinkies
             docs/wardrobe/ROSTER.md
-            docs/wardrobe/full-catalog-texture-sheet.png
-            docs/wardrobe/vertical-slice-contact-sheet.png
-            docs/wardrobe/vertical-slice-animation-strip.png
           )
           if ! git diff --quiet -- "${GENERATED_PATHS[@]}"; then
             CHANGED_GENERATED_FILES="$(git diff --name-only -- "${GENERATED_PATHS[@]}" | tr '\n' ' ' | cut -c1-3500)"
