@@ -73,11 +73,20 @@ public final class AerixClientMod implements ClientModInitializer {
 
     // Trinkies wardrobe state: what the launcher says the player wears, the frame cadence the worn
     // item's own animation clip asks for, and the mtime of the file that last produced them.
-    private TrinkiesLoadout.Snapshot trinkiesSnapshot;
-    private int trinkiesFrameTicks = 1;
+    private volatile TrinkiesLoadout.Snapshot trinkiesSnapshot;
+    private volatile int trinkiesFrameTicks = 1;
     private int trinkiesFrameDwell = 0;
     private int trinkiesPollCounter = 0;
+    private java.lang.reflect.Method mGlfwGetKey;
+    private java.lang.reflect.Method mWindowGetHandle;
+    private Field fWindow;
     private long lastTrinkiesMtime = Long.MIN_VALUE;
+    private volatile java.util.List<String> trinkiesWheel =
+            java.util.Collections.nCopies(8, (String) null);
+    private volatile String activeEmote;
+    private volatile long emoteUntilMs;
+    private int lastWheelKey = -1;
+    private long lastWheelPressMs;
 
     @Override
     public void onInitializeClient() {
@@ -106,6 +115,15 @@ public final class AerixClientMod implements ClientModInitializer {
                     resolveHandles();
                     nextResolveAttempt = now + 2000L;
                 }
+                // The wardrobe is polled on this daemon thread, ahead of both the handle resolution
+                // above and the render-thread handoff below: answering equipped.json is file IO, so it
+                // must not stall a frame, and a client whose texture bridge cannot resolve still has to
+                // read what the player is wearing. Two stat() calls every ~1.5 s is cheaper than a
+                // file watcher and keeps the loadout live if the launcher rewrites it mid-session.
+                if (++trinkiesPollCounter >= 16) {
+                    trinkiesPollCounter = 0;
+                    refreshTrinkiesLoadout(resolveRunDir(safeClientInstance()));
+                }
                 if (mGetInstance == null) continue;
                 final Object mc = mGetInstance.invoke(null);
                 if (!(mc instanceof Executor)) continue;
@@ -124,6 +142,15 @@ public final class AerixClientMod implements ClientModInitializer {
                 });
             } catch (Throwable ignored) {
             }
+        }
+    }
+
+    /** The client instance when it can be reached at all; null simply means "use the run directory". */
+    private Object safeClientInstance() {
+        try {
+            return mGetInstance == null ? null : mGetInstance.invoke(null);
+        } catch (Throwable ignored) {
+            return null;
         }
     }
 
@@ -188,12 +215,8 @@ public final class AerixClientMod implements ClientModInitializer {
 
     private void onRenderThreadTick(Object mc) throws Exception {
         File runDir = resolveRunDir(mc);
-        // Polled rather than watched: two stat() calls every ~1.5 s is cheaper than a file watcher,
-        // and it keeps the wardrobe live if the launcher rewrites the loadout while the game runs.
-        if (++trinkiesPollCounter >= 16) {
-            trinkiesPollCounter = 0;
-            refreshTrinkiesLoadout(runDir);
-        }
+        // Read on the client thread, which is the thread GLFW owns.
+        pumpEmoteWheel(mc);
         if (!modernRuntime) visualOverrides.tick(mc, runDir);
         adaptiveDistance.tick(mc, runDir);
         boolean assetSkin = modernRuntime || (handlesResolved && mSkinCompCape != null &&
@@ -226,7 +249,7 @@ public final class AerixClientMod implements ClientModInitializer {
 
         // The equipped item's idle clip decides how long a full cycle takes, so the frame step is
         // paced by the asset instead of by a constant in this mod.
-        if (++trinkiesFrameDwell >= trinkiesFrameTicks) {
+        if (++trinkiesFrameDwell >= effectiveFrameTicks()) {
             trinkiesFrameDwell = 0;
             frameIndex = (frameIndex + 1) % frameNativeImages.size();
         }
@@ -346,16 +369,161 @@ public final class AerixClientMod implements ClientModInitializer {
                 // the launcher ask for a restart.
                 trinkiesFrameTicks = 1;
             }
+            trinkiesWheel = snapshot.emoteWheel();
             TrinkiesLoadout.writeApplied(trinkiesDir, TrinkiesLoadout.buildAppliedJson(
-                    snapshot, trinkiesFrameTicks, matchesBake, System.currentTimeMillis()));
+                    snapshot, trinkiesFrameTicks, matchesBake, activeEmote, System.currentTimeMillis()));
         } catch (Throwable ignored) {
             // Cosmetic state is optional here, the frame loop is not.
         }
     }
 
+    /**
+     * One tick per frame while a wheel emote is playing, otherwise the worn item's own idle cadence.
+     * That is the whole in-game effect of an emote: a flourish on the cape, at the item's own speed,
+     * that returns itself to idle when the clip's length has passed.
+     */
+    private int effectiveFrameTicks() {
+        long until = emoteUntilMs;
+        if (until != 0L && System.currentTimeMillis() < until) {
+            return 1;
+        }
+        int ticks = trinkiesFrameTicks;
+        return ticks < 1 ? 1 : ticks;
+    }
+
+    /**
+     * The keybound half of the wardrobe: the eight {@code emote_wheel} slots the launcher writes,
+     * bound to the number keys, each of which plays that item's own {@code play} clip.
+     *
+     * Keys are polled through LWJGL rather than registered as a Fabric keybind, because a keybind
+     * requires the input-screen plumbing that changed shape across the supported versions while
+     * {@code glfwGetKey} has not. No window handle, no LWJGL, or an unbound slot all just mean the
+     * wheel is silent; nothing here can take the rest of the client down.
+     */
+    private void pumpEmoteWheel(Object mc) {
+        try {
+            java.util.List<String> wheel = trinkiesWheel;
+            boolean wheelIsEmpty = true;
+            for (int i = 0; i < wheel.size(); i++) {
+                if (wheel.get(i) != null) { wheelIsEmpty = false; break; }
+            }
+            if (wheelIsEmpty) return;
+
+            long window = resolveWindowHandle(mc);
+            if (window == 0L) return;
+            int pressed = -1;
+            for (int slot = 0; slot < 8 && pressed < 0; slot++) {
+                if (wheel.get(slot) == null) continue;
+                if (glfwKey(window, glfwKey1() + slot)) pressed = slot;
+            }
+            long now = System.currentTimeMillis();
+            if (pressed >= 0 && pressed != lastWheelKey) {
+                lastWheelPressMs = now;
+                activeEmote = wheel.get(pressed);
+                String clip = TrinkiesLoadout.readJarText(emoteClipPath(activeEmote));
+                emoteUntilMs = now + TrinkiesLoadout.playClipMillis(clip, 900L);
+                swingArm(mc);
+            } else if (pressed < 0 && lastWheelKey >= 0) {
+                lastWheelKey = pressed;
+            }
+            if (pressed >= 0 && pressed == lastWheelKey && now - lastWheelPressMs < 250L) return;
+            lastWheelKey = pressed;
+            if (now > emoteUntilMs) activeEmote = null;
+        } catch (Throwable ignored) {
+            // Emotes are the most optional thing in this mod.
+        }
+    }
+
+    /** A wheel slot may hold any catalog item, so it is resolved by id rather than through a slot. */
+    private String emoteClipPath(String id) {
+        TrinkiesLoadout.Snapshot snapshot = trinkiesSnapshot;
+        TrinkiesLoadout.Entry entry = snapshot == null ? null : snapshot.entryById(id);
+        return entry == null ? null : entry.animationsJsonPath();
+    }
+
+    /** Reflective {@code GLFW.glfwGetKey(window, key)}; the constant and the method have been stable. */
+    private boolean glfwKey(long window, int key) {
+        try {
+            if (mGlfwGetKey == null) {
+                Class<?> glfw = Class.forName("org.lwjgl.glfw.GLFW", false, getClass().getClassLoader());
+                mGlfwGetKey = glfw.getMethod("glfwGetKey", long.class, int.class);
+            }
+            Object state = mGlfwGetKey.invoke(null, Long.valueOf(window), Integer.valueOf(key));
+            return state instanceof Number && ((Number) state).intValue() == 1;
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private int glfwKey1() {
+        try {
+            Class<?> glfw = Class.forName("org.lwjgl.glfw.GLFW", false, getClass().getClassLoader());
+            return glfw.getField("GLFW_KEY_1").getInt(null);
+        } catch (Throwable ignored) {
+            return 0;
+        }
+    }
+
+    private long resolveWindowHandle(Object mc) {
+        try {
+
+            if (fWindow == null) {
+                Field windowField = null;
+                for (Field candidate : mc.getClass().getDeclaredFields()) {
+                    if (!candidate.getType().getName().contains("Window")) continue;
+                    windowField = candidate;
+                    break;
+                }
+                if (windowField == null) return 0L;
+                windowField.setAccessible(true);
+                fWindow = windowField;
+            }
+            Object window = fWindow.get(mc);
+            if (window == null) return 0L;
+            if (mWindowGetHandle == null) {
+                // getHandle() on a Mojmap runtime, its intermediary id on an obfuscated one.
+                Method candidate = findMethodSafe(window.getClass(), "getHandle");
+                if (candidate == null) candidate = findMethodSafe(window.getClass(), "method_1783");
+                if (candidate == null) return 0L;
+                mWindowGetHandle = candidate;
+            }
+            Object handle = mWindowGetHandle.invoke(window);
+            return handle instanceof Long ? ((Long) handle).longValue() : 0L;
+        } catch (Throwable ignored) {
+            return 0L;
+        }
+    }
+
+    /**
+     * The client's own arm swing, found by shape rather than by name: a one-argument method taking
+     * an enum, named {@code swingHand} on a Mojmap runtime or under its intermediary id elsewhere.
+     * If this version exposes no such method, the emote still plays on the cape and says nothing more.
+     */
+    private void swingArm(Object mc) {
+        try {
+            if (fPlayer == null) return;
+            Object player = fPlayer.get(mc);
+            if (player == null) return;
+            for (Method candidate : player.getClass().getMethods()) {
+                String name = candidate.getName();
+                if (!name.equals("swingHand") && !name.startsWith("method_606")) continue;
+                Class<?>[] params = candidate.getParameterTypes();
+                if (params.length != 1 || !params[0].isEnum()) continue;
+                Object hand = params[0].getEnumConstants()[0];
+                if (hand == null) continue;
+                candidate.setAccessible(true);
+                candidate.invoke(player, hand);
+                return;
+            }
+        } catch (Throwable ignored) {
+            // A missing swing is not worth a stack trace in the log.
+        }
+    }
+
+    /** Reuses the mod's own byte reader, which already copes with a missing or truncated file. */
     private static String readTextFile(File file) {
         try {
-            return new String(java.nio.file.Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8);
+            return new String(readAllBytes(file), StandardCharsets.UTF_8);
         } catch (Throwable ignored) {
             return null;
         }

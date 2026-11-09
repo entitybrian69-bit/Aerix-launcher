@@ -55,6 +55,32 @@ for marker in ("CLIENT_STARTED", 'isModLoaded("trinkies")', "TRINKIES_CLIENT_BOO
     if marker not in legacy:
         fail(f"legacy boot smoke is missing required marker/condition: {marker}")
 
+# The harness must drive the wardrobe, not just boot it. A mod that loads and never reads
+# trinkies/equipped.json used to pass here, which is exactly the gap this branch exists to close.
+probe = HARNESS / "src/main/java/net/aerix/trinkies/gametest/LoadoutRoundTrip.java"
+if not probe.is_file():
+    fail("the shared loadout round-trip probe is missing from the harness")
+probe_text = probe.read_text(encoding="utf-8")
+for needle in (
+    "TrinkiesLoadout.catalogFromJar()",
+    "TrinkiesLoadout.parseApplied",
+    "TrinkiesLoadout.FILE_NAME",
+    "TrinkiesLoadout.APPLIED_FILE_NAME",
+    "equipped.back",
+    "frameTicks",
+    "emoteWheelSlots",
+    "emote_wheel",
+):
+    if needle not in probe_text:
+        fail(f"the harness probe no longer asserts the client's own answer ({needle})")
+for name in ("gametest", "legacy"):
+    entrypoints = list((HARNESS / "src" / name / "java").rglob("*.java"))
+    text = "\n".join(path.read_text(encoding="utf-8") for path in entrypoints)
+    for needle in ("LoadoutRoundTrip.seed(", "LoadoutRoundTrip.firstReceipt(", "requireWardrobeApplied(",
+                    "requireWheelAccepted("):
+        if needle not in text:
+            fail(f"the {name} entrypoint does not drive the loadout round trip: {needle}")
+
 runner = (HARNESS / "run_matrix.sh").read_text(encoding="utf-8")
 for target in (
     "run_target 26.3 25 '0.165.2+26.3' runClientGameTest",
@@ -63,8 +89,16 @@ for target in (
 ):
     if target not in runner:
         fail(f"approved runtime matrix entry is missing: {target}")
+if "trinkies_loadout_applied=true" not in runner:
+    fail("the matrix no longer requires the legacy boot marker to prove the loadout was answered")
+for contract in ("client-gametest-wardrobe-and-wheel-roundtrip-no-world", "client-boot-wardrobe-and-wheel-roundtrip"):
+    if contract not in runner:
+        fail(f"the matrix no longer names its asserted contract: {contract}")
+if "trinkies_emote_wheel_slots=1" not in runner:
+    fail("the matrix no longer requires the legacy marker to prove the emote wheel was accepted")
 for marker in ("headless-graphics.log", "glxinfo -B", "runtime_java_version=", "client-matrix-result.txt"):
     if marker not in runner:
         fail(f"runtime evidence/diagnostic collection is missing: {marker}")
 
-print("Trinkies client GameTest harness wiring verified: modern startup GameTests and 1.20.1 boot fallback.")
+print("Trinkies client GameTest harness wiring verified: wardrobe + emote wheel round trip in the "
+      "modern startup GameTest and the 1.20.1 boot fallback.")

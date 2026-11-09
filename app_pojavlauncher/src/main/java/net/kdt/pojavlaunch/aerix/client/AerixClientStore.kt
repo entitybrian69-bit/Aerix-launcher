@@ -94,6 +94,7 @@ object AerixClientStore {
 
     // Fresh v2 preferences namespace so ALL HUD items default to OFF and zero-overlap positions apply immediately
     private const val PREFS_FILE = "aerix_client_v2_prefs"
+    private const val EMOTE_WHEEL_SLOTS = 8
 
     private var prefs: SharedPreferences? = null
 
@@ -139,6 +140,43 @@ object AerixClientStore {
     var equippedPetId by mutableStateOf("none")
     var equippedEmoteId by mutableStateOf("none")
     var equippedAuraId by mutableStateOf("none")
+
+    /**
+     * Master switch for the Trinkies wardrobe. Off means the launcher serves the account skin
+     * unbaked, writes an emptied loadout so a running client unequips everything, and leaves the cape
+     * to the launcher's own animated designs - the whole cosmetic path, not just the preview.
+     */
+    var trinkiesCosmeticsEnabled by mutableStateOf(true)
+
+    /**
+     * The eight keybound emote slots, index 0 bound to number key 1. Each entry is a catalog id or
+     * "none". The wardrobe's wheel editor is the only writer; the loadout hands the list to the mod,
+     * which reads each item's own play clip out of the packaged asset pack at press time.
+     */
+    var trinkiesEmoteWheel by mutableStateOf(List(EMOTE_WHEEL_SLOTS) { "none" })
+
+    /** The item bound to one wheel slot, or "none" when that key does nothing. */
+    fun emoteWheelSlot(index: Int): String = trinkiesEmoteWheel.getOrElse(index) { "none" }
+
+    /** Binds or clears one slot; an out-of-range index is ignored rather than resizing the wheel. */
+    fun setEmoteWheelSlot(index: Int, id: String) {
+        if (index !in 0 until EMOTE_WHEEL_SLOTS) return
+        trinkiesEmoteWheel = List(EMOTE_WHEEL_SLOTS) { position ->
+            if (position == index) id else emoteWheelSlot(position)
+        }
+    }
+
+    /**
+     * Positions matter, so the wheel is stored as one comma-joined id per slot and every blank or
+     * "none" entry is normalised here rather than dropped: dropping it would slide eight bindings
+     * left and quietly move a key onto a different emote.
+     */
+    private fun loadEmoteWheel(raw: String): List<String> {
+        val bound = raw.split(',')
+        return List(EMOTE_WHEEL_SLOTS) { index ->
+            bound.getOrElse(index) { "" }.trim().takeIf { it.isNotEmpty() && it != "none" } ?: "none"
+        }
+    }
 
     /** The equipped catalog id for one wardrobe category, or "none". */
     fun equippedIdFor(category: String): String = when (category) {
@@ -276,6 +314,8 @@ object AerixClientStore {
         equippedEmoteId = p.getString("equippedEmoteId", "none") ?: "none"
         equippedAuraId = p.getString("equippedAuraId", "none") ?: "none"
         wavingCapeEnabled = p.getBoolean("wavingCapeEnabled", true)
+        trinkiesCosmeticsEnabled = p.getBoolean("trinkiesCosmeticsEnabled", true)
+        trinkiesEmoteWheel = loadEmoteWheel(p.getString("trinkiesEmoteWheel", "").orEmpty())
         animatedCapeShimmer = true
 
         // Every HUD & gameplay overlay defaults strictly to FALSE unless explicitly enabled by user
@@ -384,6 +424,8 @@ object AerixClientStore {
             putString("equippedEmoteId", equippedEmoteId)
             putString("equippedAuraId", equippedAuraId)
             putBoolean("wavingCapeEnabled", wavingCapeEnabled)
+            putBoolean("trinkiesCosmeticsEnabled", trinkiesCosmeticsEnabled)
+            putString("trinkiesEmoteWheel", trinkiesEmoteWheel.joinToString(","))
 
             putBoolean("crosshairEnabled", crosshairEnabled)
             putString("crosshairColor", crosshairColor)

@@ -38,6 +38,12 @@ dependencies {
 }
 
 if (clientGameTestsAvailable) {
+    // The generated client GameTest source set tests main's classes, and main carries the shared
+    // loadout round-trip probe. Say so explicitly instead of relying on how the test harness happens
+    // to wire its classpaths, so both entrypoints compile against the same helper.
+    sourceSets.gametest.compileClasspath += sourceSets.main.output + sourceSets.main.compileClasspath
+    sourceSets.gametest.runtimeClasspath += sourceSets.main.output
+
     fabricApi {
         configureTests {
             createSourceSet = true

@@ -134,6 +134,11 @@ public final class TrinkiesLoadoutSmokeTest {
         TrinkiesLoadout.Snapshot wheelOk = TrinkiesLoadout.parse(wheelWithIds, catalog);
         check("a bound wheel slot must still be a catalog id",
                 !wheelOk.hasProblem() && aHat.equals(wheelOk.emoteWheel().get(0)), wheelOk.getProblem());
+        // A wheel binding may point at any category, so it is resolved by id rather than by slot.
+        check("and a bound wheel id resolves to its own catalog entry",
+                wheelOk.entryById(aHat) != null && "hat".equals(wheelOk.entryById(aHat).category), null);
+        check("while an id nobody bound resolves to nothing",
+                wheelOk.entryById(null) == null && wheelOk.entryById("trinkies:not_bound") == null, null);
 
         TrinkiesLoadout.Snapshot absent = TrinkiesLoadout.read(new File("definitely-not-here.json"), catalog);
         check("no file means no loadout, not an error",
@@ -166,6 +171,11 @@ public final class TrinkiesLoadoutSmokeTest {
                         "{\"clips\":{\"idle\":{\"duration\":4.56,\"loop_mode\":\"loop\"}}}", 12, 95L) == 4, null);
         check("unreadable animation data is a non-event",
                 TrinkiesLoadout.frameTicksFromAnimation("{oops", 12, 95L) == 1, null);
+        check("a pressed emote lasts as long as its own play clip",
+                TrinkiesLoadout.playClipMillis("{\"clips\":{\"play\":{\"duration\":1.5}}}", 900L) == 1500L
+                        && TrinkiesLoadout.playClipMillis("{\"clips\":{\"play\":{\"duration\":99}}}", 900L) == 6000L
+                        && TrinkiesLoadout.playClipMillis(null, 900L) == 900L
+                        && TrinkiesLoadout.playClipMillis("{oops", 10L) == 250L, null);
         // Resolved from disk the same way the mod resolves it from the JAR, so the path the catalog
         // advertises is proven to point at the file that actually ships.
         File shippedClip = new File(packRoot, back.animationsJsonPath());
@@ -200,9 +210,24 @@ public final class TrinkiesLoadoutSmokeTest {
                             && "false".equals(flat.get("bake_matches_loadout"))
                             && String.valueOf(1730000000000L).equals(flat.get("confirmedAtMs")),
                     flat.toString());
-            check("and only the five headers plus six slots appear in it",
-                    flat.size() == 11, "size=" + flat.size());
+            // schema, source, confirmedAtMs, frameTicks, bake_matches_loadout, active_emote and
+            // emoteWheelSlots, plus one flattened line per worn slot. Anything else in the receipt means
+            // somebody added a field without telling the launcher, which reads this file by key.
+            check("and only the seven headers plus six slots appear in it",
+                    flat.size() == 13, "size=" + flat.size());
             TrinkiesLoadout.writeApplied(workDir, TrinkiesLoadout.buildAppliedJson(nothingOn, 1, true, 7L));
+            Map<String, String> withEmote = TrinkiesLoadout.parseApplied(TrinkiesLoadout.buildAppliedJson(
+                    snapshot, 2, true, aHat, 9L));
+            check("the receipt records a playing emote and the wheel slot it came from",
+                    aHat.equals(withEmote.get("active_emote")), withEmote.toString());
+            Map<String, String> wheelReceipt = TrinkiesLoadout.parseApplied(
+                    TrinkiesLoadout.buildAppliedJson(wheelOk, 1, true, 11L));
+            check("the receipt counts the wheel bindings this client accepted",
+                    "1".equals(wheelReceipt.get("emoteWheelSlots")), wheelReceipt.toString());
+            Map<String, String> unboundReceipt = TrinkiesLoadout.parseApplied(
+                    TrinkiesLoadout.buildAppliedJson(snapshot, 1, true, 12L));
+            check("an unbound wheel is reported as zero rather than left out",
+                    "0".equals(unboundReceipt.get("emoteWheelSlots")), unboundReceipt.toString());
             Map<String, String> cleared = TrinkiesLoadout.parseApplied(read(marker));
             check("an empty wardrobe is written as explicit nulls, not empty strings",
                     !cleared.containsKey("equipped.hat") || cleared.get("equipped.hat") == null,

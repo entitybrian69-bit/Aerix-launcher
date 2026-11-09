@@ -87,10 +87,13 @@ write_target_result() {
     local status="$6"
     local runtime_java="${7:-unknown}"
     local detail="${8:-none}"
-    local contract="client-gametest-startup-no-world"
+    # The contract names what is actually asserted. The mod loading is not the interesting part;
+    # reading the launcher's wardrobe - worn slots and keybound wheel alike - and answering it is.
+    # Neither covers in-world attachment drawing or a real key press.
+    local contract="client-gametest-wardrobe-and-wheel-roundtrip-no-world"
 
     if [[ "$task" == "verifyClientBootSmoke" ]]; then
-        contract="client-boot-mod-load"
+        contract="client-boot-wardrobe-and-wheel-roundtrip"
     fi
 
     mkdir -p "$target_dir"
@@ -192,6 +195,12 @@ run_target() {
                 code=1
             elif ! grep -Fxq "minecraft=$version" "$marker_file" || ! grep -Fxq 'trinkies_loaded=true' "$marker_file"; then
                 failure_reason="Legacy client boot marker does not confirm the expected Minecraft version and loaded Trinkies"
+                code=1
+            elif ! grep -Fxq 'trinkies_loadout_applied=true' "$marker_file"; then
+                failure_reason="Legacy client booted, but the Trinkies mod never answered trinkies/equipped.json"
+                code=1
+            elif ! grep -Fxq 'trinkies_emote_wheel_slots=1' "$marker_file"; then
+                failure_reason="Legacy client read its wardrobe slots but never accepted the keybound emote wheel"
                 code=1
             else
                 runtime_java="$(sed -n 's/^java=//p' "$marker_file" | head -n 1)"

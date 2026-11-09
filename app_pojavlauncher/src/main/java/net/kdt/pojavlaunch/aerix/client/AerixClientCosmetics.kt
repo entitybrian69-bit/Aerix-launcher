@@ -234,6 +234,7 @@ object AerixClientCosmetics {
      * as a torn one, and an unknown or unrenderable id simply means "no Trinkies cape".
      */
     private fun trinkiesCapePatchPixels(context: Context): IntArray? {
+        if (!AerixClientStore.trinkiesCosmeticsEnabled) return null
         val id = AerixClientStore.equippedIdFor("back")
         if (!id.startsWith("trinkies:")) return null
         val item = TrinkiesCatalog.find(context, id)?.takeIf { it.locallyRendered } ?: return null
@@ -477,6 +478,7 @@ object AerixClientCosmetics {
     ): ByteArray? {
         AerixClientStore.init(context)
         if (existingSkinPng == null) return null
+        if (!AerixClientStore.trinkiesCosmeticsEnabled) return existingSkinPng
         val patches = trinkiesGarmentPatches(context)
         if (patches.isEmpty()) return existingSkinPng
         val decoded = BitmapFactory.decodeByteArray(existingSkinPng, 0, existingSkinPng.size) ?: return existingSkinPng

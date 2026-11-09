@@ -38,7 +38,13 @@ For each explicitly supported Minecraft/Fabric/Java combination, use a clean tes
 - Suits: overlay/replace mode, armor overlap, classic/slim arms, standing/sneaking/swimming/flying.
 - Back/wings: idle, jump flap, elytra flap, pose reset, frustum/distance culling.
 - Auras: client particle setting, configured particle cap, brightness contrast, far-distance culling.
-- Emotes: partial-tick interpolation, blend in/out, loop boundary, cancel on movement/damage/item use; wheel accessible on keyboard and touch; user layout/import/export preserved.
+- Emotes: partial-tick interpolation, blend in/out, loop boundary, cancel on movement/damage/item use;
+  wheel accessible on keyboard and touch; user layout/import/export preserved. Currently checkable on a
+  device: bind keys 1-8 in the Wardrobe, launch a Fabric instance, press a number key, and watch the cape
+  flourish for the bound item's own clip length; `trinkies/applied.json` should report the same number of
+  accepted bindings. Not yet available: a wheel button in the touch layout, blend/interpolation controls,
+  and cancel-on-movement, because the mod plays the item's clip as a cape cadence change rather than
+  driving an animation blender.
 - Pets: each archetype follow/sit/sleep/jump state, no collision or movement blocking, terrain height, nearest-16 limit and frustum culling.
 
 ## Device/performance record (currently not measured)

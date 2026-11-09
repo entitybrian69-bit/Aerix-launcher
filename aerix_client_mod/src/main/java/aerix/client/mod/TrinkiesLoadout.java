@@ -106,6 +106,14 @@ public final class TrinkiesLoadout {
             return id == null ? null : catalog.get(id);
         }
 
+        /**
+         * The catalog entry behind an id, whatever category it came from. The emote wheel may hold any
+         * item, so it cannot be looked up through the six worn slots.
+         */
+        public Entry entryById(String id) {
+            return id == null ? null : catalog.get(id);
+        }
+
         public int equippedCount() {
             return equipped.size();
         }
@@ -343,6 +351,36 @@ public final class TrinkiesLoadout {
     }
 
     /**
+     * How long a pressed emote should keep the cape on its own {@code play} clip, in milliseconds.
+     *
+     * Same rule as the idle cadence: the pack decides the timing, {@code defaultMillis} is what a
+     * missing or unreadable clip falls back to, and the result is bounded so a typo in an animation
+     * file cannot hold a flourish on screen forever.
+     */
+    public static long playClipMillis(String animationsJson, long defaultMillis) {
+        long bounded = Math.max(250L, Math.min(6000L, defaultMillis));
+        if (animationsJson == null) {
+            return bounded;
+        }
+        try {
+            Object root = parseJson(animationsJson);
+            Object clips = root instanceof Map ? ((Map<?, ?>) root).get("clips") : null;
+            Object play = clips instanceof Map ? ((Map<?, ?>) clips).get("play") : null;
+            if (!(play instanceof Map)) {
+                return bounded;
+            }
+            Object duration = ((Map<?, ?>) play).get("duration");
+            if (!(duration instanceof Number)) {
+                return bounded;
+            }
+            long millis = Math.round(((Number) duration).doubleValue() * 1000.0);
+            return Math.max(250L, Math.min(6000L, millis));
+        } catch (RuntimeException error) {
+            return bounded;
+        }
+    }
+
+    /**
      * Whether the frames the launcher baked into the instance were baked for the loadout the mod just
      * read. A missing marker means an older bake, which makes no claim, so it counts as a match.
      */
@@ -368,13 +406,38 @@ public final class TrinkiesLoadout {
     }
 
     /** The receipt the client leaves for the launcher, so "the mod read it" is observable, not assumed. */
+    /** How many of the eight keybound slots this client accepted; a bogus id is not counted. */
+    private static int countWheelSlots(Snapshot snapshot) {
+        if (snapshot == null) {
+            return 0;
+        }
+        int bound = 0;
+        for (String id : snapshot.emoteWheel()) {
+            if (id != null) {
+                bound++;
+            }
+        }
+        return bound;
+    }
+
     public static String buildAppliedJson(Snapshot snapshot, int frameTicks, boolean bakeMatches,
                                           long confirmedAtMs) {
+        return buildAppliedJson(snapshot, frameTicks, bakeMatches, null, confirmedAtMs);
+    }
+
+    /**
+     * @param activeEmote the wheel slot currently playing, or null; recorded so a log or the launcher
+     *                    can tell "the client is wearing this" from "the client also owes an emote"
+     */
+    public static String buildAppliedJson(Snapshot snapshot, int frameTicks, boolean bakeMatches,
+                                          String activeEmote, long confirmedAtMs) {
         StringBuilder builder = new StringBuilder(256);
         builder.append("{\n  \"schema\": 1,\n  \"source\": \"trinkies\",\n  \"confirmedAtMs\": ")
                 .append(confirmedAtMs)
                 .append(",\n  \"frameTicks\": ").append(frameTicks)
                 .append(",\n  \"bake_matches_loadout\": ").append(bakeMatches)
+                .append(",\n  \"active_emote\": ").append(activeEmote == null ? "null" : quote(activeEmote))
+                .append(",\n  \"emoteWheelSlots\": ").append(countWheelSlots(snapshot))
                 .append(",\n  \"equipped\": {\n");
         for (int i = 0; i < CATEGORIES.length; i++) {
             String category = CATEGORIES[i];

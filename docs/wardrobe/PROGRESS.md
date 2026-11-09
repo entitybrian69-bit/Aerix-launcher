@@ -2,6 +2,17 @@
 
 Updated: 2026-11-09 (UTC)
 
+## 2026-11-09 (final pass): the wheel, the switch, and an in-game assertion
+
+**Status: implemented; CI compiles the mod and the harness and runs the round trip in three real clients.**
+
+- Emote wheel, wired end to end rather than stubbed. Launcher side: the Wardrobe preview panel edits eight slots, each holding any catalog id, persisted in the client store, transferred with the other settings, and pushed to every supported instance's `equipped.json` from a background task so a rebind lands mid-session. Game side: the slots are keys 1-8, polled through `glfwGetKey` reflectively on the client thread, a press reads that item's own `clips.play.duration` through `TrinkiesLoadout.playClipMillis`, and while it lasts the cape advances one frame per tick instead of the idle cadence, plus the client's arm swing if this runtime exposes one. The active slot is recorded in `applied.json` as `active_emote`. Missing LWJGL, no window handle, an empty wheel, or a missing method all mean "silent wheel", never a crash.
+- Cosmetics are now switchable launcher-wide from the Wardrobe (`TRINKIES COSMETICS ON/OFF`, persisted and transferred with the other client settings). Off is not just a darkened preview: the served skin is unbaked, the cape patch is not baked, and the loadout is written *emptied*, so a running client unequips instead of keeping its last wardrobe.
+- The loadout poll moved to the mod's daemon thread, ahead of both handle resolution and the render-thread handoff, so answering `equipped.json` never stalls a frame and works even where the texture bridge cannot resolve.
+- In-game verification: `tools/trinkies_client_gametest` now drives the real client through the round trip, wheel included - the receipt's `emoteWheelSlots` is asserted to match what the harness seeded, in both the modern GameTest and the 1.20.1 marker (`trinkies_emote_wheel_slots=1`). The 26.3 / 1.21.11 GameTest writes a wardrobe, waits up to ~20 s for `trinkies/applied.json`, and requires the hat to be worn, the cape pace to be stretched to the item's own idle clip (2..8 ticks), and the *refusal* of a hat id placed in the `back` slot with the pace back at 1; `run_matrix.sh` additionally fails 1.20.1 unless its boot marker carries `trinkies_loadout_applied=true`. The probe reuses the mod's own `TrinkiesLoadout.catalogFromJar()` / `parseApplied`, so it cannot drift into asserting its own arithmetic, and the harness gate test fails if either entrypoint stops driving it.
+- What CI cannot cover, and does not claim: the physical key press. Fabric's client GameTest input layer dispatches `TestInput.holdKey` straight into `KeyMapping`s, so a synthetic press never lands in the native key state the wheel polls; asserting on it would have meant testing a path the player never takes.
+- Deliberately not done, because it cannot be verified from here and a throwing renderer is worse than a missing one: in-world 3D attachment drawing for wings/pets/props, pet followers, particle trails. Also untouched: cosmetics cloud sync, which needs an owner decision on what leaves the device (`wardrobe/SPEC.md`), and real-device play testing.
+
 ## 2026-11-09 (later again): the client mod consumes the loadout
 
 **Status: implemented; CI is the compile gate, and the reader's logic now executes in CI.**

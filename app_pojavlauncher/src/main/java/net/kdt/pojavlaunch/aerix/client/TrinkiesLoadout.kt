@@ -18,6 +18,9 @@ object TrinkiesLoadout {
     /** The client writes this after it has read [FILE_NAME]; it is the game's side of the receipt. */
     private const val APPLIED_FILE_NAME = "applied.json"
 
+    /** Number keys 1-8, matching the schema's fixed wheel length. */
+    private const val WHEEL_SLOTS = 8
+
     /**
      * Categories the mod can consume, in bake order. `emote` here is the worn sleeve/cuff look; the
      * keybound wheel is the separate `emote_wheel` array below.
@@ -53,17 +56,29 @@ object TrinkiesLoadout {
             return false
         }
 
+        // Turning cosmetics off writes an emptied loadout rather than skipping the write: a client
+        // that is already running reads this file, so "no receipt change" would leave it wearing
+        // everything the player just switched off.
+        val wardrobeEnabled = AerixClientStore.trinkiesCosmeticsEnabled
         val equipped = CATEGORIES.associateWith { category ->
             AerixClientStore.equippedIdFor(category).takeIf { id ->
-                id != "none" && TrinkiesCatalog.hasId(context, id, category)
+                wardrobeEnabled && id != "none" && TrinkiesCatalog.hasId(context, id, category)
             }
         }
         val json = JSONObject()
             .put("schema", SCHEMA)
             .apply { equipped.forEach { (category, id) -> put(category, id ?: JSONObject.NULL) } }
-            // The wheel is the keybound list, which no launcher UI feeds yet; it is written as eight
-            // explicit nulls so a reader can tell "nothing bound" from "field never existed".
-            .put("emote_wheel", JSONArray().apply { repeat(8) { put(JSONObject.NULL) } })
+            // The wheel is the keybound list the Wardrobe edits: eight slots, each an emote id or an
+            // explicit null, so a reader can tell "nothing bound" from "field never existed". Binding
+            // any item other than the worn emote is fine - the mod resolves each id through the
+            // catalog and plays that item's own clip, and cosmetics being off empties the wheel too.
+            .put("emote_wheel", JSONArray().apply {
+                repeat(WHEEL_SLOTS) { index ->
+                    put(AerixClientStore.emoteWheelSlot(index)
+                        .takeIf { id -> wardrobeEnabled && id != "none" && TrinkiesCatalog.find(context, id) != null }
+                        ?: JSONObject.NULL)
+                }
+            })
             .toString(2) + "\n"
 
         val temporary = File.createTempFile(".equipped-", ".tmp", canonicalDir)
@@ -116,6 +131,12 @@ object TrinkiesLoadout {
                 append(" · BAKE IS STALE, RESTART THE INSTANCE")
             } else {
                 append(" · CAPE PACE ").append(receipt.optInt("frameTicks", 1)).append(" TICKS/FRAME")
+            }
+            // The wheel is listed separately because it binds keys rather than pixels: a player who
+            // bound three emotes and sees "0/8" knows the loadout never made it into the game folder.
+            val bound = receipt.optInt("emoteWheelSlots", 0)
+            if (bound > 0 || receipt.has("emoteWheelSlots")) {
+                append(" · EMOTE WHEEL ").append(bound.coerceIn(0, WHEEL_SLOTS)).append('/').append(WHEEL_SLOTS)
             }
         }
     }.onFailure { error ->

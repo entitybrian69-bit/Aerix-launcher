@@ -153,6 +153,8 @@ class TrinkiesIntegrationSmoke(unittest.TestCase):
         loadout = (APP / "client/TrinkiesLoadout.kt").read_text()
         wardrobe = (APP / "ui/screens/TrinkiesWardrobeScreen.kt").read_text()
         schema = json.loads((ROOT / "docs/wardrobe/schema/equipped.schema.json").read_text())
+        store_source = (APP / "client/AerixClientStore.kt").read_text()
+        transfer = (APP / "client/ClientSettingsTransfer.kt").read_text()
 
         self.assertIn('assets.open(ASSET_CATALOG)', reader)
         self.assertIn('textureAsset = "trinkies/$relativeTexture"', reader)
@@ -185,7 +187,10 @@ class TrinkiesIntegrationSmoke(unittest.TestCase):
         # The other half of the contract: the client mod reads the loadout back and answers, and the
         # launcher surfaces that answer instead of assuming the wardrobe landed.
         mod_loop = (ROOT / "aerix_client_mod/src/main/java/aerix/client/mod/AerixClientMod.java").read_text()
-        self.assertIn("refreshTrinkiesLoadout(runDir)", mod_loop)
+        # The poll runs on the mod's own daemon thread, ahead of handle resolution, so a client
+        # whose texture bridge cannot resolve still answers its wardrobe.
+        self.assertIn("refreshTrinkiesLoadout(resolveRunDir(safeClientInstance()))", mod_loop)
+        self.assertIn("effectiveFrameTicks()", mod_loop)
         self.assertIn("new File(runDir, \"trinkies\")", mod_loop)
         self.assertIn('private const val APPLIED_FILE_NAME = "applied.json"', loadout)
         self.assertIn("applyClientCosmetics = true", wardrobe)
@@ -193,6 +198,37 @@ class TrinkiesIntegrationSmoke(unittest.TestCase):
         self.assertIn('AerixClientStore.setEquippedId(category, item?.id ?: "none")', wardrobe)
         # The bespoke per-family pixel painting is gone: the asset is the renderer now.
         self.assertNotIn("catalogHat.shape.lowercase()", cosmetics)
+        # One master switch, and it gates the paint paths rather than only the UI.
+        self.assertIn("if (!AerixClientStore.trinkiesCosmeticsEnabled) return existingSkinPng", cosmetics)
+        self.assertIn('if (!AerixClientStore.trinkiesCosmeticsEnabled) return null', cosmetics)
+        self.assertIn('var trinkiesCosmeticsEnabled by mutableStateOf(true)', store_source)
+        self.assertIn('putBoolean("trinkiesCosmeticsEnabled", trinkiesCosmeticsEnabled)', store_source)
+        self.assertIn('"trinkiesCosmeticsEnabled"', transfer)
+        # Off has to reach the game, so the loadout is emptied rather than skipped.
+        self.assertIn("wardrobeEnabled && id != \"none\"", loadout)
+        # A binding survives only if the launcher writes it into the loadout the mod reads, validated
+        # against the catalog and emptied with everything else when cosmetics are off.
+        self.assertIn('repeat(WHEEL_SLOTS) { index ->', loadout)
+        self.assertIn('AerixClientStore.emoteWheelSlot(index)', loadout)
+        self.assertIn('TrinkiesCatalog.find(context, id) != null', loadout)
+        self.assertIn("put(\"emote_wheel\", JSONArray()", loadout)
+        self.assertIn("trinkiesEmoteWheel", store_source)
+        self.assertIn("fun setEmoteWheelSlot(index: Int, id: String)", store_source)
+        self.assertIn('putString("trinkiesEmoteWheel", trinkiesEmoteWheel.joinToString(","))', store_source)
+        self.assertIn('"trinkiesEmoteWheel"', transfer)
+        # The Wardrobe edits the wheel, and the edit reaches every supported instance without a restart.
+        wardrobe = (APP / "ui/screens/TrinkiesWardrobeScreen.kt").read_text()
+        self.assertIn("WardrobeEmoteWheel()", wardrobe)
+        self.assertIn("bindEmoteWheelSlot(context, slot, item.id", wardrobe)
+        self.assertIn("TrinkiesLoadout.writeForInstance(context, directory)", wardrobe)
+        self.assertIn("isSupportedInstance(it)", wardrobe)
+        # The wheel is read from the loadout the launcher wrote, not from a config the mod owns.
+        mod_loop = (ROOT / "aerix_client_mod/src/main/java/aerix/client/mod/AerixClientMod.java").read_text()
+        self.assertIn("trinkiesWheel = snapshot.emoteWheel()", mod_loop)
+        self.assertIn("pumpEmoteWheel(mc)", mod_loop)
+        self.assertIn("TrinkiesLoadout.playClipMillis(", mod_loop)
+        self.assertIn("org.lwjgl.glfw.GLFW", mod_loop)
+        self.assertIn("snapshot.entryById(id)", mod_loop)
 
         state_fields = set(schema["required"])
         self.assertEqual(state_fields - {"schema", "emote_wheel"}, {"hat", "suit", "back", "pet", "emote", "aura"})

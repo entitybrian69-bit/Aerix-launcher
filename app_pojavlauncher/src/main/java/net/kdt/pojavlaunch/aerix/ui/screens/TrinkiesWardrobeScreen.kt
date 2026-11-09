@@ -431,6 +431,7 @@ private fun WardrobePreviewPanel(
         }
         Text("DRAG TO ROTATE · POSES ARE LOCAL PREVIEWS", color = Color(0xFF9A9B9E),
             fontFamily = FontFamily.Monospace, fontSize = 6.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        WardrobeEmoteWheel()
         // The game's own reply, read from the receipt a Fabric-enabled instance leaves behind. It is
         // deliberately absent rather than optimistic when no instance has confirmed the wardrobe yet.
         val appContext = androidx.compose.ui.platform.LocalContext.current
@@ -440,11 +441,121 @@ private fun WardrobePreviewPanel(
                 net.kdt.pojavlaunch.aerix.client.TrinkiesLoadout.describeGameConfirmation(appContext)
             }
         }
+        val cosmeticsOn = AerixClientStore.trinkiesCosmeticsEnabled
+        Text(
+            text = if (cosmeticsOn) "TRINKIES COSMETICS ON · TAP TO TURN OFF"
+            else "TRINKIES COSMETICS OFF · TAP TO TURN ON",
+            color = if (cosmeticsOn) wardrobeGreen else Color(0xFF9A9B9E),
+            fontFamily = FontFamily.Monospace, fontSize = 6.sp, maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.clickable {
+                AerixClientStore.trinkiesCosmeticsEnabled = !cosmeticsOn
+                AerixClientStore.persist()
+            }
+        )
         // A delegated local has no smart cast, so the nullable read goes through let.
         confirmation?.let { worn ->
             Text(worn, color = wardrobeGreen, fontFamily = FontFamily.Monospace,
                 fontSize = 6.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
+    }
+}
+
+/**
+ * The eight keybound emotes, bound to number keys 1-8 in game. A slot holds any catalog id: the mod
+ * resolves it through the packaged item list and plays that item's own `clips.play` length, so binding
+ * a hat here is a hat flourish rather than a mistake. Bindings are written straight to every supported
+ * instance's loadout, which the mod re-reads on its own clock, so a rebind lands mid-session instead of
+ * waiting for the next launch.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun WardrobeEmoteWheel() {
+    val context = LocalContext.current
+    var editingSlot by remember { mutableStateOf(-1) }
+    val emotes = remember { TrinkiesCatalog.category(context, "emote") }
+    val bound = AerixClientStore.trinkiesEmoteWheel
+    val cosmeticsOn = AerixClientStore.trinkiesCosmeticsEnabled
+    val slot = editingSlot
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("EMOTE WHEEL · KEYS 1-8", color = Color(0xFF9A9B9E),
+                fontFamily = FontFamily.Monospace, fontSize = 6.sp, maxLines = 1,
+                overflow = TextOverflow.Ellipsis)
+            Text(if (!cosmeticsOn) "COSMETICS OFF · NOTHING PLAYS"
+                else "${bound.count { it != "none" }}/8 BOUND",
+                color = if (cosmeticsOn) wardrobeGreen else Color(0xFFB45309),
+                fontFamily = FontFamily.Monospace, fontSize = 6.sp, maxLines = 1,
+                overflow = TextOverflow.Ellipsis)
+        }
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+            bound.forEachIndexed { index, id ->
+                // An id the catalog no longer lists (a pack downgrade) still shows which key it holds.
+                val name = emotes.firstOrNull { it.id == id }?.name
+                    ?: id.takeUnless { it == "none" }?.substringAfter(':')?.replace('_', ' ')
+                WardrobeWheelChip(label = "${index + 1} ${name ?: "-"}",
+                    selected = slot == index || (cosmeticsOn && name != null),
+                    onClick = { editingSlot = if (slot == index) -1 else index })
+            }
+        }
+        if (slot >= 0) {
+            Box(Modifier.fillMaxWidth().heightIn(max = 92.dp)
+                .clip(RoundedCornerShape(0.dp))
+                .background(Color(0xFF141517))
+                .border(1.dp, Color(0xFF303236), RoundedCornerShape(0.dp))
+                .verticalScroll(rememberScrollState())
+                .padding(3.dp)) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    WardrobeWheelChip(label = "UNBIND", selected = false, onClick = {
+                        bindEmoteWheelSlot(context, slot, "none", "Key ${slot + 1} does nothing now")
+                        editingSlot = -1
+                    })
+                    emotes.forEach { item ->
+                        WardrobeWheelChip(label = item.name, selected = bound[slot] == item.id, onClick = {
+                            bindEmoteWheelSlot(context, slot, item.id, "${item.name} on key ${slot + 1}")
+                            editingSlot = -1
+                        })
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Remembers the binding, then hands it to every instance that can consume it; the mod polls for it. */
+private fun bindEmoteWheelSlot(context: android.content.Context, slot: Int, id: String, feedback: String) {
+    AerixClientStore.setEmoteWheelSlot(slot, id)
+    AerixClientStore.persist()
+    PojavAccountBridge.notifyWardrobeChanged()
+    Toast.makeText(context, feedback, Toast.LENGTH_SHORT).show()
+    PojavApplication.sExecutorService.execute {
+        runCatching {
+            net.kdt.pojavlaunch.instances.Instances.loadAllInstances()
+                .filter { net.kdt.pojavlaunch.aerix.client.TrinkiesInstaller.isSupportedInstance(it) }
+                .forEach { instance ->
+                    instance.gameDirectory?.let { directory ->
+                        net.kdt.pojavlaunch.aerix.client.TrinkiesLoadout.writeForInstance(context, directory)
+                    }
+                }
+        }
+    }
+}
+
+@Composable
+private fun WardrobeWheelChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(0.dp),
+        color = if (selected) Color(0xFF234325) else Color(0xFF292B2E),
+        contentColor = if (selected) wardrobeGreen else Color(0xFFD1D1D1),
+        border = BorderStroke(1.dp, if (selected) Color(0xFF3A853D) else Color(0xFF141517))
+    ) {
+        Text(label, fontFamily = FontFamily.Monospace, fontSize = 6.sp, fontWeight = FontWeight.Bold,
+            maxLines = 1, overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = 5.dp, vertical = 3.dp))
     }
 }
 
