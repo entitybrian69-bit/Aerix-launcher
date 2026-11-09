@@ -26,6 +26,7 @@ env:
   # anywhere without a second file to choose between.
   APK_NAME: Aerix-Launcher-debug.apk
   APK_PATH: app_pojavlauncher/build/outputs/apk/noruntime/debug/app_pojavlauncher-noruntime-debug.apk
+  MOD_JAR_DIR: app_pojavlauncher/build/intermediates/package_jar_deps/components/aerix_client
 
 jobs:
   build:
@@ -235,8 +236,12 @@ jobs:
 
       - name: Verify built Trinkies JAR contents
         run: |
-          MOD_JAR_PATH="$(find aerix_client_mod/build/libs -maxdepth 1 -type f -name '*.jar' -print -quit)"
-          test -n "$MOD_JAR_PATH"
+          MOD_JAR_PATH="$(find "$MOD_JAR_DIR" -maxdepth 1 -type f -name '*.jar' -print -quit)"
+          if [[ -z "$MOD_JAR_PATH" ]]; then
+            echo "::error title=Trinkies JAR missing::No JAR found under $MOD_JAR_DIR; inspect the app project's registered jar dependency output path"
+            ls -la "$MOD_JAR_DIR" || true
+            exit 1
+          fi
           python3 tests/trinkies_jar_verify.py "$MOD_JAR_PATH"
 
       - name: Check it is really the debug build
@@ -270,7 +275,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: trinkies-fabric-client-jar
-          path: aerix_client_mod/build/libs/*.jar
+          path: ${{ env.MOD_JAR_DIR }}/*.jar
           retention-days: 30
 
       - name: Publish debug APK to GitHub Release (debug-latest)
