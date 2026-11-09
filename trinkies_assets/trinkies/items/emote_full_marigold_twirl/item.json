@@ -16,6 +16,7 @@
   "category": "emote",
   "description": "An original moonlit twirl with a marigold glass finish, family-specific silhouette, and a emote bow accent. Designed as a distinct voxel form for the Trinkies local catalog.",
   "emissive_mask": "emissive.png",
+  "garment": "garment.png",
   "id": "trinkies:emote_full_marigold_twirl",
   "model": "model.bbmodel",
   "name": "Marigold Moonlit Twirl",

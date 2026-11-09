@@ -16,6 +16,7 @@
   "category": "pet",
   "description": "An original mossback turtle with a saffron stone finish, family-specific silhouette, and a pet bounce accent. Designed as a distinct voxel form for the Trinkies local catalog.",
   "emissive_mask": "emissive.png",
+  "garment": "garment.png",
   "id": "trinkies:pet_full_saffron_turtle",
   "model": "model.bbmodel",
   "name": "Saffron Mossback Turtle",

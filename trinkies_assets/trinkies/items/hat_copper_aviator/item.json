@@ -15,6 +15,7 @@
   "category": "hat",
   "description": "A riveted sky-pilot cap with twin teal lenses and a low wind brim.",
   "emissive_mask": "emissive.png",
+  "garment": "garment.png",
   "id": "trinkies:hat_copper_aviator",
   "model": "model.bbmodel",
   "name": "Copper Aviator",

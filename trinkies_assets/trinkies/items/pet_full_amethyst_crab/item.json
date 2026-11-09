@@ -15,6 +15,7 @@
   },
   "category": "pet",
   "description": "An original pebble crab with a amethyst metal finish, family-specific silhouette, and a pet scuttle accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "garment": "garment.png",
   "id": "trinkies:pet_full_amethyst_crab",
   "model": "model.bbmodel",
   "name": "Amethyst Pebble Crab",

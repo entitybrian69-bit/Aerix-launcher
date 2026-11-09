@@ -15,6 +15,7 @@
   "category": "aura",
   "description": "An original glass rune ring with a moonstone crystal finish, family-specific silhouette, and a aura orbit accent. Designed as a distinct voxel form for the Trinkies local catalog.",
   "emissive_mask": "emissive.png",
+  "garment": "garment.png",
   "id": "trinkies:aura_full_moonstone_rune",
   "model": "model.bbmodel",
   "name": "Moonstone Glass Rune Ring",

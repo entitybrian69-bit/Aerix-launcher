@@ -14,6 +14,7 @@
   },
   "category": "hat",
   "description": "An original orbit halo with a sunstone metal finish, family-specific silhouette, and a lantern sway accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "garment": "garment.png",
   "id": "trinkies:hat_full_sunstone_halo",
   "model": "model.bbmodel",
   "name": "Sunstone Orbit Halo",

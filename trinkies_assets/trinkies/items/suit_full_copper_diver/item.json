@@ -15,6 +15,7 @@
   "category": "suit",
   "description": "An original pressure diver suit with a copper metal finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
   "emissive_mask": "emissive.png",
+  "garment": "garment.png",
   "id": "trinkies:suit_full_copper_diver",
   "model": "model.bbmodel",
   "name": "Copper Pressure Diver Suit",

@@ -14,6 +14,7 @@
   },
   "category": "hat",
   "description": "An original moonbranch antlers with a moonlit wood finish, family-specific silhouette, and a horn shiver accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "garment": "garment.png",
   "id": "trinkies:hat_full_moonlit_antlers",
   "model": "model.bbmodel",
   "name": "Moonlit Moonbranch Antlers",

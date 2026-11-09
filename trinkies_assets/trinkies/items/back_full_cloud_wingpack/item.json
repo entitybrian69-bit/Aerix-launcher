@@ -12,9 +12,11 @@
       0
     ]
   },
+  "cape_texture": "cape_patch.png",
   "category": "back",
   "description": "An original clockwork wingpack with a cloud metal finish, family-specific silhouette, and a wing flutter accent. Designed as a distinct voxel form for the Trinkies local catalog.",
   "emissive_mask": "emissive.png",
+  "garment": "garment.png",
   "id": "trinkies:back_full_cloud_wingpack",
   "model": "model.bbmodel",
   "name": "Cloud Clockwork Wingpack",

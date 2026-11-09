@@ -15,6 +15,7 @@
   "category": "suit",
   "description": "An original cartographer uniform with a crimson leather finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
   "emissive_mask": "emissive.png",
+  "garment": "garment.png",
   "id": "trinkies:suit_full_crimson_cartographer",
   "model": "model.bbmodel",
   "name": "Crimson Cartographer Uniform",

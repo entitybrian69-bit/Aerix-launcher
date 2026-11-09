@@ -45,7 +45,7 @@ def draw_full_model_preview_sheet(records: list[dict[str, Any]]) -> Path:
         detail_font = ImageFont.truetype("DejaVuSans.ttf", 8)
     except OSError:
         title_font = name_font = detail_font = ImageFont.load_default()
-    draw.text((margin, 7), "TRINKIES · FULL 300 · SHADED 3D MODEL PREVIEWS · NOT IN-GAME RENDERS",
+    draw.text((margin, 7), "TRINKIES · FULL 300 · ITEMS BAKED ONTO THE MANNEQUIN · NOT IN-GAME RENDERS",
               fill=(231, 239, 236), font=title_font)
     rarity_color = base.RARITY_ACCENT_RGB
     for index, record in enumerate(records):
@@ -87,7 +87,10 @@ def write_roster(records: list[dict[str, Any]]) -> Path:
                 f"| {category} | `{item['id']}` | {item['name']} | `{item['shape']}` · "
                 f"{', '.join(item['palette'][:2])} | {item['rarity']} |"
             )
-    lines += ["", "See `full-catalog-model-preview-sheet.png` for shaded 3D renders of the generated cube models. These are launcher/catalog previews, not Minecraft screenshots.", ""]
+    lines += ["", "Each item also ships `garment.png`: a 64×64 patch in the player skin's own UV layout, which is what the "
+              "launcher and the mod composite onto a skin. Back items add a 64×32 `cape_patch.png`.", "",
+              "See `full-catalog-model-preview-sheet.png` for the generated renders, each showing the mannequin actually wearing "
+              "the item. These are launcher/catalog previews, not Minecraft screenshots.", ""]
     output = DOCS_ROOT / "ROSTER.md"
     output.write_text("\n".join(lines), encoding="utf-8")
     return output
@@ -143,9 +146,11 @@ def generate() -> None:
             "rarity": item["rarity"], "description": item["description"],
             "item": (folder / "item.json").as_posix(),
             "texture": (folder / item["texture"]).as_posix(),
+            "garment": (folder / item["garment"]).as_posix(),
             "preview": (folder / "preview.png").as_posix(),
             "shape": item["shape"], "palette": item["palette"],
-            "local_render_support": item["category"] == "hat",
+            # Every category now ships a baked garment patch the launcher composites onto the skin.
+            "local_render_support": True,
         })
     if category_counts != {category: 50 for category in CATEGORY_ORDER}:
         raise SystemExit(f"Unexpected category counts: {category_counts}")

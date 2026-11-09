@@ -15,6 +15,7 @@
   "category": "aura",
   "description": "An original willow whorl with a aurora wood finish, family-specific silhouette, and a aura sweep accent. Designed as a distinct voxel form for the Trinkies local catalog.",
   "emissive_mask": "emissive.png",
+  "garment": "garment.png",
   "id": "trinkies:aura_full_aurora_leaf",
   "model": "model.bbmodel",
   "name": "Aurora Willow Whorl",

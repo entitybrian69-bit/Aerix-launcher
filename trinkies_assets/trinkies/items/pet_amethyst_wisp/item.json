@@ -16,6 +16,7 @@
   "category": "pet",
   "description": "A shy hovering crystal sprite with a warm core and two orbiting shards.",
   "emissive_mask": "emissive.png",
+  "garment": "garment.png",
   "id": "trinkies:pet_amethyst_wisp",
   "model": "model.bbmodel",
   "name": "Amethyst Wisp",

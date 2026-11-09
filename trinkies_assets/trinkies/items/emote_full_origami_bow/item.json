@@ -15,6 +15,7 @@
   },
   "category": "emote",
   "description": "An original marigold bow with a origami cloth finish, family-specific silhouette, and a emote bow accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "garment": "garment.png",
   "id": "trinkies:emote_full_origami_bow",
   "model": "model.bbmodel",
   "name": "Origami Marigold Bow",

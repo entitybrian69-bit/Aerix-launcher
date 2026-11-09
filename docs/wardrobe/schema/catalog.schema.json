@@ -60,6 +60,8 @@
         "description": {"type": "string", "minLength": 1, "maxLength": 240},
         "item": {"type": "string", "pattern": "^items/[a-z0-9_]+/item\\.json$"},
         "texture": {"type": "string", "pattern": "^items/[a-z0-9_]+/texture\\.png$"},
+        "garment": {"type": "string", "pattern": "^items/[a-z0-9_]+/garment\\.png$"},
+        "cape_texture": {"type": "string", "pattern": "^items/[a-z0-9_]+/cape_patch\\.png$"},
         "preview": {"type": "string", "pattern": "^items/[a-z0-9_]+/preview\\.png$"},
         "shape": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
         "palette": {

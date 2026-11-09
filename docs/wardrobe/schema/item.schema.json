@@ -6,7 +6,7 @@
   "additionalProperties": false,
   "required": [
     "id", "category", "name", "description", "rarity", "tags",
-    "model", "texture", "attach", "animations", "animation_file",
+    "model", "texture", "garment", "attach", "animations", "animation_file",
     "version", "palette", "shape"
   ],
   "properties": {
@@ -18,6 +18,8 @@
     "tags": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-z0-9-]+$", "maxLength": 32}},
     "model": {"type": "string", "pattern": "^[a-zA-Z0-9_./-]+\\.bbmodel$"},
     "texture": {"type": "string", "pattern": "^[a-zA-Z0-9_./-]+\\.png$"},
+    "garment": {"type": "string", "const": "garment.png"},
+    "cape_texture": {"type": "string", "const": "cape_patch.png"},
     "emissive_mask": {"type": "string", "pattern": "^[a-zA-Z0-9_./-]+\\.png$"},
     "particle_sheet": {"type": "string", "pattern": "^[a-zA-Z0-9_./-]+\\.png$"},
     "attach": {

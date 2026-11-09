@@ -16,6 +16,7 @@
   "category": "emote",
   "description": "A formal bow traced by two pale ribbons that settle at the shoulders.",
   "emissive_mask": "emissive.png",
+  "garment": "garment.png",
   "id": "trinkies:emote_moonlit_ribbon_bow",
   "model": "model.bbmodel",
   "name": "Moonlit Ribbon Bow",

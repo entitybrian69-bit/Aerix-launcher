@@ -12,9 +12,11 @@
       0
     ]
   },
+  "cape_texture": "cape_patch.png",
   "category": "back",
   "description": "A floating brass bell drone with three stabilizer fins and a blue glass lens.",
   "emissive_mask": "emissive.png",
+  "garment": "garment.png",
   "id": "trinkies:back_tidal_bell_drone",
   "model": "model.bbmodel",
   "name": "Tidal Bell Drone",

@@ -15,6 +15,7 @@
   "category": "aura",
   "description": "An original ember petals with a moonstone enamel finish, family-specific silhouette, and a aura rise accent. Designed as a distinct voxel form for the Trinkies local catalog.",
   "emissive_mask": "emissive.png",
+  "garment": "garment.png",
   "id": "trinkies:aura_full_moonstone_ember",
   "model": "model.bbmodel",
   "name": "Moonstone Ember Petals",

@@ -15,6 +15,7 @@
   "category": "hat",
   "description": "An original aviator cap with a moonlit leather finish, family-specific silhouette, and a hat wind accent. Designed as a distinct voxel form for the Trinkies local catalog.",
   "emissive_mask": "emissive.png",
+  "garment": "garment.png",
   "id": "trinkies:hat_full_moonlit_aviator",
   "model": "model.bbmodel",
   "name": "Moonlit Aviator Cap",

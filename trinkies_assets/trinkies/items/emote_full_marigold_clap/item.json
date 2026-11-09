@@ -16,6 +16,7 @@
   "category": "emote",
   "description": "An original spark clap with a marigold enamel finish, family-specific silhouette, and a emote cheer accent. Designed as a distinct voxel form for the Trinkies local catalog.",
   "emissive_mask": "emissive.png",
+  "garment": "garment.png",
   "id": "trinkies:emote_full_marigold_clap",
   "model": "model.bbmodel",
   "name": "Marigold Spark Clap",

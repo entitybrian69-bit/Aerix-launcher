@@ -16,6 +16,7 @@
   "category": "emote",
   "description": "A two-beat cheer with a star wand flourish and a grounded finish.",
   "emissive_mask": "emissive.png",
+  "garment": "garment.png",
   "id": "trinkies:emote_spark_wand_cheer",
   "model": "model.bbmodel",
   "name": "Spark Wand Cheer",

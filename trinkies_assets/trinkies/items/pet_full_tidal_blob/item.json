@@ -16,6 +16,7 @@
   "category": "pet",
   "description": "An original sootbubble with a tidal wool finish, family-specific silhouette, and a pet bounce accent. Designed as a distinct voxel form for the Trinkies local catalog.",
   "emissive_mask": "emissive.png",
+  "garment": "garment.png",
   "id": "trinkies:pet_full_tidal_blob",
   "model": "model.bbmodel",
   "name": "Tidal Sootbubble",

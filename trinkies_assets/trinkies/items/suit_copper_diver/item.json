@@ -15,6 +15,7 @@
   "category": "suit",
   "description": "A pressure suit with a ceramic chest plate, paired air canisters, and weighted boots.",
   "emissive_mask": "emissive.png",
+  "garment": "garment.png",
   "id": "trinkies:suit_copper_diver",
   "model": "model.bbmodel",
   "name": "Copper Diver Suit",

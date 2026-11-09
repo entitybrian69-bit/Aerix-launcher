@@ -15,6 +15,7 @@
   "category": "suit",
   "description": "A charcoal observatory robe with a raised collar and stitched constellation plates.",
   "emissive_mask": "emissive.png",
+  "garment": "garment.png",
   "id": "trinkies:suit_basalt_stargazer",
   "model": "model.bbmodel",
   "name": "Basalt Stargazer",

@@ -305,4 +305,6 @@ This generated roster has 300 unique catalog IDs: 50 per category. The initial 3
 | aura | `trinkies:aura_full_stardust_vortex` | Stardust Violet Vortex | `full_aura_vortex_4` · #252C33, #373F4B | common |
 | aura | `trinkies:aura_full_stardust_spectrum` | Stardust Prism Spectrum | `full_aura_spectrum_4` · #252C33, #373F4B | epic |
 
-See `full-catalog-model-preview-sheet.png` for shaded 3D renders of the generated cube models. These are launcher/catalog previews, not Minecraft screenshots.
+Each item also ships `garment.png`: a 64×64 patch in the player skin's own UV layout, which is what the launcher and the mod composite onto a skin. Back items add a 64×32 `cape_patch.png`.
+
+See `full-catalog-model-preview-sheet.png` for the generated renders, each showing the mannequin actually wearing the item. These are launcher/catalog previews, not Minecraft screenshots.

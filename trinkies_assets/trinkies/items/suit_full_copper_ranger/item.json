@@ -15,6 +15,7 @@
   "category": "suit",
   "description": "An original canopy ranger suit with a copper leather finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
   "emissive_mask": "emissive.png",
+  "garment": "garment.png",
   "id": "trinkies:suit_full_copper_ranger",
   "model": "model.bbmodel",
   "name": "Copper Canopy Ranger Suit",

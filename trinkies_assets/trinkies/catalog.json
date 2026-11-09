@@ -12,6 +12,7 @@
     {
       "category": "hat",
       "description": "A riveted sky-pilot cap with twin teal lenses and a low wind brim.",
+      "garment": "items/hat_copper_aviator/garment.png",
       "id": "trinkies:hat_copper_aviator",
       "item": "items/hat_copper_aviator/item.json",
       "local_render_support": true,
@@ -33,6 +34,7 @@
     {
       "category": "hat",
       "description": "A sea-glass circlet with a faceted center jewel and side fins.",
+      "garment": "items/hat_tideglass_circlet/garment.png",
       "id": "trinkies:hat_tideglass_circlet",
       "item": "items/hat_tideglass_circlet/item.json",
       "local_render_support": true,
@@ -54,6 +56,7 @@
     {
       "category": "hat",
       "description": "A soft moss-green hood crowned with a stitched mushroom silhouette.",
+      "garment": "items/hat_mosscap_hood/garment.png",
       "id": "trinkies:hat_mosscap_hood",
       "item": "items/hat_mosscap_hood/item.json",
       "local_render_support": true,
@@ -75,6 +78,7 @@
     {
       "category": "hat",
       "description": "A brass halo carrying two tiny lanterns on offset arms.",
+      "garment": "items/hat_orbit_lantern_halo/garment.png",
       "id": "trinkies:hat_orbit_lantern_halo",
       "item": "items/hat_orbit_lantern_halo/item.json",
       "local_render_support": true,
@@ -96,6 +100,7 @@
     {
       "category": "hat",
       "description": "A dark basalt brow guard with asymmetric amethyst horns.",
+      "garment": "items/hat_basalt_horn_circlet/garment.png",
       "id": "trinkies:hat_basalt_horn_circlet",
       "item": "items/hat_basalt_horn_circlet/item.json",
       "local_render_support": true,
@@ -117,9 +122,10 @@
     {
       "category": "suit",
       "description": "A pressure suit with a ceramic chest plate, paired air canisters, and weighted boots.",
+      "garment": "items/suit_copper_diver/garment.png",
       "id": "trinkies:suit_copper_diver",
       "item": "items/suit_copper_diver/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Copper Diver Suit",
       "palette": [
         "#0B2D25",
@@ -138,9 +144,10 @@
     {
       "category": "suit",
       "description": "A layered trail coat with leaf clasps, a map case, and reinforced cuffs.",
+      "garment": "items/suit_willow_wayfinder/garment.png",
       "id": "trinkies:suit_willow_wayfinder",
       "item": "items/suit_willow_wayfinder/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Willow Wayfinder",
       "palette": [
         "#1E2417",
@@ -159,9 +166,10 @@
     {
       "category": "suit",
       "description": "A geometer's suit with a faceted compass, bright shoulder tabs, and glass vials.",
+      "garment": "items/suit_prism_cartographer/garment.png",
       "id": "trinkies:suit_prism_cartographer",
       "item": "items/suit_prism_cartographer/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Prism Cartographer",
       "palette": [
         "#1D2234",
@@ -180,9 +188,10 @@
     {
       "category": "suit",
       "description": "A charcoal observatory robe with a raised collar and stitched constellation plates.",
+      "garment": "items/suit_basalt_stargazer/garment.png",
       "id": "trinkies:suit_basalt_stargazer",
       "item": "items/suit_basalt_stargazer/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Basalt Stargazer",
       "palette": [
         "#19141C",
@@ -201,9 +210,10 @@
     {
       "category": "suit",
       "description": "A blue workshop uniform with a tool harness, brass fasteners, and fin-shaped guards.",
+      "garment": "items/suit_tidal_mechanist/garment.png",
       "id": "trinkies:suit_tidal_mechanist",
       "item": "items/suit_tidal_mechanist/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Tidal Mechanist",
       "palette": [
         "#132930",
@@ -222,9 +232,10 @@
     {
       "category": "back",
       "description": "Four translucent geometric wings held by a small jade-and-copper harness.",
+      "garment": "items/back_cicada_glasswings/garment.png",
       "id": "trinkies:back_cicada_glasswings",
       "item": "items/back_cicada_glasswings/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Cicada Glasswings",
       "palette": [
         "#132C21",
@@ -243,9 +254,10 @@
     {
       "category": "back",
       "description": "A clockwork courier pack with a wooden frame, brass crank, and canvas pockets.",
+      "garment": "items/back_windup_satchel/garment.png",
       "id": "trinkies:back_windup_satchel",
       "item": "items/back_windup_satchel/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Windup Satchel",
       "palette": [
         "#301916",
@@ -264,9 +276,10 @@
     {
       "category": "back",
       "description": "A compact banner pack trailing two cut-paper ribbons and a tiny kite tail.",
+      "garment": "items/back_ribbon_kite_banner/garment.png",
       "id": "trinkies:back_ribbon_kite_banner",
       "item": "items/back_ribbon_kite_banner/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Ribbon Kite Banner",
       "palette": [
         "#472222",
@@ -285,9 +298,10 @@
     {
       "category": "back",
       "description": "Paired autumn leaves form a small articulated glider around a bark spine.",
+      "garment": "items/back_emberleaf_glider/garment.png",
       "id": "trinkies:back_emberleaf_glider",
       "item": "items/back_emberleaf_glider/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Emberleaf Glider",
       "palette": [
         "#222A1B",
@@ -306,9 +320,10 @@
     {
       "category": "back",
       "description": "A floating brass bell drone with three stabilizer fins and a blue glass lens.",
+      "garment": "items/back_tidal_bell_drone/garment.png",
       "id": "trinkies:back_tidal_bell_drone",
       "item": "items/back_tidal_bell_drone/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Tidal Bell Drone",
       "palette": [
         "#162A2E",
@@ -327,9 +342,10 @@
     {
       "category": "pet",
       "description": "A shy hovering crystal sprite with a warm core and two orbiting shards.",
+      "garment": "items/pet_amethyst_wisp/garment.png",
       "id": "trinkies:pet_amethyst_wisp",
       "item": "items/pet_amethyst_wisp/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Amethyst Wisp",
       "palette": [
         "#1E1B37",
@@ -348,9 +364,10 @@
     {
       "category": "pet",
       "description": "A round soot-coloured puff with a pale belly, pebble feet, and a curl tail.",
+      "garment": "items/pet_sootbubble/garment.png",
       "id": "trinkies:pet_sootbubble",
       "item": "items/pet_sootbubble/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Sootbubble",
       "palette": [
         "#191C1F",
@@ -369,9 +386,10 @@
     {
       "category": "pet",
       "description": "A tiny moss-winged moth with a lantern abdomen and curled feelers.",
+      "garment": "items/pet_moss_lantern_moth/garment.png",
       "id": "trinkies:pet_moss_lantern_moth",
       "item": "items/pet_moss_lantern_moth/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Moss Lantern Moth",
       "palette": [
         "#21281B",
@@ -390,9 +408,10 @@
     {
       "category": "pet",
       "description": "A folded-paper sky sprite with a long striped tail and teal fins.",
+      "garment": "items/pet_paper_comet_sprite/garment.png",
       "id": "trinkies:pet_paper_comet_sprite",
       "item": "items/pet_paper_comet_sprite/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Paper Comet Sprite",
       "palette": [
         "#4E4439",
@@ -411,9 +430,10 @@
     {
       "category": "pet",
       "description": "A pocket-sized pebble crab with copper feet, a shell dial, and bead eyes.",
+      "garment": "items/pet_clockwork_pebble_crab/garment.png",
       "id": "trinkies:pet_clockwork_pebble_crab",
       "item": "items/pet_clockwork_pebble_crab/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Clockwork Pebble Crab",
       "palette": [
         "#281B18",
@@ -432,9 +452,10 @@
     {
       "category": "emote",
       "description": "A quick greeting that unfolds a small paper pennant and tucks it away.",
+      "garment": "items/emote_origami_greeting/garment.png",
       "id": "trinkies:emote_origami_greeting",
       "item": "items/emote_origami_greeting/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Origami Greeting",
       "palette": [
         "#4E4840",
@@ -453,9 +474,10 @@
     {
       "category": "emote",
       "description": "A two-beat cheer with a star wand flourish and a grounded finish.",
+      "garment": "items/emote_spark_wand_cheer/garment.png",
       "id": "trinkies:emote_spark_wand_cheer",
       "item": "items/emote_spark_wand_cheer/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Spark Wand Cheer",
       "palette": [
         "#1A1A2E",
@@ -474,9 +496,10 @@
     {
       "category": "emote",
       "description": "A gentle bow with a hand-tied marigold bouquet held close to the chest.",
+      "garment": "items/emote_marigold_curtain_call/garment.png",
       "id": "trinkies:emote_marigold_curtain_call",
       "item": "items/emote_marigold_curtain_call/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Marigold Curtain Call",
       "palette": [
         "#381D2B",
@@ -495,9 +518,10 @@
     {
       "category": "emote",
       "description": "A short seated rhythm with a small lacquered travel drum prop.",
+      "garment": "items/emote_pocket_drumline/garment.png",
       "id": "trinkies:emote_pocket_drumline",
       "item": "items/emote_pocket_drumline/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Pocket Drumline",
       "palette": [
         "#202629",
@@ -516,9 +540,10 @@
     {
       "category": "emote",
       "description": "A formal bow traced by two pale ribbons that settle at the shoulders.",
+      "garment": "items/emote_moonlit_ribbon_bow/garment.png",
       "id": "trinkies:emote_moonlit_ribbon_bow",
       "item": "items/emote_moonlit_ribbon_bow/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Moonlit Ribbon Bow",
       "palette": [
         "#151E28",
@@ -537,9 +562,10 @@
     {
       "category": "aura",
       "description": "A slow orbit of cool droplets with sparse, low-brightness glints.",
+      "garment": "items/aura_monsoon_motes/garment.png",
       "id": "trinkies:aura_monsoon_motes",
       "item": "items/aura_monsoon_motes/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Monsoon Motes",
       "palette": [
         "#18353A",
@@ -558,9 +584,10 @@
     {
       "category": "aura",
       "description": "Three quiet arcs drift behind the shoulders like a windless aurora.",
+      "garment": "items/aura_aurora_chime/garment.png",
       "id": "trinkies:aura_aurora_chime",
       "item": "items/aura_aurora_chime/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Aurora Chime",
       "palette": [
         "#192834",
@@ -579,9 +606,10 @@
     {
       "category": "aura",
       "description": "Warm petal-shaped pixels rise in a sparse loop and fade before the head.",
+      "garment": "items/aura_ember_marigold/garment.png",
       "id": "trinkies:aura_ember_marigold",
       "item": "items/aura_ember_marigold/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Ember Marigold",
       "palette": [
         "#3B1716",
@@ -600,9 +628,10 @@
     {
       "category": "aura",
       "description": "A restrained ring of four lilac runes turns slowly around the waist.",
+      "garment": "items/aura_glass_rune_ring/garment.png",
       "id": "trinkies:aura_glass_rune_ring",
       "item": "items/aura_glass_rune_ring/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Glass Rune Ring",
       "palette": [
         "#1D1B30",
@@ -621,9 +650,10 @@
     {
       "category": "aura",
       "description": "A faint trail of angular star-dust motes follows the player's last steps.",
+      "garment": "items/aura_star_silt_trail/garment.png",
       "id": "trinkies:aura_star_silt_trail",
       "item": "items/aura_star_silt_trail/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Star Silt Trail",
       "palette": [
         "#252C33",
@@ -642,6 +672,7 @@
     {
       "category": "hat",
       "description": "An original spire crown with a frost metal finish, family-specific silhouette, and a horn shiver accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/hat_full_frost_spire/garment.png",
       "id": "trinkies:hat_full_frost_spire",
       "item": "items/hat_full_frost_spire/item.json",
       "local_render_support": true,
@@ -663,6 +694,7 @@
     {
       "category": "hat",
       "description": "An original canopy hood with a frost cloth finish, family-specific silhouette, and a hood bob accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/hat_full_frost_hood/garment.png",
       "id": "trinkies:hat_full_frost_hood",
       "item": "items/hat_full_frost_hood/item.json",
       "local_render_support": true,
@@ -684,6 +716,7 @@
     {
       "category": "hat",
       "description": "An original orbit halo with a frost metal finish, family-specific silhouette, and a lantern sway accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/hat_full_frost_halo/garment.png",
       "id": "trinkies:hat_full_frost_halo",
       "item": "items/hat_full_frost_halo/item.json",
       "local_render_support": true,
@@ -705,6 +738,7 @@
     {
       "category": "hat",
       "description": "An original aviator cap with a frost leather finish, family-specific silhouette, and a hat wind accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/hat_full_frost_aviator/garment.png",
       "id": "trinkies:hat_full_frost_aviator",
       "item": "items/hat_full_frost_aviator/item.json",
       "local_render_support": true,
@@ -726,6 +760,7 @@
     {
       "category": "hat",
       "description": "An original tide circlet with a frost glass finish, family-specific silhouette, and a circlet glint accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/hat_full_frost_circlet/garment.png",
       "id": "trinkies:hat_full_frost_circlet",
       "item": "items/hat_full_frost_circlet/item.json",
       "local_render_support": true,
@@ -747,6 +782,7 @@
     {
       "category": "hat",
       "description": "An original skyguard visor with a frost enamel finish, family-specific silhouette, and a hat wind accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/hat_full_frost_visor/garment.png",
       "id": "trinkies:hat_full_frost_visor",
       "item": "items/hat_full_frost_visor/item.json",
       "local_render_support": true,
@@ -768,6 +804,7 @@
     {
       "category": "hat",
       "description": "An original moonbranch antlers with a frost wood finish, family-specific silhouette, and a horn shiver accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/hat_full_frost_antlers/garment.png",
       "id": "trinkies:hat_full_frost_antlers",
       "item": "items/hat_full_frost_antlers/item.json",
       "local_render_support": true,
@@ -789,6 +826,7 @@
     {
       "category": "hat",
       "description": "An original petal wreath with a frost cloth finish, family-specific silhouette, and a circlet glint accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/hat_full_frost_wreath/garment.png",
       "id": "trinkies:hat_full_frost_wreath",
       "item": "items/hat_full_frost_wreath/item.json",
       "local_render_support": true,
@@ -810,6 +848,7 @@
     {
       "category": "hat",
       "description": "An original relic mask with a frost stone finish, family-specific silhouette, and a hood bob accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/hat_full_frost_mask/garment.png",
       "id": "trinkies:hat_full_frost_mask",
       "item": "items/hat_full_frost_mask/item.json",
       "local_render_support": true,
@@ -831,6 +870,7 @@
     {
       "category": "hat",
       "description": "An original spire crown with a sunstone metal finish, family-specific silhouette, and a horn shiver accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/hat_full_sunstone_spire/garment.png",
       "id": "trinkies:hat_full_sunstone_spire",
       "item": "items/hat_full_sunstone_spire/item.json",
       "local_render_support": true,
@@ -852,6 +892,7 @@
     {
       "category": "hat",
       "description": "An original canopy hood with a sunstone cloth finish, family-specific silhouette, and a hood bob accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/hat_full_sunstone_hood/garment.png",
       "id": "trinkies:hat_full_sunstone_hood",
       "item": "items/hat_full_sunstone_hood/item.json",
       "local_render_support": true,
@@ -873,6 +914,7 @@
     {
       "category": "hat",
       "description": "An original orbit halo with a sunstone metal finish, family-specific silhouette, and a lantern sway accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/hat_full_sunstone_halo/garment.png",
       "id": "trinkies:hat_full_sunstone_halo",
       "item": "items/hat_full_sunstone_halo/item.json",
       "local_render_support": true,
@@ -894,6 +936,7 @@
     {
       "category": "hat",
       "description": "An original aviator cap with a sunstone leather finish, family-specific silhouette, and a hat wind accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/hat_full_sunstone_aviator/garment.png",
       "id": "trinkies:hat_full_sunstone_aviator",
       "item": "items/hat_full_sunstone_aviator/item.json",
       "local_render_support": true,
@@ -915,6 +958,7 @@
     {
       "category": "hat",
       "description": "An original tide circlet with a sunstone glass finish, family-specific silhouette, and a circlet glint accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/hat_full_sunstone_circlet/garment.png",
       "id": "trinkies:hat_full_sunstone_circlet",
       "item": "items/hat_full_sunstone_circlet/item.json",
       "local_render_support": true,
@@ -936,6 +980,7 @@
     {
       "category": "hat",
       "description": "An original skyguard visor with a sunstone enamel finish, family-specific silhouette, and a hat wind accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/hat_full_sunstone_visor/garment.png",
       "id": "trinkies:hat_full_sunstone_visor",
       "item": "items/hat_full_sunstone_visor/item.json",
       "local_render_support": true,
@@ -957,6 +1002,7 @@
     {
       "category": "hat",
       "description": "An original moonbranch antlers with a sunstone wood finish, family-specific silhouette, and a horn shiver accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/hat_full_sunstone_antlers/garment.png",
       "id": "trinkies:hat_full_sunstone_antlers",
       "item": "items/hat_full_sunstone_antlers/item.json",
       "local_render_support": true,
@@ -978,6 +1024,7 @@
     {
       "category": "hat",
       "description": "An original petal wreath with a sunstone cloth finish, family-specific silhouette, and a circlet glint accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/hat_full_sunstone_wreath/garment.png",
       "id": "trinkies:hat_full_sunstone_wreath",
       "item": "items/hat_full_sunstone_wreath/item.json",
       "local_render_support": true,
@@ -999,6 +1046,7 @@
     {
       "category": "hat",
       "description": "An original relic mask with a sunstone stone finish, family-specific silhouette, and a hood bob accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/hat_full_sunstone_mask/garment.png",
       "id": "trinkies:hat_full_sunstone_mask",
       "item": "items/hat_full_sunstone_mask/item.json",
       "local_render_support": true,
@@ -1020,6 +1068,7 @@
     {
       "category": "hat",
       "description": "An original spire crown with a verdant metal finish, family-specific silhouette, and a horn shiver accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/hat_full_verdant_spire/garment.png",
       "id": "trinkies:hat_full_verdant_spire",
       "item": "items/hat_full_verdant_spire/item.json",
       "local_render_support": true,
@@ -1041,6 +1090,7 @@
     {
       "category": "hat",
       "description": "An original canopy hood with a verdant cloth finish, family-specific silhouette, and a hood bob accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/hat_full_verdant_hood/garment.png",
       "id": "trinkies:hat_full_verdant_hood",
       "item": "items/hat_full_verdant_hood/item.json",
       "local_render_support": true,
@@ -1062,6 +1112,7 @@
     {
       "category": "hat",
       "description": "An original orbit halo with a verdant metal finish, family-specific silhouette, and a lantern sway accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/hat_full_verdant_halo/garment.png",
       "id": "trinkies:hat_full_verdant_halo",
       "item": "items/hat_full_verdant_halo/item.json",
       "local_render_support": true,
@@ -1083,6 +1134,7 @@
     {
       "category": "hat",
       "description": "An original aviator cap with a verdant leather finish, family-specific silhouette, and a hat wind accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/hat_full_verdant_aviator/garment.png",
       "id": "trinkies:hat_full_verdant_aviator",
       "item": "items/hat_full_verdant_aviator/item.json",
       "local_render_support": true,
@@ -1104,6 +1156,7 @@
     {
       "category": "hat",
       "description": "An original tide circlet with a verdant glass finish, family-specific silhouette, and a circlet glint accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/hat_full_verdant_circlet/garment.png",
       "id": "trinkies:hat_full_verdant_circlet",
       "item": "items/hat_full_verdant_circlet/item.json",
       "local_render_support": true,
@@ -1125,6 +1178,7 @@
     {
       "category": "hat",
       "description": "An original skyguard visor with a verdant enamel finish, family-specific silhouette, and a hat wind accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/hat_full_verdant_visor/garment.png",
       "id": "trinkies:hat_full_verdant_visor",
       "item": "items/hat_full_verdant_visor/item.json",
       "local_render_support": true,
@@ -1146,6 +1200,7 @@
     {
       "category": "hat",
       "description": "An original moonbranch antlers with a verdant wood finish, family-specific silhouette, and a horn shiver accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/hat_full_verdant_antlers/garment.png",
       "id": "trinkies:hat_full_verdant_antlers",
       "item": "items/hat_full_verdant_antlers/item.json",
       "local_render_support": true,
@@ -1167,6 +1222,7 @@
     {
       "category": "hat",
       "description": "An original petal wreath with a verdant cloth finish, family-specific silhouette, and a circlet glint accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/hat_full_verdant_wreath/garment.png",
       "id": "trinkies:hat_full_verdant_wreath",
       "item": "items/hat_full_verdant_wreath/item.json",
       "local_render_support": true,
@@ -1188,6 +1244,7 @@
     {
       "category": "hat",
       "description": "An original relic mask with a verdant stone finish, family-specific silhouette, and a hood bob accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/hat_full_verdant_mask/garment.png",
       "id": "trinkies:hat_full_verdant_mask",
       "item": "items/hat_full_verdant_mask/item.json",
       "local_render_support": true,
@@ -1209,6 +1266,7 @@
     {
       "category": "hat",
       "description": "An original spire crown with a moonlit metal finish, family-specific silhouette, and a horn shiver accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/hat_full_moonlit_spire/garment.png",
       "id": "trinkies:hat_full_moonlit_spire",
       "item": "items/hat_full_moonlit_spire/item.json",
       "local_render_support": true,
@@ -1230,6 +1288,7 @@
     {
       "category": "hat",
       "description": "An original canopy hood with a moonlit cloth finish, family-specific silhouette, and a hood bob accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/hat_full_moonlit_hood/garment.png",
       "id": "trinkies:hat_full_moonlit_hood",
       "item": "items/hat_full_moonlit_hood/item.json",
       "local_render_support": true,
@@ -1251,6 +1310,7 @@
     {
       "category": "hat",
       "description": "An original orbit halo with a moonlit metal finish, family-specific silhouette, and a lantern sway accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/hat_full_moonlit_halo/garment.png",
       "id": "trinkies:hat_full_moonlit_halo",
       "item": "items/hat_full_moonlit_halo/item.json",
       "local_render_support": true,
@@ -1272,6 +1332,7 @@
     {
       "category": "hat",
       "description": "An original aviator cap with a moonlit leather finish, family-specific silhouette, and a hat wind accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/hat_full_moonlit_aviator/garment.png",
       "id": "trinkies:hat_full_moonlit_aviator",
       "item": "items/hat_full_moonlit_aviator/item.json",
       "local_render_support": true,
@@ -1293,6 +1354,7 @@
     {
       "category": "hat",
       "description": "An original tide circlet with a moonlit glass finish, family-specific silhouette, and a circlet glint accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/hat_full_moonlit_circlet/garment.png",
       "id": "trinkies:hat_full_moonlit_circlet",
       "item": "items/hat_full_moonlit_circlet/item.json",
       "local_render_support": true,
@@ -1314,6 +1376,7 @@
     {
       "category": "hat",
       "description": "An original skyguard visor with a moonlit enamel finish, family-specific silhouette, and a hat wind accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/hat_full_moonlit_visor/garment.png",
       "id": "trinkies:hat_full_moonlit_visor",
       "item": "items/hat_full_moonlit_visor/item.json",
       "local_render_support": true,
@@ -1335,6 +1398,7 @@
     {
       "category": "hat",
       "description": "An original moonbranch antlers with a moonlit wood finish, family-specific silhouette, and a horn shiver accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/hat_full_moonlit_antlers/garment.png",
       "id": "trinkies:hat_full_moonlit_antlers",
       "item": "items/hat_full_moonlit_antlers/item.json",
       "local_render_support": true,
@@ -1356,6 +1420,7 @@
     {
       "category": "hat",
       "description": "An original petal wreath with a moonlit cloth finish, family-specific silhouette, and a circlet glint accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/hat_full_moonlit_wreath/garment.png",
       "id": "trinkies:hat_full_moonlit_wreath",
       "item": "items/hat_full_moonlit_wreath/item.json",
       "local_render_support": true,
@@ -1377,6 +1442,7 @@
     {
       "category": "hat",
       "description": "An original relic mask with a moonlit stone finish, family-specific silhouette, and a hood bob accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/hat_full_moonlit_mask/garment.png",
       "id": "trinkies:hat_full_moonlit_mask",
       "item": "items/hat_full_moonlit_mask/item.json",
       "local_render_support": true,
@@ -1398,6 +1464,7 @@
     {
       "category": "hat",
       "description": "An original spire crown with a tide metal finish, family-specific silhouette, and a horn shiver accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/hat_full_tide_spire/garment.png",
       "id": "trinkies:hat_full_tide_spire",
       "item": "items/hat_full_tide_spire/item.json",
       "local_render_support": true,
@@ -1419,6 +1486,7 @@
     {
       "category": "hat",
       "description": "An original canopy hood with a tide cloth finish, family-specific silhouette, and a hood bob accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/hat_full_tide_hood/garment.png",
       "id": "trinkies:hat_full_tide_hood",
       "item": "items/hat_full_tide_hood/item.json",
       "local_render_support": true,
@@ -1440,6 +1508,7 @@
     {
       "category": "hat",
       "description": "An original orbit halo with a tide metal finish, family-specific silhouette, and a lantern sway accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/hat_full_tide_halo/garment.png",
       "id": "trinkies:hat_full_tide_halo",
       "item": "items/hat_full_tide_halo/item.json",
       "local_render_support": true,
@@ -1461,6 +1530,7 @@
     {
       "category": "hat",
       "description": "An original aviator cap with a tide leather finish, family-specific silhouette, and a hat wind accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/hat_full_tide_aviator/garment.png",
       "id": "trinkies:hat_full_tide_aviator",
       "item": "items/hat_full_tide_aviator/item.json",
       "local_render_support": true,
@@ -1482,6 +1552,7 @@
     {
       "category": "hat",
       "description": "An original tide circlet with a tide glass finish, family-specific silhouette, and a circlet glint accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/hat_full_tide_circlet/garment.png",
       "id": "trinkies:hat_full_tide_circlet",
       "item": "items/hat_full_tide_circlet/item.json",
       "local_render_support": true,
@@ -1503,6 +1574,7 @@
     {
       "category": "hat",
       "description": "An original skyguard visor with a tide enamel finish, family-specific silhouette, and a hat wind accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/hat_full_tide_visor/garment.png",
       "id": "trinkies:hat_full_tide_visor",
       "item": "items/hat_full_tide_visor/item.json",
       "local_render_support": true,
@@ -1524,6 +1596,7 @@
     {
       "category": "hat",
       "description": "An original moonbranch antlers with a tide wood finish, family-specific silhouette, and a horn shiver accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/hat_full_tide_antlers/garment.png",
       "id": "trinkies:hat_full_tide_antlers",
       "item": "items/hat_full_tide_antlers/item.json",
       "local_render_support": true,
@@ -1545,6 +1618,7 @@
     {
       "category": "hat",
       "description": "An original petal wreath with a tide cloth finish, family-specific silhouette, and a circlet glint accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/hat_full_tide_wreath/garment.png",
       "id": "trinkies:hat_full_tide_wreath",
       "item": "items/hat_full_tide_wreath/item.json",
       "local_render_support": true,
@@ -1566,6 +1640,7 @@
     {
       "category": "hat",
       "description": "An original relic mask with a tide stone finish, family-specific silhouette, and a hood bob accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/hat_full_tide_mask/garment.png",
       "id": "trinkies:hat_full_tide_mask",
       "item": "items/hat_full_tide_mask/item.json",
       "local_render_support": true,
@@ -1587,9 +1662,10 @@
     {
       "category": "suit",
       "description": "An original pressure diver suit with a crimson metal finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/suit_full_crimson_diver/garment.png",
       "id": "trinkies:suit_full_crimson_diver",
       "item": "items/suit_full_crimson_diver/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Crimson Pressure Diver Suit",
       "palette": [
         "#2D141E",
@@ -1608,9 +1684,10 @@
     {
       "category": "suit",
       "description": "An original wayfinder coat with a crimson cloth finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/suit_full_crimson_wayfinder/garment.png",
       "id": "trinkies:suit_full_crimson_wayfinder",
       "item": "items/suit_full_crimson_wayfinder/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Crimson Wayfinder Coat",
       "palette": [
         "#2D141E",
@@ -1629,9 +1706,10 @@
     {
       "category": "suit",
       "description": "An original cartographer uniform with a crimson leather finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/suit_full_crimson_cartographer/garment.png",
       "id": "trinkies:suit_full_crimson_cartographer",
       "item": "items/suit_full_crimson_cartographer/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Crimson Cartographer Uniform",
       "palette": [
         "#2D141E",
@@ -1650,9 +1728,10 @@
     {
       "category": "suit",
       "description": "An original stargazer robe with a crimson wool finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/suit_full_crimson_stargazer/garment.png",
       "id": "trinkies:suit_full_crimson_stargazer",
       "item": "items/suit_full_crimson_stargazer/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Crimson Stargazer Robe",
       "palette": [
         "#2D141E",
@@ -1671,9 +1750,10 @@
     {
       "category": "suit",
       "description": "An original mechanist harness with a crimson metal finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/suit_full_crimson_mechanist/garment.png",
       "id": "trinkies:suit_full_crimson_mechanist",
       "item": "items/suit_full_crimson_mechanist/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Crimson Mechanist Harness",
       "palette": [
         "#2D141E",
@@ -1692,9 +1772,10 @@
     {
       "category": "suit",
       "description": "An original lamellar guard suit with a crimson enamel finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/suit_full_crimson_samurai/garment.png",
       "id": "trinkies:suit_full_crimson_samurai",
       "item": "items/suit_full_crimson_samurai/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Crimson Lamellar Guard Suit",
       "palette": [
         "#2D141E",
@@ -1713,9 +1794,10 @@
     {
       "category": "suit",
       "description": "An original canopy ranger suit with a crimson leather finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/suit_full_crimson_ranger/garment.png",
       "id": "trinkies:suit_full_crimson_ranger",
       "item": "items/suit_full_crimson_ranger/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Crimson Canopy Ranger Suit",
       "palette": [
         "#2D141E",
@@ -1734,9 +1816,10 @@
     {
       "category": "suit",
       "description": "An original alchemist apron with a crimson cloth finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/suit_full_crimson_alchemist/garment.png",
       "id": "trinkies:suit_full_crimson_alchemist",
       "item": "items/suit_full_crimson_alchemist/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Crimson Alchemist Apron",
       "palette": [
         "#2D141E",
@@ -1755,9 +1838,10 @@
     {
       "category": "suit",
       "description": "An original sentinel plate suit with a crimson stone finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/suit_full_crimson_sentinel/garment.png",
       "id": "trinkies:suit_full_crimson_sentinel",
       "item": "items/suit_full_crimson_sentinel/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Crimson Sentinel Plate Suit",
       "palette": [
         "#2D141E",
@@ -1776,9 +1860,10 @@
     {
       "category": "suit",
       "description": "An original pressure diver suit with a glacier metal finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/suit_full_glacier_diver/garment.png",
       "id": "trinkies:suit_full_glacier_diver",
       "item": "items/suit_full_glacier_diver/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Glacier Pressure Diver Suit",
       "palette": [
         "#192D30",
@@ -1797,9 +1882,10 @@
     {
       "category": "suit",
       "description": "An original wayfinder coat with a glacier cloth finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/suit_full_glacier_wayfinder/garment.png",
       "id": "trinkies:suit_full_glacier_wayfinder",
       "item": "items/suit_full_glacier_wayfinder/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Glacier Wayfinder Coat",
       "palette": [
         "#192D30",
@@ -1818,9 +1904,10 @@
     {
       "category": "suit",
       "description": "An original cartographer uniform with a glacier leather finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/suit_full_glacier_cartographer/garment.png",
       "id": "trinkies:suit_full_glacier_cartographer",
       "item": "items/suit_full_glacier_cartographer/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Glacier Cartographer Uniform",
       "palette": [
         "#192D30",
@@ -1839,9 +1926,10 @@
     {
       "category": "suit",
       "description": "An original stargazer robe with a glacier wool finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/suit_full_glacier_stargazer/garment.png",
       "id": "trinkies:suit_full_glacier_stargazer",
       "item": "items/suit_full_glacier_stargazer/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Glacier Stargazer Robe",
       "palette": [
         "#192D30",
@@ -1860,9 +1948,10 @@
     {
       "category": "suit",
       "description": "An original mechanist harness with a glacier metal finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/suit_full_glacier_mechanist/garment.png",
       "id": "trinkies:suit_full_glacier_mechanist",
       "item": "items/suit_full_glacier_mechanist/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Glacier Mechanist Harness",
       "palette": [
         "#192D30",
@@ -1881,9 +1970,10 @@
     {
       "category": "suit",
       "description": "An original lamellar guard suit with a glacier enamel finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/suit_full_glacier_samurai/garment.png",
       "id": "trinkies:suit_full_glacier_samurai",
       "item": "items/suit_full_glacier_samurai/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Glacier Lamellar Guard Suit",
       "palette": [
         "#192D30",
@@ -1902,9 +1992,10 @@
     {
       "category": "suit",
       "description": "An original canopy ranger suit with a glacier leather finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/suit_full_glacier_ranger/garment.png",
       "id": "trinkies:suit_full_glacier_ranger",
       "item": "items/suit_full_glacier_ranger/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Glacier Canopy Ranger Suit",
       "palette": [
         "#192D30",
@@ -1923,9 +2014,10 @@
     {
       "category": "suit",
       "description": "An original alchemist apron with a glacier cloth finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/suit_full_glacier_alchemist/garment.png",
       "id": "trinkies:suit_full_glacier_alchemist",
       "item": "items/suit_full_glacier_alchemist/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Glacier Alchemist Apron",
       "palette": [
         "#192D30",
@@ -1944,9 +2036,10 @@
     {
       "category": "suit",
       "description": "An original sentinel plate suit with a glacier stone finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/suit_full_glacier_sentinel/garment.png",
       "id": "trinkies:suit_full_glacier_sentinel",
       "item": "items/suit_full_glacier_sentinel/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Glacier Sentinel Plate Suit",
       "palette": [
         "#192D30",
@@ -1965,9 +2058,10 @@
     {
       "category": "suit",
       "description": "An original pressure diver suit with a willow metal finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/suit_full_willow_diver/garment.png",
       "id": "trinkies:suit_full_willow_diver",
       "item": "items/suit_full_willow_diver/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Willow Pressure Diver Suit",
       "palette": [
         "#1E251A",
@@ -1986,9 +2080,10 @@
     {
       "category": "suit",
       "description": "An original wayfinder coat with a willow cloth finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/suit_full_willow_wayfinder/garment.png",
       "id": "trinkies:suit_full_willow_wayfinder",
       "item": "items/suit_full_willow_wayfinder/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Willow Wayfinder Coat",
       "palette": [
         "#1E251A",
@@ -2007,9 +2102,10 @@
     {
       "category": "suit",
       "description": "An original cartographer uniform with a willow leather finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/suit_full_willow_cartographer/garment.png",
       "id": "trinkies:suit_full_willow_cartographer",
       "item": "items/suit_full_willow_cartographer/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Willow Cartographer Uniform",
       "palette": [
         "#1E251A",
@@ -2028,9 +2124,10 @@
     {
       "category": "suit",
       "description": "An original stargazer robe with a willow wool finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/suit_full_willow_stargazer/garment.png",
       "id": "trinkies:suit_full_willow_stargazer",
       "item": "items/suit_full_willow_stargazer/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Willow Stargazer Robe",
       "palette": [
         "#1E251A",
@@ -2049,9 +2146,10 @@
     {
       "category": "suit",
       "description": "An original mechanist harness with a willow metal finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/suit_full_willow_mechanist/garment.png",
       "id": "trinkies:suit_full_willow_mechanist",
       "item": "items/suit_full_willow_mechanist/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Willow Mechanist Harness",
       "palette": [
         "#1E251A",
@@ -2070,9 +2168,10 @@
     {
       "category": "suit",
       "description": "An original lamellar guard suit with a willow enamel finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/suit_full_willow_samurai/garment.png",
       "id": "trinkies:suit_full_willow_samurai",
       "item": "items/suit_full_willow_samurai/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Willow Lamellar Guard Suit",
       "palette": [
         "#1E251A",
@@ -2091,9 +2190,10 @@
     {
       "category": "suit",
       "description": "An original canopy ranger suit with a willow leather finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/suit_full_willow_ranger/garment.png",
       "id": "trinkies:suit_full_willow_ranger",
       "item": "items/suit_full_willow_ranger/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Willow Canopy Ranger Suit",
       "palette": [
         "#1E251A",
@@ -2112,9 +2212,10 @@
     {
       "category": "suit",
       "description": "An original alchemist apron with a willow cloth finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/suit_full_willow_alchemist/garment.png",
       "id": "trinkies:suit_full_willow_alchemist",
       "item": "items/suit_full_willow_alchemist/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Willow Alchemist Apron",
       "palette": [
         "#1E251A",
@@ -2133,9 +2234,10 @@
     {
       "category": "suit",
       "description": "An original sentinel plate suit with a willow stone finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/suit_full_willow_sentinel/garment.png",
       "id": "trinkies:suit_full_willow_sentinel",
       "item": "items/suit_full_willow_sentinel/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Willow Sentinel Plate Suit",
       "palette": [
         "#1E251A",
@@ -2154,9 +2256,10 @@
     {
       "category": "suit",
       "description": "An original pressure diver suit with a violet metal finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/suit_full_violet_diver/garment.png",
       "id": "trinkies:suit_full_violet_diver",
       "item": "items/suit_full_violet_diver/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Violet Pressure Diver Suit",
       "palette": [
         "#1B1A28",
@@ -2175,9 +2278,10 @@
     {
       "category": "suit",
       "description": "An original wayfinder coat with a violet cloth finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/suit_full_violet_wayfinder/garment.png",
       "id": "trinkies:suit_full_violet_wayfinder",
       "item": "items/suit_full_violet_wayfinder/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Violet Wayfinder Coat",
       "palette": [
         "#1B1A28",
@@ -2196,9 +2300,10 @@
     {
       "category": "suit",
       "description": "An original cartographer uniform with a violet leather finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/suit_full_violet_cartographer/garment.png",
       "id": "trinkies:suit_full_violet_cartographer",
       "item": "items/suit_full_violet_cartographer/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Violet Cartographer Uniform",
       "palette": [
         "#1B1A28",
@@ -2217,9 +2322,10 @@
     {
       "category": "suit",
       "description": "An original stargazer robe with a violet wool finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/suit_full_violet_stargazer/garment.png",
       "id": "trinkies:suit_full_violet_stargazer",
       "item": "items/suit_full_violet_stargazer/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Violet Stargazer Robe",
       "palette": [
         "#1B1A28",
@@ -2238,9 +2344,10 @@
     {
       "category": "suit",
       "description": "An original mechanist harness with a violet metal finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/suit_full_violet_mechanist/garment.png",
       "id": "trinkies:suit_full_violet_mechanist",
       "item": "items/suit_full_violet_mechanist/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Violet Mechanist Harness",
       "palette": [
         "#1B1A28",
@@ -2259,9 +2366,10 @@
     {
       "category": "suit",
       "description": "An original lamellar guard suit with a violet enamel finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/suit_full_violet_samurai/garment.png",
       "id": "trinkies:suit_full_violet_samurai",
       "item": "items/suit_full_violet_samurai/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Violet Lamellar Guard Suit",
       "palette": [
         "#1B1A28",
@@ -2280,9 +2388,10 @@
     {
       "category": "suit",
       "description": "An original canopy ranger suit with a violet leather finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/suit_full_violet_ranger/garment.png",
       "id": "trinkies:suit_full_violet_ranger",
       "item": "items/suit_full_violet_ranger/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Violet Canopy Ranger Suit",
       "palette": [
         "#1B1A28",
@@ -2301,9 +2410,10 @@
     {
       "category": "suit",
       "description": "An original alchemist apron with a violet cloth finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/suit_full_violet_alchemist/garment.png",
       "id": "trinkies:suit_full_violet_alchemist",
       "item": "items/suit_full_violet_alchemist/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Violet Alchemist Apron",
       "palette": [
         "#1B1A28",
@@ -2322,9 +2432,10 @@
     {
       "category": "suit",
       "description": "An original sentinel plate suit with a violet stone finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/suit_full_violet_sentinel/garment.png",
       "id": "trinkies:suit_full_violet_sentinel",
       "item": "items/suit_full_violet_sentinel/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Violet Sentinel Plate Suit",
       "palette": [
         "#1B1A28",
@@ -2343,9 +2454,10 @@
     {
       "category": "suit",
       "description": "An original pressure diver suit with a copper metal finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/suit_full_copper_diver/garment.png",
       "id": "trinkies:suit_full_copper_diver",
       "item": "items/suit_full_copper_diver/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Copper Pressure Diver Suit",
       "palette": [
         "#311F1A",
@@ -2364,9 +2476,10 @@
     {
       "category": "suit",
       "description": "An original wayfinder coat with a copper cloth finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/suit_full_copper_wayfinder/garment.png",
       "id": "trinkies:suit_full_copper_wayfinder",
       "item": "items/suit_full_copper_wayfinder/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Copper Wayfinder Coat",
       "palette": [
         "#311F1A",
@@ -2385,9 +2498,10 @@
     {
       "category": "suit",
       "description": "An original cartographer uniform with a copper leather finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/suit_full_copper_cartographer/garment.png",
       "id": "trinkies:suit_full_copper_cartographer",
       "item": "items/suit_full_copper_cartographer/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Copper Cartographer Uniform",
       "palette": [
         "#311F1A",
@@ -2406,9 +2520,10 @@
     {
       "category": "suit",
       "description": "An original stargazer robe with a copper wool finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/suit_full_copper_stargazer/garment.png",
       "id": "trinkies:suit_full_copper_stargazer",
       "item": "items/suit_full_copper_stargazer/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Copper Stargazer Robe",
       "palette": [
         "#311F1A",
@@ -2427,9 +2542,10 @@
     {
       "category": "suit",
       "description": "An original mechanist harness with a copper metal finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/suit_full_copper_mechanist/garment.png",
       "id": "trinkies:suit_full_copper_mechanist",
       "item": "items/suit_full_copper_mechanist/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Copper Mechanist Harness",
       "palette": [
         "#311F1A",
@@ -2448,9 +2564,10 @@
     {
       "category": "suit",
       "description": "An original lamellar guard suit with a copper enamel finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/suit_full_copper_samurai/garment.png",
       "id": "trinkies:suit_full_copper_samurai",
       "item": "items/suit_full_copper_samurai/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Copper Lamellar Guard Suit",
       "palette": [
         "#311F1A",
@@ -2469,9 +2586,10 @@
     {
       "category": "suit",
       "description": "An original canopy ranger suit with a copper leather finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/suit_full_copper_ranger/garment.png",
       "id": "trinkies:suit_full_copper_ranger",
       "item": "items/suit_full_copper_ranger/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Copper Canopy Ranger Suit",
       "palette": [
         "#311F1A",
@@ -2490,9 +2608,10 @@
     {
       "category": "suit",
       "description": "An original alchemist apron with a copper cloth finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/suit_full_copper_alchemist/garment.png",
       "id": "trinkies:suit_full_copper_alchemist",
       "item": "items/suit_full_copper_alchemist/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Copper Alchemist Apron",
       "palette": [
         "#311F1A",
@@ -2511,9 +2630,10 @@
     {
       "category": "suit",
       "description": "An original sentinel plate suit with a copper stone finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/suit_full_copper_sentinel/garment.png",
       "id": "trinkies:suit_full_copper_sentinel",
       "item": "items/suit_full_copper_sentinel/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Copper Sentinel Plate Suit",
       "palette": [
         "#311F1A",
@@ -2532,9 +2652,10 @@
     {
       "category": "back",
       "description": "An original glasswing harness with a aurora glass finish, family-specific silhouette, and a wing flutter accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/back_full_aurora_wings/garment.png",
       "id": "trinkies:back_full_aurora_wings",
       "item": "items/back_full_aurora_wings/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Aurora Glasswing Harness",
       "palette": [
         "#162A24",
@@ -2553,9 +2674,10 @@
     {
       "category": "back",
       "description": "An original courier satchel with a aurora leather finish, family-specific silhouette, and a pack tick accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/back_full_aurora_satchel/garment.png",
       "id": "trinkies:back_full_aurora_satchel",
       "item": "items/back_full_aurora_satchel/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Aurora Courier Satchel",
       "palette": [
         "#162A24",
@@ -2574,9 +2696,10 @@
     {
       "category": "back",
       "description": "An original sky banner with a aurora cloth finish, family-specific silhouette, and a ribbon sway accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/back_full_aurora_banner/garment.png",
       "id": "trinkies:back_full_aurora_banner",
       "item": "items/back_full_aurora_banner/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Aurora Sky Banner",
       "palette": [
         "#162A24",
@@ -2595,9 +2718,10 @@
     {
       "category": "back",
       "description": "An original leaf glider with a aurora wood finish, family-specific silhouette, and a wing flutter accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/back_full_aurora_glider/garment.png",
       "id": "trinkies:back_full_aurora_glider",
       "item": "items/back_full_aurora_glider/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Aurora Leaf Glider",
       "palette": [
         "#162A24",
@@ -2616,9 +2740,10 @@
     {
       "category": "back",
       "description": "An original bell drone with a aurora metal finish, family-specific silhouette, and a drone orbit accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/back_full_aurora_drone/garment.png",
       "id": "trinkies:back_full_aurora_drone",
       "item": "items/back_full_aurora_drone/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Aurora Bell Drone",
       "palette": [
         "#162A24",
@@ -2637,9 +2762,10 @@
     {
       "category": "back",
       "description": "An original wayfarer shield with a aurora stone finish, family-specific silhouette, and a pack tick accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/back_full_aurora_shield/garment.png",
       "id": "trinkies:back_full_aurora_shield",
       "item": "items/back_full_aurora_shield/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Aurora Wayfarer Shield",
       "palette": [
         "#162A24",
@@ -2658,9 +2784,10 @@
     {
       "category": "back",
       "description": "An original comet tail rig with a aurora cloth finish, family-specific silhouette, and a ribbon sway accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/back_full_aurora_tail/garment.png",
       "id": "trinkies:back_full_aurora_tail",
       "item": "items/back_full_aurora_tail/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Aurora Comet Tail Rig",
       "palette": [
         "#162A24",
@@ -2679,9 +2806,10 @@
     {
       "category": "back",
       "description": "An original beacon lantern pack with a aurora metal finish, family-specific silhouette, and a pack tick accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/back_full_aurora_lantern/garment.png",
       "id": "trinkies:back_full_aurora_lantern",
       "item": "items/back_full_aurora_lantern/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Aurora Beacon Lantern Pack",
       "palette": [
         "#162A24",
@@ -2700,9 +2828,10 @@
     {
       "category": "back",
       "description": "An original clockwork wingpack with a aurora metal finish, family-specific silhouette, and a wing flutter accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/back_full_aurora_wingpack/garment.png",
       "id": "trinkies:back_full_aurora_wingpack",
       "item": "items/back_full_aurora_wingpack/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Aurora Clockwork Wingpack",
       "palette": [
         "#162A24",
@@ -2721,9 +2850,10 @@
     {
       "category": "back",
       "description": "An original glasswing harness with a ember glass finish, family-specific silhouette, and a wing flutter accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/back_full_ember_wings/garment.png",
       "id": "trinkies:back_full_ember_wings",
       "item": "items/back_full_ember_wings/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Ember Glasswing Harness",
       "palette": [
         "#331716",
@@ -2742,9 +2872,10 @@
     {
       "category": "back",
       "description": "An original courier satchel with a ember leather finish, family-specific silhouette, and a pack tick accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/back_full_ember_satchel/garment.png",
       "id": "trinkies:back_full_ember_satchel",
       "item": "items/back_full_ember_satchel/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Ember Courier Satchel",
       "palette": [
         "#331716",
@@ -2763,9 +2894,10 @@
     {
       "category": "back",
       "description": "An original sky banner with a ember cloth finish, family-specific silhouette, and a ribbon sway accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/back_full_ember_banner/garment.png",
       "id": "trinkies:back_full_ember_banner",
       "item": "items/back_full_ember_banner/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Ember Sky Banner",
       "palette": [
         "#331716",
@@ -2784,9 +2916,10 @@
     {
       "category": "back",
       "description": "An original leaf glider with a ember wood finish, family-specific silhouette, and a wing flutter accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/back_full_ember_glider/garment.png",
       "id": "trinkies:back_full_ember_glider",
       "item": "items/back_full_ember_glider/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Ember Leaf Glider",
       "palette": [
         "#331716",
@@ -2805,9 +2938,10 @@
     {
       "category": "back",
       "description": "An original bell drone with a ember metal finish, family-specific silhouette, and a drone orbit accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/back_full_ember_drone/garment.png",
       "id": "trinkies:back_full_ember_drone",
       "item": "items/back_full_ember_drone/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Ember Bell Drone",
       "palette": [
         "#331716",
@@ -2826,9 +2960,10 @@
     {
       "category": "back",
       "description": "An original wayfarer shield with a ember stone finish, family-specific silhouette, and a pack tick accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/back_full_ember_shield/garment.png",
       "id": "trinkies:back_full_ember_shield",
       "item": "items/back_full_ember_shield/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Ember Wayfarer Shield",
       "palette": [
         "#331716",
@@ -2847,9 +2982,10 @@
     {
       "category": "back",
       "description": "An original comet tail rig with a ember cloth finish, family-specific silhouette, and a ribbon sway accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/back_full_ember_tail/garment.png",
       "id": "trinkies:back_full_ember_tail",
       "item": "items/back_full_ember_tail/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Ember Comet Tail Rig",
       "palette": [
         "#331716",
@@ -2868,9 +3004,10 @@
     {
       "category": "back",
       "description": "An original beacon lantern pack with a ember metal finish, family-specific silhouette, and a pack tick accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/back_full_ember_lantern/garment.png",
       "id": "trinkies:back_full_ember_lantern",
       "item": "items/back_full_ember_lantern/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Ember Beacon Lantern Pack",
       "palette": [
         "#331716",
@@ -2889,9 +3026,10 @@
     {
       "category": "back",
       "description": "An original clockwork wingpack with a ember metal finish, family-specific silhouette, and a wing flutter accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/back_full_ember_wingpack/garment.png",
       "id": "trinkies:back_full_ember_wingpack",
       "item": "items/back_full_ember_wingpack/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Ember Clockwork Wingpack",
       "palette": [
         "#331716",
@@ -2910,9 +3048,10 @@
     {
       "category": "back",
       "description": "An original glasswing harness with a cloud glass finish, family-specific silhouette, and a wing flutter accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/back_full_cloud_wings/garment.png",
       "id": "trinkies:back_full_cloud_wings",
       "item": "items/back_full_cloud_wings/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Cloud Glasswing Harness",
       "palette": [
         "#212C35",
@@ -2931,9 +3070,10 @@
     {
       "category": "back",
       "description": "An original courier satchel with a cloud leather finish, family-specific silhouette, and a pack tick accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/back_full_cloud_satchel/garment.png",
       "id": "trinkies:back_full_cloud_satchel",
       "item": "items/back_full_cloud_satchel/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Cloud Courier Satchel",
       "palette": [
         "#212C35",
@@ -2952,9 +3092,10 @@
     {
       "category": "back",
       "description": "An original sky banner with a cloud cloth finish, family-specific silhouette, and a ribbon sway accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/back_full_cloud_banner/garment.png",
       "id": "trinkies:back_full_cloud_banner",
       "item": "items/back_full_cloud_banner/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Cloud Sky Banner",
       "palette": [
         "#212C35",
@@ -2973,9 +3114,10 @@
     {
       "category": "back",
       "description": "An original leaf glider with a cloud wood finish, family-specific silhouette, and a wing flutter accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/back_full_cloud_glider/garment.png",
       "id": "trinkies:back_full_cloud_glider",
       "item": "items/back_full_cloud_glider/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Cloud Leaf Glider",
       "palette": [
         "#212C35",
@@ -2994,9 +3136,10 @@
     {
       "category": "back",
       "description": "An original bell drone with a cloud metal finish, family-specific silhouette, and a drone orbit accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/back_full_cloud_drone/garment.png",
       "id": "trinkies:back_full_cloud_drone",
       "item": "items/back_full_cloud_drone/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Cloud Bell Drone",
       "palette": [
         "#212C35",
@@ -3015,9 +3158,10 @@
     {
       "category": "back",
       "description": "An original wayfarer shield with a cloud stone finish, family-specific silhouette, and a pack tick accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/back_full_cloud_shield/garment.png",
       "id": "trinkies:back_full_cloud_shield",
       "item": "items/back_full_cloud_shield/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Cloud Wayfarer Shield",
       "palette": [
         "#212C35",
@@ -3036,9 +3180,10 @@
     {
       "category": "back",
       "description": "An original comet tail rig with a cloud cloth finish, family-specific silhouette, and a ribbon sway accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/back_full_cloud_tail/garment.png",
       "id": "trinkies:back_full_cloud_tail",
       "item": "items/back_full_cloud_tail/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Cloud Comet Tail Rig",
       "palette": [
         "#212C35",
@@ -3057,9 +3202,10 @@
     {
       "category": "back",
       "description": "An original beacon lantern pack with a cloud metal finish, family-specific silhouette, and a pack tick accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/back_full_cloud_lantern/garment.png",
       "id": "trinkies:back_full_cloud_lantern",
       "item": "items/back_full_cloud_lantern/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Cloud Beacon Lantern Pack",
       "palette": [
         "#212C35",
@@ -3078,9 +3224,10 @@
     {
       "category": "back",
       "description": "An original clockwork wingpack with a cloud metal finish, family-specific silhouette, and a wing flutter accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/back_full_cloud_wingpack/garment.png",
       "id": "trinkies:back_full_cloud_wingpack",
       "item": "items/back_full_cloud_wingpack/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Cloud Clockwork Wingpack",
       "palette": [
         "#212C35",
@@ -3099,9 +3246,10 @@
     {
       "category": "back",
       "description": "An original glasswing harness with a canopy glass finish, family-specific silhouette, and a wing flutter accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/back_full_canopy_wings/garment.png",
       "id": "trinkies:back_full_canopy_wings",
       "item": "items/back_full_canopy_wings/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Canopy Glasswing Harness",
       "palette": [
         "#20281B",
@@ -3120,9 +3268,10 @@
     {
       "category": "back",
       "description": "An original courier satchel with a canopy leather finish, family-specific silhouette, and a pack tick accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/back_full_canopy_satchel/garment.png",
       "id": "trinkies:back_full_canopy_satchel",
       "item": "items/back_full_canopy_satchel/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Canopy Courier Satchel",
       "palette": [
         "#20281B",
@@ -3141,9 +3290,10 @@
     {
       "category": "back",
       "description": "An original sky banner with a canopy cloth finish, family-specific silhouette, and a ribbon sway accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/back_full_canopy_banner/garment.png",
       "id": "trinkies:back_full_canopy_banner",
       "item": "items/back_full_canopy_banner/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Canopy Sky Banner",
       "palette": [
         "#20281B",
@@ -3162,9 +3312,10 @@
     {
       "category": "back",
       "description": "An original leaf glider with a canopy wood finish, family-specific silhouette, and a wing flutter accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/back_full_canopy_glider/garment.png",
       "id": "trinkies:back_full_canopy_glider",
       "item": "items/back_full_canopy_glider/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Canopy Leaf Glider",
       "palette": [
         "#20281B",
@@ -3183,9 +3334,10 @@
     {
       "category": "back",
       "description": "An original bell drone with a canopy metal finish, family-specific silhouette, and a drone orbit accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/back_full_canopy_drone/garment.png",
       "id": "trinkies:back_full_canopy_drone",
       "item": "items/back_full_canopy_drone/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Canopy Bell Drone",
       "palette": [
         "#20281B",
@@ -3204,9 +3356,10 @@
     {
       "category": "back",
       "description": "An original wayfarer shield with a canopy stone finish, family-specific silhouette, and a pack tick accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/back_full_canopy_shield/garment.png",
       "id": "trinkies:back_full_canopy_shield",
       "item": "items/back_full_canopy_shield/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Canopy Wayfarer Shield",
       "palette": [
         "#20281B",
@@ -3225,9 +3378,10 @@
     {
       "category": "back",
       "description": "An original comet tail rig with a canopy cloth finish, family-specific silhouette, and a ribbon sway accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/back_full_canopy_tail/garment.png",
       "id": "trinkies:back_full_canopy_tail",
       "item": "items/back_full_canopy_tail/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Canopy Comet Tail Rig",
       "palette": [
         "#20281B",
@@ -3246,9 +3400,10 @@
     {
       "category": "back",
       "description": "An original beacon lantern pack with a canopy metal finish, family-specific silhouette, and a pack tick accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/back_full_canopy_lantern/garment.png",
       "id": "trinkies:back_full_canopy_lantern",
       "item": "items/back_full_canopy_lantern/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Canopy Beacon Lantern Pack",
       "palette": [
         "#20281B",
@@ -3267,9 +3422,10 @@
     {
       "category": "back",
       "description": "An original clockwork wingpack with a canopy metal finish, family-specific silhouette, and a wing flutter accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/back_full_canopy_wingpack/garment.png",
       "id": "trinkies:back_full_canopy_wingpack",
       "item": "items/back_full_canopy_wingpack/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Canopy Clockwork Wingpack",
       "palette": [
         "#20281B",
@@ -3288,9 +3444,10 @@
     {
       "category": "back",
       "description": "An original glasswing harness with a brass glass finish, family-specific silhouette, and a wing flutter accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/back_full_brass_wings/garment.png",
       "id": "trinkies:back_full_brass_wings",
       "item": "items/back_full_brass_wings/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Brass Glasswing Harness",
       "palette": [
         "#2F1F14",
@@ -3309,9 +3466,10 @@
     {
       "category": "back",
       "description": "An original courier satchel with a brass leather finish, family-specific silhouette, and a pack tick accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/back_full_brass_satchel/garment.png",
       "id": "trinkies:back_full_brass_satchel",
       "item": "items/back_full_brass_satchel/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Brass Courier Satchel",
       "palette": [
         "#2F1F14",
@@ -3330,9 +3488,10 @@
     {
       "category": "back",
       "description": "An original sky banner with a brass cloth finish, family-specific silhouette, and a ribbon sway accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/back_full_brass_banner/garment.png",
       "id": "trinkies:back_full_brass_banner",
       "item": "items/back_full_brass_banner/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Brass Sky Banner",
       "palette": [
         "#2F1F14",
@@ -3351,9 +3510,10 @@
     {
       "category": "back",
       "description": "An original leaf glider with a brass wood finish, family-specific silhouette, and a wing flutter accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/back_full_brass_glider/garment.png",
       "id": "trinkies:back_full_brass_glider",
       "item": "items/back_full_brass_glider/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Brass Leaf Glider",
       "palette": [
         "#2F1F14",
@@ -3372,9 +3532,10 @@
     {
       "category": "back",
       "description": "An original bell drone with a brass metal finish, family-specific silhouette, and a drone orbit accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/back_full_brass_drone/garment.png",
       "id": "trinkies:back_full_brass_drone",
       "item": "items/back_full_brass_drone/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Brass Bell Drone",
       "palette": [
         "#2F1F14",
@@ -3393,9 +3554,10 @@
     {
       "category": "back",
       "description": "An original wayfarer shield with a brass stone finish, family-specific silhouette, and a pack tick accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/back_full_brass_shield/garment.png",
       "id": "trinkies:back_full_brass_shield",
       "item": "items/back_full_brass_shield/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Brass Wayfarer Shield",
       "palette": [
         "#2F1F14",
@@ -3414,9 +3576,10 @@
     {
       "category": "back",
       "description": "An original comet tail rig with a brass cloth finish, family-specific silhouette, and a ribbon sway accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/back_full_brass_tail/garment.png",
       "id": "trinkies:back_full_brass_tail",
       "item": "items/back_full_brass_tail/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Brass Comet Tail Rig",
       "palette": [
         "#2F1F14",
@@ -3435,9 +3598,10 @@
     {
       "category": "back",
       "description": "An original beacon lantern pack with a brass metal finish, family-specific silhouette, and a pack tick accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/back_full_brass_lantern/garment.png",
       "id": "trinkies:back_full_brass_lantern",
       "item": "items/back_full_brass_lantern/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Brass Beacon Lantern Pack",
       "palette": [
         "#2F1F14",
@@ -3456,9 +3620,10 @@
     {
       "category": "back",
       "description": "An original clockwork wingpack with a brass metal finish, family-specific silhouette, and a wing flutter accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/back_full_brass_wingpack/garment.png",
       "id": "trinkies:back_full_brass_wingpack",
       "item": "items/back_full_brass_wingpack/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Brass Clockwork Wingpack",
       "palette": [
         "#2F1F14",
@@ -3477,9 +3642,10 @@
     {
       "category": "pet",
       "description": "An original crystal wisp with a amethyst crystal finish, family-specific silhouette, and a pet float accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/pet_full_amethyst_wisp/garment.png",
       "id": "trinkies:pet_full_amethyst_wisp",
       "item": "items/pet_full_amethyst_wisp/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Amethyst Crystal Wisp",
       "palette": [
         "#201E37",
@@ -3498,9 +3664,10 @@
     {
       "category": "pet",
       "description": "An original sootbubble with a amethyst wool finish, family-specific silhouette, and a pet bounce accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/pet_full_amethyst_blob/garment.png",
       "id": "trinkies:pet_full_amethyst_blob",
       "item": "items/pet_full_amethyst_blob/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Amethyst Sootbubble",
       "palette": [
         "#201E37",
@@ -3519,9 +3686,10 @@
     {
       "category": "pet",
       "description": "An original lanternwing moth with a amethyst fur finish, family-specific silhouette, and a pet flutter accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/pet_full_amethyst_moth/garment.png",
       "id": "trinkies:pet_full_amethyst_moth",
       "item": "items/pet_full_amethyst_moth/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Amethyst Lanternwing Moth",
       "palette": [
         "#201E37",
@@ -3540,9 +3708,10 @@
     {
       "category": "pet",
       "description": "An original pebble crab with a amethyst metal finish, family-specific silhouette, and a pet scuttle accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/pet_full_amethyst_crab/garment.png",
       "id": "trinkies:pet_full_amethyst_crab",
       "item": "items/pet_full_amethyst_crab/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Amethyst Pebble Crab",
       "palette": [
         "#201E37",
@@ -3561,9 +3730,10 @@
     {
       "category": "pet",
       "description": "An original kite finch with a amethyst feather finish, family-specific silhouette, and a pet flutter accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/pet_full_amethyst_bird/garment.png",
       "id": "trinkies:pet_full_amethyst_bird",
       "item": "items/pet_full_amethyst_bird/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Amethyst Kite Finch",
       "palette": [
         "#201E37",
@@ -3582,9 +3752,10 @@
     {
       "category": "pet",
       "description": "An original pocket drake with a amethyst scale finish, family-specific silhouette, and a pet glide accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/pet_full_amethyst_dragon/garment.png",
       "id": "trinkies:pet_full_amethyst_dragon",
       "item": "items/pet_full_amethyst_dragon/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Amethyst Pocket Drake",
       "palette": [
         "#201E37",
@@ -3603,9 +3774,10 @@
     {
       "category": "pet",
       "description": "An original mossback turtle with a amethyst stone finish, family-specific silhouette, and a pet bounce accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/pet_full_amethyst_turtle/garment.png",
       "id": "trinkies:pet_full_amethyst_turtle",
       "item": "items/pet_full_amethyst_turtle/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Amethyst Mossback Turtle",
       "palette": [
         "#201E37",
@@ -3624,9 +3796,10 @@
     {
       "category": "pet",
       "description": "An original clockwork sprout bot with a amethyst metal finish, family-specific silhouette, and a pet scuttle accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/pet_full_amethyst_bot/garment.png",
       "id": "trinkies:pet_full_amethyst_bot",
       "item": "items/pet_full_amethyst_bot/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Amethyst Clockwork Sprout Bot",
       "palette": [
         "#201E37",
@@ -3645,9 +3818,10 @@
     {
       "category": "pet",
       "description": "An original cloudfox cub with a amethyst fur finish, family-specific silhouette, and a pet glide accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/pet_full_amethyst_fox/garment.png",
       "id": "trinkies:pet_full_amethyst_fox",
       "item": "items/pet_full_amethyst_fox/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Amethyst Cloudfox Cub",
       "palette": [
         "#201E37",
@@ -3666,9 +3840,10 @@
     {
       "category": "pet",
       "description": "An original crystal wisp with a moss crystal finish, family-specific silhouette, and a pet float accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/pet_full_moss_wisp/garment.png",
       "id": "trinkies:pet_full_moss_wisp",
       "item": "items/pet_full_moss_wisp/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Moss Crystal Wisp",
       "palette": [
         "#23281B",
@@ -3687,9 +3862,10 @@
     {
       "category": "pet",
       "description": "An original sootbubble with a moss wool finish, family-specific silhouette, and a pet bounce accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/pet_full_moss_blob/garment.png",
       "id": "trinkies:pet_full_moss_blob",
       "item": "items/pet_full_moss_blob/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Moss Sootbubble",
       "palette": [
         "#23281B",
@@ -3708,9 +3884,10 @@
     {
       "category": "pet",
       "description": "An original lanternwing moth with a moss fur finish, family-specific silhouette, and a pet flutter accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/pet_full_moss_moth/garment.png",
       "id": "trinkies:pet_full_moss_moth",
       "item": "items/pet_full_moss_moth/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Moss Lanternwing Moth",
       "palette": [
         "#23281B",
@@ -3729,9 +3906,10 @@
     {
       "category": "pet",
       "description": "An original pebble crab with a moss metal finish, family-specific silhouette, and a pet scuttle accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/pet_full_moss_crab/garment.png",
       "id": "trinkies:pet_full_moss_crab",
       "item": "items/pet_full_moss_crab/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Moss Pebble Crab",
       "palette": [
         "#23281B",
@@ -3750,9 +3928,10 @@
     {
       "category": "pet",
       "description": "An original kite finch with a moss feather finish, family-specific silhouette, and a pet flutter accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/pet_full_moss_bird/garment.png",
       "id": "trinkies:pet_full_moss_bird",
       "item": "items/pet_full_moss_bird/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Moss Kite Finch",
       "palette": [
         "#23281B",
@@ -3771,9 +3950,10 @@
     {
       "category": "pet",
       "description": "An original pocket drake with a moss scale finish, family-specific silhouette, and a pet glide accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/pet_full_moss_dragon/garment.png",
       "id": "trinkies:pet_full_moss_dragon",
       "item": "items/pet_full_moss_dragon/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Moss Pocket Drake",
       "palette": [
         "#23281B",
@@ -3792,9 +3972,10 @@
     {
       "category": "pet",
       "description": "An original mossback turtle with a moss stone finish, family-specific silhouette, and a pet bounce accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/pet_full_moss_turtle/garment.png",
       "id": "trinkies:pet_full_moss_turtle",
       "item": "items/pet_full_moss_turtle/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Moss Mossback Turtle",
       "palette": [
         "#23281B",
@@ -3813,9 +3994,10 @@
     {
       "category": "pet",
       "description": "An original clockwork sprout bot with a moss metal finish, family-specific silhouette, and a pet scuttle accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/pet_full_moss_bot/garment.png",
       "id": "trinkies:pet_full_moss_bot",
       "item": "items/pet_full_moss_bot/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Moss Clockwork Sprout Bot",
       "palette": [
         "#23281B",
@@ -3834,9 +4016,10 @@
     {
       "category": "pet",
       "description": "An original cloudfox cub with a moss fur finish, family-specific silhouette, and a pet glide accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/pet_full_moss_fox/garment.png",
       "id": "trinkies:pet_full_moss_fox",
       "item": "items/pet_full_moss_fox/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Moss Cloudfox Cub",
       "palette": [
         "#23281B",
@@ -3855,9 +4038,10 @@
     {
       "category": "pet",
       "description": "An original crystal wisp with a cinder crystal finish, family-specific silhouette, and a pet float accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/pet_full_cinder_wisp/garment.png",
       "id": "trinkies:pet_full_cinder_wisp",
       "item": "items/pet_full_cinder_wisp/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Cinder Crystal Wisp",
       "palette": [
         "#1C1F21",
@@ -3876,9 +4060,10 @@
     {
       "category": "pet",
       "description": "An original sootbubble with a cinder wool finish, family-specific silhouette, and a pet bounce accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/pet_full_cinder_blob/garment.png",
       "id": "trinkies:pet_full_cinder_blob",
       "item": "items/pet_full_cinder_blob/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Cinder Sootbubble",
       "palette": [
         "#1C1F21",
@@ -3897,9 +4082,10 @@
     {
       "category": "pet",
       "description": "An original lanternwing moth with a cinder fur finish, family-specific silhouette, and a pet flutter accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/pet_full_cinder_moth/garment.png",
       "id": "trinkies:pet_full_cinder_moth",
       "item": "items/pet_full_cinder_moth/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Cinder Lanternwing Moth",
       "palette": [
         "#1C1F21",
@@ -3918,9 +4104,10 @@
     {
       "category": "pet",
       "description": "An original pebble crab with a cinder metal finish, family-specific silhouette, and a pet scuttle accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/pet_full_cinder_crab/garment.png",
       "id": "trinkies:pet_full_cinder_crab",
       "item": "items/pet_full_cinder_crab/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Cinder Pebble Crab",
       "palette": [
         "#1C1F21",
@@ -3939,9 +4126,10 @@
     {
       "category": "pet",
       "description": "An original kite finch with a cinder feather finish, family-specific silhouette, and a pet flutter accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/pet_full_cinder_bird/garment.png",
       "id": "trinkies:pet_full_cinder_bird",
       "item": "items/pet_full_cinder_bird/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Cinder Kite Finch",
       "palette": [
         "#1C1F21",
@@ -3960,9 +4148,10 @@
     {
       "category": "pet",
       "description": "An original pocket drake with a cinder scale finish, family-specific silhouette, and a pet glide accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/pet_full_cinder_dragon/garment.png",
       "id": "trinkies:pet_full_cinder_dragon",
       "item": "items/pet_full_cinder_dragon/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Cinder Pocket Drake",
       "palette": [
         "#1C1F21",
@@ -3981,9 +4170,10 @@
     {
       "category": "pet",
       "description": "An original mossback turtle with a cinder stone finish, family-specific silhouette, and a pet bounce accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/pet_full_cinder_turtle/garment.png",
       "id": "trinkies:pet_full_cinder_turtle",
       "item": "items/pet_full_cinder_turtle/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Cinder Mossback Turtle",
       "palette": [
         "#1C1F21",
@@ -4002,9 +4192,10 @@
     {
       "category": "pet",
       "description": "An original clockwork sprout bot with a cinder metal finish, family-specific silhouette, and a pet scuttle accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/pet_full_cinder_bot/garment.png",
       "id": "trinkies:pet_full_cinder_bot",
       "item": "items/pet_full_cinder_bot/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Cinder Clockwork Sprout Bot",
       "palette": [
         "#1C1F21",
@@ -4023,9 +4214,10 @@
     {
       "category": "pet",
       "description": "An original cloudfox cub with a cinder fur finish, family-specific silhouette, and a pet glide accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/pet_full_cinder_fox/garment.png",
       "id": "trinkies:pet_full_cinder_fox",
       "item": "items/pet_full_cinder_fox/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Cinder Cloudfox Cub",
       "palette": [
         "#1C1F21",
@@ -4044,9 +4236,10 @@
     {
       "category": "pet",
       "description": "An original crystal wisp with a tidal crystal finish, family-specific silhouette, and a pet float accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/pet_full_tidal_wisp/garment.png",
       "id": "trinkies:pet_full_tidal_wisp",
       "item": "items/pet_full_tidal_wisp/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Tidal Crystal Wisp",
       "palette": [
         "#153131",
@@ -4065,9 +4258,10 @@
     {
       "category": "pet",
       "description": "An original sootbubble with a tidal wool finish, family-specific silhouette, and a pet bounce accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/pet_full_tidal_blob/garment.png",
       "id": "trinkies:pet_full_tidal_blob",
       "item": "items/pet_full_tidal_blob/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Tidal Sootbubble",
       "palette": [
         "#153131",
@@ -4086,9 +4280,10 @@
     {
       "category": "pet",
       "description": "An original lanternwing moth with a tidal fur finish, family-specific silhouette, and a pet flutter accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/pet_full_tidal_moth/garment.png",
       "id": "trinkies:pet_full_tidal_moth",
       "item": "items/pet_full_tidal_moth/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Tidal Lanternwing Moth",
       "palette": [
         "#153131",
@@ -4107,9 +4302,10 @@
     {
       "category": "pet",
       "description": "An original pebble crab with a tidal metal finish, family-specific silhouette, and a pet scuttle accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/pet_full_tidal_crab/garment.png",
       "id": "trinkies:pet_full_tidal_crab",
       "item": "items/pet_full_tidal_crab/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Tidal Pebble Crab",
       "palette": [
         "#153131",
@@ -4128,9 +4324,10 @@
     {
       "category": "pet",
       "description": "An original kite finch with a tidal feather finish, family-specific silhouette, and a pet flutter accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/pet_full_tidal_bird/garment.png",
       "id": "trinkies:pet_full_tidal_bird",
       "item": "items/pet_full_tidal_bird/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Tidal Kite Finch",
       "palette": [
         "#153131",
@@ -4149,9 +4346,10 @@
     {
       "category": "pet",
       "description": "An original pocket drake with a tidal scale finish, family-specific silhouette, and a pet glide accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/pet_full_tidal_dragon/garment.png",
       "id": "trinkies:pet_full_tidal_dragon",
       "item": "items/pet_full_tidal_dragon/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Tidal Pocket Drake",
       "palette": [
         "#153131",
@@ -4170,9 +4368,10 @@
     {
       "category": "pet",
       "description": "An original mossback turtle with a tidal stone finish, family-specific silhouette, and a pet bounce accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/pet_full_tidal_turtle/garment.png",
       "id": "trinkies:pet_full_tidal_turtle",
       "item": "items/pet_full_tidal_turtle/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Tidal Mossback Turtle",
       "palette": [
         "#153131",
@@ -4191,9 +4390,10 @@
     {
       "category": "pet",
       "description": "An original clockwork sprout bot with a tidal metal finish, family-specific silhouette, and a pet scuttle accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/pet_full_tidal_bot/garment.png",
       "id": "trinkies:pet_full_tidal_bot",
       "item": "items/pet_full_tidal_bot/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Tidal Clockwork Sprout Bot",
       "palette": [
         "#153131",
@@ -4212,9 +4412,10 @@
     {
       "category": "pet",
       "description": "An original cloudfox cub with a tidal fur finish, family-specific silhouette, and a pet glide accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/pet_full_tidal_fox/garment.png",
       "id": "trinkies:pet_full_tidal_fox",
       "item": "items/pet_full_tidal_fox/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Tidal Cloudfox Cub",
       "palette": [
         "#153131",
@@ -4233,9 +4434,10 @@
     {
       "category": "pet",
       "description": "An original crystal wisp with a saffron crystal finish, family-specific silhouette, and a pet float accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/pet_full_saffron_wisp/garment.png",
       "id": "trinkies:pet_full_saffron_wisp",
       "item": "items/pet_full_saffron_wisp/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Saffron Crystal Wisp",
       "palette": [
         "#3C2015",
@@ -4254,9 +4456,10 @@
     {
       "category": "pet",
       "description": "An original sootbubble with a saffron wool finish, family-specific silhouette, and a pet bounce accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/pet_full_saffron_blob/garment.png",
       "id": "trinkies:pet_full_saffron_blob",
       "item": "items/pet_full_saffron_blob/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Saffron Sootbubble",
       "palette": [
         "#3C2015",
@@ -4275,9 +4478,10 @@
     {
       "category": "pet",
       "description": "An original lanternwing moth with a saffron fur finish, family-specific silhouette, and a pet flutter accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/pet_full_saffron_moth/garment.png",
       "id": "trinkies:pet_full_saffron_moth",
       "item": "items/pet_full_saffron_moth/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Saffron Lanternwing Moth",
       "palette": [
         "#3C2015",
@@ -4296,9 +4500,10 @@
     {
       "category": "pet",
       "description": "An original pebble crab with a saffron metal finish, family-specific silhouette, and a pet scuttle accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/pet_full_saffron_crab/garment.png",
       "id": "trinkies:pet_full_saffron_crab",
       "item": "items/pet_full_saffron_crab/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Saffron Pebble Crab",
       "palette": [
         "#3C2015",
@@ -4317,9 +4522,10 @@
     {
       "category": "pet",
       "description": "An original kite finch with a saffron feather finish, family-specific silhouette, and a pet flutter accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/pet_full_saffron_bird/garment.png",
       "id": "trinkies:pet_full_saffron_bird",
       "item": "items/pet_full_saffron_bird/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Saffron Kite Finch",
       "palette": [
         "#3C2015",
@@ -4338,9 +4544,10 @@
     {
       "category": "pet",
       "description": "An original pocket drake with a saffron scale finish, family-specific silhouette, and a pet glide accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/pet_full_saffron_dragon/garment.png",
       "id": "trinkies:pet_full_saffron_dragon",
       "item": "items/pet_full_saffron_dragon/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Saffron Pocket Drake",
       "palette": [
         "#3C2015",
@@ -4359,9 +4566,10 @@
     {
       "category": "pet",
       "description": "An original mossback turtle with a saffron stone finish, family-specific silhouette, and a pet bounce accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/pet_full_saffron_turtle/garment.png",
       "id": "trinkies:pet_full_saffron_turtle",
       "item": "items/pet_full_saffron_turtle/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Saffron Mossback Turtle",
       "palette": [
         "#3C2015",
@@ -4380,9 +4588,10 @@
     {
       "category": "pet",
       "description": "An original clockwork sprout bot with a saffron metal finish, family-specific silhouette, and a pet scuttle accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/pet_full_saffron_bot/garment.png",
       "id": "trinkies:pet_full_saffron_bot",
       "item": "items/pet_full_saffron_bot/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Saffron Clockwork Sprout Bot",
       "palette": [
         "#3C2015",
@@ -4401,9 +4610,10 @@
     {
       "category": "pet",
       "description": "An original cloudfox cub with a saffron fur finish, family-specific silhouette, and a pet glide accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/pet_full_saffron_fox/garment.png",
       "id": "trinkies:pet_full_saffron_fox",
       "item": "items/pet_full_saffron_fox/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Saffron Cloudfox Cub",
       "palette": [
         "#3C2015",
@@ -4422,9 +4632,10 @@
     {
       "category": "emote",
       "description": "An original paper greeting with a marigold paper finish, family-specific silhouette, and a emote wave accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/emote_full_marigold_greeting/garment.png",
       "id": "trinkies:emote_full_marigold_greeting",
       "item": "items/emote_full_marigold_greeting/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Marigold Paper Greeting",
       "palette": [
         "#381D2B",
@@ -4443,9 +4654,10 @@
     {
       "category": "emote",
       "description": "An original star wand cheer with a marigold gem finish, family-specific silhouette, and a emote cheer accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/emote_full_marigold_cheer/garment.png",
       "id": "trinkies:emote_full_marigold_cheer",
       "item": "items/emote_full_marigold_cheer/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Marigold Star Wand Cheer",
       "palette": [
         "#381D2B",
@@ -4464,9 +4676,10 @@
     {
       "category": "emote",
       "description": "An original marigold bow with a marigold cloth finish, family-specific silhouette, and a emote bow accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/emote_full_marigold_bow/garment.png",
       "id": "trinkies:emote_full_marigold_bow",
       "item": "items/emote_full_marigold_bow/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Marigold Marigold Bow",
       "palette": [
         "#381D2B",
@@ -4485,9 +4698,10 @@
     {
       "category": "emote",
       "description": "An original pocket drumline with a marigold wood finish, family-specific silhouette, and a emote drum accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/emote_full_marigold_drum/garment.png",
       "id": "trinkies:emote_full_marigold_drum",
       "item": "items/emote_full_marigold_drum/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Marigold Pocket Drumline",
       "palette": [
         "#381D2B",
@@ -4506,9 +4720,10 @@
     {
       "category": "emote",
       "description": "An original ribbon dance with a marigold cloth finish, family-specific silhouette, and a emote cheer accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/emote_full_marigold_dance/garment.png",
       "id": "trinkies:emote_full_marigold_dance",
       "item": "items/emote_full_marigold_dance/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Marigold Ribbon Dance",
       "palette": [
         "#381D2B",
@@ -4527,9 +4742,10 @@
     {
       "category": "emote",
       "description": "An original wayfinder salute with a marigold leather finish, family-specific silhouette, and a emote wave accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/emote_full_marigold_salute/garment.png",
       "id": "trinkies:emote_full_marigold_salute",
       "item": "items/emote_full_marigold_salute/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Marigold Wayfinder Salute",
       "palette": [
         "#381D2B",
@@ -4548,9 +4764,10 @@
     {
       "category": "emote",
       "description": "An original spark clap with a marigold enamel finish, family-specific silhouette, and a emote cheer accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/emote_full_marigold_clap/garment.png",
       "id": "trinkies:emote_full_marigold_clap",
       "item": "items/emote_full_marigold_clap/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Marigold Spark Clap",
       "palette": [
         "#381D2B",
@@ -4569,9 +4786,10 @@
     {
       "category": "emote",
       "description": "An original victory pennant with a marigold paper finish, family-specific silhouette, and a emote wave accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/emote_full_marigold_victory/garment.png",
       "id": "trinkies:emote_full_marigold_victory",
       "item": "items/emote_full_marigold_victory/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Marigold Victory Pennant",
       "palette": [
         "#381D2B",
@@ -4590,9 +4808,10 @@
     {
       "category": "emote",
       "description": "An original moonlit twirl with a marigold glass finish, family-specific silhouette, and a emote bow accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/emote_full_marigold_twirl/garment.png",
       "id": "trinkies:emote_full_marigold_twirl",
       "item": "items/emote_full_marigold_twirl/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Marigold Moonlit Twirl",
       "palette": [
         "#381D2B",
@@ -4611,9 +4830,10 @@
     {
       "category": "emote",
       "description": "An original paper greeting with a origami paper finish, family-specific silhouette, and a emote wave accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/emote_full_origami_greeting/garment.png",
       "id": "trinkies:emote_full_origami_greeting",
       "item": "items/emote_full_origami_greeting/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Origami Paper Greeting",
       "palette": [
         "#332B24",
@@ -4632,9 +4852,10 @@
     {
       "category": "emote",
       "description": "An original star wand cheer with a origami gem finish, family-specific silhouette, and a emote cheer accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/emote_full_origami_cheer/garment.png",
       "id": "trinkies:emote_full_origami_cheer",
       "item": "items/emote_full_origami_cheer/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Origami Star Wand Cheer",
       "palette": [
         "#332B24",
@@ -4653,9 +4874,10 @@
     {
       "category": "emote",
       "description": "An original marigold bow with a origami cloth finish, family-specific silhouette, and a emote bow accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/emote_full_origami_bow/garment.png",
       "id": "trinkies:emote_full_origami_bow",
       "item": "items/emote_full_origami_bow/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Origami Marigold Bow",
       "palette": [
         "#332B24",
@@ -4674,9 +4896,10 @@
     {
       "category": "emote",
       "description": "An original pocket drumline with a origami wood finish, family-specific silhouette, and a emote drum accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/emote_full_origami_drum/garment.png",
       "id": "trinkies:emote_full_origami_drum",
       "item": "items/emote_full_origami_drum/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Origami Pocket Drumline",
       "palette": [
         "#332B24",
@@ -4695,9 +4918,10 @@
     {
       "category": "emote",
       "description": "An original ribbon dance with a origami cloth finish, family-specific silhouette, and a emote cheer accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/emote_full_origami_dance/garment.png",
       "id": "trinkies:emote_full_origami_dance",
       "item": "items/emote_full_origami_dance/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Origami Ribbon Dance",
       "palette": [
         "#332B24",
@@ -4716,9 +4940,10 @@
     {
       "category": "emote",
       "description": "An original wayfinder salute with a origami leather finish, family-specific silhouette, and a emote wave accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/emote_full_origami_salute/garment.png",
       "id": "trinkies:emote_full_origami_salute",
       "item": "items/emote_full_origami_salute/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Origami Wayfinder Salute",
       "palette": [
         "#332B24",
@@ -4737,9 +4962,10 @@
     {
       "category": "emote",
       "description": "An original spark clap with a origami enamel finish, family-specific silhouette, and a emote cheer accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/emote_full_origami_clap/garment.png",
       "id": "trinkies:emote_full_origami_clap",
       "item": "items/emote_full_origami_clap/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Origami Spark Clap",
       "palette": [
         "#332B24",
@@ -4758,9 +4984,10 @@
     {
       "category": "emote",
       "description": "An original victory pennant with a origami paper finish, family-specific silhouette, and a emote wave accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/emote_full_origami_victory/garment.png",
       "id": "trinkies:emote_full_origami_victory",
       "item": "items/emote_full_origami_victory/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Origami Victory Pennant",
       "palette": [
         "#332B24",
@@ -4779,9 +5006,10 @@
     {
       "category": "emote",
       "description": "An original moonlit twirl with a origami glass finish, family-specific silhouette, and a emote bow accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/emote_full_origami_twirl/garment.png",
       "id": "trinkies:emote_full_origami_twirl",
       "item": "items/emote_full_origami_twirl/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Origami Moonlit Twirl",
       "palette": [
         "#332B24",
@@ -4800,9 +5028,10 @@
     {
       "category": "emote",
       "description": "An original paper greeting with a starlight paper finish, family-specific silhouette, and a emote wave accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/emote_full_starlight_greeting/garment.png",
       "id": "trinkies:emote_full_starlight_greeting",
       "item": "items/emote_full_starlight_greeting/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Starlight Paper Greeting",
       "palette": [
         "#1D2430",
@@ -4821,9 +5050,10 @@
     {
       "category": "emote",
       "description": "An original star wand cheer with a starlight gem finish, family-specific silhouette, and a emote cheer accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/emote_full_starlight_cheer/garment.png",
       "id": "trinkies:emote_full_starlight_cheer",
       "item": "items/emote_full_starlight_cheer/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Starlight Star Wand Cheer",
       "palette": [
         "#1D2430",
@@ -4842,9 +5072,10 @@
     {
       "category": "emote",
       "description": "An original marigold bow with a starlight cloth finish, family-specific silhouette, and a emote bow accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/emote_full_starlight_bow/garment.png",
       "id": "trinkies:emote_full_starlight_bow",
       "item": "items/emote_full_starlight_bow/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Starlight Marigold Bow",
       "palette": [
         "#1D2430",
@@ -4863,9 +5094,10 @@
     {
       "category": "emote",
       "description": "An original pocket drumline with a starlight wood finish, family-specific silhouette, and a emote drum accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/emote_full_starlight_drum/garment.png",
       "id": "trinkies:emote_full_starlight_drum",
       "item": "items/emote_full_starlight_drum/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Starlight Pocket Drumline",
       "palette": [
         "#1D2430",
@@ -4884,9 +5116,10 @@
     {
       "category": "emote",
       "description": "An original ribbon dance with a starlight cloth finish, family-specific silhouette, and a emote cheer accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/emote_full_starlight_dance/garment.png",
       "id": "trinkies:emote_full_starlight_dance",
       "item": "items/emote_full_starlight_dance/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Starlight Ribbon Dance",
       "palette": [
         "#1D2430",
@@ -4905,9 +5138,10 @@
     {
       "category": "emote",
       "description": "An original wayfinder salute with a starlight leather finish, family-specific silhouette, and a emote wave accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/emote_full_starlight_salute/garment.png",
       "id": "trinkies:emote_full_starlight_salute",
       "item": "items/emote_full_starlight_salute/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Starlight Wayfinder Salute",
       "palette": [
         "#1D2430",
@@ -4926,9 +5160,10 @@
     {
       "category": "emote",
       "description": "An original spark clap with a starlight enamel finish, family-specific silhouette, and a emote cheer accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/emote_full_starlight_clap/garment.png",
       "id": "trinkies:emote_full_starlight_clap",
       "item": "items/emote_full_starlight_clap/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Starlight Spark Clap",
       "palette": [
         "#1D2430",
@@ -4947,9 +5182,10 @@
     {
       "category": "emote",
       "description": "An original victory pennant with a starlight paper finish, family-specific silhouette, and a emote wave accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/emote_full_starlight_victory/garment.png",
       "id": "trinkies:emote_full_starlight_victory",
       "item": "items/emote_full_starlight_victory/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Starlight Victory Pennant",
       "palette": [
         "#1D2430",
@@ -4968,9 +5204,10 @@
     {
       "category": "emote",
       "description": "An original moonlit twirl with a starlight glass finish, family-specific silhouette, and a emote bow accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/emote_full_starlight_twirl/garment.png",
       "id": "trinkies:emote_full_starlight_twirl",
       "item": "items/emote_full_starlight_twirl/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Starlight Moonlit Twirl",
       "palette": [
         "#1D2430",
@@ -4989,9 +5226,10 @@
     {
       "category": "emote",
       "description": "An original paper greeting with a carnival paper finish, family-specific silhouette, and a emote wave accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/emote_full_carnival_greeting/garment.png",
       "id": "trinkies:emote_full_carnival_greeting",
       "item": "items/emote_full_carnival_greeting/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Carnival Paper Greeting",
       "palette": [
         "#2F1D32",
@@ -5010,9 +5248,10 @@
     {
       "category": "emote",
       "description": "An original star wand cheer with a carnival gem finish, family-specific silhouette, and a emote cheer accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/emote_full_carnival_cheer/garment.png",
       "id": "trinkies:emote_full_carnival_cheer",
       "item": "items/emote_full_carnival_cheer/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Carnival Star Wand Cheer",
       "palette": [
         "#2F1D32",
@@ -5031,9 +5270,10 @@
     {
       "category": "emote",
       "description": "An original marigold bow with a carnival cloth finish, family-specific silhouette, and a emote bow accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/emote_full_carnival_bow/garment.png",
       "id": "trinkies:emote_full_carnival_bow",
       "item": "items/emote_full_carnival_bow/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Carnival Marigold Bow",
       "palette": [
         "#2F1D32",
@@ -5052,9 +5292,10 @@
     {
       "category": "emote",
       "description": "An original pocket drumline with a carnival wood finish, family-specific silhouette, and a emote drum accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/emote_full_carnival_drum/garment.png",
       "id": "trinkies:emote_full_carnival_drum",
       "item": "items/emote_full_carnival_drum/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Carnival Pocket Drumline",
       "palette": [
         "#2F1D32",
@@ -5073,9 +5314,10 @@
     {
       "category": "emote",
       "description": "An original ribbon dance with a carnival cloth finish, family-specific silhouette, and a emote cheer accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/emote_full_carnival_dance/garment.png",
       "id": "trinkies:emote_full_carnival_dance",
       "item": "items/emote_full_carnival_dance/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Carnival Ribbon Dance",
       "palette": [
         "#2F1D32",
@@ -5094,9 +5336,10 @@
     {
       "category": "emote",
       "description": "An original wayfinder salute with a carnival leather finish, family-specific silhouette, and a emote wave accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/emote_full_carnival_salute/garment.png",
       "id": "trinkies:emote_full_carnival_salute",
       "item": "items/emote_full_carnival_salute/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Carnival Wayfinder Salute",
       "palette": [
         "#2F1D32",
@@ -5115,9 +5358,10 @@
     {
       "category": "emote",
       "description": "An original spark clap with a carnival enamel finish, family-specific silhouette, and a emote cheer accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/emote_full_carnival_clap/garment.png",
       "id": "trinkies:emote_full_carnival_clap",
       "item": "items/emote_full_carnival_clap/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Carnival Spark Clap",
       "palette": [
         "#2F1D32",
@@ -5136,9 +5380,10 @@
     {
       "category": "emote",
       "description": "An original victory pennant with a carnival paper finish, family-specific silhouette, and a emote wave accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/emote_full_carnival_victory/garment.png",
       "id": "trinkies:emote_full_carnival_victory",
       "item": "items/emote_full_carnival_victory/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Carnival Victory Pennant",
       "palette": [
         "#2F1D32",
@@ -5157,9 +5402,10 @@
     {
       "category": "emote",
       "description": "An original moonlit twirl with a carnival glass finish, family-specific silhouette, and a emote bow accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/emote_full_carnival_twirl/garment.png",
       "id": "trinkies:emote_full_carnival_twirl",
       "item": "items/emote_full_carnival_twirl/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Carnival Moonlit Twirl",
       "palette": [
         "#2F1D32",
@@ -5178,9 +5424,10 @@
     {
       "category": "emote",
       "description": "An original paper greeting with a breeze paper finish, family-specific silhouette, and a emote wave accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/emote_full_breeze_greeting/garment.png",
       "id": "trinkies:emote_full_breeze_greeting",
       "item": "items/emote_full_breeze_greeting/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Breeze Paper Greeting",
       "palette": [
         "#183032",
@@ -5199,9 +5446,10 @@
     {
       "category": "emote",
       "description": "An original star wand cheer with a breeze gem finish, family-specific silhouette, and a emote cheer accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/emote_full_breeze_cheer/garment.png",
       "id": "trinkies:emote_full_breeze_cheer",
       "item": "items/emote_full_breeze_cheer/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Breeze Star Wand Cheer",
       "palette": [
         "#183032",
@@ -5220,9 +5468,10 @@
     {
       "category": "emote",
       "description": "An original marigold bow with a breeze cloth finish, family-specific silhouette, and a emote bow accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/emote_full_breeze_bow/garment.png",
       "id": "trinkies:emote_full_breeze_bow",
       "item": "items/emote_full_breeze_bow/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Breeze Marigold Bow",
       "palette": [
         "#183032",
@@ -5241,9 +5490,10 @@
     {
       "category": "emote",
       "description": "An original pocket drumline with a breeze wood finish, family-specific silhouette, and a emote drum accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/emote_full_breeze_drum/garment.png",
       "id": "trinkies:emote_full_breeze_drum",
       "item": "items/emote_full_breeze_drum/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Breeze Pocket Drumline",
       "palette": [
         "#183032",
@@ -5262,9 +5512,10 @@
     {
       "category": "emote",
       "description": "An original ribbon dance with a breeze cloth finish, family-specific silhouette, and a emote cheer accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/emote_full_breeze_dance/garment.png",
       "id": "trinkies:emote_full_breeze_dance",
       "item": "items/emote_full_breeze_dance/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Breeze Ribbon Dance",
       "palette": [
         "#183032",
@@ -5283,9 +5534,10 @@
     {
       "category": "emote",
       "description": "An original wayfinder salute with a breeze leather finish, family-specific silhouette, and a emote wave accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/emote_full_breeze_salute/garment.png",
       "id": "trinkies:emote_full_breeze_salute",
       "item": "items/emote_full_breeze_salute/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Breeze Wayfinder Salute",
       "palette": [
         "#183032",
@@ -5304,9 +5556,10 @@
     {
       "category": "emote",
       "description": "An original spark clap with a breeze enamel finish, family-specific silhouette, and a emote cheer accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/emote_full_breeze_clap/garment.png",
       "id": "trinkies:emote_full_breeze_clap",
       "item": "items/emote_full_breeze_clap/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Breeze Spark Clap",
       "palette": [
         "#183032",
@@ -5325,9 +5578,10 @@
     {
       "category": "emote",
       "description": "An original victory pennant with a breeze paper finish, family-specific silhouette, and a emote wave accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/emote_full_breeze_victory/garment.png",
       "id": "trinkies:emote_full_breeze_victory",
       "item": "items/emote_full_breeze_victory/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Breeze Victory Pennant",
       "palette": [
         "#183032",
@@ -5346,9 +5600,10 @@
     {
       "category": "emote",
       "description": "An original moonlit twirl with a breeze glass finish, family-specific silhouette, and a emote bow accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/emote_full_breeze_twirl/garment.png",
       "id": "trinkies:emote_full_breeze_twirl",
       "item": "items/emote_full_breeze_twirl/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Breeze Moonlit Twirl",
       "palette": [
         "#183032",
@@ -5367,9 +5622,10 @@
     {
       "category": "aura",
       "description": "An original monsoon orbit with a monsoon glass finish, family-specific silhouette, and a aura orbit accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/aura_full_monsoon_monsoon/garment.png",
       "id": "trinkies:aura_full_monsoon_monsoon",
       "item": "items/aura_full_monsoon_monsoon/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Monsoon Monsoon Orbit",
       "palette": [
         "#18353A",
@@ -5388,9 +5644,10 @@
     {
       "category": "aura",
       "description": "An original aurora veil with a monsoon glass finish, family-specific silhouette, and a aura sweep accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/aura_full_monsoon_aurora/garment.png",
       "id": "trinkies:aura_full_monsoon_aurora",
       "item": "items/aura_full_monsoon_aurora/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Monsoon Aurora Veil",
       "palette": [
         "#18353A",
@@ -5409,9 +5666,10 @@
     {
       "category": "aura",
       "description": "An original ember petals with a monsoon enamel finish, family-specific silhouette, and a aura rise accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/aura_full_monsoon_ember/garment.png",
       "id": "trinkies:aura_full_monsoon_ember",
       "item": "items/aura_full_monsoon_ember/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Monsoon Ember Petals",
       "palette": [
         "#18353A",
@@ -5430,9 +5688,10 @@
     {
       "category": "aura",
       "description": "An original glass rune ring with a monsoon crystal finish, family-specific silhouette, and a aura orbit accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/aura_full_monsoon_rune/garment.png",
       "id": "trinkies:aura_full_monsoon_rune",
       "item": "items/aura_full_monsoon_rune/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Monsoon Glass Rune Ring",
       "palette": [
         "#18353A",
@@ -5451,9 +5710,10 @@
     {
       "category": "aura",
       "description": "An original star silt trail with a monsoon dust finish, family-specific silhouette, and a aura trail accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/aura_full_monsoon_star/garment.png",
       "id": "trinkies:aura_full_monsoon_star",
       "item": "items/aura_full_monsoon_star/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Monsoon Star Silt Trail",
       "palette": [
         "#18353A",
@@ -5472,9 +5732,10 @@
     {
       "category": "aura",
       "description": "An original snowfall halo with a monsoon glass finish, family-specific silhouette, and a aura rise accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/aura_full_monsoon_snow/garment.png",
       "id": "trinkies:aura_full_monsoon_snow",
       "item": "items/aura_full_monsoon_snow/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Monsoon Snowfall Halo",
       "palette": [
         "#18353A",
@@ -5493,9 +5754,10 @@
     {
       "category": "aura",
       "description": "An original willow whorl with a monsoon wood finish, family-specific silhouette, and a aura sweep accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/aura_full_monsoon_leaf/garment.png",
       "id": "trinkies:aura_full_monsoon_leaf",
       "item": "items/aura_full_monsoon_leaf/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Monsoon Willow Whorl",
       "palette": [
         "#18353A",
@@ -5514,9 +5776,10 @@
     {
       "category": "aura",
       "description": "An original violet vortex with a monsoon crystal finish, family-specific silhouette, and a aura orbit accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/aura_full_monsoon_vortex/garment.png",
       "id": "trinkies:aura_full_monsoon_vortex",
       "item": "items/aura_full_monsoon_vortex/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Monsoon Violet Vortex",
       "palette": [
         "#18353A",
@@ -5535,9 +5798,10 @@
     {
       "category": "aura",
       "description": "An original prism spectrum with a monsoon glass finish, family-specific silhouette, and a aura trail accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/aura_full_monsoon_spectrum/garment.png",
       "id": "trinkies:aura_full_monsoon_spectrum",
       "item": "items/aura_full_monsoon_spectrum/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Monsoon Prism Spectrum",
       "palette": [
         "#18353A",
@@ -5556,9 +5820,10 @@
     {
       "category": "aura",
       "description": "An original monsoon orbit with a aurora glass finish, family-specific silhouette, and a aura orbit accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/aura_full_aurora_monsoon/garment.png",
       "id": "trinkies:aura_full_aurora_monsoon",
       "item": "items/aura_full_aurora_monsoon/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Aurora Monsoon Orbit",
       "palette": [
         "#192834",
@@ -5577,9 +5842,10 @@
     {
       "category": "aura",
       "description": "An original aurora veil with a aurora glass finish, family-specific silhouette, and a aura sweep accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/aura_full_aurora_aurora/garment.png",
       "id": "trinkies:aura_full_aurora_aurora",
       "item": "items/aura_full_aurora_aurora/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Aurora Aurora Veil",
       "palette": [
         "#192834",
@@ -5598,9 +5864,10 @@
     {
       "category": "aura",
       "description": "An original ember petals with a aurora enamel finish, family-specific silhouette, and a aura rise accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/aura_full_aurora_ember/garment.png",
       "id": "trinkies:aura_full_aurora_ember",
       "item": "items/aura_full_aurora_ember/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Aurora Ember Petals",
       "palette": [
         "#192834",
@@ -5619,9 +5886,10 @@
     {
       "category": "aura",
       "description": "An original glass rune ring with a aurora crystal finish, family-specific silhouette, and a aura orbit accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/aura_full_aurora_rune/garment.png",
       "id": "trinkies:aura_full_aurora_rune",
       "item": "items/aura_full_aurora_rune/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Aurora Glass Rune Ring",
       "palette": [
         "#192834",
@@ -5640,9 +5908,10 @@
     {
       "category": "aura",
       "description": "An original star silt trail with a aurora dust finish, family-specific silhouette, and a aura trail accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/aura_full_aurora_star/garment.png",
       "id": "trinkies:aura_full_aurora_star",
       "item": "items/aura_full_aurora_star/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Aurora Star Silt Trail",
       "palette": [
         "#192834",
@@ -5661,9 +5930,10 @@
     {
       "category": "aura",
       "description": "An original snowfall halo with a aurora glass finish, family-specific silhouette, and a aura rise accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/aura_full_aurora_snow/garment.png",
       "id": "trinkies:aura_full_aurora_snow",
       "item": "items/aura_full_aurora_snow/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Aurora Snowfall Halo",
       "palette": [
         "#192834",
@@ -5682,9 +5952,10 @@
     {
       "category": "aura",
       "description": "An original willow whorl with a aurora wood finish, family-specific silhouette, and a aura sweep accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/aura_full_aurora_leaf/garment.png",
       "id": "trinkies:aura_full_aurora_leaf",
       "item": "items/aura_full_aurora_leaf/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Aurora Willow Whorl",
       "palette": [
         "#192834",
@@ -5703,9 +5974,10 @@
     {
       "category": "aura",
       "description": "An original violet vortex with a aurora crystal finish, family-specific silhouette, and a aura orbit accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/aura_full_aurora_vortex/garment.png",
       "id": "trinkies:aura_full_aurora_vortex",
       "item": "items/aura_full_aurora_vortex/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Aurora Violet Vortex",
       "palette": [
         "#192834",
@@ -5724,9 +5996,10 @@
     {
       "category": "aura",
       "description": "An original prism spectrum with a aurora glass finish, family-specific silhouette, and a aura trail accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/aura_full_aurora_spectrum/garment.png",
       "id": "trinkies:aura_full_aurora_spectrum",
       "item": "items/aura_full_aurora_spectrum/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Aurora Prism Spectrum",
       "palette": [
         "#192834",
@@ -5745,9 +6018,10 @@
     {
       "category": "aura",
       "description": "An original monsoon orbit with a ember glass finish, family-specific silhouette, and a aura orbit accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/aura_full_ember_monsoon/garment.png",
       "id": "trinkies:aura_full_ember_monsoon",
       "item": "items/aura_full_ember_monsoon/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Ember Monsoon Orbit",
       "palette": [
         "#3B1716",
@@ -5766,9 +6040,10 @@
     {
       "category": "aura",
       "description": "An original aurora veil with a ember glass finish, family-specific silhouette, and a aura sweep accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/aura_full_ember_aurora/garment.png",
       "id": "trinkies:aura_full_ember_aurora",
       "item": "items/aura_full_ember_aurora/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Ember Aurora Veil",
       "palette": [
         "#3B1716",
@@ -5787,9 +6062,10 @@
     {
       "category": "aura",
       "description": "An original ember petals with a ember enamel finish, family-specific silhouette, and a aura rise accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/aura_full_ember_ember/garment.png",
       "id": "trinkies:aura_full_ember_ember",
       "item": "items/aura_full_ember_ember/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Ember Ember Petals",
       "palette": [
         "#3B1716",
@@ -5808,9 +6084,10 @@
     {
       "category": "aura",
       "description": "An original glass rune ring with a ember crystal finish, family-specific silhouette, and a aura orbit accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/aura_full_ember_rune/garment.png",
       "id": "trinkies:aura_full_ember_rune",
       "item": "items/aura_full_ember_rune/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Ember Glass Rune Ring",
       "palette": [
         "#3B1716",
@@ -5829,9 +6106,10 @@
     {
       "category": "aura",
       "description": "An original star silt trail with a ember dust finish, family-specific silhouette, and a aura trail accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/aura_full_ember_star/garment.png",
       "id": "trinkies:aura_full_ember_star",
       "item": "items/aura_full_ember_star/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Ember Star Silt Trail",
       "palette": [
         "#3B1716",
@@ -5850,9 +6128,10 @@
     {
       "category": "aura",
       "description": "An original snowfall halo with a ember glass finish, family-specific silhouette, and a aura rise accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/aura_full_ember_snow/garment.png",
       "id": "trinkies:aura_full_ember_snow",
       "item": "items/aura_full_ember_snow/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Ember Snowfall Halo",
       "palette": [
         "#3B1716",
@@ -5871,9 +6150,10 @@
     {
       "category": "aura",
       "description": "An original willow whorl with a ember wood finish, family-specific silhouette, and a aura sweep accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/aura_full_ember_leaf/garment.png",
       "id": "trinkies:aura_full_ember_leaf",
       "item": "items/aura_full_ember_leaf/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Ember Willow Whorl",
       "palette": [
         "#3B1716",
@@ -5892,9 +6172,10 @@
     {
       "category": "aura",
       "description": "An original violet vortex with a ember crystal finish, family-specific silhouette, and a aura orbit accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/aura_full_ember_vortex/garment.png",
       "id": "trinkies:aura_full_ember_vortex",
       "item": "items/aura_full_ember_vortex/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Ember Violet Vortex",
       "palette": [
         "#3B1716",
@@ -5913,9 +6194,10 @@
     {
       "category": "aura",
       "description": "An original prism spectrum with a ember glass finish, family-specific silhouette, and a aura trail accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/aura_full_ember_spectrum/garment.png",
       "id": "trinkies:aura_full_ember_spectrum",
       "item": "items/aura_full_ember_spectrum/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Ember Prism Spectrum",
       "palette": [
         "#3B1716",
@@ -5934,9 +6216,10 @@
     {
       "category": "aura",
       "description": "An original monsoon orbit with a moonstone glass finish, family-specific silhouette, and a aura orbit accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/aura_full_moonstone_monsoon/garment.png",
       "id": "trinkies:aura_full_moonstone_monsoon",
       "item": "items/aura_full_moonstone_monsoon/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Moonstone Monsoon Orbit",
       "palette": [
         "#1D1B30",
@@ -5955,9 +6238,10 @@
     {
       "category": "aura",
       "description": "An original aurora veil with a moonstone glass finish, family-specific silhouette, and a aura sweep accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/aura_full_moonstone_aurora/garment.png",
       "id": "trinkies:aura_full_moonstone_aurora",
       "item": "items/aura_full_moonstone_aurora/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Moonstone Aurora Veil",
       "palette": [
         "#1D1B30",
@@ -5976,9 +6260,10 @@
     {
       "category": "aura",
       "description": "An original ember petals with a moonstone enamel finish, family-specific silhouette, and a aura rise accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/aura_full_moonstone_ember/garment.png",
       "id": "trinkies:aura_full_moonstone_ember",
       "item": "items/aura_full_moonstone_ember/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Moonstone Ember Petals",
       "palette": [
         "#1D1B30",
@@ -5997,9 +6282,10 @@
     {
       "category": "aura",
       "description": "An original glass rune ring with a moonstone crystal finish, family-specific silhouette, and a aura orbit accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/aura_full_moonstone_rune/garment.png",
       "id": "trinkies:aura_full_moonstone_rune",
       "item": "items/aura_full_moonstone_rune/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Moonstone Glass Rune Ring",
       "palette": [
         "#1D1B30",
@@ -6018,9 +6304,10 @@
     {
       "category": "aura",
       "description": "An original star silt trail with a moonstone dust finish, family-specific silhouette, and a aura trail accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/aura_full_moonstone_star/garment.png",
       "id": "trinkies:aura_full_moonstone_star",
       "item": "items/aura_full_moonstone_star/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Moonstone Star Silt Trail",
       "palette": [
         "#1D1B30",
@@ -6039,9 +6326,10 @@
     {
       "category": "aura",
       "description": "An original snowfall halo with a moonstone glass finish, family-specific silhouette, and a aura rise accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/aura_full_moonstone_snow/garment.png",
       "id": "trinkies:aura_full_moonstone_snow",
       "item": "items/aura_full_moonstone_snow/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Moonstone Snowfall Halo",
       "palette": [
         "#1D1B30",
@@ -6060,9 +6348,10 @@
     {
       "category": "aura",
       "description": "An original willow whorl with a moonstone wood finish, family-specific silhouette, and a aura sweep accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/aura_full_moonstone_leaf/garment.png",
       "id": "trinkies:aura_full_moonstone_leaf",
       "item": "items/aura_full_moonstone_leaf/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Moonstone Willow Whorl",
       "palette": [
         "#1D1B30",
@@ -6081,9 +6370,10 @@
     {
       "category": "aura",
       "description": "An original violet vortex with a moonstone crystal finish, family-specific silhouette, and a aura orbit accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/aura_full_moonstone_vortex/garment.png",
       "id": "trinkies:aura_full_moonstone_vortex",
       "item": "items/aura_full_moonstone_vortex/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Moonstone Violet Vortex",
       "palette": [
         "#1D1B30",
@@ -6102,9 +6392,10 @@
     {
       "category": "aura",
       "description": "An original prism spectrum with a moonstone glass finish, family-specific silhouette, and a aura trail accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/aura_full_moonstone_spectrum/garment.png",
       "id": "trinkies:aura_full_moonstone_spectrum",
       "item": "items/aura_full_moonstone_spectrum/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Moonstone Prism Spectrum",
       "palette": [
         "#1D1B30",
@@ -6123,9 +6414,10 @@
     {
       "category": "aura",
       "description": "An original monsoon orbit with a stardust glass finish, family-specific silhouette, and a aura orbit accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/aura_full_stardust_monsoon/garment.png",
       "id": "trinkies:aura_full_stardust_monsoon",
       "item": "items/aura_full_stardust_monsoon/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Stardust Monsoon Orbit",
       "palette": [
         "#252C33",
@@ -6144,9 +6436,10 @@
     {
       "category": "aura",
       "description": "An original aurora veil with a stardust glass finish, family-specific silhouette, and a aura sweep accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/aura_full_stardust_aurora/garment.png",
       "id": "trinkies:aura_full_stardust_aurora",
       "item": "items/aura_full_stardust_aurora/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Stardust Aurora Veil",
       "palette": [
         "#252C33",
@@ -6165,9 +6458,10 @@
     {
       "category": "aura",
       "description": "An original ember petals with a stardust enamel finish, family-specific silhouette, and a aura rise accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/aura_full_stardust_ember/garment.png",
       "id": "trinkies:aura_full_stardust_ember",
       "item": "items/aura_full_stardust_ember/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Stardust Ember Petals",
       "palette": [
         "#252C33",
@@ -6186,9 +6480,10 @@
     {
       "category": "aura",
       "description": "An original glass rune ring with a stardust crystal finish, family-specific silhouette, and a aura orbit accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/aura_full_stardust_rune/garment.png",
       "id": "trinkies:aura_full_stardust_rune",
       "item": "items/aura_full_stardust_rune/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Stardust Glass Rune Ring",
       "palette": [
         "#252C33",
@@ -6207,9 +6502,10 @@
     {
       "category": "aura",
       "description": "An original star silt trail with a stardust dust finish, family-specific silhouette, and a aura trail accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/aura_full_stardust_star/garment.png",
       "id": "trinkies:aura_full_stardust_star",
       "item": "items/aura_full_stardust_star/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Stardust Star Silt Trail",
       "palette": [
         "#252C33",
@@ -6228,9 +6524,10 @@
     {
       "category": "aura",
       "description": "An original snowfall halo with a stardust glass finish, family-specific silhouette, and a aura rise accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/aura_full_stardust_snow/garment.png",
       "id": "trinkies:aura_full_stardust_snow",
       "item": "items/aura_full_stardust_snow/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Stardust Snowfall Halo",
       "palette": [
         "#252C33",
@@ -6249,9 +6546,10 @@
     {
       "category": "aura",
       "description": "An original willow whorl with a stardust wood finish, family-specific silhouette, and a aura sweep accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/aura_full_stardust_leaf/garment.png",
       "id": "trinkies:aura_full_stardust_leaf",
       "item": "items/aura_full_stardust_leaf/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Stardust Willow Whorl",
       "palette": [
         "#252C33",
@@ -6270,9 +6568,10 @@
     {
       "category": "aura",
       "description": "An original violet vortex with a stardust crystal finish, family-specific silhouette, and a aura orbit accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/aura_full_stardust_vortex/garment.png",
       "id": "trinkies:aura_full_stardust_vortex",
       "item": "items/aura_full_stardust_vortex/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Stardust Violet Vortex",
       "palette": [
         "#252C33",
@@ -6291,9 +6590,10 @@
     {
       "category": "aura",
       "description": "An original prism spectrum with a stardust glass finish, family-specific silhouette, and a aura trail accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+      "garment": "items/aura_full_stardust_spectrum/garment.png",
       "id": "trinkies:aura_full_stardust_spectrum",
       "item": "items/aura_full_stardust_spectrum/item.json",
-      "local_render_support": false,
+      "local_render_support": true,
       "name": "Stardust Prism Spectrum",
       "palette": [
         "#252C33",

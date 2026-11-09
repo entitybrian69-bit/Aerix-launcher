@@ -12,8 +12,10 @@
       0
     ]
   },
+  "cape_texture": "cape_patch.png",
   "category": "back",
   "description": "An original comet tail rig with a ember cloth finish, family-specific silhouette, and a ribbon sway accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "garment": "garment.png",
   "id": "trinkies:back_full_ember_tail",
   "model": "model.bbmodel",
   "name": "Ember Comet Tail Rig",

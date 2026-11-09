@@ -15,6 +15,7 @@
   "category": "suit",
   "description": "An original mechanist harness with a crimson metal finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
   "emissive_mask": "emissive.png",
+  "garment": "garment.png",
   "id": "trinkies:suit_full_crimson_mechanist",
   "model": "model.bbmodel",
   "name": "Crimson Mechanist Harness",

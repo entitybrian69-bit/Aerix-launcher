@@ -14,6 +14,7 @@
   },
   "category": "hat",
   "description": "An original canopy hood with a verdant cloth finish, family-specific silhouette, and a hood bob accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "garment": "garment.png",
   "id": "trinkies:hat_full_verdant_hood",
   "model": "model.bbmodel",
   "name": "Verdant Canopy Hood",

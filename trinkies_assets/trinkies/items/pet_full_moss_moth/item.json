@@ -15,6 +15,7 @@
   },
   "category": "pet",
   "description": "An original lanternwing moth with a moss fur finish, family-specific silhouette, and a pet flutter accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "garment": "garment.png",
   "id": "trinkies:pet_full_moss_moth",
   "model": "model.bbmodel",
   "name": "Moss Lanternwing Moth",

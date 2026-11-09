@@ -15,6 +15,7 @@
   "category": "suit",
   "description": "A geometer's suit with a faceted compass, bright shoulder tabs, and glass vials.",
   "emissive_mask": "emissive.png",
+  "garment": "garment.png",
   "id": "trinkies:suit_prism_cartographer",
   "model": "model.bbmodel",
   "name": "Prism Cartographer",

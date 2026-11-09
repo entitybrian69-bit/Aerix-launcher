@@ -16,6 +16,7 @@
   "category": "pet",
   "description": "A pocket-sized pebble crab with copper feet, a shell dial, and bead eyes.",
   "emissive_mask": "emissive.png",
+  "garment": "garment.png",
   "id": "trinkies:pet_clockwork_pebble_crab",
   "model": "model.bbmodel",
   "name": "Clockwork Pebble Crab",

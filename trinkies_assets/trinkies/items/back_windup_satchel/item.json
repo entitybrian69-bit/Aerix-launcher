@@ -12,8 +12,10 @@
       0
     ]
   },
+  "cape_texture": "cape_patch.png",
   "category": "back",
   "description": "A clockwork courier pack with a wooden frame, brass crank, and canvas pockets.",
+  "garment": "garment.png",
   "id": "trinkies:back_windup_satchel",
   "model": "model.bbmodel",
   "name": "Windup Satchel",

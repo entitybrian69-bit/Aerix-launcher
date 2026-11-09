@@ -14,6 +14,7 @@
   },
   "category": "suit",
   "description": "An original pressure diver suit with a glacier metal finish, family-specific silhouette, and a suit breathe accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "garment": "garment.png",
   "id": "trinkies:suit_full_glacier_diver",
   "model": "model.bbmodel",
   "name": "Glacier Pressure Diver Suit",

@@ -15,6 +15,7 @@
   },
   "category": "pet",
   "description": "A round soot-coloured puff with a pale belly, pebble feet, and a curl tail.",
+  "garment": "garment.png",
   "id": "trinkies:pet_sootbubble",
   "model": "model.bbmodel",
   "name": "Sootbubble",

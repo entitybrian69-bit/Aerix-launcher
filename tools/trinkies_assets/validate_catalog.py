@@ -16,6 +16,13 @@ from jsonschema import Draft202012Validator
 from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+# The renderer owns the skin/cape UV layout, so the validator borrows its part rectangles instead
+# of restating them and drifting away from the art that was drawn with them.
+from tools.trinkies_assets import mc_skin_render as skin_render  # noqa: E402
+
 ASSET_ROOT = ROOT / "trinkies_assets" / "trinkies"
 ITEM_ROOT = ASSET_ROOT / "items"
 SCHEMAS = ROOT / "docs" / "wardrobe" / "schema"
@@ -28,6 +35,11 @@ CATALOG_VALIDATOR = Draft202012Validator(CATALOG_SCHEMA)
 
 EXPECTED_CATEGORIES = ("hat", "suit", "back", "pet", "emote", "aura")
 CATEGORY_TEXTURE_SIZE = {"hat": 64, "suit": 128, "back": 128, "pet": 128, "emote": 64, "aura": 32}
+# A wearable bake is always authored on the classic 64x64 skin (and 64x32 cape) layout.
+GARMENT_SKIN_SIZE = (64, 64)
+GARMENT_CAPE_SIZE = (64, 32)
+MAX_GARMENT_COLORS = 96
+PREVIEW_SIZE = 192
 CATEGORY_CUBE_BUDGET = {"hat": 40, "suit": 80, "back": 60, "pet": 70, "emote": 30, "aura": 24}
 MAX_COMPRESSED_BYTES = 15 * 1024 * 1024
 
@@ -83,6 +95,66 @@ def luminance(hex_color: str) -> float:
     return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
 
 
+def garment_allowed_mask(allowed: tuple[str, ...], size: tuple[int, int],
+                         blocks: dict[str, Any] | None = None) -> list[list[bool]]:
+    """Every texel a category is allowed to paint, as the union of its parts' face rectangles."""
+    blocks = blocks or skin_render.SKIN_PARTS
+    mask = [[False] * size[0] for _ in range(size[1])]
+    for part in allowed:
+        block = blocks[part]
+        for face in skin_render.FACES:
+            u, v, w, h = block.face_rect(face)
+            for y in range(v, min(size[1], v + h)):
+                mask[y][u:min(size[0], u + w)] = [True] * max(0, min(size[0], u + w) - u)
+    return mask
+
+
+def validate_garment_asset(item_dir: Path, item: dict[str, Any], category: str) -> None:
+    """The garment bake is what the launcher and the mod composite onto a player skin, so its
+    geometry rules are contracts rather than style: right size, painted only where the category
+    may paint, and a palette small enough to stay legible (and compressible) once scaled onto an
+    HD skin."""
+    item_id = item["id"]
+    allowed = skin_render.CATEGORY_PATCH_PARTS.get(category)
+    if not allowed:
+        fail(f"no garment patch region declared for category {category}")
+    garment_path = safe_item_path(item_dir, item.get("garment") or "garment.png")
+    with Image.open(garment_path) as garment:
+        garment.load()
+        if garment.size != GARMENT_SKIN_SIZE or garment.mode != "RGBA":
+            fail(f"garment patch must be a transparent {GARMENT_SKIN_SIZE[0]}x{GARMENT_SKIN_SIZE[1]} RGBA image: {item_id}")
+        pixels = list(garment.getdata())
+        if not any(alpha > 0 for _r, _g, _b, alpha in pixels):
+            fail(f"garment patch paints nothing: {item_id}")
+        if len(set(pixels)) > MAX_GARMENT_COLORS:
+            fail(f"garment patch exceeds {MAX_GARMENT_COLORS} colors: {item_id} ({len(set(pixels))})")
+        alpha = garment.getchannel("A").load()
+    mask = garment_allowed_mask(allowed, GARMENT_SKIN_SIZE)
+    stray = [(x, y) for y in range(GARMENT_SKIN_SIZE[1]) for x in range(GARMENT_SKIN_SIZE[0])
+             if alpha[x, y] > 0 and not mask[y][x]]
+    if stray:
+        fail(f"garment patch paints outside the {category} regions: {item_id} at {stray[:4]}")
+    if category == "back":
+        cape_path = safe_item_path(item_dir, item.get("cape_texture") or "cape_patch.png")
+        with Image.open(cape_path) as cape:
+            cape.load()
+            if cape.size != GARMENT_CAPE_SIZE or cape.mode != "RGBA":
+                fail(f"cape patch must be a transparent {GARMENT_CAPE_SIZE[0]}x{GARMENT_CAPE_SIZE[1]} RGBA image: {item_id}")
+            cape_pixels = list(cape.getdata())
+            if not any(alpha > 0 for _r, _g, _b, alpha in cape_pixels):
+                fail(f"cape patch paints nothing: {item_id}")
+            if len(set(cape_pixels)) > MAX_GARMENT_COLORS:
+                fail(f"cape patch exceeds {MAX_GARMENT_COLORS} colors: {item_id}")
+            # The cape sheet is 64x32 but only its own unwrapped box may be painted.
+            cape_alpha = cape.getchannel("A").load()
+            cape_mask = garment_allowed_mask(tuple(skin_render.CAPE_PARTS), GARMENT_CAPE_SIZE,
+                                             skin_render.CAPE_PARTS)
+            stray_cape = [(x, y) for y in range(GARMENT_CAPE_SIZE[1]) for x in range(GARMENT_CAPE_SIZE[0])
+                          if cape_alpha[x, y] > 0 and not cape_mask[y][x]]
+            if stray_cape:
+                fail(f"cape patch paints outside the cape UV box: {item_id} at {stray_cape[:4]}")
+
+
 def validate_item(item_path: Path, seen_ids: set[str]) -> tuple[str, int, int, str]:
     item_dir = item_path.parent
     item = json.loads(item_path.read_text(encoding="utf-8"))
@@ -133,13 +205,14 @@ def validate_item(item_path: Path, seen_ids: set[str]) -> tuple[str, int, int, s
         fail(f"texture/model resolution for {item_id} must be {texture_size}×{texture_size}")
     preview_path = item_dir / "preview.png"
     if not preview_path.is_file():
-        fail(f"missing shaded 3D model preview: {preview_path}")
+        fail(f"missing worn-by-character preview: {preview_path}")
     with Image.open(preview_path) as preview:
         preview.load()
-        if preview.size != (128, 128) or preview.mode != "RGBA":
-            fail(f"model preview must be a transparent 128×128 RGBA image: {item_id}")
+        if preview.size != (PREVIEW_SIZE, PREVIEW_SIZE) or preview.mode != "RGBA":
+            fail(f"model preview must be a transparent {PREVIEW_SIZE}×{PREVIEW_SIZE} RGBA image: {item_id}")
         if preview.getchannel("A").getbbox() is None:
             fail(f"model preview is fully transparent: {item_id}")
+
     with Image.open(texture_path) as texture:
         texture.load()
         if texture.size != (texture_size, texture_size):
@@ -182,6 +255,7 @@ def validate_item(item_path: Path, seen_ids: set[str]) -> tuple[str, int, int, s
         uncovered = sum(not value for row in coverage for value in row)
         fail(f"unused UV texels: {item_id} leaves {uncovered} of {texture_size * texture_size} texels unreferenced")
 
+    validate_garment_asset(item_dir, item, category)
     if item.get("emissive_mask"):
         mask_path = safe_item_path(item_dir, item["emissive_mask"])
         with Image.open(mask_path) as mask:

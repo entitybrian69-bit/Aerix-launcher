@@ -15,6 +15,7 @@
   },
   "category": "pet",
   "description": "An original kite finch with a tidal feather finish, family-specific silhouette, and a pet flutter accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "garment": "garment.png",
   "id": "trinkies:pet_full_tidal_bird",
   "model": "model.bbmodel",
   "name": "Tidal Kite Finch",

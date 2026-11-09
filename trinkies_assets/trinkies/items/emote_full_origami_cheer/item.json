@@ -16,6 +16,7 @@
   "category": "emote",
   "description": "An original star wand cheer with a origami gem finish, family-specific silhouette, and a emote cheer accent. Designed as a distinct voxel form for the Trinkies local catalog.",
   "emissive_mask": "emissive.png",
+  "garment": "garment.png",
   "id": "trinkies:emote_full_origami_cheer",
   "model": "model.bbmodel",
   "name": "Origami Star Wand Cheer",

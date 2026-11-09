@@ -15,6 +15,7 @@
   "category": "hat",
   "description": "A dark basalt brow guard with asymmetric amethyst horns.",
   "emissive_mask": "emissive.png",
+  "garment": "garment.png",
   "id": "trinkies:hat_basalt_horn_circlet",
   "model": "model.bbmodel",
   "name": "Basalt Horn Circlet",

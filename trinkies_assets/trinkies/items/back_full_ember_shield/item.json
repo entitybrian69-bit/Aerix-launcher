@@ -12,9 +12,11 @@
       0
     ]
   },
+  "cape_texture": "cape_patch.png",
   "category": "back",
   "description": "An original wayfarer shield with a ember stone finish, family-specific silhouette, and a pack tick accent. Designed as a distinct voxel form for the Trinkies local catalog.",
   "emissive_mask": "emissive.png",
+  "garment": "garment.png",
   "id": "trinkies:back_full_ember_shield",
   "model": "model.bbmodel",
   "name": "Ember Wayfarer Shield",

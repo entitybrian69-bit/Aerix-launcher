@@ -14,6 +14,7 @@
   },
   "category": "suit",
   "description": "A blue workshop uniform with a tool harness, brass fasteners, and fin-shaped guards.",
+  "garment": "garment.png",
   "id": "trinkies:suit_tidal_mechanist",
   "model": "model.bbmodel",
   "name": "Tidal Mechanist",

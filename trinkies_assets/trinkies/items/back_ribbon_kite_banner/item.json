@@ -12,8 +12,10 @@
       0
     ]
   },
+  "cape_texture": "cape_patch.png",
   "category": "back",
   "description": "A compact banner pack trailing two cut-paper ribbons and a tiny kite tail.",
+  "garment": "garment.png",
   "id": "trinkies:back_ribbon_kite_banner",
   "model": "model.bbmodel",
   "name": "Ribbon Kite Banner",

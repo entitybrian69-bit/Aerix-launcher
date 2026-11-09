@@ -12,9 +12,11 @@
       0
     ]
   },
+  "cape_texture": "cape_patch.png",
   "category": "back",
   "description": "Four translucent geometric wings held by a small jade-and-copper harness.",
   "emissive_mask": "emissive.png",
+  "garment": "garment.png",
   "id": "trinkies:back_cicada_glasswings",
   "model": "model.bbmodel",
   "name": "Cicada Glasswings",

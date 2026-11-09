@@ -15,6 +15,7 @@
   "category": "hat",
   "description": "An original moonbranch antlers with a verdant wood finish, family-specific silhouette, and a horn shiver accent. Designed as a distinct voxel form for the Trinkies local catalog.",
   "emissive_mask": "emissive.png",
+  "garment": "garment.png",
   "id": "trinkies:hat_full_verdant_antlers",
   "model": "model.bbmodel",
   "name": "Verdant Moonbranch Antlers",

@@ -14,6 +14,7 @@
   },
   "category": "hat",
   "description": "An original aviator cap with a tide leather finish, family-specific silhouette, and a hat wind accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "garment": "garment.png",
   "id": "trinkies:hat_full_tide_aviator",
   "model": "model.bbmodel",
   "name": "Tide Aviator Cap",

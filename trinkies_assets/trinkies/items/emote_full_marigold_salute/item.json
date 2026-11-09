@@ -15,6 +15,7 @@
   },
   "category": "emote",
   "description": "An original wayfinder salute with a marigold leather finish, family-specific silhouette, and a emote wave accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "garment": "garment.png",
   "id": "trinkies:emote_full_marigold_salute",
   "model": "model.bbmodel",
   "name": "Marigold Wayfinder Salute",

@@ -15,6 +15,7 @@
   "category": "hat",
   "description": "An original tide circlet with a frost glass finish, family-specific silhouette, and a circlet glint accent. Designed as a distinct voxel form for the Trinkies local catalog.",
   "emissive_mask": "emissive.png",
+  "garment": "garment.png",
   "id": "trinkies:hat_full_frost_circlet",
   "model": "model.bbmodel",
   "name": "Frost Tide Circlet",

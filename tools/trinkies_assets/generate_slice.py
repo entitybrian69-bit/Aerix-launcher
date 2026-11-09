@@ -12,6 +12,7 @@ import colorsys
 import hashlib
 import json
 import math
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -19,11 +20,21 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from tools.trinkies_assets import garments as garment_art  # noqa: E402
+from tools.trinkies_assets import mc_skin_render as skin_render  # noqa: E402
+
 ASSET_ROOT = ROOT / "trinkies_assets" / "trinkies"
 ITEM_ROOT = ASSET_ROOT / "items"
 DOCS_ROOT = ROOT / "docs" / "wardrobe"
 SCHEMA_VERSION = 1
-PREVIEW_SIZE = 128
+PREVIEW_SIZE = 192
+# The wearable garment patch is always authored against the classic 64x64 skin layout so a client
+# can bake it onto any HD skin by scaling UVs; back items add a 64x32 cape patch.
+GARMENT_SKIN_SIZE = 64
+GARMENT_CAPE_SIZE = (64, 32)
 
 # The current wardrobe uses four named tiers plus exactly five one-off Eternal items.
 # The legacy source labels are normalized when item.json/catalog.json are written.
@@ -555,6 +566,69 @@ def build_animations(category: str, motion: str, bones: list[str]) -> dict[str, 
     return {"schema": 1, "clips": clips}
 
 
+_BASE_SHEETS: dict[str, Any] = {}
+
+
+def base_skin_sheet() -> Any:
+    """The mannequin garment patches are baked onto, built once per run."""
+    if "skin" not in _BASE_SHEETS:
+        _BASE_SHEETS["skin"] = skin_render.make_base_skin()
+    return _BASE_SHEETS["skin"]
+
+
+def base_cape_sheet() -> Any:
+    if "cape" not in _BASE_SHEETS:
+        _BASE_SHEETS["cape"] = skin_render.make_base_cape()
+    return _BASE_SHEETS["cape"]
+
+
+def shape_variant(shape: str, item_id: str) -> int:
+    """`full_<category>_<family>_<n>` carries its own theme index; slice shapes derive one."""
+    fields = shape.split("_")
+    if len(fields) >= 4 and fields[-1].isdigit():
+        return int(fields[-1])
+    return stable_seed(item_id) % 5
+
+
+def build_item_art(item: dict[str, Any], seed: int) -> garment_art.ItemArt:
+    """Author the wearable patch + card geometry for one item from its catalog metadata."""
+    category, shape = item["category"], item["shape"]
+    return garment_art.build_art(
+        category,
+        garment_art.family_for_shape(category, shape),
+        item["palette"],
+        shape_variant(shape, item["id"]),
+        emissive="emissive_mask" in item,
+        seed=(seed % 99_991) + 1,
+    )
+
+
+def write_garment_assets(item_dir: Path, art: garment_art.ItemArt) -> dict[str, str]:
+    """Save the baked garment patch(es) and fail loudly if the art wanders off its UV regions."""
+    patch = skin_render.Patch(art.patch)
+    leaks = patch.leaks_outside(skin_render.CATEGORY_PATCH_PARTS[patch_category(item_dir)])
+    if leaks:
+        raise ValueError(f"garment patch paints outside its allowed parts: {item_dir.name} {leaks[:4]}")
+    fields = {"garment": "garment.png"}
+    save_png(Image.fromarray(art.patch, "RGBA"), item_dir / "garment.png")
+    if art.cape is not None and art.has_cape:
+        fields["cape_texture"] = "cape_patch.png"
+        save_png(Image.fromarray(art.cape, "RGBA"), item_dir / "cape_patch.png")
+    return fields
+
+
+# The item directory name starts with the category, which keeps the patch validator cheap.
+def patch_category(item_dir: Path) -> str:
+    for category in ("hat", "suit", "back", "pet", "emote", "aura"):
+        if item_dir.name.startswith(category + "_"):
+            return category
+    raise ValueError(f"cannot infer category from item directory: {item_dir.name}")
+
+
+def save_png(image: Image.Image, path: Path) -> None:
+    image.save(path, format="PNG", optimize=True, compress_level=9)
+
+
 def item_record(row: tuple[Any, ...]) -> dict[str, Any]:
     category, slug, name, description, rarity, tags, shape, base, accent, material, bone, motion, emissive, suit_mode = row
     item_id = f"trinkies:{category}_{slug}"
@@ -602,8 +676,11 @@ def item_record(row: tuple[Any, ...]) -> dict[str, Any]:
         item["particle_sheet"] = "texture.png"
     if suit_mode:
         item["suit_mode"] = suit_mode
+    art = build_item_art(item, seed)
+    item.update(write_garment_assets(item_dir, art))
     (item_dir / "item.json").write_text(json.dumps(item, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    record = {"item": item, "parts": parts, "palette_rgb": palette, "texture_size": size, "seed": seed, "animation": animation}
+    record = {"item": item, "parts": parts, "palette_rgb": palette, "texture_size": size, "seed": seed,
+              "animation": animation, "art": art}
     write_model_preview(record)
     return record
 
@@ -671,6 +748,30 @@ def draw_cube_preview(draw: ImageDraw.ImageDraw, part: dict[str, Any], palette: 
 
 
 def write_model_preview(record: dict[str, Any]) -> Path:
+    """Render the catalog card: the mannequin actually wearing this item, at card resolution."""
+    item = record["item"]
+    art = record.get("art")
+    if art is not None:
+        return write_character_preview(record, art)
+    return write_cube_preview(record)
+
+
+def write_character_preview(record: dict[str, Any], art: garment_art.ItemArt) -> Path:
+    item = record["item"]
+    category = item["category"]
+    skin_sheet = skin_render.composite_over(base_skin_sheet(), art.patch)
+    cape_sheet = None
+    if art.cape is not None and art.has_cape:
+        cape_sheet = skin_render.composite_over(base_cape_sheet(), art.cape)
+    image = skin_render.render_character_preview(
+        PREVIEW_SIZE, skin_sheet, art.attachments, category=category, cape_sheet=cape_sheet,
+        pose=art.pose or None, silhouette=art.silhouette)
+    output = ITEM_ROOT / item["id"].split(":", 1)[1] / "preview.png"
+    save_png(Image.fromarray(image, "RGBA"), output)
+    return output
+
+
+def write_cube_preview(record: dict[str, Any]) -> Path:
     """Rasterize one transparent, shaded isometric icon from the item's actual cube geometry."""
     item = record["item"]
     clips = record["animation"]["clips"]

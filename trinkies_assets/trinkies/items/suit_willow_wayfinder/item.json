@@ -14,6 +14,7 @@
   },
   "category": "suit",
   "description": "A layered trail coat with leaf clasps, a map case, and reinforced cuffs.",
+  "garment": "garment.png",
   "id": "trinkies:suit_willow_wayfinder",
   "model": "model.bbmodel",
   "name": "Willow Wayfinder",

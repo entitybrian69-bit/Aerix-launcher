@@ -12,8 +12,10 @@
       0
     ]
   },
+  "cape_texture": "cape_patch.png",
   "category": "back",
   "description": "An original courier satchel with a aurora leather finish, family-specific silhouette, and a pack tick accent. Designed as a distinct voxel form for the Trinkies local catalog.",
+  "garment": "garment.png",
   "id": "trinkies:back_full_aurora_satchel",
   "model": "model.bbmodel",
   "name": "Aurora Courier Satchel",
