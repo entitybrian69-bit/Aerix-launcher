@@ -244,6 +244,31 @@ jobs:
           fi
           python3 tests/trinkies_jar_verify.py "$MOD_JAR_PATH"
 
+      - name: Run 1.21.11 Fabric client GameTest (Xvfb + llvmpipe)
+        shell: bash
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+          MESA_LOADER_DRIVER_OVERRIDE: llvmpipe
+          GALLIUM_DRIVER: llvmpipe
+        run: |
+          set +e
+          xvfb-run -a ./gradlew -p tools/trinkies_client_gametest runClientGameTest --console=plain > gametest.log 2>&1
+          code=$?
+          if [ "$code" -ne 0 ]; then
+            tail -200 gametest.log | gzip -9c | base64 -w0 | fold -w 3500 |
+              while IFS= read -r chunk || [ -n "$chunk" ]; do echo "::error title=client-gametest-log-gzip-base64::$chunk"; done
+          fi
+          exit "$code"
+
+      - name: Upload client GameTest screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trinkies-client-gametest-1.21.11-screenshots
+          path: tools/trinkies_client_gametest/build/run/clientGameTest/screenshots/**/*.png
+          if-no-files-found: warn
+          retention-days: 30
+
       - name: Check it is really the debug build
         id: verify
         run: |

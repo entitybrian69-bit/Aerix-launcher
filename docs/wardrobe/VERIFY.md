@@ -1,6 +1,6 @@
 # Wardrobe + Trinkies verification checklist
 
-**Status: UNVERIFIED.** This is a test plan, not evidence that any Minecraft renderer or device has passed. The Fabric client gametest API exists for the 1.21.11 branch, but this project currently has no Loom configuration, client-gametest module, renderer, or test fixture. First make a version-specific gametest harness compile and run in CI. If the harness cannot launch a client under Xvfb and Mesa llvmpipe, use the manual checklist below and attach unedited screenshots/logs.
+**Status: UNVERIFIED.** This is a test plan, not evidence that any Trinkies renderer or device has passed. The Fabric client gametest API exists for 1.21.11. A separate Loom-based CI smoke harness is configured to load the packaged Trinkies JAR, create a local player, and capture a baseline third-person screenshot under Xvfb/Mesa llvmpipe; that harness has not yet run. It deliberately does not claim cosmetic rendering. If it cannot launch a client, use the manual checklist below and attach unedited screenshots/logs.
 
 ## Automated prerequisites
 

@@ -1,0 +1,46 @@
+plugins {
+    id 'net.fabricmc.fabric-loom-remap' version "${loom_version}"
+}
+
+group = 'net.aerix.trinkies.tests'
+version = '1.0.0'
+base.archivesName = 'trinkies-client-gametest'
+
+repositories {
+    // Loom supplies Minecraft and Fabric's repositories. The root repo policy is isolated by this build.
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${minecraft_version}"
+    mappings loom.officialMojangMappings()
+    modImplementation "net.fabricmc:fabric-loader:${loader_version}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${fabric_api_version}"
+
+    // Test the same JAR that the launcher packages, not a second copy of Trinkies sources.
+    modImplementation fileTree(
+        dir: file('../../app_pojavlauncher/build/intermediates/package_jar_deps/components/aerix_client'),
+        include: ['*.jar']
+    )
+}
+
+fabricApi {
+    configureTests {
+        createSourceSet = true
+        modId = 'trinkies-gametest'
+        enableGameTests = false
+        enableClientGameTests = true
+        eula = true
+        username = 'AerixTestPlayer'
+    }
+}
+
+tasks.withType(org.gradle.language.jvm.tasks.ProcessResources).configureEach {
+    inputs.property 'version', project.version
+    filesMatching('fabric.mod.json') {
+        expand 'version': project.version
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 21
+}
