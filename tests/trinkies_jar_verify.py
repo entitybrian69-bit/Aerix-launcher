@@ -38,7 +38,16 @@ def main() -> int:
             if "assets/trinkies/manifest.json" not in jar.namelist():
                 raise ValueError("asset manifest is missing from the mod JAR")
     except (OSError, KeyError, json.JSONDecodeError, zipfile.BadZipFile, ValueError) as error:
-        print(f"Trinkies JAR verification failed: {error}", file=sys.stderr)
+        message = f"Trinkies JAR verification failed: {error}"
+        try:
+            with zipfile.ZipFile(jar_path) as jar:
+                candidates = [name for name in jar.namelist() if name == "fabric.mod.json" or name.startswith("assets/trinkies/")]
+                message += f"; relevant entries: {candidates[:24]}"
+        except (OSError, zipfile.BadZipFile):
+            pass
+        print(message, file=sys.stderr)
+        escaped = message.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+        print(f"::error title=Trinkies JAR verification failed::{escaped}")
         return 1
 
     print(f"Verified {jar_path}: client-only Trinkies, 30 catalog assets, categories={counts}")

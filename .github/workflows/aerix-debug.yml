@@ -266,6 +266,7 @@ jobs:
           retention-days: 30
 
       - name: Upload Trinkies Fabric JAR
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: trinkies-fabric-client-jar
