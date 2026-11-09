@@ -141,7 +141,7 @@ def generate() -> None:
         item = record["item"]
         category_counts[item["category"]] += 1
         folder = Path("items") / item["id"].split(":", 1)[1]
-        catalog_items.append({
+        entry = {
             "id": item["id"], "category": item["category"], "name": item["name"],
             "rarity": item["rarity"], "description": item["description"],
             "item": (folder / "item.json").as_posix(),
@@ -151,7 +151,15 @@ def generate() -> None:
             "shape": item["shape"], "palette": item["palette"],
             # Every category now ships a baked garment patch the launcher composites onto the skin.
             "local_render_support": True,
-        })
+        }
+        if item["category"] == "back":
+            # Back items carry a second patch in the cape's own UV space, so the cape a
+            # Fabric-enabled instance resolves matches the character instead of falling
+            # back to the vanilla player cape. `item.json` stores both patches as bare
+            # filenames for slice and generated rows alike, so every asset path the
+            # catalog advertises is re-anchored here rather than copied over.
+            entry["cape_texture"] = (folder / "cape_patch.png").as_posix()
+        catalog_items.append(entry)
     if category_counts != {category: 50 for category in CATEGORY_ORDER}:
         raise SystemExit(f"Unexpected category counts: {category_counts}")
     catalog = {

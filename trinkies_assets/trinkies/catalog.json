@@ -230,6 +230,7 @@
       "texture": "items/suit_tidal_mechanist/texture.png"
     },
     {
+      "cape_texture": "items/back_cicada_glasswings/cape_patch.png",
       "category": "back",
       "description": "Four translucent geometric wings held by a small jade-and-copper harness.",
       "garment": "items/back_cicada_glasswings/garment.png",
@@ -252,6 +253,7 @@
       "texture": "items/back_cicada_glasswings/texture.png"
     },
     {
+      "cape_texture": "items/back_windup_satchel/cape_patch.png",
       "category": "back",
       "description": "A clockwork courier pack with a wooden frame, brass crank, and canvas pockets.",
       "garment": "items/back_windup_satchel/garment.png",
@@ -274,6 +276,7 @@
       "texture": "items/back_windup_satchel/texture.png"
     },
     {
+      "cape_texture": "items/back_ribbon_kite_banner/cape_patch.png",
       "category": "back",
       "description": "A compact banner pack trailing two cut-paper ribbons and a tiny kite tail.",
       "garment": "items/back_ribbon_kite_banner/garment.png",
@@ -296,6 +299,7 @@
       "texture": "items/back_ribbon_kite_banner/texture.png"
     },
     {
+      "cape_texture": "items/back_emberleaf_glider/cape_patch.png",
       "category": "back",
       "description": "Paired autumn leaves form a small articulated glider around a bark spine.",
       "garment": "items/back_emberleaf_glider/garment.png",
@@ -318,6 +322,7 @@
       "texture": "items/back_emberleaf_glider/texture.png"
     },
     {
+      "cape_texture": "items/back_tidal_bell_drone/cape_patch.png",
       "category": "back",
       "description": "A floating brass bell drone with three stabilizer fins and a blue glass lens.",
       "garment": "items/back_tidal_bell_drone/garment.png",
@@ -2650,6 +2655,7 @@
       "texture": "items/suit_full_copper_sentinel/texture.png"
     },
     {
+      "cape_texture": "items/back_full_aurora_wings/cape_patch.png",
       "category": "back",
       "description": "An original glasswing harness with a aurora glass finish, family-specific silhouette, and a wing flutter accent. Designed as a distinct voxel form for the Trinkies local catalog.",
       "garment": "items/back_full_aurora_wings/garment.png",
@@ -2672,6 +2678,7 @@
       "texture": "items/back_full_aurora_wings/texture.png"
     },
     {
+      "cape_texture": "items/back_full_aurora_satchel/cape_patch.png",
       "category": "back",
       "description": "An original courier satchel with a aurora leather finish, family-specific silhouette, and a pack tick accent. Designed as a distinct voxel form for the Trinkies local catalog.",
       "garment": "items/back_full_aurora_satchel/garment.png",
@@ -2694,6 +2701,7 @@
       "texture": "items/back_full_aurora_satchel/texture.png"
     },
     {
+      "cape_texture": "items/back_full_aurora_banner/cape_patch.png",
       "category": "back",
       "description": "An original sky banner with a aurora cloth finish, family-specific silhouette, and a ribbon sway accent. Designed as a distinct voxel form for the Trinkies local catalog.",
       "garment": "items/back_full_aurora_banner/garment.png",
@@ -2716,6 +2724,7 @@
       "texture": "items/back_full_aurora_banner/texture.png"
     },
     {
+      "cape_texture": "items/back_full_aurora_glider/cape_patch.png",
       "category": "back",
       "description": "An original leaf glider with a aurora wood finish, family-specific silhouette, and a wing flutter accent. Designed as a distinct voxel form for the Trinkies local catalog.",
       "garment": "items/back_full_aurora_glider/garment.png",
@@ -2738,6 +2747,7 @@
       "texture": "items/back_full_aurora_glider/texture.png"
     },
     {
+      "cape_texture": "items/back_full_aurora_drone/cape_patch.png",
       "category": "back",
       "description": "An original bell drone with a aurora metal finish, family-specific silhouette, and a drone orbit accent. Designed as a distinct voxel form for the Trinkies local catalog.",
       "garment": "items/back_full_aurora_drone/garment.png",
@@ -2760,6 +2770,7 @@
       "texture": "items/back_full_aurora_drone/texture.png"
     },
     {
+      "cape_texture": "items/back_full_aurora_shield/cape_patch.png",
       "category": "back",
       "description": "An original wayfarer shield with a aurora stone finish, family-specific silhouette, and a pack tick accent. Designed as a distinct voxel form for the Trinkies local catalog.",
       "garment": "items/back_full_aurora_shield/garment.png",
@@ -2782,6 +2793,7 @@
       "texture": "items/back_full_aurora_shield/texture.png"
     },
     {
+      "cape_texture": "items/back_full_aurora_tail/cape_patch.png",
       "category": "back",
       "description": "An original comet tail rig with a aurora cloth finish, family-specific silhouette, and a ribbon sway accent. Designed as a distinct voxel form for the Trinkies local catalog.",
       "garment": "items/back_full_aurora_tail/garment.png",
@@ -2804,6 +2816,7 @@
       "texture": "items/back_full_aurora_tail/texture.png"
     },
     {
+      "cape_texture": "items/back_full_aurora_lantern/cape_patch.png",
       "category": "back",
       "description": "An original beacon lantern pack with a aurora metal finish, family-specific silhouette, and a pack tick accent. Designed as a distinct voxel form for the Trinkies local catalog.",
       "garment": "items/back_full_aurora_lantern/garment.png",
@@ -2826,6 +2839,7 @@
       "texture": "items/back_full_aurora_lantern/texture.png"
     },
     {
+      "cape_texture": "items/back_full_aurora_wingpack/cape_patch.png",
       "category": "back",
       "description": "An original clockwork wingpack with a aurora metal finish, family-specific silhouette, and a wing flutter accent. Designed as a distinct voxel form for the Trinkies local catalog.",
       "garment": "items/back_full_aurora_wingpack/garment.png",
@@ -2848,6 +2862,7 @@
       "texture": "items/back_full_aurora_wingpack/texture.png"
     },
     {
+      "cape_texture": "items/back_full_ember_wings/cape_patch.png",
       "category": "back",
       "description": "An original glasswing harness with a ember glass finish, family-specific silhouette, and a wing flutter accent. Designed as a distinct voxel form for the Trinkies local catalog.",
       "garment": "items/back_full_ember_wings/garment.png",
@@ -2870,6 +2885,7 @@
       "texture": "items/back_full_ember_wings/texture.png"
     },
     {
+      "cape_texture": "items/back_full_ember_satchel/cape_patch.png",
       "category": "back",
       "description": "An original courier satchel with a ember leather finish, family-specific silhouette, and a pack tick accent. Designed as a distinct voxel form for the Trinkies local catalog.",
       "garment": "items/back_full_ember_satchel/garment.png",
@@ -2892,6 +2908,7 @@
       "texture": "items/back_full_ember_satchel/texture.png"
     },
     {
+      "cape_texture": "items/back_full_ember_banner/cape_patch.png",
       "category": "back",
       "description": "An original sky banner with a ember cloth finish, family-specific silhouette, and a ribbon sway accent. Designed as a distinct voxel form for the Trinkies local catalog.",
       "garment": "items/back_full_ember_banner/garment.png",
@@ -2914,6 +2931,7 @@
       "texture": "items/back_full_ember_banner/texture.png"
     },
     {
+      "cape_texture": "items/back_full_ember_glider/cape_patch.png",
       "category": "back",
       "description": "An original leaf glider with a ember wood finish, family-specific silhouette, and a wing flutter accent. Designed as a distinct voxel form for the Trinkies local catalog.",
       "garment": "items/back_full_ember_glider/garment.png",
@@ -2936,6 +2954,7 @@
       "texture": "items/back_full_ember_glider/texture.png"
     },
     {
+      "cape_texture": "items/back_full_ember_drone/cape_patch.png",
       "category": "back",
       "description": "An original bell drone with a ember metal finish, family-specific silhouette, and a drone orbit accent. Designed as a distinct voxel form for the Trinkies local catalog.",
       "garment": "items/back_full_ember_drone/garment.png",
@@ -2958,6 +2977,7 @@
       "texture": "items/back_full_ember_drone/texture.png"
     },
     {
+      "cape_texture": "items/back_full_ember_shield/cape_patch.png",
       "category": "back",
       "description": "An original wayfarer shield with a ember stone finish, family-specific silhouette, and a pack tick accent. Designed as a distinct voxel form for the Trinkies local catalog.",
       "garment": "items/back_full_ember_shield/garment.png",
@@ -2980,6 +3000,7 @@
       "texture": "items/back_full_ember_shield/texture.png"
     },
     {
+      "cape_texture": "items/back_full_ember_tail/cape_patch.png",
       "category": "back",
       "description": "An original comet tail rig with a ember cloth finish, family-specific silhouette, and a ribbon sway accent. Designed as a distinct voxel form for the Trinkies local catalog.",
       "garment": "items/back_full_ember_tail/garment.png",
@@ -3002,6 +3023,7 @@
       "texture": "items/back_full_ember_tail/texture.png"
     },
     {
+      "cape_texture": "items/back_full_ember_lantern/cape_patch.png",
       "category": "back",
       "description": "An original beacon lantern pack with a ember metal finish, family-specific silhouette, and a pack tick accent. Designed as a distinct voxel form for the Trinkies local catalog.",
       "garment": "items/back_full_ember_lantern/garment.png",
@@ -3024,6 +3046,7 @@
       "texture": "items/back_full_ember_lantern/texture.png"
     },
     {
+      "cape_texture": "items/back_full_ember_wingpack/cape_patch.png",
       "category": "back",
       "description": "An original clockwork wingpack with a ember metal finish, family-specific silhouette, and a wing flutter accent. Designed as a distinct voxel form for the Trinkies local catalog.",
       "garment": "items/back_full_ember_wingpack/garment.png",
@@ -3046,6 +3069,7 @@
       "texture": "items/back_full_ember_wingpack/texture.png"
     },
     {
+      "cape_texture": "items/back_full_cloud_wings/cape_patch.png",
       "category": "back",
       "description": "An original glasswing harness with a cloud glass finish, family-specific silhouette, and a wing flutter accent. Designed as a distinct voxel form for the Trinkies local catalog.",
       "garment": "items/back_full_cloud_wings/garment.png",
@@ -3068,6 +3092,7 @@
       "texture": "items/back_full_cloud_wings/texture.png"
     },
     {
+      "cape_texture": "items/back_full_cloud_satchel/cape_patch.png",
       "category": "back",
       "description": "An original courier satchel with a cloud leather finish, family-specific silhouette, and a pack tick accent. Designed as a distinct voxel form for the Trinkies local catalog.",
       "garment": "items/back_full_cloud_satchel/garment.png",
@@ -3090,6 +3115,7 @@
       "texture": "items/back_full_cloud_satchel/texture.png"
     },
     {
+      "cape_texture": "items/back_full_cloud_banner/cape_patch.png",
       "category": "back",
       "description": "An original sky banner with a cloud cloth finish, family-specific silhouette, and a ribbon sway accent. Designed as a distinct voxel form for the Trinkies local catalog.",
       "garment": "items/back_full_cloud_banner/garment.png",
@@ -3112,6 +3138,7 @@
       "texture": "items/back_full_cloud_banner/texture.png"
     },
     {
+      "cape_texture": "items/back_full_cloud_glider/cape_patch.png",
       "category": "back",
       "description": "An original leaf glider with a cloud wood finish, family-specific silhouette, and a wing flutter accent. Designed as a distinct voxel form for the Trinkies local catalog.",
       "garment": "items/back_full_cloud_glider/garment.png",
@@ -3134,6 +3161,7 @@
       "texture": "items/back_full_cloud_glider/texture.png"
     },
     {
+      "cape_texture": "items/back_full_cloud_drone/cape_patch.png",
       "category": "back",
       "description": "An original bell drone with a cloud metal finish, family-specific silhouette, and a drone orbit accent. Designed as a distinct voxel form for the Trinkies local catalog.",
       "garment": "items/back_full_cloud_drone/garment.png",
@@ -3156,6 +3184,7 @@
       "texture": "items/back_full_cloud_drone/texture.png"
     },
     {
+      "cape_texture": "items/back_full_cloud_shield/cape_patch.png",
       "category": "back",
       "description": "An original wayfarer shield with a cloud stone finish, family-specific silhouette, and a pack tick accent. Designed as a distinct voxel form for the Trinkies local catalog.",
       "garment": "items/back_full_cloud_shield/garment.png",
@@ -3178,6 +3207,7 @@
       "texture": "items/back_full_cloud_shield/texture.png"
     },
     {
+      "cape_texture": "items/back_full_cloud_tail/cape_patch.png",
       "category": "back",
       "description": "An original comet tail rig with a cloud cloth finish, family-specific silhouette, and a ribbon sway accent. Designed as a distinct voxel form for the Trinkies local catalog.",
       "garment": "items/back_full_cloud_tail/garment.png",
@@ -3200,6 +3230,7 @@
       "texture": "items/back_full_cloud_tail/texture.png"
     },
     {
+      "cape_texture": "items/back_full_cloud_lantern/cape_patch.png",
       "category": "back",
       "description": "An original beacon lantern pack with a cloud metal finish, family-specific silhouette, and a pack tick accent. Designed as a distinct voxel form for the Trinkies local catalog.",
       "garment": "items/back_full_cloud_lantern/garment.png",
@@ -3222,6 +3253,7 @@
       "texture": "items/back_full_cloud_lantern/texture.png"
     },
     {
+      "cape_texture": "items/back_full_cloud_wingpack/cape_patch.png",
       "category": "back",
       "description": "An original clockwork wingpack with a cloud metal finish, family-specific silhouette, and a wing flutter accent. Designed as a distinct voxel form for the Trinkies local catalog.",
       "garment": "items/back_full_cloud_wingpack/garment.png",
@@ -3244,6 +3276,7 @@
       "texture": "items/back_full_cloud_wingpack/texture.png"
     },
     {
+      "cape_texture": "items/back_full_canopy_wings/cape_patch.png",
       "category": "back",
       "description": "An original glasswing harness with a canopy glass finish, family-specific silhouette, and a wing flutter accent. Designed as a distinct voxel form for the Trinkies local catalog.",
       "garment": "items/back_full_canopy_wings/garment.png",
@@ -3266,6 +3299,7 @@
       "texture": "items/back_full_canopy_wings/texture.png"
     },
     {
+      "cape_texture": "items/back_full_canopy_satchel/cape_patch.png",
       "category": "back",
       "description": "An original courier satchel with a canopy leather finish, family-specific silhouette, and a pack tick accent. Designed as a distinct voxel form for the Trinkies local catalog.",
       "garment": "items/back_full_canopy_satchel/garment.png",
@@ -3288,6 +3322,7 @@
       "texture": "items/back_full_canopy_satchel/texture.png"
     },
     {
+      "cape_texture": "items/back_full_canopy_banner/cape_patch.png",
       "category": "back",
       "description": "An original sky banner with a canopy cloth finish, family-specific silhouette, and a ribbon sway accent. Designed as a distinct voxel form for the Trinkies local catalog.",
       "garment": "items/back_full_canopy_banner/garment.png",
@@ -3310,6 +3345,7 @@
       "texture": "items/back_full_canopy_banner/texture.png"
     },
     {
+      "cape_texture": "items/back_full_canopy_glider/cape_patch.png",
       "category": "back",
       "description": "An original leaf glider with a canopy wood finish, family-specific silhouette, and a wing flutter accent. Designed as a distinct voxel form for the Trinkies local catalog.",
       "garment": "items/back_full_canopy_glider/garment.png",
@@ -3332,6 +3368,7 @@
       "texture": "items/back_full_canopy_glider/texture.png"
     },
     {
+      "cape_texture": "items/back_full_canopy_drone/cape_patch.png",
       "category": "back",
       "description": "An original bell drone with a canopy metal finish, family-specific silhouette, and a drone orbit accent. Designed as a distinct voxel form for the Trinkies local catalog.",
       "garment": "items/back_full_canopy_drone/garment.png",
@@ -3354,6 +3391,7 @@
       "texture": "items/back_full_canopy_drone/texture.png"
     },
     {
+      "cape_texture": "items/back_full_canopy_shield/cape_patch.png",
       "category": "back",
       "description": "An original wayfarer shield with a canopy stone finish, family-specific silhouette, and a pack tick accent. Designed as a distinct voxel form for the Trinkies local catalog.",
       "garment": "items/back_full_canopy_shield/garment.png",
@@ -3376,6 +3414,7 @@
       "texture": "items/back_full_canopy_shield/texture.png"
     },
     {
+      "cape_texture": "items/back_full_canopy_tail/cape_patch.png",
       "category": "back",
       "description": "An original comet tail rig with a canopy cloth finish, family-specific silhouette, and a ribbon sway accent. Designed as a distinct voxel form for the Trinkies local catalog.",
       "garment": "items/back_full_canopy_tail/garment.png",
@@ -3398,6 +3437,7 @@
       "texture": "items/back_full_canopy_tail/texture.png"
     },
     {
+      "cape_texture": "items/back_full_canopy_lantern/cape_patch.png",
       "category": "back",
       "description": "An original beacon lantern pack with a canopy metal finish, family-specific silhouette, and a pack tick accent. Designed as a distinct voxel form for the Trinkies local catalog.",
       "garment": "items/back_full_canopy_lantern/garment.png",
@@ -3420,6 +3460,7 @@
       "texture": "items/back_full_canopy_lantern/texture.png"
     },
     {
+      "cape_texture": "items/back_full_canopy_wingpack/cape_patch.png",
       "category": "back",
       "description": "An original clockwork wingpack with a canopy metal finish, family-specific silhouette, and a wing flutter accent. Designed as a distinct voxel form for the Trinkies local catalog.",
       "garment": "items/back_full_canopy_wingpack/garment.png",
@@ -3442,6 +3483,7 @@
       "texture": "items/back_full_canopy_wingpack/texture.png"
     },
     {
+      "cape_texture": "items/back_full_brass_wings/cape_patch.png",
       "category": "back",
       "description": "An original glasswing harness with a brass glass finish, family-specific silhouette, and a wing flutter accent. Designed as a distinct voxel form for the Trinkies local catalog.",
       "garment": "items/back_full_brass_wings/garment.png",
@@ -3464,6 +3506,7 @@
       "texture": "items/back_full_brass_wings/texture.png"
     },
     {
+      "cape_texture": "items/back_full_brass_satchel/cape_patch.png",
       "category": "back",
       "description": "An original courier satchel with a brass leather finish, family-specific silhouette, and a pack tick accent. Designed as a distinct voxel form for the Trinkies local catalog.",
       "garment": "items/back_full_brass_satchel/garment.png",
@@ -3486,6 +3529,7 @@
       "texture": "items/back_full_brass_satchel/texture.png"
     },
     {
+      "cape_texture": "items/back_full_brass_banner/cape_patch.png",
       "category": "back",
       "description": "An original sky banner with a brass cloth finish, family-specific silhouette, and a ribbon sway accent. Designed as a distinct voxel form for the Trinkies local catalog.",
       "garment": "items/back_full_brass_banner/garment.png",
@@ -3508,6 +3552,7 @@
       "texture": "items/back_full_brass_banner/texture.png"
     },
     {
+      "cape_texture": "items/back_full_brass_glider/cape_patch.png",
       "category": "back",
       "description": "An original leaf glider with a brass wood finish, family-specific silhouette, and a wing flutter accent. Designed as a distinct voxel form for the Trinkies local catalog.",
       "garment": "items/back_full_brass_glider/garment.png",
@@ -3530,6 +3575,7 @@
       "texture": "items/back_full_brass_glider/texture.png"
     },
     {
+      "cape_texture": "items/back_full_brass_drone/cape_patch.png",
       "category": "back",
       "description": "An original bell drone with a brass metal finish, family-specific silhouette, and a drone orbit accent. Designed as a distinct voxel form for the Trinkies local catalog.",
       "garment": "items/back_full_brass_drone/garment.png",
@@ -3552,6 +3598,7 @@
       "texture": "items/back_full_brass_drone/texture.png"
     },
     {
+      "cape_texture": "items/back_full_brass_shield/cape_patch.png",
       "category": "back",
       "description": "An original wayfarer shield with a brass stone finish, family-specific silhouette, and a pack tick accent. Designed as a distinct voxel form for the Trinkies local catalog.",
       "garment": "items/back_full_brass_shield/garment.png",
@@ -3574,6 +3621,7 @@
       "texture": "items/back_full_brass_shield/texture.png"
     },
     {
+      "cape_texture": "items/back_full_brass_tail/cape_patch.png",
       "category": "back",
       "description": "An original comet tail rig with a brass cloth finish, family-specific silhouette, and a ribbon sway accent. Designed as a distinct voxel form for the Trinkies local catalog.",
       "garment": "items/back_full_brass_tail/garment.png",
@@ -3596,6 +3644,7 @@
       "texture": "items/back_full_brass_tail/texture.png"
     },
     {
+      "cape_texture": "items/back_full_brass_lantern/cape_patch.png",
       "category": "back",
       "description": "An original beacon lantern pack with a brass metal finish, family-specific silhouette, and a pack tick accent. Designed as a distinct voxel form for the Trinkies local catalog.",
       "garment": "items/back_full_brass_lantern/garment.png",
@@ -3618,6 +3667,7 @@
       "texture": "items/back_full_brass_lantern/texture.png"
     },
     {
+      "cape_texture": "items/back_full_brass_wingpack/cape_patch.png",
       "category": "back",
       "description": "An original clockwork wingpack with a brass metal finish, family-specific silhouette, and a wing flutter accent. Designed as a distinct voxel form for the Trinkies local catalog.",
       "garment": "items/back_full_brass_wingpack/garment.png",
