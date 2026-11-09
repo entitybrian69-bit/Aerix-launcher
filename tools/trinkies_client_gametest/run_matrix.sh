@@ -63,8 +63,15 @@ run_target() {
 
     tail -50 "$log_file"
     if (( code != 0 )); then
+        local diagnostic_file="$target_dir/failure-diagnostics.log"
         echo "Client test failed for Minecraft $version / Java $java_version (exit $code)."
-        tail -200 "$log_file" | gzip -9c | base64 -w0 | fold -w 3500 |
+        {
+            echo '=== Runtime and failure markers ==='
+            grep -inE 'TRINKIES_CLIENT_GAMETEST_STARTED|ERROR|FATAL|Exception|Caused by:|OutOfMemoryError|failed to|Failure:|Timeout' "$log_file" | tail -150 || true
+            echo '=== Final Gradle/game log lines ==='
+            tail -120 "$log_file"
+        } > "$diagnostic_file"
+        gzip -9c "$diagnostic_file" | base64 -w0 | fold -w 3500 |
             while IFS= read -r chunk || [[ -n "$chunk" ]]; do
                 echo "::error title=client-matrix-${label}-log-gzip-base64::$chunk"
             done

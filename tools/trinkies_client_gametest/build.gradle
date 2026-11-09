@@ -1,5 +1,6 @@
 plugins {
-    id 'net.fabricmc.fabric-loom-remap' version "${loom_version}"
+    id 'net.fabricmc.fabric-loom-remap' version "${loom_version}" apply false
+    id 'net.fabricmc.fabric-loom' version "${loom_version}" apply false
 }
 
 group = 'net.aerix.trinkies.tests'
@@ -9,6 +10,9 @@ base.archivesName = 'trinkies-client-gametest'
 def minecraftVersion = providers.gradleProperty('minecraft_version').get()
 def testRuntimeJava = Integer.parseInt(providers.gradleProperty('test_runtime_java').getOrElse('21'))
 def clientGameTestsAvailable = minecraftVersion != '1.20.1'
+def usesRemappedLoom = minecraftVersion != '26.3'
+apply plugin: (usesRemappedLoom ? 'net.fabricmc.fabric-loom-remap' : 'net.fabricmc.fabric-loom')
+def modDependencyConfiguration = usesRemappedLoom ? 'modImplementation' : 'implementation'
 def testRuntimeLauncher = javaToolchains.launcherFor {
     languageVersion = JavaLanguageVersion.of(testRuntimeJava)
 }
@@ -19,15 +23,17 @@ repositories {
 
 dependencies {
     minecraft "com.mojang:minecraft:${minecraft_version}"
-    mappings loom.officialMojangMappings()
-    modImplementation "net.fabricmc:fabric-loader:${loader_version}"
-    modImplementation "net.fabricmc.fabric-api:fabric-api:${fabric_api_version}"
+    if (usesRemappedLoom) {
+        mappings loom.officialMojangMappings()
+    }
+    add(modDependencyConfiguration, "net.fabricmc:fabric-loader:${loader_version}")
+    add(modDependencyConfiguration, "net.fabricmc.fabric-api:fabric-api:${fabric_api_version}")
 
     // Test the same JAR that the launcher packages, not a second copy of Trinkies sources.
-    modImplementation fileTree(
+    add(modDependencyConfiguration, fileTree(
         dir: file('../../app_pojavlauncher/build/intermediates/package_jar_deps/components/aerix_client'),
         include: ['*.jar']
-    )
+    ))
 }
 
 if (clientGameTestsAvailable) {

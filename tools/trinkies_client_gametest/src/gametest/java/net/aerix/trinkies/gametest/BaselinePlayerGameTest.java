@@ -18,6 +18,9 @@ import net.fabricmc.loader.api.FabricLoader;
 public final class BaselinePlayerGameTest implements FabricClientGameTest {
     @Override
     public void runTest(ClientGameTestContext context) {
+        System.out.println("TRINKIES_CLIENT_GAMETEST_STARTED: minecraft="
+                + System.getProperty("trinkies.test.minecraft_version", "unknown")
+                + ", java=" + System.getProperty("java.version", "unknown"));
         if (!FabricLoader.getInstance().isModLoaded("trinkies")) {
             throw new AssertionError("The packaged Trinkies mod was not loaded by the client game test");
         }
