@@ -11,7 +11,7 @@ import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContex
 import net.fabricmc.loader.api.FabricLoader;
 
 /**
- * Infrastructure smoke test only: proves the packaged client JAR loads and the 1.21.11
+ * Infrastructure smoke test only: proves the packaged client JAR loads and the target
  * client-gametest runner can create a local player and capture a third-person screenshot.
  * It deliberately does not claim any cosmetic is rendered; the hat acceptance test comes later.
  */
@@ -24,7 +24,8 @@ public final class BaselinePlayerGameTest implements FabricClientGameTest {
 
         Path screenshot;
         try (TestSingleplayerContext world = context.worldBuilder().create()) {
-            world.getClientWorld().waitForChunksRender();
+            // Use only cross-version context methods; TestSingleplayerContext changed in 26.3.
+            context.waitTicks(10);
             context.runOnClient(client -> {
                 if (client.player == null) {
                     throw new AssertionError("Expected a local player in the generated singleplayer world");
@@ -32,7 +33,9 @@ public final class BaselinePlayerGameTest implements FabricClientGameTest {
                 client.options.setCameraType(CameraType.THIRD_PERSON_BACK);
             });
             context.waitTick();
-            screenshot = context.takeScreenshot("trinkies-baseline-player-third-person");
+            String targetVersion = System.getProperty("trinkies.test.minecraft_version", "unknown")
+                    .replaceAll("[^A-Za-z0-9._-]", "-");
+            screenshot = context.takeScreenshot("trinkies-baseline-player-third-person-" + targetVersion);
             context.runOnClient(client -> client.options.setCameraType(CameraType.FIRST_PERSON));
         }
 
