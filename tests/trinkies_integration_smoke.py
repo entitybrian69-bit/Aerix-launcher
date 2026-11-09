@@ -115,6 +115,14 @@ class TrinkiesIntegrationSmoke(unittest.TestCase):
         self.assertEqual(re.search(r'BAKE_ORDER: List<String> = listOf\(([^)]*)\)', composite)[1]
                          .replace('"', "").replace(",", " ").split(),
                          ["suit", "back", "pet", "emote", "aura", "hat"])
+        # A part's footprint must stay the union of its six faces. Testing the block as one
+        # bounding box instead silently accepts the unused corner cells of the unfold, which is
+        # exactly where a patch that repaints the face would hide.
+        covers = composite[composite.index("private fun covers("):composite.index("private fun inside(")]
+        for face in ("top", "bottom", "right", "front", "left", "back"):
+            self.assertIn(f"// {face}", covers)
+        self.assertEqual(covers.count("inside(x, y,"), 6, "one test per face, no bounding-box shortcut")
+        self.assertIn("part in OVERLAY_BLOCKS", covers)
 
     def test_baked_garments_stay_inside_their_category_footprint(self):
         """A patch that painted the face or the legs would rewrite the player's own skin rather than

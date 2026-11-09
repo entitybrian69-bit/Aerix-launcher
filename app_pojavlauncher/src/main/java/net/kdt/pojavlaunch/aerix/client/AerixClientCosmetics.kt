@@ -519,7 +519,7 @@ object AerixClientCosmetics {
                         return@let null
                     }
                     val pixels = IntArray(GARMENT_PATCH_SIZE * GARMENT_PATCH_SIZE)
-                    bitmap.getPixels(pixels, GARMENT_PATCH_SIZE, 0, 0, GARMENT_PATCH_SIZE, GARMENT_PATCH_SIZE)
+                    bitmap.getPixels(pixels, 0, GARMENT_PATCH_SIZE, 0, 0, GARMENT_PATCH_SIZE, GARMENT_PATCH_SIZE)
                     bitmap.recycle()
                     if (TrinkiesGarmentComposite.isUsableGarment(pixels, category)) pixels else null
                 }
