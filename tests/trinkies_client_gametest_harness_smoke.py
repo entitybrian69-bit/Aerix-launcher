@@ -81,6 +81,18 @@ for name in ("gametest", "legacy"):
         if needle not in text:
             fail(f"the {name} entrypoint does not drive the loadout round trip: {needle}")
 
+# Loom creates the client GameTest source set in its own afterEvaluate hook, so anything that touches
+# `sourceSets.gametest` while the script is still being evaluated fails the whole build before a client
+# starts - "Could not get unknown property 'gametest'" is what that looked like in CI. The classpath
+# bridge has to be deferred, and it has to fail loudly if Loom stops creating the set it defers to.
+build = (HARNESS / "build.gradle").read_text(encoding="utf-8")
+if "sourceSets.gametest." in build:
+    fail("build.gradle reaches for sourceSets.gametest eagerly; Loom creates it in afterEvaluate")
+if "project.afterEvaluate" not in build or "findByName('gametest')" not in build:
+    fail("build.gradle no longer defers the gametest classpath bridge until Loom has created the set")
+if "Loom did not create the 'gametest' source set" not in build:
+    fail("the deferred bridge must fail with an explanation rather than skip silently")
+
 runner = (HARNESS / "run_matrix.sh").read_text(encoding="utf-8")
 for target in (
     "run_target 26.3 25 '0.165.2+26.3' runClientGameTest",

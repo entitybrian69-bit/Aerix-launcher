@@ -38,12 +38,6 @@ dependencies {
 }
 
 if (clientGameTestsAvailable) {
-    // The generated client GameTest source set tests main's classes, and main carries the shared
-    // loadout round-trip probe. Say so explicitly instead of relying on how the test harness happens
-    // to wire its classpaths, so both entrypoints compile against the same helper.
-    sourceSets.gametest.compileClasspath += sourceSets.main.output + sourceSets.main.compileClasspath
-    sourceSets.gametest.runtimeClasspath += sourceSets.main.output
-
     fabricApi {
         configureTests {
             createSourceSet = true
@@ -53,6 +47,26 @@ if (clientGameTestsAvailable) {
             eula = true
             username = 'AerixTestPlayer'
         }
+    }
+
+    // The client GameTest source set has to see main's classes: the shared loadout round-trip probe
+    // lives in src/main/java so that the modern branch and the 1.20.1 branch exercise the same file
+    // instead of two copies that can drift.
+    //
+    // Loom creates that source set from configureTests, and it does so inside its own afterEvaluate
+    // hook, so `sourceSets.gametest` here is "Could not get unknown property 'gametest' for SourceSet
+    // container" and the build dies before any client starts. Register after Loom instead, look the
+    // set up by name, and say plainly if the wiring ever stops matching so the failure is not silent.
+    project.afterEvaluate {
+        def gameTestSourceSet = sourceSets.findByName('gametest')
+        if (gameTestSourceSet == null) {
+            throw new GradleException(
+                "Loom did not create the 'gametest' source set, so the loadout probe cannot be put on " +
+                "its classpath. Check that configureTests still owns createSourceSet before renaming " +
+                "anything; silently skipping this would let the client test compile against nothing.")
+        }
+        gameTestSourceSet.compileClasspath += sourceSets.main.output + sourceSets.main.compileClasspath
+        gameTestSourceSet.runtimeClasspath += sourceSets.main.output
     }
 } else {
     // Fabric's client-game-test API does not exist on 1.20.1. Use a test-only client entrypoint
