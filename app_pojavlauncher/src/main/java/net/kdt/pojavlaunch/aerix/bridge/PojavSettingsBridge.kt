@@ -45,7 +45,7 @@ import net.kdt.pojavlaunch.LauncherActivity
 import net.kdt.pojavlaunch.PojavApplication
 import net.kdt.pojavlaunch.R
 import net.kdt.pojavlaunch.Tools
-import net.kdt.pojavlaunch.utils.jre.InstanceMemory
+import net.kdt.pojavlaunch.utils.jre.LaunchMemory
 import net.kdt.pojavlaunch.fragments.GamepadMapperFragment
 import net.kdt.pojavlaunch.game.renderer.RendererCache
 import net.kdt.pojavlaunch.game.renderer.def.Renderers
@@ -212,12 +212,10 @@ object PojavSettingsBridge {
      * The policy lives in [InstanceMemory] so the UI sliders, the instance editor and the JVM
      * arguments that are really passed cannot drift apart.
      */
-    fun safeMaxRam(context: Context): Int =
-        InstanceMemory.safeMb(Tools.getTotalDeviceMemory(context).toLong(), Architecture.is32BitsDevice())
+    fun safeMaxRam(context: Context): Int = LaunchMemory.safeMaxMb(context)
 
     /** A stored allocation that a previous, wider ceiling allowed. Applied at launch and in UI. */
-    fun clampRam(context: Context, requestedMb: Int): Int =
-        InstanceMemory.clamp(context, requestedMb)
+    fun clampRam(context: Context, requestedMb: Int): Int = LaunchMemory.clamp(context, requestedMb)
 
     /** LauncherPreferenceVideoFragment "#724" fix: values under 25 show as 100. */
     fun resolutionPercent(): Int {

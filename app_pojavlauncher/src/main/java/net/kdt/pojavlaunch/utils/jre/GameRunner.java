@@ -450,7 +450,7 @@ public class GameRunner {
         // A heap the device cannot honour is worse than a smaller one: the launcher process, the GL
         // driver and Android are all still in this memory. Clamp, and say so - the old toast just
         // announced whatever the slider had been dragged to.
-        final int launchMemoryMb = InstanceMemory.clamp(activity, requestedMemoryMb);
+        final int launchMemoryMb = LaunchMemory.clamp(activity, requestedMemoryMb);
         final int deviceRamMb = net.kdt.pojavlaunch.Tools.getTotalDeviceMemory(activity);
         final boolean clamped = launchMemoryMb != requestedMemoryMb;
         Logger.appendToLog("Java heap allocation: " + launchMemoryMb + " MB" +
