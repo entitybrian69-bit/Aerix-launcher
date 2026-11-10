@@ -8,7 +8,6 @@ import java.io.InputStream;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.lang.reflect.RecordComponent;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -37,7 +36,8 @@ final class ModernCapeBridge {
     private Method playerInfo, infoSkin, getManager, texGet, texRegister, texRelease;
     private Method imageRead, imageCopy, dynPixels, dynUpload;
     private Constructor<?> textureConstructor, skinConstructor;
-    private RecordComponent[] skinComponents;
+    private Object[] skinComponents;
+    private Method recordIsRecord, recordComponents, componentAccessor, componentName;
     private Method[] skinAccessors;
     private int capeComponent = -1;
     private Object capeId, capeAsset, activeInfo, activeManager, activeTexture;
@@ -156,6 +156,7 @@ final class ModernCapeBridge {
         imageCopy = methodWithArgs(image, new Class<?>[] { image }, "copyFrom", "method_4317");
         dynPixels = noArgMethod(dynamic, "getPixels", "method_4525");
         dynUpload = noArgMethod(dynamic, "upload", "method_4524");
+        openRecordApi();
         resolveSkinShape(skin);
         textureConstructor = dynamic.getConstructor(Supplier.class, image);
         Object local;
@@ -177,27 +178,64 @@ final class ModernCapeBridge {
      * the one thing that cannot drift between versions.
      */
     private void resolveSkinShape(Class<?> skin) throws Exception {
-        if (!skin.isRecord()) {
+        Object[] components = recordComponentsOf(skin);
+        if (components == null || components.length < 3) {
             resolvePositionalSkin(skin);
             return;
         }
-        RecordComponent[] components = skin.getRecordComponents();
-        if (components.length < 3) throw new NoSuchMethodException("skin record has too few components");
         List<Method> accessors = new ArrayList<Method>();
         Class<?>[] parameterTypes = new Class<?>[components.length];
+        StringBuilder names = new StringBuilder();
         for (int i = 0; i < components.length; i++) {
-            RecordComponent component = components[i];
-            Method accessor = component.getAccessor();
-            if (accessor == null) throw new NoSuchMethodException("accessor for " + component.getName());
+            String name = (String) componentName.invoke(components[i]);
+            Method accessor = (Method) componentAccessor.invoke(components[i]);
+            if (accessor == null) throw new NoSuchMethodException("accessor for " + name);
             accessor.setAccessible(true);
             accessors.add(accessor);
-            parameterTypes[i] = component.getType();
-            if (component.getName().toLowerCase(Locale.ROOT).contains("cape")) capeComponent = i;
+            parameterTypes[i] = accessor.getReturnType();
+            if (names.length() > 0) names.append(',');
+            names.append(name);
+            if (name.toLowerCase(Locale.ROOT).contains("cape")) capeComponent = i;
         }
-        if (capeComponent < 0) throw new NoSuchFieldException("no cape component in " + skin.getSimpleName());
+        if (capeComponent < 0) {
+            // The names are the diagnosis: a component nobody thought to call "cape" is a version
+            // this bridge has not been told about, and a silent skip is what hid capes for a year.
+            throw new NoSuchFieldException("no cape component in " + skin.getSimpleName() +
+                    " (" + names + ')');
+        }
         skinConstructor = skin.getConstructor(parameterTypes);
         skinComponents = components;
         skinAccessors = accessors.toArray(new Method[0]);
+    }
+
+    /**
+     * Opens the record API if the running JVM has one.
+     *
+     * This module is built for Java 8 and older Minecraft runtimes still boot on it, so
+     * {@code java.lang.reflect.RecordComponent} cannot be named in the source: it is looked up here,
+     * and a JVM without records simply takes the pre-record path below instead of failing to load.
+     */
+    private void openRecordApi() {
+        try {
+            Class<?> component = Class.forName("java.lang.reflect.RecordComponent", false, loader);
+            Method isRecord = Class.class.getMethod("isRecord");
+            Method components = Class.class.getMethod("getRecordComponents");
+            Method accessor = component.getMethod("getAccessor");
+            Method name = component.getMethod("getName");
+            recordIsRecord = isRecord;
+            recordComponents = components;
+            componentAccessor = accessor;
+            componentName = name;
+        } catch (Throwable absent) {
+            recordIsRecord = null;
+        }
+    }
+
+    /** @return the skin class's record components, or null when it is not a record or has no API. */
+    private Object[] recordComponentsOf(Class<?> skin) throws Exception {
+        if (recordIsRecord == null) return null;
+        if (!Boolean.TRUE.equals(recordIsRecord.invoke(skin))) return null;
+        return (Object[]) recordComponents.invoke(skin);
     }
 
     /**
@@ -205,6 +243,8 @@ final class ModernCapeBridge {
      * our texture in both cape slots, because the elytra sheet shares it.
      */
     private void resolvePositionalSkin(Class<?> skin) throws Exception {
+        skinComponents = null;
+        capeComponent = -1;
         Method body = noArgMethod(skin, "body", "comp_1626");
         Method model = noArgMethod(skin, "model", "comp_1629");
         Method secure = noArgMethod(skin, "secure", "comp_1630");
@@ -212,8 +252,6 @@ final class ModernCapeBridge {
         skinConstructor = skin.getConstructor(textureType, textureType, textureType,
                 model.getReturnType(), secure.getReturnType());
         skinAccessors = new Method[] { body, model, secure };
-        skinComponents = null;
-        capeComponent = -1;
     }
 
     /** @return the same skin, with its cape asset pointing at the launcher-served texture. */

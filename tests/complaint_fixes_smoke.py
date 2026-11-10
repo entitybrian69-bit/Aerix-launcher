@@ -123,7 +123,10 @@ assert 'String status()' in cape, 'a single renamed accessor used to hide behind
 assert 'attempts++' in cape and 'retryAfter = now + Math.min(30_000L, 1_500L * attempts)' in cape, \
     'resolve failures must be retried, never disabled forever'
 assert 'resolvePositionalSkin(skin)' in cape, 'older skin classes still need the body, cape, elytra order'
-assert 'getRecordComponents()' in cape
+# The record API is looked up rather than named: this module is built for Java 8, and a Java 16
+# symbol in the source is a compile error on that toolchain.
+assert 'Class.class.getMethod("getRecordComponents")' in cape
+assert 'import java.lang.reflect.RecordComponent;' not in cape
 
 # 8. A recording has to be openable by other apps, not only by this launcher.
 output = read(JAVA / 'recording/RecordingOutput.kt')
