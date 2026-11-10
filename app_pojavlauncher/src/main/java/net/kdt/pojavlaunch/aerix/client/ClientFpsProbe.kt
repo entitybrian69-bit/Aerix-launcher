@@ -35,6 +35,7 @@ object ClientFpsProbe {
     @Volatile private var cachedAt: Long = -1L
 
     /** @return frames per second as the game counted them, or null when no mod is publishing. */
+    @JvmStatic
     fun read(): Int? {
         // The bridge already tracks which instance owns the running game; a second copy of that
         // fact would drift the first time a launch failed halfway.
@@ -47,6 +48,7 @@ object ClientFpsProbe {
     }
 
     /** Forget the memoised value, e.g. when a different instance is launched. */
+    @JvmStatic
     fun invalidate() {
         cachedAt = -1L
         cachedFps = null
