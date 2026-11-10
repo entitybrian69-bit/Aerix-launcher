@@ -51,6 +51,7 @@ import net.kdt.pojavlaunch.game.renderer.def.Renderers
 import net.kdt.pojavlaunch.game.renderer.extra.GLESProvider
 import net.kdt.pojavlaunch.mobileglues.MainActivity as MobileGluesActivity
 import net.kdt.pojavlaunch.prefs.LauncherPreferences
+import net.kdt.pojavlaunch.utils.DisplayRefreshMode
 import net.kdt.pojavlaunch.prefs.screens.LauncherPreferenceControlFragment
 import net.kdt.pojavlaunch.prefs.screens.LauncherPreferenceExperimentalFragment
 import net.kdt.pojavlaunch.prefs.screens.LauncherPreferenceFragment
@@ -281,6 +282,8 @@ object PojavSettingsBridge {
                 current = { LauncherPreferences.PREF_USE_ALTERNATE_SURFACE }),
             PojavSetting.Toggle("force_vsync", R.string.preference_force_vsync_title, R.string.preference_force_vsync_description,
                 current = { LauncherPreferences.PREF_FORCE_VSYNC }, visible = { LauncherPreferences.PREF_USE_ALTERNATE_SURFACE }),
+            PojavSetting.Toggle(DisplayRefreshMode.PREF_KEY, R.string.aerix_max_refresh_title, R.string.aerix_max_refresh_desc,
+                current = { LauncherPreferences.PREF_MAX_REFRESH_RATE }),
             PojavSetting.Toggle("use_angle", R.string.preference_use_angle_title, R.string.preference_use_angle_description,
                 current = { LauncherPreferences.PREF_USE_ANGLE }, visible = { hasAngle(it) }),
             PojavSetting.Toggle("use_system_angle", R.string.preference_use_system_angle_title, R.string.preference_use_angle_description,

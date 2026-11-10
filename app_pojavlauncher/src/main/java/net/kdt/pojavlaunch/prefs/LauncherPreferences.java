@@ -14,6 +14,7 @@ import android.util.Log;
 
 import net.kdt.pojavlaunch.*;
 import net.kdt.pojavlaunch.game.renderer.def.Renderers;
+import net.kdt.pojavlaunch.utils.DisplayRefreshMode;
 import net.kdt.pojavlaunch.multirt.MultiRTUtils;
 import net.kdt.pojavlaunch.utils.GpuUtils;
 import net.kdt.pojavlaunch.utils.JREUtils;
@@ -43,7 +44,13 @@ public class LauncherPreferences {
     public static float PREF_MOUSESPEED = 1f;
     public static int PREF_RAM_ALLOCATION;
     public static String PREF_DEFAULT_RUNTIME;
-    public static boolean PREF_SUSTAINED_PERFORMANCE = false;
+	public static boolean PREF_SUSTAINED_PERFORMANCE = false;
+	/**
+	 * Ask the display for the fastest refresh mode it offers at the resolution the game is already
+	 * running at. Off by default: it is a battery and thermal cost the player opts into, and on most
+	 * devices the system policy is already the right one.
+	 */
+	public static boolean PREF_MAX_REFRESH_RATE = false;
     public static boolean PREF_VIRTUAL_MOUSE_START = false;
     public static boolean PREF_USE_ALTERNATE_SURFACE = true;
     public static boolean PREF_JAVA_SANDBOX = true;
@@ -112,6 +119,7 @@ public class LauncherPreferences {
         PREF_RAM_ALLOCATION = DEFAULT_PREF.getInt("allocation", findBestRAMAllocation(ctx));
         PREF_CUSTOM_JAVA_ARGS = DEFAULT_PREF.getString("javaArgs", "");
         PREF_SUSTAINED_PERFORMANCE = DEFAULT_PREF.getBoolean("sustainedPerformance", isDevicePowerful);
+        PREF_MAX_REFRESH_RATE = DEFAULT_PREF.getBoolean(DisplayRefreshMode.PREF_KEY, false);
         PREF_VIRTUAL_MOUSE_START = DEFAULT_PREF.getBoolean("mouse_start", false);
         PREF_USE_ALTERNATE_SURFACE = DEFAULT_PREF.getBoolean("alternate_surface", isDevicePowerful);
         PREF_JAVA_SANDBOX = DEFAULT_PREF.getBoolean("java_sandbox", true);

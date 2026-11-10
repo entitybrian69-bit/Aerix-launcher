@@ -115,6 +115,12 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     private GameMenuOverlayView mGameMenuOverlay;
     private net.kdt.pojavlaunch.aerix.client.AerixClientOverlayView mAerixClientOverlay;
     private GyroControl mGyroControl = null;
+    /**
+     * The refresh rate the window last asked the display for, or 0 for "nothing outstanding". Only
+     * used to decide whether a layout pass silently dropped the request, so the answer can be said
+     * out loud instead of the setting quietly doing nothing.
+     */
+    private float mRequestedRefreshHz = 0f;
     private ControlLayout mControlLayout;
     private HotbarView mHotbarView;
     private GameRenderer mGameRenderer;
@@ -478,6 +484,7 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         mControlLayout.post(()->{
             Tools.getDisplayMetrics(this);
             loadControls();
+            updateDisplayRefreshMode();
         });
     }
 
@@ -556,6 +563,63 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         super.onStop();
     }
 
+    /**
+     * Ask the display for the fastest refresh mode it offers at the game's resolution, if the player
+     * switched that on. This is a window attribute, not a game setting: the renderer keeps swapping at
+     * its own pace and VSync decides when a frame is presented, so all this can do is stop the panel
+     * from being parked at 60 Hz while it is capable of more.
+     *
+     * Re-applied after configuration changes, because rotation, a fold, or the system dropping the
+     * window preference on focus loss all leave the activity asking for nothing.
+     */
+    private void updateDisplayRefreshMode() {
+        final net.kdt.pojavlaunch.utils.RefreshModeChoice.Plan plan =
+                LauncherPreferences.PREF_MAX_REFRESH_RATE
+                        ? net.kdt.pojavlaunch.utils.DisplayRefreshMode.planFor(this) : null;
+        if (plan == null) {
+            mRequestedRefreshHz = 0f;
+            net.kdt.pojavlaunch.utils.DisplayRefreshMode.clear(this);
+            return;
+        }
+        mRequestedRefreshHz = plan.getRequestedHz();
+        if (!net.kdt.pojavlaunch.utils.DisplayRefreshMode.applyTo(this)) return;
+        if (mControlLayout == null) return;
+        // Deferred because the display policy may not have honoured the request yet, and a layout pass
+        // in the meantime would have dropped it. See reportDisplayRefreshOutcome for the read-back.
+        mControlLayout.postDelayed(this::reportDisplayRefreshOutcome, 900L);
+    }
+
+    /**
+     * Read the panel back after a refresh-rate request and say what it ended up at. A max-refresh
+     * setting that reports nothing is indistinguishable from one that is ignored, and that difference
+     * decides whether the player leaves it on. Within a rounding step of the ask counts as honoured;
+     * anything else gets one retry first, because a request that landed on the old mode is usually the
+     * window attributes being re-evaluated between the write and the layout pass rather than a refusal.
+     */
+    private void reportDisplayRefreshOutcome() {
+        if (!LauncherPreferences.PREF_MAX_REFRESH_RATE || mRequestedRefreshHz <= 0f) return;
+        float active = net.kdt.pojavlaunch.utils.DisplayRefreshMode.activeRefreshHz(this);
+        if (active + 0.5f >= mRequestedRefreshHz || active <= 0f) {
+            reportRefreshHz(active);
+            return;
+        }
+        if (!net.kdt.pojavlaunch.utils.DisplayRefreshMode.applyTo(this)) return;
+        reportRefreshHz(net.kdt.pojavlaunch.utils.DisplayRefreshMode.activeRefreshHz(this));
+    }
+
+    /** The one line the player sees, phrased from what the display is doing rather than from the setting. */
+    private void reportRefreshHz(float activeHz) {
+        if (activeHz <= 0f) return;
+        final int reachedHz = (int) Math.round(activeHz);
+        final boolean honoured = reachedHz + 1 >= Math.round(mRequestedRefreshHz);
+        Logger.appendToLog("Display refresh: " + (honoured ? "confirmed at " : "device kept the panel at ")
+                + reachedHz + "Hz (asked for " + (int) Math.round(mRequestedRefreshHz) + "Hz)");
+        runOnUiThread(() -> Toast.makeText(GameActivity.this,
+                getString(honoured ? R.string.aerix_max_refresh_done : R.string.aerix_max_refresh_refused,
+                        reachedHz),
+                honoured ? Toast.LENGTH_SHORT : Toast.LENGTH_LONG).show());
+    }
+
     @Override
     protected void onDestroy() {
         net.kdt.pojavlaunch.aerix.social.SocialBackend.onGameStopped();
@@ -586,6 +650,7 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
             // Child of mControlLayout, so refreshing size here is correct
             launcherGLView.refreshSize();
             mControlLayout.refreshControlButtonPositions();
+            updateDisplayRefreshMode();
         });
     }
 

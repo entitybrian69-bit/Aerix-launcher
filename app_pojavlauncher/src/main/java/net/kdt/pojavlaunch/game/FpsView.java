@@ -45,7 +45,16 @@ public class FpsView extends View {
                 sampler.reset();
                 updateText(getContext().getString(R.string.fps_overlay_unavailable));
             } else if (sampler.sample(count, SystemClock.elapsedRealtimeNanos())) {
-                updateText(getContext().getString(R.string.fps_overlay_value, sampler.fps(), sampler.average()));
+                // With the refresh-rate request on, the panel rate is the thing being tested, so it is
+                // printed next to the frame count: "58 FPS @ 120 Hz" proves the display moved even
+                // though the game cannot use every frame.
+                float hz = net.kdt.pojavlaunch.utils.DisplayRefreshMode.activeRefreshHz(getContext());
+                if (net.kdt.pojavlaunch.prefs.LauncherPreferences.PREF_MAX_REFRESH_RATE && hz > 0f) {
+                    updateText(getContext().getString(R.string.fps_overlay_value_hz,
+                            sampler.fps(), sampler.average(), Math.round(hz)));
+                } else {
+                    updateText(getContext().getString(R.string.fps_overlay_value, sampler.fps(), sampler.average()));
+                }
             }
             postDelayed(this, UPDATE_INTERVAL_MS);
         }

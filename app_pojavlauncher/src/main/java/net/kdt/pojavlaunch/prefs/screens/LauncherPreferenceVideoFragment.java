@@ -21,6 +21,7 @@ import net.kdt.pojavlaunch.game.renderer.extra.GLESProvider;
 import net.kdt.pojavlaunch.prefs.CustomSeekBarPreference;
 import net.kdt.pojavlaunch.prefs.LauncherPreferences;
 import net.kdt.pojavlaunch.game.renderer.GameRenderer;
+import net.kdt.pojavlaunch.utils.DisplayRefreshMode;
 import net.kdt.pojavlaunch.utils.GpuUtils;
 
 /**
@@ -49,6 +50,21 @@ public class LauncherPreferenceVideoFragment extends LauncherPreferenceFragment 
                 SwitchPreferenceCompat.class);
         sustainedPerfSwitch.setVisible(Build.VERSION.SDK_INT >= Build.VERSION_CODES.N);
         sustainedPerfSwitch.setChecked(LauncherPreferences.PREF_SUSTAINED_PERFORMANCE);
+
+        // The preference fragment persists this key on its own; what is added here is the readback, so
+        // the row says what THIS screen can do instead of restating the switch description.
+        Preference maxRefreshSwitch = requirePreference(DisplayRefreshMode.PREF_KEY);
+        float maxRefreshCeiling = DisplayRefreshMode.ceilingRefreshHz(requireContext());
+        float maxRefreshActive = DisplayRefreshMode.activeRefreshHz(requireContext());
+        if (maxRefreshCeiling <= 0f) {
+            maxRefreshSwitch.setSummary(getString(R.string.aerix_max_refresh_desc));
+        } else if (maxRefreshCeiling <= maxRefreshActive + 0.1f) {
+            maxRefreshSwitch.setSummary(getString(R.string.aerix_max_refresh_unavailable,
+                    Math.round(maxRefreshActive)));
+        } else {
+            maxRefreshSwitch.setSummary(getString(R.string.aerix_max_refresh_summary,
+                    Math.round(maxRefreshCeiling), Math.round(maxRefreshActive)));
+        }
 
         requirePreference("alternate_surface", SwitchPreferenceCompat.class).setChecked(LauncherPreferences.PREF_USE_ALTERNATE_SURFACE);
         requirePreference("force_vsync", SwitchPreferenceCompat.class).setChecked(LauncherPreferences.PREF_FORCE_VSYNC);

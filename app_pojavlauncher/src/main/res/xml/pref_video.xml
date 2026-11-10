@@ -47,6 +47,14 @@
             />
 
         <androidx.preference.SwitchPreferenceCompat
+            android:title="@string/aerix_max_refresh_title"
+            android:summary="@string/aerix_max_refresh_desc"
+            android:key="requestMaxRefreshRate"
+            android:defaultValue="false"
+            android:icon="@drawable/ic_mat_sustained_perf"
+            />
+
+        <androidx.preference.SwitchPreferenceCompat
             android:defaultValue="false"
             android:key="alternate_surface"
             android:summary="@string/mcl_setting_subtitle_use_surface_view"

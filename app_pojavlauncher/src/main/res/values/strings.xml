@@ -630,6 +630,13 @@ Your original layout is kept unchanged. Continue importing?</string>
     <string name="fps_overlay_unavailable">FPS unavailable</string>
     <string name="fps_overlay_value">%1$d FPS (avg. %2$d)</string>
     <string name="fps_overlay_drag">Drag the FPS counter to move it</string>
+    <string name="fps_overlay_value_hz">%1$d FPS (avg. %2$d) @ %3$d Hz</string>
+    <string name="aerix_max_refresh_title">Request max refresh rate</string>
+    <string name="aerix_max_refresh_desc">Switch the display to the fastest refresh rate it supports at the game\'s current resolution, lifting the 60 Hz cap on devices that keep Minecraft there. Costs battery; the in-game FPS readout and the log report the rate actually reached.</string>
+    <string name="aerix_max_refresh_summary">This screen tops out at %1$d Hz and is running at %2$d Hz now</string>
+    <string name="aerix_max_refresh_unavailable">No refresh mode faster than %1$d Hz exists at this resolution</string>
+    <string name="aerix_max_refresh_refused">Android kept this screen at %1$d Hz: this device does not accept a faster refresh rate while the game is in the foreground</string>
+    <string name="aerix_max_refresh_done">Display switched to %1$d Hz for the game</string>
 
     <!-- First-run guide, after Zalith Launcher 2's spotlight tour. -->
     <string name="aerix_guide_welcome_title">Welcome to %1$s</string>

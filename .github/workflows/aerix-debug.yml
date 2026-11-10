@@ -73,6 +73,7 @@ jobs:
           python3 tests/font_styles_smoke.py
           python3 tests/glass_launcher_ui_smoke.py
           python3 tests/controller_input_scroll_smoke.py
+          python3 tests/max_refresh_rate_smoke.py
           python3 tests/rust_removed_smoke.py
           python3 tests/offline_username_smoke.py
           python3 tests/aerix_cloud_skin_smoke.py
@@ -121,6 +122,19 @@ jobs:
             tests/AerixSkinServerOfflineTest.kt -classpath app_pojavlauncher/libs/gson-2.8.6.jar \
             -d "$RUNNER_TEMP/aerix-skinserver-test.jar"
           java -cp "$RUNNER_TEMP/aerix-skinserver-test.jar:app_pojavlauncher/libs/gson-2.8.6.jar:$RUNNER_TEMP/aerix-kotlin/lib/kotlin-stdlib.jar" AerixSkinServerOfflineTestKt
+          # Max-refresh-rate: the chooser is pure arithmetic, so it is checked on its own, and the
+          # Android adapter is then executed against stub `android.*` classes so a real request path
+          # (read modes -> pick -> write preferredDisplayModeId -> vote -> read back) is proven here
+          # rather than only on a phone.
+          "$RUNNER_TEMP/aerix-kotlin/bin/kotlinc" \
+            app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/utils/RefreshModeChoice.kt \
+            tests/RefreshModeChoiceOfflineTest.kt -d "$RUNNER_TEMP/aerix-refresh-choice.jar"
+          java -cp "$RUNNER_TEMP/aerix-refresh-choice.jar:$RUNNER_TEMP/aerix-kotlin/lib/kotlin-stdlib.jar" RefreshModeChoiceOfflineTestKt
+          "$RUNNER_TEMP/aerix-kotlin/bin/kotlinc" tests/refresh_display_stubs/*.kt \
+            app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/utils/RefreshModeChoice.kt \
+            app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/utils/DisplayRefreshMode.kt \
+            tests/DisplayRefreshModeAndroidTest.kt -d "$RUNNER_TEMP/aerix-refresh-adapter.jar"
+          java -cp "$RUNNER_TEMP/aerix-refresh-adapter.jar:$RUNNER_TEMP/aerix-kotlin/lib/kotlin-stdlib.jar" DisplayRefreshModeAndroidTestKt
           mkdir -p "$RUNNER_TEMP/aerix-recorder-test"
           javac -d "$RUNNER_TEMP/aerix-recorder-test" \
             app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/recording/RecordingPaths.java \

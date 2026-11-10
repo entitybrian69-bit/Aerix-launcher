@@ -159,6 +159,7 @@ import net.kdt.pojavlaunch.mobileglues.MainActivity as MobileGluesActivity
 import net.kdt.pojavlaunch.multirt.MultiRTUtils
 import net.kdt.pojavlaunch.multirt.Runtime
 import net.kdt.pojavlaunch.prefs.LauncherPreferences
+import net.kdt.pojavlaunch.utils.DisplayRefreshMode
 import net.kdt.pojavlaunch.progresskeeper.ProgressKeeper
 import net.kdt.pojavlaunch.tasks.DataMigrator
 import net.kdt.pojavlaunch.utils.jre.RuntimeSelectionException
@@ -982,6 +983,29 @@ private fun RendererTabContent(activity: FragmentActivity) {
                     summary = "Enable vertical sync for the Zink renderer via the system interface",
                     checked = LauncherPreferences.PREF_FORCE_VSYNC,
                     onCheckedChange = { PojavSettingsBridge.writeBoolean(activity, "force_vsync", it) }
+                )
+                var maxRefreshEnabled by remember { mutableStateOf(LauncherPreferences.PREF_MAX_REFRESH_RATE) }
+                // Read the panel rather than the preference: this is the line that tells the player
+                // whether their screen has a faster mode to ask for at all, and what it is doing now.
+                val maxRefreshCeilingHz = Math.round(DisplayRefreshMode.ceilingRefreshHz(activity)).toInt()
+                val maxRefreshActiveHz = Math.round(DisplayRefreshMode.activeRefreshHz(activity)).toInt()
+                val maxRefreshSummary = when {
+                    maxRefreshCeilingHz <= 0 -> activity.getString(R.string.aerix_max_refresh_desc)
+                    maxRefreshCeilingHz <= maxRefreshActiveHz ->
+                        activity.getString(R.string.aerix_max_refresh_unavailable, maxRefreshActiveHz)
+                    maxRefreshEnabled ->
+                        activity.getString(R.string.aerix_max_refresh_summary, maxRefreshCeilingHz, maxRefreshActiveHz)
+                    else -> activity.getString(R.string.aerix_max_refresh_desc)
+                }
+                MiraiSwitchSettingsCard(
+                    position = CardPosition.Middle,
+                    title = activity.getString(R.string.aerix_max_refresh_title),
+                    summary = maxRefreshSummary,
+                    checked = maxRefreshEnabled,
+                    onCheckedChange = { isOn ->
+                        maxRefreshEnabled = isOn
+                        PojavSettingsBridge.writeBoolean(activity, DisplayRefreshMode.PREF_KEY, isOn)
+                    }
                 )
                 MiraiSwitchSettingsCard(
                     position = CardPosition.Middle,
