@@ -333,10 +333,11 @@ final class ModernCapeBridge {
     }
 
     private Class<?> load(String... names) throws ClassNotFoundException {
+        String[] ordered = prefer(names);
         ClassNotFoundException last = null;
-        for (int i = 0; i < names.length; i++) {
+        for (int i = 0; i < ordered.length; i++) {
             try {
-                return Class.forName(names[i], false, loader);
+                return Class.forName(ordered[i], false, loader);
             } catch (ClassNotFoundException missing) {
                 last = missing;
             }
@@ -344,11 +345,28 @@ final class ModernCapeBridge {
         throw last;
     }
 
-    private static Field field(Class<?> type, String... names) throws Exception {
+    /**
+     * @return the candidate names in the order this runtime should be asked in.
+     *
+     * A dev client and an intermediary client are not the same classes, and a {@code Field} or
+     * {@code Method} read from one cannot be applied to an object of the other. Asking for the
+     * mapping the client was built with first - and only then the other - is what keeps the two
+     * worlds apart; trying every name in a fixed order resolves the wrong class on a runtime where
+     * both exist, which is exactly what a bridge with both fixtures on its classpath does.
+     */
+    private String[] prefer(String... names) {
+        if (named || names.length < 2) return names;
+        String[] reversed = new String[names.length];
+        for (int i = 0; i < names.length; i++) reversed[i] = names[names.length - 1 - i];
+        return reversed;
+    }
+
+    private Field field(Class<?> type, String... names) throws Exception {
+        String[] ordered = prefer(names);
         Exception last = null;
-        for (int i = 0; i < names.length; i++) {
+        for (int i = 0; i < ordered.length; i++) {
             try {
-                Field found = type.getDeclaredField(names[i]);
+                Field found = type.getDeclaredField(ordered[i]);
                 found.setAccessible(true);
                 return found;
             } catch (NoSuchFieldException missing) {
@@ -359,13 +377,14 @@ final class ModernCapeBridge {
     }
 
     /** @return the first named no-argument method the type declares, walking its supertypes. */
-    private static Method noArgMethod(Class<?> type, String... names) throws Exception {
+    private Method noArgMethod(Class<?> type, String... names) throws Exception {
+        String[] ordered = prefer(names);
         NoSuchMethodException last = null;
-        for (int i = 0; i < names.length; i++) {
+        for (int i = 0; i < ordered.length; i++) {
             Class<?> current = type;
             while (current != null && current != Object.class) {
                 try {
-                    Method found = current.getDeclaredMethod(names[i]);
+                    Method found = current.getDeclaredMethod(ordered[i]);
                     if (found.getParameterTypes().length != 0) break;
                     found.setAccessible(true);
                     return found;
@@ -375,14 +394,15 @@ final class ModernCapeBridge {
                 }
             }
         }
-        throw last == null ? new NoSuchMethodException(names[0]) : last;
+        throw last == null ? new NoSuchMethodException(prefer(names)[0]) : last;
     }
 
-    private static Method methodWithArgs(Class<?> type, Class<?>[] arguments, String... names) throws Exception {
+    private Method methodWithArgs(Class<?> type, Class<?>[] arguments, String... names) throws Exception {
+        String[] ordered = prefer(names);
         NoSuchMethodException last = null;
-        for (int i = 0; i < names.length; i++) {
+        for (int i = 0; i < ordered.length; i++) {
             try {
-                Method found = type.getMethod(names[i], arguments);
+                Method found = type.getMethod(ordered[i], arguments);
                 found.setAccessible(true);
                 return found;
             } catch (NoSuchMethodException missing) {
