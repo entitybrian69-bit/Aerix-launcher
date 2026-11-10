@@ -68,6 +68,8 @@ assert 'prefs.edit()' not in player_hook, \
     "the player's escape hatch must not rewrite the saved setting: the next recording stays clean"
 fade = controller.split('private fun applyControlsToRecording()')[1].split('\n    }')[0]
 assert 'setControlsCapturedInRecording(!ghosted)' in fade
+assert 'cleanCaptureActive' in fade, \
+    'fading is only the fallback now: while the encoder is fed the game surface, the controls stay visible'
 assert 'Toast.makeText(' in fade and 'hide/show controls button' in fade, \
     'fading the controls out has to tell the player they are still there and still work'
 assert 'ghostingControls = false' in controller.split('fun destroy()')[1][:600]
@@ -79,9 +81,12 @@ assert 'interface OnPlayerControlsToggle' in cl and 'setOnPlayerControlsToggle' 
 # the fade stays a fade: no visibility change anywhere on this path
 assert 'setVisibility' not in toggle
 assert 'mControlLayout.setOnPlayerControlsToggle' in game and 'mRecorder.onControlsRequestedByPlayer()' in game
-# the dialog must not promise something Android cannot do: it says the buttons stop being drawn
+# The dialog must describe the mechanism that actually runs, and must not overpromise: a device that
+# refuses a surface readback gets the fade, and the caption has to say so before the player commits.
 hint = controller.split('fun describeControls')[1].split('\n        }')[0]
-assert 'Android records the whole screen' in hint and 'keep taking touches' in hint
-assert 'Tap your hide/show controls button' in hint
+assert "game's own frames" in hint and 'tappable' in hint, \
+    'the caption has to name the capture source, not just the visual effect'
+assert 'falls back to not drawing them' in hint and 'still take touches' in hint
+assert 'readbackIsDirect' in hint, 'the wording must follow the render path this device is on'
 
 print('Recorder wiring smoke test passed')

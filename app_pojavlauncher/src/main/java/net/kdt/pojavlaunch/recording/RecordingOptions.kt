@@ -12,6 +12,21 @@ object RecordingOptions {
     const val DEFAULT_QUALITY = 720
     const val DEFAULT_FPS = 30
 
+    /**
+     * Where the encoder's frames come from. [GAME] is the only way to get footage without the on-screen
+     * touch controls in it, because a mirrored display already has them composited in; it is also the
+     * one that can fail on a device that refuses a surface readback, which is why every session starts
+     * by trying it and quietly falls back to [MIRROR] rather than by promising it.
+     */
+    enum class CaptureMode {
+        MIRROR,
+        GAME;
+
+        companion object {
+            fun saved(value: String?): CaptureMode = values().firstOrNull { it.name == value } ?: MIRROR
+        }
+    }
+
     enum class AudioSource(val label: String, val game: Boolean, val microphone: Boolean) {
         GAME("Game audio", true, false),
         MICROPHONE("Microphone", false, true),
@@ -34,7 +49,8 @@ object RecordingOptions {
         val height: Int,
         val bitrate: Int,
         val encoder: String,
-        val audioSource: AudioSource = AudioSource.GAME
+        val audioSource: AudioSource = AudioSource.GAME,
+        val capture: CaptureMode = CaptureMode.MIRROR
     )
 
     fun size(

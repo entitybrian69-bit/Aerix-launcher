@@ -24,6 +24,7 @@ import androidx.core.content.ContextCompat
 import net.kdt.pojavlaunch.Tools
 import net.kdt.pojavlaunch.PojavApplication
 import net.kdt.pojavlaunch.game.GameActivity
+import net.kdt.pojavlaunch.prefs.LauncherPreferences
 import java.io.File
 
 /** Keeps the game menu, floating REC pill, permissions, and `:recorder` service lifecycle together. */
@@ -41,6 +42,25 @@ class RecorderController @JvmOverloads constructor(private val activity: Activit
     private var controlsInRecording = prefs.getBoolean(WITH_CONTROLS, true)
     /** Whether the control layer is faded out right now, so the fade and its notice fire once each. */
     private var ghostingControls = false
+    /**
+     * Whether this session is encoding the game's own frames, so the controls can stay exactly where the
+     * player expects them: they are not part of that image, so there is nothing to hide.
+     */
+    private var captureCleanRequested = false
+    private var captureGaveUp = false
+    /**
+     * Reads the game's frames on demand for `:recorder`. Kept for the life of the controller because the
+     * encoder's input surface is useless to us once the activity is gone, and the recorder must never be
+     * left producing from a dead view.
+     */
+    private var gameSurfaceFeed: GameSurfaceFeed? = null
+
+    /** Created only for a take that asks for clean footage, and shut down with the activity. */
+    private fun ensureGameSurfaceFeed(): GameSurfaceFeed =
+        gameSurfaceFeed ?: GameSurfaceFeed(
+            surfaceProvider = { (activity as? GameActivity)?.recordingSurfaceView },
+            onFallback = { reason -> onCleanCaptureUnavailable(reason) }
+        ).also { gameSurfaceFeed = it }
 
     private val indicator = TextView(activity).apply {
         val density = activity.resources.displayMetrics.density
@@ -84,7 +104,7 @@ class RecorderController @JvmOverloads constructor(private val activity: Activit
      * of a video that was supposed to be free of them.
      */
     private fun applyControlsToRecording() {
-        val ghosted = !controlsInRecording && RecordingState.isActive()
+        val ghosted = !controlsInRecording && RecordingState.isActive() && !cleanCaptureActive
         if (ghosted == ghostingControls) return
         ghostingControls = ghosted
         (activity as? GameActivity)?.setControlsCapturedInRecording(!ghosted)
@@ -98,6 +118,27 @@ class RecorderController @JvmOverloads constructor(private val activity: Activit
                 Toast.LENGTH_LONG
             ).show()
         }
+    }
+
+    /** False once the recorder has said it is mirroring the display after all, or with no session running. */
+    private val cleanCaptureActive: Boolean
+        get() = captureCleanRequested && !captureGaveUp && RecordingState.isActive()
+
+    /**
+     * The recorder could not use the game's frames, so the fallback the player actually asked for applies:
+     * stop drawing the controls (they keep working) for the rest of this take. Said out loud, because a
+     * video that quietly contains the buttons after they were asked not to is worse than an annoying toast.
+     */
+    private fun onCleanCaptureUnavailable(reason: String) {
+        if (!captureCleanRequested || captureGaveUp) return
+        captureGaveUp = true
+        applyControlsToRecording()
+        Toast.makeText(
+            activity,
+            "This device would not give up the game's frames ($reason), so the controls are hidden for " +
+                "the recording instead - they still work where they were.",
+            Toast.LENGTH_LONG
+        ).show()
     }
 
     /**
@@ -231,12 +272,18 @@ class RecorderController @JvmOverloads constructor(private val activity: Activit
         }
         fun describeControls(included: Boolean) {
             controlsHint.text = if (included) {
-                "On: the controls are drawn, so they are part of the video."
+                "On: the whole screen is recorded, so the controls you see are in the video too."
             } else {
-                "Off: Android records the whole screen, so controls you can see are controls the video " +
-                    "sees. The buttons stop being drawn while the recording runs and come back the " +
-                    "moment it ends - they keep taking touches the whole time, like the transparency " +
-                    "slider at 0%. Tap your hide/show controls button mid-recording to bring them back."
+                val path = if (GameCapture.readbackIsDirect(LauncherPreferences.PREF_USE_ALTERNATE_SURFACE)) {
+                    " Your TextureView render path hands frames back directly."
+                } else {
+                    " Your SurfaceView render path is the one some devices refuse, and then the controls " +
+                        "are hidden for the take instead."
+                }
+                "Off: the video is built from the game's own frames, so the buttons stay on screen, stay " +
+                    "tappable, and never appear in the recording. If this device refuses to hand its " +
+                    "frames back, Aerix falls back to not drawing them while the recording runs - they " +
+                    "still take touches, like the transparency slider at 0%." + path
             }
         }
         // The dialog's wording follows the checkbox instead of describing whatever was saved last time,
@@ -296,6 +343,13 @@ class RecorderController @JvmOverloads constructor(private val activity: Activit
 
     private fun start(config: RecordingOptions.Config, withControls: Boolean = true) {
         controlsInRecording = withControls
+        captureGaveUp = false
+        // Unchecking "record with controls" is the request to capture the game's frames instead of the
+        // display, which is what makes the controls stay visible while staying out of the video.
+        captureCleanRequested = !withControls
+        val chosen = config.copy(
+            capture = if (captureCleanRequested) RecordingOptions.CaptureMode.GAME else RecordingOptions.CaptureMode.MIRROR
+        )
         prefs.edit()
             .putInt("quality", config.quality)
             .putInt("fps", config.fps)
@@ -304,8 +358,9 @@ class RecorderController @JvmOverloads constructor(private val activity: Activit
             .apply()
         // The phase callback covers the normal path; this one is for a session started while the
         // recorder is already active, where no phase change would arrive to fade the controls out.
+        // With the game surface feeding the encoder there is nothing to fade, so this is a no-op.
         applyControlsToRecording()
-        pending = config
+        pending = chosen
         if (config.audioSource.hasAudio &&
             ContextCompat.checkSelfPermission(activity, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED
         ) {
@@ -379,6 +434,12 @@ class RecorderController @JvmOverloads constructor(private val activity: Activit
                 .putExtra("bitrate", config.bitrate)
                 .putExtra("encoder", config.encoder)
                 .putExtra("audioSource", config.audioSource.name)
+            if (config.capture == RecordingOptions.CaptureMode.GAME) {
+                // The recorder needs a way back into this process: it is the game's frames it wants, and
+                // only this process can read them.
+                intent.putExtra(GameCapture.EXTRA_CLEAN_VIDEO, true)
+                    .putExtra(GameCapture.EXTRA_FEED, ensureGameSurfaceFeed().messenger)
+            }
             runCatching {
                 ContextCompat.startForegroundService(activity, intent)
             }.onFailure { err ->
@@ -417,6 +478,10 @@ class RecorderController @JvmOverloads constructor(private val activity: Activit
         // to stop: the phase callback may not arrive before the activity goes away.
         ghostingControls = false
         (activity as? GameActivity)?.setControlsCapturedInRecording(true)
+        // A producer left attached to the encoder's input surface would keep reading a view that is
+        // going away, so this process stops feeding whether or not the recorder asked it to.
+        gameSurfaceFeed?.shutdown()
+        gameSurfaceFeed = null
         RecordingState.removeListener(stateListener)
         if (startRequested || RecordingState.isActive()) stop()
     }

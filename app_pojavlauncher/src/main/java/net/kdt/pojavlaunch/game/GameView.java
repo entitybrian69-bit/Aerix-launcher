@@ -94,6 +94,15 @@ public class GameView extends FrameLayout implements PlatformGrabListener, Surfa
         mPointerCapture = new AndroidPointerCapture(mCursorView, this);
     }
 
+    /**
+     * The view holding the game's own frames - a SurfaceView or a TextureView, whichever render path this
+     * device picked. The recorder reads from it to build a video without the control layer in it, since
+     * the control layer is a sibling of this view and never part of its contents.
+     */
+    public View getRecordingSurfaceView() {
+        return mSurface;
+    }
+
     /** Initialize the view and all its settings
      * @param isAlreadyRunning set to true to tell the view that the game is already running
      *                         (only updates the window without calling the start listener)
