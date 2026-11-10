@@ -249,9 +249,10 @@ public class LauncherActivity extends BaseActivity {
             Insets bars = AerixPreferences.INSTANCE.getFullScreen()
                     ? Insets.NONE
                     : insets.getInsets(WindowInsetsCompat.Type.systemBars());
-            int top = Math.max(cutout.getTop(), bars.getTop());
-            int bottom = Math.max(cutout.getBottom(), bars.getBottom());
-            AerixWindowInsets.INSTANCE.update(bars.getLeft(), top, bars.getRight(), bottom);
+            // androidx.core's Insets publishes plain fields, not getters.
+            int top = Math.max(cutout.top, bars.top);
+            int bottom = Math.max(cutout.bottom, bars.bottom);
+            AerixWindowInsets.INSTANCE.update(bars.left, top, bars.right, bottom);
             return insets;
         });
         setContentView(R.layout.activity_pojav_launcher);
