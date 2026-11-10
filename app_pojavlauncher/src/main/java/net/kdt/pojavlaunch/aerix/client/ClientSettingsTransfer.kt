@@ -11,7 +11,7 @@ object ClientSettingsTransfer {
     private val floatKeys = setOf("crosshairSize", "crosshairGap", "crosshairThickness", "crosshairOutline", "crosshairOpacity", "touchAimMultiplier", "gyroSensitivity")
     private val intKeys = setOf("peakCpsRecord", "installsCompleted", "adaptiveFpsTarget", "adaptiveMinDistance", "cooldownDurationMs")
     private val stringKeys = setOf("selectedClientVersion", "equippedCapeId", "trinkiesEmoteWheel", "equippedHatId", "equippedSuitId", "equippedBackId", "equippedPetId",
-        "equippedEmoteId", "equippedAuraId", "crosshairShape", "crosshairColor", "packGlintColor", "visualTimeMode", "visualWeatherMode", "clientWaypoints", "clientChatShortcuts", "hudPositionsJson)
+        "equippedEmoteId", "equippedAuraId", "crosshairShape", "crosshairColor", "packGlintColor", "visualTimeMode", "visualWeatherMode", "clientWaypoints", "clientChatShortcuts", "hudPositionsJson")
     private val allowedKeys = boolKeys + floatKeys + intKeys + stringKeys
 
     fun export(context: Context): String {

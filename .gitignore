@@ -12,3 +12,7 @@ app_pojavlauncher/.cxx/
 /app_pojavlauncher/libs/ltw-release.aar
 site-preview/
 apk/
+
+# Python tooling scratch, never an artifact of the asset generator.
+__pycache__/
+*.py[cod]

@@ -43,9 +43,12 @@ def check_the_wiring_uses_the_reader() -> None:
         "TrinkiesLoadout.frameTicksFromAnimation(",
         "TrinkiesLoadout.bakeMatchesLoadout(",
         "TrinkiesLoadout.writeApplied(trinkiesDir,",
-        "if (++trinkiesFrameDwell >= trinkiesFrameTicks) {",
+        "if (++trinkiesFrameDwell >= effectiveFrameTicks()) {",
+        "trinkiesWheel = snapshot.emoteWheel()",
     ):
         assert needle in mod, f"AerixClientMod no longer consumes the Trinkies loadout: {needle}"
+    # The dwell gate has to read the effective cadence rather than the field: a pressed emote shortens
+    # it to one tick per frame, and gating on trinkiesFrameTicks directly would quietly ignore the wheel.
     # The wardrobe state must never be able to take the animator or live options down with it.
     refresh = mod[mod.index("private void refreshTrinkiesLoadout"):mod.index("private static String readTextFile")]
     assert "catch (Throwable ignored)" in refresh, "loadout failures must not escape the render tick"
