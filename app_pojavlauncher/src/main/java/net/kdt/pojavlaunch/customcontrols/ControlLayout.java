@@ -257,6 +257,24 @@ public class ControlLayout extends FrameLayout {
 	public void toggleControlVisible(){
 		mControlVisible = !mControlVisible;
 		setControlVisible(mControlVisible);
+		// Whoever is watching the recording wants to know that the player, not the launcher, reached
+		// for their controls. See setOnPlayerControlsToggle.
+		if (mOnPlayerControlsToggle != null) mOnPlayerControlsToggle.onPlayerToggled();
+	}
+
+	/**
+	 * Lets the recorder know the player explicitly toggled control visibility. A "clean recording" fade
+	 * must never trap anyone: their own hide/show controls button is the escape hatch, and the recorder
+	 * stops fading out as soon as it hears from it.
+	 */
+	public interface OnPlayerControlsToggle {
+		void onPlayerToggled();
+	}
+
+	private OnPlayerControlsToggle mOnPlayerControlsToggle = null;
+
+	public void setOnPlayerControlsToggle(OnPlayerControlsToggle listener) {
+		mOnPlayerControlsToggle = listener;
 	}
 
 	public float getLayoutScale(){

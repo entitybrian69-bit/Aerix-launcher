@@ -39,6 +39,8 @@ class RecorderController @JvmOverloads constructor(private val activity: Activit
      * the controls still faded out instead of popping them back into the video.
      */
     private var controlsInRecording = prefs.getBoolean(WITH_CONTROLS, true)
+    /** Whether the control layer is faded out right now, so the fade and its notice fire once each. */
+    private var ghostingControls = false
 
     private val indicator = TextView(activity).apply {
         val density = activity.resources.displayMetrics.density
@@ -82,7 +84,33 @@ class RecorderController @JvmOverloads constructor(private val activity: Activit
      * of a video that was supposed to be free of them.
      */
     private fun applyControlsToRecording() {
-        (activity as? GameActivity)?.setControlsCapturedInRecording(controlsInRecording || !RecordingState.isActive())
+        val ghosted = !controlsInRecording && RecordingState.isActive()
+        if (ghosted == ghostingControls) return
+        ghostingControls = ghosted
+        (activity as? GameActivity)?.setControlsCapturedInRecording(!ghosted)
+        if (ghosted) {
+            // The buttons are still there and still pressed exactly where they always were, so this has
+            // to say what happened rather than leave the player staring at a screen missing its controls.
+            Toast.makeText(
+                activity,
+                "Controls are hidden while this recording runs, but still work. " +
+                    "Tap your hide/show controls button to make them visible again.",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+
+    /**
+     * The player asked for their controls back mid-take, so honor it for the rest of the recording: a
+     * clean-video option that leaves someone hunting for the jump button is not a feature, and an
+     * explicit visibility tap can only mean the fade went too far. This does not change the saved
+     * setting, so the next recording is clean again unless they say otherwise.
+     */
+    fun onControlsRequestedByPlayer() {
+        if (!ghostingControls) return
+        controlsInRecording = true
+        applyControlsToRecording()
+        Toast.makeText(activity, "Controls will be in this recording.", Toast.LENGTH_SHORT).show()
     }
 
     init {
@@ -205,9 +233,10 @@ class RecorderController @JvmOverloads constructor(private val activity: Activit
             controlsHint.text = if (included) {
                 "On: the controls are drawn, so they are part of the video."
             } else {
-                "Off: the controls fade out on screen and in the video until the recording ends. The " +
-                    "capture mirrors the display, so fading is the only way to leave them out - and " +
-                    "faded controls still take touches, exactly like the transparency slider at 0%."
+                "Off: Android records the whole screen, so controls you can see are controls the video " +
+                    "sees. The buttons stop being drawn while the recording runs and come back the " +
+                    "moment it ends - they keep taking touches the whole time, like the transparency " +
+                    "slider at 0%. Tap your hide/show controls button mid-recording to bring them back."
             }
         }
         // The dialog's wording follows the checkbox instead of describing whatever was saved last time,
@@ -386,6 +415,7 @@ class RecorderController @JvmOverloads constructor(private val activity: Activit
         dialog = null
         // Never leave the controls faded out on the strength of a recording this controller is about
         // to stop: the phase callback may not arrive before the activity goes away.
+        ghostingControls = false
         (activity as? GameActivity)?.setControlsCapturedInRecording(true)
         RecordingState.removeListener(stateListener)
         if (startRequested || RecordingState.isActive()) stop()

@@ -49,7 +49,7 @@ assert 'start(config: RecordingOptions.Config, withControls: Boolean = true)' in
     'record-with-controls must default on, matching the old behavior for existing installs'
 assert 'applyControlsToRecording()' in controller.split('private val stateListener')[1].split('\n    }')[0], \
     'the fade must follow the recorder phase, not just the button press'
-assert 'controlsInRecording || !RecordingState.isActive()' in controller, \
+assert 'val ghosted = !controlsInRecording && RecordingState.isActive()' in controller, \
     'the controls must come back whenever no recording is running, including a cancelled consent sheet'
 game_controls = game.split('public void setControlsCapturedInRecording')[1].split('\n    }')[0]
 assert 'mControlLayout.setRecordingOpacity(captured ? 1f : 0f)' in game_controls
@@ -57,5 +57,31 @@ assert 'if (mControlLayout == null) return' in game_controls
 assert controller.index('(activity as? GameActivity)?.setControlsCapturedInRecording(true)') < \
     controller.index('RecordingState.removeListener(stateListener)'), \
     'destroying the recorder must restore the controls before it stops listening for the stop signal'
+
+# Ghosting the controls must be escapable and must be announced: the player cannot be left with an
+# invisible control layer they did not ask for, and only the *displayed* pixels can be excluded.
+assert 'fun onControlsRequestedByPlayer()' in controller
+player_hook = controller.split('fun onControlsRequestedByPlayer()')[1].split('\n    }')[0]
+assert 'if (!ghostingControls) return' in player_hook, 'only an active fade should be cancelled by the player'
+assert 'controlsInRecording = true' in player_hook
+assert 'prefs.edit()' not in player_hook, \
+    "the player's escape hatch must not rewrite the saved setting: the next recording stays clean"
+fade = controller.split('private fun applyControlsToRecording()')[1].split('\n    }')[0]
+assert 'setControlsCapturedInRecording(!ghosted)' in fade
+assert 'Toast.makeText(' in fade and 'hide/show controls button' in fade, \
+    'fading the controls out has to tell the player they are still there and still work'
+assert 'ghostingControls = false' in controller.split('fun destroy()')[1][:600]
+cl = (ROOT / 'customcontrols/ControlLayout.java').read_text()
+toggle = cl.split('public void toggleControlVisible()')[1].split('\n\t}')[0]
+assert 'mOnPlayerControlsToggle.onPlayerToggled()' in toggle, \
+    'the players own toggle has to reach the recorder'
+assert 'interface OnPlayerControlsToggle' in cl and 'setOnPlayerControlsToggle' in cl
+# the fade stays a fade: no visibility change anywhere on this path
+assert 'setVisibility' not in toggle
+assert 'mControlLayout.setOnPlayerControlsToggle' in game and 'mRecorder.onControlsRequestedByPlayer()' in game
+# the dialog must not promise something Android cannot do: it says the buttons stop being drawn
+hint = controller.split('fun describeControls')[1].split('\n        }')[0]
+assert 'Android records the whole screen' in hint and 'keep taking touches' in hint
+assert 'Tap your hide/show controls button' in hint
 
 print('Recorder wiring smoke test passed')

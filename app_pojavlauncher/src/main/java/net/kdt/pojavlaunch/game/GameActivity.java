@@ -339,6 +339,10 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         setContentView(resId);
         bindValues();
         mControlLayout.setMenuListener(this);
+        // A recording that ghosts the controls has to give them back on the player's own request.
+        mControlLayout.setOnPlayerControlsToggle(() -> {
+            if (mRecorder != null) mRecorder.onControlsRequestedByPlayer();
+        });
 
         mDrawerPullButton.setOnClickListener(v -> onClickedMenu());
         mRecorder = new net.kdt.pojavlaunch.recording.RecorderController(this, instance.getInstanceDirectory());
