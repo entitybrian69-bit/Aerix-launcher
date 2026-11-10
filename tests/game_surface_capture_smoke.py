@@ -67,26 +67,41 @@ for rule in ("planCopy", "nextDelayMs", "decide", "startupGraceMs", "shouldUseGa
 check("@JvmStatic" in core, "the core rules need @JvmStatic so the Kotlin-free harness can call them")
 
 # --- the feed must be the thing that produces frames, and must not touch the codec
-for api in ("ImageWriter.newInstance(surface, width, height, MAX_IMAGES)", "acquireNextImage", "queueInputImage"):
+for api in ("ImageWriter.newInstance(surface, MAX_IMAGES)", "acquireNextImage", "queueInputImage"):
     check(api in feed, f"GameSurfaceFeed must use {api}; that is how a surface gets produced from memory")
+check("newInstance(surface, width, height" not in feed,
+      "ImageWriter has no size argument for a Surface producer; the surface's own geometry decides it")
+check("import android.view.PixelCopy" in feed and "import android.media.PixelCopy" not in feed,
+      "PixelCopy is android.view.PixelCopy, not android.media")
+check("GameCapture.pixelCopySuccessCode" in feed,
+      "the PixelCopy status value must be resolved by the tested rule, never hard-coded")
+check("PixelCopy::class.java.fields" in feed,
+      "the status constant has changed name and value between releases, so read it off the device")
+check("image.planes.size == 1" in feed,
+      "planar (YUV) input must be refused, not half-written as if it were packed RGBA")
 # ImageWriter has no pixel-format argument for a Surface producer: it is fixed to RGBA_8888, so the
 # stride arithmetic has to verify the plane instead of assuming it.
 check("plane.pixelStride != GameCapture.BYTES_PER_PIXEL" in feed,
       "the feed must check the plane's pixel stride before trusting 4 bytes per pixel")
 check("import android.graphics.PixelFormat" not in feed,
       "there is no ImageWriter overload that takes a format; asking for one is the bug this prevents")
-check("PixelCopy.request(view, dest, listener, copyHandler)" in feed,
+check("PixelCopy.request(view, reuse, listener, copyHandler)" in feed,
       "SurfaceView content is only readable through PixelCopy, not getBitmap")
-check("import android.media.PixelCopy" in feed and "getBitmap(full)" not in feed,
+check("getBitmap(full)" not in feed and "OnPixelCopyFinishedListener" in feed,
       "the SurfaceView path must not call a hidden getBitmap, which does not compile against the SDK")
 check("copyHandler = Handler(Looper.getMainLooper())" in feed,
       "the copy must call back on a looper the capture thread is not blocking on")
-check("grab = null" in feed and "recycle()" in feed,
-      "a destination an unfinished copy may still write into has to be dropped, never recycled")
+abandon = first(feed, "private fun abandonStaging()", "abandonStaging")
+if abandon >= 0:
+    check("scratch = null" in feed[abandon:abandon + 260] and "recycle" not in feed[abandon:abandon + 260],
+          "a destination an unfinished copy may still write into has to be dropped, never recycled")
+    check("abandonStaging()" in feed[feed.find("private inner class PixelCopySource"):feed.find("private inner class PixelCopySource") + 2000],
+          "the timed-out copy path must be the one that abandons the staging bitmap")
 check("image.timestamp = System.nanoTime()" in feed,
       "hand-fed frames must carry this process's monotonic timestamp, or the muxer's offsets drift")
 for load_bearing in ("GameCapture.planCopy", "GameCapture.isBulkCopy", "GameCapture.decide",
-                    "GameCapture.nextDelayMs", "GameCapture.startupGraceMs", "GameCapture.shouldUseGameSurface"):
+                    "GameCapture.nextDelayMs", "GameCapture.startupGraceMs",
+                    "GameCapture.shouldUseGameSurface", "GameCapture.pixelCopySuccessCode"):
     check(load_bearing in feed, f"{load_bearing} must be used by the feed, not just tested in isolation")
 check("MediaCodec" not in feed and "MediaMuxer" not in feed and "createVirtualDisplay" not in feed,
       "the game process must never touch MediaCodec/muxer/ projection - that isolation is why :recorder exists")
@@ -94,8 +109,9 @@ check("getBitmap" in feed and "SurfaceView" in feed and "TextureView" in feed,
       "both render paths need a readback, and one of them is the case that fails")
 check("Build.VERSION.SDK_INT >= 24" in feed,
       "PixelCopy is API 24 and minSdk is 23, so the SurfaceView readback must be guarded")
-check("COPY_TIMEOUT_MS" in feed and "await(" in feed,
+check("COPY_TIMEOUT_MS" in feed and "await(COPY_TIMEOUT_MS" in feed,
       "a copy that never finishes must be given up on, not waited on forever")
+check("MAX_STAGED_PIXELS" in feed, "the staging bitmap must be bounded, or a 4K readback allocates freely")
 check("return null" in feed, "a refused readback must return null rather than a half-written frame")
 
 # --- stop ordering: the producer lets go of the surface before anything else can take it

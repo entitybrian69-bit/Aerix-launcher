@@ -108,5 +108,19 @@ fun main() {
     expect(GameCapture.readbackIsDirect(false), "a TextureView render path reads its own frames back")
     expect(!GameCapture.readbackIsDirect(true), "a SurfaceView render path must never be promised as clean")
 
+    // 10. The PixelCopy status value differs by platform generation, so it is looked up, not assumed.
+    expectEquals(GameCapture.pixelCopySuccessCode(mapOf("SUCCESS" to 0, "ERROR_TIMEOUT" to 2)), 0,
+        "a platform that names it SUCCESS reports 0")
+    expectEquals(GameCapture.pixelCopySuccessCode(mapOf("RESULT_SUCCESS" to 1, "RESULT_ERROR_TIMEOUT" to 2)), 1,
+        "an older platform that names it RESULT_SUCCESS reports 1")
+    expectEquals(GameCapture.pixelCopySuccessCode(mapOf("SUCCESS" to 0, "RESULT_SUCCESS" to 1)), 0,
+        "the current name wins when a platform carries both")
+    expectEquals(GameCapture.pixelCopySuccessCode(mapOf("RESULT_ERROR_TIMEOUT" to 2)),
+        GameCapture.NO_SUCCESS_CODE, "an unrecognisable PixelCopy must never be read as success")
+    expect(GameCapture.pixelCopySuccessCode(emptyMap()) == GameCapture.NO_SUCCESS_CODE,
+        "no constants at all must not silently mean zero")
+    expect(GameCapture.NO_SUCCESS_CODE != 0 && GameCapture.NO_SUCCESS_CODE != 1,
+        "the unknown marker must not collide with either platform's success value")
+
     println("game capture: $checks checks passed")
 }

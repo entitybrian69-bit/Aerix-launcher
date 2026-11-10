@@ -126,6 +126,22 @@ object GameCapture {
         return (scaled + slowFpsBonus).coerceIn(1_200L, 6_000L)
     }
 
+    /** Returned by [pixelCopySuccessCode] when the platform has no recognisable status constant. */
+    const val NO_SUCCESS_CODE = Int.MIN_VALUE
+
+    /**
+     * Which of `PixelCopy`'s status values means "the frame was copied".
+     *
+     * The name and the number both changed between Android releases - `RESULT_SUCCESS` was 1, `SUCCESS`
+     * is 0 - and a session compiled against the wrong one would read every successful copy as a refusal,
+     * which is a feature that quietly never works. So the value is taken from the running device's own
+     * class rather than compiled in, and if it cannot be named at all the answer is a code that matches
+     * nothing: giving up and mirroring the display is a worse video, but a black one is a broken one.
+     */
+    @JvmStatic
+    fun pixelCopySuccessCode(valuesByName: Map<String, Int>): Int =
+        valuesByName["SUCCESS"] ?: valuesByName["RESULT_SUCCESS"] ?: NO_SUCCESS_CODE
+
     /**
      * Whether the render path in use is the one that can be read back without argument.
      *

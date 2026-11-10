@@ -1,6 +1,6 @@
 import android.graphics.Bitmap
 import android.media.ImageWriterTestConfig
-import android.media.PixelCopyOutcome
+import android.view.PixelCopyOutcome
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -81,7 +81,13 @@ private fun awaitUntil(millis: Long, predicate: () -> Boolean): Boolean {
     return predicate()
 }
 
+/**
+ * A real codec input surface already knows its own geometry, so the fake is sized to match what the
+ * recorder asked for; the tests that care about the difference override it afterwards.
+ */
 private fun begin(feed: GameSurfaceFeed, recorder: Recorder, surface: Surface, width: Int, height: Int, fps: Int) {
+    ImageWriterTestConfig.fallbackWidth = width
+    ImageWriterTestConfig.fallbackHeight = height
     val message = Message.obtain(null, GameCapture.MSG_BEGIN).apply {
         replyTo = recorder.messenger
         data = Bundle().apply {
@@ -146,8 +152,8 @@ fun main() {
         val frames = framesOf(feed)
         expect(frames.isNotEmpty(), "frames must be queued")
         expect(ImageWriterTestConfig.created == 1, "exactly one producer may attach, got ${ImageWriterTestConfig.created}")
-        expectEquals(ImageWriterTestConfig.sizes.firstOrNull(), "640x360/4",
-            "the writer must be created for the encoder's size with a small buffer pool")
+        expectEquals(ImageWriterTestConfig.sizes.firstOrNull(), "maxImages=4",
+            "the writer must be created with the only overload the SDK exposes, a size would not compile")
         frames.forEachIndexed { position, frame ->
             expectEquals(frame.width, 640, "frame $position width")
             expectEquals(frame.height, 360, "frame $position height")
@@ -166,6 +172,58 @@ fun main() {
         expect(feed.feeding, "the feed reports it is producing")
         expect(recorder.seen.count { it == GameCapture.MSG_BEGIN_FAILED } == 0,
             "a working session must not report a failure")
+        feed.shutdown()
+    }
+
+    // 1b. The surface's geometry wins over the requested size: a bitmap of the wrong dimensions would be
+    //     stretched by the encoder rather than scaled, and the feed has no way to resize the surface.
+    ImageWriterTestConfig.reset()
+    run {
+        ImageWriterTestConfig.surfaceWidth = 320
+        ImageWriterTestConfig.surfaceHeight = 180
+        val view = TextureView().apply { width = 1280; height = 720 }
+        val feed = GameSurfaceFeed({ view })
+        val recorder = Recorder()
+        begin(feed, recorder, Surface(), 640, 360, 30)
+        expect(recorder.await(GameCapture.MSG_BEGIN_ACK, 4_000L), "a mismatched surface must still be feedable")
+        expect(awaitUntil(2_000L) { framesOf(feed).isNotEmpty() }, "the frame must be queued")
+        val frame = framesOf(feed).first()
+        expectEquals(frame.width, 320, "the frame must be the size the surface reports, not what was asked for")
+        expectEquals(frame.height, 180, "and at its height")
+        feed.shutdown()
+    }
+
+    // 1c. A surface that reports no geometry at all must fall back to the requested size, not to zero.
+    ImageWriterTestConfig.reset()
+    run {
+        ImageWriterTestConfig.reportZeroSize = true
+        val view = TextureView().apply { width = 96; height = 64 }
+        val feed = GameSurfaceFeed({ view })
+        val recorder = Recorder()
+        begin(feed, recorder, Surface(), 48, 32, 30)
+        expect(recorder.await(GameCapture.MSG_BEGIN_ACK, 4_000L), "an unspecified surface size must not stall the session")
+        expect(awaitUntil(2_000L) { framesOf(feed).isNotEmpty() }, "a frame must still be queued")
+        val frame = framesOf(feed).first()
+        // The pixels are the proof: a 48x32 layout only lands correctly if the feed staged what it was
+        // asked for, since the Image itself has no size to copy.
+        expect(frameAt(frame, 0, 0) == expected(0, 0) && frameAt(frame, 47, 31) == expected(47, 31),
+            "the requested size must be used as the fallback, got row stride ${frame.rowStride}")
+        feed.shutdown()
+    }
+
+    // 1d. Planar (YUV) input is not something this can write, so it is refused instead of half-filled.
+    ImageWriterTestConfig.reset()
+    run {
+        ImageWriterTestConfig.planes = 3
+        ImageWriterTestConfig.pixelStride = 1
+        val view = TextureView().apply { width = 96; height = 64 }
+        val feed = GameSurfaceFeed({ view })
+        val recorder = Recorder()
+        begin(feed, recorder, Surface(), 96, 64, 30)
+        expect(recorder.await(GameCapture.MSG_BEGIN_FAILED, 4_000L), "a planar codec input must be refused")
+        expectEquals(GameCapture.Unavailable.values().getOrNull(recorder.lastArg),
+            GameCapture.Unavailable.STRIDE_MISMATCH, "and named as a layout problem")
+        expect(framesOf(feed).isEmpty(), "no frame may be queued against a planar layout")
         feed.shutdown()
     }
 

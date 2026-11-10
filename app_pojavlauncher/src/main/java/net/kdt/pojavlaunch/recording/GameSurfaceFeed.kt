@@ -1,13 +1,8 @@
 package net.kdt.pojavlaunch.recording
 
 import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Paint
-import android.graphics.PorterDuff
-import android.graphics.Rect
 import android.media.Image
 import android.media.ImageWriter
-import android.media.PixelCopy
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -16,6 +11,7 @@ import android.os.Looper
 import android.os.Message
 import android.os.Messenger
 import android.util.Log
+import android.view.PixelCopy
 import android.view.Surface
 import android.view.SurfaceView
 import android.view.TextureView
@@ -38,9 +34,10 @@ import java.util.concurrent.atomic.AtomicInteger
  * Everything here is best-effort by construction. A device that refuses a surface readback, or whose
  * encoder will not accept a remote producer, must end up with a working (if control-bearing) video
  * rather than a black one, so any failure stops feeding and tells `:recorder`, which then mirrors the
- * display and asks for the controls to be faded.
- */
-/**
+ * display and asks for the controls to be faded. The rules worth getting right - stride arithmetic,
+ * pacing, and when to give up - live in [GameCapture], which has no Android in it and is executed by
+ * tests/GameCaptureTest.kt.
+ *
  * [onFallback] runs on the main looper with the recorder's reason for giving up, which is the only
  * moment the UI is allowed to fade the controls out: until then a clean capture is assumed to be
  * working, and fading early would show a controls-less screen for nothing.
@@ -56,20 +53,16 @@ class GameSurfaceFeed(
     private var writer: ImageWriter? = null
     private var source: FrameSource? = null
     private var scratch: Bitmap? = null
-    private var staging: Canvas? = null
     private var pixels: IntArray? = null
-    private val paint = Paint(Paint.FILTER_BITMAP_FLAG)
-    /** PixelCopy calls back on whatever looper it is given; the main one is the only one we own that the
-     *  capture thread is not blocking on. */
-    private val copyHandler = Handler(Looper.getMainLooper())
-    /** Set once the recorder has given up on this session's clean capture, so it is reported once. */
-    private var reportedFallback = false
     private val running = AtomicBoolean(false)
     private val acked = AtomicBoolean(false)
+    private var targetWidth = 0
+    private var targetHeight = 0
     private var targetFps = DEFAULT_FPS
     private var graceMs = MIN_GRACE_MS
     private var startedAt = 0L
     private var framesFed = 0L
+    private var reportedFallback = false
 
     /** Whether this process currently believes its frames are being encoded clean, unbelayed by a fallback. */
     @Volatile
@@ -78,6 +71,12 @@ class GameSurfaceFeed(
 
     /** Handed to `:recorder` in the start intent; the only channel it has to reach this process. */
     val messenger = Messenger(Handler(Looper.getMainLooper()) { message -> receive(message) })
+
+    /**
+     * PixelCopy calls back on whatever looper it is given. It has to be one this thread is not blocked
+     * on, which rules out the capture thread.
+     */
+    private val copyHandler = Handler(Looper.getMainLooper())
 
     private fun receive(message: Message): Boolean {
         when (message.what) {
@@ -136,7 +135,7 @@ class GameSurfaceFeed(
     private fun startWorker(): Handler? = synchronized(lock) {
         val alive = thread
         if (alive != null && alive.isAlive && worker != null) return@synchronized worker
-        val next = HandlerThread("AerixGameFeed")
+        val next = HandlerThread(FEED_THREAD)
         runCatching { next.start() }.onFailure {
             Log.w(TAG, "Could not start the capture thread", it)
             return@synchronized null
@@ -163,11 +162,8 @@ class GameSurfaceFeed(
             fail(GameCapture.Unavailable.VIEW_TYPE)
             return
         }
-        val bitmap = stagedBitmap(width, height)
-        if (bitmap == null) {
-            fail(GameCapture.Unavailable.TOO_SMALL)
-            return
-        }
+        targetWidth = width
+        targetHeight = height
         targetFps = fps
         graceMs = GameCapture.startupGraceMs(width, height, fps)
         startedAt = System.nanoTime() / 1_000_000L
@@ -175,15 +171,14 @@ class GameSurfaceFeed(
         acked.set(false)
         reportedFallback = false
         source = frameSource
-        // The only size-and-count overload ImageWriter offers for a Surface producer - and the format it
-        // fixes to RGBA_8888 is exactly what the copy math below assumes, so the plane's pixel stride is
-        // checked rather than trusted.
-        val imageWriter = runCatching {
-            ImageWriter.newInstance(surface, width, height, MAX_IMAGES)
-        }.getOrNull()
+        // The two-argument overload is the one the SDK exposes for a Surface producer: there is no public
+        // way to ask ImageWriter for a size or a format, because the surface's own buffer geometry decides
+        // both. So nothing below may assume the encoder's width and height - the loop reads the geometry
+        // off each Image and verifies the plane is a single packed RGBA row.
+        val imageWriter = runCatching { ImageWriter.newInstance(surface, MAX_IMAGES) }.getOrNull()
         if (imageWriter == null) {
-            // Not being able to become a producer for this codec's input surface is a device property,
-            // not something a retry fixes, so say so once and let the recorder mirror instead.
+            // Not being able to become a producer for this codec's input surface is a device property, not
+            // something a retry fixes, so say so once and let the recorder mirror instead.
             stopFeeding()
             report(GameCapture.MSG_BEGIN_FAILED, GameCapture.Unavailable.WRITER_FAILED.ordinal)
             return
@@ -198,31 +193,17 @@ class GameSurfaceFeed(
     /**
      * Which readback a render path allows. A `TextureView` owns its `SurfaceTexture` and can be asked for
      * a scaled bitmap directly; a `SurfaceView`'s frames are composited outside the view hierarchy, so
-     * reading them back is a full-size grab plus a software scale - and some devices refuse that outright.
+     * they have to be copied out of the surface, which some devices refuse.
      */
     private fun selectSource(view: View?): FrameSource? = when {
         view is TextureView -> TextureSource(view)
-        view is SurfaceView && Build.VERSION.SDK_INT >= 24 -> SurfaceViewSource(view)
+        view is SurfaceView && Build.VERSION.SDK_INT >= 24 -> PixelCopySource(view)
         else -> null
-    }
-
-    private fun stagedBitmap(width: Int, height: Int): Bitmap? {
-        val current = scratch
-        if (current != null && !current.isRecycled && current.width == width && current.height == height) {
-            return current
-        }
-        if (width.toLong() * height > MAX_STAGED_PIXELS) return null
-        return runCatching { Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888) }.getOrNull()?.also {
-            runCatching { current?.recycle() }
-            scratch = it
-            staging = Canvas(it)
-        }
     }
 
     /** One frame of work: take a buffer, fill it, hand it to the codec, then pace the next one. */
     private fun pump() {
         if (!running.get()) return
-        val bitmap = scratch?.takeIf { !it.isRecycled } ?: return
         val imageWriter = writer
         if (imageWriter == null) {
             stopFeeding()
@@ -237,8 +218,20 @@ class GameSurfaceFeed(
             if (!gaveUp()) postFrame(GameCapture.nextDelayMs(targetFps, 0L))
             return
         }
-        val captured = runCatching { source?.capture(bitmap.width, bitmap.height, bitmap) }.getOrNull()
-        if (captured == null || captured.isRecycled || captured.width != bitmap.width || captured.height != bitmap.height) {
+        // The image, not the request, fixes the size: that is what the surface says the codec will
+        // accept, and a bitmap of any other size would be stretched rather than scaled.
+        val frameWidth = image.width.takeIf { it > 0 } ?: targetWidth
+        val frameHeight = image.height.takeIf { it > 0 } ?: targetHeight
+        val bitmap = stagedBitmap(frameWidth, frameHeight)
+        if (bitmap == null) {
+            runCatching { image.close() }
+            fail(GameCapture.Unavailable.TOO_SMALL)
+            return
+        }
+        val captured = runCatching { source?.capture(frameWidth, frameHeight, bitmap) }.getOrNull()
+        if (captured == null || captured.isRecycled ||
+            captured.width != frameWidth || captured.height != frameHeight
+        ) {
             recycle(captured, bitmap)
             runCatching { image.close() }
             if (!gaveUp()) postFrame(GameCapture.nextDelayMs(targetFps, 0L))
@@ -251,8 +244,8 @@ class GameSurfaceFeed(
             fail(failure)
             return
         }
-        // Queueing hands the buffer to the codec, and with it ownership of the image: closing it here
-        // instead would return an unwritten buffer, which is a dropped frame that looks like a good one.
+        // Queueing hands the buffer to the codec, and with it the image: closing it here instead would
+        // return an unwritten buffer, which is a dropped frame that looks like a good one.
         if (!runCatching { imageWriter.queueInputImage(image) }.isSuccess) {
             runCatching { image.close() }
             fail(GameCapture.Unavailable.WRITER_FAILED)
@@ -277,7 +270,10 @@ class GameSurfaceFeed(
 
     /** Copies one frame into one codec buffer. Null means the frame is in; otherwise, why not. */
     private fun writeFrame(image: Image, bitmap: Bitmap): GameCapture.Unavailable? {
-        val plane = image.planes.firstOrNull() ?: return GameCapture.Unavailable.WRITER_FAILED
+        // One plane with a pixel stride of 4 is a packed RGBA_8888 row. Several planes mean the codec
+        // asked for planar (YUV) input, which cannot be written without a colour conversion.
+        val plane = if (image.planes.size == 1) image.planes[0] else null
+            ?: return GameCapture.Unavailable.STRIDE_MISMATCH
         val buffer = plane.buffer ?: return GameCapture.Unavailable.WRITER_FAILED
         if (plane.pixelStride != GameCapture.BYTES_PER_PIXEL ||
             plane.rowStride % GameCapture.BYTES_PER_PIXEL != 0 ||
@@ -294,13 +290,16 @@ class GameSurfaceFeed(
         if (GameCapture.isBulkCopy(plan)) {
             buffer.position(0)
             buffer.limit(buffer.capacity())
-            return if (runCatching { bitmap.copyPixelsToBuffer(buffer) }.isSuccess) stamp(image) else null
+            return if (runCatching { bitmap.copyPixelsToBuffer(buffer) }.isSuccess) {
+                stamp(image)
+            } else {
+                GameCapture.Unavailable.WRITER_FAILED
+            }
         }
-        val sourceWordsPerRow = bitmap.rowBytes / GameCapture.BYTES_PER_PIXEL
-        val rowWords = ensurePixels(sourceWordsPerRow * bitmap.height)
-            ?: return GameCapture.Unavailable.STRIDE_MISMATCH
+        val wordsPerRow = bitmap.rowBytes / GameCapture.BYTES_PER_PIXEL
+        val rowWords = ensurePixels(wordsPerRow * bitmap.height) ?: return GameCapture.Unavailable.STRIDE_MISMATCH
         val written = runCatching {
-            bitmap.getPixels(rowWords, sourceWordsPerRow, 0, 0, 0, bitmap.width, bitmap.height)
+            bitmap.getPixels(rowWords, wordsPerRow, 0, 0, 0, bitmap.width, bitmap.height)
             val words = buffer.asIntBuffer()
             for (row in plan) {
                 words.position(row.dstOffset / GameCapture.BYTES_PER_PIXEL)
@@ -314,7 +313,9 @@ class GameSurfaceFeed(
 
     /**
      * The codec timestamps whatever a producer queues, so a hand-fed frame has to carry this process's
-     * monotonic clock or the file's PTS values and the muxer's offset disagree and audio drifts.
+     * monotonic clock or the file's PTS values and the recorder's muxing offset disagree and audio
+     * drifts. `System.nanoTime()` is the system-wide monotonic clock, which is what the recorder based
+     * its own epoch on, so the two processes agree without further negotiation.
      */
     private fun stamp(image: Image): GameCapture.Unavailable? =
         if (runCatching { image.timestamp = System.nanoTime() }.isSuccess) null else GameCapture.Unavailable.WRITER_FAILED
@@ -326,9 +327,27 @@ class GameSurfaceFeed(
         return runCatching { IntArray(size) }.getOrNull()?.also { pixels = it }
     }
 
+    private fun stagedBitmap(width: Int, height: Int): Bitmap? {
+        val current = scratch
+        if (current != null && !current.isRecycled && current.width == width && current.height == height) {
+            return current
+        }
+        if (width.toLong() * height > MAX_STAGED_PIXELS) return null
+        return runCatching { Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888) }.getOrNull()?.also {
+            runCatching { current?.recycle() }
+            scratch = it
+        }
+    }
+
     /** A source may hand back the feed's scratch bitmap or its own; only the latter is ours to free. */
     private fun recycle(captured: Bitmap?, scratch: Bitmap) {
         if (captured != null && captured !== scratch) runCatching { captured.recycle() }
+    }
+
+    /** Abandons the staging bitmap without recycling it; see [PixelCopySource] for why that matters. */
+    private fun abandonStaging() {
+        scratch = null
+        pixels = null
     }
 
     private fun elapsedMs(): Long = System.nanoTime() / 1_000_000L - startedAt
@@ -389,7 +408,6 @@ class GameSurfaceFeed(
     private fun releaseStaging() {
         runCatching { scratch?.recycle() }
         scratch = null
-        staging = null
         pixels = null
     }
 
@@ -401,7 +419,7 @@ class GameSurfaceFeed(
     }
 
     /**
-     * A way to get one game frame into a bitmap of the encoder's size.
+     * A way to get one game frame into a bitmap of the size the codec will accept.
      *
      * [reuse] is the feed's own scratch bitmap, which a source is expected to fill and return. Returning
      * a different bitmap is allowed and the feed recycles it, because the `TextureView` path has no way
@@ -421,72 +439,64 @@ class GameSurfaceFeed(
     }
 
     /**
-     * Reads the composited SurfaceView layer with `PixelCopy`, the only supported API for it.
+     * Reads the composited layer with `PixelCopy`, the only supported way to see a `SurfaceView`'s
+     * frames - the view itself has no public readback, and `getBitmap` on it is a hidden API. The system
+     * scales and converts into the destination, so the scratch bitmap is filled at the codec's size.
      *
-     * The copy finishes on the main looper, so the wait happens here on the capture thread - never the
-     * other way round. If the copy does not finish in time the destination is dropped rather than
-     * recycled: writing into a recycled bitmap is a native crash, and a leaked bitmap is only memory.
+     * A copy that has not finished may still be writing, so a timed-out destination is abandoned rather
+     * than recycled: freeing a buffer the graphics stack still owns is a native crash, and a leaked
+     * bitmap is only memory.
      */
-    private inner class SurfaceViewSource(private val view: SurfaceView) : FrameSource {
-        private var grab: Bitmap? = null
-
+    private inner class PixelCopySource(private val view: SurfaceView) : FrameSource {
         override fun capture(width: Int, height: Int, reuse: Bitmap): Bitmap? {
-            val surfaceWidth = view.width
-            val surfaceHeight = view.height
-            if (surfaceWidth <= 0 || surfaceHeight <= 0) return null
-            val full = grab?.takeIf {
-                !it.isRecycled && it.width == surfaceWidth && it.height == surfaceHeight
-            } ?: runCatching { Bitmap.createBitmap(surfaceWidth, surfaceHeight, Bitmap.Config.ARGB_8888) }
-                .getOrNull()?.also {
-                    runCatching { grab?.recycle() }
-                    grab = it
-                } ?: return null
-            if (!copySurface(full)) {
-                grab = null
-                return null
-            }
-            if (width == full.width && height == full.height) return full
-            val canvas = staging ?: return null
-            return runCatching {
-                canvas.setBitmap(reuse)
-                canvas.drawColor(0, PorterDuff.Mode.CLEAR)
-                canvas.drawBitmap(full, null, Rect(0, 0, width, height), paint)
-                reuse
-            }.getOrNull()
-        }
-
-        override fun dispose() {
-            runCatching { grab?.recycle() }
-            grab = null
-        }
-
-        private fun copySurface(dest: Bitmap): Boolean {
+            if (view.width <= 0 || view.height <= 0) return null
             val done = CountDownLatch(1)
-            val result = AtomicInteger(-1)
+            val status = AtomicInteger(INVALID_STATUS)
             val listener = PixelCopy.OnPixelCopyFinishedListener { code ->
-                result.set(code)
+                status.set(code)
                 done.countDown()
             }
-            val requested = runCatching {
-                PixelCopy.request(view, dest, listener, copyHandler)
-            }.isSuccess
-            if (!requested) return false
-            if (!runCatching { done.await(COPY_TIMEOUT_MS, TimeUnit.MILLISECONDS) }.getOrDefault(false)) return false
-            return result.get() == PixelCopy.RESULT_SUCCESS
+            val requested = runCatching { PixelCopy.request(view, reuse, listener, copyHandler) }.isSuccess
+            if (!requested) return null
+            if (!runCatching { done.await(COPY_TIMEOUT_MS, TimeUnit.MILLISECONDS) }.getOrDefault(false)) {
+                abandonStaging()
+                return null
+            }
+            if (status.get() != successCode) {
+                // ERROR_SOURCE_NO_DATA just means the game has not queued a frame yet: null tells the
+                // loop to try again next interval, and the grace window bounds how long that can go on.
+                return null
+            }
+            return reuse
         }
     }
 
+    /**
+     * The platform's own success value. Which constant exists, and what number it holds, changed between
+     * releases (`RESULT_SUCCESS` was 1, `SUCCESS` is 0), and guessing is a feature that quietly never
+     * works, so the value is read off the running device's class instead of compiled in.
+     */
+    private val successCode: Int by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+        val names = runCatching {
+            PixelCopy::class.java.fields.associate { field ->
+                field.name to runCatching { field.getInt(null) }.getOrDefault(INVALID_STATUS)
+            }
+        }.getOrDefault(emptyMap())
+        GameCapture.pixelCopySuccessCode(names)
+    }
 
     private companion object {
         private const val TAG = "AerixGameFeed"
+        private const val FEED_THREAD = "AerixGameFeed"
         private const val MAX_IMAGES = 4
         private const val DEFAULT_FPS = 30
         private const val MIN_GRACE_MS = 1_200L
+        private const val INVALID_STATUS = Int.MIN_VALUE
 
-        /** A copy that never finishes is a device refusing to hand the layer over, not a slow frame. */
+        /** A copy that never finishes is a refusal, not a slow frame; the loop has its own cadence. */
         private const val COPY_TIMEOUT_MS = 600L
 
-        /** Refuses to allocate a staging bitmap for a surface this size; 4K is the encoder's problem. */
+        /** Refuses to stage a frame bigger than this; past it the readback costs more than it proves. */
         private const val MAX_STAGED_PIXELS = 10_000_000L
     }
 }

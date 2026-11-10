@@ -59,3 +59,59 @@ class SurfaceView : View()
 
 /** Shared by both readback paths so a copied frame and a grabbed frame carry the same pattern. */
 internal fun fillBitmap(bitmap: Bitmap) = TextureView.fill(bitmap)
+
+/**
+ * The only supported way to read a `SurfaceView`'s composited layer, and the reason the SurfaceView path
+ * needs a fallback: whether the copy is permitted is a device answer. `outcome` picks the three answers a
+ * real device gives - success, refusal, and silence (the case that must not recycle a destination it may
+ * still be writing into).
+ */
+object PixelCopyOutcome {
+    var mode: String = "success"
+    var requests = 0
+    var lastDest: Bitmap? = null
+
+    fun reset() {
+        mode = "success"
+        requests = 0
+        lastDest = null
+    }
+}
+
+class PixelCopy {
+    /**
+     * Both generations of the SDK's status constants, with their real values: `RESULT_SUCCESS` was 1,
+     * `SUCCESS` is 0. They are `const` so they become public static int fields, which is what the feed
+     * reflects over instead of hard-coding a number.
+     */
+    companion object {
+        const val SUCCESS = 0
+        const val ERROR_UNKNOWN = 1
+        const val ERROR_TIMEOUT = 2
+
+        @JvmStatic
+        fun request(
+            source: SurfaceView,
+            dest: Bitmap,
+            listener: OnPixelCopyFinishedListener,
+            listenerThread: android.os.Handler
+        ) {
+            PixelCopyOutcome.requests++
+            PixelCopyOutcome.lastDest = dest
+            when (PixelCopyOutcome.mode) {
+                "refuse" -> listenerThread.post(Runnable { listener.onPixelCopyFinished(ERROR_UNKNOWN) })
+                // No callback at all: the caller has to give up without touching dest again.
+                "hang" -> Unit
+                "throw" -> throw IllegalArgumentException("the surface is not available")
+                else -> listenerThread.post(Runnable {
+                    fillBitmap(dest)
+                    listener.onPixelCopyFinished(SUCCESS)
+                })
+            }
+        }
+    }
+
+    fun interface OnPixelCopyFinishedListener {
+        fun onPixelCopyFinished(copyResult: Int)
+    }
+}

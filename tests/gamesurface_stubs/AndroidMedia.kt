@@ -1,8 +1,10 @@
 /*
  * Test doubles for `android.media.Image` / `ImageWriter`, see AndroidGraphics.kt for why they exist.
  * `ImageWriterTestConfig` is what makes the interesting cases reachable without a device: a padded row
- * stride (the case that needs the row-by-row copy) and a buffer smaller than the frame (the case that
- * must be refused rather than half-written).
+ * stride (the case that needs the row-by-row copy), a multi-plane YUV layout (must be refused), a buffer
+ * smaller than the frame (must be refused rather than half-written), and a surface whose geometry differs
+ * from what the recorder asked for (the feed must follow the surface, since ImageWriter has no public way
+ * to request a size).
  */
 package android.media
 
@@ -12,20 +14,41 @@ import java.nio.ByteOrder
 
 object ImageWriterTestConfig {
     var rowStride: Int = 0
+    var planes: Int = 1
+    var pixelStride: Int = 4
     var capacityShort: Boolean = false
     var failCreation: Boolean = false
     var holdAllBuffers: Boolean = false
     var maxImages: Int = 4
+
+    /** The size the *surface* reports, which is what a real ImageWriter would derive its images from. */
+    var surfaceWidth: Int = 0
+    var surfaceHeight: Int = 0
+
+    /** Used when the surface geometry is unset, mirroring how a real producer window falls back. */
+    var fallbackWidth: Int = 0
+    var fallbackHeight: Int = 0
+
+    /** A surface that reports no geometry at all: the feed must then use the size it was asked for. */
+    var reportZeroSize: Boolean = false
+
     var created: Int = 0
     var closed: Int = 0
     val sizes = ArrayList<String>()
 
     fun reset() {
         rowStride = 0
+        planes = 1
+        pixelStride = 4
         capacityShort = false
         failCreation = false
         holdAllBuffers = false
         maxImages = 4
+        surfaceWidth = 0
+        surfaceHeight = 0
+        reportZeroSize = false
+        fallbackWidth = 0
+        fallbackHeight = 0
         created = 0
         closed = 0
         sizes.clear()
@@ -33,54 +56,6 @@ object ImageWriterTestConfig {
 }
 
 class Plane internal constructor(val rowStride: Int, val pixelStride: Int, val buffer: ByteBuffer)
-
-/**
- * `PixelCopy` is the only supported way to read a SurfaceView's composited layer, and it is
- * asynchronous, so the fake has to be too: `outcome` picks the three answers a real device gives -
- * success, refusal, and silence (the case that must not recycle the destination it may still write).
- */
-object PixelCopyOutcome {
-    var mode: String = "success"
-    var requests = 0
-    fun reset() {
-        mode = "success"
-        requests = 0
-    }
-}
-
-class PixelCopy {
-    fun interface OnPixelCopyFinishedListener {
-        fun onPixelCopyFinished(copyResult: Int)
-    }
-
-    companion object {
-        const val RESULT_SUCCESS = 1
-        const val RESULT_UNKNOWN_ERROR = 0
-        const val RESULT_ERROR_TIMEOUT = 2
-        const val RESULT_ERROR_SOURCE_NOT_EMPTY = 4
-
-        @JvmStatic
-        fun request(
-            view: android.view.SurfaceView,
-            dest: android.graphics.Bitmap,
-            listener: OnPixelCopyFinishedListener,
-            handler: android.os.Handler
-        ) {
-            PixelCopyOutcome.requests++
-            when (PixelCopyOutcome.mode) {
-                "refuse" -> handler.post(Runnable { listener.onPixelCopyFinished(RESULT_UNKNOWN_ERROR) })
-                // No callback at all: the caller has to give up without touching dest again.
-                "hang" -> Unit
-                "throw" -> throw IllegalArgumentException("surface is not available")
-                else -> handler.post(Runnable {
-                    android.view.fillBitmap(dest)
-                    listener.onPixelCopyFinished(RESULT_SUCCESS)
-                })
-            }
-        }
-
-    }
-}
 
 class Image internal constructor(
     val width: Int,
@@ -101,27 +76,35 @@ class Image internal constructor(
 
 class QueuedFrame(val timestamp: Long, val bytes: ByteArray, val width: Int, val height: Int, val rowStride: Int)
 
-class ImageWriter private constructor(
-    private val width: Int,
-    private val height: Int,
-    private val maxImages: Int
-) {
-    val stride = if (ImageWriterTestConfig.rowStride > 0) ImageWriterTestConfig.rowStride else width * 4
+class ImageWriter private constructor(maxImages: Int) {
+    private val geometryWidth: Int
+        get() = ImageWriterTestConfig.surfaceWidth.takeIf { it > 0 }
+            ?: ImageWriterTestConfig.fallbackWidth
+
+    private val geometryHeight: Int
+        get() = ImageWriterTestConfig.surfaceHeight.takeIf { it > 0 }
+            ?: ImageWriterTestConfig.fallbackHeight
+
+    private val imageWidth: Int
+        get() = if (ImageWriterTestConfig.reportZeroSize) 0 else geometryWidth
+
+    private val imageHeight: Int
+        get() = if (ImageWriterTestConfig.reportZeroSize) 0 else geometryHeight
+
+    private val stride: Int
+        get() = ImageWriterTestConfig.rowStride.takeIf { it > 0 } ?: geometryWidth * 4
+
     val queued = ArrayList<QueuedFrame>()
     private val outstanding = ArrayList<Image>()
-    private var next = 0
+    private val pool = maxImages
     var isClosed = false
         private set
 
-    internal fun acquire(): Image? {
-        if (isClosed) return null
-        if (outstanding.size >= maxImages) return null
-        val rows = if (ImageWriterTestConfig.capacityShort) height - 1 else height
+    private fun newImage(): Image {
+        val rows = if (ImageWriterTestConfig.capacityShort) (geometryHeight - 1).coerceAtLeast(1) else geometryHeight
         val buffer = ByteBuffer.allocateDirect(stride * rows).order(ByteOrder.nativeOrder())
-        val image = Image(width, height, arrayOf(Plane(stride, 4, buffer)), this)
-        outstanding.add(image)
-        next++
-        return image
+        val planes = Array(ImageWriterTestConfig.planes) { Plane(stride, ImageWriterTestConfig.pixelStride, buffer) }
+        return Image(imageWidth, imageHeight, planes, this)
     }
 
     internal fun release(image: Image) {
@@ -129,14 +112,13 @@ class ImageWriter private constructor(
     }
 
     fun acquireNextImage(): Image? = synchronized(this) {
+        if (isClosed) return@synchronized null
         if (ImageWriterTestConfig.holdAllBuffers) {
-            while (outstanding.size < maxImages) {
-                val buffer = ByteBuffer.allocateDirect(stride * height).order(ByteOrder.nativeOrder())
-                outstanding.add(Image(width, height, arrayOf(Plane(stride, 4, buffer)), this))
-            }
+            while (outstanding.size < pool) outstanding.add(newImage())
             return@synchronized null
         }
-        acquire()
+        if (outstanding.size >= pool) return@synchronized null
+        newImage().also { outstanding.add(it) }
     }
 
     /** The codec's side of the exchange: whatever lands here is what a decoder would have seen. */
@@ -145,10 +127,8 @@ class ImageWriter private constructor(
             val plane = image.planes[0]
             val buffer = plane.buffer.duplicate().order(ByteOrder.nativeOrder())
             val bytes = ByteArray(buffer.capacity())
-            val mark = buffer.position()
             buffer.position(0)
             buffer.get(bytes, 0, bytes.size)
-            buffer.position(mark)
             QueuedFrame(image.timestamp, bytes, image.width, image.height, plane.rowStride)
         }
         runCatching { image.close() }
@@ -163,16 +143,29 @@ class ImageWriter private constructor(
     }
 
     companion object {
+        /**
+         * The SDK's public entry points, kept at the same arity: `maxImages` is the only knob, and the
+         * geometry comes from the surface. There is deliberately no `(surface, width, height, maxImages)`
+         * overload here, because inventing one is what cost a build.
+         */
         @JvmStatic
         @Throws(IllegalArgumentException::class)
-        fun newInstance(surface: Surface, width: Int, height: Int, maxImages: Int): ImageWriter {
+        fun newInstance(surface: Surface): ImageWriter = create(surface, DEFAULT_IMAGES)
+
+        @JvmStatic
+        @Throws(IllegalArgumentException::class)
+        fun newInstance(surface: Surface, maxImages: Int): ImageWriter = create(surface, maxImages)
+
+        private const val DEFAULT_IMAGES = 12
+
+        private fun create(surface: Surface, maxImages: Int): ImageWriter {
             ImageWriterTestConfig.created++
-            ImageWriterTestConfig.sizes.add("${width}x$height/$maxImages")
+            ImageWriterTestConfig.sizes.add("maxImages=$maxImages")
             if (ImageWriterTestConfig.failCreation || surface.released) {
                 throw IllegalArgumentException("this surface cannot be produced into")
             }
-            require(maxImages in 1..31) { "maxImages" }
-            return ImageWriter(width, height, ImageWriterTestConfig.maxImages.coerceAtLeast(1))
+            require(maxImages in 1..31) { "maxImages must be at least 1" }
+            return ImageWriter(maxImages.coerceAtLeast(1))
         }
     }
 }
