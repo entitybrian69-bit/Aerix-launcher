@@ -27,11 +27,29 @@ assert 'protected boolean shouldIgnoreNotch()' in game, 'the game window has to 
 notch = game.split('protected boolean shouldIgnoreNotch()')[1].split('    }')[0]
 assert 'return true;' in notch, 'a reserved cutout is what produced the black band next to the game'
 
-# 2. Mouse speed must not touch aim while the game holds the pointer.
+# 2. Aim and the launcher cursor must be two settings, not one with a gate on it.
+#
+# The first attempt kept one preference and ignored it while the game held the pointer, which left
+# every not-grabbing path - game menus, touch look - still sharing the number, so "mouse sensitivity
+# in the game changes the whole game" came straight back. They are separate keys now, and the old key
+# is carried into the new one so an update does not reset anyone's aim.
 touch = read(JAVA / 'game/TouchEventProcessor.java')
-assert 'float mouseSpeed = Platform.isGrabbing() ? 1f : LauncherPreferences.PREF_MOUSESPEED;' in touch, \
-    'the launcher multiplier must stop applying once the game owns the mouse'
-assert 'x * LauncherPreferences.PREF_MOUSESPEED' not in touch
+assert 'Platform.isGrabbing()' in touch and 'PREF_GAME_MOUSE_SENSITIVITY' in touch, \
+    'aim must follow its own preference while the game owns the mouse'
+assert 'PREF_MOUSESPEED' in touch, 'the GUI pointer keeps the launcher cursor speed'
+capture = read(JAVA / 'customcontrols/mouse/AndroidPointerCapture.java')
+assert 'applyMotionVector(view, LauncherPreferences.PREF_GAME_MOUSE_SENSITIVITY)' in capture, \
+    'the mouse aim path reads the game sensitivity, not the cursor speed'
+assert 'applyMotionVector(view, LauncherPreferences.PREF_MOUSESPEED)' in capture, \
+    'the ungrabbed pointer still moves at the launcher cursor speed'
+quick = read(JAVA / 'prefs/QuickSettingSideDialog.java')
+assert 'putInt("gameMouseSensitivity", progress)' in quick, \
+    'the in-game slider writes the in-game key only'
+assert 'putInt("mousespeed", progress)' not in quick, \
+    'and never the launcher cursor key again'
+prefs = read(JAVA / 'prefs/LauncherPreferences.java')
+assert 'PREF_GAME_MOUSE_SENSITIVITY' in prefs, 'the split needs a preference of its own'
+assert 'getInt("gameMouseSensitivity"' in prefs, 'seeded from the stored cursor speed on first run'
 
 # 3. Cursor size has to follow the slider, and be reachable in game.
 assert 'applyAerixPointerPreferences();' in game
