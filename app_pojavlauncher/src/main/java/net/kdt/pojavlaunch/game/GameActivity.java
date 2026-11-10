@@ -20,6 +20,7 @@ import android.graphics.drawable.ColorDrawable;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.content.SharedPreferences;
 import android.os.ResultReceiver;
 import android.util.Log;
 import android.view.InputDevice;
@@ -394,7 +395,7 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
             }
         });
         drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED);
-        launcherGLView.mCursorView.setCursorScale(LauncherPreferences.PREF_MOUSESCALE);
+        applyAerixPointerPreferences();
         weakCursor = new WeakReference<>(launcherGLView.mCursorView);
 
         try {
@@ -800,6 +801,22 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     }
 
     /** Opens the existing in-game launcher settings (including resolution) from Aerix Client. */
+    /** The on-screen cursor is drawn by the launcher, so its scale can follow the slider at once. */
+    public void applyAerixPointerPreferences() {
+        if (launcherGLView == null || launcherGLView.mCursorView == null) return;
+        launcherGLView.mCursorView.setCursorScale(LauncherPreferences.PREF_MOUSESCALE);
+    }
+
+    /**
+     * The game window is always edge-to-edge. Reserving the cutout produced a black strip next to the
+     * rotated game - the launcher's own window already ignores it for exactly this reason - so the
+     * player no longer has to find the setting to make it go away.
+     */
+    @Override
+    protected boolean shouldIgnoreNotch() {
+        return true;
+    }
+
     public void openAerixQuickSettings() { openQuickSettings(); }
 
     public void openAerixScreenRecorder() {
@@ -829,6 +846,17 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
                 @Override
                 public void onButtonTransparencyChanged() {
                     mControlLayout.updateButtonOpacity();
+                }
+
+                @Override
+                public void onCursorScaleChanged() {
+                    applyAerixPointerPreferences();
+                }
+
+                @Override
+                public void onZoomStrengthChanged() {
+                    // The bridge reads the strength from the request file, so push it again.
+                    net.kdt.pojavlaunch.aerix.client.ClientLiveOptionsBridge.syncAll();
                 }
             };
         }

@@ -241,6 +241,13 @@ object AerixClientCosmetics {
      * into `<instanceGameDir>/config/aerix_cape_frames/` and syncs `<instanceGameDir>/config/waveycapes.json`
      * so `AerixClientMod` + `WaveyCapes` animate AND wave the cape live in-game!
      */
+    /** Last outcome of [syncCapeAssetsToInstance], shown in the Client menu so a silent failure
+     *  cannot hide behind a switch that looks enabled. */
+    @Volatile
+    @JvmStatic
+    var lastCapeSyncStatus: String = "Not synced in this session"
+        private set
+
     fun syncCapeAssetsToInstance(context: Context, instanceGameDir: File) {
         runCatching {
             AerixClientStore.init(context)
@@ -287,6 +294,13 @@ object AerixClientCosmetics {
             val waveyFile = File(configDir, "waveycapes.json")
             waveyFile.writeText(waveyJson)
             waveyFile.setLastModified(now)
+            val bytes = framesDir.listFiles()?.sumOf { it.length() } ?: 0L
+            lastCapeSyncStatus = "Wrote $total frames (${bytes} B) for " +
+                "${if (importedCape != null) "your imported cape" else spec.id} into ${framesDir.name}; " +
+                "bridge mod: ${AerixClientModBridge.lastStatus}"
+        }.onFailure { error ->
+            lastCapeSyncStatus = "Could not write cape frames: ${error.message ?: error.javaClass.simpleName}"
+            android.util.Log.w("AerixCapes", "Cape frame sync failed", error)
         }
     }
 

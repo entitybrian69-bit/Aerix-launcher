@@ -193,6 +193,9 @@ object AerixClientStore {
     var quickHitboxesEnabled by mutableStateOf(false)
 
     var fullbrightEnabled by mutableStateOf(false)
+    /** Multiplayer-only performance profile the bridge mod applies live, inside a server. */
+    var serverBoostEnabled by mutableStateOf(false)
+    var serverBoostPreset by mutableStateOf("MEDIUM")
     var visualTimeMode by mutableStateOf("OFF")
     var visualWeatherMode by mutableStateOf("OFF")
     var visualFilter by mutableStateOf(VisualFilterPreset.NONE)
@@ -303,6 +306,9 @@ object AerixClientStore {
         quickHitboxesEnabled = p.getBoolean("quickHitboxesEnabled", false)
 
         fullbrightEnabled = p.getBoolean("fullbrightEnabled", false)
+        serverBoostEnabled = p.getBoolean("serverBoostEnabled", false)
+        serverBoostPreset = p.getString("serverBoostPreset", "MEDIUM")
+            ?.takeIf { it in setOf("LIGHT", "MEDIUM", "EXTREME") } ?: "MEDIUM"
         visualTimeMode = p.getString("visualTimeMode", "OFF")?.takeIf { it in setOf("OFF", "DAY", "SUNSET", "NIGHT") } ?: "OFF"
         visualWeatherMode = p.getString("visualWeatherMode", "OFF")?.takeIf { it in setOf("OFF", "CLEAR", "RAIN") } ?: "OFF"
         autoGgEnabled = p.getBoolean("autoGgEnabled", false)
@@ -400,6 +406,8 @@ object AerixClientStore {
             putBoolean("quickHitboxesEnabled", quickHitboxesEnabled)
 
             putBoolean("fullbrightEnabled", fullbrightEnabled)
+            putBoolean("serverBoostEnabled", serverBoostEnabled)
+            putString("serverBoostPreset", serverBoostPreset)
             putString("visualTimeMode", visualTimeMode)
             putString("visualWeatherMode", visualWeatherMode)
             putBoolean("autoGgEnabled", autoGgEnabled)

@@ -662,7 +662,10 @@ class ScreenRecordingService : Service() {
             null
         }
         val result = when {
-            saved?.playable == true -> "Saved to ${saved.path}"
+            saved?.playable == true -> if (saved.mediaUri != null)
+                    "Saved to Movies/Aerix - open it from any gallery, or from Recordings below"
+                else
+                    "Saved to ${saved.path}"
             saved != null -> "Recording incomplete; kept for recovery at ${saved.path}"
             failure != null -> failure
             else -> "Recording discarded (no video data)"

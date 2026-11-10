@@ -5,6 +5,7 @@ import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaMuxer
 import android.media.MediaScannerConnection
+import android.net.Uri
 import android.util.Log
 import java.io.File
 import java.text.SimpleDateFormat
@@ -13,7 +14,8 @@ import java.util.Locale
 
 /** Mux to a temporary file in the actual instance; retain incomplete data for recovery. */
 internal class RecordingOutput(private val context: Context, private val instanceRoot: File) {
-    data class Saved(val path: String, val playable: Boolean)
+    /** [mediaUri] is the copy in the system media library, which is what other apps can open. */
+    data class Saved(val path: String, val playable: Boolean, val mediaUri: Uri? = null)
     private var temporary: File? = null
 
     fun open(): MediaMuxer {
@@ -51,6 +53,11 @@ internal class RecordingOutput(private val context: Context, private val instanc
         if (!destination.createNewFile()) return Saved(source.absolutePath, false)
         if (!source.renameTo(destination)) { destination.delete(); return Saved(source.absolutePath, false) }
         if (valid) MediaScannerConnection.scanFile(context, arrayOf(destination.absolutePath), arrayOf("video/mp4"), null)
-        return Saved(destination.absolutePath, valid)
+        // The instance folder is app-private on Android 10 and up, so publishing a copy into
+        // Movies/Aerix is what makes the video openable, shareable and visible in a gallery.
+        val media = if (valid) runCatching { RecordingLibrary.publish(context, destination) }
+            .onFailure { Log.w("AerixRecorder", "Recording could not be published", it) }
+            .getOrNull() else null
+        return Saved(destination.absolutePath, valid, media)
     }
 }

@@ -278,6 +278,8 @@ object PojavSettingsBridge {
                 step = 5, suffix = " %", current = { resolutionPercent() }),
             PojavSetting.Toggle("sustainedPerformance", R.string.preference_sustained_performance_title, R.string.preference_sustained_performance_description,
                 current = { LauncherPreferences.PREF_SUSTAINED_PERFORMANCE }, visible = { Build.VERSION.SDK_INT >= Build.VERSION_CODES.N }),
+            PojavSetting.Toggle("show_fps", R.string.preference_show_fps_title, R.string.preference_show_fps_description,
+                current = { LauncherPreferences.PREF_SHOW_FPS }),
             PojavSetting.Toggle("alternate_surface", R.string.mcl_setting_title_use_surface_view, R.string.mcl_setting_subtitle_use_surface_view,
                 current = { LauncherPreferences.PREF_USE_ALTERNATE_SURFACE }),
             PojavSetting.Toggle("force_vsync", R.string.preference_force_vsync_title, R.string.preference_force_vsync_description,

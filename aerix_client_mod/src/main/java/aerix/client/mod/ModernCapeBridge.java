@@ -8,23 +8,38 @@ import java.io.InputStream;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.reflect.RecordComponent;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.function.Supplier;
 
-/** Adapts animated local capes to the PlayerSkin asset API used by newer clients. */
+/**
+ * Adapts launcher-served animated capes to the skin-asset API the newer clients use.
+ *
+ * A player without a Mojang cape has no cape texture to animate, so this bridge replaces the
+ * {@code PlayerSkin} the game builds for the local player with one whose cape asset points at a
+ * texture id this mod owns, then feeds that texture the launcher's animated frames. Members are
+ * looked up by several names at once (Mojang-mapped first, intermediary second), the record's
+ * components are matched by name rather than by position, and a failure is retried and reported
+ * through {@link #status()} instead of swallowed - a single renamed accessor is what used to make
+ * capes silently never appear at all.
+ */
 final class ModernCapeBridge {
     private final ClassLoader loader;
     private final boolean named;
     private boolean resolved;
-    private boolean disabled;
     private long retryAfter;
     private long lastFailureLog;
+    private String failure = "";
+    private int attempts;
     private Field playerField, skinLookupField;
     private Method playerInfo, infoSkin, getManager, texGet, texRegister, texRelease;
-    private Method imageRead, imageCopy, dynPixels, dynUpload, skinBody, skinModel, skinSecure;
+    private Method imageRead, imageCopy, dynPixels, dynUpload;
     private Constructor<?> textureConstructor, skinConstructor;
+    private RecordComponent[] skinComponents;
+    private Method[] skinAccessors;
+    private int capeComponent = -1;
     private Object capeId, capeAsset, activeInfo, activeManager, activeTexture;
     private Supplier<?> installedLookup, originalLookup;
     private final List<byte[]> frameBytes = new ArrayList<byte[]>();
@@ -37,9 +52,17 @@ final class ModernCapeBridge {
         this.named = named;
     }
 
+    /** One line for the launcher's Client menu: what the cape path is doing right now. */
+    String status() {
+        if (!resolved) return "not available on this version (" + failure + ")";
+        if (frameImages.isEmpty()) return "no cape frames in config/aerix_cape_frames yet";
+        if (activeTexture == null) return "waiting for the player to load in";
+        return "animating " + frameImages.size() + " frames";
+    }
+
     void tick(Object minecraft, File runDir) {
         long now = System.currentTimeMillis();
-        if (disabled || now < retryAfter) return;
+        if (now < retryAfter) return;
         try {
             if (!resolved) resolve();
             Object player = playerField.get(minecraft);
@@ -85,12 +108,19 @@ final class ModernCapeBridge {
                 activeInfo = info;
             }
         } catch (Throwable error) {
-            if (!resolved) disabled = true;
-            else retryAfter = now + 2000L;
+            // A missing handle is retried instead of given up on: the class it lives on may not be
+            // loaded yet this early in the launch, and quitting forever is what hid capes.
+            if (!resolved) {
+                attempts++;
+                retryAfter = now + Math.min(30_000L, 1_500L * attempts);
+            } else {
+                retryAfter = now + 2_000L;
+            }
+            failure = brief(error);
             detach();
-            if (disabled || now - lastFailureLog >= 30000L) {
-                System.err.println("Aerix Client: cape animation unavailable: " + error);
+            if (now - lastFailureLog >= 30_000L) {
                 lastFailureLog = now;
+                System.err.println("Aerix Client: cape animation unavailable: " + error);
             }
         }
     }
@@ -100,34 +130,100 @@ final class ModernCapeBridge {
         Class<?> player = load("net.minecraft.client.player.AbstractClientPlayer", "net.minecraft.class_742");
         Class<?> info = load("net.minecraft.client.multiplayer.PlayerInfo", "net.minecraft.class_640");
         Class<?> skin = load("net.minecraft.world.entity.player.PlayerSkin", "net.minecraft.class_8685");
-        Class<?> identifier = load("net.minecraft.resources.Identifier", "net.minecraft.class_2960");
-        Class<?> asset = load("net.minecraft.core.ClientAsset$ResourceTexture", "net.minecraft.class_12079$class_10726");
+        Class<?> identifier = load("net.minecraft.resources.Identifier", "net.minecraft.resources.ResourceLocation",
+                "net.minecraft.class_2960");
+        Class<?> asset = load("net.minecraft.core.ClientAsset$ResourceTexture",
+                "net.minecraft.class_12079$class_10726");
         Class<?> manager = load("net.minecraft.client.renderer.texture.TextureManager", "net.minecraft.class_1060");
         Class<?> abstractTexture = load("net.minecraft.client.renderer.texture.AbstractTexture", "net.minecraft.class_1044");
         Class<?> dynamic = load("net.minecraft.client.renderer.texture.DynamicTexture", "net.minecraft.class_1043");
         Class<?> image = load("com.mojang.blaze3d.platform.NativeImage", "net.minecraft.class_1011");
-        playerField = field(mc, named ? "player" : "field_1724");
-        skinLookupField = field(info, named ? "skinLookup" : "field_45607");
-        playerInfo = method(player, named ? "getPlayerInfo" : "method_3123");
-        infoSkin = method(info, named ? "getSkin" : "method_52810");
-        getManager = method(mc, named ? "getTextureManager" : "method_1531");
-        texGet = method(manager, named ? "getTexture" : "method_4619", identifier);
-        texRegister = method(manager, named ? "register" : "method_4616", identifier, abstractTexture);
-        texRelease = method(manager, named ? "release" : "method_4615", identifier);
-        imageRead = method(image, named ? "read" : "method_4309", InputStream.class);
-        imageCopy = method(image, named ? "copyFrom" : "method_4317", image);
-        dynPixels = method(dynamic, named ? "getPixels" : "method_4525");
-        dynUpload = method(dynamic, named ? "upload" : "method_4524");
-        skinBody = method(skin, named ? "body" : "comp_1626");
-        skinModel = method(skin, named ? "model" : "comp_1629");
-        skinSecure = method(skin, named ? "secure" : "comp_1630");
-        Class<?> assetType = skinBody.getReturnType();
-        skinConstructor = skin.getConstructor(assetType, assetType, assetType, skinModel.getReturnType(), boolean.class);
+        playerField = field(mc, "player", "field_1724");
+        skinLookupField = field(info, "skinLookup", "field_45607");
+        playerInfo = noArgMethod(player, "getPlayerInfo", "method_3123");
+        infoSkin = noArgMethod(info, "getSkin", "method_52810");
+        getManager = noArgMethod(mc, "getTextureManager", "method_1531");
+        texGet = methodWithArgs(manager, new Class<?>[] { identifier }, "getTexture", "method_4619");
+        texRegister = methodWithArgs(manager, new Class<?>[] { identifier, abstractTexture }, "register", "method_4616");
+        texRelease = methodWithArgs(manager, new Class<?>[] { identifier }, "release", "method_4615");
+        imageRead = methodWithArgs(image, new Class<?>[] { InputStream.class }, "read", "method_4309");
+        imageCopy = methodWithArgs(image, new Class<?>[] { image }, "copyFrom", "method_4317");
+        dynPixels = noArgMethod(dynamic, "getPixels", "method_4525");
+        dynUpload = noArgMethod(dynamic, "upload", "method_4524");
+        resolveSkinShape(skin);
         textureConstructor = dynamic.getConstructor(Supplier.class, image);
-        capeId = method(identifier, named ? "fromNamespaceAndPath" : "method_60655", String.class, String.class)
-                .invoke(null, "aerix", "local_cape");
+        Object local;
+        try {
+            Method fromPath = methodWithArgs(identifier, new Class<?>[] { String.class, String.class },
+                    "fromNamespaceAndPath", "method_60655");
+            local = fromPath.invoke(null, "aerix", "local_cape");
+        } catch (NoSuchMethodException noFactory) {
+            local = identifier.getConstructor(String.class, String.class).newInstance("aerix", "local_cape");
+        }
+        capeId = local;
         capeAsset = asset.getConstructor(identifier, identifier).newInstance(capeId, capeId);
         resolved = true;
+    }
+
+    /**
+     * Resolves the {@code PlayerSkin} record's components so the cape slot - and only the cape slot -
+     * is the one replaced. Records declare their components in canonical-constructor order, which is
+     * the one thing that cannot drift between versions.
+     */
+    private void resolveSkinShape(Class<?> skin) throws Exception {
+        if (!skin.isRecord()) {
+            resolvePositionalSkin(skin);
+            return;
+        }
+        RecordComponent[] components = skin.getRecordComponents();
+        if (components.length < 3) throw new NoSuchMethodException("skin record has too few components");
+        List<Method> accessors = new ArrayList<Method>();
+        Class<?>[] parameterTypes = new Class<?>[components.length];
+        for (int i = 0; i < components.length; i++) {
+            RecordComponent component = components[i];
+            Method accessor = component.getAccessor();
+            if (accessor == null) throw new NoSuchMethodException("accessor for " + component.getName());
+            accessor.setAccessible(true);
+            accessors.add(accessor);
+            parameterTypes[i] = component.getType();
+            if (component.getName().toLowerCase(Locale.ROOT).contains("cape")) capeComponent = i;
+        }
+        if (capeComponent < 0) throw new NoSuchFieldException("no cape component in " + skin.getSimpleName());
+        skinConstructor = skin.getConstructor(parameterTypes);
+        skinComponents = components;
+        skinAccessors = accessors.toArray(new Method[0]);
+    }
+
+    /**
+     * Pre-record skin classes keep the order this bridge has always used - body, cape, elytra - with
+     * our texture in both cape slots, because the elytra sheet shares it.
+     */
+    private void resolvePositionalSkin(Class<?> skin) throws Exception {
+        Method body = noArgMethod(skin, "body", "comp_1626");
+        Method model = noArgMethod(skin, "model", "comp_1629");
+        Method secure = noArgMethod(skin, "secure", "comp_1630");
+        Class<?> textureType = body.getReturnType();
+        skinConstructor = skin.getConstructor(textureType, textureType, textureType,
+                model.getReturnType(), secure.getReturnType());
+        skinAccessors = new Method[] { body, model, secure };
+        skinComponents = null;
+        capeComponent = -1;
+    }
+
+    /** @return the same skin, with its cape asset pointing at the launcher-served texture. */
+    private Object withLocalCape(Object original) throws Exception {
+        if (original == null) return null;
+        if (skinComponents != null) {
+            Object[] arguments = new Object[skinAccessors.length];
+            for (int i = 0; i < arguments.length; i++) {
+                arguments[i] = i == capeComponent ? capeAsset : skinAccessors[i].invoke(original);
+            }
+            return skinConstructor.newInstance(arguments);
+        }
+        Object body = skinAccessors[0].invoke(original);
+        Object model = skinAccessors[1].invoke(original);
+        Object secure = skinAccessors[2].invoke(original);
+        return skinConstructor.newInstance(body, capeAsset, capeAsset, model, secure);
     }
 
     private void reloadFrames(File runDir) throws Throwable {
@@ -182,26 +278,84 @@ final class ModernCapeBridge {
             if (original == null) return null;
             if (original == previous && result != null) return result;
             try {
-                Object skin = skinConstructor.newInstance(skinBody.invoke(original), capeAsset, capeAsset,
-                        skinModel.invoke(original), skinSecure.invoke(original));
+                Object skin = withLocalCape(original);
                 previous = original; result = skin;
                 return skin;
             } catch (Throwable ignored) { return original; }
         }
     }
 
-    private Class<?> load(String mojang, String intermediary) throws ClassNotFoundException {
-        return Class.forName(named ? mojang : intermediary, false, loader);
+    private Class<?> load(String... names) throws ClassNotFoundException {
+        ClassNotFoundException last = null;
+        for (int i = 0; i < names.length; i++) {
+            try {
+                return Class.forName(names[i], false, loader);
+            } catch (ClassNotFoundException missing) {
+                last = missing;
+            }
+        }
+        throw last;
     }
-    private static Field field(Class<?> type, String name) throws Exception {
-        Field f = type.getDeclaredField(name); f.setAccessible(true); return f;
+
+    private static Field field(Class<?> type, String... names) throws Exception {
+        Exception last = null;
+        for (int i = 0; i < names.length; i++) {
+            try {
+                Field found = type.getDeclaredField(names[i]);
+                found.setAccessible(true);
+                return found;
+            } catch (NoSuchFieldException missing) {
+                last = missing;
+            }
+        }
+        throw last;
     }
-    private static Method method(Class<?> type, String name, Class<?>... args) throws Exception {
-        Method m = type.getDeclaredMethod(name, args); m.setAccessible(true); return m;
+
+    /** @return the first named no-argument method the type declares, walking its supertypes. */
+    private static Method noArgMethod(Class<?> type, String... names) throws Exception {
+        NoSuchMethodException last = null;
+        for (int i = 0; i < names.length; i++) {
+            Class<?> current = type;
+            while (current != null && current != Object.class) {
+                try {
+                    Method found = current.getDeclaredMethod(names[i]);
+                    if (found.getParameterTypes().length != 0) break;
+                    found.setAccessible(true);
+                    return found;
+                } catch (NoSuchMethodException missing) {
+                    last = missing;
+                    current = current.getSuperclass();
+                }
+            }
+        }
+        throw last == null ? new NoSuchMethodException(names[0]) : last;
     }
+
+    private static Method methodWithArgs(Class<?> type, Class<?>[] arguments, String... names) throws Exception {
+        NoSuchMethodException last = null;
+        for (int i = 0; i < names.length; i++) {
+            try {
+                Method found = type.getMethod(names[i], arguments);
+                found.setAccessible(true);
+                return found;
+            } catch (NoSuchMethodException missing) {
+                last = missing;
+            }
+        }
+        throw last;
+    }
+
+    private static String brief(Throwable error) {
+        if (error == null) return "";
+        String message = error.getMessage();
+        String text = error.getClass().getSimpleName() + (message == null ? "" : ": " + message);
+        return text.length() <= 160 ? text : text.substring(0, 160);
+    }
+
     private static void close(Object value) {
         if (value instanceof AutoCloseable) try { ((AutoCloseable) value).close(); } catch (Exception ignored) { }
     }
+
     private static byte[] read(File file) throws Exception {
         try (InputStream in = new FileInputStream(file); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             byte[] buffer = new byte[4096]; int n;

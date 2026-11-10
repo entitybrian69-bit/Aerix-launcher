@@ -24,8 +24,12 @@ public abstract class TouchEventProcessor {
 
     protected void applyMoveVector(float x, float y) {
         float clientAimMultiplier = net.kdt.pojavlaunch.aerix.client.AerixClientInputBridge.touchAimMultiplier();
-        Platform.cursorX += x * LauncherPreferences.PREF_MOUSESPEED * clientAimMultiplier;
-        Platform.cursorY += y * LauncherPreferences.PREF_MOUSESPEED * clientAimMultiplier;
+        // "Mouse speed" is a launcher-cursor setting. While the game holds the pointer it is the
+        // game's own sensitivity that turns the mouse, so multiplying here would silently change
+        // in-game aim sensitivity (and stacking it with a raised slider looked like a bug).
+        float mouseSpeed = Platform.isGrabbing() ? 1f : LauncherPreferences.PREF_MOUSESPEED;
+        Platform.cursorX += x * mouseSpeed * clientAimMultiplier;
+        Platform.cursorY += y * mouseSpeed * clientAimMultiplier;
         Platform.sendCursorPosition();
     }
 

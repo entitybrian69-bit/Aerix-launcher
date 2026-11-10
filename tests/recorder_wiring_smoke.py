@@ -11,7 +11,16 @@ assert '.putExtra("instanceRoot", instanceDir?.absolutePath)' in controller
 assert 'RecordingPaths.directory(instanceRoot, true)' in output
 assert 'MediaExtractor' in output and 'SAMPLE_FLAG_SYNC' in output
 assert '-incomplete.mp4' in output
-assert 'Recordings' in controller and 'Tools.openPath(activity, file, action == 1)' in controller
+assert 'Recordings' in controller
+# A recording must be openable by other apps, so the list goes through the media library copy
+# instead of a path inside app-private storage that no player can read.
+assert 'RecordingLibrary.view(activity, file, action == 1)' in controller
+library = (ROOT / 'recording/RecordingLibrary.kt').read_text()
+assert 'Movies/$ALBUM' in library or 'DIRECTORY_MOVIES' in library
+assert 'IS_PENDING' in library and 'FLAG_GRANT_READ_URI_PERMISSION' in library
+assert 'Tools.openPath(context, file, share)' in library, 'the document provider stays the fallback'
+assert 'RecordingLibrary.publish(context, destination)' in output
+assert 'mediaUri' in output and 'Saved(destination.absolutePath, valid, media)' in output
 assert 'worker.post { stopRecording() }' in service
 assert 'requestedAudio.microphone' in service
 assert 'worker.postDelayed(audioTimeout' in service

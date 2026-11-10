@@ -6,6 +6,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -61,13 +62,18 @@ public final class AerixClientMod implements ClientModInitializer {
     private ModernCapeBridge modernCapeBridge;
     private final ClientVisualOverrides visualOverrides = new ClientVisualOverrides();
     private final ClientAdaptiveDistance adaptiveDistance = new ClientAdaptiveDistance();
+    /** Fullbright, the ZOOM button and Server Boost, applied to the game's own Options. */
+    private final ClientLiveOptions liveOptions = new ClientLiveOptions();
+    /** What the cape path last reported, and when the launcher-readable status was written. */
+    private String capeStatus = "waiting for the game";
+    private long lastStatusWrite;
+    private long lastPoll;
 
     // Cached cape animation frames (kept as raw PNG bytes + decoded NativeImage instances)
     private final List<byte[]> framePngBytes = new ArrayList<byte[]>();
     private final List<Object> frameNativeImages = new ArrayList<Object>();
     private long lastCapeMetaMtime = -1L;
     private long lastWaveyMtime = -1L;
-    private long lastLivePropsMtime = -1L;
     private int frameIndex = 0;
     private int slowCounter = 0;
 
@@ -180,32 +186,43 @@ public final class AerixClientMod implements ClientModInitializer {
 
     private void onRenderThreadTick(Object mc) throws Exception {
         File runDir = resolveRunDir(mc);
+        Object world = ClientLiveOptions.multiplayerState(mc);
+        // Live options are independent of the texture API, so they run before the cape branches
+        // below - one of which returns early. Keeping them here is what lets the ZOOM button and
+        // Server Boost work on the versions that use the newer skin lookup.
+        liveOptions.tick(mc, runDir, world);
         if (!modernRuntime) visualOverrides.tick(mc, runDir);
         adaptiveDistance.tick(mc, runDir);
         boolean assetSkin = modernRuntime || (handlesResolved && mSkinCompCape != null &&
                 clsIdentifier != null && !clsIdentifier.isAssignableFrom(mSkinCompCape.getReturnType()));
-        if (assetSkin) {
-            if (++slowCounter >= 8) { slowCounter = 0; syncWaveyCapesIfNeeded(runDir); }
-            if (modernCapeBridge == null) modernCapeBridge = new ModernCapeBridge(AerixClientMod.class.getClassLoader(), modernRuntime);
-            modernCapeBridge.tick(mc, runDir);
-            return;
-        }
         slowCounter++;
         if (slowCounter >= 8) {
             slowCounter = 0;
             syncWaveyCapesIfNeeded(runDir);
-            syncLiveOptionsIfNeeded(mc, runDir);
             if (handlesResolved) reloadCapeFramesIfNeeded(runDir);
         } else if (handlesResolved && frameNativeImages.isEmpty()) {
             reloadCapeFramesIfNeeded(runDir);
         }
+        if (assetSkin) {
+            if (modernCapeBridge == null)
+                modernCapeBridge = new ModernCapeBridge(AerixClientMod.class.getClassLoader(), modernRuntime);
+            modernCapeBridge.tick(mc, runDir);
+            writeStatus(runDir, world, modernCapeBridge.status());
+            return;
+        }
+        writeStatus(runDir, world, legacyCapeStatus());
 
         if (!handlesResolved || frameNativeImages.isEmpty() || fPlayer == null) return;
         Object player = fPlayer.get(mc);
         if (player == null) return;
 
         Object capeId = resolvePlayerCapeIdentifier(player);
-        if (capeId == null) return;
+        if (capeId == null) {
+            // The player has no cape in their profile, so there is no texture for the animation to
+            // feed. The status file says so instead of the Client menu silently doing nothing.
+            capeStatus = "no cape in the skin profile";
+            return;
+        }
 
         Object texMgr = mGetTextureManager.invoke(mc);
         if (texMgr == null) return;
@@ -365,32 +382,55 @@ public final class AerixClientMod implements ClientModInitializer {
         return false;
     }
 
-    private void syncLiveOptionsIfNeeded(Object mc, File runDir) {
-        File liveFile = new File(runDir, "config/aerix_live.properties");
-        if (!liveFile.isFile() || fOptions == null) return;
-        long mtime = liveFile.lastModified();
-        if (mtime == lastLivePropsMtime) return;
-        lastLivePropsMtime = mtime;
+    /** @return a one-line description of why the animated cape is or is not showing. */
+    private String legacyCapeStatus() {
+        if (!handlesResolved) return "game texture handles unavailable on this version";
+        if (frameNativeImages.isEmpty()) return "no cape frames in config/aerix_cape_frames yet";
+        if (fPlayer == null) return "player handle unavailable";
+        return "animating " + frameNativeImages.size() + " frames";
+    }
 
+    /**
+     * Publishes what the game side of the client actually managed to do, so the launcher's Client
+     * menu can show the truth instead of a switch that silently does nothing. Every two seconds,
+     * written through a temporary file so the launcher never reads a half-written report.
+     */
+    private void writeStatus(File runDir, Object world, String bridgeStatus) {
+        if (bridgeStatus != null) capeStatus = bridgeStatus;
+        long now = System.currentTimeMillis();
+        if (now - lastStatusWrite < 2000L) return;
+        lastStatusWrite = now;
+        Properties out = new Properties();
+        out.setProperty("modVersion", "1.2.0");
+        out.setProperty("runtime", modernRuntime ? "mojang-mapped" : "intermediary");
+        out.setProperty("cape", capeStatus);
+        out.setProperty("live", liveOptions.statusLine());
+        out.setProperty("zoom", liveOptions.isZoomActive() ? "held" : "idle");
+        String boost = liveOptions.isBoostEngaged() ? "applied" :
+                (Boolean.TRUE.equals(world) ? "requested, waiting for the game to expose it" : "waiting for a server");
+        out.setProperty("boost", boost);
+        out.setProperty("world", Boolean.TRUE.equals(world) ? "server" :
+                (Boolean.FALSE.equals(world) ? "singleplayer" : "unknown"));
+        out.setProperty("updatedAt", Long.toString(now));
+        File config = new File(runDir, "config");
+        File target = new File(config, "aerix_status.properties");
+        File temp = new File(config, "aerix_status.properties.tmp");
+        FileOutputStream stream = null;
         try {
-            Properties props = new Properties();
-            FileInputStream fis = new FileInputStream(liveFile);
-            try {
-                props.load(fis);
-            } finally {
-                fis.close();
-            }
-            Object opts = fOptions.get(mc);
-            if (opts == null) return;
-            String gammaStr = props.getProperty("gamma");
-            if (gammaStr != null) {
-                double g = Double.parseDouble(gammaStr.trim());
-                Field fGamma = findFieldSafe(opts.getClass(), "field_1840");
-                if (fGamma != null && fGamma.getType() == double.class) {
-                    fGamma.setDouble(opts, g);
+            config.mkdirs();
+            stream = new FileOutputStream(temp);
+            out.store(stream, "Aerix Client bridge - written inside the game");
+            stream.close();
+            stream = null;
+            if (!temp.renameTo(target)) temp.delete();
+        } catch (Throwable ignored) {
+            if (stream != null) {
+                try {
+                    stream.close();
+                } catch (Throwable ignoredAgain) {
                 }
             }
-        } catch (Throwable ignored) {
+            temp.delete();
         }
     }
 

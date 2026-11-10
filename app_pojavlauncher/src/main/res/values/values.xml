@@ -16,6 +16,10 @@
     <integer name="mouse_scale_seekbar_min">25</integer>
     <integer name="mouse_scale_seekbar_max">300</integer>
 
+    <integer name="zoom_strength_seekbar_min">25</integer>
+    <integer name="zoom_strength_seekbar_max">90</integer>
+    <integer name="zoom_strength_seekbar_increment">5</integer>
+
     <integer name="mouse_speed_seekbar_increment">5</integer>
     <integer name="mouse_speed_seekbar_min">25</integer>
     <integer name="mouse_speed_seekbar_max">300</integer>

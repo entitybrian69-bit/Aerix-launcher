@@ -31,7 +31,14 @@ public class LauncherPreferences {
     public static SharedPreferences DEFAULT_PREF;
     public static String PREF_RENDERER = "opengles2";
 
-	public static boolean PREF_IGNORE_NOTCH = false;
+		/**
+	 * Edge-to-edge is the default, exactly like the launcher's own window. Leaving the cutout
+	 * reserved produced a black strip next to the game (reported as "some space left at the left
+	 * side"), because the game window is rotated to landscape and the cutout then sits on its left.
+	 */
+	public static boolean PREF_IGNORE_NOTCH = true;
+	/** Zoom strength of the built-in client ZOOM button, as a percentage of the game FOV. */
+	public static float PREF_ZOOM_FOV_SCALE = 0.45f;
 	public static float PREF_BUTTONSIZE = 100f;
 	public static float PREF_MOUSESCALE = 1f;
 	public static int PREF_LONGPRESS_TRIGGER = 300;
@@ -110,7 +117,8 @@ public class LauncherPreferences {
         PREF_BUTTONSIZE = DEFAULT_PREF.getInt("buttonscale", 100);
         PREF_MOUSESCALE = DEFAULT_PREF.getInt("mousescale", 100)/100f;
         PREF_MOUSESPEED = ((float)DEFAULT_PREF.getInt("mousespeed",100))/100f;
-        PREF_IGNORE_NOTCH = DEFAULT_PREF.getBoolean("ignoreNotch", false);
+        PREF_IGNORE_NOTCH = DEFAULT_PREF.getBoolean("ignoreNotch", true);
+        PREF_ZOOM_FOV_SCALE = DEFAULT_PREF.getInt("zoomFovScale", 45) / 100f;
 		PREF_LONGPRESS_TRIGGER = DEFAULT_PREF.getInt("timeLongPressTrigger", 300);
 		PREF_DEFAULTCTRL_PATH = DEFAULT_PREF.getString("defaultCtrl", Tools.CTRLDEF_FILE);
         PREF_FORCE_ENGLISH = DEFAULT_PREF.getBoolean("force_english", false);

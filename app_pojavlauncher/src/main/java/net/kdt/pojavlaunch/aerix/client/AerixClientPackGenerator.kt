@@ -260,16 +260,8 @@ object AerixClientPackGenerator {
         val outText = map.entries.joinToString("\n") { "${it.key}:${it.value}" } + "\n"
         optFile.writeText(outText)
 
-        // Also update live runtime bridge properties for AerixClientMod hot-reload!
-        runCatching {
-            val cfgDir = File(instanceGameDir, "config").apply { mkdirs() }
-            val liveFile = File(cfgDir, "aerix_live.properties")
-            val now = System.currentTimeMillis()
-            liveFile.writeText(
-                "gamma=${if (AerixClientStore.fullbrightEnabled) "100.0" else "1.0"}\nupdatedAt=$now\n"
-            )
-            liveFile.setLastModified(now)
-        }
+        // Same file the in-game bridge polls every tick, so a toggle also works without a restart.
+        runCatching { ClientLiveOptionsBridge.syncAll(instanceGameDir) }
     }
 
     // Do not overwrite third-party mod configuration; versions have different schemas and

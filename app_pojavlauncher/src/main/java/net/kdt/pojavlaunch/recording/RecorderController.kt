@@ -292,7 +292,7 @@ class RecorderController @JvmOverloads constructor(private val activity: Activit
         describeControls(withControls.isChecked)
 
         TextView(activity).apply {
-            text = "H.264 MP4 · Saves in this instance's recordings folder."
+            text = "H.264 MP4 · Saved in this instance's recordings folder and in Movies/Aerix, so a gallery or player can open it."
             textSize = 12f
             setPadding(0, (10 * density).toInt(), 0, 0)
             body.addView(this)
@@ -334,9 +334,9 @@ class RecorderController @JvmOverloads constructor(private val activity: Activit
                 val file = files.getOrNull(which) ?: return@setItems
                 dialog = AlertDialog.Builder(activity).setTitle(file.name)
                     .setItems(arrayOf("Open video", "Share video")) { _, action ->
-                        runCatching { Tools.openPath(activity, file, action == 1) }.onFailure {
-                            Toast.makeText(activity, "No app could open this video: ${it.message.orEmpty()}", Toast.LENGTH_LONG).show()
-                        }
+                        // Goes through the media library copy: a file inside the app's own storage is
+                        // unreadable to every other app on Android 10 and later.
+                        RecordingLibrary.view(activity, file, action == 1)
                     }.setNegativeButton("Cancel", null).show()
             }.setNegativeButton("Close", null).show()
     }

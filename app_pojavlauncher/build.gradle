@@ -404,6 +404,9 @@ afterEvaluate {
         registrar.setVariant(variant)
 
         registrar.projectJarDependency project(":forge_installer"), "components/forge_installer"
+        // The Client's in-game half (capes, live options, ZOOM, Server Boost) ships as an asset and is
+        // copied into every managed instance by AerixClientModBridge before the game starts.
+        registrar.projectJarDependency project(":aerix_client_mod"), "components/aerix_client_mod"
 		if (variant.getName().toLowerCase().contains("full")) {
             registrar.jreRuntimeDependency 8, "components/jre"
         }

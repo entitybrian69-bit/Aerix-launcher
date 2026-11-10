@@ -59,6 +59,10 @@
     <string name="mcl_setting_title_buttonscale">Control buttons scaling</string>
     <string name="mcl_setting_subtitle_buttonscale">Upscale them if the buttons are too small.</string>
     <string name="mcl_setting_title_mousescale">Mouse scaling</string>
+    <string name="quick_setting_cursor_size">Cursor size</string>
+    <string name="quick_setting_cursor_size_summary">Shrinks or grows the on-screen mouse pointer.</string>
+    <string name="quick_setting_zoom_strength">Zoom strength</string>
+    <string name="quick_setting_zoom_strength_summary">How narrow the field of view gets while the ZOOM button is held.</string>
     <string name="mcl_setting_subtitle_mousescale">Change the size of the virtual mouse.</string>
     <string name="mcl_setting_title_javaargs">JVM Launch arguments</string>
     <string name="mcl_setting_subtitle_javaargs">Be careful, this may make game crash if modified without knowledge.</string>

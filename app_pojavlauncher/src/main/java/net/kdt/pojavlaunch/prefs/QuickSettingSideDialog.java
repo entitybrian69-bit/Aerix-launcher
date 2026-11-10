@@ -7,8 +7,10 @@ import static net.kdt.pojavlaunch.prefs.LauncherPreferences.PREF_GYRO_INVERT_X;
 import static net.kdt.pojavlaunch.prefs.LauncherPreferences.PREF_GYRO_INVERT_Y;
 import static net.kdt.pojavlaunch.prefs.LauncherPreferences.PREF_GYRO_SENSITIVITY;
 import static net.kdt.pojavlaunch.prefs.LauncherPreferences.PREF_LONGPRESS_TRIGGER;
+import static net.kdt.pojavlaunch.prefs.LauncherPreferences.PREF_MOUSESCALE;
 import static net.kdt.pojavlaunch.prefs.LauncherPreferences.PREF_MOUSESPEED;
 import static net.kdt.pojavlaunch.prefs.LauncherPreferences.PREF_SCALE_FACTOR;
+import static net.kdt.pojavlaunch.prefs.LauncherPreferences.PREF_ZOOM_FOV_SCALE;
 
 import android.content.Context;
 import android.content.SharedPreferences;
@@ -34,10 +36,13 @@ public abstract class QuickSettingSideDialog extends com.kdt.SideDialogView {
 
     private SwitchCompat mGyroSwitch, mGyroXSwitch, mGyroYSwitch, mGestureSwitch;
     private CustomSeekbar mGyroSensitivityBar, mMouseSpeedBar, mGestureDelayBar, mResolutionBar, mTransparencyBar;
+    private CustomSeekbar mCursorSizeBar, mZoomStrengthBar;
     private TextView mGyroSensitivityText, mGyroSensitivityDisplayText, mMouseSpeedText, mGestureDelayText, mGestureDelayDisplayText, mResolutionText, mTransparencyText;
+    private TextView mCursorSizeText, mZoomStrengthText;
 
     private boolean mOriginalGyroEnabled, mOriginalGyroXEnabled, mOriginalGyroYEnabled, mOriginalGestureDisabled;
     private float mOriginalGyroSensitivity, mOriginalMouseSpeed, mOriginalResolution;
+    private float mOriginalCursorScale, mOriginalZoomStrength;
     private int mOriginalGestureDelay;
     private short mOriginalTransparency;
 
@@ -73,6 +78,8 @@ public abstract class QuickSettingSideDialog extends com.kdt.SideDialogView {
         mGestureDelayBar = mDialogContent.findViewById(R.id.editGestureDelay_seekbar);
         mResolutionBar = mDialogContent.findViewById(R.id.editResolution_seekbar);
         mTransparencyBar = mDialogContent.findViewById(R.id.buttonTransparency_seekBar);
+        mCursorSizeBar = mDialogContent.findViewById(R.id.editCursorSize_seekbar);
+        mZoomStrengthBar = mDialogContent.findViewById(R.id.editZoomStrength_seekbar);
 
         mGyroSensitivityText = mDialogContent.findViewById(R.id.editGyro_textView_percent);
         mGyroSensitivityDisplayText = mDialogContent.findViewById(R.id.editGyro_textView);
@@ -81,6 +88,8 @@ public abstract class QuickSettingSideDialog extends com.kdt.SideDialogView {
         mGestureDelayDisplayText = mDialogContent.findViewById(R.id.editGestureDelay_textView);
         mResolutionText = mDialogContent.findViewById(R.id.editResolution_textView_percent);
         mTransparencyText = mDialogContent.findViewById(R.id.buttonTransparency_textView_percent);
+        mCursorSizeText = mDialogContent.findViewById(R.id.editCursorSize_textView_percent);
+        mZoomStrengthText = mDialogContent.findViewById(R.id.editZoomStrength_textView_percent);
     }
 
     private void setupListeners() {
@@ -96,6 +105,8 @@ public abstract class QuickSettingSideDialog extends com.kdt.SideDialogView {
         mOriginalGestureDelay = PREF_LONGPRESS_TRIGGER;
         mOriginalResolution = PREF_SCALE_FACTOR;
         mOriginalTransparency = PREF_BUTTON_TRANSPARENCY;
+        mOriginalCursorScale = PREF_MOUSESCALE;
+        mOriginalZoomStrength = PREF_ZOOM_FOV_SCALE;
 
         mGyroSwitch.setChecked(mOriginalGyroEnabled);
         mGyroXSwitch.setChecked(mOriginalGyroXEnabled);
@@ -142,6 +153,26 @@ public abstract class QuickSettingSideDialog extends com.kdt.SideDialogView {
         });
         mMouseSpeedBar.setProgress((int) (mOriginalMouseSpeed * 100f));
         setSeekTextPercent(mMouseSpeedText, mMouseSpeedBar.getProgress());
+
+        // Cursor size only ever scaled the launcher's own pointer, so it is applied right here
+        // instead of waiting for the next launch.
+        mCursorSizeBar.setOnSeekBarChangeListener((SimpleSeekBarListener) (seekBar, progress, fromUser) -> {
+            PREF_MOUSESCALE = progress / 100f;
+            mEditor.putInt("mousescale", progress);
+            setSeekTextPercent(mCursorSizeText, progress);
+            onCursorScaleChanged();
+        });
+        mCursorSizeBar.setProgress(Math.round(PREF_MOUSESCALE * 100f));
+        setSeekTextPercent(mCursorSizeText, mCursorSizeBar.getProgress());
+
+        mZoomStrengthBar.setOnSeekBarChangeListener((SimpleSeekBarListener) (seekBar, progress, fromUser) -> {
+            PREF_ZOOM_FOV_SCALE = progress / 100f;
+            mEditor.putInt("zoomFovScale", progress);
+            setSeekTextPercent(mZoomStrengthText, progress);
+            onZoomStrengthChanged();
+        });
+        mZoomStrengthBar.setProgress(Math.round(PREF_ZOOM_FOV_SCALE * 100f));
+        setSeekTextPercent(mZoomStrengthText, mZoomStrengthBar.getProgress());
 
         mGestureDelayBar.setOnSeekBarChangeListener((SimpleSeekBarListener) (seekBar, progress, fromUser) -> {
             PREF_LONGPRESS_TRIGGER = progress;
@@ -222,6 +253,8 @@ public abstract class QuickSettingSideDialog extends com.kdt.SideDialogView {
         mGestureDelayBar.setOnSeekBarChangeListener(null);
         mResolutionBar.setOnSeekBarChangeListener(null);
         mTransparencyBar.setOnSeekBarChangeListener(null);
+        mCursorSizeBar.setOnSeekBarChangeListener(null);
+        mZoomStrengthBar.setOnSeekBarChangeListener(null);
     }
 
     private void setupCancelButton() {
@@ -246,6 +279,8 @@ public abstract class QuickSettingSideDialog extends com.kdt.SideDialogView {
             PREF_LONGPRESS_TRIGGER = mOriginalGestureDelay;
             PREF_SCALE_FACTOR = mOriginalResolution;
             PREF_BUTTON_TRANSPARENCY = mOriginalTransparency;
+            PREF_MOUSESCALE = mOriginalCursorScale;
+            PREF_ZOOM_FOV_SCALE = mOriginalZoomStrength;
 
             onGyroStateChanged();
             onResolutionChanged();
@@ -257,6 +292,12 @@ public abstract class QuickSettingSideDialog extends com.kdt.SideDialogView {
 
     /** Called when the resolution is changed. Use {@link LauncherPreferences#PREF_SCALE_FACTOR} */
     public abstract void onResolutionChanged();
+
+    /** Called when the on-screen cursor size changed. Optional: the default is to do nothing extra. */
+    public void onCursorScaleChanged() { }
+
+    /** Called when the built-in zoom strength changed, so a running game can be told about it. */
+    public void onZoomStrengthChanged() { }
 
     /** Called when the gyro state is changed.
      * Use {@link LauncherPreferences#PREF_ENABLE_GYRO}

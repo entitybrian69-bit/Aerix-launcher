@@ -228,6 +228,7 @@ class AerixClientOverlayView @JvmOverloads constructor(
             return
         }
         activeClientInstance = instance
+        ClientLiveOptionsBridge.activeGameDir = instance.gameDirectory
         AerixClientStore.reload(context.applicationContext)
         ClientPerformanceSettings.reload(context.applicationContext)
         AerixClientInputBridge.resetSessionState(instance.versionId)
@@ -260,6 +261,7 @@ class AerixClientOverlayView @JvmOverloads constructor(
 
     fun onHostDestroy() {
         activeClientInstance?.gameDirectory?.let { runCatching { ClientTelemetryBridge.setEnabled(it, false) } }
+        ClientLiveOptionsBridge.activeGameDir = null
         AerixClientInputBridge.clientSessionActive = false
         unregisterGyro()
     }
@@ -1164,6 +1166,7 @@ private fun ClientSquaresGridPage(
             statusText = { if (AerixClientStore.fullbrightEnabled) "ENABLED" else "DISABLED" },
             onClick = {
                 AerixClientStore.fullbrightEnabled = !AerixClientStore.fullbrightEnabled
+                ClientLiveOptionsBridge.syncAll()
                 AerixClientStore.persist()
                 onSyncOptionsTxt()
                 Toast.makeText(
@@ -2022,6 +2025,51 @@ private fun ClientPerformancePage(gameDir: File?, onClose: () -> Unit) {
         ClientInformationToggle("Frame time and stutters HUD", AerixClientStore.frameTimingEnabled) { AerixClientStore.frameTimingEnabled = it }
         ClientInformationToggle("Adaptive render distance", AerixClientStore.adaptiveDistanceEnabled) { AerixClientStore.adaptiveDistanceEnabled = it }
         Text("${ClientAdaptiveBridge.status}. Changes only client render distance; it returns to the original when disabled. Compatibility varies by version/mod.", color = LiquidCrystalPalette.TextMuted, fontSize = 10.sp)
+        // A server costs far more than a world of your own: chunks arrive from the network and every
+        // player on screen brings entities. This profile is therefore applied only inside a server and
+        // given straight back when you leave, so your own settings stay yours.
+        var gameReport by remember(gameDir) { mutableStateOf(ClientLiveOptionsBridge.describeGameStatus()) }
+        LaunchedEffect(gameDir) {
+            while (true) {
+                ClientLiveOptionsBridge.refreshGameStatus(gameDir)
+                gameReport = ClientLiveOptionsBridge.describeGameStatus()
+                delay(2_000L)
+            }
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Server Boost", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Text("Lowers chunk, entity and particle load while you are on a server only. Applied live - no restart, and your own options come back when you leave.",
+                    color = LiquidCrystalPalette.TextSecondary, fontSize = 10.sp)
+            }
+            Switch(
+                checked = AerixClientStore.serverBoostEnabled,
+                onCheckedChange = {
+                    AerixClientStore.serverBoostEnabled = it
+                    AerixClientStore.persist()
+                    ClientLiveOptionsBridge.syncAll(gameDir)
+                },
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = Color.White,
+                    checkedTrackColor = LiquidCrystalPalette.CrimsonPrimary,
+                    uncheckedThumbColor = LiquidCrystalPalette.TextSecondary,
+                    uncheckedTrackColor = LiquidCrystalPalette.DarkOuter
+                )
+            )
+        }
+        Row(modifier = Modifier.horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+            Text("Strength", color = Color.White, fontSize = 11.sp)
+            ClientLiveOptionsBridge.BoostPreset.values().forEach { preset ->
+                LiquidCrystalPill(preset.label, selected = AerixClientStore.serverBoostPreset == preset.name, onClick = {
+                    AerixClientStore.serverBoostPreset = preset.name
+                    AerixClientStore.persist()
+                    ClientLiveOptionsBridge.syncAll(gameDir)
+                })
+            }
+        }
+        Text("Zoom strength and cursor size are in Quick Settings (the menu button in game); the ZOOM pill works without any zoom mod installed.",
+            color = LiquidCrystalPalette.TextMuted, fontSize = 10.sp)
+        Text(gameReport, color = LiquidCrystalPalette.TextSecondary, fontSize = 10.sp)
         Row(modifier = Modifier.horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
             Text("Target FPS", color = Color.White, fontSize = 11.sp)
             listOf(30, 45, 60, 90, 120).forEach { value -> LiquidCrystalPill("$value", selected = AerixClientStore.adaptiveFpsTarget == value, onClick = { AerixClientStore.adaptiveFpsTarget = value; AerixClientStore.persist() }) }
@@ -2228,14 +2276,26 @@ private fun ClientCapesSubPage(onSyncCape: () -> Unit) {
                     fontSize = 13.sp,
                     fontWeight = FontWeight.ExtraBold
                 )
-                Text(
-                    text = "Equipped: ${activeCape.title}",
-                    color = LiquidCrystalPalette.CrimsonGlow,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        text = "Equipped: ${activeCape.title}",
+                        color = LiquidCrystalPalette.CrimsonGlow,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Game side: ${ClientLiveOptionsBridge.readGameStatus()["cape"] ?: "not reporting yet"} · mod: ${AerixClientModBridge.lastStatus}",
+                        color = LiquidCrystalPalette.TextMuted,
+                        fontSize = 9.sp
+                    )
+                }
             }
 
+            LiquidCrystalPill("Re-send cape frames to the game", onClick = {
+                onSyncCape()
+                Toast.makeText(context, AerixClientCosmetics.lastCapeSyncStatus, Toast.LENGTH_LONG).show()
+            })
+            Spacer(Modifier.height(6.dp))
             val capeRows = AerixClientCosmetics.capes.chunked(3)
             Column(
                 modifier = Modifier

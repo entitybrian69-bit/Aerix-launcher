@@ -205,10 +205,21 @@ object AerixClientInputBridge {
         Platform.PLATFORM.sendKeyEvent(KeyEvent.KEYCODE_W, enabled, 0)
     }
 
+    /**
+     * The ZOOM pill. With the bundled bridge mod in the instance this narrows the game's own field of
+     * view through `config/aerix_live.properties`, so no third-party zoom mod is needed and releasing
+     * hands the player's own FOV straight back. Older instances that only have an optional zoom mod
+     * keep the historic key press.
+     */
     fun setZoomActive(holding: Boolean) {
         if (zoomHolding == holding) return
         zoomHolding = holding
-        Platform.PLATFORM.sendKeyEvent(KeyEvent.KEYCODE_C, holding, 0)
+        val gameDir = ClientLiveOptionsBridge.activeGameDir
+        if (gameDir != null && AerixClientModBridge.isInstalled(gameDir)) {
+            ClientLiveOptionsBridge.setZoomHeld(gameDir, holding)
+        } else {
+            Platform.PLATFORM.sendKeyEvent(KeyEvent.KEYCODE_C, holding, 0)
+        }
     }
 
     fun syncHotbarSlot(slot1To9: Int) {

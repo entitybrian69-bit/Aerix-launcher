@@ -173,27 +173,24 @@ object AerixClientInstaller {
     fun syncLocalAssetsAtGameStart(context: Context, instance: Instance) {
         runCatching {
             val gameDir = instance.gameDirectory?.apply { mkdirs() } ?: return
-            val modsDir = File(gameDir, "mods").apply { mkdirs() }
+            File(gameDir, "mods").apply { mkdirs() }
             migrateLegacyClientIcon(context, instance)
             val mcVer = AerixClientPackGenerator.resolveMcVersionFromInstance(
                 instance.versionId ?: instance.name,
                 AerixClientStore.selectedClientVersion
             )
-            // Launches from Home bypass the Client tab's network sync; repair missing cape mod here too.
-            runCatching { ensureWaveyCapes(modsDir, mcVer) }.onFailure { error ->
-                android.util.Log.w("AerixClient", "Waving cape mod unavailable", error)
-                android.os.Handler(android.os.Looper.getMainLooper()).post {
-                    android.widget.Toast.makeText(context, "Waving capes unavailable: ${error.message}", android.widget.Toast.LENGTH_LONG).show()
-                }
+            // The launcher's own half of the Client features. This is a copy out of the APK, so it
+            // costs a few milliseconds and is what makes capes, Fullbright and ZOOM work at all.
+            AerixClientModBridge.installIfNeeded(context, gameDir)
+            // A session that ended while boosted or zoomed must not keep those numbers.
+            runCatching { ClientLiveOptionsBridge.restoreAtLaunch(gameDir) }.onFailure { error ->
+                android.util.Log.w("AerixClient", "Could not restore live options", error)
             }
-            if (ClientVersions.supportsPodium(mcVer)) {
-                runCatching { ensurePodiumAndSodium(modsDir, mcVer) }.onFailure { error ->
-                    android.util.Log.w("AerixClient", "Podium unavailable", error)
-                    android.os.Handler(android.os.Looper.getMainLooper()).post {
-                        android.widget.Toast.makeText(context, "Podium / Sodium unavailable for $mcVer: ${error.message}", android.widget.Toast.LENGTH_LONG).show()
-                    }
-                }
-            }
+            ClientLiveOptionsBridge.activeGameDir = gameDir
+            ClientLiveOptionsBridge.syncAll(gameDir)
+            // Third-party mod repair needs Modrinth. It used to run here, which is why a launch could
+            // hang on a slow connection - and a modpack's own mod set must not be second-guessed.
+            if (instance.modpackSource == null) scheduleThirdPartyModRepair(context, gameDir, mcVer)
             AerixClientPackGenerator.ensurePackUpToDate(context, gameDir, mcVer)
             ClientVisualBridge.sync(gameDir)
             runCatching { ClientAdaptiveBridge.restoreAtLaunch(gameDir) }.onFailure { error ->
@@ -211,6 +208,29 @@ object AerixClientInstaller {
                 }
             }
         }
+    }
+
+    /**
+     * Third-party mod repair needs Modrinth, so it never runs on the launch path: an unreachable
+     * network used to freeze the boot screen here, and a modpack's own mod set must not be
+     * second-guessed by us at all (it is what conflicts with a player's pack).
+     */
+    private fun scheduleThirdPartyModRepair(context: Context, gameDir: File, mcVer: String) {
+        val app = context.applicationContext
+        val worker = Thread {
+            runCatching {
+                val modsDir = File(gameDir, "mods").apply { mkdirs() }
+                runCatching { ensureWaveyCapes(modsDir, mcVer) }
+                    .onFailure { error -> android.util.Log.w("AerixClient", "Waving cape mod unavailable", error) }
+                if (ClientVersions.supportsPodium(mcVer)) {
+                    runCatching { ensurePodiumAndSodium(modsDir, mcVer) }
+                        .onFailure { error -> android.util.Log.w("AerixClient", "Podium unavailable", error) }
+                }
+            }
+        }
+        worker.name = "Aerix-ModRepair"
+        worker.isDaemon = true
+        worker.start()
     }
 
     suspend fun installClientVersion(context: Context, mcVersion: String): Result<Instance> =

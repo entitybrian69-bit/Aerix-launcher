@@ -69,6 +69,8 @@ jobs:
           python3 tests/fastclient_assets_smoke.py
           python3 tests/fastclient_performance_download_test.py
           python3 tests/recorder_wiring_smoke.py
+          python3 tests/game_surface_capture_smoke.py
+          python3 tests/complaint_fixes_smoke.py
           python3 tests/authlib_263_smoke.py
           python3 tests/font_styles_smoke.py
           python3 tests/glass_launcher_ui_smoke.py
@@ -197,6 +199,10 @@ jobs:
             tests/ClientAdaptiveDistanceSmokeTest.java
           java -cp "$RUNNER_TEMP/aerix-memory-test" AdaptiveDistanceSmokeTest
           java -cp "$RUNNER_TEMP/aerix-memory-test" aerix.client.mod.ClientAdaptiveDistanceSmokeTest
+          javac -d "$RUNNER_TEMP/aerix-memory-test" \
+            aerix_client_mod/src/main/java/aerix/client/mod/ClientLiveOptions.java \
+            tests/ClientLiveOptionsSmokeTest.java
+          java -cp "$RUNNER_TEMP/aerix-memory-test" aerix.client.mod.ClientLiveOptionsSmokeTest
 
       - name: Live Minecraft authlib integration (temporary test identity)
         if: contains(github.event.head_commit.message, '[auth-fixture]')
