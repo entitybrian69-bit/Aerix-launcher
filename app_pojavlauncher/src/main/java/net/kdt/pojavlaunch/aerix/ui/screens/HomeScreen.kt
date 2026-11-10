@@ -65,6 +65,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import net.kdt.pojavlaunch.aerix.bridge.AerixPreferences
+import net.kdt.pojavlaunch.aerix.bridge.AerixLauncherUiStyle
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -233,19 +240,32 @@ private fun HomeCharacterStage(
     val versionLabel = remember(selected, vanilla) {
         selected?.let { instanceVersionLabel(it.versionId, vanilla) } ?: "Choose a Minecraft instance"
     }
+    // Premium UI is the older, heavier skin - wide glass stage, pill buttons, generous padding.
+    // Clean UI is the newer flat one: the same controls, tighter rows, smaller stage. Reading the
+    // preference as Compose state is what makes the switch take effect on the spot.
+    val clean = AerixPreferences.uiStyle == AerixLauncherUiStyle.CLEAN
+    val stageGap by animateDpAsState(if (clean) AerixSpacing.xs else AerixSpacing.sm, label = "stageGap")
+    val stagePadding by animateDpAsState(if (clean) AerixSpacing.xs else AerixSpacing.smPlus, label = "stagePadding")
+    val buttonHeight by animateDpAsState(if (clean) 40.dp else 46.dp, label = "playHeight")
+    val buttonRadius by animateDpAsState(if (clean) 14.dp else 999.dp, label = "playRadius")
+    val panelAlpha by animateFloatAsState(if (clean) 0.55f else 0.8f, label = "panelAlpha")
 
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
+        verticalArrangement = Arrangement.spacedBy(stageGap)
     ) {
+        AerixUiStyleSwitch(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = stagePadding, vertical = AerixSpacing.xxs)
+        )
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = AerixSpacing.smPlus, vertical = AerixSpacing.xs),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = stagePadding, vertical = AerixSpacing.xs),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Column {
-                Text("YOUR CHARACTER", color = AerixSurface.textSecondary, fontSize = 10.sp,
+                Text(if (clean) "CHARACTER" else "YOUR CHARACTER", color = AerixSurface.textSecondary,
+                    fontSize = if (clean) 9.sp else 10.sp,
                     fontWeight = FontWeight.ExtraBold, letterSpacing = 1.4.sp)
                 Text(account?.username ?: "Aerix", color = AerixSurface.textPrimary,
                     style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1)
@@ -330,9 +350,9 @@ private fun HomeCharacterStage(
         }
 
         Surface(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = AerixSpacing.smPlus),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = stagePadding),
             shape = RoundedCornerShape(AerixRadii.cardSmall),
-            color = AerixSurface.panel.copy(alpha = 0.8f),
+            color = AerixSurface.panel.copy(alpha = panelAlpha),
             border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft),
             onClick = actions.instanceSelector
         ) {
@@ -353,9 +373,9 @@ private fun HomeCharacterStage(
         }
 
         Surface(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = AerixSpacing.smPlus).height(46.dp)
+            modifier = Modifier.fillMaxWidth().padding(horizontal = stagePadding).height(buttonHeight)
                 .guideAnchor(AerixGuideState.PLAY),
-            shape = RoundedCornerShape(999.dp),
+            shape = RoundedCornerShape(buttonRadius),
             color = accent,
             contentColor = AerixSurface.onAccent,
             onClick = if (selected != null) actions.play else actions.instanceSelector
@@ -1125,6 +1145,52 @@ private fun SameVersionNudgeStrip(
                 contentDescription = null,
                 tint = accent,
                 modifier = Modifier.size(15.dp)
+            )
+        }
+    }
+}
+
+
+/**
+ * The dashboard's own switch between the two launcher skins.
+ *
+ * It sits at the very top because that is where a player looks for "make this look like the other
+ * one", and it is a pair of pills with a sliding highlight rather than a checkbox: pressing a name
+ * and watching the page move into its new position is the whole point of the choice, and a
+ * confirmation dialog or a restart would take that away.
+ */
+@Composable
+private fun AerixUiStyleSwitch(modifier: Modifier = Modifier) {
+    val selected = AerixPreferences.uiStyle
+    val accent = AerixThemeManager.currentAccent()
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(AerixSurface.panel.copy(alpha = 0.45f))
+            .border(AerixSpacing.hairline, AerixSurface.borderSoft, RoundedCornerShape(999.dp))
+            .padding(3.dp),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        AerixLauncherUiStyle.values().forEach { style ->
+            val active = style == selected
+            val tint by animateColorAsState(
+                if (active) accent.copy(alpha = 0.28f) else Color.Transparent,
+                animationSpec = tween(260, easing = FastOutSlowInEasing),
+                label = "uiStylePill"
+            )
+            Text(
+                text = style.label,
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(tint)
+                    .clickable { AerixPreferences.saveUiStyle(style) }
+                    .padding(vertical = 7.dp),
+                color = if (active) AerixSurface.textPrimary else AerixSurface.textSecondary,
+                fontSize = 11.sp,
+                fontWeight = if (active) FontWeight.ExtraBold else FontWeight.SemiBold,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
         }
     }

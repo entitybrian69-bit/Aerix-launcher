@@ -437,7 +437,7 @@ private fun AerixClientRootOverlay(
 
     var telemetry by remember { mutableStateOf<ClientTelemetrySnapshot?>(null) }
     var wallClock by remember { mutableStateOf("") }
-    val needsTelemetry = (mcVersion == "26.3" && (AerixClientStore.perfPillEnabled || AerixClientStore.fpsHistoryEnabled || AerixClientStore.adaptiveDistanceEnabled || modal == InGameClientModal.OLED_AFK)) || AerixClientStore.coordsHudEnabled || AerixClientStore.armorHudEnabled ||
+    val needsTelemetry = (mcVersion == "26.3" && (AerixClientStore.perfPillEnabled || net.kdt.pojavlaunch.prefs.LauncherPreferences.PREF_SHOW_FPS || AerixClientStore.fpsHistoryEnabled || AerixClientStore.adaptiveDistanceEnabled || modal == InGameClientModal.OLED_AFK)) || AerixClientStore.coordsHudEnabled || AerixClientStore.armorHudEnabled ||
         AerixClientStore.effectsHudEnabled || AerixClientStore.worldTimeHudEnabled ||
         AerixClientStore.serverHudEnabled || AerixClientStore.pingHudEnabled || AerixClientStore.lightHudEnabled || AerixClientStore.biomeHudEnabled ||
         AerixClientStore.compassEnabled || AerixClientStore.waypointHudEnabled || AerixClientStore.deathWaypointEnabled || AerixClientStore.healthHudEnabled || AerixClientStore.selectedSlotHudEnabled || AerixClientStore.hotbarSwipeEnabled || AerixClientStore.adaptiveDistanceEnabled || ClientAdaptiveBridge.recovering ||
@@ -2021,6 +2021,32 @@ private fun ClientPerformancePage(gameDir: File?, onClose: () -> Unit) {
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
+        // The pill that draws frames per second belongs to the launcher's window, and until now an
+        // Aerix Client instance could neither show it nor hide it: the setting existed only on the
+        // classic video page. It lives here, next to the counters it belongs to.
+        ClientInformationToggle("FPS pill on screen", AerixClientStore.fpsOverlayEnabled) {
+            AerixClientStore.fpsOverlayEnabled = it
+            AerixClientStore.persist()
+            (LocalContext.current as? net.kdt.pojavlaunch.game.GameActivity)?.refreshFpsViewVisibility()
+        }
+        Text("Cursor size  ${net.kdt.pojavlaunch.aerix.client.AerixCursorSkin.scalePercent}%",
+            color = Color.White, fontSize = 11.sp)
+        Slider(value = (net.kdt.pojavlaunch.aerix.client.AerixCursorSkin.scalePercent / 100f).coerceIn(0.25f, 3f),
+            onValueChange = {
+                val percent = (it * 100).roundToInt()
+                net.kdt.pojavlaunch.aerix.client.AerixCursorSkin.setScale(LocalContext.current, percent)
+                (LocalContext.current as? net.kdt.pojavlaunch.game.GameActivity)?.applyAerixPointerPreferences()
+            }, valueRange = 0.25f..3f)
+        Row(modifier = Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            listOf("Tiny" to 45, "Normal" to 100, "Large" to 165, "Huge" to 240).forEach { (label, percent) ->
+                LiquidCrystalPill(label, onClick = {
+                    net.kdt.pojavlaunch.aerix.client.AerixCursorSkin.setScale(LocalContext.current, percent)
+                    (LocalContext.current as? net.kdt.pojavlaunch.game.GameActivity)?.applyAerixPointerPreferences()
+                })
+            }
+        }
+        Text(net.kdt.pojavlaunch.aerix.client.AerixCursorSkin.report(LocalContext.current),
+            color = LiquidCrystalPalette.TextMuted, fontSize = 10.sp)
         ClientInformationToggle("Show FPS history HUD", AerixClientStore.fpsHistoryEnabled) { AerixClientStore.fpsHistoryEnabled = it }
         ClientInformationToggle("Frame time and stutters HUD", AerixClientStore.frameTimingEnabled) { AerixClientStore.frameTimingEnabled = it }
         ClientInformationToggle("Adaptive render distance", AerixClientStore.adaptiveDistanceEnabled) { AerixClientStore.adaptiveDistanceEnabled = it }
@@ -2112,6 +2138,45 @@ private fun ClientPerformancePage(gameDir: File?, onClose: () -> Unit) {
         PerformanceChoice("Mipmap levels", "mipmapLevels", options, listOf("0" to "Off", "2" to "2", "4" to "4"))
         PerformanceChoice("VSync", "enableVsync", options, listOf("false" to "Off", "true" to "On"))
         PerformanceChoice("FPS limit", "maxFps", options, listOf("30" to "30", "60" to "60", "120" to "120", "260" to "Unlimited"))
+        // The in-game FPS limit is not what holds a phone at 60. Two launcher-side decisions are:
+        // the panel being left in its default mode, and "force vsync", which is switched on for
+        // devices this launcher considers powerful - a Dimensity 6000-series phone therefore paints
+        // at the refresh rate the display was never asked to raise, whatever the sliders above say.
+        // So the ceiling is measured here, stated here, and lifted here.
+        val displayContext = LocalContext.current
+        val liveHz = net.kdt.pojavlaunch.utils.DisplayRefreshMode.activeRefreshHz(displayContext)
+        val ceilingHz = net.kdt.pojavlaunch.utils.DisplayRefreshMode.ceilingRefreshHz(displayContext)
+        val vsyncForced = net.kdt.pojavlaunch.prefs.LauncherPreferences.PREF_FORCE_VSYNC
+        val refreshRequested = net.kdt.pojavlaunch.prefs.LauncherPreferences.PREF_MAX_REFRESH_RATE
+        Text(
+            "Panel serving ${Math.round(liveHz)} Hz · fastest at this resolution ${Math.round(ceilingHz)} Hz · " +
+                "launcher vsync ${if (vsyncForced) "forced on" else "off"} · " +
+                "max refresh request ${if (refreshRequested) "on" else "off"}",
+            color = LiquidCrystalPalette.TextMuted,
+            fontSize = 10.sp
+        )
+        if (ceilingHz > liveHz + 1f || vsyncForced || !refreshRequested) {
+            val label = when {
+                ceilingHz > liveHz + 1f -> "Unlock ${Math.round(ceilingHz)} Hz and drop vsync"
+                vsyncForced -> "Release the vsync cap"
+                else -> "Ask the display for its fastest mode"
+            }
+            LiquidCrystalPill(label, onClick = {
+                val prefs = net.kdt.pojavlaunch.prefs.LauncherPreferences.DEFAULT_PREF
+                prefs?.edit()
+                    ?.putBoolean(net.kdt.pojavlaunch.utils.DisplayRefreshMode.PREF_KEY, true)
+                    ?.putBoolean("force_vsync", false)
+                    ?.apply()
+                net.kdt.pojavlaunch.prefs.LauncherPreferences.PREF_MAX_REFRESH_RATE = true
+                net.kdt.pojavlaunch.prefs.LauncherPreferences.PREF_FORCE_VSYNC = false
+                // Apply to this window at once; the next launch reads the same preferences.
+                net.kdt.pojavlaunch.utils.DisplayRefreshMode.applyTo(
+                    displayContext as? android.app.Activity
+                )
+                ClientPerformanceSettings.set("enableVsync", "false")
+                ClientPerformanceSettings.set("maxFps", "260")
+            })
+        }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Animated item textures · next launch", color = Color.White, fontSize = 11.sp)
             Switch(modifier = Modifier.bringFocusedItemIntoView(), checked = AerixClientStore.packVanillaAnimatedGear, onCheckedChange = {

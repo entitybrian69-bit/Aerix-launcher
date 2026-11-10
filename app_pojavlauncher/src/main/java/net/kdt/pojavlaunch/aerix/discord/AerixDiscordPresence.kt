@@ -844,7 +844,25 @@ object AerixDiscordPresence {
 
     /* ── what the profile says ─────────────────────────────────────────────── */
 
-    /** Launcher pages: the same two lines for every screen, with the section in the second one. */
+    /**
+     * The specific thing the player is doing in the launcher, when the shell knows it: the pack
+     * whose page they are reading, the modpack they are searching for, the instance they are
+     * building. Reported by [net.kdt.pojavlaunch.aerix.social.SocialBackend.reportLauncherActivity],
+     * which every screen already calls for the friends list - so the card and the friends list can
+     * never say two different things, and a screen that reports nothing falls back to the page.
+     */
+    @Volatile private var launcherActivityDetail: String? = null
+    @Volatile private var lastLauncherSection: String? = null
+
+    /** @param line what they are doing, or null to go back to the plain page name. */
+    fun launcherActivity(line: String?) {
+        val detail = line?.trim()?.takeIf { it.isNotEmpty() }?.take(56)
+        if (detail == launcherActivityDetail) return
+        launcherActivityDetail = detail
+        inLauncher(lastLauncherSection)
+    }
+
+    /** Launcher pages: the section in the second line, or the activity when one is known. */
     fun inLauncher(section: String?) {
         // Ignore late Compose updates after leaving, which would otherwise republish the card.
         val diskOwner = appContext?.let { readDiskState(it)?.owner }
@@ -852,8 +870,9 @@ object AerixDiscordPresence {
         clearOnlyMode = false
         inGameMode = false
         activeModpackIconUrl = null
+        lastLauncherSection = section
         details = InLauncher.DETAILS
-        state = InLauncher.stateFor(section)
+        state = launcherActivityDetail ?: InLauncher.stateFor(section)
         if (startedAt == 0L) startedAt = System.currentTimeMillis()
         appContext?.let { app ->
             val disk = readDiskState(app)
@@ -879,6 +898,9 @@ object AerixDiscordPresence {
     fun playing(instance: String?, minecraftVersion: String?, modpackIconUrl: String? = null) {
         clearOnlyMode = false
         inGameMode = true
+        // The next time the launcher owns the card, it starts from the page name again rather than
+        // from whatever they were reading before the game booted.
+        launcherActivityDetail = null
         activeModpackIconUrl = modpackIconUrl?.takeIf { it.isNotBlank() }
         details = "Playing Minecraft${if (minecraftVersion.isNullOrBlank()) "" else " $minecraftVersion"}"
         state = instance?.takeIf { it.isNotBlank() } ?: "In game"

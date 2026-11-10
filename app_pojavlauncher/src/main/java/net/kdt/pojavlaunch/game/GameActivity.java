@@ -553,8 +553,13 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     private void updateFpsViewVisibility() {
         if (mFpsView == null) return;
         boolean isClient = instance != null && instance.isAerixClient;
-        boolean show = !isClient
-                && LauncherPreferences.PREF_SHOW_FPS
+        // An Aerix Client instance used to have no readout at all, so "turn the FPS overlay off" was
+        // a setting nobody could reach there and "turn it on" nobody could obey: the A overlay now
+        // owns that switch, and the launcher's preference still rules everywhere else.
+        boolean wanted = isClient
+                ? net.kdt.pojavlaunch.aerix.client.AerixClientStore.INSTANCE.getFpsOverlayEnabled()
+                : LauncherPreferences.PREF_SHOW_FPS;
+        boolean show = wanted
                 && (mGameMenuOverlay == null || !mGameMenuOverlay.isMenuShown());
         mFpsView.setVisibility(show ? View.VISIBLE : View.GONE);
     }
@@ -805,6 +810,13 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     public void applyAerixPointerPreferences() {
         if (launcherGLView == null || launcherGLView.mCursorView == null) return;
         launcherGLView.mCursorView.setCursorScale(LauncherPreferences.PREF_MOUSESCALE);
+        // The chosen cursor image, its opacity and its anchor, straight from the settings page. The
+        // skin object caches the decode, so this is cheap to call on every cursor-related change.
+        launcherGLView.mCursorView.setCursorSkin(
+                net.kdt.pojavlaunch.aerix.client.AerixCursorSkin.INSTANCE.currentBitmap(this),
+                net.kdt.pojavlaunch.aerix.client.AerixCursorSkin.INSTANCE.getOpacityPercent(),
+                net.kdt.pojavlaunch.aerix.client.AerixCursorSkin.INSTANCE.getAnchoredCenter());
+        Logger.appendToLog("Aerix cursor: " + net.kdt.pojavlaunch.aerix.client.AerixCursorSkin.INSTANCE.report(this) + "\n");
     }
 
     /**
@@ -818,6 +830,11 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     }
 
     public void openAerixQuickSettings() { openQuickSettings(); }
+
+    /** Re-evaluate the frame rate readout, for when the A overlay flips its switch mid-game. */
+    public void refreshFpsViewVisibility() {
+        updateFpsViewVisibility();
+    }
 
     public void openAerixScreenRecorder() {
         if (mRecorder != null) mRecorder.show();

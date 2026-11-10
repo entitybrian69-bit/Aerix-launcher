@@ -45,6 +45,7 @@ import net.kdt.pojavlaunch.LauncherActivity
 import net.kdt.pojavlaunch.PojavApplication
 import net.kdt.pojavlaunch.R
 import net.kdt.pojavlaunch.Tools
+import net.kdt.pojavlaunch.utils.jre.InstanceMemory
 import net.kdt.pojavlaunch.fragments.GamepadMapperFragment
 import net.kdt.pojavlaunch.game.renderer.RendererCache
 import net.kdt.pojavlaunch.game.renderer.def.Renderers
@@ -197,6 +198,26 @@ object PojavSettingsBridge {
         return if (Architecture.is32BitsDevice() || deviceRam < 2048) minOf(1024, deviceRam)
         else deviceRam - (if (deviceRam < 3064) 800 else 1024)
     }
+
+    /**
+     * The highest heap this device can actually run Minecraft on, which is lower than [maxRam].
+     *
+     * Pojav's own ceiling is "device RAM minus a gigabyte", and the whole launcher process lives
+     * beside the JVM: the GL driver, native texture allocations, mapped modpack archives and
+     * Android itself. A player who drags that slider to the end - which is what "1GB of ram is not
+     * enough for me, it takes 10 fps, freezes when switching settings, cannot even enter a world"
+     * reads like - gets exactly that: a heap the kernel cannot honour. Three phones reported their
+     * slider maximum back to us (6063, 4778, 3979 MB), so the ceiling was the trap.
+     *
+     * The policy lives in [InstanceMemory] so the UI sliders, the instance editor and the JVM
+     * arguments that are really passed cannot drift apart.
+     */
+    fun safeMaxRam(context: Context): Int =
+        InstanceMemory.safeMb(Tools.getTotalDeviceMemory(context).toLong(), Architecture.is32BitsDevice())
+
+    /** A stored allocation that a previous, wider ceiling allowed. Applied at launch and in UI. */
+    fun clampRam(context: Context, requestedMb: Int): Int =
+        InstanceMemory.clamp(context, requestedMb)
 
     /** LauncherPreferenceVideoFragment "#724" fix: values under 25 show as 100. */
     fun resolutionPercent(): Int {
@@ -365,7 +386,7 @@ object PojavSettingsBridge {
             PojavSetting.Action("install_jre", R.string.multirt_title, R.string.multirt_subtitle,
                 run = { open(it, LauncherPreferenceJavaFragment::class.java) }),
             PojavSetting.Slider("allocation", R.string.mcl_memory_allocation, R.string.mcl_memory_allocation_subtitle,
-                min = { integer(it, R.integer.memory_seekbar_min) }, max = { maxRam(it) },
+                min = { integer(it, R.integer.memory_seekbar_min) }, max = { safeMaxRam(it) },
                 step = 8, suffix = " MB", current = { LauncherPreferences.PREF_RAM_ALLOCATION }),
             PojavSetting.Text("javaArgs", R.string.mcl_setting_title_javaargs, R.string.mcl_setting_subtitle_javaargs,
                 current = { LauncherPreferences.PREF_CUSTOM_JAVA_ARGS ?: "" }),

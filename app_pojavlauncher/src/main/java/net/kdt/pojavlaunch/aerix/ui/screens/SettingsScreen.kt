@@ -445,7 +445,8 @@ private fun RendererTabContent(activity: FragmentActivity) {
 
     val runtimes = remember(revision) { runCatching { MultiRTUtils.getRuntimes() }.getOrDefault(emptyList()) }
     val defaultJre = remember(revision) { LauncherPreferences.PREF_DEFAULT_RUNTIME ?: "" }
-    val maxAllocMb = remember { PojavSettingsBridge.maxRam(activity).coerceAtLeast(1024) }
+    // Ceiling, not the device total: the old value let the slider be dragged into an OOM.
+    val maxAllocMb = remember { PojavSettingsBridge.safeMaxRam(activity).coerceAtLeast(256) }
     val totalRamMb = remember { Tools.getTotalDeviceMemory(activity).coerceAtLeast(2048) }
     var ramAlloc by remember(revision) { mutableIntStateOf(LauncherPreferences.PREF_RAM_ALLOCATION.coerceIn(256, maxAllocMb)) }
 
@@ -1159,7 +1160,7 @@ private fun GameTabContent(activity: FragmentActivity) {
         }
 
         item {
-            val maxRam = remember { PojavSettingsBridge.maxRam(activity) }
+            val maxRam = remember { PojavSettingsBridge.safeMaxRam(activity) }
             SettingsCardColumn(modifier = Modifier.fillMaxWidth()) {
                 MiraiSliderSettingsCard(
                     position = CardPosition.Top,
@@ -1762,26 +1763,21 @@ private fun ControlsTabContent(activity: FragmentActivity) {
                     checked = remember(revision) { LauncherPreferences.PREF_VIRTUAL_MOUSE_START },
                     onCheckedChange = { PojavSettingsBridge.writeBoolean(activity, "mouse_start", it) }
                 )
-                MiraiSliderSettingsCard(
-                    position = CardPosition.Middle,
-                    title = stringResource(R.string.mcl_setting_title_mousescale),
-                    summary = stringResource(R.string.mcl_setting_subtitle_mousescale),
-                    value = remember(revision) { (LauncherPreferences.PREF_MOUSESCALE * 100).roundToInt() },
-                    range = 25..300,
-                    step = 5,
-                    suffix = " %",
-                    onValueChange = { PojavSettingsBridge.writeInt(activity, "mousescale", it) }
+            }
+        }
+
+        // Mouse settings: the pointer's image, size and opacity, its speed, and the game's look
+        // sensitivity kept as a separate control. The two speeds used to be one preference, which is
+        // why turning aim up also slid the launcher cursor out from under the finger.
+        item {
+            Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm)) {
+                Text(
+                    "Mouse settings",
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp
                 )
-                MiraiSliderSettingsCard(
-                    position = CardPosition.Bottom,
-                    title = stringResource(R.string.mcl_setting_title_mousespeed),
-                    summary = stringResource(R.string.mcl_setting_subtitle_mousespeed),
-                    value = remember(revision) { (LauncherPreferences.PREF_MOUSESPEED * 100).roundToInt() },
-                    range = 25..300,
-                    step = 5,
-                    suffix = " %",
-                    onValueChange = { PojavSettingsBridge.writeInt(activity, "mousespeed", it) }
-                )
+                AerixMouseSettingsSection()
             }
         }
 

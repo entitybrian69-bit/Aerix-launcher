@@ -194,6 +194,7 @@ Your original layout is kept unchanged. Continue importing?</string>
     <string name="main_install_jar_file">Execute a .jar</string>
     <string name="main_play">Play</string>
     <string name="autoram_info_msg">Memory set to %d MB</string>
+    <string name="autoram_capped_msg">Memory set to %1$d MB of %2$d MB device RAM - more than this starves the renderer and the launcher, which is why a huge allocation makes the game stutter instead of faster</string>
     <string name="mcl_setting_check_libraries">Check libraries after downloading</string>
     <string name="mcl_setting_check_libraries_subtitle">This option forces the launcher to check the library hash if it\'s available. Prevents broken downloads.</string>
     <string name="dl_library_sha_fail">Library %s is damaged and will be redownloaded</string>
@@ -632,6 +633,8 @@ Your original layout is kept unchanged. Continue importing?</string>
     <plurals name="dock_tasks"><item quantity="one">%d active task</item><item quantity="other">%d active tasks</item></plurals>
     <string name="fps_overlay_waiting">-- FPS</string>
     <string name="fps_overlay_unavailable">FPS unavailable</string>
+    <string name="fps_overlay_unavailable_reason">FPS unavailable - no frame source (install the Aerix client mod or use the GLFW renderer)</string>
+    <string name="fps_overlay_stalled">0 FPS - the game is not presenting frames</string>
     <string name="fps_overlay_value">%1$d FPS (avg. %2$d)</string>
     <string name="fps_overlay_drag">Drag the FPS counter to move it</string>
     <string name="fps_overlay_value_hz">%1$d FPS (avg. %2$d) @ %3$d Hz</string>

@@ -239,12 +239,19 @@ public class LauncherActivity extends BaseActivity {
         // system bars only when the launcher is not fullscreen, since Tools.setInsetsMode pads the
         // content for those itself and this would count them twice.
         ViewCompat.setOnApplyWindowInsetsListener(getWindow().getDecorView(), (view, insets) -> {
-            int mask = WindowInsetsCompat.Type.displayCutout();
-            if (!AerixPreferences.INSTANCE.getFullScreen()) {
-                mask |= WindowInsetsCompat.Type.systemBars();
-            }
-            Insets safe = insets.getInsets(mask);
-            AerixWindowInsets.INSTANCE.update(safe.left, safe.top, safe.right, safe.bottom);
+            // Vertical: keep clear of the bars and of the camera. Horizontal: only the system bars,
+            // never the cutout depth. A punch-hole reserves a strip of display that nothing can use,
+            // and painting the launcher's dark canvas there is exactly what reads as "black space on
+            // the left, it is not full screen" on a phone held sideways. The camera sits inside the
+            // bezel area, so content that reaches the physical edge is covered by the frame anyway;
+            // the rail carries its own padding, which keeps its tap targets clear of the hole.
+            Insets cutout = insets.getInsets(WindowInsetsCompat.Type.displayCutout());
+            Insets bars = AerixPreferences.INSTANCE.getFullScreen()
+                    ? Insets.NONE
+                    : insets.getInsets(WindowInsetsCompat.Type.systemBars());
+            int top = Math.max(cutout.getTop(), bars.getTop());
+            int bottom = Math.max(cutout.getBottom(), bars.getBottom());
+            AerixWindowInsets.INSTANCE.update(bars.getLeft(), top, bars.getRight(), bottom);
             return insets;
         });
         setContentView(R.layout.activity_pojav_launcher);

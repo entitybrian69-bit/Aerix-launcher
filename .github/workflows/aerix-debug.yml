@@ -83,6 +83,7 @@ jobs:
           python3 tests/recorder_wiring_smoke.py
           python3 tests/game_surface_capture_smoke.py
           python3 tests/complaint_fixes_smoke.py
+          python3 tests/mouse_cursor_recording_smoke.py
           python3 tests/authlib_263_smoke.py
           python3 tests/font_styles_smoke.py
           python3 tests/glass_launcher_ui_smoke.py

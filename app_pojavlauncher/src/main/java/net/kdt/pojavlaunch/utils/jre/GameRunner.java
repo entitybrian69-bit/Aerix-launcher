@@ -446,10 +446,20 @@ public class GameRunner {
             }
         }
 
-        final int launchMemoryMb = InstanceMemory.effectiveMb(instance.jvmArgs, LauncherPreferences.PREF_RAM_ALLOCATION);
+        final int requestedMemoryMb = InstanceMemory.effectiveMb(instance.jvmArgs, LauncherPreferences.PREF_RAM_ALLOCATION);
+        // A heap the device cannot honour is worse than a smaller one: the launcher process, the GL
+        // driver and Android are all still in this memory. Clamp, and say so - the old toast just
+        // announced whatever the slider had been dragged to.
+        final int launchMemoryMb = InstanceMemory.clamp(activity, requestedMemoryMb);
+        final int deviceRamMb = net.kdt.pojavlaunch.Tools.getTotalDeviceMemory(activity);
+        final boolean clamped = launchMemoryMb != requestedMemoryMb;
         Logger.appendToLog("Java heap allocation: " + launchMemoryMb + " MB" +
-                (InstanceMemory.overrideMb(instance.jvmArgs) > 0 ? " (instance override)" : " (launcher default)") + "\n");
-        activity.runOnUiThread(() -> Toast.makeText(activity, activity.getString(R.string.autoram_info_msg, launchMemoryMb), Toast.LENGTH_SHORT).show());
+                (InstanceMemory.overrideMb(instance.jvmArgs) > 0 ? " (instance override)" : " (launcher default)") +
+                (clamped ? " (reduced from " + requestedMemoryMb + " MB; device has " + deviceRamMb
+                        + " MB total and needs room for the renderer)" : "") + "\n");
+        activity.runOnUiThread(() -> Toast.makeText(activity, activity.getString(
+                clamped ? R.string.autoram_capped_msg : R.string.autoram_info_msg,
+                launchMemoryMb, deviceRamMb), Toast.LENGTH_LONG).show());
 
         Log.i("GameRunner", "Starting Minecraft");
 

@@ -127,6 +127,7 @@ fun CreateInstanceScreen(activity: FragmentActivity, onClose: () -> Unit) {
     var loader by remember { mutableStateOf(AerixLoader.VANILLA) }
     var onlyStable by remember { mutableStateOf(true) }
     var name by rememberSaveable { mutableStateOf("") }
+    net.kdt.pojavlaunch.aerix.ui.aerixLauncherActivity("Building ${name.ifBlank { "a new instance" }.take(36)}")
     var nameEdited by rememberSaveable { mutableStateOf(false) }
     var icon by remember { mutableStateOf<Bitmap?>(null) }
     var loaderVersions by remember { mutableStateOf<List<AerixLoaderVersion>?>(null) }

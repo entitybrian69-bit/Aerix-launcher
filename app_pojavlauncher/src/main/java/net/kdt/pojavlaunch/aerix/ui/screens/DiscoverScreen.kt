@@ -30,6 +30,7 @@
 
 package net.kdt.pojavlaunch.aerix.ui.screens
 
+import net.kdt.pojavlaunch.aerix.ui.aerixLauncherActivity
 import android.graphics.BitmapFactory
 import android.text.format.Formatter
 import android.util.LruCache
@@ -378,6 +379,9 @@ private fun SearchAssetsContent(
     var selectedCategories by rememberSaveable(type) { mutableStateOf(arrayListOf<String>()) }
     val resultsState = rememberLazyListState()
     var mcVersion by rememberSaveable(type) { mutableStateOf<String?>(null) }
+    // The search is an activity: "Hunting for modpack: fabric optimization" is what a friend sees
+    // while the results are still being scrolled through.
+    aerixLauncherActivity(if (query.isBlank()) null else "Hunting for ${if (type.name == "MODPACK") "modpack" else "mod"}: ${query.trim().take(34)}")
     var loader by rememberSaveable(type) { mutableStateOf<String?>(null) }
     var pageIndex by rememberSaveable(type) { mutableIntStateOf(1) }
 
@@ -1166,6 +1170,7 @@ private fun AssetDetailContent(
     val scope = rememberCoroutineScope()
     val accent = AerixThemeManager.currentAccent()
 
+    aerixLauncherActivity("Reading ${project.title.take(38)}")
     var details by remember(project.id) { mutableStateOf<AssetProjectDetails?>(null) }
     var files by remember(project.id) { mutableStateOf<List<AssetFile>?>(null) }
     var target by remember { mutableStateOf(InstanceTarget(null, null)) }

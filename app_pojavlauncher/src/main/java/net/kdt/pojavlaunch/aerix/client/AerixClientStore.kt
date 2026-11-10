@@ -143,6 +143,11 @@ object AerixClientStore {
     var crosshairOpacity by mutableFloatStateOf(0.95f)
     var crosshairAttackPulse by mutableStateOf(false)
 
+    /**
+     * The launcher's frame rate pill, switched from inside the game. An Aerix Client instance has no
+     * other FPS readout, so without this the player cannot ask for one - or get rid of one.
+     */
+    var fpsOverlayEnabled by mutableStateOf(true)
     var perfPillEnabled by mutableStateOf(false)
     var fpsHistoryEnabled by mutableStateOf(false)
     var frameTimingEnabled by mutableStateOf(false)
@@ -253,6 +258,7 @@ object AerixClientStore {
         crosshairOpacity = p.getFloat("crosshairOpacity", 0.95f)
         crosshairAttackPulse = p.getBoolean("crosshairAttackPulse", false)
 
+        fpsOverlayEnabled = p.getBoolean("fpsOverlayEnabled", true)
         perfPillEnabled = p.getBoolean("perfPillEnabled", false)
         fpsHistoryEnabled = p.getBoolean("fpsHistoryEnabled", false)
         frameTimingEnabled = p.getBoolean("frameTimingEnabled", false)
@@ -356,6 +362,7 @@ object AerixClientStore {
             putFloat("crosshairOpacity", crosshairOpacity)
             putBoolean("crosshairAttackPulse", crosshairAttackPulse)
 
+            putBoolean("fpsOverlayEnabled", fpsOverlayEnabled)
             putBoolean("perfPillEnabled", perfPillEnabled)
             putBoolean("fpsHistoryEnabled", fpsHistoryEnabled)
             putBoolean("frameTimingEnabled", frameTimingEnabled)

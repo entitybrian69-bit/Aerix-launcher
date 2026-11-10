@@ -241,6 +241,20 @@ object SocialBackend {
         val clean = line?.trim()?.takeIf { it.isNotEmpty() }?.take(52)
         if (clean == launcherActivityLine) return
         launcherActivityLine = clean
+        // Discord reads the launcher's own IPC socket, not the friends-list row, so this has to be
+        // handed over directly - and before the sign-in gate, since a player without an Aerix
+        // account still expects their card to say what they are doing.
+        runCatching { net.kdt.pojavlaunch.aerix.discord.AerixDiscordPresence.launcherActivity(clean) }
+        if (!signedIn) return
+        bgScope.launch { syncRichPresenceToServer() }
+    }
+
+    /** Drop the line, but only when nothing newer has already replaced it. */
+    @JvmStatic
+    fun clearLauncherActivity(expected: String?) {
+        if (expected == null || launcherActivityLine != expected) return
+        launcherActivityLine = null
+        runCatching { net.kdt.pojavlaunch.aerix.discord.AerixDiscordPresence.launcherActivity(null) }
         if (!signedIn) return
         bgScope.launch { syncRichPresenceToServer() }
     }

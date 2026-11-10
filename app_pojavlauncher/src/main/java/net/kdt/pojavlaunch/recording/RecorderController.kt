@@ -322,11 +322,27 @@ class RecorderController @JvmOverloads constructor(private val activity: Activit
             Toast.makeText(activity, "Cannot open this instance's recordings folder.", Toast.LENGTH_LONG).show()
             return
         }
+        // Whatever an earlier crash left as ".partial" is re-filed before the list is built, so a
+        // recording is either in this list or explained - never a mystery archive in the folder.
+        val strays = runCatching { RecordingOutput.recoverStrays(activity, directory) }.getOrDefault(emptyList())
         val files = directory.listFiles()?.filter { it.isFile && it.extension.equals("mp4", true) }
             ?.sortedByDescending { it.lastModified() }.orEmpty()
         if (files.isEmpty()) {
-            Toast.makeText(activity, "No recordings in this instance yet.", Toast.LENGTH_LONG).show()
-            return
+            val unfinished = strays.count { !it.playable }
+            Toast.makeText(
+                activity,
+                when {
+                    strays.isNotEmpty() && unfinished == 0 ->
+                        "Recovered ${strays.size} recording(s) into this instance's MP4 list."
+                    unfinished > 0 ->
+                        "$unfinished interrupted recording(s) kept as -unfinished.mp4 beside the " +
+                            "real ones: the video data is there but the index never got written, so " +
+                            "a player may refuse to seek it."
+                    else -> "No recordings in this instance yet."
+                },
+                Toast.LENGTH_LONG
+            ).show()
+            if (files.isEmpty()) return
         }
         dialog = AlertDialog.Builder(activity)
             .setTitle("Instance recordings")

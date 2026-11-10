@@ -2,6 +2,7 @@ package net.kdt.pojavlaunch.prefs;
 
 import static net.kdt.pojavlaunch.prefs.LauncherPreferences.PREF_BUTTON_TRANSPARENCY;
 import static net.kdt.pojavlaunch.prefs.LauncherPreferences.PREF_DISABLE_GESTURES;
+import static net.kdt.pojavlaunch.prefs.LauncherPreferences.PREF_GAME_MOUSE_SENSITIVITY;
 import static net.kdt.pojavlaunch.prefs.LauncherPreferences.PREF_ENABLE_GYRO;
 import static net.kdt.pojavlaunch.prefs.LauncherPreferences.PREF_GYRO_INVERT_X;
 import static net.kdt.pojavlaunch.prefs.LauncherPreferences.PREF_GYRO_INVERT_Y;
@@ -101,7 +102,7 @@ public abstract class QuickSettingSideDialog extends com.kdt.SideDialogView {
         mOriginalGestureDisabled = PREF_DISABLE_GESTURES;
 
         mOriginalGyroSensitivity = PREF_GYRO_SENSITIVITY;
-        mOriginalMouseSpeed = PREF_MOUSESPEED;
+        mOriginalMouseSpeed = PREF_GAME_MOUSE_SENSITIVITY;
         mOriginalGestureDelay = PREF_LONGPRESS_TRIGGER;
         mOriginalResolution = PREF_SCALE_FACTOR;
         mOriginalTransparency = PREF_BUTTON_TRANSPARENCY;
@@ -146,9 +147,11 @@ public abstract class QuickSettingSideDialog extends com.kdt.SideDialogView {
         mGyroSensitivityBar.setProgress((int) (mOriginalGyroSensitivity * 100f));
         setSeekTextPercent(mGyroSensitivityText, mGyroSensitivityBar.getProgress());
 
+        // This dialog is shown from inside the game, so it tunes aim. The launcher cursor keeps its
+        // own speed in Settings -> Mouse settings; changing one must not move the other.
         mMouseSpeedBar.setOnSeekBarChangeListener((SimpleSeekBarListener) (seekBar, progress, fromUser) -> {
-            PREF_MOUSESPEED = progress / 100f;
-            mEditor.putInt("mousespeed", progress);
+            PREF_GAME_MOUSE_SENSITIVITY = progress / 100f;
+            mEditor.putInt("gameMouseSensitivity", progress);
             setSeekTextPercent(mMouseSpeedText, progress);
         });
         mMouseSpeedBar.setProgress((int) (mOriginalMouseSpeed * 100f));
@@ -275,7 +278,7 @@ public abstract class QuickSettingSideDialog extends com.kdt.SideDialogView {
             PREF_DISABLE_GESTURES = mOriginalGestureDisabled;
 
             PREF_GYRO_SENSITIVITY = mOriginalGyroSensitivity;
-            PREF_MOUSESPEED = mOriginalMouseSpeed;
+            PREF_GAME_MOUSE_SENSITIVITY = mOriginalMouseSpeed;
             PREF_LONGPRESS_TRIGGER = mOriginalGestureDelay;
             PREF_SCALE_FACTOR = mOriginalResolution;
             PREF_BUTTON_TRANSPARENCY = mOriginalTransparency;

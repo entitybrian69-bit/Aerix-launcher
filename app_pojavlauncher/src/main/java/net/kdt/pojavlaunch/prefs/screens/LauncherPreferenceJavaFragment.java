@@ -49,11 +49,12 @@ public class LauncherPreferenceJavaFragment extends LauncherPreferenceFragment {
         CustomSeekBarPreference seek7 = requirePreference("allocation",
                 CustomSeekBarPreference.class);
 
-        int maxRAM;
-        int deviceRam = getTotalDeviceMemory(seek7.getContext());
-
-        if(is32BitsDevice() || deviceRam < 2048) maxRAM = Math.min(1024, deviceRam);
-        else maxRAM = deviceRam - (deviceRam < 3064 ? 800 : 1024);
+        // One ceiling for every UI: "device RAM minus a gigabyte" let the slider be dragged to a
+        // heap the device cannot actually give the game, which is what produced the reported
+        // "10 fps, freezes when switching settings" on 4-6 GB phones. InstanceMemory.safeMb keeps
+        // room for the renderer and Android beside the JVM.
+        int maxRAM = net.kdt.pojavlaunch.utils.jre.InstanceMemory.safeMb(
+                getTotalDeviceMemory(seek7.getContext()), is32BitsDevice());
 
         seek7.setRange(256, maxRAM);
         seek7.setValue(ramAllocation);

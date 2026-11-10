@@ -205,6 +205,7 @@ fun InstanceEditorScreen(activity: FragmentActivity, onClose: () -> Unit) {
         }
     }
     val draft = PojavInstanceEditorBridge.draft
+    draft?.let { net.kdt.pojavlaunch.aerix.ui.aerixLauncherActivity("Editing ${it.name.ifBlank { it.versionId }.take(36)}") }
     if (draft == null) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(text = stringResource(R.string.no_instance), color = AerixSurface.textSecondary, fontSize = 13.sp)
@@ -1356,7 +1357,7 @@ private fun InstanceSettingsPane(
         mutableIntStateOf(prefs.getInt("aerix_inst_vibrate_duration_$instanceKey", -1))
     }
 
-    val maxRamMb = remember { PojavSettingsBridge.maxRam(activity).coerceAtLeast(1024) }
+    val maxRamMb = remember { PojavSettingsBridge.safeMaxRam(activity).coerceAtLeast(256) }
     val globalRamMb = remember { LauncherPreferences.PREF_RAM_ALLOCATION.coerceIn(256, maxRamMb) }
     var customRamMb by remember(draft.jvmArgs) {
         mutableIntStateOf(net.kdt.pojavlaunch.utils.jre.InstanceMemory.overrideMb(draft.jvmArgs))

@@ -49,6 +49,12 @@ public class LauncherPreferences {
     public static boolean PREF_DISABLE_GESTURES = false;
     public static boolean PREF_DISABLE_SWAP_HAND = false;
     public static float PREF_MOUSESPEED = 1f;
+    /**
+     * Look/aim sensitivity while the game holds the pointer. Deliberately separate from
+     * {@link #PREF_MOUSESPEED}, which scales the launcher's own cursor: sharing one value meant a
+     * player tuning their aim in the in-game slider also moved the cursor on every other screen.
+     */
+    public static float PREF_GAME_MOUSE_SENSITIVITY = 1f;
     public static int PREF_RAM_ALLOCATION;
     public static String PREF_DEFAULT_RUNTIME;
 	public static boolean PREF_SUSTAINED_PERFORMANCE = false;
@@ -116,7 +122,11 @@ public class LauncherPreferences {
         }
         PREF_BUTTONSIZE = DEFAULT_PREF.getInt("buttonscale", 100);
         PREF_MOUSESCALE = DEFAULT_PREF.getInt("mousescale", 100)/100f;
-        PREF_MOUSESPEED = ((float)DEFAULT_PREF.getInt("mousespeed",100))/100f;
+        PREF_MOUSESPEED = clampPercent(DEFAULT_PREF.getInt("mousespeed", 100)) / 100f;
+        // One key used to serve both the game's aim and the launcher cursor. Carry the stored value
+        // over on the first launch of the split build so aim sensitivity does not silently reset.
+        PREF_GAME_MOUSE_SENSITIVITY = clampPercent(DEFAULT_PREF.getInt("gameMouseSensitivity",
+                DEFAULT_PREF.getInt("mousespeed", 100))) / 100f;
         PREF_IGNORE_NOTCH = DEFAULT_PREF.getBoolean("ignoreNotch", true);
         PREF_ZOOM_FOV_SCALE = DEFAULT_PREF.getInt("zoomFovScale", 45) / 100f;
 		PREF_LONGPRESS_TRIGGER = DEFAULT_PREF.getInt("timeLongPressTrigger", 300);
@@ -127,7 +137,12 @@ public class LauncherPreferences {
         PREF_RAM_ALLOCATION = DEFAULT_PREF.getInt("allocation", findBestRAMAllocation(ctx));
         PREF_CUSTOM_JAVA_ARGS = DEFAULT_PREF.getString("javaArgs", "");
         PREF_SUSTAINED_PERFORMANCE = DEFAULT_PREF.getBoolean("sustainedPerformance", isDevicePowerful);
-        PREF_MAX_REFRESH_RATE = DEFAULT_PREF.getBoolean(DisplayRefreshMode.PREF_KEY, false);
+        // A phone whose panel can do 90 or 120 Hz should not have to discover a hidden switch to
+        // get the refresh rate it paid for: the request is on by default exactly when a faster mode
+        // exists at the current resolution, and DisplayRefreshMode reports whether the device
+        // honoured it, so a 60 Hz panel is unaffected rather than being promised something it lacks.
+        PREF_MAX_REFRESH_RATE = DEFAULT_PREF.getBoolean(DisplayRefreshMode.PREF_KEY,
+                DisplayRefreshMode.isAvailable(ctx));
         PREF_VIRTUAL_MOUSE_START = DEFAULT_PREF.getBoolean("mouse_start", false);
         PREF_USE_ALTERNATE_SURFACE = DEFAULT_PREF.getBoolean("alternate_surface", isDevicePowerful);
         PREF_JAVA_SANDBOX = DEFAULT_PREF.getBoolean("java_sandbox", true);
@@ -210,6 +225,12 @@ public class LauncherPreferences {
      * @param ctx Context needed to get the total memory of the device.
      * @return The best default value found.
      */
+    /** Mouse sensitivity percentages stay in a range the pointer can actually be used at. */
+    private static int clampPercent(int percent) {
+        if (percent <= 0) return 100;
+        return Math.max(10, Math.min(400, percent));
+    }
+
     private static int findBestRAMAllocation(Context ctx){
         int deviceRam = Tools.getTotalDeviceMemory(ctx);
         if (deviceRam < 1024) return 296;
