@@ -30,6 +30,8 @@ class TextureView : View() {
     var isAvailable = true
     var refuseReadback = false
 
+    override fun toString() = "TextureView(${width}x${height})"
+
     fun getBitmap(width: Int, height: Int): Bitmap? {
         if (refuseReadback || !isAvailable || width <= 0 || height <= 0) return null
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
@@ -49,16 +51,11 @@ class TextureView : View() {
     }
 }
 
-/** A `SurfaceView` writes into the caller's bitmap and is the one that can simply say no. */
-class SurfaceView : View() {
-    var refuseReadback = false
-    var reads = 0
+/**
+ * A `SurfaceView`'s content only ever reaches the app through `PixelCopy` (see AndroidMedia.kt), which is
+ * the whole reason this path needs a fallback: whether the copy is permitted at all is a device answer.
+ */
+class SurfaceView : View()
 
-    fun getBitmap(dest: Bitmap): Boolean {
-        reads++
-        if (refuseReadback) return false
-        if (dest.width != width || dest.height != height) return false
-        TextureView.fill(dest)
-        return true
-    }
-}
+/** Shared by both readback paths so a copied frame and a grabbed frame carry the same pattern. */
+internal fun fillBitmap(bitmap: Bitmap) = TextureView.fill(bitmap)

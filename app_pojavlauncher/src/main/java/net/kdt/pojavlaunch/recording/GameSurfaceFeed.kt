@@ -3,11 +3,11 @@ package net.kdt.pojavlaunch.recording
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
-import android.graphics.PixelFormat
 import android.graphics.PorterDuff
 import android.graphics.Rect
 import android.media.Image
 import android.media.ImageWriter
+import android.media.PixelCopy
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -20,7 +20,10 @@ import android.view.Surface
 import android.view.SurfaceView
 import android.view.TextureView
 import android.view.View
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Produces the encoder's frames from the game's own surface, in `:game`.
@@ -56,6 +59,9 @@ class GameSurfaceFeed(
     private var staging: Canvas? = null
     private var pixels: IntArray? = null
     private val paint = Paint(Paint.FILTER_BITMAP_FLAG)
+    /** PixelCopy calls back on whatever looper it is given; the main one is the only one we own that the
+     *  capture thread is not blocking on. */
+    private val copyHandler = Handler(Looper.getMainLooper())
     /** Set once the recorder has given up on this session's clean capture, so it is reported once. */
     private var reportedFallback = false
     private val running = AtomicBoolean(false)
@@ -169,8 +175,11 @@ class GameSurfaceFeed(
         acked.set(false)
         reportedFallback = false
         source = frameSource
+        // The only size-and-count overload ImageWriter offers for a Surface producer - and the format it
+        // fixes to RGBA_8888 is exactly what the copy math below assumes, so the plane's pixel stride is
+        // checked rather than trusted.
         val imageWriter = runCatching {
-            ImageWriter.newInstance(surface, width, height, PixelFormat.RGBA_8888, MAX_IMAGES)
+            ImageWriter.newInstance(surface, width, height, MAX_IMAGES)
         }.getOrNull()
         if (imageWriter == null) {
             // Not being able to become a producer for this codec's input surface is a device property,
@@ -270,7 +279,8 @@ class GameSurfaceFeed(
     private fun writeFrame(image: Image, bitmap: Bitmap): GameCapture.Unavailable? {
         val plane = image.planes.firstOrNull() ?: return GameCapture.Unavailable.WRITER_FAILED
         val buffer = plane.buffer ?: return GameCapture.Unavailable.WRITER_FAILED
-        if (plane.rowStride % GameCapture.BYTES_PER_PIXEL != 0 ||
+        if (plane.pixelStride != GameCapture.BYTES_PER_PIXEL ||
+            plane.rowStride % GameCapture.BYTES_PER_PIXEL != 0 ||
             bitmap.rowBytes % GameCapture.BYTES_PER_PIXEL != 0
         ) {
             return GameCapture.Unavailable.STRIDE_MISMATCH
@@ -410,10 +420,16 @@ class GameSurfaceFeed(
         }
     }
 
+    /**
+     * Reads the composited SurfaceView layer with `PixelCopy`, the only supported API for it.
+     *
+     * The copy finishes on the main looper, so the wait happens here on the capture thread - never the
+     * other way round. If the copy does not finish in time the destination is dropped rather than
+     * recycled: writing into a recycled bitmap is a native crash, and a leaked bitmap is only memory.
+     */
     private inner class SurfaceViewSource(private val view: SurfaceView) : FrameSource {
         private var grab: Bitmap? = null
 
-        @Suppress("DEPRECATION")
         override fun capture(width: Int, height: Int, reuse: Bitmap): Bitmap? {
             val surfaceWidth = view.width
             val surfaceHeight = view.height
@@ -425,7 +441,10 @@ class GameSurfaceFeed(
                     runCatching { grab?.recycle() }
                     grab = it
                 } ?: return null
-            if (!runCatching { view.getBitmap(full) }.getOrDefault(false)) return null
+            if (!copySurface(full)) {
+                grab = null
+                return null
+            }
             if (width == full.width && height == full.height) return full
             val canvas = staging ?: return null
             return runCatching {
@@ -440,13 +459,32 @@ class GameSurfaceFeed(
             runCatching { grab?.recycle() }
             grab = null
         }
+
+        private fun copySurface(dest: Bitmap): Boolean {
+            val done = CountDownLatch(1)
+            val result = AtomicInteger(-1)
+            val listener = PixelCopy.OnPixelCopyFinishedListener { code ->
+                result.set(code)
+                done.countDown()
+            }
+            val requested = runCatching {
+                PixelCopy.request(view, dest, listener, copyHandler)
+            }.isSuccess
+            if (!requested) return false
+            if (!runCatching { done.await(COPY_TIMEOUT_MS, TimeUnit.MILLISECONDS) }.getOrDefault(false)) return false
+            return result.get() == PixelCopy.RESULT_SUCCESS
+        }
     }
+
 
     private companion object {
         private const val TAG = "AerixGameFeed"
         private const val MAX_IMAGES = 4
         private const val DEFAULT_FPS = 30
         private const val MIN_GRACE_MS = 1_200L
+
+        /** A copy that never finishes is a device refusing to hand the layer over, not a slow frame. */
+        private const val COPY_TIMEOUT_MS = 600L
 
         /** Refuses to allocate a staging bitmap for a surface this size; 4K is the encoder's problem. */
         private const val MAX_STAGED_PIXELS = 10_000_000L

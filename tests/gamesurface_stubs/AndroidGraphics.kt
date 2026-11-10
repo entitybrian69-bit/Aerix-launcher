@@ -49,6 +49,7 @@ class Bitmap private constructor(
 
     fun recycle() {
         isRecycled = true
+        recycleCount++
     }
 
     fun getPixels(pixels: IntArray, stride: Int, offset: Int, x: Int, y: Int, w: Int, h: Int) {
@@ -83,6 +84,10 @@ class Bitmap private constructor(
     }
 
     companion object {
+        /** Recycling a bitmap an asynchronous copy may still be writing to is a native crash, so the
+         *  harness counts it and asserts the abandoned destinations are only ever dropped. */
+        var recycleCount = 0
+
         fun createBitmap(width: Int, height: Int, config: Config): Bitmap = Bitmap(width, height, width)
         fun createBitmap(width: Int, height: Int, config: Config, strideRows: Int): Bitmap =
             Bitmap(width, height, strideRows)

@@ -558,7 +558,7 @@ class ScreenRecordingService : Service() {
      * first: a BufferQueue accepts one producer, so handing the same surface to a `VirtualDisplay` while
      * the game still holds it would make the fallback fail as well, and the recording would be lost.
      */
-    private fun fallbackToMirror(reason: String, announce: Boolean) {
+    private fun fallbackToMirror(reason: String, announce: Boolean = true) {
         if (finished || display != null) return
         val config = sessionConfig ?: return
         feedWaiting = false

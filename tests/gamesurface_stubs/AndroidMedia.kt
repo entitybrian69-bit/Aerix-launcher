@@ -18,7 +18,7 @@ object ImageWriterTestConfig {
     var maxImages: Int = 4
     var created: Int = 0
     var closed: Int = 0
-    val format = ArrayList<Int>()
+    val sizes = ArrayList<String>()
 
     fun reset() {
         rowStride = 0
@@ -28,11 +28,59 @@ object ImageWriterTestConfig {
         maxImages = 4
         created = 0
         closed = 0
-        format.clear()
+        sizes.clear()
     }
 }
 
 class Plane internal constructor(val rowStride: Int, val pixelStride: Int, val buffer: ByteBuffer)
+
+/**
+ * `PixelCopy` is the only supported way to read a SurfaceView's composited layer, and it is
+ * asynchronous, so the fake has to be too: `outcome` picks the three answers a real device gives -
+ * success, refusal, and silence (the case that must not recycle the destination it may still write).
+ */
+object PixelCopyOutcome {
+    var mode: String = "success"
+    var requests = 0
+    fun reset() {
+        mode = "success"
+        requests = 0
+    }
+}
+
+class PixelCopy {
+    fun interface OnPixelCopyFinishedListener {
+        fun onPixelCopyFinished(copyResult: Int)
+    }
+
+    companion object {
+        const val RESULT_SUCCESS = 1
+        const val RESULT_UNKNOWN_ERROR = 0
+        const val RESULT_ERROR_TIMEOUT = 2
+        const val RESULT_ERROR_SOURCE_NOT_EMPTY = 4
+
+        @JvmStatic
+        fun request(
+            view: android.view.SurfaceView,
+            dest: android.graphics.Bitmap,
+            listener: OnPixelCopyFinishedListener,
+            handler: android.os.Handler
+        ) {
+            PixelCopyOutcome.requests++
+            when (PixelCopyOutcome.mode) {
+                "refuse" -> handler.post(Runnable { listener.onPixelCopyFinished(RESULT_UNKNOWN_ERROR) })
+                // No callback at all: the caller has to give up without touching dest again.
+                "hang" -> Unit
+                "throw" -> throw IllegalArgumentException("surface is not available")
+                else -> handler.post(Runnable {
+                    android.view.fillBitmap(dest)
+                    listener.onPixelCopyFinished(RESULT_SUCCESS)
+                })
+            }
+        }
+
+    }
+}
 
 class Image internal constructor(
     val width: Int,
@@ -56,7 +104,6 @@ class QueuedFrame(val timestamp: Long, val bytes: ByteArray, val width: Int, val
 class ImageWriter private constructor(
     private val width: Int,
     private val height: Int,
-    format: Int,
     private val maxImages: Int
 ) {
     val stride = if (ImageWriterTestConfig.rowStride > 0) ImageWriterTestConfig.rowStride else width * 4
@@ -118,14 +165,14 @@ class ImageWriter private constructor(
     companion object {
         @JvmStatic
         @Throws(IllegalArgumentException::class)
-        fun newInstance(surface: Surface, width: Int, height: Int, format: Int, maxImages: Int): ImageWriter {
+        fun newInstance(surface: Surface, width: Int, height: Int, maxImages: Int): ImageWriter {
             ImageWriterTestConfig.created++
-            ImageWriterTestConfig.format.add(format)
+            ImageWriterTestConfig.sizes.add("${width}x$height/$maxImages")
             if (ImageWriterTestConfig.failCreation || surface.released) {
                 throw IllegalArgumentException("this surface cannot be produced into")
             }
             require(maxImages in 1..31) { "maxImages" }
-            return ImageWriter(width, height, format, ImageWriterTestConfig.maxImages)
+            return ImageWriter(width, height, ImageWriterTestConfig.maxImages.coerceAtLeast(1))
         }
     }
 }

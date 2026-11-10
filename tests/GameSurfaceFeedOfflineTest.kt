@@ -1,5 +1,6 @@
 import android.graphics.Bitmap
 import android.media.ImageWriterTestConfig
+import android.media.PixelCopyOutcome
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -113,6 +114,23 @@ private fun framesOf(feed: GameSurfaceFeed): List<QueuedFrame> =
     writerOf(feed)?.queued.orEmpty()
 
 fun main() {
+    // 0. The SurfaceView happy path goes through PixelCopy at the surface's own size.
+    ImageWriterTestConfig.reset()
+    PixelCopyOutcome.reset()
+    run {
+        val view = SurfaceView().apply { width = 96; height = 64 }
+        val feed = GameSurfaceFeed({ view })
+        val recorder = Recorder()
+        begin(feed, recorder, Surface(), 96, 64, 30)
+        expect(recorder.await(GameCapture.MSG_BEGIN_ACK, 4_000L), "a SurfaceView session must be feedable")
+        expect(awaitUntil(2_000L) { framesOf(feed).isNotEmpty() }, "the copied frame must be queued")
+        val frame = framesOf(feed).first()
+        expect(frameAt(frame, 0, 0) == expected(0, 0), "pixel 0,0 must survive the copy")
+        expect(frameAt(frame, 95, 63) == expected(95, 63), "the bottom-right pixel must survive the copy")
+        expect(PixelCopyOutcome.requests >= 1, "the readback must go through PixelCopy")
+        feed.shutdown()
+    }
+
     // 1. The happy path with matching strides: the whole frame is one bulk copy, and every pixel that
     //    reaches the codec must be the pixel the game drew - nothing of the control layer is in it
     //    because the control layer was never in this bitmap to begin with.
@@ -128,8 +146,8 @@ fun main() {
         val frames = framesOf(feed)
         expect(frames.isNotEmpty(), "frames must be queued")
         expect(ImageWriterTestConfig.created == 1, "exactly one producer may attach, got ${ImageWriterTestConfig.created}")
-        expectEquals(ImageWriterTestConfig.format.firstOrNull(), android.graphics.PixelFormat.RGBA_8888,
-            "the writer must be created for RGBA_8888")
+        expectEquals(ImageWriterTestConfig.sizes.firstOrNull(), "640x360/4",
+            "the writer must be created for the encoder's size with a small buffer pool")
         frames.forEachIndexed { position, frame ->
             expectEquals(frame.width, 640, "frame $position width")
             expectEquals(frame.height, 360, "frame $position height")
@@ -151,7 +169,7 @@ fun main() {
         feed.shutdown()
     }
 
-    // 2. A padded stride, which is the case that smears the picture diagonally if the row math is wrong.
+    // 2. A padded stride (TextureView), which is the case that smears the picture diagonally if the row math is wrong.
     ImageWriterTestConfig.reset()
     run {
         // 64-byte rows with 4 bytes of tail padding: not a bulk copy, so the row walk has to run.
@@ -206,10 +224,12 @@ fun main() {
         feed.shutdown()
     }
 
-    // 4. A readback that is refused forever - the SurfaceView case that makes the fallback mandatory.
+    // 4. A readback the device refuses - the SurfaceView case that makes the fallback mandatory.
     ImageWriterTestConfig.reset()
+    PixelCopyOutcome.reset()
+    PixelCopyOutcome.mode = "refuse"
     run {
-        val view = SurfaceView().apply { width = 800; height = 480; refuseReadback = true }
+        val view = SurfaceView().apply { width = 800; height = 480 }
         val feed = GameSurfaceFeed({ view })
         val recorder = Recorder()
         begin(feed, recorder, Surface(), 800, 480, 30)
@@ -219,9 +239,28 @@ fun main() {
             "a surface that never yields a frame must be reported within the grace window")
         expectEquals(GameCapture.Unavailable.values().getOrNull(recorder.lastArg),
             GameCapture.Unavailable.NO_FRAMES, "the reported reason")
-        expect(view.reads > 0, "the readback must actually have been attempted")
-        expect(framesOf(feed).isEmpty() || feed.feeding, "a refused readback must not queue frames")
+        expect(PixelCopyOutcome.requests > 0, "the readback must actually have been attempted")
+        expect(framesOf(feed).isEmpty(), "a refused readback must not queue frames")
         expect(ImageWriterTestConfig.closed >= 1, "the producer must be released after giving up")
+        feed.shutdown()
+    }
+
+    // 4b. A copy that never calls back: the destination must be abandoned, never recycled, because the
+    //     driver may still be writing into it - that is a native crash rather than a dropped frame.
+    ImageWriterTestConfig.reset()
+    PixelCopyOutcome.reset()
+    PixelCopyOutcome.mode = "hang"
+    run {
+        val view = SurfaceView().apply { width = 320; height = 240 }
+        val feed = GameSurfaceFeed({ view })
+        val recorder = Recorder()
+        val recycledBefore = Bitmap.recycleCount
+        begin(feed, recorder, Surface(), 320, 240, 30)
+        expect(recorder.await(GameCapture.MSG_BEGIN_FAILED, 8_000L),
+            "a hanging copy still has to end the attempt inside a bounded time")
+        expectEquals(Bitmap.recycleCount, recycledBefore,
+            "a bitmap an unfinished copy may still write into must not be recycled")
+        expect(PixelCopyOutcome.requests >= 1, "the copy must have been requested before waiting on it")
         feed.shutdown()
     }
 

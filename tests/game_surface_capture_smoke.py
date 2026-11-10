@@ -67,8 +67,22 @@ for rule in ("planCopy", "nextDelayMs", "decide", "startupGraceMs", "shouldUseGa
 check("@JvmStatic" in core, "the core rules need @JvmStatic so the Kotlin-free harness can call them")
 
 # --- the feed must be the thing that produces frames, and must not touch the codec
-for api in ("ImageWriter.newInstance", "acquireNextImage", "queueInputImage", "PixelFormat.RGBA_8888"):
+for api in ("ImageWriter.newInstance(surface, width, height, MAX_IMAGES)", "acquireNextImage", "queueInputImage"):
     check(api in feed, f"GameSurfaceFeed must use {api}; that is how a surface gets produced from memory")
+# ImageWriter has no pixel-format argument for a Surface producer: it is fixed to RGBA_8888, so the
+# stride arithmetic has to verify the plane instead of assuming it.
+check("plane.pixelStride != GameCapture.BYTES_PER_PIXEL" in feed,
+      "the feed must check the plane's pixel stride before trusting 4 bytes per pixel")
+check("import android.graphics.PixelFormat" not in feed,
+      "there is no ImageWriter overload that takes a format; asking for one is the bug this prevents")
+check("PixelCopy.request(view, dest, listener, copyHandler)" in feed,
+      "SurfaceView content is only readable through PixelCopy, not getBitmap")
+check("import android.media.PixelCopy" in feed and "getBitmap(full)" not in feed,
+      "the SurfaceView path must not call a hidden getBitmap, which does not compile against the SDK")
+check("copyHandler = Handler(Looper.getMainLooper())" in feed,
+      "the copy must call back on a looper the capture thread is not blocking on")
+check("grab = null" in feed and "recycle()" in feed,
+      "a destination an unfinished copy may still write into has to be dropped, never recycled")
 check("image.timestamp = System.nanoTime()" in feed,
       "hand-fed frames must carry this process's monotonic timestamp, or the muxer's offsets drift")
 for load_bearing in ("GameCapture.planCopy", "GameCapture.isBulkCopy", "GameCapture.decide",
@@ -79,7 +93,9 @@ check("MediaCodec" not in feed and "MediaMuxer" not in feed and "createVirtualDi
 check("getBitmap" in feed and "SurfaceView" in feed and "TextureView" in feed,
       "both render paths need a readback, and one of them is the case that fails")
 check("Build.VERSION.SDK_INT >= 24" in feed,
-      "SurfaceView.getBitmap(Bitmap) is API 24 and minSdk is 23, so the readback must be guarded")
+      "PixelCopy is API 24 and minSdk is 23, so the SurfaceView readback must be guarded")
+check("COPY_TIMEOUT_MS" in feed and "await(" in feed,
+      "a copy that never finishes must be given up on, not waited on forever")
 check("return null" in feed, "a refused readback must return null rather than a half-written frame")
 
 # --- stop ordering: the producer lets go of the surface before anything else can take it
