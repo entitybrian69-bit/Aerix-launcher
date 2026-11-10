@@ -1,11 +1,11 @@
 /*
  * Aerix Launcher UI layer for PojavLauncher.
- * In-game skin bridge: hands the skin chosen in the Skin Wardrobe to Minecraft itself.
+ * In-game skin bridge: hands the account's own skin and the launcher's cape to Minecraft itself.
  *
  * A launcher cannot paint a skin onto the player from the outside: the game asks the session
  * service of the account for the profile of the local player and reads the skin texture URL out
- * of the "textures" property it gets back. That is why a skin equipped in the wardrobe used to be
- * visible everywhere in the launcher and nowhere in the game.
+ * of the "textures" property it gets back. That is why a skin chosen in the account screen used to
+ * be visible everywhere in the launcher and nowhere in the game.
  *
  * This runs a tiny Yggdrasil ("authlib-injector") endpoint on the loopback interface with the
  * account's equipped skin, cape and Wide/Slim model, and the game is started with the
@@ -54,7 +54,8 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
 /**
- * Serves the equipped wardrobe skin to the game through a loopback Yggdrasil endpoint.
+ * Serves the account's skin and the launcher's animated cape to the game through a loopback
+ * Yggdrasil endpoint.
  *
  * Only one game runs at a time, so there is one server: [launchArguments] replaces the previous
  * one and [stop] retires it when the game is closed.
@@ -148,41 +149,19 @@ object AerixSkinServer {
         if (authType.injectorUrl != null) return emptyList()
 
         val isSlim = PojavAccountBridge.isSlimModelFor(context, account)
-        val selectedInstance = runCatching {
-            net.kdt.pojavlaunch.instances.Instances.loadSelectedInstance()
-        }.getOrNull()
-        val isTrinkiesSession = runCatching {
-            net.kdt.pojavlaunch.aerix.client.TrinkiesInstaller.isSupportedInstance(selectedInstance)
-        }.getOrDefault(false)
-        // Cosmetics are per instance as well as globally: an instance carrying the opt-out marker gets
-        // the same account skin the launcher would serve with Trinkies switched off, while keeping its
-        // animated cape. Deciding this here, where the instance is known, is what keeps the bake
-        // functions free of any guess about which folder the game is running from.
-        val cosmeticsHere = isTrinkiesSession && runCatching {
-            !net.kdt.pojavlaunch.aerix.client.TrinkiesInstaller.isCosmeticsOptedOut(
-                selectedInstance?.gameDirectory
-            )
-        }.getOrDefault(true)
 
         val skinFile = PojavAccountBridge.customSkinFile(account)
         val capeFile = PojavAccountBridge.customCapeFile(account)
         val rawSkinBytes = if (skinFile.isFile && skinFile.length() > 0) skinFile.readBytes() else null
         val normalizedSkin = rawSkinBytes?.let { PojavAccountBridge.normalizeSkinBytesForGame(it) }
-        val skinBytes = if (isTrinkiesSession) {
-            net.kdt.pojavlaunch.aerix.client.AerixClientCosmetics.applyWardrobeToSkin(
-                context,
-                normalizedSkin,
-                isSlim,
-                cosmeticsHere
-            )
+        // The launcher's own animated cape is served whenever the account has no imported cape file
+        // of its own. This only runs for local accounts - every auth provider with its own injector URL
+        // returned above - so it cannot override a genuine Mojang cape.
+        val skinBytes = normalizedSkin
+        val capeBytes = if (capeFile.isFile && capeFile.length() > 0) {
+            capeFile.readBytes()
         } else {
-            normalizedSkin
-        }
-        val capeBytes = if (isTrinkiesSession) {
-            net.kdt.pojavlaunch.aerix.client.AerixClientCosmetics.resolveInGameCapeBytes(context, cosmeticsHere)
-                ?: (if (capeFile.isFile && capeFile.length() > 0) capeFile.readBytes() else null)
-        } else {
-            if (capeFile.isFile && capeFile.length() > 0) capeFile.readBytes() else null
+            net.kdt.pojavlaunch.aerix.client.AerixClientCosmetics.resolveInGameCapeBytes(context)
         }
         // Local accounts also need the bridge to resolve other players' shared appearances.
         if (skinBytes == null && capeBytes == null && authType != AuthType.LOCAL) return emptyList()

@@ -40,19 +40,7 @@ data class ClientModEntry(
     val category: String
 )
 
-enum class TrinkiesDeploymentStatus { INSTALLED, CURRENT, CONFLICT, FAILED }
-
-data class TrinkiesDeploymentResult(
-    val status: TrinkiesDeploymentStatus,
-    val detail: String,
-    val sha256: String? = null
-)
-
 object AerixClientInstaller {
-
-    private const val TRINKIES_ARTIFACT_NAME = "trinkies-aerix.jar"
-    private const val TRINKIES_MANIFEST_NAME = "trinkies-aerix.manifest.json"
-    private const val TRINKIES_MANIFEST_FORMAT = "aerix.trinkies.install-manifest"
 
     private const val USER_AGENT =
         "entitybrian69-bit/Aerix-launcher/aerix-client (https://github.com/entitybrian69-bit/Aerix-launcher)"
@@ -80,6 +68,22 @@ object AerixClientInstaller {
         private set
 
     fun instanceNameFor(mcVersion: String): String = "Aerix Client $mcVersion"
+
+    /**
+     * Which game folders the launcher manages: the Aerix Client bundle plus Fabric/Quilt-family
+     * instances. Vanilla and Forge/NeoForge are deliberately untouched, because pushing launcher
+     * assets into a loader that cannot use them is how a working instance gets broken.
+     */
+    @JvmStatic
+    fun isManagedInstance(instance: Instance?): Boolean {
+        if (instance == null) return false
+        if (instance.isAerixClient) return true
+        val id = instance.versionId.orEmpty().lowercase()
+        val name = instance.name.orEmpty().lowercase()
+        return id.contains("fabric") || id.contains("quilt") ||
+            name.startsWith("fabric ") || name.startsWith("quilt ") ||
+            name.startsWith("legacy fabric")
+    }
 
     fun findInstalledClientInstance(mcVersion: String? = null): Instance? =
         findInstalledClientInstance(mcVersion, runCatching { Instances.loadAllInstances() }.getOrDefault(emptyList()))
@@ -129,204 +133,9 @@ object AerixClientInstaller {
     }
 
     /**
-     * Installs the Java-8 Trinkies bridge without touching unowned files. Updates are allowed only
-     * when the visible sidecar manifest proves that the existing artifact is the exact prior build.
-     */
-    @Synchronized
-    fun deployBundledTrinkies(context: Context, modsDir: File): TrinkiesDeploymentResult {
-        var artifactTemp: File? = null
-        try {
-            if (!modsDir.isDirectory && !modsDir.mkdirs()) {
-                return TrinkiesDeploymentResult(TrinkiesDeploymentStatus.FAILED, "Could not create the instance mods folder")
-            }
-            val bundled = context.assets.open("components/aerix_client/aerix_client_mod.jar").use { it.readBytes() }
-            val bundledMetadata = readFabricModMetadata(bundled)
-                ?: return TrinkiesDeploymentResult(TrinkiesDeploymentStatus.FAILED, "The bundled Trinkies JAR has no valid Fabric descriptor")
-            if (bundledMetadata.optString("id") != "trinkies" || bundledMetadata.optString("environment") != "client") {
-                return TrinkiesDeploymentResult(TrinkiesDeploymentStatus.FAILED, "The bundled JAR is not a client-only Trinkies mod")
-            }
-            val bundledHash = sha256(bundled)
-            val target = File(modsDir, TRINKIES_ARTIFACT_NAME)
-            val manifest = File(modsDir, TRINKIES_MANIFEST_NAME)
-            val manifestJson = if (manifest.exists()) runCatching {
-                org.json.JSONObject(manifest.readText(Charsets.UTF_8))
-            }.getOrNull() else null
-            val manifestOwned = manifestJson?.let { isOurTrinkiesManifest(it) } == true
-            if (manifest.exists() && !manifestOwned) {
-                return TrinkiesDeploymentResult(
-                    TrinkiesDeploymentStatus.CONFLICT,
-                    "${manifest.name} already exists and is not a valid Aerix install manifest; it was left untouched"
-                )
-            }
-
-            val legacyAnimatorJar = File(modsDir, "aerix-client-animator.jar")
-            if (legacyAnimatorJar.exists()) {
-                return TrinkiesDeploymentResult(
-                    TrinkiesDeploymentStatus.CONFLICT,
-                    "${legacyAnimatorJar.name} is present; it was left untouched. Review it before installing the renamed Trinkies mod"
-                )
-            }
-            val otherTrinkies = findFabricModJar(modsDir, "trinkies", target)
-            if (otherTrinkies != null) {
-                return TrinkiesDeploymentResult(
-                    TrinkiesDeploymentStatus.CONFLICT,
-                    "${otherTrinkies.name} already provides Trinkies; no mod was replaced or removed"
-                )
-            }
-
-            val existingHash = if (target.isFile) sha256(target) else null
-            val isCurrent = existingHash == bundledHash
-            val priorHashMatches = manifestOwned && existingHash != null &&
-                manifestJson?.optString("sha256") == existingHash
-            if (existingHash != null && !isCurrent && !priorHashMatches) {
-                return TrinkiesDeploymentResult(
-                    TrinkiesDeploymentStatus.CONFLICT,
-                    "${target.name} exists without a matching Aerix hash manifest; it was left untouched"
-                )
-            }
-
-            if (isCurrent) {
-                if (!manifestOwned || manifestJson?.optString("sha256") != bundledHash) {
-                    if (!writeTrinkiesManifest(manifest, bundledMetadata.optString("version"), bundledHash, manifestOwned)) {
-                        return TrinkiesDeploymentResult(
-                            TrinkiesDeploymentStatus.FAILED,
-                            "Trinkies is current, but its install manifest could not be written",
-                            bundledHash
-                        )
-                    }
-                }
-                return TrinkiesDeploymentResult(TrinkiesDeploymentStatus.CURRENT, "Trinkies is already current", bundledHash)
-            }
-
-            artifactTemp = File.createTempFile(".trinkies-aerix-", ".tmp", modsDir)
-            FileOutputStream(artifactTemp).use { output ->
-                output.write(bundled)
-                output.fd.sync()
-            }
-            if (sha256(artifactTemp) != bundledHash) {
-                return TrinkiesDeploymentResult(TrinkiesDeploymentStatus.FAILED, "Temporary Trinkies JAR failed SHA-256 verification")
-            }
-            if (!replaceManagedFile(artifactTemp, target, mayReplace = existingHash != null && priorHashMatches)) {
-                return TrinkiesDeploymentResult(TrinkiesDeploymentStatus.FAILED, "Could not atomically install ${target.name}")
-            }
-            artifactTemp = null
-            if (!writeTrinkiesManifest(manifest, bundledMetadata.optString("version"), bundledHash, manifestOwned)) {
-                return TrinkiesDeploymentResult(
-                    TrinkiesDeploymentStatus.FAILED,
-                    "The mod JAR was written, but the install manifest could not be updated; it will be rechecked next launch",
-                    bundledHash
-                )
-            }
-            return TrinkiesDeploymentResult(TrinkiesDeploymentStatus.INSTALLED, "Trinkies installed and SHA-256 verified", bundledHash)
-        } catch (error: Exception) {
-            android.util.Log.w("AerixClient", "Could not install bundled Trinkies", error)
-            return TrinkiesDeploymentResult(TrinkiesDeploymentStatus.FAILED, error.message ?: "Trinkies installation failed")
-        } finally {
-            artifactTemp?.delete()
-        }
-    }
-
-    private fun isOurTrinkiesManifest(json: org.json.JSONObject): Boolean =
-        json.optString("format") == TRINKIES_MANIFEST_FORMAT &&
-            json.optInt("schema", -1) == 1 &&
-            json.optString("modId") == "trinkies" &&
-            json.optString("artifact") == TRINKIES_ARTIFACT_NAME &&
-            json.optString("sha256").matches(Regex("[0-9a-f]{64}"))
-
-    private fun writeTrinkiesManifest(
-        manifest: File,
-        modVersion: String,
-        sha256: String,
-        mayReplace: Boolean
-    ): Boolean {
-        val json = org.json.JSONObject()
-            .put("format", TRINKIES_MANIFEST_FORMAT)
-            .put("schema", 1)
-            .put("modId", "trinkies")
-            .put("artifact", TRINKIES_ARTIFACT_NAME)
-            .put("version", modVersion)
-            .put("sha256", sha256)
-        val temporary = runCatching { File.createTempFile(".trinkies-manifest-", ".tmp", manifest.parentFile) }
-            .getOrNull() ?: return false
-        return try {
-            FileOutputStream(temporary).use { output ->
-                output.write(json.toString(2).toByteArray(Charsets.UTF_8))
-                output.fd.sync()
-            }
-            replaceManagedFile(temporary, manifest, mayReplace).also { replaced ->
-                if (replaced) temporary.delete()
-            }
-        } catch (_: Exception) {
-            false
-        } finally {
-            temporary.delete()
-        }
-    }
-
-    /** Renames over an existing destination only after its ownership hash was checked. */
-    private fun replaceManagedFile(temporary: File, target: File, mayReplace: Boolean): Boolean {
-        if (!target.exists()) return temporary.renameTo(target)
-        if (!mayReplace) return false
-        if (temporary.renameTo(target)) return true
-        val backup = File(target.parentFile, ".${target.name}.${java.util.UUID.randomUUID()}.bak")
-        if (!target.renameTo(backup)) return false
-        if (temporary.renameTo(target)) {
-            backup.delete()
-            return true
-        }
-        backup.renameTo(target)
-        return false
-    }
-
-    private fun readFabricModMetadata(bytes: ByteArray): org.json.JSONObject? = runCatching {
-        ZipInputStream(ByteArrayInputStream(bytes)).use { zip ->
-            while (true) {
-                val entry = zip.nextEntry ?: return@use null
-                if (entry.name == "fabric.mod.json") {
-                    val descriptor = zip.readBytes()
-                    if (descriptor.size > 65_536) return@use null
-                    return@use org.json.JSONObject(String(descriptor, Charsets.UTF_8))
-                }
-            }
-            @Suppress("UNREACHABLE_CODE")
-            null
-        }
-    }.getOrNull()
-
-    private fun findFabricModJar(modsDir: File, id: String, except: File): File? =
-        modsDir.listFiles()?.firstOrNull { file ->
-            file.isFile && file.extension.equals("jar", true) && file.canonicalFile != except.canonicalFile &&
-                readFabricModMetadata(file)?.optString("id") == id
-        }
-
-    private fun readFabricModMetadata(file: File): org.json.JSONObject? = runCatching {
-        java.util.zip.ZipFile(file).use { zip ->
-            val entry = zip.getEntry("fabric.mod.json") ?: return@use null
-            if (entry.size < 0 || entry.size > 65_536) return@use null
-            zip.getInputStream(entry).bufferedReader(Charsets.UTF_8).use { org.json.JSONObject(it.readText()) }
-        }
-    }.getOrNull()
-
-    private fun sha256(bytes: ByteArray): String =
-        MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it.toInt() and 0xff) }
-
-    private fun sha256(file: File): String {
-        val digest = MessageDigest.getInstance("SHA-256")
-        file.inputStream().buffered().use { input ->
-            val buffer = ByteArray(8192)
-            while (true) {
-                val read = input.read(buffer)
-                if (read < 0) break
-                digest.update(buffer, 0, read)
-            }
-        }
-        return digest.digest().joinToString("") { "%02x".format(it.toInt() and 0xff) }
-    }
-
-    /**
      * Upgrades an already-installed Client instance right before Launch so users immediately get
-     * `wavey-capes`, `immediatelyfast`, the managed Trinkies artifact, `iris` removal, `AERIX CLIENT`
-     * title logo, `images.jpeg` forest background, and genuine vanilla animated gear!
+     * `wavey-capes`, `immediatelyfast`, `iris` removal, `AERIX CLIENT` title logo, `images.jpeg`
+     * forest background, and genuine vanilla animated gear!
      */
     suspend fun syncExistingInstanceForLaunch(context: Context, instance: Instance, mcVersion: String) =
         withContext(Dispatchers.IO) {
@@ -338,10 +147,6 @@ object AerixClientInstaller {
                     instance.argsMode = Instance.ARGS_MODE_MERGE_DEFAULT_FIRST
                     instance.jvmArgs = TUNED_CLIENT_JVM_ARGS
                     instance.write()
-                }
-                val trinkiesResult = deployBundledTrinkies(context, modsDir)
-                if (trinkiesResult.status == TrinkiesDeploymentStatus.CONFLICT || trinkiesResult.status == TrinkiesDeploymentStatus.FAILED) {
-                    android.util.Log.w("AerixClient", "Trinkies not changed: ${trinkiesResult.detail}")
                 }
                 // Ensure essential new upgrade jars exist even on older installs
                 for (slug in listOf("wavey-capes", "immediatelyfast", "entityculling")) {
@@ -374,10 +179,6 @@ object AerixClientInstaller {
                 instance.versionId ?: instance.name,
                 AerixClientStore.selectedClientVersion
             )
-            val trinkiesResult = deployBundledTrinkies(context, modsDir)
-            if (trinkiesResult.status == TrinkiesDeploymentStatus.CONFLICT || trinkiesResult.status == TrinkiesDeploymentStatus.FAILED) {
-                android.util.Log.w("AerixClient", "Trinkies not changed: ${trinkiesResult.detail}")
-            }
             // Launches from Home bypass the Client tab's network sync; repair missing cape mod here too.
             runCatching { ensureWaveyCapes(modsDir, mcVer) }.onFailure { error ->
                 android.util.Log.w("AerixClient", "Waving cape mod unavailable", error)
@@ -479,9 +280,6 @@ object AerixClientInstaller {
                 val gameDir = clientInstance.gameDirectory.apply { mkdirs() }
                 val modsDir = File(gameDir, "mods").apply { mkdirs() }
 
-                val trinkiesResult = deployBundledTrinkies(context, modsDir)
-                check(trinkiesResult.status == TrinkiesDeploymentStatus.INSTALLED ||
-                    trinkiesResult.status == TrinkiesDeploymentStatus.CURRENT) { trinkiesResult.detail }
 
                 val modPlan = buildModListForVersion(mcVersion)
                 val missingMods = mutableListOf<String>()

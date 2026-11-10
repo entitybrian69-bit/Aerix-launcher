@@ -7,13 +7,6 @@ java {
     targetCompatibility = JavaVersion.VERSION_1_8
 }
 
-tasks.named('processResources') {
-    // The same source files used by the launcher are bundled for future in-game readers.
-    from(rootProject.file('trinkies_assets/trinkies')) {
-        into 'assets/trinkies'
-    }
-}
-
 jar {
     exclude 'net/fabricmc/**'
     manifest {

@@ -26,7 +26,7 @@ class SkinPreviewCameraSmoke(unittest.TestCase):
             distance = 18.75 / math.sin(limiting_half_fov) * 1.08
             self.assertGreaterEqual(distance * math.sin(limiting_half_fov), 18.75)
 
-    def test_preview_pixel_budget_and_wardrobe_controls(self):
+    def test_preview_pixel_budget_and_camera_controls(self):
         js = (ASSETS / "skinview.js").read_text()
         self.assertIn("MAX_RENDER_PIXELS = 1_200_000", js)
         self.assertIn("MAX_PREVIEW_PIXEL_RATIO = 1.25", js)
@@ -42,15 +42,11 @@ class SkinPreviewCameraSmoke(unittest.TestCase):
         self.assertIn("Channel<Triple<Int, Int, Int>>(Channel.CONFLATED)", component)
         self.assertIn("withFrameNanos { }", component)
         self.assertNotIn("delay(16)", component)
-        self.assertIn("autoRotate = true", (APP / "ui/screens/TrinkiesWardrobeScreen.kt").read_text())
 
-    def test_reported_preview_callers_use_fitted_distance_and_clipping_boundaries(self):
+    def test_home_preview_uses_fitted_distance_and_clipping_boundaries(self):
         home = (APP / "ui/screens/HomeScreen.kt").read_text()
-        wardrobe = (APP / "ui/screens/TrinkiesWardrobeScreen.kt").read_text()
         self.assertIn("cameraDistance = 48", home)
         self.assertIn(".clipToBounds()", home)
-        self.assertIn("cameraDistance = 48", wardrobe)
-        self.assertIn(".clip(RoundedCornerShape(0.dp))", wardrobe)
 
 
 if __name__ == "__main__":

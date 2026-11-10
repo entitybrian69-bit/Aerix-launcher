@@ -114,7 +114,6 @@ import net.kdt.pojavlaunch.aerix.guide.guideAnchor
 import net.kdt.pojavlaunch.aerix.theme.AerixSpacing
 import net.kdt.pojavlaunch.aerix.theme.AerixSurface
 import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
-import net.kdt.pojavlaunch.aerix.client.TrinkiesInstaller
 import net.kdt.pojavlaunch.aerix.ui.AerixNav
 import net.kdt.pojavlaunch.aerix.ui.LauncherSection
 import net.kdt.pojavlaunch.contracts.OpenDocumentWithExtension
@@ -165,17 +164,13 @@ private class HomeActions(
     val accounts: () -> Unit,
     val aerixAccount: () -> Unit,
     val quickTools: () -> Unit,
-    val instanceSelector: () -> Unit,
-    val wardrobe: () -> Unit
+    val instanceSelector: () -> Unit
 )
 
 @Composable
 fun HomeScreen(activity: FragmentActivity, navigate: (LauncherSection) -> Unit) {
     LaunchedEffect(Unit) {
         PojavAccountBridge.ensureLoaded()
-        // Existing and newly-created Fabric-family instances receive Trinkies automatically;
-        // unsupported loaders are intentionally untouched.
-        TrinkiesInstaller.installIntoSupportedInstances(activity)
     }
     val instances = PojavInstanceBridge.instances
     val selected = PojavInstanceBridge.selected
@@ -208,8 +203,7 @@ fun HomeScreen(activity: FragmentActivity, navigate: (LauncherSection) -> Unit) 
         accounts = { navigate(LauncherSection.ACCOUNTS) },
         aerixAccount = { AerixNav.navigate(LauncherSection.AERIX_ACCOUNT) },
         quickTools = { navigate(LauncherSection.QUICK_TOOLS) },
-        instanceSelector = { navigate(LauncherSection.INSTANCE_SELECTOR) },
-        wardrobe = { navigate(LauncherSection.TRINKIES_WARDROBE) }
+        instanceSelector = { navigate(LauncherSection.INSTANCE_SELECTOR) }
     )
 
     HomeCharacterStage(
@@ -330,7 +324,6 @@ private fun HomeCharacterStage(
                 useClientCape = true,
                 showOfficialCape = true,
                 animationName = "NewIdle",
-                applyClientCosmetics = true,
                 cameraDistance = 48,
                 modifier = Modifier.fillMaxSize().padding(horizontal = 18.dp, vertical = 8.dp)
             )

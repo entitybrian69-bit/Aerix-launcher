@@ -649,12 +649,6 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
 
         if (instance.isAerixClient) {
             net.kdt.pojavlaunch.aerix.client.AerixClientInstaller.syncLocalAssetsAtGameStart(this, instance);
-        } else if (net.kdt.pojavlaunch.aerix.client.TrinkiesInstaller.isSupportedInstance(instance)) {
-            net.kdt.pojavlaunch.aerix.client.TrinkiesInstaller.syncLocalAssetsAtGameStart(this, instance);
-        }
-        if (net.kdt.pojavlaunch.aerix.client.TrinkiesInstaller.isSupportedInstance(instance) &&
-                !net.kdt.pojavlaunch.aerix.client.TrinkiesLoadout.writeForInstance(this, gamedir)) {
-            Logger.appendToLog("Trinkies: could not write the local equipped state for " + instance.name);
         }
         GameRunner.launchGame(this, account, instance, versionId, classpath, mGameRenderer);
         //Note that we actually stall in the above function, even if the game crashes. But let's be safe.

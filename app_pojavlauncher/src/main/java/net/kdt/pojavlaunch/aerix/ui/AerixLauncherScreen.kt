@@ -95,7 +95,6 @@ import net.kdt.pojavlaunch.aerix.ui.screens.HomeScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.InstanceEditorScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.InstanceSelectorScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.QuickToolsScreen
-import net.kdt.pojavlaunch.aerix.ui.screens.TrinkiesWardrobeScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.LibraryScreen
 import net.kdt.pojavlaunch.aerix.bridge.AerixInstallQueue
 import net.kdt.pojavlaunch.aerix.ui.screens.AerixInstallPanel
@@ -184,9 +183,9 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
         // itself stays clear of the camera cutout and of the system bars.
         Box(modifier = Modifier.fillMaxSize().padding(AerixWindowInsets.padding())) {
             Row(modifier = Modifier.fillMaxSize()) {
-                // Socials has its own navigation; the wardrobe uses its Lobby header. The utility
-                // rail at the far right stays in the shell for every destination.
-                if (section != LauncherSection.SOCIALS && section != LauncherSection.TRINKIES_WARDROBE) {
+                // Socials has its own navigation. The utility rail at the far right stays in the
+                // shell for every destination.
+                if (section != LauncherSection.SOCIALS) {
                     AerixNavigationRail(
                         selectedSection = section,
                         onNavigate = navigate,
@@ -208,7 +207,6 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
                             LauncherSection.HOME -> HomeScreen(activity, navigate)
                             LauncherSection.QUICK_TOOLS -> QuickToolsScreen(activity, navigate)
                             LauncherSection.INSTANCE_SELECTOR -> InstanceSelectorScreen(activity, navigate)
-                            LauncherSection.TRINKIES_WARDROBE -> TrinkiesWardrobeScreen(activity, navigate)
                             LauncherSection.AERIX_CLIENT -> ClientHubScreen(activity, clientOwnerPage) { clientOwnerPage = it }
                             LauncherSection.LIBRARY -> LibraryScreen(activity)
                             LauncherSection.SERVERS -> ServersScreen(activity)
@@ -281,8 +279,7 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
                         navigate(LauncherSection.SOCIALS)
                     },
                     onQuickTools = { navigate(LauncherSection.QUICK_TOOLS) },
-                    onInstances = { navigate(LauncherSection.INSTANCE_SELECTOR) },
-                    onWardrobe = { navigate(LauncherSection.TRINKIES_WARDROBE) }
+                    onInstances = { navigate(LauncherSection.INSTANCE_SELECTOR) }
                 )
             }
 

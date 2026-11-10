@@ -892,16 +892,15 @@ begin
     end if;
 end ';
 
--- ---- the optional wardrobe backup --------------------------------------------------------
+-- ---- the retired wardrobe backup ----------------------------------------------------------
 --
--- Wardrobe cloud sync is off by default and per device; the launcher needs none of this table to
--- serve cosmetics, because the skin and cape are baked on the device from ids that ship in the APK.
--- The row holds slot ids and the eight emote bindings only - no skin, no cape, no texture, no image.
--- A player who never turns the switch on has no row and nothing is ever sent. Same content as
--- supabase/step4-wardrobe.sql, which is the paste-one-file version of this step.
+-- This backed the launcher-side wardrobe, which has since been removed: no client code reads or
+-- writes this table any more. The row would have held slot ids and eight emote bindings only - no
+-- skin, no cape, no texture, no image. It is left applied on the live project because it is empty and
+-- readable only by its owner, and dropping it is a one-liner (see the bottom of this file). Same
+-- content as supabase/step4-wardrobe.sql, the paste-one-file version of this step.
 
 -- ---- table --------------------------------------------------------------------------------
-
 create table if not exists public.wardrobe_sync (
     -- Same key as the profile row, so an account deletion cascades the wardrobe with it.
     id         uuid primary key references public.profiles (id) on delete cascade,

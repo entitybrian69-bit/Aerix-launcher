@@ -50,13 +50,6 @@ data class ClientCapeSpec(
 }
 
 object AerixClientCosmetics {
-    /** The UV grid every catalog garment patch is authored on. */
-    private const val GARMENT_PATCH_SIZE = 64
-
-    /** The Minecraft cape sheet every back item's `cape_patch.png` is authored on. */
-    private const val CAPE_PATCH_WIDTH = 64
-    private const val CAPE_PATCH_HEIGHT = 32
-
     const val OWNER_EMAIL = "entitybrian69@gmail.com"
     const val CO_OWNER_EMAIL = "kushaladhikari982648@gmail.com"
 
@@ -226,61 +219,17 @@ object AerixClientCosmetics {
     }.getOrNull()
 
     /**
-     * The equipped back item's `cape_patch.png` as cape-sheet pixels.
-     *
-     * Back items are authored in the cape's own UV space, so the patch lands texel-for-texel and
-     * needs no geometry of its own here - the same data-driven rule the skin bake follows. A patch
-     * that is not exactly `64x32` is dropped rather than stretched, because a stretched cape reads
-     * as a torn one, and an unknown or unrenderable id simply means "no Trinkies cape".
-     */
-    private fun trinkiesCapePatchPixels(context: Context): IntArray? {
-        if (!AerixClientStore.trinkiesCosmeticsEnabled) return null
-        val id = AerixClientStore.equippedIdFor("back")
-        if (!id.startsWith("trinkies:")) return null
-        val item = TrinkiesCatalog.find(context, id)?.takeIf { it.locallyRendered } ?: return null
-        val asset = item.capeAsset ?: return null
-        return runCatching {
-            context.applicationContext.assets.open(asset).use { stream ->
-                BitmapFactory.decodeStream(stream)
-            }?.let { bitmap ->
-                if (bitmap.width != CAPE_PATCH_WIDTH || bitmap.height != CAPE_PATCH_HEIGHT) {
-                    bitmap.recycle()
-                    return@let null
-                }
-                val pixels = IntArray(CAPE_PATCH_WIDTH * CAPE_PATCH_HEIGHT)
-                bitmap.getPixels(
-                    pixels, 0, CAPE_PATCH_WIDTH, 0, 0, CAPE_PATCH_WIDTH, CAPE_PATCH_HEIGHT
-                )
-                bitmap.recycle()
-                pixels
-            }
-        }.getOrNull()
-    }
-
-    /**
-     * Bakes a cape patch onto a generated frame. A null patch - nothing equipped, or an asset that
-     * did not load - leaves the launcher's own cape standing, which is also what keeps elytra wings
-     * intact wherever a back item only covers the cape panel.
-     */
-    private fun overlayCapePatch(frame: Bitmap, patch: IntArray?) {
-        if (patch != null) TrinkiesGarmentComposite.bakeCapeInto(frame, patch)
-    }
-
-    /**
      * Generates a genuine `64×32` Minecraft Cape + Elytra PNG byte array served by `AerixSkinServer`:
      * - Front/Back/Sides Cape UV: `(0..21, 0..16)` (Front visible face = `1..10, 1..16`)
      * - Elytra Wing UV: `(22..45, 0..21)` so wearing an Elytra renders matching custom wings too!
      */
-    fun resolveInGameCapeBytes(context: Context, enabledForInstance: Boolean = true): ByteArray? = runCatching {
+    fun resolveInGameCapeBytes(context: Context): ByteArray? = runCatching {
         AerixClientStore.init(context)
         if (AerixClientStore.equippedCapeId == "custom") {
             resolveImportedCapeBytes()?.let { return@runCatching it }
         }
 
         val bmp = buildAnimatedCapeFrameBitmap(effectiveCapeSpec(), frameIndex = 0, totalFrames = 12)
-        // The launcher's animated cape is the launcher's; only the wardrobe patch on top of it is
-        // what an instance opts out of.
-        overlayCapePatch(bmp, if (enabledForInstance) trinkiesCapePatchPixels(context) else null)
         ByteArrayOutputStream().use { out ->
             bmp.compress(Bitmap.CompressFormat.PNG, 100, out)
             out.toByteArray()
@@ -297,11 +246,6 @@ object AerixClientCosmetics {
             AerixClientStore.init(context)
             val spec = effectiveCapeSpec()
             val importedCape = if (AerixClientStore.equippedCapeId == "custom") resolveImportedCapeBytes() else null
-            // An opted-out instance still gets the launcher's own animated cape; only the wardrobe's
-            // patch on top of it is skipped, and the meta line below has to say so or the client's
-            // bake cross-check would blame a mismatch that is the player's own choice.
-            val cosmeticsHere = !TrinkiesInstaller.isCosmeticsOptedOut(instanceGameDir)
-            val trinkiesCape = if (importedCape == null && cosmeticsHere) trinkiesCapePatchPixels(context) else null
             val configDir = File(instanceGameDir, "config").apply { mkdirs() }
             val framesDir = File(configDir, "aerix_cape_frames").apply { mkdirs() }
 
@@ -312,7 +256,6 @@ object AerixClientCosmetics {
                     FileOutputStream(outFile).use { it.write(importedCape) }
                 } else {
                     val bmp = buildAnimatedCapeFrameBitmap(spec, frameIndex = i, totalFrames = total)
-                    overlayCapePatch(bmp, trinkiesCape)
                     FileOutputStream(outFile).use { fos -> bmp.compress(Bitmap.CompressFormat.PNG, 100, fos) }
                 }
             }
@@ -321,7 +264,6 @@ object AerixClientCosmetics {
             metaFile.writeText(
                 buildString {
                     appendLine("capeId=${if (importedCape != null) "custom" else spec.id}")
-                    appendLine("trinkiesBack=${if (cosmeticsHere) AerixClientStore.equippedIdFor("back") else "none"}")
                     appendLine("frames=$total")
                     appendLine("waving=${AerixClientStore.wavingCapeEnabled}")
                     appendLine("updatedAtMs=$now")
@@ -352,7 +294,7 @@ object AerixClientCosmetics {
         runCatching {
             val all = Instances.loadAllInstances()
             for (inst in all) {
-                if (TrinkiesInstaller.isSupportedInstance(inst)) {
+                if (AerixClientInstaller.isManagedInstance(inst)) {
                     inst.gameDirectory?.let { syncCapeAssetsToInstance(context, it) }
                 }
             }
@@ -468,74 +410,6 @@ object AerixClientCosmetics {
         }
         return bmp
     }
-
-    /**
-     * Bakes the equipped Trinkies wardrobe onto the skin that is served to the game.
-     *
-     * Each catalog item ships a `garment.png` patch laid out in the player's own UV space, so
-     * equipping anything is one source-over pass in that space — the same pass the launcher's
-     * preview and the client mod run. Nothing here knows what any individual item looks like: the
-     * catalog is the renderer, so an id the catalog does not carry simply paints nothing.
-     */
-    fun applyWardrobeToSkin(
-        context: Context,
-        existingSkinPng: ByteArray?,
-        @Suppress("UNUSED_PARAMETER") slim: Boolean,
-        enabledForInstance: Boolean = true
-    ): ByteArray? {
-        AerixClientStore.init(context)
-        if (existingSkinPng == null) return null
-        if (!enabledForInstance || !AerixClientStore.trinkiesCosmeticsEnabled) return existingSkinPng
-        val patches = trinkiesGarmentPatches(context)
-        if (patches.isEmpty()) return existingSkinPng
-        val decoded = BitmapFactory.decodeByteArray(existingSkinPng, 0, existingSkinPng.size) ?: return existingSkinPng
-        if (decoded.width < 64 || decoded.height < 64) {
-            decoded.recycle()
-            return existingSkinPng
-        }
-        val copy = decoded.copy(Bitmap.Config.ARGB_8888, true) ?: run {
-            decoded.recycle()
-            return existingSkinPng
-        }
-        decoded.recycle()
-
-        if (!TrinkiesGarmentComposite.bakeInto(copy, patches)) {
-            copy.recycle()
-            return existingSkinPng
-        }
-
-        return ByteArrayOutputStream().use { out ->
-            copy.compress(Bitmap.CompressFormat.PNG, 100, out)
-            copy.recycle()
-            out.toByteArray()
-        }
-    }
-
-    /**
-     * The garment patch of every equipped catalog item, in composite order. A category whose item
-     * is unknown, not locally rendered, or whose patch is missing/misplaced is skipped rather than
-     * guessed at, so a broken asset can only ever drop one layer.
-     */
-    private fun trinkiesGarmentPatches(context: Context): List<Pair<String, IntArray>> =
-        TrinkiesGarmentComposite.BAKE_ORDER.mapNotNull { category ->
-            val id = AerixClientStore.equippedIdFor(category)
-            if (!id.startsWith("trinkies:")) return@mapNotNull null
-            val item = TrinkiesCatalog.find(context, id)?.takeIf { it.locallyRendered } ?: return@mapNotNull null
-            runCatching {
-                context.applicationContext.assets.open(item.garmentAsset).use { stream ->
-                    BitmapFactory.decodeStream(stream)
-                }?.let { bitmap ->
-                    if (bitmap.width != GARMENT_PATCH_SIZE || bitmap.height != GARMENT_PATCH_SIZE) {
-                        bitmap.recycle()
-                        return@let null
-                    }
-                    val pixels = IntArray(GARMENT_PATCH_SIZE * GARMENT_PATCH_SIZE)
-                    bitmap.getPixels(pixels, 0, GARMENT_PATCH_SIZE, 0, 0, GARMENT_PATCH_SIZE, GARMENT_PATCH_SIZE)
-                    bitmap.recycle()
-                    if (TrinkiesGarmentComposite.isUsableGarment(pixels, category)) pixels else null
-                }
-            }.getOrNull()?.let { category to it }
-        }
 
     fun buildCapeAndElytraBitmap(spec: ClientCapeSpec): Bitmap {
         val bmp = Bitmap.createBitmap(64, 32, Bitmap.Config.ARGB_8888)

@@ -108,7 +108,6 @@ enum class LauncherSection {
     /** Home utility destinations; Back returns to the dashboard. */
     QUICK_TOOLS,
     INSTANCE_SELECTOR,
-    TRINKIES_WARDROBE,
     ADD_ACCOUNT,
     OFFLINE_ACCOUNT,
     AERIX_ACCOUNT,
@@ -250,7 +249,6 @@ fun AerixHomeUtilityRail(
     onOpenProfile: () -> Unit,
     onQuickTools: () -> Unit,
     onInstances: () -> Unit,
-    onWardrobe: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val account = PojavAccountBridge.current
@@ -317,12 +315,6 @@ fun AerixHomeUtilityRail(
                 selectedSection == LauncherSection.INSTANCE_SELECTOR,
                 activeAccent, expandedRail, compactRail
             ) { onInstances() }
-            RailIconItem(
-                R.drawable.aerix_ic_style_outlined,
-                "Cosmetics & Wardrobe",
-                selectedSection == LauncherSection.TRINKIES_WARDROBE,
-                activeAccent, expandedRail, compactRail
-            ) { onWardrobe() }
             RailIconItem(
                 R.drawable.aerix_ic_dashboard_filled,
                 stringResource(R.string.aerix_nav_library),

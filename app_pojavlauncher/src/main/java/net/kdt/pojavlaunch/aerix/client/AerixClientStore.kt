@@ -94,7 +94,6 @@ object AerixClientStore {
 
     // Fresh v2 preferences namespace so ALL HUD items default to OFF and zero-overlap positions apply immediately
     private const val PREFS_FILE = "aerix_client_v2_prefs"
-    private const val EMOTE_WHEEL_SLOTS = 8
 
     private var prefs: SharedPreferences? = null
 
@@ -129,85 +128,6 @@ object AerixClientStore {
 
     /* ── Capes State (3D Character + Waving Cape + 15 Animated Capes) ─────── */
     var equippedCapeId by mutableStateOf("crimson_sovereign")
-    var equippedHatId by mutableStateOf("none")
-
-    /**
-     * The rest of the wardrobe. Each one is a catalog id or "none"; every category bakes onto the
-     * served skin, so an equipped id here is what the player actually wears in game.
-     */
-    var equippedSuitId by mutableStateOf("none")
-    var equippedBackId by mutableStateOf("none")
-    var equippedPetId by mutableStateOf("none")
-    var equippedEmoteId by mutableStateOf("none")
-    var equippedAuraId by mutableStateOf("none")
-
-    /**
-     * Master switch for the Trinkies wardrobe. Off means the launcher serves the account skin
-     * unbaked, writes an emptied loadout so a running client unequips everything, and leaves the cape
-     * to the launcher's own animated designs - the whole cosmetic path, not just the preview.
-     */
-    var trinkiesCosmeticsEnabled by mutableStateOf(true)
-
-    /**
-     * The eight keybound emote slots, index 0 bound to number key 1. Each entry is a catalog id or
-     * "none". The wardrobe's wheel editor is the only writer; the loadout hands the list to the mod,
-     * which reads each item's own play clip out of the packaged asset pack at press time.
-     */
-    var trinkiesEmoteWheel by mutableStateOf(List(EMOTE_WHEEL_SLOTS) { "none" })
-
-    /**
-     * Opt-in backup of the wardrobe *ids* - six worn slots and eight wheel bindings - against the
-     * signed-in social account. Off by default and per device, because the only thing worth carrying
-     * to another phone is the list, not the pixels: the launcher can rebuild every garment from those
-     * ids locally, so nothing image-like is ever uploaded. Push, restore and erase are explicit taps.
-     */
-    var trinkiesCloudSyncEnabled by mutableStateOf(false)
-
-    /** The item bound to one wheel slot, or "none" when that key does nothing. */
-    fun emoteWheelSlot(index: Int): String = trinkiesEmoteWheel.getOrElse(index) { "none" }
-
-    /** Binds or clears one slot; an out-of-range index is ignored rather than resizing the wheel. */
-    fun setEmoteWheelSlot(index: Int, id: String) {
-        if (index !in 0 until EMOTE_WHEEL_SLOTS) return
-        trinkiesEmoteWheel = List(EMOTE_WHEEL_SLOTS) { position ->
-            if (position == index) id else emoteWheelSlot(position)
-        }
-    }
-
-    /**
-     * Positions matter, so the wheel is stored as one comma-joined id per slot and every blank or
-     * "none" entry is normalised here rather than dropped: dropping it would slide eight bindings
-     * left and quietly move a key onto a different emote.
-     */
-    private fun loadEmoteWheel(raw: String): List<String> {
-        val bound = raw.split(',')
-        return List(EMOTE_WHEEL_SLOTS) { index ->
-            bound.getOrElse(index) { "" }.trim().takeIf { it.isNotEmpty() && it != "none" } ?: "none"
-        }
-    }
-
-    /** The equipped catalog id for one wardrobe category, or "none". */
-    fun equippedIdFor(category: String): String = when (category) {
-        "hat" -> equippedHatId
-        "suit" -> equippedSuitId
-        "back" -> equippedBackId
-        "pet" -> equippedPetId
-        "emote" -> equippedEmoteId
-        "aura" -> equippedAuraId
-        else -> "none"
-    }
-
-    /** Sets the equipped id for one wardrobe category; unknown categories are ignored. */
-    fun setEquippedId(category: String, id: String) {
-        when (category) {
-            "hat" -> equippedHatId = id
-            "suit" -> equippedSuitId = id
-            "back" -> equippedBackId = id
-            "pet" -> equippedPetId = id
-            "emote" -> equippedEmoteId = id
-            "aura" -> equippedAuraId = id
-        }
-    }
     var wavingCapeEnabled by mutableStateOf(true)
     var animatedCapeShimmer by mutableStateOf(true)
 
@@ -315,16 +235,7 @@ object AerixClientStore {
         selectedClientVersion = p.getString("selectedClientVersion", "1.16.5") ?: "1.16.5"
 
         equippedCapeId = p.getString("equippedCapeId", "crimson_sovereign") ?: "crimson_sovereign"
-        equippedHatId = p.getString("equippedHatId", "none") ?: "none"
-        equippedSuitId = p.getString("equippedSuitId", "none") ?: "none"
-        equippedBackId = p.getString("equippedBackId", "none") ?: "none"
-        equippedPetId = p.getString("equippedPetId", "none") ?: "none"
-        equippedEmoteId = p.getString("equippedEmoteId", "none") ?: "none"
-        equippedAuraId = p.getString("equippedAuraId", "none") ?: "none"
         wavingCapeEnabled = p.getBoolean("wavingCapeEnabled", true)
-        trinkiesCosmeticsEnabled = p.getBoolean("trinkiesCosmeticsEnabled", true)
-        trinkiesEmoteWheel = loadEmoteWheel(p.getString("trinkiesEmoteWheel", "").orEmpty())
-        trinkiesCloudSyncEnabled = p.getBoolean("trinkiesCloudSyncEnabled", false)
         animatedCapeShimmer = true
 
         // Every HUD & gameplay overlay defaults strictly to FALSE unless explicitly enabled by user
@@ -426,16 +337,7 @@ object AerixClientStore {
             putString("selectedClientVersion", selectedClientVersion)
 
             putString("equippedCapeId", equippedCapeId)
-            putString("equippedHatId", equippedHatId)
-            putString("equippedSuitId", equippedSuitId)
-            putString("equippedBackId", equippedBackId)
-            putString("equippedPetId", equippedPetId)
-            putString("equippedEmoteId", equippedEmoteId)
-            putString("equippedAuraId", equippedAuraId)
             putBoolean("wavingCapeEnabled", wavingCapeEnabled)
-            putBoolean("trinkiesCosmeticsEnabled", trinkiesCosmeticsEnabled)
-            putString("trinkiesEmoteWheel", trinkiesEmoteWheel.joinToString(","))
-            putBoolean("trinkiesCloudSyncEnabled", trinkiesCloudSyncEnabled)
 
             putBoolean("crosshairEnabled", crosshairEnabled)
             putString("crosshairColor", crosshairColor)

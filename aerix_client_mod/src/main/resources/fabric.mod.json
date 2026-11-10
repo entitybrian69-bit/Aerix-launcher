@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "id": "trinkies",
-  "version": "1.0.0",
-  "name": "Trinkies",
-  "description": "Launcher-integrated client cosmetics bridge for animated capes and local player appearance.",
+  "id": "aerix_client",
+  "version": "1.1.0",
+  "name": "Aerix Client",
+  "description": "Client-side bridge for launcher-served capes, live client options and adaptive render distance.",
   "authors": [
     "Aerix"
   ],

@@ -33,7 +33,7 @@ Run them in this order, each time in **SQL Editor → New query → paste → Ru
 | 1 | `supabase/step1-tables.sql` | tables, columns, indexes, the image bucket |
 | 2 | `supabase/step2-functions.sql` | the lookup and counting functions |
 | 3 | `supabase/step3-policies.sql` | who is allowed to read and write what |
-| 4 | `supabase/step4-wardrobe.sql` | optional: the wardrobe backup table. Already run on the live project, and idempotent - running it again changes nothing. Skip it and the launcher simply never shows a synced wardrobe. |
+| 4 | `supabase/step4-wardrobe.sql` | the wardrobe backup table. It is **applied on the live project but no longer used**: the launcher-side wardrobe was removed, so nothing reads or writes it. The table is left in place rather than dropped; `drop table if exists public.wardrobe_sync;` removes it, and no other feature depends on it. |
 
 Raw links, tap any of them and use GitHub's copy icon:
 

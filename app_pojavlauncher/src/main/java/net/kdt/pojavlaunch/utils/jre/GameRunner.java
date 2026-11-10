@@ -385,10 +385,10 @@ public class GameRunner {
         FileUtils.ensureDirectory(lwjglExtractDir);
         javaArgList.add("-Dorg.lwjgl.system.SharedLibraryExtractPath="+lwjglExtractDir.getAbsolutePath());
 
-        // The skin chosen in the wardrobe only reaches the game this way: the game reads its own
-        // profile from the session service, so the launcher serves that profile (with the skin,
-        // cape and arm model) from a loopback endpoint and points the shipped authlib-injector at
-        // it. Without an equipped skin this adds nothing and the launch is unchanged.
+        // The account's skin and cape only reach the game this way: the game reads its own profile
+        // from the session service, so the launcher serves that profile (with the skin, cape and arm
+        // model) from a loopback endpoint and points the shipped authlib-injector at it. With nothing
+        // equipped this adds nothing and the launch is unchanged.
         javaArgList.addAll(AerixSkinServer.launchArguments(activity, account));
         addAuthlibInjectorArgs(javaArgList, account);
 

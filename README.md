@@ -116,9 +116,9 @@ Aerix natively organizes launcher layouts, renderer stacks, and instance folders
 Aerix respects user privacy. Your worlds are yours. Your accounts are yours. Aerix does not take a cut or a look at either.
 
 *   🚫 **No Ads:** No popups, banners, or monetization layers.
-*   🚫 **No Network Telemetry:** Trinkies adds no analytics upload or cosmetic-state network sync. The optional Aerix Client HUD snapshot is disabled by default, requires a local opt-in file, and remains in that instance's `config/` folder; it is not uploaded by Trinkies.
-*   🚫 **No Harvesting:** No credential logging or advertising profile is created by Trinkies.
-*   🔒 **Local-First Security:** Profiles, custom skins, and capes remain on device unless you deliberately use an account, skin service, or social feature that requests a remote connection. The wardrobe asset slice does not add a new network endpoint.
+*   🚫 **No Network Telemetry:** nothing here uploads cosmetic or appearance state on its own. The optional Aerix Client HUD snapshot is disabled by default, requires a local opt-in file, and remains in that instance's `config/` folder; it is not uploaded anywhere.
+*   🚫 **No Harvesting:** No credential logging or advertising profile is created by the launcher.
+*   🔒 **Local-First Security:** Profiles, custom skins, and capes remain on device unless you deliberately use an account, skin service, or social feature that requests a remote connection. Nothing cosmetic adds a network endpoint of its own.
 *   📦 **GPL-3.0 Verification:** Fully open-source code so the internal application mechanics are completely inspectable by anyone.
 
 ---
@@ -133,17 +133,7 @@ Aerix respects user privacy. Your worlds are yours. Your accounts are yours. Aer
 
 ---
 
-## 👗 Wardrobe and Trinkies
-
-The Wardrobe is a client-side cosmetic hub with account skins, standard/imported capes, and a generated catalog of **300 original items** (50 each for hats, suits, back items, pets, emotes, and auras). The launcher reads the shared catalog and displays a transparent, shaded 3D preview rasterized from each item's model geometry, on Common green, Epic purple, Legendary gold, Mythic red, or Eternal silver cards. Exactly five catalog items are Eternal. These are static UI previews, not in-game accessory rendering. Users can select all 50 hats; selections are saved locally, applied through the launcher skin-overlay path, and snapshotted to `trinkies/equipped.json` for supported Fabric-family/Aerix Client instances at launch. The in-game hat overlay has not yet been visually verified. Suits, back items beyond existing capes, pets, auras, and emotes have previews but still need gameplay renderers/equip support. Skin/cape visibility to other players depends on the account service and server; no Trinkies multiplayer cosmetic sync is enabled.
-
-The full catalog, JSON schemas, deterministic original-art generation, and offline budget/UV checks are under `trinkies_assets/`, `tools/trinkies_assets/`, and `docs/wardrobe/`. All 300 items pass structural validation and the compressed pack is below 15 MiB, but the pack is still marked **unverified in-game**: assets have not all been reviewed in Blockbench, rendered in Minecraft, or visually approved. See [`docs/wardrobe/PLAN.md`](docs/wardrobe/PLAN.md) and [`docs/wardrobe/VERIFY.md`](docs/wardrobe/VERIFY.md) for current verification scope.
-
-The client installer now uses a SHA-256 sidecar manifest and skips unowned/duplicate mods instead of silently overwriting or deleting them. Its bundled mod is client-only; no cosmetics sync endpoint or client-to-client cosmetics protocol is enabled. No 60-fps or device-compatibility claim is made for the preview changes without measurements.
-
----
-
-## 📋 Full Feature List
+## 📋 Full Feature List## 📋 Full Feature List
 
 ### ▶ Play
 *   Unified Play hub linking your file path library and recent worlds together.

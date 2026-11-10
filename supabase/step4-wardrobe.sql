@@ -5,16 +5,19 @@
 -- tables, functions and policies; this step only adds a table of its own, so it can be run before
 -- or after them, and it can be dropped without touching anything else (see the drop at the bottom).
 --
--- Nothing in here is needed to play. The launcher is fully offline for cosmetics: the skin and cape
--- are built on the device from catalog ids that ship inside the APK. This table exists only so a
--- player who signs in can carry the same outfit and the same eight emote keys to a second phone.
--- No client reads or writes it unless Wardrobe cloud sync is turned on in the Wardrobe screen, which
--- is off by default and per device.
+-- Nothing in here is needed to play, and nothing in the launcher uses it any more: the wardrobe this
+-- backed was removed, so no client reads or writes this table.
 --
 -- What it holds, per user: which of the shipped catalog items is worn in each of the six slots, and
 -- what each of the eight emote keys is bound to. Ids only - no skin, no cape, no texture, no preview
 -- image, no file. A baked 64x64 skin would be a few kilobytes and a personal identifier of the
 -- player's face; a list of item ids is neither, and it is the whole state the app needs.
+--
+-- STATUS (2026-11-10): the launcher-side wardrobe this table backed was removed, so no client code
+-- reads or writes `public.wardrobe_sync` any more. The table is deliberately LEFT IN PLACE on the
+-- live project (it is empty and self-only), and this file stays as the record of what is there and how
+-- to undo it:
+--     drop table if exists public.wardrobe_sync;
 
 -- ---- table --------------------------------------------------------------------------------
 

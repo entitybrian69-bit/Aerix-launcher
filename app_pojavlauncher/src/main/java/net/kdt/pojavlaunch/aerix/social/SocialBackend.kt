@@ -1539,56 +1539,6 @@ object SocialBackend {
         )
     }
 
-    // ---- wardrobe backup ---------------------------------------------------------------------
-    //
-    // The Wardrobe screen owns the payload; these calls only move it. Nothing here runs unless the
-    // player turns Wardrobe cloud sync on, and the table behind it (supabase/step4-wardrobe.sql)
-    // keeps every row readable and writable by its own user and by nobody else.
-
-    /** Stores the player's wardrobe snapshot, replacing the previous one. */
-    suspend fun pushWardrobeSnapshot(loadoutJson: String): Boolean = attempt {
-        ensureToken()
-        val id = userId ?: return@attempt false
-        val payload = runCatching { JsonParser.parseString(loadoutJson) }.getOrNull()
-        if (payload == null || !payload.isJsonObject) {
-            lastError = "The wardrobe snapshot is not a JSON object"
-            return@attempt false
-        }
-        val body = JsonArray().apply {
-            add(JsonObject().apply {
-                addProperty("id", id)
-                add("loadout", payload)
-            })
-        }
-        call(
-            "POST",
-            "$PROJECT_URL/rest/v1/wardrobe_sync?on_conflict=id",
-            body.toString(),
-            extraHeaders = mapOf("Prefer" to "resolution=merge-duplicates,return=minimal")
-        ) != null
-    } ?: false
-
-    /**
-     * The stored snapshot and its server timestamp, or null when there is no copy. An empty result is
-     * not an error: a player who never pushed has nothing, and the caller says so plainly.
-     */
-    suspend fun pullWardrobeSnapshot(): Pair<String, String>? = attempt {
-        ensureToken()
-        val id = userId ?: return@attempt null
-        val rows = call("GET", "$PROJECT_URL/rest/v1/wardrobe_sync?id=eq.$id&select=loadout,updated_at")
-        val row = rows?.takeIf { it.isJsonArray }?.asJsonArray
-            ?.takeIf { it.size() > 0 }?.get(0) as? JsonObject ?: return@attempt null
-        val loadout = row.get("loadout")?.takeIf { it.isJsonObject }?.toString() ?: return@attempt null
-        loadout to (row.stringOrNull("updated_at") ?: "")
-    }
-
-    /** Forgets the stored copy. The local wardrobe is untouched; this only deletes the backup. */
-    suspend fun eraseWardrobeSnapshot(): Boolean = attempt {
-        ensureToken()
-        val id = userId ?: return@attempt false
-        call("DELETE", "$PROJECT_URL/rest/v1/wardrobe_sync?id=eq.$id") != null
-    } ?: false
-
     // ---- friends, mutuals, nicknames, pins & join toasts ------------------------------------
 
     private fun sortFriends(list: List<SocialFriend>): List<SocialFriend> =
