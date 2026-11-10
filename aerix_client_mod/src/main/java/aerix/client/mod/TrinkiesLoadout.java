@@ -358,26 +358,47 @@ public final class TrinkiesLoadout {
      * file cannot hold a flourish on screen forever.
      */
     public static long playClipMillis(String animationsJson, long defaultMillis) {
-        long bounded = Math.max(250L, Math.min(6000L, defaultMillis));
+        long bounded = clampClip(defaultMillis);
         if (animationsJson == null) {
             return bounded;
         }
         try {
             Object root = parseJson(animationsJson);
             Object clips = root instanceof Map ? ((Map<?, ?>) root).get("clips") : null;
-            Object play = clips instanceof Map ? ((Map<?, ?>) clips).get("play") : null;
-            if (!(play instanceof Map)) {
+            if (!(clips instanceof Map)) {
                 return bounded;
             }
-            Object duration = ((Map<?, ?>) play).get("duration");
+            // play is the emote clip the wheel is built around; signature is the flourish a pet item
+            // carries instead, and is just as much "what this item does when you ask it to". An item
+            // with neither keeps the caller's default, which is a beat, not a bug.
+            Object clip = firstClip((Map<?, ?>) clips, "play", "signature");
+            if (clip == null) {
+                return bounded;
+            }
+            Object duration = ((Map<?, ?>) clip).get("duration");
             if (!(duration instanceof Number)) {
                 return bounded;
             }
-            long millis = Math.round(((Number) duration).doubleValue() * 1000.0);
-            return Math.max(250L, Math.min(6000L, millis));
+            return clampClip(Math.round(((Number) duration).doubleValue() * 1000.0));
         } catch (RuntimeException error) {
             return bounded;
         }
+    }
+
+    /** The first named clip that is actually an object; a null or malformed entry falls through. */
+    private static Object firstClip(Map<?, ?> clips, String... names) {
+        for (String name : names) {
+            Object candidate = clips.get(name);
+            if (candidate instanceof Map) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    /** A clip the animator can act on: at least two frames of cape, at most four seconds of show. */
+    private static long clampClip(long millis) {
+        return Math.max(250L, Math.min(6000L, millis));
     }
 
     /**

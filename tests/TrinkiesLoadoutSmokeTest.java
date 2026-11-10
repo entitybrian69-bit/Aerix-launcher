@@ -171,6 +171,13 @@ public final class TrinkiesLoadoutSmokeTest {
                         "{\"clips\":{\"idle\":{\"duration\":4.56,\"loop_mode\":\"loop\"}}}", 12, 95L) == 4, null);
         check("unreadable animation data is a non-event",
                 TrinkiesLoadout.frameTicksFromAnimation("{oops", 12, 95L) == 1, null);
+        check("a wheel press on a pet item uses that item's own signature flourish",
+                TrinkiesLoadout.playClipMillis("{\"clips\":{\"signature\":{\"duration\":2.8}}}", 900L) == 2800L
+                        && TrinkiesLoadout.playClipMillis("{\"clips\":{\"idle\":{\"duration\":5.0}}}", 900L) == 900L
+                        && TrinkiesLoadout.playClipMillis(
+                                "{\"clips\":{\"play\":{\"duration\":1.5},\"signature\":{\"duration\":9.0}}}", 900L)
+                                == 1500L,
+                "signature/priority/default coverage");
         check("a pressed emote lasts as long as its own play clip",
                 TrinkiesLoadout.playClipMillis("{\"clips\":{\"play\":{\"duration\":1.5}}}", 900L) == 1500L
                         && TrinkiesLoadout.playClipMillis("{\"clips\":{\"play\":{\"duration\":99}}}", 900L) == 6000L
