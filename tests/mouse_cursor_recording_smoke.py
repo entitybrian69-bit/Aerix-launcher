@@ -156,7 +156,15 @@ check("editing an instance is announced", 'aerixLauncherActivity("Editing' in ed
 
 print("8. the launcher fills the display")
 launcher = read(os.path.join(JAVA, "LauncherActivity.java"))
-check("the cutout is not reserved as a black rail", "bars.getLeft(), top, bars.getRight(), bottom" in launcher)
+rail = launcher[launcher.index("setOnApplyWindowInsetsListener"):launcher.index("setContentView(R.layout.activity_pojav_launcher")]
+check("the cutout is not reserved as a black rail",
+      "AerixWindowInsets.INSTANCE.update(bars.left, top, bars.right, bottom)" in rail)
+check("the bar is horizontal-only and never the cutout's depth",
+      "Type.displayCutout()" in rail and "bars.left, top, bars.right, bottom" in rail)
+# androidx.core.graphics.Insets publishes fields; getLeft() et al. do not exist there and the
+# Java compile fails on them, so the getter form has to stay out of this block.
+check("the insets are read the way this androidx version exposes them",
+      ".getLeft()" not in rail and ".getTop()" not in rail and ".getBottom()" not in rail)
 check("the reserve never double-counts the system bars",
       "int mask = WindowInsetsCompat.Type.displayCutout();" not in launcher)
 
