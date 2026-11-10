@@ -32,6 +32,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.fragment.app.FragmentActivity
@@ -279,6 +280,57 @@ fun AerixClientScreen(activity: FragmentActivity, onBack: () -> Unit) {
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.ExtraBold
                             )
+                        }
+
+                        // "Update my mods" - the only path that writes jars of ours into an
+                        // instance folder, and it needs a tap. The answer is shown, not swallowed,
+                        // so a Modrinth that did not answer reads as "unavailable" instead of success.
+                        if (installed != null) {
+                            Box(
+                                modifier = Modifier
+                                    .liquidGlass(
+                                        shape = pillShape,
+                                        tint = AerixSurface.glassTint,
+                                        strength = 0.9f
+                                    )
+                                    .background(
+                                        brush = Brush.horizontalGradient(
+                                            listOf(
+                                                Color.White.copy(alpha = 0.14f),
+                                                AerixSurface.glassBlue.copy(alpha = 0.22f)
+                                            )
+                                        ),
+                                        shape = pillShape
+                                    )
+                                    .clickable(enabled = !busy && !AerixClientInstaller.isUpdatingMods) {
+                                        scope.launch {
+                                            val summary = AerixClientInstaller.updateOwnMods(activity, installed)
+                                            refreshTick++
+                                            summary.onSuccess { text ->
+                                                Toast.makeText(activity, text, Toast.LENGTH_LONG).show()
+                                            }.onFailure { err ->
+                                                Toast.makeText(
+                                                    activity,
+                                                    err.message ?: "The mod update failed",
+                                                    Toast.LENGTH_LONG
+                                                ).show()
+                                            }
+                                        }
+                                    }
+                                    .padding(horizontal = 16.dp, vertical = 9.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = if (AerixClientInstaller.isUpdatingMods)
+                                        AerixClientInstaller.modUpdateState.ifBlank { "Updating mods..." }
+                                    else "Update my mods",
+                                    color = Color.White,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
                         }
 
                         // Liquid Glass Launch Pill (upgrades existing instance pack + WaveyCapes + FPS before launch!)

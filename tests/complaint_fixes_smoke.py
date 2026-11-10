@@ -159,4 +159,67 @@ assert 'writeStatus(runDir, world, legacyCapeStatus())' in tick
 assert 'syncLiveOptionsIfNeeded' not in mod, 'the old gamma-only path is replaced by the bridge'
 assert 'components/aerix_client_mod' in gradle
 
+# 11. A modpack belongs to the client it was built for, in the search and in the install sheet.
+discover = read(ROOT / 'app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/ui/screens/DiscoverScreen.kt')
+assert 'val result = PojavAssetBridge.searchFollowing(' in discover, \
+    'the strict filter used to return an empty page with no explanation at all'
+assert 'PojavAssetBridge.instanceTarget()' in discover, 'the search must start from the instance in use'
+assert 'followsInstance = false' in discover, 'a touched pill has to stop the follow, not fight it'
+assert 'Nothing is tagged' in discover, 'a relaxed page must say that it is relaxed'
+install_match = read(ROOT / 'app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/ui/screens/AssetInstallMatch.kt')
+assert 'internal fun loaderMatters(type: AssetType): Boolean = type.supportsLoaderFilter' in install_match, \
+    'a Fabric pack in a Forge instance is exactly what the loader check exists to catch'
+asset_bridge = read(ROOT / 'app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/bridge/PojavAssetBridge.kt')
+assert 'class AssetSearch(' in asset_bridge and 'relaxedVersion: Boolean = false' in asset_bridge
+relief = asset_bridge.split('suspend fun searchFollowing')[1].split('private suspend fun')[0]
+assert ': return@withContext AssetSearch(null)' in relief, \
+    'a failed request must stay failed: only an empty page may be relaxed'
+assert 'if (strict.projects.isNotEmpty() || (mcVersion.isNullOrBlank() && loader.isNullOrBlank()))' in relief
+
+# 12. Our mods only move when the player says so, and a modpack keeps the ones it shipped with.
+assert 'suspend fun updateOwnMods(context: Context, instance: Instance): Result<String>' in installer
+update = installer.split('suspend fun updateOwnMods')[1].split('private fun jarNamesFor')[0]
+assert 'instance.modpackSource != null' in update and 'curated.filter { it.slug == "fabric-api" }' in update, \
+    'a pack instance may only gain Fabric API, and never lose what it already has'
+assert 'force = !fromPack' in update, 'a pack must not have its version-matched jars replaced'
+assert 'AerixClientModBridge.installIfNeeded(context, gameDir)' in update
+assert 'unavailable for $mcVer' in update, 'a Modrinth that did not answer must not read as success'
+assert 'force: Boolean = false' in installer and 'if (!force && fabricId != null' in installer, \
+    'only the explicit update may replace a jar already in the folder'
+assert 'AerixClientInstaller.updateOwnMods(activity, installed)' in read(
+    ROOT / 'app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/ui/screens/AerixClientScreen.kt'), \
+    'the button is the only caller; nothing pushes mods on its own'
+
+# 13. What the launcher is doing is visible to friends, and switchable off.
+activity = read(JAVA / 'aerix/social/SocialActivity.kt')
+assert 'SocialBackend.reportLauncherActivity(' in activity
+assert 'Reading $title \u00b7 $kind' in activity and 'Building $clean' in activity
+backend = read(JAVA / 'aerix/social/SocialBackend.kt')
+assert 'fun reportLauncherActivity(line: String?)' in backend
+assert 'launcherActivityLine' in backend and 'shareLauncherActivity = p.getBoolean("share_activity", true)' in backend
+chain = backend.split('private suspend fun syncRichPresenceToServer')[1].split('val wireStatus')[0]
+assert chain.index('activeGameStatusLine') < chain.index('launcherActivityLine'), \
+    'the game session is the true sentence while a world is open'
+assert backend.index('if (!shareLauncherActivity) return') < backend.index('fun toggleBackgroundNotifications'), \
+    'Activity Off has to stop the line before it is remembered, not after'
+assert 'toggleShareLauncherActivity(!SocialBackend.shareLauncherActivity)' in read(
+    ROOT / 'app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/ui/screens/SocialUi.kt')
+assert 'SocialActivity.reading(project)' in discover and 'SocialActivity.building(' in read(
+    ROOT / 'app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/ui/screens/CreateInstanceScreen.kt')
+
+# 14. The chat glitch: no double bubble, no yank to the bottom, no menu on the wrong row.
+chat = read(JAVA / 'aerix/ui/screens/SocialChatViews.kt')
+assert 'internal fun socialMessageKey(m: SocialMessage): String' in chat, \
+    'the dedup and the list key must agree on what one message is'
+assert chat.count('socialMessageKey(') >= 3, 'the row state needs the same key, or it follows the slot'
+gate = chat.split('val pinnedToEnd = remember')[1].split('SocialPanel')[0]
+assert 'lastVisible.index >= info.totalItemsCount - 2' in gate
+assert 'if (!initialScrollDone || inGame || lastIsMine || pinnedToEnd.value)' in gate, \
+    'a receipt or a typing dot must not move the list out from under the player'
+assert 'import androidx.compose.runtime.derivedStateOf' in chat
+for snippet in ('if (alreadySent(enriched, meId, queued)) return@forEachIndexed',
+                'if (alreadySent(enriched, me, q)) return@forEachIndexed',
+                'private fun alreadySent(rows: List<SocialMessage>, me: String, queued: SocialOutboxItem)'):
+    assert snippet in backend, 'a queued send shown beside its delivered copy is the double bubble: ' + snippet
+
 print('public-complaint wiring passed')

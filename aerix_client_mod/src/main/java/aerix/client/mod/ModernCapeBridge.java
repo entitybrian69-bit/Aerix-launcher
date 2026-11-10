@@ -41,6 +41,8 @@ final class ModernCapeBridge {
     private Method[] skinAccessors;
     private int capeComponent = -1;
     private Object capeId, capeAsset, activeInfo, activeManager, activeTexture;
+    /** Why the skin itself could not be rebuilt, once the handles were already good. */
+    private String skinFailure;
     private Supplier<?> installedLookup, originalLookup;
     private final List<byte[]> frameBytes = new ArrayList<byte[]>();
     private final List<Object> frameImages = new ArrayList<Object>();
@@ -57,6 +59,10 @@ final class ModernCapeBridge {
         if (!resolved) return "not available on this version (" + failure + ")";
         if (frameImages.isEmpty()) return "no cape frames in config/aerix_cape_frames yet";
         if (activeTexture == null) return "waiting for the player to load in";
+        // A skin that cannot be rebuilt looks exactly like a cape that is not wanted, so the reason
+        // is carried into the sentence rather than left in a log nobody opens.
+        if (skinFailure != null)
+            return "frames live, skin override failed: " + skinFailure;
         return "animating " + frameImages.size() + " frames";
     }
 
@@ -281,7 +287,10 @@ final class ModernCapeBridge {
                 Object skin = withLocalCape(original);
                 previous = original; result = skin;
                 return skin;
-            } catch (Throwable ignored) { return original; }
+            } catch (Throwable failure) {
+                skinFailure = brief(failure);
+                return original;
+            }
         }
     }
 

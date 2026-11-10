@@ -61,6 +61,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -227,9 +228,7 @@ fun SocialConversationPanel(
         } else {
             emptyList()
         }
-        raw.distinctBy { m ->
-            m.localTempId ?: if (m.id != 0L) "id_${m.id}" else "ts_${m.sender}_${m.atMs}_${m.body.hashCode()}"
-        }
+        raw.distinctBy { m -> socialMessageKey(m) }
     }
 
     val editTextHolder = remember { arrayOfNulls<AppCompatEditText>(1) }
@@ -355,9 +354,23 @@ fun SocialConversationPanel(
     }
 
     val lastMsgKey = messages.lastOrNull()?.let { "${it.id}_${it.isRead}" }
+    // Whether the player is at the end of the conversation, which is the only place it is safe to
+    // keep snapping them back to. Reading history is what makes an unsolicited scroll a glitch.
+    val pinnedToEnd = remember {
+        derivedStateOf {
+            val info = listState.layoutInfo
+            val lastVisible = info.visibleItemsInfo.lastOrNull()
+            lastVisible == null || lastVisible.index >= info.totalItemsCount - 2
+        }
+    }
     LaunchedEffect(messages.size, lastMsgKey, activeTyper != null) {
         val totalItems = messages.size + (if (activeTyper != null) 1 else 0)
-        if (totalItems > 0) {
+        if (totalItems <= 0) return@LaunchedEffect
+        // Your own send always follows - you want to see what you just wrote. Anything else (a
+        // receipt flipping on the last bubble, the typing dot appearing) moves the list only while
+        // the end of it is already in view.
+        val lastIsMine = messages.lastOrNull()?.sender == myId
+        if (!initialScrollDone || inGame || lastIsMine || pinnedToEnd.value) {
             runCatching {
                 if (!initialScrollDone || inGame) {
                     listState.scrollToItem(totalItems - 1)
@@ -564,12 +577,13 @@ fun SocialConversationPanel(
                 ) {
                     items(
                         items = messages,
-                        key = { m ->
-                            m.localTempId ?: if (m.id != 0L) "id_${m.id}" else "ts_${m.sender}_${m.atMs}_${m.body.hashCode()}"
-                        }
+                        key = { m -> socialMessageKey(m) }
                     ) { msg ->
                         val isMine = msg.sender == myId
-                        var menuOpen by remember { mutableStateOf(false) }
+                        // Keyed by the message, not by the slot: an unkeyed remember follows the
+                        // position, so opening one bubble's menu opened whichever bubble had moved
+                        // into it - and the list moved on every receipt.
+                        var menuOpen by remember(socialMessageKey(msg)) { mutableStateOf(false) }
 
                         Column(
                             modifier = Modifier.fillMaxWidth(),
@@ -1218,3 +1232,14 @@ private fun formatChatTimestamp(epochMs: Long): String {
     chatTimestampCache[epochMs] = formatted
     return formatted
 }
+
+/**
+ * The identity of one message in this conversation.
+ *
+ * A send that has not been confirmed yet carries only the id the launcher made up, so its temp id
+ * is the key; a confirmed row keys on its server id. One function for both, because the dedup that
+ * hides a double bubble and the list key that recycles a row have to agree exactly - two different
+ * rules for "is this the same message" is how one message ends up on screen twice.
+ */
+internal fun socialMessageKey(m: SocialMessage): String =
+    m.localTempId ?: if (m.id != 0L) "id_${m.id}" else "ts_${m.sender}_${m.atMs}_${m.body.hashCode()}"

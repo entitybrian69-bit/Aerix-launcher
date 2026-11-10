@@ -66,6 +66,11 @@ object AerixClientInstaller {
         private set
     var lastError by mutableStateOf<String?>(null)
         private set
+    /** "Update my mods" is on the network: one at a time, and the pill says so while it runs. */
+    var isUpdatingMods by mutableStateOf(false)
+        private set
+    var modUpdateState by mutableStateOf("")
+        private set
 
     fun instanceNameFor(mcVersion: String): String = "Aerix Client $mcVersion"
 
@@ -231,6 +236,75 @@ object AerixClientInstaller {
         worker.name = "Aerix-ModRepair"
         worker.isDaemon = true
         worker.start()
+    }
+
+    /**
+     * "Update my mods": the player asked, so this is the one moment the launcher writes jars a
+     * player could have chosen themselves into an instance folder it does not own.
+     *
+     * A pack instance is held to the two files the Client features cannot work without - our own
+     * bridge mod and Fabric API - and even those are only added when missing: the pack's author
+     * picked its mods, and replacing their version-matched Sodium with ours is a crash on launch.
+     * An instance the launcher built gets the whole curated list refreshed to the newest file for
+     * its version. Nothing calls this except the button, and the summary says what actually moved,
+     * so a Modrinth that did not answer cannot be mistaken for "up to date".
+     */
+    suspend fun updateOwnMods(context: Context, instance: Instance): Result<String> = withContext(Dispatchers.IO) {
+        if (isUpdatingMods)
+            return@withContext Result.failure(IllegalStateException("A mod update is already running"))
+        isUpdatingMods = true
+        modUpdateState = "Asking Modrinth…"
+        try {
+            val gameDir = instance.gameDirectory
+                ?: return@withContext Result.failure(IllegalStateException("This instance has no folder of its own"))
+            val modsDir = File(gameDir, "mods").apply { mkdirs() }
+            val mcVer = AerixClientPackGenerator.resolveMcVersionFromInstance(
+                instance.versionId ?: instance.name, AerixClientStore.selectedClientVersion
+            )
+            val fromPack = instance.modpackSource != null
+            val bridgeOk = runCatching { AerixClientModBridge.installIfNeeded(context, gameDir) }.isSuccess
+            val curated = buildModListForVersion(mcVer)
+            val wanted = if (fromPack) curated.filter { it.slug == "fabric-api" } else curated
+            val updated = ArrayList<String>()
+            val current = ArrayList<String>()
+            val missing = ArrayList<String>()
+            wanted.forEachIndexed { index, entry ->
+                modUpdateState = "${index + 1}/${wanted.size} · ${entry.title}"
+                val before = jarNamesFor(modsDir, entry.slug)
+                val ok = runCatching {
+                    ensureModrinthJar(modsDir, entry.slug, mcVer, depth = 0, force = !fromPack)
+                }.getOrDefault(false)
+                val after = jarNamesFor(modsDir, entry.slug)
+                when {
+                    !ok -> missing += entry.title
+                    after != before -> updated += entry.title
+                    else -> current += entry.title
+                }
+            }
+            val summary = buildString {
+                append(
+                    if (bridgeOk) "Aerix Client mod written to the instance"
+                    else "Aerix Client mod could NOT be written"
+                )
+                if (fromPack) append(" · a modpack keeps its own mods: only missing files were added")
+                if (updated.isNotEmpty()) append(" · updated: ").append(updated.joinToString(", "))
+                if (current.isNotEmpty()) append(" · already current: ").append(current.size)
+                if (missing.isNotEmpty()) append(" · unavailable for $mcVer: ").append(missing.joinToString(", "))
+            }
+            modUpdateState = summary
+            if (!bridgeOk) Result.failure(IllegalStateException(summary)) else Result.success(summary)
+        } finally {
+            isUpdatingMods = false
+        }
+    }
+
+    /** The jars of one project in the mods folder, so an update can tell new from unchanged. */
+    private fun jarNamesFor(modsDir: File, slug: String): Set<String> {
+        val key = slug.replace("-", "").replace("_", "").lowercase()
+        return modsDir.listFiles()?.filter { file ->
+            file.isFile && file.extension.equals("jar", true) &&
+                file.name.replace("-", "").replace("_", "").lowercase().contains(key)
+        }?.map { it.name }?.toSet() ?: emptySet()
     }
 
     suspend fun installClientVersion(context: Context, mcVersion: String): Result<Instance> =
@@ -416,15 +490,26 @@ object AerixClientInstaller {
         }
     }
 
-    private fun ensureModrinthJar(modsDir: File, projectSlugOrId: String, mcVersion: String, depth: Int): Boolean {
+    private fun ensureModrinthJar(
+        modsDir: File,
+        projectSlugOrId: String,
+        mcVersion: String,
+        depth: Int,
+        /**
+         * An explicit update asks for the newest file even where a jar of this mod already sits.
+         * Everything that runs by itself - the launch path, the repair worker - leaves this false,
+         * so a file the player put in the folder is never overwritten unasked.
+         */
+        force: Boolean = false
+    ): Boolean {
         val fabricId = when (projectSlugOrId) {
             "sodium", "AANobbMI" -> "sodium"
             "podium", "fW8woQj4" -> "podium"
             else -> null
         }
-        if (fabricId != null && hasFabricMod(modsDir, fabricId)) return true
+        if (!force && fabricId != null && hasFabricMod(modsDir, fabricId)) return true
         val normalizedKey = projectSlugOrId.replace("-", "").lowercase()
-        val alreadyExists = fabricId == null && modsDir.listFiles()?.any { f ->
+        val alreadyExists = !force && fabricId == null && modsDir.listFiles()?.any { f ->
             f.isFile && f.extension.equals("jar", true) &&
                 f.name.replace("-", "").replace("_", "").lowercase().contains(normalizedKey)
         } == true
@@ -485,6 +570,17 @@ object AerixClientInstaller {
 
         val targetFile = File(modsDir, fileName)
         if (targetFile.isFile && targetFile.length() > 1024L) return true
+        if (force) {
+            // Two jars of one mod id is a crash on launch, so the file an update replaces goes
+            // with it - and only once the new one has been chosen, never before.
+            runCatching {
+                modsDir.listFiles()?.forEach { stale ->
+                    if (stale.isFile && stale.extension.equals("jar", true) && stale.name != fileName &&
+                        stale.name.replace("-", "").replace("_", "").lowercase().contains(normalizedKey)
+                    ) stale.delete()
+                }
+            }
+        }
 
         val tmpFile = File(modsDir, "$fileName.part")
         val dlReq = Request.Builder()

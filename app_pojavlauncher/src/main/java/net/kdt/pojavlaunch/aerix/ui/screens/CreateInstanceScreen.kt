@@ -104,6 +104,7 @@ import net.kdt.pojavlaunch.aerix.theme.AerixRadii
 import net.kdt.pojavlaunch.aerix.theme.AerixSpacing
 import net.kdt.pojavlaunch.aerix.theme.AerixSurface
 import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
+import net.kdt.pojavlaunch.aerix.social.SocialActivity
 
 /** Version tabs, the same grouping Pojav's VersionListAdapter builds. */
 private val versionTabs = listOf(
@@ -257,6 +258,7 @@ fun CreateInstanceScreen(activity: FragmentActivity, onClose: () -> Unit) {
                     iconRes = R.drawable.aerix_ic_download,
                     enabled = canInstall,
                     onClick = {
+                        SocialActivity.building(name.ifBlank { loader.displayName })
                         PojavCreateInstanceBridge.install(
                             context = activity,
                             loader = loader,

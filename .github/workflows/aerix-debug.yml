@@ -54,6 +54,19 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Run the cape bridge against Minecraft fixtures
+        run: |
+          set +e
+          python3 tests/modern_cape_smoke.py > "$RUNNER_TEMP/cape.log" 2>&1
+          status=$?
+          if [ "$status" -ne 0 ]; then
+            # Annotations are the only part of a red job that survives to the API, so the reason the
+            # bridge gave up has to be in one - not forty lines of log nobody scrolls.
+            echo "::error title=Cape bridge smoke::$(tr '\n' '|' < "$RUNNER_TEMP/cape.log" | tail -c 1500)"
+          fi
+          tail -40 "$RUNNER_TEMP/cape.log"
+          exit "$status"
+
       - name: Verify Client smoke tests
         run: |
           trap 'echo "::error title=Smoke test failed::$BASH_COMMAND"' ERR
@@ -61,7 +74,6 @@ jobs:
           python3 tests/branding_identity_smoke.py
           python3 tests/data_migration_smoke.py
           python3 tests/discord_presence_logo_smoke.py
-          python3 tests/modern_cape_smoke.py
           python3 tests/social_profile_cosmetics_smoke.py
           python3 tests/skin_preview_camera_smoke.py
           python3 tests/client_background_smoke.py

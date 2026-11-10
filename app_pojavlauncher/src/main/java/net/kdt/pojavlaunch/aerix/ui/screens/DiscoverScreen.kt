@@ -148,6 +148,7 @@ import net.kdt.pojavlaunch.aerix.theme.AerixSurface
 import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
 import net.kdt.pojavlaunch.aerix.ui.AerixNav
 import net.kdt.pojavlaunch.aerix.ui.LauncherSection
+import net.kdt.pojavlaunch.aerix.social.SocialActivity
 import net.kdt.pojavlaunch.utils.DownloadUtils
 import java.io.ByteArrayOutputStream
 
@@ -202,6 +203,11 @@ private val commonMcVersions = listOf(
     "1.19.4", "1.19.2",
     "1.18.2", "1.17.1", "1.16.5", "1.12.2", "1.8.9", "1.7.10"
 )
+
+/** "fabric" reads "Fabric" in the note that explains a search that had to drop a filter. */
+private fun loaderLabel(loader: String?): String = loader?.let { id ->
+    filterLoaders.firstOrNull { it.first == id }?.second ?: id.replaceFirstChar { it.uppercase() }
+} ?: "any loader"
 
 private val filterLoaders = listOf(
     "fabric" to "Fabric",
@@ -268,6 +274,13 @@ fun DiscoverScreen(activity: FragmentActivity, navigate: (LauncherSection) -> Un
         activeProject = null
         returnToReleases = false
         AerixDownloadRequest.type = null
+    }
+
+    // The friends list reads this: which mod or pack the player is actually looking at. Only the
+    // detail card is named - a list of thirty cards is not "browsing something" yet.
+    LaunchedEffect(activeProject) {
+        val project = activeProject
+        if (project != null) SocialActivity.reading(project) else SocialActivity.idle()
     }
 
     BackHandler(enabled = activeProject != null, onBack = closeDetail)
@@ -373,6 +386,12 @@ private fun SearchAssetsContent(
     var failed by remember { mutableStateOf(false) }
     var reloadNonce by remember { mutableIntStateOf(0) }
     var installedFingerprints by remember { mutableStateOf<Set<String>>(emptySet()) }
+    // Set when a filtered search came back empty and had to be asked again with less on it: the
+    // rows below then say so, rather than pretending they all match the pills above.
+    var relaxedNote by remember { mutableStateOf<String?>(null) }
+    // The version and loader of the instance the player is on, used until a pill is touched.
+    var followsInstance by rememberSaveable(type) { mutableStateOf(true) }
+    var showFollowMenu by remember { mutableStateOf(false) }
 
     // The filters of the source: every Minecraft version it knows, and the categories of the
     // content type as that source names them. They follow the platform switch, because the two
@@ -400,6 +419,18 @@ private fun SearchAssetsContent(
         installedFingerprints = PojavAssetBridge.installedFingerprints(type)
     }
 
+    // Searching for a pack or a mod while an instance is selected is a search *for that instance*,
+    // so its version and loader are the filters to start with: "Fabric 1.21.4" instead of
+    // everything, which is what made a pack for the client the player picked hard to find. The
+    // player's own choice wins the moment a pill is touched - that turns following off.
+    LaunchedEffect(type, followsInstance, selectedInstance?.source) {
+        if (!followsInstance || !type.supportsLoaderFilter) return@LaunchedEffect
+        val target = PojavAssetBridge.instanceTarget()
+        mcVersion = target.mcVersion
+        loader = filterLoaders.firstOrNull { it.first == target.loader?.lowercase() }?.first
+        pageIndex = 1
+    }
+
     LaunchedEffect(type, platform) {
         facets = AssetFacets()
         facets = PojavAssetBridge.facets(context, platform, type)
@@ -409,7 +440,7 @@ private fun SearchAssetsContent(
         loading = true
         failed = false
         val offset = (pageIndex - 1).coerceAtLeast(0) * PojavAssetBridge.PAGE_SIZE
-        val result = PojavAssetBridge.search(
+        val result = PojavAssetBridge.searchFollowing(
             context = context,
             platform = platform,
             type = type,
@@ -419,8 +450,17 @@ private fun SearchAssetsContent(
             offset = offset,
             categories = selectedCategories
         )
-        page = result
-        failed = result == null
+        page = result.page
+        failed = result.page == null
+        relaxedNote = when {
+            result.relaxedLoader && result.relaxedVersion ->
+                "Nothing is tagged ${loaderLabel(loader)} for ${mcVersion ?: "this version"} - " +
+                    "showing every loader and every version, so check each card."
+            result.relaxedLoader ->
+                "Nothing is tagged ${loaderLabel(loader)} - showing every loader for " +
+                    "${mcVersion ?: "every version"}."
+            else -> null
+        }
         loading = false
     }
 
@@ -560,6 +600,41 @@ private fun SearchAssetsContent(
                 onClick = { showVersionPicker = true }
             )
 
+            // Which filters belong to the instance, and the way out of them. Following is a switch
+            // rather than a filter of its own: it decides what the two pills beside it start at.
+            if (type.supportsLoaderFilter) {
+                Box {
+                    DiscoverFilterDropdownPill(
+                        label = if (followsInstance)
+                            "Instance: ${selectedInstance?.name?.take(18) ?: "selected"}"
+                        else "Filters: manual",
+                        onClick = { showFollowMenu = true }
+                    )
+                    DropdownMenu(
+                        expanded = showFollowMenu,
+                        onDismissRequest = { showFollowMenu = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Follow this instance") },
+                            onClick = {
+                                showFollowMenu = false
+                                followsInstance = true
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Search every instance") },
+                            onClick = {
+                                showFollowMenu = false
+                                followsInstance = false
+                                loader = null
+                                mcVersion = null
+                                pageIndex = 1
+                            }
+                        )
+                    }
+                }
+            }
+
             // Loader Dropdown Pill ("Loader: All ▾")
             if (type.supportsLoaderFilter) {
                 Box {
@@ -576,6 +651,7 @@ private fun SearchAssetsContent(
                             text = { Text("All Loaders") },
                             onClick = {
                                 showLoaderMenu = false
+                                followsInstance = false
                                 loader = null
                                 pageIndex = 1
                             }
@@ -585,6 +661,7 @@ private fun SearchAssetsContent(
                                 text = { Text(label) },
                                 onClick = {
                                     showLoaderMenu = false
+                                    followsInstance = false
                                     loader = id
                                     pageIndex = 1
                                 }
@@ -605,6 +682,8 @@ private fun SearchAssetsContent(
                 selectedId = mcVersion,
                 onPick = {
                     mcVersion = it
+                    // Touching the version pill is the player speaking for the instance.
+                    followsInstance = false
                     pageIndex = 1
                     showVersionPicker = false
                 },
@@ -628,6 +707,28 @@ private fun SearchAssetsContent(
                 },
                 onDismiss = { showCategoryPicker = false }
             )
+        }
+
+        // Why the rows below are not all tagged for the pills above, said out loud: a Forge pack on
+        // a Fabric screen is worse than an honest empty list, so the note has to be visible.
+        relaxedNote?.let { note ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(AerixRadii.controlSmall))
+                    .background(AerixSurface.panelRaised)
+                    .padding(horizontal = AerixSpacing.smPlus, vertical = AerixSpacing.xs),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(AerixSpacing.xs)
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.aerix_ic_info_outlined),
+                    contentDescription = null,
+                    tint = AerixSurface.textSecondary,
+                    modifier = Modifier.size(16.dp)
+                )
+                Text(text = note, fontSize = 12.sp, color = AerixSurface.textSecondary)
+            }
         }
 
         // Results area

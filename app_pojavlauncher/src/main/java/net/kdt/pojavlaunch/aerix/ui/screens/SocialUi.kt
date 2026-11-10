@@ -925,6 +925,14 @@ fun SocialStatusDialog(
                         ) {
                             SocialBackend.toggleBackgroundNotifications(!bgAlerts)
                         }
+                        // The launcher alongside the game and the Discord link: what I am reading,
+                        // what I am building. One pill, because it is one decision.
+                        SocialButton(
+                            label = if (SocialBackend.shareLauncherActivity) "My Activity ✓" else "Activity Off",
+                            filled = SocialBackend.shareLauncherActivity
+                        ) {
+                            SocialBackend.toggleShareLauncherActivity(!SocialBackend.shareLauncherActivity)
+                        }
                     }
                     Text(
                         "${customText.length}/52",
@@ -932,6 +940,16 @@ fun SocialStatusDialog(
                         color = AerixSurface.textMuted
                     )
                 }
+
+                Text(
+                    text = if (SocialBackend.shareLauncherActivity)
+                        "Friends see what you are doing here - the mod or pack you are reading, the instance you are building, and the world you are in."
+                    else "Friends see your status text and the world you are in, nothing about this screen.",
+                    fontSize = 10.5.sp,
+                    color = AerixSurface.textMuted,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
 
                 // Actions
                 Row(

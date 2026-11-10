@@ -79,7 +79,7 @@ def fixtures(named):
           ModernCapeBridge bridge=new ModernCapeBridge(Test$SUFFIX$.class.getClassLoader(),$NAMED$);
           bridge.tick(mc,new java.io.File(args[0]));
           {skin} overridden=info.{getskin}();
-          check(overridden!=original && overridden.b==body && overridden.m.equals("slim") && overridden.s,"preserve skin");
+          check(overridden!=original && overridden.b==body && overridden.m.equals("slim") && overridden.s,"preserve skin ["+bridge.status()+"]");
           check(overridden.c!=null && overridden.c==overridden.e,"cape and elytra");
           check(remote.{getskin}()==original,"remote player unchanged");
           {id} capeId={id}.{mkid}("aerix","local_cape");

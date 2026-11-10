@@ -30,9 +30,12 @@ private val MOD_LOADERS = setOf("fabric", "forge", "neoforge", "quilt", "liteloa
  * Whether a loader checkbox means anything for [type]. Resource packs, shaders and worlds run on
  * any instance, and their platform "loaders" are things like "iris" or "minecraft", which no
  * instance runs: only mods and modpacks are tied to a loader.
+ *
+ * A modpack counts as tied to one, because it is: a Fabric pack in a Forge instance does not load,
+ * and its own mod list assumes the loader it ships with. Leaving it out of the check is what let
+ * the install sheet tick an instance that could never open the pack.
  */
-internal fun loaderMatters(type: AssetType): Boolean =
-    type.supportsLoaderFilter && type != AssetType.MODPACK
+internal fun loaderMatters(type: AssetType): Boolean = type.supportsLoaderFilter
 
 /** "1.16" in a file's version list covers every 1.16.x instance; anything else has to match. */
 internal fun fileVersionMatches(fileVersion: String, instanceVersion: String?): Boolean {
