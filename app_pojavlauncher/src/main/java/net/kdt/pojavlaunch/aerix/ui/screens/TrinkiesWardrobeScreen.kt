@@ -470,7 +470,7 @@ private data class InstanceCosmeticState(val name: String, val optedOut: Boolean
  * The per-instance half of the same decision. Cosmetics are a property of the account, but a player
  * can exempt the folder they are about to launch - a vanilla-speedrun instance, a server whose resource
  * pack already does the job - without turning the wardrobe off everywhere. The answer lives in that
- * instance's own `trinkies/disabled` marker, so it survives an export or a share, and toggling it
+ * instance's own `trinkies/disabled` marker, so it travels with the folder, and toggling it
  * re-syncs that instance right away: the loadout is rewritten emptied, so a game that is already
  * running unequips on its next poll rather than keeping the look the player just declined.
  */

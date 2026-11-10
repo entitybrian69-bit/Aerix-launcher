@@ -36,10 +36,11 @@ object TrinkiesInstaller {
 
     /**
      * Per-instance cosmetics opt-out, kept as a marker file inside the instance rather than a new
-     * `Instance` field: `<game directory>/trinkies/disabled`. A file travels with the folder on
-     * import, export and world-share without every reader of `instances.json` having to learn a new
-     * name first, and it sits next to the `equipped.json` it makes the point of. Cosmetics are on
-     * unless the marker exists.
+     * `Instance` field: `<game directory>/trinkies/disabled`. `instances.json` is written by several
+     * code paths, and a Gson boolean missing from an old file reads as `false` - for an "enabled"
+     * flag that quietly strips every existing instance of its look. A marker has no schema to age:
+     * it travels with the folder through any copy or backup, and it sits next to the `equipped.json`
+     * it makes the point of. Cosmetics are on unless the file exists.
      *
      * This turns off *cosmetics*, not the mod: an opted-out instance still gets the Trinkies JAR and
      * the launcher's own animated cape, because the player's client tweaks there are not what the
