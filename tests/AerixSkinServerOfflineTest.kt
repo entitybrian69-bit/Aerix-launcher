@@ -80,6 +80,41 @@ fun main() {
     val redirected = URL("$base/sessionserver/session/minecraft/profile/$uuid").openConnection() as HttpURLConnection
     check(redirected.responseCode == 204) { "Redirected image was accepted" }
     AerixSkinServer.stop()
+    // The per-instance opt-out is decided here, at the one seam that knows which folder the game is
+    // starting from, so it has to be observable here: a marker in that folder must change what the
+    // cosmetics layer is asked for, and its absence must not.
+    val instanceDir = File(net.kdt.pojavlaunch.Tools.DIR_DATA, "cosmetics-instance")
+    check(instanceDir.mkdirs()) { "Could not create the instance directory for the opt-out check" }
+    net.kdt.pojavlaunch.instances.Instances.selected =
+        net.kdt.pojavlaunch.instances.Instance(isAerixClient = true, gameDirectory = instanceDir)
+    val bakesBefore = net.kdt.pojavlaunch.aerix.client.AerixClientCosmetics.skinBakes
+    base = launch()
+    check(base.isNotEmpty()) { "A Trinkies instance must still get the local bridge" }
+    check(net.kdt.pojavlaunch.aerix.client.AerixClientCosmetics.skinBakes > bakesBefore) {
+        "A supported instance must ask the cosmetics layer for the account skin"
+    }
+    check(net.kdt.pojavlaunch.aerix.client.AerixClientCosmetics.lastSkinAllowed == true) {
+        "An instance without the marker must have its wardrobe baked"
+    }
+    check(net.kdt.pojavlaunch.aerix.client.AerixClientCosmetics.lastCapeAllowed == true) {
+        "An instance without the marker must have its cape patch baked"
+    }
+    val marker = File(instanceDir, "trinkies/disabled")
+    check(marker.parentFile!!.mkdirs() && marker.createNewFile()) { "Could not write the opt-out marker" }
+    base = launch()
+    check(net.kdt.pojavlaunch.aerix.client.AerixClientCosmetics.lastSkinAllowed == false) {
+        "The opt-out marker did not reach the skin bake"
+    }
+    check(net.kdt.pojavlaunch.aerix.client.AerixClientCosmetics.lastCapeAllowed == false) {
+        "The opt-out marker did not reach the cape resolve"
+    }
+    File(instanceDir, "trinkies/disabled").delete()
+    base = launch()
+    check(net.kdt.pojavlaunch.aerix.client.AerixClientCosmetics.lastSkinAllowed == true) {
+        "Clearing the marker must give the instance its cosmetics back"
+    }
+    AerixSkinServer.stop()
+    net.kdt.pojavlaunch.instances.Instances.selected = null
     File(net.kdt.pojavlaunch.Tools.DIR_DATA).deleteRecursively()
     println("Offline local and shared profile bridge checks passed")
 }

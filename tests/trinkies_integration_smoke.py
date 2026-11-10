@@ -337,5 +337,90 @@ class TrinkiesIntegrationSmoke(unittest.TestCase):
         self.assertNotIn("CATALOG ONLY · NO RENDERER", wardrobe)
 
 
+    def test_the_offline_skin_server_stubs_track_the_real_cosmetics_signatures(self):
+        """The debug workflow compiles `AerixSkinServer.kt` on its own against hand-written stubs in
+        `tests/skinserver_stubs/`, so the entry points it calls have to exist there with the same
+        shape. That is the one place a widened signature shows up as a Kotlin compile error rather
+        than a behaviour change, and it is worth catching before a push: a default parameter on the
+        real function is invisible to every other gate in this file."""
+        stub_dir = ROOT / "tests/skinserver_stubs"
+        real_client = (APP / "client/AerixClientCosmetics.kt").read_text()
+        real_installer = (APP / "client/TrinkiesInstaller.kt").read_text()
+        stub_client = (stub_dir / "client.kt").read_text()
+        stub_instances = (stub_dir / "instances.kt").read_text()
+        offline_test = (ROOT / "tests/AerixSkinServerOfflineTest.kt").read_text()
+
+        def signature(source, name):
+            """`(parameter count, required count)` of `fun name(...)`, or None when absent."""
+            marker = "fun %s(" % name
+            at = source.find(marker)
+            if at < 0:
+                return None
+            open_at = at + len(marker) - 1
+            depth = 0
+            end = -1
+            for index in range(open_at, len(source)):
+                char = source[index]
+                if char == "(":
+                    depth += 1
+                elif char == ")":
+                    depth -= 1
+                    if depth == 0:
+                        end = index
+                        break
+            self.assertGreater(end, 0, "unbalanced signature for %s" % name)
+            body = source[open_at + 1:end].strip()
+            if not body:
+                return 0, 0
+            parts, depth, current = [], 0, ""
+            for char in body:
+                if char in "([{":
+                    depth += 1
+                elif char in ")]}":
+                    depth -= 1
+                if char == "," and depth == 0:
+                    parts.append(current)
+                    current = ""
+                else:
+                    current += char
+            parts.append(current)
+            parts = [part.strip() for part in parts if part.strip()]
+            return len(parts), sum(1 for part in parts if "=" not in part)
+
+        for label, real, names in (
+            ("AerixClientCosmetics", real_client, ("applyWardrobeToSkin", "resolveInGameCapeBytes")),
+            ("TrinkiesInstaller", real_installer, ("isSupportedInstance", "isCosmeticsOptedOut")),
+        ):
+            for name in names:
+                declared = signature(real, name)
+                mirrored = signature(stub_client, name)
+                self.assertIsNotNone(declared, "%s must exist in %s.kt" % (name, label))
+                self.assertIsNotNone(
+                    mirrored, "%s is missing from the CI stub in skinserver_stubs/client.kt" % name
+                )
+                self.assertEqual(
+                    declared[0], mirrored[0],
+                    "%s: the stub takes %d parameter(s), the real function takes %d"
+                    % (name, mirrored[0], declared[0]),
+                )
+                self.assertEqual(
+                    declared[1], mirrored[1],
+                    "%s: defaults must be mirrored too, or the stub stops accepting bare calls" % name,
+                )
+
+        # The marker has to be readable by name in both worlds, and the stub Instance has to carry
+        # the folder the real reader wants, or the opt-out is untestable offline.
+        marker = re.search(r'const val COSMETICS_OPT_OUT_MARKER = "([^"]+)"', real_installer)
+        self.assertIsNotNone(marker, "the marker path must stay a single named constant")
+        self.assertIn('File(it, "%s")' % marker.group(1), stub_client)
+        self.assertIn("gameDirectory", stub_instances)
+        self.assertIn("var selected", stub_instances)
+        # ...and the offline test must exercise both halves of the decision, not just compile.
+        self.assertIn('File(instanceDir, "%s")' % marker.group(1), offline_test)
+        self.assertIn("lastSkinAllowed == false", offline_test)
+        self.assertIn("lastSkinAllowed == true", offline_test)
+        self.assertIn("lastCapeAllowed == false", offline_test)
+
+
 if __name__ == "__main__":
     unittest.main()
