@@ -21,6 +21,9 @@ class Display {
     }
 
     class Mode internal constructor(private val spec: ScreenMode) {
+        /** The mode's nominal rate: rounded, and the only rate member every SDK level binds. */
+        @Suppress("DEPRECATION")
+        val refreshRate: Float get() = spec.peakHz
         val physicalWidth: Int get() = spec.width
         val physicalHeight: Int get() = spec.height
         val physicalRefreshRate: Float get() = spec.liveHz
@@ -39,19 +42,55 @@ class WindowManager {
 
     class LayoutParams {
         var preferredDisplayModeId: Int = 0
+        @Suppress("DEPRECATION")
+        var preferredRefreshRate: Float = 0f
+
+        fun copyFrom(other: LayoutParams) {
+            preferredDisplayModeId = other.preferredDisplayModeId
+            preferredRefreshRate = other.preferredRefreshRate
+        }
+
         companion object {
             const val FRAME_RATE_COMPATIBILITY_DEFAULT = 0
         }
     }
 }
 
+class View {
+    companion object {
+        const val REQUESTED_FRAME_RATE_CATEGORY_UNSPECIFIED = 0
+        const val REQUESTED_FRAME_RATE_CATEGORY_NORMAL = 1
+        const val REQUESTED_FRAME_RATE_CATEGORY_HIGH = 2
+    }
+
+    fun setRequestedFrameRate(category: Int) {
+        FakeScreen.writtenFrameRateCategory = category
+    }
+}
+
 class Window {
-    var attributes: WindowManager.LayoutParams = WindowManager.LayoutParams()
+    val decorView: View = View()
+
+    private val attrs = WindowManager.LayoutParams()
+
+    /**
+     * Getters hand out a copy and setters record only what actually changed, because that is what the
+     * framework does: production code reads the attributes, mutates them, and writes the same instance
+     * back, so a naive recorder would report every field as written on every pass.
+     */
+    var attributes: WindowManager.LayoutParams
+        get() = WindowManager.LayoutParams().also { it.copyFrom(attrs) }
         set(value) {
-            field = value
-            FakeScreen.writtenModeId = value.preferredDisplayModeId
+            if (attrs.preferredDisplayModeId != value.preferredDisplayModeId) {
+                FakeScreen.writtenModeId = value.preferredDisplayModeId
+            }
+            if (attrs.preferredRefreshRate != value.preferredRefreshRate) {
+                FakeScreen.writtenPreferredRate = value.preferredRefreshRate
+            }
+            attrs.copyFrom(value)
         }
 
+    /** Reached only reflectively by the production code, so it must be a real public method. */
     fun setFrameRate(rate: Float, compatibility: Int) {
         FakeScreen.writtenFrameRate = rate
     }

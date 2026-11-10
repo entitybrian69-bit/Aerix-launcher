@@ -93,8 +93,23 @@ assert 'Build.VERSION.SDK_INT >= Build.VERSION_CODES.R' in adapter, \
     'Display.getMode/getPossibleRefreshRates need an API 30 guard'
 assert 'Build.VERSION.SDK_INT >= Build.VERSION_CODES.S' in adapter, \
     'Window.setFrameRate needs an API 31 guard'
-assert 'FRANE' not in adapter and 'FRAME_RATE_COMPATIBILITY_DEFAULT' in adapter
-assert 'getPhysicalRefreshRate' in adapter, 'rounded refresh rates must not be used for comparison'
+# The SDK surface this module compiles against does not bind every rate member by name, so the exact
+# (unrounded) rates and the frame-rate vote are reached reflectively - and the two levers that do bind
+# are referenced directly. If that ever flips, these greps are what notice it.
+assert 'floatMember(mode, "getPhysicalRefreshRate")' in adapter, \
+    'the unrounded mode rate must be read reflectively, not assumed bindable'
+assert 'getPossibleRefreshRates' in adapter, 'the adaptive rate range must be read reflectively'
+assert '"setFrameRate", Float::class.javaPrimitiveType' in adapter, \
+    'Window.setFrameRate must be reached reflectively with its real signature'
+assert 'FRAME_RATE_COMPATIBILITY_DEFAULT' in adapter
+assert 'preferredRefreshRate' in adapter, \
+    'the API 17 rate preference is the fallback on ROMs that ignore the newer levers'
+assert 'REQUESTED_FRAME_RATE_CATEGORY_HIGH' in adapter and 'REQUESTED_FRAME_RATE_CATEGORY_UNSPECIFIED' in adapter, \
+    'asking for the high category and withdrawing it must both be present'
+assert '"setRequestedFrameRate", Int::class.javaPrimitiveType' in adapter or \
+    'getMethod("setRequestedFrameRate", Int::class.javaPrimitiveType)' in adapter, \
+    'the view category lever must be looked up at runtime, never hardcoded against a guess'
+assert 'getField(constant)' in adapter, 'the framework constant must be read from the platform'
 
 # No mechanism here needs a permission: only documented window levers, no settings/global writes.
 for forbidden in ('Settings.System', 'Settings.Global', 'WRITE_SECURE_SETTINGS', 'su -c',

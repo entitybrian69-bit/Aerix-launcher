@@ -21,9 +21,12 @@ object FakeScreen {
     /** Emulated `Build.VERSION.SDK_INT`, so a test can stand in for Android 11 and for Android 12+. */
     var sdkInt: Int = 34
 
-    /** What the window was told: the mode id written into its LayoutParams, and the rate voted. */
+    /** What the window was told: the mode id and rate written into its LayoutParams, the rate voted
+     *  through `Window.setFrameRate`, and the frame-rate category set on the decor view. */
     var writtenModeId: Int? = null
+    var writtenPreferredRate: Float? = null
     var writtenFrameRate: Float? = null
+    var writtenFrameRateCategory: Int? = null
 
     /** Everything the production code logged, so the test can assert the player was told the truth. */
     val logs: MutableList<String> = mutableListOf()
@@ -36,7 +39,9 @@ object FakeScreen {
         current = null
         sdkInt = 34
         writtenModeId = null
+        writtenPreferredRate = null
         writtenFrameRate = null
+        writtenFrameRateCategory = null
         logs.clear()
         hasDisplay = true
     }
