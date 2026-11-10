@@ -22,7 +22,8 @@ native key state the wheel polls, and an assertion built on it would prove nothi
 Wardrobe cloud sync is opt-in, off by default, and carries ids only. Turning it on in the Wardrobe adds
 three taps - back up, restore, erase - that read and write one `wardrobe_sync` row belonging to the
 signed-in Aerix account (`supabase/step4-wardrobe.sql`: self-only row-level security, a 4 KB jsonb cap,
-a delete policy so the copy can be forgotten). A payload is six slot ids plus eight wheel bindings: no
+a delete policy so the copy can be forgotten; that step has been applied to the social project and read back from
+`pg_policy`, but the round trip itself has only been reviewed, not run from a device). A payload is six slot ids plus eight wheel bindings: no
 skin, no cape, no texture, no preview, because the launcher rebuilds all of that from the catalog it
 already ships. Restore re-validates every id against the local catalog, unequips slots the copy did not
 mention, and rewrites the instance loadouts so a running client follows; an id this pack no longer

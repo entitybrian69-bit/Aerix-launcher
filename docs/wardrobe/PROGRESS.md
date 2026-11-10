@@ -4,11 +4,21 @@ Updated: 2026-11-09 (UTC)
 
 ## 2026-11-09 (cloud): the wardrobe can follow the account, one tap at a time
 
-**Status: implemented and gated locally; the SQL is written for the owner to run, not applied.**
+**Status: implemented, gated locally, and the table is live on the project.**
 
 - Opt-in `WARDROBE CLOUD SYNC` in the Wardrobe preview panel, off by default, three explicit taps (back up / restore / erase), no timer and no launch-time fetch. The Supabase connector being on is what unblocked this; the privacy call the previous entry listed as missing is the one that produced ids-only and off-by-default rather than a silent default-on backup.
 - The payload is `{schema, slots{6}, emote_wheel[8]}`. No skin, cape, texture, preview, file or path. A 64x64 skin is a few kilobytes *and* a picture of a face; a list of catalog ids is neither, and the launcher regenerates the pixels from the catalog in the APK, so there is nothing to leak and nothing to fetch on a metered connection.
-- `supabase/step4-wardrobe.sql` (mirrored into `schema.sql`) holds the table and its four policies: select/insert/update/delete, each `to authenticated` with `auth.uid() = id`, cascade on account deletion, a `pg_column_size(loadout) <= 4096` check plus `jsonb_typeof = 'object'` and a schema-version check, so the table cannot quietly become blob storage. Delete is allowed precisely so the feature can be undone. **Not executed against the live project** - the repo's flow is the owner pasting each step in the SQL editor, and applying a migration to a production database is their call, not mine.
+- `supabase/step4-wardrobe.sql` (mirrored into `schema.sql`) holds the table and its four policies: select/insert/update/delete, each `to authenticated` with `auth.uid() = id`, cascade on account deletion, a `pg_column_size(loadout) <= 4096` check plus `jsonb_typeof = 'object'` and a schema-version check, so the table cannot quietly become blob storage. Delete is allowed precisely so the feature can be undone.
+
+  That step was then applied to the live project (`create_wardrobe_sync` migration on
+  `lktupxfszfefsoyksfkg`, the project the launcher already points at) and read back from the catalog:
+  `relrowsecurity = true`, exactly four policies, every one of them `to authenticated` with
+  `auth.uid() = id` (read/write/append/delete), three check constraints, and grants identical to
+  `profiles` - which matters because `anon` holds the same table grants and is stopped by having no
+  policy at all, not by a grant. Re-running the file changes nothing, so it is safe for a second
+  project to paste it. What is *not* proven from here: an authenticated round trip. The sandbox has no
+  route to `supabase.co`, so push/restore/erase are compile-verified and code-reviewed only, and the
+  first real device test is a phone with the debug APK.
 - Restore is a refusal-first operation: ids are re-checked against the local catalog (slot id in the right category, wheel id present at all), a `schema` newer than this launcher's is refused whole rather than half-applied, unknown ids are left as the player had them, and slots the copy omitted are unequipped because the row is a snapshot. Then the instance loadouts are rewritten, so a running client follows within its next poll.
 - `tests/trinkies_cloud_sync_smoke.py` (wired into the debug workflow) is the interesting gate: it fails if the SQL loses a policy or widens one, if the payload reaches for `Bitmap`/`assets.open`/`Base64`/`File(`, if the snapshot shape grows a fourth key, if the three copies of the category list drift, or if the switch stops defaulting to off.
 - Everything in the previous entry still holds: compiled in CI, asserted in three booting clients, and *not* verified on a phone or against the live Supabase project.
