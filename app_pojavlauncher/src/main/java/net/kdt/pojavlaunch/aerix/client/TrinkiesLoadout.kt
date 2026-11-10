@@ -59,8 +59,10 @@ object TrinkiesLoadout {
 
         // Turning cosmetics off writes an emptied loadout rather than skipping the write: a client
         // that is already running reads this file, so "no receipt change" would leave it wearing
-        // everything the player just switched off.
-        val wardrobeEnabled = AerixClientStore.trinkiesCosmeticsEnabled
+        // everything the player just switched off. The per-instance marker joins the same decision,
+        // which is why the check lives here and not in the caller that knows about instances.
+        val wardrobeEnabled = AerixClientStore.trinkiesCosmeticsEnabled &&
+            !TrinkiesInstaller.isCosmeticsOptedOut(root)
         val equipped = CATEGORIES.associateWith { category ->
             AerixClientStore.equippedIdFor(category).takeIf { id ->
                 wardrobeEnabled && id != "none" && TrinkiesCatalog.hasId(context, id, category)

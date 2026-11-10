@@ -1,6 +1,6 @@
 # Wardrobe + Trinkies continuation progress
 
-Updated: 2026-11-09 (UTC)
+Updated: 2026-11-10 (UTC)
 
 ## 2026-11-09 (cloud): the wardrobe can follow the account, one tap at a time
 
@@ -22,6 +22,14 @@ Updated: 2026-11-09 (UTC)
 - Restore is a refusal-first operation: ids are re-checked against the local catalog (slot id in the right category, wheel id present at all), a `schema` newer than this launcher's is refused whole rather than half-applied, unknown ids are left as the player had them, and slots the copy omitted are unequipped because the row is a snapshot. Then the instance loadouts are rewritten, so a running client follows within its next poll.
 - `tests/trinkies_cloud_sync_smoke.py` (wired into the debug workflow) is the interesting gate: it fails if the SQL loses a policy or widens one, if the payload reaches for `Bitmap`/`assets.open`/`Base64`/`File(`, if the snapshot shape grows a fourth key, if the three copies of the category list drift, or if the switch stops defaulting to off.
 - Everything in the previous entry still holds: compiled in CI, asserted in three booting clients, and *not* verified on a phone or against the live Supabase project.
+
+## 2026-11-10: cosmetics can be declined per instance
+
+- The Wardrobe's `TRINKIES COSMETICS` switch is launcher-wide, which is right for most players and wrong for the one who keeps a speedrun or a modpack instance that should be left alone. It now has a per-instance half: `<instance>/trinkies/disabled`, toggled from the line under it, which names the instance the launcher would start next.
+- A marker file rather than an `Instance` field, on purpose: `instances.json` is produced by several writers and a Gson field absent from an old file silently reads as `false`, which for an "enabled" flag means every existing instance loses its cosmetics on upgrade. An inverse flag in JSON would work but would be invisible in an exported folder; the marker travels with the instance and sits beside the `equipped.json` it contradicts.
+- All three paths that could put a look on a player consult it: `writeForInstance` (empties the loadout), the cape-frame sync (skips the patch and writes `trinkiesBack=none`, so the mod's cross-check agrees instead of warning), and `AerixSkinServer.prepare` (serves the account skin unbaked). `TrinkiesInstaller.setCosmeticsOptedOut` re-runs the last two for that folder right away, so a running client follows within its next 16-tick poll without a relaunch.
+- Deliberately not changed: the Trinkies JAR install scope (an opted-out instance still gets the mod, because the switch is about cosmetics) and the Wardrobe's own preview (it shows the account's outfit, not the last instance's exception).
+- `tests/trinkies_integration_smoke.py` now pins the marker's path, all three consumer reads, the `trinkiesBack=none` agreement line, and that the toggle re-syncs - so a refactor that lets one of the three paths forget the opt-out fails the build instead of quietly wearing a hat the player declined.
 
 ## 2026-11-09 (final pass): the wheel, the switch, and an in-game assertion
 

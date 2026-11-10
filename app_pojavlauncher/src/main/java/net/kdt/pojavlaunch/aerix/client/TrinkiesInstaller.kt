@@ -34,6 +34,53 @@ object TrinkiesInstaller {
             name.startsWith("legacy fabric")
     }
 
+    /**
+     * Per-instance cosmetics opt-out, kept as a marker file inside the instance rather than a new
+     * `Instance` field: `<game directory>/trinkies/disabled`. A file travels with the folder on
+     * import, export and world-share without every reader of `instances.json` having to learn a new
+     * name first, and it sits next to the `equipped.json` it makes the point of. Cosmetics are on
+     * unless the marker exists.
+     *
+     * This turns off *cosmetics*, not the mod: an opted-out instance still gets the Trinkies JAR and
+     * the launcher's own animated cape, because the player's client tweaks there are not what the
+     * switch is about. What stops is the skin bake, the cape patch bake, and the wardrobe the mod
+     * reads - which is emptied rather than left behind, so a running client unequips.
+     */
+    const val COSMETICS_OPT_OUT_MARKER = "trinkies/disabled"
+
+    @JvmStatic
+    fun isCosmeticsOptedOut(gameDirectory: File?): Boolean {
+        val dir = gameDirectory ?: return false
+        return runCatching { File(dir, COSMETICS_OPT_OUT_MARKER).isFile }.getOrDefault(false)
+    }
+
+    /**
+     * Writes or clears the marker and brings the instance's own state in line immediately, so a game
+     * that is already running follows the change on its next loadout poll instead of at the next
+     * launch. Returns false when the marker could not be changed, which the caller reports plainly.
+     */
+    @JvmStatic
+    fun setCosmeticsOptedOut(context: Context, instance: Instance?, optedOut: Boolean): Boolean =
+        runCatching {
+            val dir = instance?.gameDirectory ?: return false
+            val marker = File(dir, COSMETICS_OPT_OUT_MARKER)
+            val changed = if (optedOut) {
+                if (marker.isFile) true
+                else {
+                    marker.parentFile?.mkdirs()
+                    marker.createNewFile()
+                }
+            } else {
+                !marker.exists() || marker.delete()
+            }
+            if (!changed) return false
+            AerixClientCosmetics.syncCapeAssetsToInstance(context, dir)
+            TrinkiesLoadout.writeForInstance(context, dir)
+            true
+        }.onFailure { error ->
+            Log.w(TAG, "Could not change the per-instance Trinkies cosmetics state", error)
+        }.getOrDefault(false)
+
     /** One local-only pass; safe to call whenever the Home screen is entered. */
     @JvmStatic
     fun installIntoSupportedInstances(context: Context) {

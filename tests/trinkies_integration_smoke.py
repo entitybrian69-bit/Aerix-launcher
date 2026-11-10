@@ -171,9 +171,9 @@ class TrinkiesIntegrationSmoke(unittest.TestCase):
         # Back items are the one category with a second sheet, so their patch has to reach the cape
         # the game reads: the served PNG and every animation frame written into the instance.
         self.assertIn('AerixClientStore.equippedIdFor("back")', cosmetics)
-        self.assertIn("overlayCapePatch(bmp, trinkiesCapePatchPixels(context))", cosmetics)
+        self.assertIn("overlayCapePatch(bmp, if (enabledForInstance) trinkiesCapePatchPixels(context) else null)", cosmetics)
         self.assertIn(
-            "val trinkiesCape = if (importedCape == null) trinkiesCapePatchPixels(context) else null",
+            "val trinkiesCape = if (importedCape == null && cosmeticsHere) trinkiesCapePatchPixels(context) else null",
             cosmetics,
         )
         self.assertIn("overlayCapePatch(bmp, trinkiesCape)", cosmetics)
@@ -198,8 +198,9 @@ class TrinkiesIntegrationSmoke(unittest.TestCase):
         self.assertIn('AerixClientStore.setEquippedId(category, item?.id ?: "none")', wardrobe)
         # The bespoke per-family pixel painting is gone: the asset is the renderer now.
         self.assertNotIn("catalogHat.shape.lowercase()", cosmetics)
-        # One master switch, and it gates the paint paths rather than only the UI.
-        self.assertIn("if (!AerixClientStore.trinkiesCosmeticsEnabled) return existingSkinPng", cosmetics)
+        # One master switch, and it gates the paint paths rather than only the UI. The per-instance
+        # marker joins the same test, on the same line, so neither switch can be forgotten in a refactor.
+        self.assertIn("if (!enabledForInstance || !AerixClientStore.trinkiesCosmeticsEnabled) return existingSkinPng", cosmetics)
         self.assertIn('if (!AerixClientStore.trinkiesCosmeticsEnabled) return null', cosmetics)
         self.assertIn('var trinkiesCosmeticsEnabled by mutableStateOf(true)', store_source)
         self.assertIn('putBoolean("trinkiesCosmeticsEnabled", trinkiesCosmeticsEnabled)', store_source)
@@ -225,6 +226,23 @@ class TrinkiesIntegrationSmoke(unittest.TestCase):
         self.assertIn("fun refreshSupportedInstances(context: Context)", writer)
         self.assertIn("isSupportedInstance(it)", writer)
         self.assertIn("writeForInstance(context, directory)", writer)
+        # Per-instance opt-out: a marker inside the instance, honoured by the bake paths, the cape
+        # frames and the loadout, and re-synced the moment the player flips it.
+        installer = (APP / "client/TrinkiesInstaller.kt").read_text()
+        self.assertIn('const val COSMETICS_OPT_OUT_MARKER = "trinkies/disabled"', installer)
+        self.assertIn("fun isCosmeticsOptedOut(gameDirectory: File?)", installer)
+        self.assertIn("fun setCosmeticsOptedOut(context: Context, instance: Instance?, optedOut: Boolean): Boolean", installer)
+        self.assertIn("AerixClientCosmetics.syncCapeAssetsToInstance(context, dir)", installer)
+        self.assertIn("TrinkiesLoadout.writeForInstance(context, dir)", installer)
+        self.assertIn("!TrinkiesInstaller.isCosmeticsOptedOut(root)", loadout)
+        self.assertIn("enabledForInstance: Boolean = true", cosmetics)
+        # The meta line the mod cross-checks has to agree with what was actually baked.
+        self.assertIn('trinkiesBack=${if (cosmeticsHere) AerixClientStore.equippedIdFor("back") else "none"}', cosmetics)
+        server = (APP / "bridge/AerixSkinServer.kt").read_text()
+        self.assertIn("val cosmeticsHere = isTrinkiesSession && runCatching {", server)
+        self.assertIn("resolveInGameCapeBytes(context, cosmeticsHere)", server)
+        self.assertIn("WardrobeInstanceSwitch()", wardrobe)
+        self.assertIn("TrinkiesInstaller.setCosmeticsOptedOut(", wardrobe)
         # The wheel is read from the loadout the launcher wrote, not from a config the mod owns.
         mod_loop = (ROOT / "aerix_client_mod/src/main/java/aerix/client/mod/AerixClientMod.java").read_text()
         self.assertIn("trinkiesWheel = snapshot.emoteWheel()", mod_loop)

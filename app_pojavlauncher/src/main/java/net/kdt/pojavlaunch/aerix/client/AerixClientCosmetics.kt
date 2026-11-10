@@ -271,14 +271,16 @@ object AerixClientCosmetics {
      * - Front/Back/Sides Cape UV: `(0..21, 0..16)` (Front visible face = `1..10, 1..16`)
      * - Elytra Wing UV: `(22..45, 0..21)` so wearing an Elytra renders matching custom wings too!
      */
-    fun resolveInGameCapeBytes(context: Context): ByteArray? = runCatching {
+    fun resolveInGameCapeBytes(context: Context, enabledForInstance: Boolean = true): ByteArray? = runCatching {
         AerixClientStore.init(context)
         if (AerixClientStore.equippedCapeId == "custom") {
             resolveImportedCapeBytes()?.let { return@runCatching it }
         }
 
         val bmp = buildAnimatedCapeFrameBitmap(effectiveCapeSpec(), frameIndex = 0, totalFrames = 12)
-        overlayCapePatch(bmp, trinkiesCapePatchPixels(context))
+        // The launcher's animated cape is the launcher's; only the wardrobe patch on top of it is
+        // what an instance opts out of.
+        overlayCapePatch(bmp, if (enabledForInstance) trinkiesCapePatchPixels(context) else null)
         ByteArrayOutputStream().use { out ->
             bmp.compress(Bitmap.CompressFormat.PNG, 100, out)
             out.toByteArray()
@@ -295,7 +297,11 @@ object AerixClientCosmetics {
             AerixClientStore.init(context)
             val spec = effectiveCapeSpec()
             val importedCape = if (AerixClientStore.equippedCapeId == "custom") resolveImportedCapeBytes() else null
-            val trinkiesCape = if (importedCape == null) trinkiesCapePatchPixels(context) else null
+            // An opted-out instance still gets the launcher's own animated cape; only the wardrobe's
+            // patch on top of it is skipped, and the meta line below has to say so or the client's
+            // bake cross-check would blame a mismatch that is the player's own choice.
+            val cosmeticsHere = !TrinkiesInstaller.isCosmeticsOptedOut(instanceGameDir)
+            val trinkiesCape = if (importedCape == null && cosmeticsHere) trinkiesCapePatchPixels(context) else null
             val configDir = File(instanceGameDir, "config").apply { mkdirs() }
             val framesDir = File(configDir, "aerix_cape_frames").apply { mkdirs() }
 
@@ -315,7 +321,7 @@ object AerixClientCosmetics {
             metaFile.writeText(
                 buildString {
                     appendLine("capeId=${if (importedCape != null) "custom" else spec.id}")
-                    appendLine("trinkiesBack=${AerixClientStore.equippedIdFor("back")}")
+                    appendLine("trinkiesBack=${if (cosmeticsHere) AerixClientStore.equippedIdFor("back") else "none"}")
                     appendLine("frames=$total")
                     appendLine("waving=${AerixClientStore.wavingCapeEnabled}")
                     appendLine("updatedAtMs=$now")
@@ -474,11 +480,12 @@ object AerixClientCosmetics {
     fun applyWardrobeToSkin(
         context: Context,
         existingSkinPng: ByteArray?,
-        @Suppress("UNUSED_PARAMETER") slim: Boolean
+        @Suppress("UNUSED_PARAMETER") slim: Boolean,
+        enabledForInstance: Boolean = true
     ): ByteArray? {
         AerixClientStore.init(context)
         if (existingSkinPng == null) return null
-        if (!AerixClientStore.trinkiesCosmeticsEnabled) return existingSkinPng
+        if (!enabledForInstance || !AerixClientStore.trinkiesCosmeticsEnabled) return existingSkinPng
         val patches = trinkiesGarmentPatches(context)
         if (patches.isEmpty()) return existingSkinPng
         val decoded = BitmapFactory.decodeByteArray(existingSkinPng, 0, existingSkinPng.size) ?: return existingSkinPng

@@ -148,11 +148,21 @@ object AerixSkinServer {
         if (authType.injectorUrl != null) return emptyList()
 
         val isSlim = PojavAccountBridge.isSlimModelFor(context, account)
+        val selectedInstance = runCatching {
+            net.kdt.pojavlaunch.instances.Instances.loadSelectedInstance()
+        }.getOrNull()
         val isTrinkiesSession = runCatching {
-            net.kdt.pojavlaunch.aerix.client.TrinkiesInstaller.isSupportedInstance(
-                net.kdt.pojavlaunch.instances.Instances.loadSelectedInstance()
-            )
+            net.kdt.pojavlaunch.aerix.client.TrinkiesInstaller.isSupportedInstance(selectedInstance)
         }.getOrDefault(false)
+        // Cosmetics are per instance as well as globally: an instance carrying the opt-out marker gets
+        // the same account skin the launcher would serve with Trinkies switched off, while keeping its
+        // animated cape. Deciding this here, where the instance is known, is what keeps the bake
+        // functions free of any guess about which folder the game is running from.
+        val cosmeticsHere = isTrinkiesSession && runCatching {
+            !net.kdt.pojavlaunch.aerix.client.TrinkiesInstaller.isCosmeticsOptedOut(
+                selectedInstance?.gameDirectory
+            )
+        }.getOrDefault(true)
 
         val skinFile = PojavAccountBridge.customSkinFile(account)
         val capeFile = PojavAccountBridge.customCapeFile(account)
@@ -162,13 +172,14 @@ object AerixSkinServer {
             net.kdt.pojavlaunch.aerix.client.AerixClientCosmetics.applyWardrobeToSkin(
                 context,
                 normalizedSkin,
-                isSlim
+                isSlim,
+                cosmeticsHere
             )
         } else {
             normalizedSkin
         }
         val capeBytes = if (isTrinkiesSession) {
-            net.kdt.pojavlaunch.aerix.client.AerixClientCosmetics.resolveInGameCapeBytes(context)
+            net.kdt.pojavlaunch.aerix.client.AerixClientCosmetics.resolveInGameCapeBytes(context, cosmeticsHere)
                 ?: (if (capeFile.isFile && capeFile.length() > 0) capeFile.readBytes() else null)
         } else {
             if (capeFile.isFile && capeFile.length() > 0) capeFile.readBytes() else null

@@ -454,12 +454,78 @@ private fun WardrobePreviewPanel(
             }
         )
         WardrobeCloudSyncLine()
+        WardrobeInstanceSwitch()
         // A delegated local has no smart cast, so the nullable read goes through let.
         confirmation?.let { worn ->
             Text(worn, color = wardrobeGreen, fontFamily = FontFamily.Monospace,
                 fontSize = 6.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
+}
+
+/** What the per-instance switch knows about the instance the launcher would start next. */
+private data class InstanceCosmeticState(val name: String, val optedOut: Boolean, val supported: Boolean)
+
+/**
+ * The per-instance half of the same decision. Cosmetics are a property of the account, but a player
+ * can exempt the folder they are about to launch - a vanilla-speedrun instance, a server whose resource
+ * pack already does the job - without turning the wardrobe off everywhere. The answer lives in that
+ * instance's own `trinkies/disabled` marker, so it survives an export or a share, and toggling it
+ * re-syncs that instance right away: the loadout is rewritten emptied, so a game that is already
+ * running unequips on its next poll rather than keeping the look the player just declined.
+ */
+@Composable
+private fun WardrobeInstanceSwitch() {
+    val context = LocalContext.current
+    var refresh by remember { mutableStateOf(0) }
+    val state by produceState<InstanceCosmeticState?>(null, refresh) {
+        value = withContext(Dispatchers.IO) {
+            runCatching {
+                val instance = net.kdt.pojavlaunch.instances.Instances.loadSelectedInstance()
+                    ?: return@runCatching null
+                InstanceCosmeticState(
+                    name = instance.name ?: "this instance",
+                    optedOut = net.kdt.pojavlaunch.aerix.client.TrinkiesInstaller
+                        .isCosmeticsOptedOut(instance.gameDirectory),
+                    supported = net.kdt.pojavlaunch.aerix.client.TrinkiesInstaller
+                        .isSupportedInstance(instance)
+                )
+            }.getOrNull()
+        }
+    }
+    val current = state ?: return
+    val label = current.name.uppercase()
+    Text(
+        text = when {
+            !current.supported -> "COSMETICS APPLY TO FABRIC INSTANCES · SELECTED: $label"
+            !current.optedOut -> "COSMETICS ON IN $label · TAP TO SKIP THIS INSTANCE"
+            else -> "COSMETICS SKIPPED IN $label · TAP TO ALLOW IT HERE"
+        },
+        color = when {
+            !current.supported -> Color(0xFF9A9B9E)
+            current.optedOut -> Color(0xFFB45309)
+            else -> wardrobeGreen
+        },
+        fontFamily = FontFamily.Monospace, fontSize = 6.sp, maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = if (current.supported) {
+            Modifier.clickable {
+                // Off the composition thread: this touches the instance folder and rewrites its cape
+                // frames and loadout. The counter bumps so the line re-reads the marker it just wrote.
+                PojavApplication.sExecutorService.execute {
+                    runCatching {
+                        val instance = net.kdt.pojavlaunch.instances.Instances.loadSelectedInstance()
+                        net.kdt.pojavlaunch.aerix.client.TrinkiesInstaller.setCosmeticsOptedOut(
+                            context, instance, !current.optedOut
+                        )
+                    }
+                    refresh++
+                }
+            }
+        } else {
+            Modifier
+        }
+    )
 }
 
 /**
