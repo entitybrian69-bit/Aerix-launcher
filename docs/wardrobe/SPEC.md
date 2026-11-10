@@ -75,7 +75,7 @@ The launcher's target path is `<instance game directory>/trinkies/equipped.json`
 }
 ```
 
-Before launching a supported instance, the launcher validates the selected hat ID against `catalog.json`, writes `<instance game directory>/trinkies/equipped.json` through a sibling temporary file, flushes and fsyncs it, then atomically renames it. The current writer snapshots the locally selected hat and leaves the other categories null until their renderers exist. The Fabric mod does not yet read/watch this file or preserve last-good state on parse failure; currently it is a validated launcher-side per-instance snapshot, not an in-game renderer input.
+Before launching a supported instance, the launcher validates the selected hat ID against `catalog.json`, writes `<instance game directory>/trinkies/equipped.json` through a sibling temporary file, flushes and fsyncs it, then atomically renames it. The writer fills all six categories from the store and writes the eight-slot `emote_wheel` beside them, dropping any id the local catalog does not carry. The Fabric mod polls the file on its own worker thread, re-validates every id against the packaged catalog, keeps the last good snapshot when a write is malformed, and answers with `trinkies/applied.json`; that receipt is what the Wardrobe displays and what the client runtime matrix asserts.
 
 ## Budgets
 
@@ -98,11 +98,11 @@ The zipped generated asset pack must stay below 15 MiB. The linter measures the 
 
 ## Multiplayer threat model and privacy
 
-No Trinkies multiplayer sync is shipped by this change. The existing Supabase social features are not an authorization mechanism for Minecraft UUIDs.
+Trinkies sync is opt-in, off by default, and ids-only: `TrinkiesCloudSync` pushes the six worn slots and the eight wheel bindings to a `wardrobe_sync` row keyed by the signed-in Aerix account (`supabase/step4-wardrobe.sql`, row-level security self-only, a 4 KB jsonb cap, delete allowed so the copy can be forgotten). Push, restore and erase are explicit taps in the Wardrobe, and no request happens when the switch is off. What it deliberately is not: multiplayer cosmetics for other players, and a Minecraft-UUID-verified identity - the existing Supabase social features are not an authorization mechanism for Minecraft UUIDs, so a wardrobe follows the Aerix account, not the Minecraft account.
 
-If the owner approves a future opt-in sync:
+A future wide rollout would still need, and does not have today:
 
 - State payloads are only catalog IDs (`hat`, `suit`, `back`, `aura`, `pet`) tied to a verified Minecraft UUID; no skin PNGs, server addresses, account tokens, coordinates, or chat are part of the cosmetic protocol.
 - Microsoft/Ely.by identity requires a proof bound to the UUID before writes. Offline profiles are local-only by default because their UUID is not authenticated.
 - The client sends nothing until one clear opt-in with a plain-language explanation. A **Delete my data** action must remove the player's row and any event state. The service has a remote kill switch; game launch/join never waits for it.
-- Supabase must enforce RLS and per-UUID ownership in database functions, rate limit writes, validate IDs against the item catalog, batch tab-list reads, use a TTL/ETag or version cache, and exponential backoff. Realtime emotes are transient session events, not durable state; room identifiers should be derived from a privacy-reviewed server-session hash. No protocol or RLS SQL is included yet.
+- Rate limits on writes, batched tab-list reads, a TTL/ETag or version cache, and exponential backoff. RLS and self-only ownership are in place, ids are validated against the catalog on the way in, and backoff is unnecessary while sync is a tap rather than a loop. Realtime emotes are transient session events, not durable state; room identifiers should be derived from a privacy-reviewed server-session hash. No protocol or RLS SQL is included yet.

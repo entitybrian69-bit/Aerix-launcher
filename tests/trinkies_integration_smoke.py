@@ -220,8 +220,11 @@ class TrinkiesIntegrationSmoke(unittest.TestCase):
         wardrobe = (APP / "ui/screens/TrinkiesWardrobeScreen.kt").read_text()
         self.assertIn("WardrobeEmoteWheel()", wardrobe)
         self.assertIn("bindEmoteWheelSlot(context, slot, item.id", wardrobe)
-        self.assertIn("TrinkiesLoadout.writeForInstance(context, directory)", wardrobe)
-        self.assertIn("isSupportedInstance(it)", wardrobe)
+        self.assertIn("TrinkiesLoadout.refreshSupportedInstances(context)", wardrobe)
+        writer = (APP / "client/TrinkiesLoadout.kt").read_text()
+        self.assertIn("fun refreshSupportedInstances(context: Context)", writer)
+        self.assertIn("isSupportedInstance(it)", writer)
+        self.assertIn("writeForInstance(context, directory)", writer)
         # The wheel is read from the loadout the launcher wrote, not from a config the mod owns.
         mod_loop = (ROOT / "aerix_client_mod/src/main/java/aerix/client/mod/AerixClientMod.java").read_text()
         self.assertIn("trinkiesWheel = snapshot.emoteWheel()", mod_loop)

@@ -3,6 +3,7 @@ package net.kdt.pojavlaunch.aerix.client
 import android.content.Context
 import android.system.Os
 import android.util.Log
+import net.kdt.pojavlaunch.PojavApplication
 import net.kdt.pojavlaunch.instances.Instances
 import org.json.JSONArray
 import org.json.JSONObject
@@ -97,6 +98,29 @@ object TrinkiesLoadout {
     }.onFailure { error ->
         Log.w(TAG, "Could not atomically write the local Trinkies loadout", error)
     }.getOrDefault(false)
+
+    /**
+     * Rewrites the loadout into every instance that can consume one, on a background thread.
+     *
+     * A launch does this anyway; the point is a change made *while the game is running* - a rebound
+     * emote key, a wardrobe pulled from the cloud - which would otherwise sit in the store until the
+     * next launch. Safe to call from the UI thread: the file writes happen off it, each write is an
+     * atomic same-directory rename, and the mod re-reads the file on its own clock.
+     */
+    @JvmStatic
+    fun refreshSupportedInstances(context: Context) {
+        PojavApplication.sExecutorService.execute {
+            runCatching {
+                Instances.loadAllInstances()
+                    .filter { TrinkiesInstaller.isSupportedInstance(it) }
+                    .forEach { instance ->
+                        instance.gameDirectory?.let { directory -> writeForInstance(context, directory) }
+                    }
+            }.onFailure { error ->
+                Log.w(TAG, "Could not refresh the Trinkies loadout of every instance", error)
+            }
+        }
+    }
 
     /**
      * One line describing what a Fabric-enabled instance read back from its loadout, or null when no

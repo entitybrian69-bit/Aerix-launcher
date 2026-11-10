@@ -81,6 +81,7 @@ jobs:
           python3 tests/modern_cape_smoke.py
           python3 tests/social_profile_cosmetics_smoke.py
           python3 tests/trinkies_integration_smoke.py
+          python3 tests/trinkies_cloud_sync_smoke.py
           python3 tests/trinkies_loadout_jvm.py
           python3 tests/trinkies_client_gametest_harness_smoke.py
           python3 tests/skin_preview_camera_smoke.py

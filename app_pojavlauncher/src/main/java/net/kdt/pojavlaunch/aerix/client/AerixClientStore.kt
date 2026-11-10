@@ -155,6 +155,14 @@ object AerixClientStore {
      */
     var trinkiesEmoteWheel by mutableStateOf(List(EMOTE_WHEEL_SLOTS) { "none" })
 
+    /**
+     * Opt-in backup of the wardrobe *ids* - six worn slots and eight wheel bindings - against the
+     * signed-in social account. Off by default and per device, because the only thing worth carrying
+     * to another phone is the list, not the pixels: the launcher can rebuild every garment from those
+     * ids locally, so nothing image-like is ever uploaded. Push, restore and erase are explicit taps.
+     */
+    var trinkiesCloudSyncEnabled by mutableStateOf(false)
+
     /** The item bound to one wheel slot, or "none" when that key does nothing. */
     fun emoteWheelSlot(index: Int): String = trinkiesEmoteWheel.getOrElse(index) { "none" }
 
@@ -316,6 +324,7 @@ object AerixClientStore {
         wavingCapeEnabled = p.getBoolean("wavingCapeEnabled", true)
         trinkiesCosmeticsEnabled = p.getBoolean("trinkiesCosmeticsEnabled", true)
         trinkiesEmoteWheel = loadEmoteWheel(p.getString("trinkiesEmoteWheel", "").orEmpty())
+        trinkiesCloudSyncEnabled = p.getBoolean("trinkiesCloudSyncEnabled", false)
         animatedCapeShimmer = true
 
         // Every HUD & gameplay overlay defaults strictly to FALSE unless explicitly enabled by user
@@ -426,6 +435,7 @@ object AerixClientStore {
             putBoolean("wavingCapeEnabled", wavingCapeEnabled)
             putBoolean("trinkiesCosmeticsEnabled", trinkiesCosmeticsEnabled)
             putString("trinkiesEmoteWheel", trinkiesEmoteWheel.joinToString(","))
+            putBoolean("trinkiesCloudSyncEnabled", trinkiesCloudSyncEnabled)
 
             putBoolean("crosshairEnabled", crosshairEnabled)
             putString("crosshairColor", crosshairColor)

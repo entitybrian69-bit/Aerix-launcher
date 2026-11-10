@@ -453,10 +453,77 @@ private fun WardrobePreviewPanel(
                 AerixClientStore.persist()
             }
         )
+        WardrobeCloudSyncLine()
         // A delegated local has no smart cast, so the nullable read goes through let.
         confirmation?.let { worn ->
             Text(worn, color = wardrobeGreen, fontFamily = FontFamily.Monospace,
                 fontSize = 6.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+/**
+ * The opt-in wardrobe backup, kept next to the cosmetics switch because it is the same decision
+ * written down: ids off the device, or nothing off the device. Push, restore and erase are all taps,
+ * never timers, and the note under them is the outcome the server actually reported - there is no
+ * optimistic "synced" here, because a green lie about a cloud row is worse than a quiet one.
+ */
+@Composable
+private fun WardrobeCloudSyncLine() {
+    val context = LocalContext.current
+    val cloudOn = AerixClientStore.trinkiesCloudSyncEnabled
+    val socialSignedIn = net.kdt.pojavlaunch.aerix.social.SocialBackend.signedIn
+    var note by remember { mutableStateOf<String?>(null) }
+    var busy by remember { mutableStateOf(false) }
+    // A tap counter plus the operation, rather than the operation as the key: tapping "BACK UP NOW"
+    // twice in a row is a legitimate second request, and a key that does not change never re-runs.
+    var request by remember { mutableStateOf(0) }
+    var requestedOp by remember { mutableStateOf(0) }
+    LaunchedEffect(request) {
+        if (request == 0) return@LaunchedEffect
+        busy = true
+        note = withContext(Dispatchers.IO) {
+            when (requestedOp) {
+                1 -> net.kdt.pojavlaunch.aerix.client.TrinkiesCloudSync.push(context)
+                2 -> net.kdt.pojavlaunch.aerix.client.TrinkiesCloudSync.pull(context)
+                else -> net.kdt.pojavlaunch.aerix.client.TrinkiesCloudSync.erase(context)
+            }.message
+        }
+        busy = false
+    }
+    fun ask(op: Int) {
+        if (busy) return
+        requestedOp = op
+        request++
+    }
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(
+            text = when {
+                !cloudOn -> "WARDROBE CLOUD SYNC OFF · TAP TO TURN ON"
+                !socialSignedIn -> "CLOUD SYNC ON · SIGN IN TO AERIX SOCIAL TO USE IT"
+                else -> "WARDROBE CLOUD SYNC ON · IDS ONLY"
+            },
+            color = if (cloudOn) wardrobeGreen else Color(0xFF9A9B9E),
+            fontFamily = FontFamily.Monospace, fontSize = 6.sp, maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.clickable {
+                AerixClientStore.trinkiesCloudSyncEnabled = !cloudOn
+                AerixClientStore.persist()
+            }
+        )
+        if (cloudOn && socialSignedIn) {
+            Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                WardrobeWheelChip(label = if (busy) "WORKING" else "BACK UP NOW", selected = false,
+                    onClick = { ask(1) })
+                WardrobeWheelChip(label = "RESTORE", selected = false,
+                    onClick = { ask(2) })
+                WardrobeWheelChip(label = "ERASE COPY", selected = false,
+                    onClick = { ask(3) })
+            }
+        }
+        note?.let { message ->
+            Text(message, color = Color(0xFF9A9B9E), fontFamily = FontFamily.Monospace, fontSize = 6.sp,
+                maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
     }
 }
@@ -531,17 +598,9 @@ private fun bindEmoteWheelSlot(context: android.content.Context, slot: Int, id: 
     AerixClientStore.persist()
     PojavAccountBridge.notifyWardrobeChanged()
     Toast.makeText(context, feedback, Toast.LENGTH_SHORT).show()
-    PojavApplication.sExecutorService.execute {
-        runCatching {
-            net.kdt.pojavlaunch.instances.Instances.loadAllInstances()
-                .filter { net.kdt.pojavlaunch.aerix.client.TrinkiesInstaller.isSupportedInstance(it) }
-                .forEach { instance ->
-                    instance.gameDirectory?.let { directory ->
-                        net.kdt.pojavlaunch.aerix.client.TrinkiesLoadout.writeForInstance(context, directory)
-                    }
-                }
-        }
-    }
+    // Not just stored: written straight into every instance that can consume it, so a running client
+    // picks the binding up on its next poll instead of waiting for the next launch.
+    net.kdt.pojavlaunch.aerix.client.TrinkiesLoadout.refreshSupportedInstances(context)
 }
 
 @Composable

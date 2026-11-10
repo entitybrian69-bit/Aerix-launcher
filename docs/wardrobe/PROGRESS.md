@@ -2,6 +2,17 @@
 
 Updated: 2026-11-09 (UTC)
 
+## 2026-11-09 (cloud): the wardrobe can follow the account, one tap at a time
+
+**Status: implemented and gated locally; the SQL is written for the owner to run, not applied.**
+
+- Opt-in `WARDROBE CLOUD SYNC` in the Wardrobe preview panel, off by default, three explicit taps (back up / restore / erase), no timer and no launch-time fetch. The Supabase connector being on is what unblocked this; the privacy call the previous entry listed as missing is the one that produced ids-only and off-by-default rather than a silent default-on backup.
+- The payload is `{schema, slots{6}, emote_wheel[8]}`. No skin, cape, texture, preview, file or path. A 64x64 skin is a few kilobytes *and* a picture of a face; a list of catalog ids is neither, and the launcher regenerates the pixels from the catalog in the APK, so there is nothing to leak and nothing to fetch on a metered connection.
+- `supabase/step4-wardrobe.sql` (mirrored into `schema.sql`) holds the table and its four policies: select/insert/update/delete, each `to authenticated` with `auth.uid() = id`, cascade on account deletion, a `pg_column_size(loadout) <= 4096` check plus `jsonb_typeof = 'object'` and a schema-version check, so the table cannot quietly become blob storage. Delete is allowed precisely so the feature can be undone. **Not executed against the live project** - the repo's flow is the owner pasting each step in the SQL editor, and applying a migration to a production database is their call, not mine.
+- Restore is a refusal-first operation: ids are re-checked against the local catalog (slot id in the right category, wheel id present at all), a `schema` newer than this launcher's is refused whole rather than half-applied, unknown ids are left as the player had them, and slots the copy omitted are unequipped because the row is a snapshot. Then the instance loadouts are rewritten, so a running client follows within its next poll.
+- `tests/trinkies_cloud_sync_smoke.py` (wired into the debug workflow) is the interesting gate: it fails if the SQL loses a policy or widens one, if the payload reaches for `Bitmap`/`assets.open`/`Base64`/`File(`, if the snapshot shape grows a fourth key, if the three copies of the category list drift, or if the switch stops defaulting to off.
+- Everything in the previous entry still holds: compiled in CI, asserted in three booting clients, and *not* verified on a phone or against the live Supabase project.
+
 ## 2026-11-09 (final pass): the wheel, the switch, and an in-game assertion
 
 **Status: implemented; CI compiles the mod and the harness and runs the round trip in three real clients.**
@@ -11,7 +22,7 @@ Updated: 2026-11-09 (UTC)
 - The loadout poll moved to the mod's daemon thread, ahead of both handle resolution and the render-thread handoff, so answering `equipped.json` never stalls a frame and works even where the texture bridge cannot resolve.
 - In-game verification: `tools/trinkies_client_gametest` now drives the real client through the round trip, wheel included - the receipt's `emoteWheelSlots` is asserted to match what the harness seeded, in both the modern GameTest and the 1.20.1 marker (`trinkies_emote_wheel_slots=1`). The 26.3 / 1.21.11 GameTest writes a wardrobe, waits up to ~20 s for `trinkies/applied.json`, and requires the hat to be worn, the cape pace to be stretched to the item's own idle clip (2..8 ticks), and the *refusal* of a hat id placed in the `back` slot with the pace back at 1; `run_matrix.sh` additionally fails 1.20.1 unless its boot marker carries `trinkies_loadout_applied=true`. The probe reuses the mod's own `TrinkiesLoadout.catalogFromJar()` / `parseApplied`, so it cannot drift into asserting its own arithmetic, and the harness gate test fails if either entrypoint stops driving it.
 - What CI cannot cover, and does not claim: the physical key press. Fabric's client GameTest input layer dispatches `TestInput.holdKey` straight into `KeyMapping`s, so a synthetic press never lands in the native key state the wheel polls; asserting on it would have meant testing a path the player never takes.
-- Deliberately not done, because it cannot be verified from here and a throwing renderer is worse than a missing one: in-world 3D attachment drawing for wings/pets/props, pet followers, particle trails. Also untouched: cosmetics cloud sync, which needs an owner decision on what leaves the device (`wardrobe/SPEC.md`), and real-device play testing.
+- Deliberately not done, because it cannot be verified from here and a throwing renderer is worse than a missing one: in-world 3D attachment drawing for wings/pets/props, pet followers, particle trails. Also untouched at the time: cosmetics cloud sync, which needed an owner decision on what leaves the device (`wardrobe/SPEC.md`) - that decision is what shaped the opt-in, ids-only backup recorded in the entry above - and real-device play testing, which is still outstanding.
 
 ## 2026-11-09 (later again): the client mod consumes the loadout
 
