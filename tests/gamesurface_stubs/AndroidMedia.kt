@@ -35,6 +35,8 @@ object ImageWriterTestConfig {
     var created: Int = 0
     var closed: Int = 0
     val sizes = ArrayList<String>()
+    var reportedWidth: Int = 0
+    var reportedHeight: Int = 0
 
     fun reset() {
         rowStride = 0
@@ -51,6 +53,8 @@ object ImageWriterTestConfig {
         fallbackHeight = 0
         created = 0
         closed = 0
+        reportedWidth = 0
+        reportedHeight = 0
         sizes.clear()
     }
 }
@@ -85,11 +89,7 @@ class ImageWriter private constructor(maxImages: Int) {
         get() = ImageWriterTestConfig.surfaceHeight.takeIf { it > 0 }
             ?: ImageWriterTestConfig.fallbackHeight
 
-    private val imageWidth: Int
-        get() = if (ImageWriterTestConfig.reportZeroSize) 0 else geometryWidth
 
-    private val imageHeight: Int
-        get() = if (ImageWriterTestConfig.reportZeroSize) 0 else geometryHeight
 
     private val stride: Int
         get() = ImageWriterTestConfig.rowStride.takeIf { it > 0 } ?: geometryWidth * 4
@@ -104,22 +104,36 @@ class ImageWriter private constructor(maxImages: Int) {
         val rows = if (ImageWriterTestConfig.capacityShort) (geometryHeight - 1).coerceAtLeast(1) else geometryHeight
         val buffer = ByteBuffer.allocateDirect(stride * rows).order(ByteOrder.nativeOrder())
         val planes = Array(ImageWriterTestConfig.planes) { Plane(stride, ImageWriterTestConfig.pixelStride, buffer) }
-        return Image(imageWidth, imageHeight, planes, this)
+        val w = if (ImageWriterTestConfig.reportZeroSize) 0 else geometryWidth
+        val h = if (ImageWriterTestConfig.reportZeroSize) 0 else geometryHeight
+        return Image(w, h, planes, this)
     }
 
     internal fun release(image: Image) {
         outstanding.remove(image)
     }
 
-    fun acquireNextImage(): Image? = synchronized(this) {
-        if (isClosed) return@synchronized null
+    /**
+     * The documented contract, kept exactly: `ImageWriter` has no `acquireNextImage`, and
+     * `dequeueInputImage` *throws* rather than returning null when every image is already out. The fake
+     * throws too (it does not model the blocking half of the real call, which no assertion depends on).
+     */
+    fun dequeueInputImage(): Image = synchronized(this) {
+        if (isClosed) throw IllegalStateException("the writer is closed")
         if (ImageWriterTestConfig.holdAllBuffers) {
             while (outstanding.size < pool) outstanding.add(newImage())
-            return@synchronized null
         }
-        if (outstanding.size >= pool) return@synchronized null
+        if (outstanding.size >= pool) {
+            throw IllegalStateException("Already dequeued max number of Images $pool")
+        }
         newImage().also { outstanding.add(it) }
     }
+
+    val maxImages: Int get() = pool
+
+    /** `ImageWriter.getWidth`/`getHeight` are public, and the feed logs them; -1 means "from the surface". */
+    val width: Int get() = ImageWriterTestConfig.reportedWidth
+    val height: Int get() = ImageWriterTestConfig.reportedHeight
 
     /** The codec's side of the exchange: whatever lands here is what a decoder would have seen. */
     fun queueInputImage(image: Image) {
@@ -151,6 +165,10 @@ class ImageWriter private constructor(maxImages: Int) {
         @JvmStatic
         @Throws(IllegalArgumentException::class)
         fun newInstance(surface: Surface): ImageWriter = create(surface, DEFAULT_IMAGES)
+
+        /** Present so `width`/`height` reads work the way they do on the real class. */
+        @JvmStatic
+        fun newInstance(surface: Surface, maxImages: Int, format: Int): ImageWriter = create(surface, maxImages)
 
         @JvmStatic
         @Throws(IllegalArgumentException::class)

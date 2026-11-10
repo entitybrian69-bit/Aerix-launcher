@@ -186,7 +186,12 @@ class GameSurfaceFeed(
         writer = imageWriter
         running.set(true)
         feeding = true
-        Log.i(TAG, "Feeding ${width}x$height at $fps fps from the game surface")
+        // getWidth/getHeight report -1 when the surface owns the geometry, which is the normal case for
+        // an encoder input surface, so the log names the size the frames will actually be read at instead.
+        val writerWidth = runCatching { imageWriter.width }.getOrDefault(-1)
+        val writerHeight = runCatching { imageWriter.height }.getOrDefault(-1)
+        val geometry = if (writerWidth > 0 && writerHeight > 0) "${writerWidth}x$writerHeight" else "$width x $height"
+        Log.i(TAG, "Feeding $geometry at $fps fps from the game surface")
         postFrame(0L)
     }
 
@@ -210,11 +215,12 @@ class GameSurfaceFeed(
             return
         }
         val frameStart = System.nanoTime()
-        val image = runCatching { imageWriter.acquireNextImage() }.getOrNull()
+        // dequeueInputImage throws when every buffer is still with the codec, and can block until one is
+        // released; either way this thread is the one that waits, never the render thread. A dropped
+        // frame is the right answer to back-pressure - retrying immediately would turn it into a spin,
+        // so the retry keeps the frame cadence.
+        val image = runCatching { imageWriter.dequeueInputImage() }.getOrNull()
         if (image == null) {
-            // Every buffer is still with the codec. Dropping this frame is the right answer; blocking
-            // here would stall the render thread that is waiting for a buffer of its own - and retrying
-            // immediately would turn back-pressure into a spin, so the retry keeps the frame cadence.
             if (!gaveUp()) postFrame(GameCapture.nextDelayMs(targetFps, 0L))
             return
         }

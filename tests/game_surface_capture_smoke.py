@@ -67,10 +67,12 @@ for rule in ("planCopy", "nextDelayMs", "decide", "startupGraceMs", "shouldUseGa
 check("@JvmStatic" in core, "the core rules need @JvmStatic so the Kotlin-free harness can call them")
 
 # --- the feed must be the thing that produces frames, and must not touch the codec
-for api in ("ImageWriter.newInstance(surface, MAX_IMAGES)", "acquireNextImage", "queueInputImage"):
+for api in ("ImageWriter.newInstance(surface, MAX_IMAGES)", "dequeueInputImage", "queueInputImage"):
     check(api in feed, f"GameSurfaceFeed must use {api}; that is how a surface gets produced from memory")
 check("newInstance(surface, width, height" not in feed,
       "ImageWriter has no size argument for a Surface producer; the surface's own geometry decides it")
+check("acquireNextImage" not in feed,
+      "ImageWriter has no acquireNextImage - that is ImageReader; dequeueInputImage throws on back-pressure instead")
 check("import android.view.PixelCopy" in feed and "import android.media.PixelCopy" not in feed,
       "PixelCopy is android.view.PixelCopy, not android.media")
 check("GameCapture.pixelCopySuccessCode" in feed,
