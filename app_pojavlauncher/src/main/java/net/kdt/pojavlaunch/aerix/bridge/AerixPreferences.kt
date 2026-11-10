@@ -32,15 +32,19 @@ import net.kdt.pojavlaunch.prefs.LauncherPreferences
 enum class AerixColorTheme { AERIX, CUSTOM }
 
 /**
- * Which dashboard skin the launcher draws.
+ * The two home screens the launcher can draw.
  *
- * [PREMIUM] is the older look: the large glass stage, wide padding, pill-shaped buttons and the
- * glowing accents. [CLEAN] is the newer one: the same controls, flat panels, tighter rows and a
- * smaller character stage, which reads better on a phone held sideways. Both are live - the player
- * picks one at the top of the dashboard and the shell moves into position, because restarting the
- * launcher to try a skin is not a choice, it is a chore.
+ * [PREMIUM] is the original dashboard - the utility tiles under "YOUR SPACE", the active-world card,
+ * tasks and recent worlds below it, and the docked 3D skin card with its own PLAY on wide screens,
+ * with the large glass stage, wide padding and pill-shaped buttons that go with it. Players asked
+ * for "the old UI" back, so that is what the pill is labelled, rather than a name to decode.
+ * [CLEAN] is the newer one: the same controls and the same data, flat panels, tighter rows and the
+ * rotatable character as the hero of the page, which reads better on a phone held sideways.
+ *
+ * Both are live - the player picks one at the top of the dashboard and the home page composes into
+ * it, because restarting the launcher to try a skin is not a choice, it is a chore.
  */
-enum class AerixLauncherUiStyle(val label: String) { PREMIUM("Premium UI"), CLEAN("Clean UI") }
+enum class AerixLauncherUiStyle(val label: String) { PREMIUM("Old UI (dashboard)"), CLEAN("New UI (hero)") }
 
 /** Page transition types, from mirai utils/animation/TransitionAnimationType.kt. */
 enum class AerixTransitionType { CLOSE, JELLY_BOUNCE, BOUNCE, SLICE_IN }

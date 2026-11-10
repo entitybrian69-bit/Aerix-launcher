@@ -212,17 +212,99 @@ fun HomeScreen(activity: FragmentActivity, navigate: (LauncherSection) -> Unit) 
         instanceSelector = { navigate(LauncherSection.INSTANCE_SELECTOR) }
     )
 
-    HomeCharacterStage(
-        selected = selected,
-        actions = actions,
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(start = AerixSpacing.mdPlus, end = AerixSpacing.xs, top = AerixSpacing.smPlus, bottom = AerixSpacing.smPlus)
-    )
+    // "The old UI" is this dashboard, and it is a different composition rather than the same one
+    // with different padding: the utility tiles under YOUR SPACE, the active-world card, tasks and
+    // recent worlds below them, and the docked 3D skin card with its own PLAY on the right. The
+    // character stage that replaced it is the Clean skin. Reading the preference as Compose state is
+    // what makes the switch repaint the home page on the spot, with no restart.
+    if (AerixPreferences.uiStyle == AerixLauncherUiStyle.PREMIUM) {
+        val accent = AerixThemeManager.currentAccent()
+        val taskCount = PojavTaskBridge.taskCount
+        val recent = remember(instances, selected) {
+            instances.filterNot { it == selected }.take(8).ifEmpty { instances.take(8) }
+        }
+        Column(modifier = Modifier.fillMaxSize()) {
+            // The switch stays on the page in both skins, so choosing the old look is never a trap.
+            AerixUiStyleSwitch(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = AerixSpacing.mdPlus, end = AerixSpacing.mdPlus, top = AerixSpacing.xs)
+            )
+            ClassicHomeDashboard(
+                selected = selected,
+                instances = instances,
+                recent = recent,
+                count = instances.size,
+                accent = accent,
+                taskCount = taskCount,
+                actions = actions
+            )
+        }
+    } else {
+        HomeCharacterStage(
+            selected = selected,
+            actions = actions,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(start = AerixSpacing.mdPlus, end = AerixSpacing.xs, top = AerixSpacing.smPlus, bottom = AerixSpacing.smPlus)
+        )
+    }
 }
 
-/** Empty launcher dashboard: the 360° character is the hero, with instance selection and Play
- * directly below it. Everything else lives in the utility rails and their destinations. */
+/**
+ * Home as it was before the character stage became the hero: Mirai's LauncherScreen split, the
+ * content dashboard on the left (weight 7.4f) and the docked 3D skin [ActionMenuCard] on the right
+ * (weight 2.6f) whenever the window is 500.dp wide or more. Inside the dashboard, landscape and at
+ * least 720.dp wide gets [WideHomeDashboard]; anything smaller scrolls as [CompactHomeDashboard].
+ */
+@Composable
+private fun ClassicHomeDashboard(
+    selected: AerixInstance?,
+    instances: List<AerixInstance>,
+    recent: List<AerixInstance>,
+    count: Int,
+    accent: Color,
+    taskCount: Int,
+    actions: HomeActions
+) {
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val showActionMenu = maxWidth >= 500.dp
+        Row(modifier = Modifier.fillMaxSize()) {
+            BoxWithConstraints(
+                modifier = Modifier
+                    .weight(if (showActionMenu) ContentWeight else 1f)
+                    .fillMaxHeight()
+                    .padding(start = AerixSpacing.mdPlus, end = AerixSpacing.smCompact, top = AerixSpacing.smPlus)
+            ) {
+                if (maxWidth >= 720.dp && maxWidth > maxHeight) {
+                    WideHomeDashboard(selected, recent, count, accent, taskCount, actions)
+                } else {
+                    CompactHomeDashboard(selected, recent, count, accent, taskCount, actions)
+                }
+            }
+            if (showActionMenu) {
+                ActionMenuCard(
+                    selected = selected,
+                    instances = instances,
+                    actions = actions,
+                    modifier = Modifier
+                        .guideAnchor(AerixGuideState.PLAY)
+                        .weight(ActionMenuWeight)
+                        .fillMaxHeight()
+                        .padding(
+                            top = ActionMenuOuterPadding,
+                            bottom = ActionMenuOuterPadding,
+                            end = ActionMenuOuterPadding
+                        )
+                )
+            }
+        }
+    }
+}
+
+/** The Clean skin's home: the 360° character is the hero, with instance selection and Play
+ * directly below it. Everything else lives in the utility rails and their destinations. The Premium
+ * skin renders [ClassicHomeDashboard] instead - see [HomeScreen]. */
 @Composable
 private fun HomeCharacterStage(
     selected: AerixInstance?,
@@ -392,8 +474,8 @@ private fun HomeCharacterStage(
 }
 
 /**
- * Kept as a fallback/reference component for older dashboards: the 3D rotatable skin stage, an
- * instance menu and the PLAY button. Home now uses [HomeCharacterStage] and the right utility rail.
+ * The docked right-hand card of [ClassicHomeDashboard]: the 3D rotatable skin stage, an instance
+ * menu and the PLAY button. [HomeCharacterStage] is the other skin's take on the same controls.
  */
 @Composable
 private fun ActionMenuCard(

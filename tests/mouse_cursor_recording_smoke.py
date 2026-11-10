@@ -171,7 +171,7 @@ check("the reserve never double-counts the system bars",
 print("9. the dashboard skin switches without a restart")
 aerix_prefs = read(os.path.join(JAVA, "aerix", "bridge"), "AerixPreferences.kt")
 check("two skins, named as the players named them",
-      'PREMIUM("Premium UI")' in aerix_prefs and 'CLEAN("Clean UI")' in aerix_prefs)
+      'PREMIUM("Old UI (dashboard)")' in aerix_prefs and 'CLEAN("New UI (hero)")' in aerix_prefs)
 check("the choice is persisted", 'putString(KEY_UI_STYLE, value.name)' in aerix_prefs)
 check("the choice is Compose state, so no restart is needed",
       "var uiStyle by mutableStateOf" in aerix_prefs)
@@ -180,6 +180,21 @@ check("the switch sits at the top of the dashboard", "AerixUiStyleSwitch" in hom
 check("the two layouts animate into position",
       "animateDpAsState" in home and "animateFloatAsState" in home)
 check("the pills move with a sliding highlight", 'label = "uiStylePill"' in home)
+# "The old UI" is a layout, not a colour scheme: the dashboard the players screenshotted put the
+# utility tiles and the active-world card on the left and the docked 3D skin card on the right. If
+# the switch only changed padding, picking "old UI" would show them a different launcher.
+classic_block = home[home.index("if (AerixPreferences.uiStyle == AerixLauncherUiStyle.PREMIUM)"):]
+classic_block = classic_block[:classic_block.index("} else {")]
+check("the old skin is its own composition", "ClassicHomeDashboard(" in classic_block)
+check("the old skin keeps the switch, so it is never a dead end",
+      "AerixUiStyleSwitch" in classic_block)
+check("the dashboard and the docked skin card are both drawn",
+      "WideHomeDashboard(" in home and "CompactHomeDashboard(" in home
+      and "ActionMenuCard(" in home[home.index("private fun ClassicHomeDashboard"):])
+check("the split matches the layout the screenshot showed",
+      "maxWidth >= 500.dp" in home and "ContentWeight" in home and "ActionMenuWeight" in home)
+check("the old sections are still the ones the page names",
+      "aerix_home_your_space" in home and "aerix_home_active_world" in home)
 
 print("10. mouse settings live where they were asked for")
 section = read(os.path.join(JAVA, "aerix", "ui", "screens"), "AerixMouseSettingsSection.kt")
@@ -227,6 +242,34 @@ check("a pack keeps its own mods", "updateOwnMods" in client_screen)
 check("the new instance is found by diffing, not guessing", "instance.name !in before" in client_screen)
 check("the pack install goes through the launcher's own path",
       "PojavAssetBridge.install(context, project, file)" in client_screen)
+
+print("14. the in-game A menu survives a tap the device reports twice")
+guard = read(os.path.join(JAVA, "aerix", "client"), "AerixOverlayInput.kt")
+check("the guard arms only once the menu has been drawn",
+      "const val NOT_ARMED = Long.MAX_VALUE" in guard and "fun arm()" in guard)
+check("the grace window is a number, not a guess at a frame rate",
+      "DISMISS_GRACE_MS = 240L" in guard)
+check("an early tap is swallowed and counted",
+      "dismissedTaps++" in guard and "fun acceptTapDismiss" in guard)
+check("an early back/escape is swallowed too",
+      "dismissedKeys++" in guard and "fun acceptKeyDismiss" in guard)
+check("the guard says what it did", "fun report(): String" in guard)
+check("every modal open re-arms it", "fun noteOpened()" in guard)
+check("every modal arms on the frame after it is drawn",
+      "withFrameNanos { }\n        AerixOverlayInput.arm()" in overlay
+      and "if (bootVisible || modal == InGameClientModal.NONE) return@LaunchedEffect" in overlay)
+check("the backdrop asks the guard before it closes",
+      "if (AerixOverlayInput.acceptTapDismiss()) onClose()" in overlay)
+check("the back path asks the guard as well",
+      "if (!AerixOverlayInput.acceptKeyDismiss()) return true" in overlay)
+check("opening the menu re-arms the guard", "AerixOverlayInput.noteOpened()" in overlay)
+check("the page that shows FPS also shows the touch guard",
+      "AerixOverlayInput.report()" in overlay)
+# Nineteen pixels off the top of the screen is inside the strip Android treats as a system gesture,
+# which is how a tap on the Client button can be delivered twice, or eaten, on some phones.
+check("the Client button is not parked in the system's edge gesture strip",
+      "val topSafePx = with(pillDensity) { 26.dp.roundToPx() }" in overlay
+      and "maxOf(((btnPos?.yNorm ?: 0.035f) * hPx).roundToInt(), topSafePx)" in overlay)
 
 print()
 if failures:

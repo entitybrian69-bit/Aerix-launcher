@@ -68,6 +68,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
@@ -249,6 +250,7 @@ class AerixClientOverlayView @JvmOverloads constructor(
         if (visibility != VISIBLE) return
         bootOverlayVisible = false
         menuSubPage = ClientMenuSubPage.GRID
+        AerixOverlayInput.noteOpened()
         activeModal = InGameClientModal.MODULES
     }
 
@@ -273,6 +275,10 @@ class AerixClientOverlayView @JvmOverloads constructor(
             return true
         }
         if (activeModal != InGameClientModal.NONE) {
+            // A tap on the Client button can reach the game as an escape key as well as a touch, in
+            // which case the panel that the tap opened is closed by the very same tap. Key and tap
+            // share one grace window, so the menu only answers BACK/ESC once it has been on screen.
+            if (!AerixOverlayInput.acceptKeyDismiss()) return true
             if (activeModal == InGameClientModal.OLED_AFK) {
                 AerixClientInputBridge.setRightClickHold(false)
             }
@@ -368,6 +374,9 @@ class AerixClientOverlayView @JvmOverloads constructor(
                         }
                         if (next == InGameClientModal.MODULES) {
                             menuSubPage = ClientMenuSubPage.GRID
+                        }
+                        if (next != InGameClientModal.NONE) {
+                            AerixOverlayInput.noteOpened()
                         }
                         activeModal = next
                         syncGyroRegistration()
@@ -664,15 +673,33 @@ private fun AerixClientRootOverlay(
         }
     }
 
+    // A modal may only be dismissed by an outside tap or by back/escape once it has actually been
+    // drawn, and then only for a gesture that started after that plus the grace window - see
+    // AerixOverlayInput. This is armed here rather than inside the client menu because every modal
+    // answers the same two dismissal paths: a subpage that could never be left would be a far worse
+    // bug than the flicker this guard is for.
+    LaunchedEffect(modal, bootVisible) {
+        if (bootVisible || modal == InGameClientModal.NONE) return@LaunchedEffect
+        withFrameNanos { }
+        AerixOverlayInput.arm()
+    }
+
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val wPx = constraints.maxWidth.toFloat().coerceAtLeast(1f)
         val hPx = constraints.maxHeight.toFloat().coerceAtLeast(1f)
 
-        // Compact non-overlapping `[✦ Client]` button in safe gap (x=0.57, y=0.018 — clear of TAB at 0.46 & A at 0.77)
+        // Compact non-overlapping `[✦ Client]` button in the safe gap (x=0.57, clear of TAB at 0.46
+        // & A at 0.77). Its height comes from the player's own saved position, floored below the
+        // system's top-edge gesture strip so the tap that opens the menu stays a tap.
         if (!bootVisible && modal == InGameClientModal.NONE) {
             val btnPos = AerixClientStore.hudPositions["client_btn"]
             val bx = ((btnPos?.xNorm ?: 0.57f) * wPx).roundToInt()
-            val by = ((btnPos?.yNorm ?: 0.018f) * hPx).roundToInt()
+            // 1.8% of the screen height is about nineteen pixels, which is inside the strip Android
+            // hands to the system as a top-edge gesture on many phones: the tap is eaten or repeated,
+            // and the panel flashes open and shut. Anything higher than this stays a launcher touch.
+            val pillDensity = LocalDensity.current
+            val topSafePx = with(pillDensity) { 26.dp.roundToPx() }
+            val by = maxOf(((btnPos?.yNorm ?: 0.035f) * hPx).roundToInt(), topSafePx)
             Row(
                 modifier = Modifier
                     .offset { IntOffset(bx, by) }
@@ -816,7 +843,7 @@ private fun FamousClientRectangleMenu(
             .fillMaxSize()
             .background(Color(0x990A0B0E))
             .pointerInput(Unit) {
-                detectTapGestures(onTap = { onClose() })
+                detectTapGestures(onTap = { if (AerixOverlayInput.acceptTapDismiss()) onClose() })
             },
         contentAlignment = Alignment.Center
     ) {
@@ -2051,6 +2078,7 @@ private fun ClientPerformancePage(gameDir: File?, onClose: () -> Unit) {
         }
         Text(net.kdt.pojavlaunch.aerix.client.AerixCursorSkin.report(pageContext),
             color = LiquidCrystalPalette.TextMuted, fontSize = 10.sp)
+        Text(AerixOverlayInput.report(), color = LiquidCrystalPalette.TextMuted, fontSize = 10.sp)
         ClientInformationToggle("Show FPS history HUD", AerixClientStore.fpsHistoryEnabled) { AerixClientStore.fpsHistoryEnabled = it }
         ClientInformationToggle("Frame time and stutters HUD", AerixClientStore.frameTimingEnabled) { AerixClientStore.frameTimingEnabled = it }
         ClientInformationToggle("Adaptive render distance", AerixClientStore.adaptiveDistanceEnabled) { AerixClientStore.adaptiveDistanceEnabled = it }
