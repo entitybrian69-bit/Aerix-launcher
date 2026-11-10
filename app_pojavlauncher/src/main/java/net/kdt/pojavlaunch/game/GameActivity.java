@@ -476,6 +476,19 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         mControlLayout.toggleControlVisible();
     }
 
+    /**
+     * Puts the on-screen controls in or out of what a screen recording captures.
+     *
+     * The recorder mirrors the display, so the only way to leave the buttons out of the video is to
+     * stop drawing them - and the only safe way to do that mid-game is alpha, since a hidden control
+     * stops receiving touches and the player would be unable to play until the recording ended. The
+     * recorder calls this when a session that opted out of controls starts, and when it finishes.
+     */
+    public void setControlsCapturedInRecording(boolean captured) {
+        if (mControlLayout == null) return;
+        mControlLayout.setRecordingOpacity(captured ? 1f : 0f);
+    }
+
     @Override
     public void onAttachedToWindow() {
         // A missing instance or unavailable renderer can finish before views are bound.

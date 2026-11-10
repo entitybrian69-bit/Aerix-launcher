@@ -58,6 +58,15 @@ public class ControlLayout extends FrameLayout {
 	private boolean mControlVisible = false;
 
 	private float mButtonsOpacity = 1.0f;
+	/**
+	 * Multiplies button alpha while a screen recording wants clean footage, so the on-screen controls
+	 * drop out of the capture without dropping out of the game.
+	 *
+	 * Alpha and not visibility on purpose: a GONE or INVISIBLE control stops receiving touches, and a
+	 * player who cannot jump or place blocks until the recording ends is a worse trade than a video
+	 * with buttons in it. The buttons stay where they are, keep taking input, and simply draw nothing.
+	 */
+	private float mRecordingOpacity = 1.0f;
 
 	private EditControlSideDialog mControlDialog = null;
 	private ControlHandleView mHandleView;
@@ -90,7 +99,7 @@ public class ControlLayout extends FrameLayout {
 	}
 
 	public void loadLayout(CustomControls controlLayout) {
-		this.mButtonsOpacity = (float) LauncherPreferences.PREF_BUTTON_TRANSPARENCY / 100;
+		this.mButtonsOpacity = (float) LauncherPreferences.PREF_BUTTON_TRANSPARENCY / 100 * mRecordingOpacity;
 		boolean sanitizedModified = false;
 		if(controlLayout != null) {
 			sanitizedModified = LayoutSanitizer.sanitizeLayout(controlLayout);
@@ -266,6 +275,27 @@ public class ControlLayout extends FrameLayout {
             // Avoid going through the JNI each time.
             button.setVisible(((button.getProperties().displayInGame && Platform.isGrabbing()) || (button.getProperties().displayInMenu && !Platform.isGrabbing())) && isVisible);
 		}
+	}
+
+	/**
+	 * Fades the whole control layer in or out for the duration of a recording. Call with 0 to leave the
+	 * controls out of a screen capture, 1 to put them back; the player's own transparency setting is
+	 * multiplied with it, so a layout that is already half-transparent stays consistent.
+	 */
+	public void setRecordingOpacity(float opacity) {
+		float clamped = opacity < 0f ? 0f : (opacity > 1f ? 1f : opacity);
+		if (mRecordingOpacity == clamped) {
+			return;
+		}
+		mRecordingOpacity = clamped;
+		// Every button alpha goes through updateButtonOpacity, including the ones loaded mid-recording
+		// by a layout switch, which is what keeps a rotation or a control edit from bringing the
+		// buttons back into the video.
+		updateButtonOpacity();
+	}
+
+	public float getRecordingOpacity() {
+		return mRecordingOpacity;
 	}
 
 	public void setModifiable(boolean isModifiable) {
@@ -706,7 +736,7 @@ public class ControlLayout extends FrameLayout {
 	}
 
 	public void updateButtonOpacity() {
-		mButtonsOpacity = Math.clamp((float) LauncherPreferences.PREF_BUTTON_TRANSPARENCY / 100, 0, 1);
+		mButtonsOpacity = Math.clamp((float) LauncherPreferences.PREF_BUTTON_TRANSPARENCY / 100, 0, 1) * mRecordingOpacity;
 		for(ControlInterface button : getButtonChildren()) {
 			// In edit mode, all controls have to be shown
 			if(mModifiable) button.setVisible(true);
