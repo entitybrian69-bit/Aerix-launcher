@@ -170,7 +170,7 @@ check("the choice is Compose state, so no restart is needed",
 home = read(os.path.join(JAVA, "aerix", "ui", "screens"), "HomeScreen.kt")
 check("the switch sits at the top of the dashboard", "AerixUiStyleSwitch" in home)
 check("the two layouts animate into position",
-      "animateDpAsState" in home and "animateColorAsState" in home)
+      "animateDpAsState" in home and "animateFloatAsState" in home)
 check("the pills move with a sliding highlight", 'label = "uiStylePill"' in home)
 
 print("10. mouse settings live where they were asked for")
@@ -185,7 +185,10 @@ check("every import the file needs is declared",
 settings_screen = read(os.path.join(JAVA, "aerix", "ui", "screens"), "SettingsScreen.kt")
 check("the settings page mounts the section", "AerixMouseSettingsSection()" in settings_screen)
 overlay = read(os.path.join(JAVA, "aerix", "client"), "AerixClientOverlayView.kt")
-check("the in-game overlay gets cursor size", "AerixCursorSkin.setScale(LocalContext.current" in overlay)
+# LocalContext.current is a composable getter, so the page hoists it once and the click handlers
+# use the hoisted value - asserting on the hoist is what keeps that from being "re-fixed" backwards.
+check("the in-game overlay gets cursor size", "AerixCursorSkin.setScale(pageContext" in overlay)
+check("the page hoists its context out of the callbacks", "val pageContext = LocalContext.current" in overlay)
 check("the in-game overlay switches the FPS pill", "fpsOverlayEnabled" in overlay)
 game_prefs = read(os.path.join(JAVA, "aerix", "client"), "AerixClientStore.kt")
 check("that switch is persisted", 'putBoolean("fpsOverlayEnabled"' in game_prefs)

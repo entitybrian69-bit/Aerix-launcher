@@ -2011,6 +2011,10 @@ private fun findInstalledOptimizationMods(gameDir: File?): List<String> {
 
 @Composable
 private fun ClientPerformancePage(gameDir: File?, onClose: () -> Unit) {
+    // Read from the composition, once. LocalContext.current is itself a composable getter, so the
+    // click and slider callbacks below cannot ask for it themselves.
+    val pageContext = LocalContext.current
+    val pageActivity = pageContext as? net.kdt.pojavlaunch.game.GameActivity
     val context = LocalContext.current
     val options = ClientPerformanceSettings.overrides
     var installedMods by remember(gameDir) { mutableStateOf<List<String>>(emptyList()) }
@@ -2027,25 +2031,25 @@ private fun ClientPerformancePage(gameDir: File?, onClose: () -> Unit) {
         ClientInformationToggle("FPS pill on screen", AerixClientStore.fpsOverlayEnabled) {
             AerixClientStore.fpsOverlayEnabled = it
             AerixClientStore.persist()
-            (LocalContext.current as? net.kdt.pojavlaunch.game.GameActivity)?.refreshFpsViewVisibility()
+            pageActivity?.refreshFpsViewVisibility()
         }
         Text("Cursor size  ${net.kdt.pojavlaunch.aerix.client.AerixCursorSkin.scalePercent}%",
             color = Color.White, fontSize = 11.sp)
         Slider(value = (net.kdt.pojavlaunch.aerix.client.AerixCursorSkin.scalePercent / 100f).coerceIn(0.25f, 3f),
             onValueChange = {
                 val percent = (it * 100).roundToInt()
-                net.kdt.pojavlaunch.aerix.client.AerixCursorSkin.setScale(LocalContext.current, percent)
-                (LocalContext.current as? net.kdt.pojavlaunch.game.GameActivity)?.applyAerixPointerPreferences()
+                net.kdt.pojavlaunch.aerix.client.AerixCursorSkin.setScale(pageContext, percent)
+                pageActivity?.applyAerixPointerPreferences()
             }, valueRange = 0.25f..3f)
         Row(modifier = Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             listOf("Tiny" to 45, "Normal" to 100, "Large" to 165, "Huge" to 240).forEach { (label, percent) ->
                 LiquidCrystalPill(label, onClick = {
-                    net.kdt.pojavlaunch.aerix.client.AerixCursorSkin.setScale(LocalContext.current, percent)
-                    (LocalContext.current as? net.kdt.pojavlaunch.game.GameActivity)?.applyAerixPointerPreferences()
+                    net.kdt.pojavlaunch.aerix.client.AerixCursorSkin.setScale(pageContext, percent)
+                    pageActivity?.applyAerixPointerPreferences()
                 })
             }
         }
-        Text(net.kdt.pojavlaunch.aerix.client.AerixCursorSkin.report(LocalContext.current),
+        Text(net.kdt.pojavlaunch.aerix.client.AerixCursorSkin.report(pageContext),
             color = LiquidCrystalPalette.TextMuted, fontSize = 10.sp)
         ClientInformationToggle("Show FPS history HUD", AerixClientStore.fpsHistoryEnabled) { AerixClientStore.fpsHistoryEnabled = it }
         ClientInformationToggle("Frame time and stutters HUD", AerixClientStore.frameTimingEnabled) { AerixClientStore.frameTimingEnabled = it }
@@ -2143,7 +2147,7 @@ private fun ClientPerformancePage(gameDir: File?, onClose: () -> Unit) {
         // devices this launcher considers powerful - a Dimensity 6000-series phone therefore paints
         // at the refresh rate the display was never asked to raise, whatever the sliders above say.
         // So the ceiling is measured here, stated here, and lifted here.
-        val displayContext = LocalContext.current
+        val displayContext = pageContext
         val liveHz = net.kdt.pojavlaunch.utils.DisplayRefreshMode.activeRefreshHz(displayContext)
         val ceilingHz = net.kdt.pojavlaunch.utils.DisplayRefreshMode.ceilingRefreshHz(displayContext)
         val vsyncForced = net.kdt.pojavlaunch.prefs.LauncherPreferences.PREF_FORCE_VSYNC

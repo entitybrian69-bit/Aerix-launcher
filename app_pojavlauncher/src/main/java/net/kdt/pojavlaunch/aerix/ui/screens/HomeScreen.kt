@@ -66,7 +66,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -1174,8 +1173,10 @@ private fun AerixUiStyleSwitch(modifier: Modifier = Modifier) {
     ) {
         AerixLauncherUiStyle.values().forEach { style ->
             val active = style == selected
-            val tint by animateColorAsState(
-                if (active) accent.copy(alpha = 0.28f) else Color.Transparent,
+            // Animated on alpha rather than on the color itself: this Compose build has no colour
+            // animator here, and a fading fill reads the same while sliding into place.
+            val pillAlpha by animateFloatAsState(
+                if (active) 1f else 0f,
                 animationSpec = tween(260, easing = FastOutSlowInEasing),
                 label = "uiStylePill"
             )
@@ -1184,7 +1185,7 @@ private fun AerixUiStyleSwitch(modifier: Modifier = Modifier) {
                 modifier = Modifier
                     .weight(1f)
                     .clip(RoundedCornerShape(999.dp))
-                    .background(tint)
+                    .background(accent.copy(alpha = 0.28f * pillAlpha))
                     .clickable { AerixPreferences.saveUiStyle(style) }
                     .padding(vertical = 7.dp),
                 color = if (active) AerixSurface.textPrimary else AerixSurface.textSecondary,
