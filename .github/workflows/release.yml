@@ -240,3 +240,22 @@ jobs:
             dist/Aerix-Launcher-*.apk dist/Aerix-Launcher.apk dist/SHA256SUMS
           gh release view "v$VERSION" --json tagName,name,url,assets \
             -q '.tagName, .name, .url, (.assets[] | "\(.name) \(.size) \(.digest // "-")")'
+
+      - name: Check the release reaches the website
+        # Pages publishes from v3_openjdk: pages.yml gates its deploy job on that exact ref, because a
+        # testing branch must never push a build to the site. So a tag cut anywhere else is real - the
+        # APKs are on Releases and the updater will find them - but the website keeps advertising
+        # whatever v3_openjdk last held. That was silently true for every release until 2.3.1, when the
+        # site was still on 1.5.6, so the publish job says it out loud every time.
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          status=$(gh api "repos/$GITHUB_REPOSITORY/compare/v3_openjdk...$GITHUB_SHA" --jq .status 2>/dev/null || echo unknown)
+          case "$status" in
+            identical) echo "This commit is the tip of v3_openjdk: the website publishes with it." ;;
+            behind)    echo "v3_openjdk already has this commit: the website will follow on its next run." ;;
+            *)         echo "Release v$VERSION was cut from $GITHUB_REF_NAME, which is $status v3_openjdk - the site stays on the previous release until this branch is merged there."
+                       echo "::notice title=website-not-yet-published::v$VERSION is live on Releases but not on the website. Merge $GITHUB_REF_NAME into v3_openjdk (pages.yml deploys from that ref only) to publish docs/ for this release." ;;
+          esac

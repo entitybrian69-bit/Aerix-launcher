@@ -79,6 +79,14 @@ as assets on the GitHub Releases page and nowhere else.
 Current public release: **v2.3.1** (notes in
 `docs/releases/v2.3.1.md`).
 
+The website is a second step, not part of the cut. GitHub Pages is set to *GitHub Actions*, and
+`pages.yml` deploys only from `v3_openjdk` - a side branch verifies `docs/` and stops there, on purpose,
+so a testing branch can never publish a build. That means the site shows whatever `v3_openjdk` last
+held: a release tagged on a session branch is on Releases and in the in-app updater immediately, but the
+website keeps the previous version until the branch is merged. `Release CI` now says so in its last
+publish step when a cut is not yet on `v3_openjdk`. Regenerate with `python3 tools/build_site.py`
+before the merge if the version rows drifted.
+
 The release carries three builds per edition, named after `version.properties`:
 `Aerix-Launcher-<version>-arm64-v8a.apk`, `-armeabi-v7a.apk` and the universal
 `Aerix-Launcher-<version>.apk`, plus the three `-noruntime` equivalents.
