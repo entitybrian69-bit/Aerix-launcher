@@ -98,6 +98,7 @@ import net.kdt.pojavlaunch.R
 import net.kdt.pojavlaunch.aerix.bridge.AerixAccount
 import net.kdt.pojavlaunch.aerix.bridge.AerixPreferences
 import net.kdt.pojavlaunch.aerix.components.AerixSkinPreview3D
+import net.kdt.pojavlaunch.aerix.components.bringFocusedItemIntoView
 import net.kdt.pojavlaunch.aerix.bridge.GameDownloadTarget
 import net.kdt.pojavlaunch.aerix.bridge.PojavAccountBridge
 import net.kdt.pojavlaunch.aerix.theme.AerixRadii
@@ -464,6 +465,7 @@ private fun LoadingWallpaperRow(accent: Color, compact: Boolean, height: Dp) {
             .clip(shape)
             .background(accent.copy(alpha = 0.10f))
             .border(1.dp, accent.copy(alpha = 0.35f), shape)
+            .bringFocusedItemIntoView()
             .clickable(role = Role.Switch) { apply(!checked) }
             .padding(horizontal = AerixSpacing.smPlus),
         verticalAlignment = Alignment.CenterVertically
@@ -493,6 +495,7 @@ private fun LoadingWallpaperRow(accent: Color, compact: Boolean, height: Dp) {
             modifier = Modifier.weight(1f)
         )
         Switch(
+            modifier = Modifier.bringFocusedItemIntoView(),
             checked = checked,
             onCheckedChange = { apply(it) },
             colors = SwitchDefaults.colors(
@@ -533,6 +536,7 @@ private fun CompactMenuButton(
             .clip(shape)
             .background(background)
             .border(1.dp, outline, shape)
+            .bringFocusedItemIntoView()
             .clickable(
                 interactionSource = interaction,
                 indication = null,
@@ -905,6 +909,7 @@ private fun AccountPickerDialog(
                                     else AerixSurface.borderSoft,
                                     shape
                                 )
+                                .bringFocusedItemIntoView()
                                 .clickable(role = Role.Button) { onPick(entry) }
                                 .padding(horizontal = AerixSpacing.sm),
                             verticalAlignment = Alignment.CenterVertically

@@ -7,19 +7,39 @@ import xml.etree.ElementTree as ET
 ROOT = Path(__file__).resolve().parents[1]
 APP = ROOT / "app_pojavlauncher"
 RES = APP / "src/main/res"
+ACTIVE_PACKAGES = {
+    "net.al.aerixlauncher",
+    "net.al.aerixlauncher.debug",
+    "net.al.aerixlauncher.pub",
+}
+LEGACY_PACKAGES = {
+    "net.kdt.pojavlaunch",
+    "net.kdt.pojavlaunch.debug",
+    "net.kdt.pojavlaunch.pub",
+}
 
 
 class BrandingIdentitySmoke(unittest.TestCase):
     def test_application_ids_and_provider_authorities(self):
         gradle = (APP / "build.gradle").read_text()
-        self.assertIn('applicationId "net.kdt.pojavlaunch"', gradle)
-        for package in ("net.kdt.pojavlaunch", "net.kdt.pojavlaunch.debug", "net.kdt.pojavlaunch.pub"):
+        self.assertIn('applicationId "net.al.aerixlauncher"', gradle)
+        self.assertNotIn('applicationId "net.kdt.pojavlaunch"', gradle)
+        for package in ACTIVE_PACKAGES:
             self.assertIn("'application_package', '" + package + "'", gradle)
-        for authority in ("net.kdt.pojavlaunch.scoped.gamefolder",
-                          "net.kdt.pojavlaunch.scoped.gamefolder.debug",
-                          "net.kdt.pojavlaunch.pub.scoped.gamefolder"):
+        for authority in (
+            "net.al.aerixlauncher.scoped.gamefolder",
+            "net.al.aerixlauncher.scoped.gamefolder.debug",
+            "net.al.aerixlauncher.pub.scoped.gamefolder",
+        ):
             self.assertIn("'storageProviderAuthorities', '" + authority + "'", gradle)
+        # The source namespace remains stable; applicationId controls the installed APK identity.
         self.assertIn("namespace 'net.kdt.pojavlaunch'", gradle)
+
+        debug_workflow = (ROOT / ".github/workflows/aerix-debug.yml").read_text()
+        self.assertIn("applicationId net.al.aerixlauncher.debug confirmed", debug_workflow)
+        self.assertIn("package: net.al.aerixlauncher.debug", debug_workflow)
+        play_workflow = (ROOT / ".github/workflows/android.yml").read_text()
+        self.assertIn("packageName: net.al.aerixlauncher", play_workflow)
 
     def test_existing_signing_and_debug_version_configuration(self):
         gradle = (APP / "build.gradle").read_text()
@@ -30,14 +50,25 @@ class BrandingIdentitySmoke(unittest.TestCase):
         self.assertIn('onVariants(selector().withBuildType("debug"))', gradle)
         self.assertIn("output.versionCode.set(AERIX_DEBUG_VERSION_CODE)", gradle)
 
-    def test_previous_apps_can_still_be_discovered(self):
+    def test_current_and_previous_apps_can_still_be_discovered(self):
         manifest = ET.parse(APP / "src/main/AndroidManifest.xml").getroot()
         ns = "{http://schemas.android.com/apk/res/android}"
         packages = {p.get(ns + "name") for p in manifest.findall("./queries/package")}
-        self.assertTrue({"net.kdt.pojavlaunch", "net.kdt.pojavlaunch.debug", "net.kdt.pojavlaunch.pub"} <= packages)
+        self.assertTrue((ACTIVE_PACKAGES | LEGACY_PACKAGES) <= packages)
+
         activity = (APP / "src/main/java/net/kdt/pojavlaunch/LauncherActivity.java").read_text()
-        self.assertIn("s.equals(getPackageName())", activity)
+        for package in LEGACY_PACKAGES:
+            self.assertIn(f'"{package}"', activity)
+        for package in ACTIVE_PACKAGES:
+            self.assertNotIn(f'"{package}"', activity)
+        self.assertIn("getLaunchIntentForPackage(packageName)", activity)
         self.assertIn("R.string.migration_notice", activity)
+
+        angle_provider = (
+            APP / "src/main/java/net/kdt/pojavlaunch/mobileglues/settings/AngleProvider.kt"
+        ).read_text()
+        for package in ACTIVE_PACKAGES | LEGACY_PACKAGES:
+            self.assertIn(f'"{package}"', angle_provider)
 
     def test_localized_app_labels_and_notifications(self):
         count = 0

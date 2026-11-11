@@ -29,7 +29,7 @@ def versionParts = AERIX_VERSION_NAME.split('\\.').collect { it.toInteger() }
 if (versionParts[1] >= 100 || versionParts[2] >= 100) throw new GradleException('Minor/patch must be below 100')
 def AERIX_VERSION_CODE = versionParts[0] * 10000 + versionParts[1] * 100 + versionParts[2]
 // Debug testing APKs advance monotonically on every build so installing a new debug APK over an
-// existing net.kdt.pojavlaunch.debug install never fails with
+// existing net.al.aerixlauncher.debug install never fails with
 // INSTALL_FAILED_VERSION_DOWNGRADE ("App not installed as package appears to be invalid").
 def AERIX_DEBUG_VERSION_CODE = ((long) (System.currentTimeMillis() / 1000L) - 1700000000L).toInteger()
 
@@ -66,6 +66,11 @@ configurations {
 
 android {
     namespace 'net.kdt.pojavlaunch'
+
+    sourceSets {
+        main {
+        }
+    }
 
     compileSdk = 36
 
@@ -128,14 +133,13 @@ android {
     }
 
     defaultConfig {
-        applicationId "net.kdt.pojavlaunch"
+        applicationId "net.al.aerixlauncher"
         minSdkVersion 23
         targetSdkVersion 36
         versionCode AERIX_VERSION_CODE
         versionName AERIX_VERSION_NAME
         multiDexEnabled false //important
         resValue 'string', 'curseforge_api_key', getCFApiKey()
-        resValue 'string', 'group_id', 'net.kdt'
     }
 
     /*
@@ -192,8 +196,19 @@ android {
             resValue "string", "app_name", "Aerix Launcher (Debug)"
             resValue "string", "app_short_name", "Aerix Launcher (Debug)"
             resValue "string", "aerix_app_label", "Aerix Launcher (Debug)"
-            resValue 'string', 'application_package', 'net.kdt.pojavlaunch.debug'
-            resValue 'string', 'storageProviderAuthorities', 'net.kdt.pojavlaunch.scoped.gamefolder.debug'
+            resValue 'string', 'application_package', 'net.al.aerixlauncher.debug'
+            resValue 'string', 'storageProviderAuthorities', 'net.al.aerixlauncher.scoped.gamefolder.debug'
+        }
+        // Aerix Nightly is the testing channel. It keeps the debug applicationId, signing key and
+        // versionCode, so it installs over an existing debug build and behaves exactly like it.
+        // Only the launcher label changes.
+        nightly {
+            initWith debug
+            signingConfig signingConfigs.customDebug
+            matchingFallbacks += List.of("debug")
+            resValue "string", "app_name", "Aerix Nightly"
+            resValue "string", "app_short_name", "Aerix Nightly"
+            resValue "string", "aerix_app_label", "Aerix Nightly"
         }
         proguard {
             initWith debug
@@ -214,8 +229,8 @@ android {
             resValue "string", "app_name", "Aerix Launcher"
             resValue "string", "app_short_name", "Aerix Launcher"
             resValue "string", "aerix_app_label", "Aerix Launcher"
-            resValue 'string', 'application_package', 'net.kdt.pojavlaunch'
-            resValue 'string', 'storageProviderAuthorities', 'net.kdt.pojavlaunch.scoped.gamefolder'
+            resValue 'string', 'application_package', 'net.al.aerixlauncher'
+            resValue 'string', 'storageProviderAuthorities', 'net.al.aerixlauncher.scoped.gamefolder'
         }
         gplay {
             initWith release
@@ -229,8 +244,8 @@ android {
             resValue "string", "app_name", "Aerix Launcher (Nightly)"
             resValue "string", "app_short_name", "Aerix Launcher (Nightly)"
             resValue "string", "aerix_app_label", "Aerix Launcher (Nightly)"
-            resValue 'string', 'application_package', 'net.kdt.pojavlaunch.pub'
-            resValue 'string', 'storageProviderAuthorities', 'net.kdt.pojavlaunch.pub.scoped.gamefolder'
+            resValue 'string', 'application_package', 'net.al.aerixlauncher.pub'
+            resValue 'string', 'storageProviderAuthorities', 'net.al.aerixlauncher.pub.scoped.gamefolder'
             matchingFallbacks += List.of("release")
         }
     }
@@ -274,6 +289,13 @@ android {
 
 androidComponents {
     onVariants(selector().withBuildType("debug")) { variant ->
+        variant.outputs.each { output ->
+            output.versionCode.set(AERIX_DEBUG_VERSION_CODE)
+        }
+    }
+    // Nightly shares the debug applicationId, so it needs the same monotonically increasing
+    // versionCode. Otherwise installing it over a debug build would be a downgrade.
+    onVariants(selector().withBuildType("nightly")) { variant ->
         variant.outputs.each { output ->
             output.versionCode.set(AERIX_DEBUG_VERSION_CODE)
         }
@@ -400,8 +422,9 @@ afterEvaluate {
         registrar.setVariant(variant)
 
         registrar.projectJarDependency project(":forge_installer"), "components/forge_installer"
-        registrar.projectJarDependency project(":aerix_client_mod"), "components/aerix_client"
-
+        // The Client's in-game half (capes, live options, ZOOM, Server Boost) ships as an asset and is
+        // copied into every managed instance by AerixClientModBridge before the game starts.
+        registrar.projectJarDependency project(":aerix_client_mod"), "components/aerix_client_mod"
 		if (variant.getName().toLowerCase().contains("full")) {
             registrar.jreRuntimeDependency 8, "components/jre"
         }

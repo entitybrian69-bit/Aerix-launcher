@@ -7,7 +7,6 @@ import static net.kdt.pojavlaunch.prefs.LauncherPreferences.PREF_ENABLE_GYRO;
 import static net.kdt.pojavlaunch.prefs.LauncherPreferences.PREF_SUSTAINED_PERFORMANCE;
 import static net.kdt.pojavlaunch.prefs.LauncherPreferences.PREF_USE_ALTERNATE_SURFACE;
 import static net.kdt.pojavlaunch.prefs.LauncherPreferences.PREF_VIRTUAL_MOUSE_START;
-import static net.kdt.pojavlaunch.prefs.LauncherPreferences.PREF_ZINK_PREFER_SYSTEM_DRIVER;
 
 import android.app.Activity;
 import android.app.AlertDialog;
@@ -21,6 +20,7 @@ import android.graphics.drawable.ColorDrawable;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.content.SharedPreferences;
 import android.os.ResultReceiver;
 import android.util.Log;
 import android.view.InputDevice;
@@ -58,6 +58,7 @@ import net.kdt.pojavlaunch.Tools;
 import net.kdt.pojavlaunch.authenticator.accounts.Accounts;
 import net.kdt.pojavlaunch.aerix.bridge.AerixPreferences;
 import net.kdt.pojavlaunch.aerix.bridge.AerixAccount;
+import net.kdt.pojavlaunch.aerix.vulkan.VulkanDriverManager;
 import net.kdt.pojavlaunch.aerix.ui.game.GameMenuCallbacks;
 import net.kdt.pojavlaunch.aerix.ui.game.GameMenuOverlayView;
 import net.kdt.pojavlaunch.customcontrols.ControlButtonMenuListener;
@@ -115,6 +116,12 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     private GameMenuOverlayView mGameMenuOverlay;
     private net.kdt.pojavlaunch.aerix.client.AerixClientOverlayView mAerixClientOverlay;
     private GyroControl mGyroControl = null;
+    /**
+     * The refresh rate the window last asked the display for, or 0 for "nothing outstanding". Only
+     * used to decide whether a layout pass silently dropped the request, so the answer can be said
+     * out loud instead of the setting quietly doing nothing.
+     */
+    private float mRequestedRefreshHz = 0f;
     private ControlLayout mControlLayout;
     private HotbarView mHotbarView;
     private GameRenderer mGameRenderer;
@@ -209,9 +216,19 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
             return;
         }
 
-        if(GpuUtils.getGlInfo().isAdreno() && !PREF_ZINK_PREFER_SYSTEM_DRIVER) {
-            mGameRenderer.overrideVulkanDriver();
+        String instanceDriverKey = instance.name != null ? instance.name : instance.versionId;
+        String vulkanDriverId = VulkanDriverManager.selectedDriverId(this, instanceDriverKey);
+        boolean useTurnip = !VulkanDriverManager.isSystemDriver(vulkanDriverId);
+        boolean adrenoGpu = GpuUtils.getGlInfo().isAdreno();
+        String customVulkanDriverPath = VulkanDriverManager.libraryDirectory(this, vulkanDriverId);
+        if (useTurnip && !adrenoGpu) {
+            Logger.appendToLog("Vulkan driver: Turnip is Adreno-only; falling back to the system Vulkan driver");
+            useTurnip = false;
+            customVulkanDriverPath = null;
         }
+        GameRenderer.configureVulkanDriver(customVulkanDriverPath, useTurnip);
+        if (useTurnip) mGameRenderer.overrideVulkanDriver();
+        Logger.appendToLog("Vulkan driver selection: " + (useTurnip ? vulkanDriverId : VulkanDriverManager.SYSTEM_DRIVER));
 
         AsyncAssetManager.extractDefaultSettings(this, instance.getGameDirectory());
         MCOptionUtils.load(instance.getGameDirectory().getAbsolutePath());
@@ -323,6 +340,10 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         setContentView(resId);
         bindValues();
         mControlLayout.setMenuListener(this);
+        // A recording that ghosts the controls has to give them back on the player's own request.
+        mControlLayout.setOnPlayerControlsToggle(() -> {
+            if (mRecorder != null) mRecorder.onControlsRequestedByPlayer();
+        });
 
         mDrawerPullButton.setOnClickListener(v -> onClickedMenu());
         mRecorder = new net.kdt.pojavlaunch.recording.RecorderController(this, instance.getInstanceDirectory());
@@ -374,7 +395,7 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
             }
         });
         drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED);
-        launcherGLView.mCursorView.setCursorScale(LauncherPreferences.PREF_MOUSESCALE);
+        applyAerixPointerPreferences();
         weakCursor = new WeakReference<>(launcherGLView.mCursorView);
 
         try {
@@ -460,6 +481,30 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         mControlLayout.toggleControlVisible();
     }
 
+    /**
+     * The view the game renders into, for the recorder's game-surface capture. Null until the game has a
+     * window, which is the case the recorder treats as "this session cannot be clean" and mirrors the
+     * display instead.
+     */
+    public View getRecordingSurfaceView() {
+        return launcherGLView != null ? launcherGLView.getRecordingSurfaceView() : null;
+    }
+
+    /**
+     * Puts the on-screen controls in or out of what a screen recording captures.
+     *
+     * A recording built from the game's own frames never contains them, which is the preferred path. This
+     * is the fallback for when a session captures the display instead: the only way to leave the buttons
+     * out of a mirrored display is to stop drawing them, and the only safe way to do that mid-game is
+     * alpha, since a hidden control stops receiving touches and the player would be unable to play until
+     * the recording ended. The recorder calls this when a session that opted out of controls starts, and
+     * when it finishes.
+     */
+    public void setControlsCapturedInRecording(boolean captured) {
+        if (mControlLayout == null) return;
+        mControlLayout.setRecordingOpacity(captured ? 1f : 0f);
+    }
+
     @Override
     public void onAttachedToWindow() {
         // A missing instance or unavailable renderer can finish before views are bound.
@@ -468,6 +513,7 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         mControlLayout.post(()->{
             Tools.getDisplayMetrics(this);
             loadControls();
+            updateDisplayRefreshMode();
         });
     }
 
@@ -507,8 +553,13 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     private void updateFpsViewVisibility() {
         if (mFpsView == null) return;
         boolean isClient = instance != null && instance.isAerixClient;
-        boolean show = !isClient
-                && LauncherPreferences.PREF_SHOW_FPS
+        // An Aerix Client instance used to have no readout at all, so "turn the FPS overlay off" was
+        // a setting nobody could reach there and "turn it on" nobody could obey: the A overlay now
+        // owns that switch, and the launcher's preference still rules everywhere else.
+        boolean wanted = isClient
+                ? net.kdt.pojavlaunch.aerix.client.AerixClientStore.INSTANCE.getFpsOverlayEnabled()
+                : LauncherPreferences.PREF_SHOW_FPS;
+        boolean show = wanted
                 && (mGameMenuOverlay == null || !mGameMenuOverlay.isMenuShown());
         mFpsView.setVisibility(show ? View.VISIBLE : View.GONE);
     }
@@ -546,6 +597,63 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         super.onStop();
     }
 
+    /**
+     * Ask the display for the fastest refresh mode it offers at the game's resolution, if the player
+     * switched that on. This is a window attribute, not a game setting: the renderer keeps swapping at
+     * its own pace and VSync decides when a frame is presented, so all this can do is stop the panel
+     * from being parked at 60 Hz while it is capable of more.
+     *
+     * Re-applied after configuration changes, because rotation, a fold, or the system dropping the
+     * window preference on focus loss all leave the activity asking for nothing.
+     */
+    private void updateDisplayRefreshMode() {
+        final net.kdt.pojavlaunch.utils.RefreshModeChoice.Plan plan =
+                LauncherPreferences.PREF_MAX_REFRESH_RATE
+                        ? net.kdt.pojavlaunch.utils.DisplayRefreshMode.planFor(this) : null;
+        if (plan == null) {
+            mRequestedRefreshHz = 0f;
+            net.kdt.pojavlaunch.utils.DisplayRefreshMode.clear(this);
+            return;
+        }
+        mRequestedRefreshHz = plan.getRequestedHz();
+        if (!net.kdt.pojavlaunch.utils.DisplayRefreshMode.applyTo(this)) return;
+        if (mControlLayout == null) return;
+        // Deferred because the display policy may not have honoured the request yet, and a layout pass
+        // in the meantime would have dropped it. See reportDisplayRefreshOutcome for the read-back.
+        mControlLayout.postDelayed(this::reportDisplayRefreshOutcome, 900L);
+    }
+
+    /**
+     * Read the panel back after a refresh-rate request and say what it ended up at. A max-refresh
+     * setting that reports nothing is indistinguishable from one that is ignored, and that difference
+     * decides whether the player leaves it on. Within a rounding step of the ask counts as honoured;
+     * anything else gets one retry first, because a request that landed on the old mode is usually the
+     * window attributes being re-evaluated between the write and the layout pass rather than a refusal.
+     */
+    private void reportDisplayRefreshOutcome() {
+        if (!LauncherPreferences.PREF_MAX_REFRESH_RATE || mRequestedRefreshHz <= 0f) return;
+        float active = net.kdt.pojavlaunch.utils.DisplayRefreshMode.activeRefreshHz(this);
+        if (active + 0.5f >= mRequestedRefreshHz || active <= 0f) {
+            reportRefreshHz(active);
+            return;
+        }
+        if (!net.kdt.pojavlaunch.utils.DisplayRefreshMode.applyTo(this)) return;
+        reportRefreshHz(net.kdt.pojavlaunch.utils.DisplayRefreshMode.activeRefreshHz(this));
+    }
+
+    /** The one line the player sees, phrased from what the display is doing rather than from the setting. */
+    private void reportRefreshHz(float activeHz) {
+        if (activeHz <= 0f) return;
+        final int reachedHz = (int) Math.round(activeHz);
+        final boolean honoured = reachedHz + 1 >= Math.round(mRequestedRefreshHz);
+        Logger.appendToLog("Display refresh: " + (honoured ? "confirmed at " : "device kept the panel at ")
+                + reachedHz + "Hz (asked for " + (int) Math.round(mRequestedRefreshHz) + "Hz)");
+        runOnUiThread(() -> Toast.makeText(GameActivity.this,
+                getString(honoured ? R.string.aerix_max_refresh_done : R.string.aerix_max_refresh_refused,
+                        reachedHz),
+                honoured ? Toast.LENGTH_SHORT : Toast.LENGTH_LONG).show());
+    }
+
     @Override
     protected void onDestroy() {
         net.kdt.pojavlaunch.aerix.social.SocialBackend.onGameStopped();
@@ -576,6 +684,7 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
             // Child of mControlLayout, so refreshing size here is correct
             launcherGLView.refreshSize();
             mControlLayout.refreshControlButtonPositions();
+            updateDisplayRefreshMode();
         });
     }
 
@@ -697,7 +806,35 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     }
 
     /** Opens the existing in-game launcher settings (including resolution) from Aerix Client. */
+    /** The on-screen cursor is drawn by the launcher, so its scale can follow the slider at once. */
+    public void applyAerixPointerPreferences() {
+        if (launcherGLView == null || launcherGLView.mCursorView == null) return;
+        launcherGLView.mCursorView.setCursorScale(LauncherPreferences.PREF_MOUSESCALE);
+        // The chosen cursor image, its opacity and its anchor, straight from the settings page. The
+        // skin object caches the decode, so this is cheap to call on every cursor-related change.
+        launcherGLView.mCursorView.setCursorSkin(
+                net.kdt.pojavlaunch.aerix.client.AerixCursorSkin.INSTANCE.currentBitmap(this),
+                net.kdt.pojavlaunch.aerix.client.AerixCursorSkin.INSTANCE.getOpacityPercent(),
+                net.kdt.pojavlaunch.aerix.client.AerixCursorSkin.INSTANCE.getAnchoredCenter());
+        Logger.appendToLog("Aerix cursor: " + net.kdt.pojavlaunch.aerix.client.AerixCursorSkin.INSTANCE.report(this) + "\n");
+    }
+
+    /**
+     * The game window is always edge-to-edge. Reserving the cutout produced a black strip next to the
+     * rotated game - the launcher's own window already ignores it for exactly this reason - so the
+     * player no longer has to find the setting to make it go away.
+     */
+    @Override
+    protected boolean shouldIgnoreNotch() {
+        return true;
+    }
+
     public void openAerixQuickSettings() { openQuickSettings(); }
+
+    /** Re-evaluate the frame rate readout, for when the A overlay flips its switch mid-game. */
+    public void refreshFpsViewVisibility() {
+        updateFpsViewVisibility();
+    }
 
     public void openAerixScreenRecorder() {
         if (mRecorder != null) mRecorder.show();
@@ -726,6 +863,17 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
                 @Override
                 public void onButtonTransparencyChanged() {
                     mControlLayout.updateButtonOpacity();
+                }
+
+                @Override
+                public void onCursorScaleChanged() {
+                    applyAerixPointerPreferences();
+                }
+
+                @Override
+                public void onZoomStrengthChanged() {
+                    // The bridge reads the strength from the request file, so push it again.
+                    net.kdt.pojavlaunch.aerix.client.ClientLiveOptionsBridge.syncAll();
                 }
             };
         }

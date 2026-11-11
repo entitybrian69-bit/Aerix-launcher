@@ -1,0 +1,52 @@
+[
+ {
+  "file": "aerix_cursor_diamond_sword.png",
+  "id": "diamond_sword",
+  "name": "Diamond Sword"
+ },
+ {
+  "file": "aerix_cursor_grey_arrow.png",
+  "id": "grey_arrow",
+  "name": "Iron Arrow"
+ },
+ {
+  "file": "aerix_cursor_red_3d_arrow.png",
+  "id": "red_3d_arrow",
+  "name": "Red Cursor"
+ },
+ {
+  "file": "aerix_cursor_cyan_pixel_arrow.png",
+  "id": "cyan_pixel_arrow",
+  "name": "Diamond Arrow"
+ },
+ {
+  "file": "aerix_cursor_fire_sword.png",
+  "id": "fire_sword",
+  "name": "Flaming Sword"
+ },
+ {
+  "file": "aerix_cursor_golden_apple.png",
+  "id": "golden_apple",
+  "name": "Golden Apple"
+ },
+ {
+  "file": "aerix_cursor_crosshair.png",
+  "id": "crosshair",
+  "name": "Crosshair"
+ },
+ {
+  "file": "aerix_cursor_paper_plane.png",
+  "id": "paper_plane",
+  "name": "Paper Plane"
+ },
+ {
+  "file": "aerix_cursor_stone_axe.png",
+  "id": "stone_axe",
+  "name": "Stone Axe"
+ },
+ {
+  "file": "aerix_cursor_netherite_sword.png",
+  "id": "netherite_sword",
+  "name": "Netherite Sword"
+ }
+]

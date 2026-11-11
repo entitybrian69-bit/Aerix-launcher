@@ -35,7 +35,7 @@
 
 ## Android package and existing data
 
-To keep existing Aerix installs updatable, the release app retains the Android ID `net.kdt.pojavlaunch`; the debug app retains `net.kdt.pojavlaunch.debug`. Android can install an update over an existing app only when its package ID and signing certificate match and its version code is not lower. Debug and release are separate apps and cannot update each other. Back up your data before installing an update.
+The current Android application IDs are `net.al.aerixlauncher` (release), `net.al.aerixlauncher.debug` (testing), and `net.al.aerixlauncher.pub` (nightly). This replaces the previous Aerix IDs under `net.kdt.pojavlaunch`. Android treats the new ID as a separate app: it will not update an old install or automatically copy private app data. On Android 10 and newer, use the first-run import prompt or **Settings → Import data** to copy supported game files, instances, and control maps; Android 9 and older already share the game-data folder. Accounts, sign-in tokens, preferences, and runtimes do not transfer, so sign in again and download runtimes as needed. Keep the old app installed until the new one is verified. Debug and release builds also remain separate apps and cannot update each other. See [the migration guide](docs/APP_ID_MIGRATION.md) for step-by-step instructions.
 
 ## 🗺️ Quick Links
 <p align="center">
@@ -116,9 +116,9 @@ Aerix natively organizes launcher layouts, renderer stacks, and instance folders
 Aerix respects user privacy. Your worlds are yours. Your accounts are yours. Aerix does not take a cut or a look at either.
 
 *   🚫 **No Ads:** No popups, banners, or monetization layers.
-*   🚫 **No Telemetry:** Zero analytics trackers, hidden logs, or user reporting data streams.
-*   🚫 **No Harvesting:** No profiling, credential logging, or account caching.
-*   🔒 **Local-First Security:** Profiles, custom skins, and capes remain strictly isolated on your device storage unless you deliberately initiate a login that explicitly requests a remote server connection.
+*   🚫 **No Network Telemetry:** nothing here uploads cosmetic or appearance state on its own. The optional Aerix Client HUD snapshot is disabled by default, requires a local opt-in file, and remains in that instance's `config/` folder; it is not uploaded anywhere.
+*   🚫 **No Harvesting:** No credential logging or advertising profile is created by the launcher.
+*   🔒 **Local-First Security:** Profiles, custom skins, and capes remain on device unless you deliberately use an account, skin service, or social feature that requests a remote connection. Nothing cosmetic adds a network endpoint of its own.
 *   📦 **GPL-3.0 Verification:** Fully open-source code so the internal application mechanics are completely inspectable by anyone.
 
 ---
@@ -133,7 +133,7 @@ Aerix respects user privacy. Your worlds are yours. Your accounts are yours. Aer
 
 ---
 
-## 📋 Full Feature List
+## 📋 Full Feature List## 📋 Full Feature List
 
 ### ▶ Play
 *   Unified Play hub linking your file path library and recent worlds together.
@@ -171,7 +171,7 @@ Aerix respects user privacy. Your worlds are yours. Your accounts are yours. Aer
 *   **100% Human-Coded:** Pure handcrafted layout structure. No automated wrappers, no AI passes filling in layouts, and no generated scrap.
 *   **Owner Maintained:** The person who writes the modules is the person tracking issues, fixing dependencies, and addressing community reports.
 *   **Multi-Device Validation:** Built builds are rigorously evaluated on a cluster of different hardware configurations before moving into stable branches.
-*   **Continuous Debugging:** Automated Debug CI compiles on every commit and incoming pull request to safeguard against silent deployment breaks.
+*   **Continuous Testing:** Aerix Nightly CI compiles on every commit and incoming pull request to safeguard against silent deployment breaks.
 
 ---
 
@@ -209,7 +209,7 @@ That is why the product stays coherent: the people who add offline capes are the
 
 **Requires Android 8.0+.** Best on 4 GB RAM or more.
 
-Debug builds from CI are for testing. Release builds are the ones to keep.
+**Aerix Nightly** builds from CI are for testing — all non-release updates and testing land on that APK: [Aerix-Nightly.apk](https://github.com/entitybrian69-bit/Aerix-launcher/releases/download/debug-latest/Aerix-Nightly.apk). Release builds are the ones to keep.
 
 🌐 **Website:** <https://entitybrian69-bit.github.io/Aerix-launcher/> — screenshots, the full renderer lineup, a setup guide and an FAQ.
 

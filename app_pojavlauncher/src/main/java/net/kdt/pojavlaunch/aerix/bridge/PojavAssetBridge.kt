@@ -237,6 +237,16 @@ class AssetFile(
     ) : this(name, name, fileName, url, sha1, 0L, "release", "", gameVersions, loaders)
 }
 
+/** One page of the Discover screen, and which filter had to be dropped to fill it. */
+class AssetSearch(
+    val page: AssetPage?,
+    /** The loader of the running client matched nothing, so the rows are not all built for it. */
+    val relaxedLoader: Boolean = false,
+    /** Neither the loader nor the Minecraft version matched, so every version is on screen. */
+    val relaxedVersion: Boolean = false
+)
+
+
 class AssetPage(val projects: List<AssetProject>, val total: Int)
 
 /**
@@ -331,6 +341,47 @@ object PojavAssetBridge {
                 AssetPlatform.CURSEFORGE -> searchCurseForge(context, type, query, mcVersion, loader, chosenCategories, sort, offset)
             }
         }.getOrNull()
+    }
+
+    /**
+     * The search of the Discover screen, with the relief a strict filter needs.
+     *
+     * Loaders and versions are tags authors set themselves, and one forgotten tag takes a whole
+     * project out of a filtered search. So an empty page is asked for again: first without the
+     * loader, then without the version, and only then given up on. A request that failed stays
+     * failed - nothing here retries the network, so a device that is offline still says so.
+     */
+    suspend fun searchFollowing(
+        context: Context,
+        platform: AssetPlatform,
+        type: AssetType,
+        query: String,
+        mcVersion: String?,
+        loader: String?,
+        offset: Int,
+        category: String? = null,
+        sort: AssetSort = AssetSort.RELEVANCE,
+        categories: List<String> = emptyList()
+    ): AssetSearch = withContext(Dispatchers.IO) {
+        val strict = search(context, platform, type, query, mcVersion, loader, offset, category, sort, categories)
+            ?: return@withContext AssetSearch(null)
+        if (strict.projects.isNotEmpty() || (mcVersion.isNullOrBlank() && loader.isNullOrBlank()))
+            return@withContext AssetSearch(strict)
+
+        if (!loader.isNullOrBlank()) {
+            val everyLoader = search(context, platform, type, query, mcVersion, null, offset, category, sort, categories)
+            if (everyLoader != null && everyLoader.projects.isNotEmpty())
+                return@withContext AssetSearch(everyLoader, relaxedLoader = true)
+        }
+        if (!mcVersion.isNullOrBlank()) {
+            val everyVersion = search(context, platform, type, query, null, null, offset, category, sort, categories)
+            // The version carries the query further than the loader does: a pack for another
+            // version is still the pack that was asked for, while one for another loader may not
+            // open at all. So this last page is shown, note and all, instead of an empty screen.
+            if (everyVersion != null)
+                return@withContext AssetSearch(everyVersion, relaxedLoader = true, relaxedVersion = true)
+        }
+        AssetSearch(strict)
     }
 
     /**
@@ -805,7 +856,11 @@ object PojavAssetBridge {
                 title = hit.string("title") ?: "",
                 description = hit.string("description") ?: "",
                 author = hit.string("author") ?: "",
-                iconUrl = hit.string("icon_url")?.takeIf { it.isNotBlank() },
+                // Modrinth v2's search rows keep the logo in an "icon_urls" *array* - "icon_url"
+                // exists only on the project endpoint - so reading the bare field left every search
+                // row, here and on Discover, without a logo to draw.
+                iconUrl = hit.string("icon_url")?.takeIf { it.isNotBlank() }
+                    ?: hit.arr("icon_urls").strings().firstOrNull { it.isNotBlank() },
                 downloads = hit.long("downloads"),
                 loaders = loaders
             )

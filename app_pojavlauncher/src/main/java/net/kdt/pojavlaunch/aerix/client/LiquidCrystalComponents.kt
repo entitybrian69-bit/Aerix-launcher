@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import net.kdt.pojavlaunch.aerix.bridge.PojavAccountBridge
+import net.kdt.pojavlaunch.aerix.components.bringFocusedItemIntoView
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
@@ -129,7 +130,7 @@ fun LiquidCrystalPill(
             .clip(shape)
             .background(bg, shape)
             .border(1.dp, border, shape)
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .then(if (onClick != null) Modifier.bringFocusedItemIntoView().clickable(onClick = onClick) else Modifier)
             .padding(horizontal = 11.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -181,6 +182,7 @@ fun LiquidCrystalPrimaryButton(
             .clip(shape)
             .background(fill, shape)
             .border(1.dp, border, shape)
+            .bringFocusedItemIntoView()
             .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 18.dp, vertical = 11.dp),
         horizontalAlignment = Alignment.CenterHorizontally

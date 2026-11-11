@@ -128,7 +128,6 @@ object AerixClientStore {
 
     /* ── Capes State (3D Character + Waving Cape + 15 Animated Capes) ─────── */
     var equippedCapeId by mutableStateOf("crimson_sovereign")
-    var equippedHatId by mutableStateOf("none")
     var wavingCapeEnabled by mutableStateOf(true)
     var animatedCapeShimmer by mutableStateOf(true)
 
@@ -144,6 +143,11 @@ object AerixClientStore {
     var crosshairOpacity by mutableFloatStateOf(0.95f)
     var crosshairAttackPulse by mutableStateOf(false)
 
+    /**
+     * The launcher's frame rate pill, switched from inside the game. An Aerix Client instance has no
+     * other FPS readout, so without this the player cannot ask for one - or get rid of one.
+     */
+    var fpsOverlayEnabled by mutableStateOf(true)
     var perfPillEnabled by mutableStateOf(false)
     var fpsHistoryEnabled by mutableStateOf(false)
     var frameTimingEnabled by mutableStateOf(false)
@@ -194,6 +198,9 @@ object AerixClientStore {
     var quickHitboxesEnabled by mutableStateOf(false)
 
     var fullbrightEnabled by mutableStateOf(false)
+    /** Multiplayer-only performance profile the bridge mod applies live, inside a server. */
+    var serverBoostEnabled by mutableStateOf(false)
+    var serverBoostPreset by mutableStateOf("MEDIUM")
     var visualTimeMode by mutableStateOf("OFF")
     var visualWeatherMode by mutableStateOf("OFF")
     var visualFilter by mutableStateOf(VisualFilterPreset.NONE)
@@ -236,7 +243,6 @@ object AerixClientStore {
         selectedClientVersion = p.getString("selectedClientVersion", "1.16.5") ?: "1.16.5"
 
         equippedCapeId = p.getString("equippedCapeId", "crimson_sovereign") ?: "crimson_sovereign"
-        equippedHatId = p.getString("equippedHatId", "none") ?: "none"
         wavingCapeEnabled = p.getBoolean("wavingCapeEnabled", true)
         animatedCapeShimmer = true
 
@@ -252,6 +258,7 @@ object AerixClientStore {
         crosshairOpacity = p.getFloat("crosshairOpacity", 0.95f)
         crosshairAttackPulse = p.getBoolean("crosshairAttackPulse", false)
 
+        fpsOverlayEnabled = p.getBoolean("fpsOverlayEnabled", true)
         perfPillEnabled = p.getBoolean("perfPillEnabled", false)
         fpsHistoryEnabled = p.getBoolean("fpsHistoryEnabled", false)
         frameTimingEnabled = p.getBoolean("frameTimingEnabled", false)
@@ -305,6 +312,9 @@ object AerixClientStore {
         quickHitboxesEnabled = p.getBoolean("quickHitboxesEnabled", false)
 
         fullbrightEnabled = p.getBoolean("fullbrightEnabled", false)
+        serverBoostEnabled = p.getBoolean("serverBoostEnabled", false)
+        serverBoostPreset = p.getString("serverBoostPreset", "MEDIUM")
+            ?.takeIf { it in setOf("LIGHT", "MEDIUM", "EXTREME") } ?: "MEDIUM"
         visualTimeMode = p.getString("visualTimeMode", "OFF")?.takeIf { it in setOf("OFF", "DAY", "SUNSET", "NIGHT") } ?: "OFF"
         visualWeatherMode = p.getString("visualWeatherMode", "OFF")?.takeIf { it in setOf("OFF", "CLEAR", "RAIN") } ?: "OFF"
         autoGgEnabled = p.getBoolean("autoGgEnabled", false)
@@ -339,7 +349,6 @@ object AerixClientStore {
             putString("selectedClientVersion", selectedClientVersion)
 
             putString("equippedCapeId", equippedCapeId)
-            putString("equippedHatId", equippedHatId)
             putBoolean("wavingCapeEnabled", wavingCapeEnabled)
 
             putBoolean("crosshairEnabled", crosshairEnabled)
@@ -353,6 +362,7 @@ object AerixClientStore {
             putFloat("crosshairOpacity", crosshairOpacity)
             putBoolean("crosshairAttackPulse", crosshairAttackPulse)
 
+            putBoolean("fpsOverlayEnabled", fpsOverlayEnabled)
             putBoolean("perfPillEnabled", perfPillEnabled)
             putBoolean("fpsHistoryEnabled", fpsHistoryEnabled)
             putBoolean("frameTimingEnabled", frameTimingEnabled)
@@ -403,6 +413,8 @@ object AerixClientStore {
             putBoolean("quickHitboxesEnabled", quickHitboxesEnabled)
 
             putBoolean("fullbrightEnabled", fullbrightEnabled)
+            putBoolean("serverBoostEnabled", serverBoostEnabled)
+            putString("serverBoostPreset", serverBoostPreset)
             putString("visualTimeMode", visualTimeMode)
             putString("visualWeatherMode", visualWeatherMode)
             putBoolean("autoGgEnabled", autoGgEnabled)

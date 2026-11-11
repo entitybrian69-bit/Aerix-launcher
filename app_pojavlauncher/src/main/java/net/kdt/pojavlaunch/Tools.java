@@ -336,8 +336,11 @@ public final class Tools {
         }
     }
 
+    /** What an error surface shows when there is no Throwable to show: text, never another crash. */
+    private static final String NO_ERROR_DETAIL = "Unknown error (no exception attached)";
+
     public static String printToString(Throwable throwable) {
-        if (throwable == null) return "Unknown error (no exception attached)";
+        if (throwable == null) return NO_ERROR_DETAIL;
         StringWriter stringWriter = new StringWriter();
         PrintWriter printWriter = new PrintWriter(stringWriter);
         try {
@@ -368,6 +371,26 @@ public final class Tools {
     public static void showError(final Context ctx, final int title, final String rolledMessage, final Throwable e) {
         showError(ctx, title, rolledMessage, e, false, false);
     }
+    public static void showError(final Context ctx, final int title, final String rolledMessage, final Throwable e, final boolean exitIfOk) {
+        showError(ctx, title, rolledMessage, e, exitIfOk, false);
+    }
+
+    /**
+     * The body of an error dialog: the full trace when the user asked for more, otherwise the rolled-up
+     * line, otherwise whatever the Throwable can say for itself.
+     *
+     * Every input is optional, on purpose. showError is the last thing between a failure and the user
+     * reading about it, so it must not be able to fail: the runtime-install dialog offers "Show more"
+     * whether or not a cause was attached, and asking that absent cause for its message threw an NPE out
+     * of the dialog's own button (2.3.0, Tools.showError) - the report replaced the explanation.
+     */
+    static String errorBody(String rolledMessage, Throwable e, boolean showMore) {
+        if (showMore) return printToString(e);
+        if (rolledMessage != null && !rolledMessage.isEmpty()) return rolledMessage;
+        if (e == null) return NO_ERROR_DETAIL;
+        String message = e.getMessage();
+        return message != null ? message : e.getClass().getName();
+    }
     public static void showError(final Context ctx, final int titleId, final Throwable e, final boolean exitIfOk) {
         showError(ctx, titleId, null, e, exitIfOk, false);
     }
@@ -379,7 +402,7 @@ public final class Tools {
         }
 
         Runnable runnable = () -> {
-            final String errMsg = showMore ? printToString(e) : rolledMessage != null ? rolledMessage : e.getMessage();
+            final String errMsg = errorBody(rolledMessage, e, showMore);
             AlertDialog.Builder builder = new AlertDialog.Builder(ctx)
                     .setTitle(titleId)
                     .setMessage(errMsg)

@@ -65,6 +65,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import net.kdt.pojavlaunch.aerix.bridge.AerixPreferences
+import net.kdt.pojavlaunch.aerix.bridge.AerixLauncherUiStyle
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -74,6 +80,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -161,7 +168,9 @@ private class HomeActions(
     val fileManager: () -> Unit,
     val logs: () -> Unit,
     val accounts: () -> Unit,
-    val aerixAccount: () -> Unit
+    val aerixAccount: () -> Unit,
+    val quickTools: () -> Unit,
+    val instanceSelector: () -> Unit
 )
 
 @Composable
@@ -171,11 +180,6 @@ fun HomeScreen(activity: FragmentActivity, navigate: (LauncherSection) -> Unit) 
     }
     val instances = PojavInstanceBridge.instances
     val selected = PojavInstanceBridge.selected
-    val taskCount = PojavTaskBridge.taskCount
-    val accent = AerixThemeManager.currentAccent()
-    val recent = remember(instances, selected) {
-        instances.filterNot { it == selected }.take(8).ifEmpty { instances.take(8) }
-    }
     val jarLauncher = rememberLauncherForActivityResult(OpenDocumentWithExtension("jar")) { uri ->
         if (uri != null) PojavNavigator.runJar(activity, uri)
     }
@@ -203,11 +207,66 @@ fun HomeScreen(activity: FragmentActivity, navigate: (LauncherSection) -> Unit) 
         fileManager = { navigate(LauncherSection.FILES) },
         logs = { navigate(LauncherSection.LOGS) },
         accounts = { navigate(LauncherSection.ACCOUNTS) },
-        aerixAccount = { AerixNav.navigate(LauncherSection.AERIX_ACCOUNT) }
+        aerixAccount = { AerixNav.navigate(LauncherSection.AERIX_ACCOUNT) },
+        quickTools = { navigate(LauncherSection.QUICK_TOOLS) },
+        instanceSelector = { navigate(LauncherSection.INSTANCE_SELECTOR) }
     )
 
-    // Mirai LauncherScreen: content dashboard on the left (weight 7.4f) and the docked 3D skin
-    // ActionMenu card on the right (weight 2.6f) whenever maxWidth >= 500.dp.
+    // "The old UI" is this dashboard, and it is a different composition rather than the same one
+    // with different padding: the utility tiles under YOUR SPACE, the active-world card, tasks and
+    // recent worlds below them, and the docked 3D skin card with its own PLAY on the right. The
+    // character stage that replaced it is the Clean skin. Reading the preference as Compose state is
+    // what makes the switch repaint the home page on the spot, with no restart.
+    if (AerixPreferences.uiStyle == AerixLauncherUiStyle.PREMIUM) {
+        val accent = AerixThemeManager.currentAccent()
+        val taskCount = PojavTaskBridge.taskCount
+        val recent = remember(instances, selected) {
+            instances.filterNot { it == selected }.take(8).ifEmpty { instances.take(8) }
+        }
+        Column(modifier = Modifier.fillMaxSize()) {
+            // The switch stays on the page in both skins, so choosing the old look is never a trap.
+            AerixUiStyleSwitch(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = AerixSpacing.mdPlus, end = AerixSpacing.mdPlus, top = AerixSpacing.xs)
+            )
+            ClassicHomeDashboard(
+                selected = selected,
+                instances = instances,
+                recent = recent,
+                count = instances.size,
+                accent = accent,
+                taskCount = taskCount,
+                actions = actions
+            )
+        }
+    } else {
+        HomeCharacterStage(
+            selected = selected,
+            actions = actions,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(start = AerixSpacing.mdPlus, end = AerixSpacing.xs, top = AerixSpacing.smPlus, bottom = AerixSpacing.smPlus)
+        )
+    }
+}
+
+/**
+ * Home as it was before the character stage became the hero: Mirai's LauncherScreen split, the
+ * content dashboard on the left (weight 7.4f) and the docked 3D skin [ActionMenuCard] on the right
+ * (weight 2.6f) whenever the window is 500.dp wide or more. Inside the dashboard, landscape and at
+ * least 720.dp wide gets [WideHomeDashboard]; anything smaller scrolls as [CompactHomeDashboard].
+ */
+@Composable
+private fun ClassicHomeDashboard(
+    selected: AerixInstance?,
+    instances: List<AerixInstance>,
+    recent: List<AerixInstance>,
+    count: Int,
+    accent: Color,
+    taskCount: Int,
+    actions: HomeActions
+) {
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val showActionMenu = maxWidth >= 500.dp
         Row(modifier = Modifier.fillMaxSize()) {
@@ -218,9 +277,9 @@ fun HomeScreen(activity: FragmentActivity, navigate: (LauncherSection) -> Unit) 
                     .padding(start = AerixSpacing.mdPlus, end = AerixSpacing.smCompact, top = AerixSpacing.smPlus)
             ) {
                 if (maxWidth >= 720.dp && maxWidth > maxHeight) {
-                    WideHomeDashboard(selected, recent, instances.size, accent, taskCount, actions)
+                    WideHomeDashboard(selected, recent, count, accent, taskCount, actions)
                 } else {
-                    CompactHomeDashboard(selected, recent, instances.size, accent, taskCount, actions)
+                    CompactHomeDashboard(selected, recent, count, accent, taskCount, actions)
                 }
             }
             if (showActionMenu) {
@@ -243,9 +302,180 @@ fun HomeScreen(activity: FragmentActivity, navigate: (LauncherSection) -> Unit) 
     }
 }
 
+/** The Clean skin's home: the 360° character is the hero, with instance selection and Play
+ * directly below it. Everything else lives in the utility rails and their destinations. The Premium
+ * skin renders [ClassicHomeDashboard] instead - see [HomeScreen]. */
+@Composable
+private fun HomeCharacterStage(
+    selected: AerixInstance?,
+    actions: HomeActions,
+    modifier: Modifier = Modifier
+) {
+    val account = PojavAccountBridge.current
+    val accent = AerixThemeManager.currentAccent()
+    val vanilla = stringResource(R.string.aerix_home_vanilla)
+    var dollAzimuth by remember(account?.username) { mutableFloatStateOf(28f) }
+    val flingScope = rememberCoroutineScope()
+    val velocityTracker = remember(account?.username) { VelocityTracker() }
+    var flingJob by remember(account?.username) { mutableStateOf<Job?>(null) }
+    val versionLabel = remember(selected, vanilla) {
+        selected?.let { instanceVersionLabel(it.versionId, vanilla) } ?: "Choose a Minecraft instance"
+    }
+    // Premium UI is the older, heavier skin - wide glass stage, pill buttons, generous padding.
+    // Clean UI is the newer flat one: the same controls, tighter rows, smaller stage. Reading the
+    // preference as Compose state is what makes the switch take effect on the spot.
+    val clean = AerixPreferences.uiStyle == AerixLauncherUiStyle.CLEAN
+    val stageGap by animateDpAsState(if (clean) AerixSpacing.xs else AerixSpacing.sm, label = "stageGap")
+    val stagePadding by animateDpAsState(if (clean) AerixSpacing.xs else AerixSpacing.smPlus, label = "stagePadding")
+    val buttonHeight by animateDpAsState(if (clean) 40.dp else 46.dp, label = "playHeight")
+    val buttonRadius by animateDpAsState(if (clean) 14.dp else 999.dp, label = "playRadius")
+    val panelAlpha by animateFloatAsState(if (clean) 0.55f else 0.8f, label = "panelAlpha")
+
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(stageGap)
+    ) {
+        AerixUiStyleSwitch(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = stagePadding, vertical = AerixSpacing.xxs)
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = stagePadding, vertical = AerixSpacing.xs),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column {
+                Text(if (clean) "CHARACTER" else "YOUR CHARACTER", color = AerixSurface.textSecondary,
+                    fontSize = if (clean) 9.sp else 10.sp,
+                    fontWeight = FontWeight.ExtraBold, letterSpacing = 1.4.sp)
+                Text(account?.username ?: "Aerix", color = AerixSurface.textPrimary,
+                    style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1)
+            }
+            Surface(
+                onClick = actions.accounts,
+                shape = RoundedCornerShape(999.dp),
+                color = if (account == null) accent.copy(alpha = 0.16f) else AerixSurface.panel.copy(alpha = 0.8f),
+                border = BorderStroke(AerixSpacing.hairline, if (account == null) accent.copy(alpha = 0.7f) else AerixSurface.borderSoft)
+            ) {
+                Text(
+                    if (account == null) "ADD MINECRAFT ACCOUNT" else "DRAG TO ROTATE",
+                    color = if (account == null) accent else AerixSurface.textSecondary,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                )
+            }
+        }
+
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .padding(horizontal = AerixSpacing.smPlus)
+                .clipToBounds()
+                .drawWithCache {
+                    val glow = Brush.radialGradient(
+                        colors = listOf(accent.copy(alpha = 0.18f), Color.Transparent),
+                        center = Offset(size.width * 0.5f, size.height * 0.58f),
+                        radius = size.minDimension * 0.54f
+                    )
+                    onDrawBehind { drawRect(glow) }
+                }
+                .pointerInput(account?.username) {
+                    detectHorizontalDragGestures(
+                        onDragStart = {
+                            flingJob?.cancel()
+                            flingJob = null
+                            velocityTracker.resetTracking()
+                        },
+                        onDragEnd = {
+                            val releaseVelocity = -velocityTracker.calculateVelocity().x * DOLL_DRAG_DEG_PER_PX
+                            flingJob?.cancel()
+                            if (abs(releaseVelocity) < DOLL_FLING_MIN_VELOCITY) {
+                                flingJob = null
+                                return@detectHorizontalDragGestures
+                            }
+                            flingJob = flingScope.launch {
+                                var velocity = releaseVelocity
+                                var lastFrame = withFrameNanos { it }
+                                while (abs(velocity) > DOLL_FLING_STOP_VELOCITY) {
+                                    ensureActive()
+                                    val now = withFrameNanos { it }
+                                    val dt = ((now - lastFrame) / 1_000_000_000f).coerceIn(0f, 0.05f)
+                                    lastFrame = now
+                                    dollAzimuth = (dollAzimuth + velocity * dt).mod(360f)
+                                    velocity *= exp(-DOLL_FLING_FRICTION * dt)
+                                }
+                                flingJob = null
+                            }
+                        },
+                        onDragCancel = { flingJob?.cancel(); flingJob = null },
+                        onHorizontalDrag = { change, dragAmount ->
+                            velocityTracker.addPosition(change.uptimeMillis, change.position)
+                            dollAzimuth = (dollAzimuth - dragAmount * DOLL_DRAG_DEG_PER_PX).mod(360f)
+                        }
+                    )
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            AerixSkinPreview3D(
+                account = account,
+                azimuth = dollAzimuth.roundToInt(),
+                interactionEnabled = false,
+                useClientCape = true,
+                showOfficialCape = true,
+                animationName = "NewIdle",
+                cameraDistance = 48,
+                modifier = Modifier.fillMaxSize().padding(horizontal = 18.dp, vertical = 8.dp)
+            )
+        }
+
+        Surface(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = stagePadding),
+            shape = RoundedCornerShape(AerixRadii.cardSmall),
+            color = AerixSurface.panel.copy(alpha = panelAlpha),
+            border = BorderStroke(AerixSpacing.hairline, AerixSurface.borderSoft),
+            onClick = actions.instanceSelector
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = AerixSpacing.smPlus, vertical = AerixSpacing.xs),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Icon(painterResource(R.drawable.aerix_ic_videogame_asset_outlined), contentDescription = null,
+                    tint = accent, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(AerixSpacing.xs))
+                Text(selected?.name ?: "Select instance", color = AerixSurface.textPrimary,
+                    fontWeight = FontWeight.Bold, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Spacer(Modifier.width(AerixSpacing.xs))
+                Text(versionLabel, color = accent, fontWeight = FontWeight.SemiBold,
+                    fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+
+        Surface(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = stagePadding).height(buttonHeight)
+                .guideAnchor(AerixGuideState.PLAY),
+            shape = RoundedCornerShape(buttonRadius),
+            color = accent,
+            contentColor = AerixSurface.onAccent,
+            onClick = if (selected != null) actions.play else actions.instanceSelector
+        ) {
+            Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center) {
+                Text("PLAY", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.ExtraBold,
+                    color = AerixSurface.onAccent)
+                Spacer(Modifier.width(AerixSpacing.xs))
+                Icon(painterResource(R.drawable.aerix_ic_play_arrow_filled), contentDescription = "Play",
+                    tint = AerixSurface.onAccent, modifier = Modifier.size(18.dp))
+            }
+        }
+    }
+}
+
 /**
- * Right-hand ActionMenu card from Mirai's LauncherScreen.kt: 3D rotatable skin stage on a dark
- * pedestal with the username pill, the two-line instance selector pill and the PLAY button.
+ * The docked right-hand card of [ClassicHomeDashboard]: the 3D rotatable skin stage, an instance
+ * menu and the PLAY button. [HomeCharacterStage] is the other skin's take on the same controls.
  */
 @Composable
 private fun ActionMenuCard(
@@ -303,7 +533,7 @@ private fun ActionMenuCard(
                                 dollVelocityTracker.resetTracking()
                             },
                             onDragEnd = {
-                                val releaseVelocity = dollVelocityTracker.calculateVelocity().x * DOLL_DRAG_DEG_PER_PX
+                                val releaseVelocity = -dollVelocityTracker.calculateVelocity().x * DOLL_DRAG_DEG_PER_PX
                                 dollFlingJob?.cancel()
                                 if (abs(releaseVelocity) < DOLL_FLING_MIN_VELOCITY) {
                                     dollFlingJob = null
@@ -329,7 +559,7 @@ private fun ActionMenuCard(
                             },
                             onHorizontalDrag = { change, dragAmount ->
                                 dollVelocityTracker.addPosition(change.uptimeMillis, change.position)
-                                dollAzimuth = (dollAzimuth + dragAmount * DOLL_DRAG_DEG_PER_PX).mod(360f)
+                                dollAzimuth = (dollAzimuth - dragAmount * DOLL_DRAG_DEG_PER_PX).mod(360f)
                             }
                         )
                     },
@@ -1001,3 +1231,50 @@ private fun SameVersionNudgeStrip(
     }
 }
 
+
+/**
+ * The dashboard's own switch between the two launcher skins.
+ *
+ * It sits at the very top because that is where a player looks for "make this look like the other
+ * one", and it is a pair of pills with a sliding highlight rather than a checkbox: pressing a name
+ * and watching the page move into its new position is the whole point of the choice, and a
+ * confirmation dialog or a restart would take that away.
+ */
+@Composable
+private fun AerixUiStyleSwitch(modifier: Modifier = Modifier) {
+    val selected = AerixPreferences.uiStyle
+    val accent = AerixThemeManager.currentAccent()
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(AerixSurface.panel.copy(alpha = 0.45f))
+            .border(AerixSpacing.hairline, AerixSurface.borderSoft, RoundedCornerShape(999.dp))
+            .padding(3.dp),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        AerixLauncherUiStyle.values().forEach { style ->
+            val active = style == selected
+            // Animated on alpha rather than on the color itself: this Compose build has no colour
+            // animator here, and a fading fill reads the same while sliding into place.
+            val pillAlpha by animateFloatAsState(
+                if (active) 1f else 0f,
+                animationSpec = tween(260, easing = FastOutSlowInEasing),
+                label = "uiStylePill"
+            )
+            Text(
+                text = style.label,
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(accent.copy(alpha = 0.28f * pillAlpha))
+                    .clickable { AerixPreferences.saveUiStyle(style) }
+                    .padding(vertical = 7.dp),
+                color = if (active) AerixSurface.textPrimary else AerixSurface.textSecondary,
+                fontSize = 11.sp,
+                fontWeight = if (active) FontWeight.ExtraBold else FontWeight.SemiBold,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+        }
+    }
+}

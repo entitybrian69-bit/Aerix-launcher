@@ -22,7 +22,10 @@ import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.IBinder
+import android.os.Bundle
 import android.os.Looper
+import android.os.Message
+import android.os.Messenger
 import android.util.Log
 import android.view.Surface
 import android.widget.Toast
@@ -30,6 +33,8 @@ import androidx.core.content.ContextCompat
 import net.kdt.pojavlaunch.R
 import java.nio.ByteBuffer
 import java.io.File
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 /**
  * Hardware Surface-to-H.264 + optional AAC MP4 recorder isolated in `:recorder` so `MediaCodec`
@@ -48,6 +53,19 @@ class ScreenRecordingService : Service() {
     private var audio: RecordingAudio? = null
     private var muxer: MediaMuxer? = null
     private var output: RecordingOutput? = null
+
+    // --- game-surface capture: the encoder's input surface is produced from `:game` instead of a display
+    private var gameFeed: Messenger? = null
+    private var sessionConfig: RecordingOptions.Config? = null
+    private var feedWaiting = false
+    private var feedAcked = false
+    @Volatile private var feedStopAck: CountDownLatch? = null
+    /**
+     * Receives the feed handshake on the main looper and hops to [worker] immediately. It must not be
+     * bound to [worker] itself: [stopGameFeed] waits for the game's reply while running on that thread,
+     * and a handler that needs the same thread to deliver would guarantee a stall.
+     */
+    private val feedMessenger by lazy { Messenger(Handler(Looper.getMainLooper()) { message -> onFeedMessage(message) }) }
 
     private var audioEnabledForSession = false
     private var videoTrack = -1
@@ -69,6 +87,10 @@ class ScreenRecordingService : Service() {
     private lateinit var timestamps: RecordingTimestamps
 
     private val stopTimeout = Runnable { finish(videoSamples > 0 && muxerStarted) }
+    /** The game never confirmed a single frame: fall back to mirroring before the file is worthless. */
+    private val feedTimeout = Runnable {
+        if (feedWaiting && !feedAcked) fallbackToMirror(GameCapture.Unavailable.NO_FRAMES.reason)
+    }
     private val audioTimeout = Runnable {
         if (!finished && audioEnabledForSession && audioTrack < 0) {
             try { dropAudio("Audio encoder produced no samples") }
@@ -229,6 +251,13 @@ class ScreenRecordingService : Service() {
                 @Suppress("DEPRECATION") intent.getParcelableExtra("consent")
             } ?: error("Screen capture permission is required")
 
+            // `:game` owns the game's frames, so a control-free video means asking it to produce the
+            // encoder's input surface; without that messenger there is nothing to feed, so mirror.
+            val feed = if (intent.getBooleanExtra(GameCapture.EXTRA_CLEAN_VIDEO, false)) {
+                readFeedMessenger(intent)
+            } else {
+                null
+            }
             val config = RecordingOptions.Config(
                 quality = intent.getIntExtra("quality", 0),
                 fps = intent.getIntExtra("fps", 0),
@@ -236,7 +265,8 @@ class ScreenRecordingService : Service() {
                 height = intent.getIntExtra("height", 0),
                 bitrate = intent.getIntExtra("bitrate", 0),
                 encoder = intent.getStringExtra("encoder").orEmpty(),
-                audioSource = requestedAudio
+                audioSource = requestedAudio,
+                capture = if (feed == null) RecordingOptions.CaptureMode.MIRROR else RecordingOptions.CaptureMode.GAME
             )
             require(
                 config.width > 0 && config.height > 0 && config.fps > 0 &&
@@ -249,12 +279,27 @@ class ScreenRecordingService : Service() {
             finished = false
             stopping = false
             startPending = true
+            gameFeed = feed
+            feedWaiting = false
+            feedAcked = false
             RecordingState.update(RecordingState.Phase.STARTING, "Starting recorder...", this)
             worker.post { begin(token, config, instanceRoot) }
         } catch (error: Throwable) {
             worker.post { finish(false, error.message ?: "Cannot start recorder") }
         }
         return START_NOT_STICKY
+    }
+
+    private fun readFeedMessenger(intent: Intent): Messenger? = try {
+        if (Build.VERSION.SDK_INT >= 33) {
+            intent.getParcelableExtra(GameCapture.EXTRA_FEED, Messenger::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            intent.getParcelableExtra<Messenger>(GameCapture.EXTRA_FEED)
+        }
+    } catch (error: Throwable) {
+        Log.w(TAG, "Game feed messenger unreadable, mirroring the display instead", error)
+        null
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
@@ -272,6 +317,7 @@ class ScreenRecordingService : Service() {
             return
         }
         try {
+            sessionConfig = config
             val epochUs = System.nanoTime() / 1000
             timestamps = RecordingTimestamps(epochUs)
             output = RecordingOutput(this, instanceRoot)
@@ -406,28 +452,149 @@ class ScreenRecordingService : Service() {
                 }
             }
 
-            display = requireNotNull(projection!!.createVirtualDisplay(
-                "AerixRecorder",
-                config.width,
-                config.height,
-                resources.displayMetrics.densityDpi.coerceAtLeast(160),
-                DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
-                surface,
-                null,
-                worker
-            )) { "Could not create the screen capture display" }
-
             val activeAudioLabel = if (audioEnabledForSession) config.audioSource.label else "Video only"
-            RecordingState.update(
-                RecordingState.Phase.RECORDING,
-                "${config.quality}p · ${config.fps} FPS · $activeAudioLabel",
-                this
-            )
-            toast("Recording started (${config.quality}p ${config.fps}fps)")
+            if (config.capture == RecordingOptions.CaptureMode.GAME && gameFeed != null) {
+                startGameFeed(config, activeAudioLabel)
+            } else {
+                attachDisplay(config)
+                RecordingState.update(
+                    RecordingState.Phase.RECORDING,
+                    "${config.quality}p · ${config.fps} FPS · $activeAudioLabel",
+                    this
+                )
+                toast("Recording started (${config.quality}p ${config.fps}fps)")
+            }
         } catch (error: Throwable) {
             Log.e(TAG, "Recorder failed to start", error)
             finish(false, error.message ?: "Unable to start hardware recording")
         }
+    }
+
+    /**
+     * Hands the display to the encoder. This is the path that has always worked, and the one a session
+     * lands on when the game cannot produce frames: the video then contains whatever is on screen, which
+     * is why falling back also asks `:game` to stop drawing the controls (see [GameCapture]).
+     */
+    private fun attachDisplay(config: RecordingOptions.Config) {
+        val projection = this.projection ?: error("Screen capture session expired")
+        display = requireNotNull(projection.createVirtualDisplay(
+            "AerixRecorder",
+            config.width,
+            config.height,
+            resources.displayMetrics.densityDpi.coerceAtLeast(160),
+            DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
+            surface,
+            null,
+            worker
+        )) { "Could not create the screen capture display" }
+    }
+
+    /**
+     * Asks `:game` to become the encoder's producer. A `Surface` is Parcelable, so what crosses the
+     * process boundary is the buffer queue handle and not the pixels - and until the first frame is
+     * confirmed the recorder keeps recording nothing, which is why [feedTimeout] exists.
+     */
+    private fun startGameFeed(config: RecordingOptions.Config, audioLabel: String) {
+        val target = gameFeed ?: return attachDisplay(config)
+        val input = surface
+        if (input == null || !input.isValid) {
+            Log.w(TAG, "Encoder input surface unusable, mirroring the display")
+            attachDisplay(config)
+            RecordingState.update(RecordingState.Phase.RECORDING, "${config.quality}p · ${config.fps} FPS · $audioLabel", this)
+            return
+        }
+        feedWaiting = true
+        feedAcked = false
+        val message = Message.obtain(null, GameCapture.MSG_BEGIN).apply {
+            replyTo = feedMessenger
+            data = Bundle().apply {
+                @Suppress("DEPRECATION")
+                putParcelable(GameCapture.KEY_SURFACE, input)
+                putInt(GameCapture.KEY_WIDTH, config.width)
+                putInt(GameCapture.KEY_HEIGHT, config.height)
+                putInt(GameCapture.KEY_FPS, config.fps)
+            }
+        }
+        val sent = runCatching { target.send(message) }.isSuccess
+        if (!sent) {
+            feedWaiting = false
+            Log.w(TAG, "Could not reach the game process, mirroring the display")
+            fallbackToMirror(GameCapture.Unavailable.NO_SURFACE.reason, announce = false)
+            return
+        }
+        RecordingState.update(
+            RecordingState.Phase.RECORDING,
+            "${config.quality}p · ${config.fps} FPS · $audioLabel · controls stay on screen",
+            this
+        )
+        toast("Recording started (${config.quality}p ${config.fps}fps) - controls kept out of the video")
+        worker.postDelayed(feedTimeout, GameCapture.startupGraceMs(config.width, config.height, config.fps) + EXTRA_GRACE_MS)
+    }
+
+    private fun onFeedMessage(message: Message): Boolean {
+        if (!::worker.isInitialized || thread.isAlive.not()) return true
+        worker.post {
+            when (message.what) {
+                GameCapture.MSG_BEGIN_ACK -> {
+                    if (!feedWaiting || finished) return@post
+                    feedWaiting = false
+                    feedAcked = true
+                    worker.removeCallbacks(feedTimeout)
+                    Log.i(TAG, "Game surface is producing frames; the display is not being captured")
+                }
+                GameCapture.MSG_BEGIN_FAILED -> {
+                    val reason = GameCapture.Unavailable.values()
+                        .getOrNull(message.arg1)?.reason ?: "the game could not produce frames"
+                    if (feedWaiting || feedAcked) fallbackToMirror(reason, announce = true)
+                }
+                GameCapture.MSG_STOP_ACK -> feedStopAck?.countDown()
+            }
+        }
+        return true
+    }
+
+    /**
+     * Switches a live session over to the display mirror. The producer in `:game` has to be released
+     * first: a BufferQueue accepts one producer, so handing the same surface to a `VirtualDisplay` while
+     * the game still holds it would make the fallback fail as well, and the recording would be lost.
+     */
+    private fun fallbackToMirror(reason: String, announce: Boolean = true) {
+        if (finished || display != null) return
+        val config = sessionConfig ?: return
+        feedWaiting = false
+        worker.removeCallbacks(feedTimeout)
+        Log.w(TAG, "Game surface capture unavailable ($reason); mirroring the display instead")
+        stopGameFeed()
+        val attached = runCatching { attachDisplay(config) }.isSuccess
+        if (!attached) {
+            finish(false, "Game capture failed and the screen could not be captured either")
+            return
+        }
+        if (RecordingState.phase == RecordingState.Phase.RECORDING || RecordingState.phase == RecordingState.Phase.STARTING) {
+            val audioLabel = if (audioEnabledForSession) config.audioSource.label else "Video only"
+            RecordingState.update(
+                RecordingState.Phase.RECORDING,
+                "${config.quality}p · ${config.fps} FPS · $audioLabel · controls hidden",
+                this
+            )
+        }
+        runCatching { gameFeed?.send(Message.obtain(null, GameCapture.MSG_FALLBACK)) }
+        if (announce) {
+            toast("This device will not hand over the game's frames; controls are hidden for the recording instead")
+        }
+    }
+
+    /** Stops the game-side producer and waits briefly for it to let go of the encoder's surface. */
+    private fun stopGameFeed() {
+        val target = gameFeed ?: return
+        val latch = CountDownLatch(1)
+        feedStopAck = latch
+        val sent = runCatching { target.send(Message.obtain(null, GameCapture.MSG_STOP)) }.isSuccess
+        if (sent) {
+            // Bounded, and on [worker] - never a wait the main thread could be asked to satisfy.
+            runCatching { latch.await(STOP_ACK_MS, TimeUnit.MILLISECONDS) }
+        }
+        feedStopAck = null
     }
 
     private fun dropAudio(reason: String) {
@@ -447,6 +614,8 @@ class ScreenRecordingService : Service() {
         stopping = true
         RecordingState.update(RecordingState.Phase.STOPPING, "Saving MP4...", this)
         audio?.stop()
+        if (feedWaiting || feedAcked) stopGameFeed()
+        feedWaiting = false
         runCatching { display?.release() }
         display = null
         val signaled = runCatching { videoEncoder?.signalEndOfInputStream() ?: return@runCatching false; true }.getOrDefault(false)
@@ -462,8 +631,15 @@ class ScreenRecordingService : Service() {
         if (::worker.isInitialized) {
             worker.removeCallbacks(stopTimeout)
             worker.removeCallbacks(audioTimeout)
+            worker.removeCallbacks(feedTimeout)
         }
         startPending = false
+        feedWaiting = false
+        feedAcked = false
+        runCatching { if (feedNeedsStop()) gameFeed?.send(Message.obtain(null, GameCapture.MSG_STOP)) }
+        gameFeed = null
+        feedStopAck = null
+        sessionConfig = null
         runCatching { audio?.release() }
         audio = null
         runCatching { display?.release() }; display = null
@@ -486,7 +662,10 @@ class ScreenRecordingService : Service() {
             null
         }
         val result = when {
-            saved?.playable == true -> "Saved to ${saved.path}"
+            saved?.playable == true -> if (saved.mediaUri != null)
+                    "Saved to Movies/Aerix - open it from any gallery, or from Recordings below"
+                else
+                    "Saved to ${saved.path}"
             saved != null -> "Recording incomplete; kept for recovery at ${saved.path}"
             failure != null -> failure
             else -> "Recording discarded (no video data)"
@@ -499,6 +678,8 @@ class ScreenRecordingService : Service() {
         stopSelf()
         thread.quitSafely()
     }
+
+    private fun feedNeedsStop() = gameFeed != null && (feedWaiting || feedAcked)
 
     private fun notification(): Notification {
         if (Build.VERSION.SDK_INT >= 26) {
@@ -544,5 +725,10 @@ class ScreenRecordingService : Service() {
         private const val CHANNEL = "aerix_screen_recorder"
         private const val NOTIFICATION = 4109
         private const val TAG = "AerixRecorder"
+
+        /** The recorder waits a little longer than the game's own readback grace, so a slow first frame
+         *  is never mistaken for an unusable render path. */
+        private const val EXTRA_GRACE_MS = 900L
+        private const val STOP_ACK_MS = 400L
     }
 }

@@ -891,3 +891,71 @@ begin
         end loop;
     end if;
 end ';
+
+-- ---- the retired wardrobe backup ----------------------------------------------------------
+--
+-- This backed the launcher-side wardrobe, which has since been removed: no client code reads or
+-- writes this table any more. The row would have held slot ids and eight emote bindings only - no
+-- skin, no cape, no texture, no image. It is left applied on the live project because it is empty and
+-- readable only by its owner, and dropping it is a one-liner (see the bottom of this file). Same
+-- content as supabase/step4-wardrobe.sql, the paste-one-file version of this step.
+
+-- ---- table --------------------------------------------------------------------------------
+create table if not exists public.wardrobe_sync (
+    -- Same key as the profile row, so an account deletion cascades the wardrobe with it.
+    id         uuid primary key references public.profiles (id) on delete cascade,
+    loadout    jsonb not null,
+    updated_at timestamptz not null default now(),
+    -- A wardrobe is six slot ids plus eight wheel bindings. Anything larger is not a wardrobe, and
+    -- refusing it here stops this table from quietly turning into blob storage for some future
+    -- client, whoever wrote that client.
+    constraint wardrobe_sync_is_object check (jsonb_typeof(loadout) = 'object'),
+    constraint wardrobe_sync_is_small check (pg_column_size(loadout) <= 4096),
+    -- The app writes {schema, slots, emote_wheel} and nothing else. Rejecting other shapes in the
+    -- database means a launcher bug cannot store arbitrary JSON against an account.
+    constraint wardrobe_sync_has_schema check (
+        (loadout ->> 'schema') is null or (loadout ->> 'schema') in ('1', '1.0')
+    )
+);
+
+-- "Newest wardrobe across all devices", used by support-style queries and by the app when it wants
+-- to tell a player how stale their last push was.
+create index if not exists wardrobe_sync_updated_idx on public.wardrobe_sync (updated_at desc);
+
+alter table public.wardrobe_sync enable row level security;
+
+-- ---- access rules -------------------------------------------------------------------------
+--
+-- One row per user, readable and writable only by that user. There is no policy that lets a friend,
+-- a party member or an anonymous reader see any of this, and no policy at all for the anon role, so
+-- a logged-out client cannot enumerate wardrobes even if it guessed the publishable key.
+
+drop policy if exists wardrobe_sync_read on public.wardrobe_sync;
+
+create policy wardrobe_sync_read on public.wardrobe_sync
+    for select to authenticated using (auth.uid() = id);
+
+-- The app upserts (POST with merge-duplicates, exactly like the profile row), so insert and update
+-- carry the same self-only check.
+drop policy if exists wardrobe_sync_insert on public.wardrobe_sync;
+
+create policy wardrobe_sync_insert on public.wardrobe_sync
+    for insert to authenticated with check (auth.uid() = id);
+
+drop policy if exists wardrobe_sync_update on public.wardrobe_sync;
+
+create policy wardrobe_sync_update on public.wardrobe_sync
+    for update to authenticated using (auth.uid() = id) with check (auth.uid() = id);
+
+-- Delete is allowed for the same reason as everything else: only the owner, and because "Erase cloud
+-- wardrobe" is a button the player can press. A feature that can write must be able to undo.
+drop policy if exists wardrobe_sync_delete on public.wardrobe_sync;
+
+create policy wardrobe_sync_delete on public.wardrobe_sync
+    for delete to authenticated using (auth.uid() = id);
+
+-- Nothing to grant explicitly: Supabase gives the authenticated role access to tables it creates in
+-- public, and the anon and service roles are limited by the policies above (no policy matches them).
+--
+-- To remove the feature again, run:
+--   drop table if exists public.wardrobe_sync;

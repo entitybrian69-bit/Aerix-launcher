@@ -22,6 +22,7 @@ def current_version() -> str:
 
 
 VERSION = current_version()
+RELEASE_DATE = "11 Nov 2026"
 
 NAV = [
     ("index.html", "Home"),
@@ -273,14 +274,14 @@ def build_index():
         </p>
         <div class="btn-row">
           <a class="btn btn-primary" href="{DOWNLOAD_URL}" download data-primary-download>
-            <span class="nowrap">Download for Android</span> <span class="btn-size">72 MB</span>
+            <span class="nowrap">Download for Android</span> <span class="btn-size">89 MB</span>
           </a>
           <a class="btn btn-ghost" href="#whats-new">What's new</a>
         </div>
         <p class="hero-meta">
           <span>Android 6.0+</span>
           <span>arm64, armv7 and universal builds</span>
-          <span id="downloadFacts">v{VERSION} · 26 Oct 2026</span>
+          <span id="downloadFacts">v{VERSION} · {RELEASE_DATE}</span>
         </p>
       </div>
       <div class="device">
@@ -312,9 +313,9 @@ def build_index():
     <div class="wrap">
       <div class="section-head reveal">
         <span class="kicker">The latest game log</span>
-        <h2 id="log-title">What <span style="color:var(--crimson)">1.5.6</span> includes</h2>
+        <h2 id="log-title">What <span style="color:var(--crimson)">{VERSION}</span> includes</h2>
         <p>
-          Every release writes its own log, and this is the current one — the change you can
+          Every release writes its own log, and this is the current one - the change you can
           feel first, then the details that make it hold. The full history is in the release notes.
         </p>
       </div>
@@ -328,27 +329,37 @@ def build_index():
         <ol class="log-rows">
           <li>
             <span class="n">01</span>
-            <span><b>The first-run guide can no longer close the launcher</b>
-            The tour positioned its card from the component it was pointing at. When that component was off screen the offset went negative, and Compose rejects a negative padding — first launch died on <code>AerixGuide.kt:235</code>. The anchor is now validated and clipped before anything is drawn.</span>
+            <span><b>The launcher is its own app now</b>
+            Aerix installs as <code>net.al.aerixlauncher</code> instead of borrowing the upstream package. Your instances, settings and game data are imported on first launch, the old install is left alone as a rollback, and an update can never overwrite the app it copied from.</span>
           </li>
           <li>
             <span class="n">02</span>
-            <span><b>A step that points at nothing falls back to the centred card</b>
-            A rail item left of the overlay, a page still sliding in, a card already scrolled away — the tour keeps going instead of pointing at empty space.</span>
+            <span><b>One memory ceiling, not two</b>
+            The launcher heap and the game heap are budgeted from the same device reading, so a phone that was never able to grant 6 GB stops offering it and says so. Devices that can still take it keep a "Try 6 GB anyway" override.</span>
           </li>
           <li>
             <span class="n">03</span>
-            <span><b>Every padding is clamped</b>
-            Finite, never negative, never larger than the space it is applied to. Unbounded and zero-size measurements are handled instead of divided against, so no future component can take a launch down either.</span>
+            <span><b>The A menu stays where you left it</b>
+            Releasing the A button inside the overlay keeps the menu in place. A hide now needs the gesture to start below the system strip and a 240 ms hold, a swipe past the top edge no longer blanks the controls mid-game, and an overlay the launcher did not hide says why on its own pill.</span>
           </li>
           <li>
             <span class="n">04</span>
-            <span><b>Everything from 1.5.5 ships unchanged</b>
-            Eleven animated control themes, account switching inside a running game, the Emesis → GL4ES renderer fallback, and six HD clips at full quality.</span>
+            <span><b>Mouse aim and cursors behave</b>
+            The sensitivity that scales both axes and the per-axis aim sensitivity are separate settings again, cursor skins apply to the overlay, the custom cursor size slider works, and a cursor recorded through the overlay plays back at the size it was drawn at.</span>
+          </li>
+          <li>
+            <span class="n">05</span>
+            <span><b>Recordings you can find again</b>
+            Clips land in a library you import, share and delete from inside the launcher, with a recents row on Discover - and a take interrupted before it was finalised is kept as <code>-unfinished.mp4</code> instead of thrown away.</span>
+          </li>
+          <li>
+            <span class="n">06</span>
+            <span><b>2.3.1: the two crashes players reported</b>
+            A display question asked from the wrong kind of Context was killing the launcher on start on Android 11+, and the runtime dialog crashed while trying to explain a failed install. Both are fixed, and the surface rate read that went with them is guarded.</span>
           </li>
         </ol>
         <div class="log-foot">
-          <span>Patch release · build 10506 · published 26 Oct 2026</span>
+          <span>Minor release · published {RELEASE_DATE} · Android 6.0+ · arm64-v8a, armeabi-v7a and universal</span>
           <a class="btn btn-sm" href="https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest" target="_blank" rel="noopener" data-release-link>
             Read the full notes
           </a>
@@ -505,7 +516,7 @@ def build_index():
           <p class="counter-label">APK downloads, counted across every release</p>
           <dl class="counter-meta">
             <div><dt>Latest release</dt><dd>v<span data-release-version>{VERSION}</span></dd></div>
-            <div><dt>Published</dt><dd><span data-release-date>26 Oct 2026</span></dd></div>
+            <div><dt>Published</dt><dd><span data-release-date>{RELEASE_DATE}</span></dd></div>
             <div><dt>Source</dt><dd><a href="{REPO_URL}/releases" target="_blank" rel="noopener">github.com · releases</a></dd></div>
           </dl>
           <p class="counter-note">
@@ -531,25 +542,25 @@ def build_index():
           <a class="dl-card" href="{DOWNLOAD_URL}" download data-dl="arm64">
             <strong>arm64-v8a <span class="tag hot">recommended</span></strong>
             <small class="asset">Aerix-Launcher-{VERSION}-arm64-v8a.apk</small>
-            <span class="size">72.0 MB</span>
+            <span class="size">88.8 MB</span>
             <small>64-bit phones — nearly all of them</small>
           </a>
           <a class="dl-card" href="https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest" target="_blank" rel="noopener" data-dl="armv7">
             <strong>armeabi-v7a</strong>
             <small class="asset">Aerix-Launcher-{VERSION}-armeabi-v7a.apk</small>
-            <span class="size">72.2 MB</span>
+            <span class="size">89.0 MB</span>
             <small>Older 32-bit phones</small>
           </a>
           <a class="dl-card" href="{DOWNLOAD_URL}" download data-dl="universal">
             <strong>Universal</strong>
             <small class="asset">Aerix-Launcher-{VERSION}.apk</small>
-            <span class="size">127.2 MB</span>
+            <span class="size">144.0 MB</span>
             <small>Every architecture, including x86 — the fallback</small>
           </a>
         </div>
 
         <div class="dl-foot">
-          <span>Also on the release: <a href="https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest/download/Aerix-Launcher-noruntime.apk" download>no-runtime build</a> (99.4 MB) — same launcher, Java fetched on first launch.</span>
+          <span>Also on the release: <a href="https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest/download/Aerix-Launcher-noruntime.apk" download>no-runtime build</a> (116.2 MB) — same launcher, Java fetched on first launch.</span>
           <span><a href="https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest/download/SHA256SUMS" target="_blank" rel="noopener">SHA-256 checksums</a></span>
           <span>Downloaded <b data-downloads>—</b> times from GitHub</span>
           <span>Signed with the project key · updates in place</span>
@@ -968,19 +979,19 @@ def build_install():
               <a class="dl-card" href="{DOWNLOAD_URL}" download data-dl="arm64">
                 <strong>arm64-v8a <span class="tag hot">recommended</span></strong>
                 <small class="asset">Aerix-Launcher-{VERSION}-arm64-v8a.apk</small>
-                <span class="size">72.0 MB</span>
+                <span class="size">88.8 MB</span>
                 <small>64-bit phones — nearly all of them</small>
               </a>
               <a class="dl-card" href="{DOWNLOAD_URL}" download data-dl="armv7">
                 <strong>armeabi-v7a</strong>
                 <small class="asset">Aerix-Launcher-{VERSION}-armeabi-v7a.apk</small>
-                <span class="size">72.2 MB</span>
+                <span class="size">89.0 MB</span>
                 <small>Older 32-bit phones</small>
               </a>
               <a class="dl-card" href="{DOWNLOAD_URL}" download data-dl="universal">
                 <strong>Universal</strong>
                 <small class="asset">Aerix-Launcher-{VERSION}.apk</small>
-                <span class="size">127.2 MB</span>
+                <span class="size">144.0 MB</span>
                 <small>Every architecture — the safe fallback</small>
               </a>
             </div>
@@ -1036,7 +1047,7 @@ def build_install():
         <h2 style="margin-top:0">Ready?</h2>
         <p class="muted">Android 6.0+ · signed with the project key · updates in place.</p>
         <div class="btn-row">
-          <a class="btn btn-primary" href="{DOWNLOAD_URL}" download data-primary-download><span class="nowrap">Download for Android</span> <span class="btn-size">72 MB</span></a>
+          <a class="btn btn-primary" href="{DOWNLOAD_URL}" download data-primary-download><span class="nowrap">Download for Android</span> <span class="btn-size">89 MB</span></a>
           <a class="btn btn-ghost" href="faq.html">Common questions</a>
         </div>
       </div>

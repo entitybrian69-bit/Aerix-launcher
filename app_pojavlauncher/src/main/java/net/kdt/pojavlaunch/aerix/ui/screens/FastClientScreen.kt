@@ -19,6 +19,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -46,6 +47,7 @@ import net.kdt.pojavlaunch.instances.Instances
 fun FastClientScreen(activity: FragmentActivity, onBack: () -> Unit) {
     var refresh by remember { mutableIntStateOf(0) }
     val scope = rememberCoroutineScope()
+    var searchPacks by remember { mutableStateOf(false) }
     val instances = remember(refresh, FastClientInstaller.installingVersion) {
         runCatching { Instances.loadAllInstances() }.getOrDefault(emptyList())
     }
@@ -66,6 +68,13 @@ fun FastClientScreen(activity: FragmentActivity, onBack: () -> Unit) {
         }
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm)) {
             Text("Install a separate FastClient instance. Fabric Loader, Fabric API, Lithium and Entity Culling are downloaded during setup; Minecraft files download when you launch.", color = AerixSurface.textSecondary, fontSize = 12.sp)
+            // The same pack search the Aerix Client page has, filtered by the versions FastClient is
+            // actually built for. A pack keeps its own mods here: FastClient is an instance of its own,
+            // not a mod that can be dropped into somebody else's.
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(AerixSpacing.sm)) {
+                Button(onClick = { searchPacks = true }) { Text("Search modpacks") }
+                Text("Pick a pack, then pick which Minecraft version of it to take.", color = AerixSurface.textSecondary, fontSize = 11.sp)
+            }
             if (FastClientInstaller.installingVersion != null) {
                 GlassPanel(Modifier.fillMaxWidth(), radius = AerixRadii.card) {
                     Text(FastClientInstaller.status, color = Color.White, fontWeight = FontWeight.Bold)
@@ -111,7 +120,16 @@ fun FastClientScreen(activity: FragmentActivity, onBack: () -> Unit) {
             Text("Android compatibility and performance depend on the device and renderer. FastClient is provided by its creator.", color = AerixSurface.textSecondary, fontSize = 12.sp)
         }
     }
-}
+
+        if (searchPacks) {
+            // A pack creates its own instance, so the list of FastClient installs below is stale once
+            // it finishes; the reload is what makes the new one appear without leaving the page.
+            AerixPackSearchDialog(activity, ClientOwnerPage.MX_INSPIRE, onDismiss = { searchPacks = false }) {
+                refresh++
+                PojavInstanceBridge.reload()
+            }
+        }
+    }
 
 @Composable
 private fun FastClientTitle() {

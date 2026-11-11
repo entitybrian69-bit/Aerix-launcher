@@ -21,9 +21,12 @@ import net.kdt.pojavlaunch.instances.Instances
 import net.kdt.pojavlaunch.modloaders.FabriclikeUtils
 import okhttp3.Request
 import org.json.JSONArray
+import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.net.URLEncoder
+import java.security.MessageDigest
+import java.util.zip.ZipInputStream
 
 data class ClientVersionSpec(
     val mcVersion: String,
@@ -63,8 +66,29 @@ object AerixClientInstaller {
         private set
     var lastError by mutableStateOf<String?>(null)
         private set
+    /** "Update my mods" is on the network: one at a time, and the pill says so while it runs. */
+    var isUpdatingMods by mutableStateOf(false)
+        private set
+    var modUpdateState by mutableStateOf("")
+        private set
 
     fun instanceNameFor(mcVersion: String): String = "Aerix Client $mcVersion"
+
+    /**
+     * Which game folders the launcher manages: the Aerix Client bundle plus Fabric/Quilt-family
+     * instances. Vanilla and Forge/NeoForge are deliberately untouched, because pushing launcher
+     * assets into a loader that cannot use them is how a working instance gets broken.
+     */
+    @JvmStatic
+    fun isManagedInstance(instance: Instance?): Boolean {
+        if (instance == null) return false
+        if (instance.isAerixClient) return true
+        val id = instance.versionId.orEmpty().lowercase()
+        val name = instance.name.orEmpty().lowercase()
+        return id.contains("fabric") || id.contains("quilt") ||
+            name.startsWith("fabric ") || name.startsWith("quilt ") ||
+            name.startsWith("legacy fabric")
+    }
 
     fun findInstalledClientInstance(mcVersion: String? = null): Instance? =
         findInstalledClientInstance(mcVersion, runCatching { Instances.loadAllInstances() }.getOrDefault(emptyList()))
@@ -114,26 +138,9 @@ object AerixClientInstaller {
     }
 
     /**
-     * Copies our bundled `aerix_client_mod.jar` (`AerixClientMod`) into `<modsDir>/aerix-client-animator.jar`
-     * and deletes any legacy FPS-heavy shaders/dynamic-light jars (`iris`, `lambdynamiclights`).
-     */
-    fun deployBundledAnimatorAndPurgeBloat(context: Context, modsDir: File) {
-        modsDir.mkdirs()
-        // 2. Extract bundled Java-8 `aerix_client_mod.jar` from APK assets into `mods/aerix-client-animator.jar`
-        runCatching {
-            val target = File(modsDir, "aerix-client-animator.jar")
-            context.assets.open("components/aerix_client/aerix_client_mod.jar").use { input ->
-                FileOutputStream(target).use { out ->
-                    input.copyTo(out)
-                }
-            }
-        }
-    }
-
-    /**
      * Upgrades an already-installed Client instance right before Launch so users immediately get
-     * `wavey-capes`, `immediatelyfast`, `aerix-client-animator.jar`, `iris` removal, `AERIX CLIENT`
-     * title logo, `images.jpeg` forest background, and genuine vanilla animated gear!
+     * `wavey-capes`, `immediatelyfast`, `iris` removal, `AERIX CLIENT` title logo, `images.jpeg`
+     * forest background, and genuine vanilla animated gear!
      */
     suspend fun syncExistingInstanceForLaunch(context: Context, instance: Instance, mcVersion: String) =
         withContext(Dispatchers.IO) {
@@ -146,7 +153,6 @@ object AerixClientInstaller {
                     instance.jvmArgs = TUNED_CLIENT_JVM_ARGS
                     instance.write()
                 }
-                deployBundledAnimatorAndPurgeBloat(context, modsDir)
                 // Ensure essential new upgrade jars exist even on older installs
                 for (slug in listOf("wavey-capes", "immediatelyfast", "entityculling")) {
                     runCatching { ensureModrinthJar(modsDir, slug, mcVersion, depth = 0) }
@@ -172,28 +178,24 @@ object AerixClientInstaller {
     fun syncLocalAssetsAtGameStart(context: Context, instance: Instance) {
         runCatching {
             val gameDir = instance.gameDirectory?.apply { mkdirs() } ?: return
-            val modsDir = File(gameDir, "mods").apply { mkdirs() }
+            File(gameDir, "mods").apply { mkdirs() }
             migrateLegacyClientIcon(context, instance)
             val mcVer = AerixClientPackGenerator.resolveMcVersionFromInstance(
                 instance.versionId ?: instance.name,
                 AerixClientStore.selectedClientVersion
             )
-            deployBundledAnimatorAndPurgeBloat(context, modsDir)
-            // Launches from Home bypass the Client tab's network sync; repair missing cape mod here too.
-            runCatching { ensureWaveyCapes(modsDir, mcVer) }.onFailure { error ->
-                android.util.Log.w("AerixClient", "Waving cape mod unavailable", error)
-                android.os.Handler(android.os.Looper.getMainLooper()).post {
-                    android.widget.Toast.makeText(context, "Waving capes unavailable: ${error.message}", android.widget.Toast.LENGTH_LONG).show()
-                }
+            // The launcher's own half of the Client features. This is a copy out of the APK, so it
+            // costs a few milliseconds and is what makes capes, Fullbright and ZOOM work at all.
+            AerixClientModBridge.installIfNeeded(context, gameDir)
+            // A session that ended while boosted or zoomed must not keep those numbers.
+            runCatching { ClientLiveOptionsBridge.restoreAtLaunch(gameDir) }.onFailure { error ->
+                android.util.Log.w("AerixClient", "Could not restore live options", error)
             }
-            if (ClientVersions.supportsPodium(mcVer)) {
-                runCatching { ensurePodiumAndSodium(modsDir, mcVer) }.onFailure { error ->
-                    android.util.Log.w("AerixClient", "Podium unavailable", error)
-                    android.os.Handler(android.os.Looper.getMainLooper()).post {
-                        android.widget.Toast.makeText(context, "Podium / Sodium unavailable for $mcVer: ${error.message}", android.widget.Toast.LENGTH_LONG).show()
-                    }
-                }
-            }
+            ClientLiveOptionsBridge.activeGameDir = gameDir
+            ClientLiveOptionsBridge.syncAll(gameDir)
+            // Third-party mod repair needs Modrinth. It used to run here, which is why a launch could
+            // hang on a slow connection - and a modpack's own mod set must not be second-guessed.
+            if (instance.modpackSource == null) scheduleThirdPartyModRepair(context, gameDir, mcVer)
             AerixClientPackGenerator.ensurePackUpToDate(context, gameDir, mcVer)
             ClientVisualBridge.sync(gameDir)
             runCatching { ClientAdaptiveBridge.restoreAtLaunch(gameDir) }.onFailure { error ->
@@ -211,6 +213,98 @@ object AerixClientInstaller {
                 }
             }
         }
+    }
+
+    /**
+     * Third-party mod repair needs Modrinth, so it never runs on the launch path: an unreachable
+     * network used to freeze the boot screen here, and a modpack's own mod set must not be
+     * second-guessed by us at all (it is what conflicts with a player's pack).
+     */
+    private fun scheduleThirdPartyModRepair(context: Context, gameDir: File, mcVer: String) {
+        val app = context.applicationContext
+        val worker = Thread {
+            runCatching {
+                val modsDir = File(gameDir, "mods").apply { mkdirs() }
+                runCatching { ensureWaveyCapes(modsDir, mcVer) }
+                    .onFailure { error -> android.util.Log.w("AerixClient", "Waving cape mod unavailable", error) }
+                if (ClientVersions.supportsPodium(mcVer)) {
+                    runCatching { ensurePodiumAndSodium(modsDir, mcVer) }
+                        .onFailure { error -> android.util.Log.w("AerixClient", "Podium unavailable", error) }
+                }
+            }
+        }
+        worker.name = "Aerix-ModRepair"
+        worker.isDaemon = true
+        worker.start()
+    }
+
+    /**
+     * "Update my mods": the player asked, so this is the one moment the launcher writes jars a
+     * player could have chosen themselves into an instance folder it does not own.
+     *
+     * A pack instance is held to the two files the Client features cannot work without - our own
+     * bridge mod and Fabric API - and even those are only added when missing: the pack's author
+     * picked its mods, and replacing their version-matched Sodium with ours is a crash on launch.
+     * An instance the launcher built gets the whole curated list refreshed to the newest file for
+     * its version. Nothing calls this except the button, and the summary says what actually moved,
+     * so a Modrinth that did not answer cannot be mistaken for "up to date".
+     */
+    suspend fun updateOwnMods(context: Context, instance: Instance): Result<String> = withContext(Dispatchers.IO) {
+        if (isUpdatingMods)
+            return@withContext Result.failure(IllegalStateException("A mod update is already running"))
+        isUpdatingMods = true
+        modUpdateState = "Asking Modrinth…"
+        try {
+            val gameDir = instance.gameDirectory
+                ?: return@withContext Result.failure(IllegalStateException("This instance has no folder of its own"))
+            val modsDir = File(gameDir, "mods").apply { mkdirs() }
+            val mcVer = AerixClientPackGenerator.resolveMcVersionFromInstance(
+                instance.versionId ?: instance.name, AerixClientStore.selectedClientVersion
+            )
+            val fromPack = instance.modpackSource != null
+            val bridgeOk = runCatching { AerixClientModBridge.installIfNeeded(context, gameDir) }.isSuccess
+            val curated = buildModListForVersion(mcVer)
+            val wanted = if (fromPack) curated.filter { it.slug == "fabric-api" } else curated
+            val updated = ArrayList<String>()
+            val current = ArrayList<String>()
+            val missing = ArrayList<String>()
+            wanted.forEachIndexed { index, entry ->
+                modUpdateState = "${index + 1}/${wanted.size} · ${entry.title}"
+                val before = jarNamesFor(modsDir, entry.slug)
+                val ok = runCatching {
+                    ensureModrinthJar(modsDir, entry.slug, mcVer, depth = 0, force = !fromPack)
+                }.getOrDefault(false)
+                val after = jarNamesFor(modsDir, entry.slug)
+                when {
+                    !ok -> missing += entry.title
+                    after != before -> updated += entry.title
+                    else -> current += entry.title
+                }
+            }
+            val summary = buildString {
+                append(
+                    if (bridgeOk) "Aerix Client mod written to the instance"
+                    else "Aerix Client mod could NOT be written"
+                )
+                if (fromPack) append(" · a modpack keeps its own mods: only missing files were added")
+                if (updated.isNotEmpty()) append(" · updated: ").append(updated.joinToString(", "))
+                if (current.isNotEmpty()) append(" · already current: ").append(current.size)
+                if (missing.isNotEmpty()) append(" · unavailable for $mcVer: ").append(missing.joinToString(", "))
+            }
+            modUpdateState = summary
+            if (!bridgeOk) Result.failure(IllegalStateException(summary)) else Result.success(summary)
+        } finally {
+            isUpdatingMods = false
+        }
+    }
+
+    /** The jars of one project in the mods folder, so an update can tell new from unchanged. */
+    private fun jarNamesFor(modsDir: File, slug: String): Set<String> {
+        val key = slug.replace("-", "").replace("_", "").lowercase()
+        return modsDir.listFiles()?.filter { file ->
+            file.isFile && file.extension.equals("jar", true) &&
+                file.name.replace("-", "").replace("_", "").lowercase().contains(key)
+        }?.map { it.name }?.toSet() ?: emptySet()
     }
 
     suspend fun installClientVersion(context: Context, mcVersion: String): Result<Instance> =
@@ -280,7 +374,6 @@ object AerixClientInstaller {
                 val gameDir = clientInstance.gameDirectory.apply { mkdirs() }
                 val modsDir = File(gameDir, "mods").apply { mkdirs() }
 
-                deployBundledAnimatorAndPurgeBloat(context, modsDir)
 
                 val modPlan = buildModListForVersion(mcVersion)
                 val missingMods = mutableListOf<String>()
@@ -397,15 +490,26 @@ object AerixClientInstaller {
         }
     }
 
-    private fun ensureModrinthJar(modsDir: File, projectSlugOrId: String, mcVersion: String, depth: Int): Boolean {
+    private fun ensureModrinthJar(
+        modsDir: File,
+        projectSlugOrId: String,
+        mcVersion: String,
+        depth: Int,
+        /**
+         * An explicit update asks for the newest file even where a jar of this mod already sits.
+         * Everything that runs by itself - the launch path, the repair worker - leaves this false,
+         * so a file the player put in the folder is never overwritten unasked.
+         */
+        force: Boolean = false
+    ): Boolean {
         val fabricId = when (projectSlugOrId) {
             "sodium", "AANobbMI" -> "sodium"
             "podium", "fW8woQj4" -> "podium"
             else -> null
         }
-        if (fabricId != null && hasFabricMod(modsDir, fabricId)) return true
+        if (!force && fabricId != null && hasFabricMod(modsDir, fabricId)) return true
         val normalizedKey = projectSlugOrId.replace("-", "").lowercase()
-        val alreadyExists = fabricId == null && modsDir.listFiles()?.any { f ->
+        val alreadyExists = !force && fabricId == null && modsDir.listFiles()?.any { f ->
             f.isFile && f.extension.equals("jar", true) &&
                 f.name.replace("-", "").replace("_", "").lowercase().contains(normalizedKey)
         } == true
@@ -466,6 +570,17 @@ object AerixClientInstaller {
 
         val targetFile = File(modsDir, fileName)
         if (targetFile.isFile && targetFile.length() > 1024L) return true
+        if (force) {
+            // Two jars of one mod id is a crash on launch, so the file an update replaces goes
+            // with it - and only once the new one has been chosen, never before.
+            runCatching {
+                modsDir.listFiles()?.forEach { stale ->
+                    if (stale.isFile && stale.extension.equals("jar", true) && stale.name != fileName &&
+                        stale.name.replace("-", "").replace("_", "").lowercase().contains(normalizedKey)
+                    ) stale.delete()
+                }
+            }
+        }
 
         val tmpFile = File(modsDir, "$fileName.part")
         val dlReq = Request.Builder()

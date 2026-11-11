@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "id": "aerix_client_animator",
-  "version": "1.0.0",
-  "name": "Aerix Client Animator",
-  "description": "Live animated 3D capes and instant client runtime bridge for Aerix Client.",
+  "id": "aerix_client",
+  "version": "1.2.0",
+  "name": "Aerix Client",
+  "description": "Client-side bridge for launcher-served capes, live client options (Fullbright, ZOOM, Server Boost) and adaptive render distance.",
   "authors": [
     "Aerix"
   ],

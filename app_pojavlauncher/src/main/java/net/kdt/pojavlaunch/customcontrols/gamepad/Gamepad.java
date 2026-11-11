@@ -101,15 +101,20 @@ public class Gamepad implements PlatformGrabListener, GamepadHandler {
 
         enableTouchpadIfNecessary();
 
-        reloadGamepadMaps();
+        loadGamepadMaps(false);
         mMapProvider.attachGrabListener(this);
     }
 
 
     public void reloadGamepadMaps() {
+        loadGamepadMaps(true);
+    }
+
+    private void loadGamepadMaps(boolean forceReload) {
         if(mGameMap != null) mGameMap.resetPressedState();
         if(mMenuMap != null) mMenuMap.resetPressedState();
-        GamepadMapStore.load();
+        if (forceReload) GamepadMapStore.load();
+        else GamepadMapStore.ensureLoaded();
         mGameMap = mMapProvider.getGameMap();
         mMenuMap = mMapProvider.getMenuMap();
         mCurrentMap = mGameMap;

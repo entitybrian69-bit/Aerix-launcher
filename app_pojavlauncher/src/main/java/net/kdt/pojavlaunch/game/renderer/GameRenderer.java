@@ -51,6 +51,7 @@ public class GameRenderer {
     private final static String TAG = "Renderer";
     private final static String FALLBACK_RENDERER = GL4ES_RENDERER;
     private static volatile boolean pluginInitializationFailed;
+    private static volatile String customVulkanDriverPath;
     private RenderSpec currentRenderer;
     private final boolean requireSelectedRenderer;
     private Map<String, String> environment = new HashMap<>();
@@ -102,8 +103,26 @@ public class GameRenderer {
      * @param additionalPath additional library path to search libs at
      */
     public static void setRendererLibraryPath(String mainPath, String additionalPath) {
-        if (additionalPath != null) mainPath = additionalPath + ":" + mainPath;
-        MojoExec.setNativeLibraryDir(mainPath);
+        StringBuilder searchPath = new StringBuilder();
+        appendSearchPath(searchPath, customVulkanDriverPath);
+        appendSearchPath(searchPath, additionalPath);
+        appendSearchPath(searchPath, mainPath);
+        MojoExec.setNativeLibraryDir(searchPath.toString());
+    }
+
+    private static void appendSearchPath(StringBuilder searchPath, String path) {
+        if (path == null || path.isEmpty()) return;
+        if (searchPath.length() > 0) searchPath.append(':');
+        searchPath.append(path);
+    }
+
+    /**
+     * Configure the ICD selected for this game launch. Custom Turnip libraries are searched before
+     * the launcher's bundled native libraries; passing null keeps the built-in/system behavior.
+     */
+    public static void configureVulkanDriver(String customDriverPath, boolean useTurnip) {
+        customVulkanDriverPath = customDriverPath;
+        MojoExec.setUseTurnip(useTurnip);
     }
 
 

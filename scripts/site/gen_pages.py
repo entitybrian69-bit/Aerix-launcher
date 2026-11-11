@@ -534,7 +534,7 @@ def build_install():
 
     <div class="note reveal">
       <h3>A note on package names</h3>
-      <p>The release build installs as <code>net.kdt.pojavlaunch</code>. The earlier test builds used the <code>.debug</code> package, so the two can sit side by side — but their instances and game data do not carry over, and an installed original PojavLauncher has to be removed first because the signature differs.</p>
+      <p>The release build installs as <code>net.al.aerixlauncher</code>, and its test build uses <code>net.al.aerixlauncher.debug</code>. Older Aerix builds used the separate <code>net.kdt.pojavlaunch</code> IDs, so they remain installed rather than updating in place. On Android 10 and newer, use the optional import prompt or the Settings import action to copy supported game data; private accounts, preferences, and runtimes stay with the old app. Keep the old install until the new one is verified.</p>
     </div>
 
     <div class="note reveal">

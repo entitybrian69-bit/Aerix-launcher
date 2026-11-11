@@ -14,6 +14,7 @@ import net.kdt.pojavlaunch.game.GameActivity;
 import net.kdt.pojavlaunch.Tools;
 import net.kdt.pojavlaunch.customcontrols.gamepad.DefaultDataProvider;
 import net.kdt.pojavlaunch.customcontrols.gamepad.Gamepad;
+import net.kdt.pojavlaunch.customcontrols.gamepad.GamepadMapStore;
 import net.kdt.pojavlaunch.game.platform.backend.AWTBackend;
 import net.kdt.pojavlaunch.game.platform.backend.DummyBackend;
 import net.kdt.pojavlaunch.lifecycle.ContextExecutor;
@@ -62,6 +63,8 @@ public class Platform {
      * @param view a host view used for input handling
      */
     public static void initialize(Activity activity, GameView view) {
+        // Read the small saved mapping before the first gamepad event reaches the UI thread.
+        GamepadMapStore.ensureLoaded();
         Platform.mHostView = view;
         Platform.mInputManager = createRemapperManager(view);
         mClipboard = new AndroidClipboard(activity.getApplicationContext());

@@ -31,6 +31,7 @@
 package net.kdt.pojavlaunch.aerix.ui.screens
 
 import net.kdt.pojavlaunch.aerix.bridge.rememberControlLayoutCatalog
+import net.kdt.pojavlaunch.aerix.vulkan.VulkanDriverManager
 import android.text.format.DateFormat
 import android.text.format.Formatter
 import android.widget.Toast
@@ -204,6 +205,7 @@ fun InstanceEditorScreen(activity: FragmentActivity, onClose: () -> Unit) {
         }
     }
     val draft = PojavInstanceEditorBridge.draft
+    draft?.let { net.kdt.pojavlaunch.aerix.ui.aerixLauncherActivity("Editing ${it.name.ifBlank { it.versionId }.take(36)}") }
     if (draft == null) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(text = stringResource(R.string.no_instance), color = AerixSurface.textSecondary, fontSize = 13.sp)
@@ -1298,15 +1300,20 @@ private fun InstanceSettingsPane(
     }
 
     val vulkanDriverEntries = remember {
-        listOf(
-            "" to "Follow Global",
-            "default driver" to "default driver",
-            "turnip" to "Turnip (Adreno)",
-            "freedreno" to "Freedreno (KGSL)"
-        )
+        buildList {
+            add("" to "Follow Global")
+            add(VulkanDriverManager.SYSTEM_DRIVER to "System Vulkan driver")
+            add(VulkanDriverManager.TURNIP_DRIVER to "Turnip (built-in)")
+            VulkanDriverManager.installedDrivers(activity).forEach { driver -> add(driver.id to driver.name) }
+        }
     }
     var vulkanDriver by remember(instanceKey) {
-        mutableStateOf(prefs.getString("aerix_inst_vulkan_$instanceKey", "") ?: "")
+        mutableStateOf(
+            VulkanDriverManager.normalizeInstanceSelection(
+                activity,
+                prefs.getString("aerix_inst_vulkan_$instanceKey", "") ?: ""
+            )
+        )
     }
 
     val graphicsApiEntries = remember {
@@ -1350,7 +1357,7 @@ private fun InstanceSettingsPane(
         mutableIntStateOf(prefs.getInt("aerix_inst_vibrate_duration_$instanceKey", -1))
     }
 
-    val maxRamMb = remember { PojavSettingsBridge.maxRam(activity).coerceAtLeast(1024) }
+    val maxRamMb = remember { PojavSettingsBridge.safeMaxRam(activity).coerceAtLeast(256) }
     val globalRamMb = remember { LauncherPreferences.PREF_RAM_ALLOCATION.coerceIn(256, maxRamMb) }
     var customRamMb by remember(draft.jvmArgs) {
         mutableIntStateOf(net.kdt.pojavlaunch.utils.jre.InstanceMemory.overrideMb(draft.jvmArgs))

@@ -32,6 +32,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.fragment.app.FragmentActivity
@@ -59,6 +60,7 @@ fun AerixClientScreen(activity: FragmentActivity, onBack: () -> Unit) {
     }
 
     var refreshTick by remember { mutableIntStateOf(0) }
+    var modpackSearchOpen by remember { mutableStateOf(false) }
     var preparingLaunchVer by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     val accent = AerixSurface.accent
@@ -66,7 +68,26 @@ fun AerixClientScreen(activity: FragmentActivity, onBack: () -> Unit) {
     AerixPage(
         title = "Aerix Client",
         subtitle = null,
-        trailing = { ClientOwnerBackButton(onBack) }
+        trailing = {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                // Modpacks used to be reachable only from the Discover tab, which does not know
+                // that the player is here to set up a client: searching for a pack and installing it
+                // with or without Aerix Client belongs on this page.
+                Text(
+                    text = "Search modpacks",
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(AerixRadii.card))
+                        .background(accent.copy(alpha = 0.18f))
+                        .border(1.dp, accent.copy(alpha = 0.45f), RoundedCornerShape(AerixRadii.card))
+                        .clickable { modpackSearchOpen = true }
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    color = Color.White,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                ClientOwnerBackButton(onBack)
+            }
+        }
     ) {
         // Active download progress banner in Liquid Glass
         if (AerixClientInstaller.isInstalling) {
@@ -114,6 +135,13 @@ fun AerixClientScreen(activity: FragmentActivity, onBack: () -> Unit) {
                 color = AerixSurface.errorDarkContainer.copy(alpha = 0.55f)
             ) {
                 Text(text = err, color = Color.White, fontSize = 12.sp)
+            }
+        }
+
+        if (modpackSearchOpen) {
+            AerixPackSearchDialog(activity, ClientOwnerPage.SAHIL, onDismiss = { modpackSearchOpen = false }) {
+                // A pack creates its own instance, so the version list below is stale.
+                refreshTick++
             }
         }
 
@@ -279,6 +307,57 @@ fun AerixClientScreen(activity: FragmentActivity, onBack: () -> Unit) {
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.ExtraBold
                             )
+                        }
+
+                        // "Update my mods" - the only path that writes jars of ours into an
+                        // instance folder, and it needs a tap. The answer is shown, not swallowed,
+                        // so a Modrinth that did not answer reads as "unavailable" instead of success.
+                        if (installed != null) {
+                            Box(
+                                modifier = Modifier
+                                    .liquidGlass(
+                                        shape = pillShape,
+                                        tint = AerixSurface.glassTint,
+                                        strength = 0.9f
+                                    )
+                                    .background(
+                                        brush = Brush.horizontalGradient(
+                                            listOf(
+                                                Color.White.copy(alpha = 0.14f),
+                                                AerixSurface.glassBlue.copy(alpha = 0.22f)
+                                            )
+                                        ),
+                                        shape = pillShape
+                                    )
+                                    .clickable(enabled = !busy && !AerixClientInstaller.isUpdatingMods) {
+                                        scope.launch {
+                                            val summary = AerixClientInstaller.updateOwnMods(activity, installed)
+                                            refreshTick++
+                                            summary.onSuccess { text ->
+                                                Toast.makeText(activity, text, Toast.LENGTH_LONG).show()
+                                            }.onFailure { err ->
+                                                Toast.makeText(
+                                                    activity,
+                                                    err.message ?: "The mod update failed",
+                                                    Toast.LENGTH_LONG
+                                                ).show()
+                                            }
+                                        }
+                                    }
+                                    .padding(horizontal = 16.dp, vertical = 9.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = if (AerixClientInstaller.isUpdatingMods)
+                                        AerixClientInstaller.modUpdateState.ifBlank { "Updating mods..." }
+                                    else "Update my mods",
+                                    color = Color.White,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
                         }
 
                         // Liquid Glass Launch Pill (upgrades existing instance pack + WaveyCapes + FPS before launch!)

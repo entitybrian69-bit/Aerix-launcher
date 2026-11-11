@@ -6,6 +6,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.system.Os;
@@ -52,6 +53,7 @@ import net.kdt.pojavlaunch.progresskeeper.ProgressKeeper;
 import net.kdt.pojavlaunch.progresskeeper.TaskCountListener;
 import net.kdt.pojavlaunch.services.ProgressServiceKeeper;
 import net.kdt.pojavlaunch.tasks.MoJsonExtras;
+import net.kdt.pojavlaunch.tasks.DataMigrator;
 import net.kdt.pojavlaunch.tasks.AsyncVersionList;
 import net.kdt.pojavlaunch.tasks.MoJsonDownloader;
 import net.kdt.pojavlaunch.utils.NotificationUtils;
@@ -62,6 +64,9 @@ import java.io.IOException;
 
 public class LauncherActivity extends BaseActivity {
     public static final String SETTING_FRAGMENT_TAG = "SETTINGS_FRAGMENT";
+    private static final String PREF_MIGRATION_NOTICE_SNOOZED_UNTIL = "migrationNoticeSnoozedUntil";
+    private static final long MIGRATION_NOTICE_SNOOZE_MILLIS = 7L * 24L * 60L * 60L * 1000L;
+    private static final long MIGRATION_PICKER_SNOOZE_MILLIS = 5L * 60L * 1000L;
 
     private FragmentContainerView mFragmentView;
     private View mHomeButton;
@@ -69,6 +74,7 @@ public class LauncherActivity extends BaseActivity {
     private ProgressServiceKeeper mProgressServiceKeeper;
     private NotificationManager mNotificationManager;
     private static ActivityResultLauncher<String> mRequestPermissionLauncher;
+    private ActivityResultLauncher<Uri> mMigrationTreeLauncher;
 
     /* Aerix: the floating home button is shown only while a Pojav screen sits above the Aerix shell */
     private final FragmentManager.OnBackStackChangedListener mBackStackListener = this::updateHomeButton;
@@ -233,12 +239,20 @@ public class LauncherActivity extends BaseActivity {
         // system bars only when the launcher is not fullscreen, since Tools.setInsetsMode pads the
         // content for those itself and this would count them twice.
         ViewCompat.setOnApplyWindowInsetsListener(getWindow().getDecorView(), (view, insets) -> {
-            int mask = WindowInsetsCompat.Type.displayCutout();
-            if (!AerixPreferences.INSTANCE.getFullScreen()) {
-                mask |= WindowInsetsCompat.Type.systemBars();
-            }
-            Insets safe = insets.getInsets(mask);
-            AerixWindowInsets.INSTANCE.update(safe.left, safe.top, safe.right, safe.bottom);
+            // Vertical: keep clear of the bars and of the camera. Horizontal: only the system bars,
+            // never the cutout depth. A punch-hole reserves a strip of display that nothing can use,
+            // and painting the launcher's dark canvas there is exactly what reads as "black space on
+            // the left, it is not full screen" on a phone held sideways. The camera sits inside the
+            // bezel area, so content that reaches the physical edge is covered by the frame anyway;
+            // the rail carries its own padding, which keeps its tap targets clear of the hole.
+            Insets cutout = insets.getInsets(WindowInsetsCompat.Type.displayCutout());
+            Insets bars = AerixPreferences.INSTANCE.getFullScreen()
+                    ? Insets.NONE
+                    : insets.getInsets(WindowInsetsCompat.Type.systemBars());
+            // androidx.core's Insets publishes plain fields, not getters.
+            int top = Math.max(cutout.top, bars.top);
+            int bottom = Math.max(cutout.bottom, bars.bottom);
+            AerixWindowInsets.INSTANCE.update(bars.left, top, bars.right, bottom);
             return insets;
         });
         setContentView(R.layout.activity_pojav_launcher);
@@ -255,6 +269,8 @@ public class LauncherActivity extends BaseActivity {
 
         getWindow().setBackgroundDrawable(null);
         bindViews();
+        mMigrationTreeLauncher = registerForActivityResult(
+                new ActivityResultContracts.OpenDocumentTree(), this::onMigrationTreeSelected);
         mRequestPermissionLauncher = this.registerForActivityResult(
                 new ActivityResultContracts.RequestPermission(),
                 isAllowed -> {
@@ -460,22 +476,87 @@ public class LauncherActivity extends BaseActivity {
         showNotificationPermissionReasoning();
     }
 
-    // Call async
-    private void checkPreviousInstalls(){
-        final String[] packages = {"net.kdt.pojavlaunch", "net.kdt.pojavlaunch.debug", "net.kdt.pojavlaunch.pub"};
-        for(String s : packages){
-            if (s.equals(getPackageName())) continue;
-            Intent i = getPackageManager().getLaunchIntentForPackage(s);
-            if(i == null) continue;
-            Tools.runOnUiThread(() ->
-                    new AlertDialog.Builder(this)
-                        .setTitle(R.string.migration_progress_warning_title)
-                        .setMessage(R.string.migration_notice)
-                        .setPositiveButton(android.R.string.ok, (d, button) -> LauncherPreferences.DEFAULT_PREF.edit().putBoolean("migrationNotice", false).apply())
-                        .setOnDismissListener(d -> LauncherPreferences.PREF_MIGRATION_NOTICE = false)
-                        .show());
+    // Call async. Only legacy IDs are migration sources; sibling current variants are not old installs.
+    private void checkPreviousInstalls() {
+        if (!LauncherPreferences.PREF_MIGRATION_NOTICE || LauncherPreferences.DEFAULT_PREF == null) return;
+        long snoozedUntil = LauncherPreferences.DEFAULT_PREF.getLong(PREF_MIGRATION_NOTICE_SNOOZED_UNTIL, 0L);
+        if (System.currentTimeMillis() < snoozedUntil) return;
+
+        final String[] legacyPackages = {
+                "net.kdt.pojavlaunch", "net.kdt.pojavlaunch.debug", "net.kdt.pojavlaunch.pub"
+        };
+        for (String packageName : legacyPackages) {
+            Intent launchIntent = getPackageManager().getLaunchIntentForPackage(packageName);
+            if (launchIntent == null) continue;
+            Tools.runOnUiThread(() -> showPreviousInstallNotice(packageName));
             break;
         }
+    }
+
+    private void showPreviousInstallNotice(String packageName) {
+        if (isFinishing() || isDestroyed()) return;
+        AlertDialog.Builder dialog = new AlertDialog.Builder(this)
+                .setTitle(R.string.migration_progress_warning_title);
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            dialog.setMessage(getString(R.string.migration_notice_shared, packageName))
+                    .setPositiveButton(android.R.string.ok, (d, which) -> disableMigrationNotice())
+                    .show();
+            return;
+        }
+        dialog.setMessage(getString(R.string.migration_notice, packageName))
+                .setPositiveButton(R.string.migration_prompt_import, (d, which) -> {
+                    snoozeMigrationNotice(MIGRATION_PICKER_SNOOZE_MILLIS);
+                    if (mMigrationTreeLauncher != null) {
+                        mMigrationTreeLauncher.launch(null);
+                    } else {
+                        clearMigrationNoticeSnooze();
+                    }
+                })
+                .setNegativeButton(R.string.migration_prompt_later, (d, which) -> snoozeMigrationNotice())
+                .setNeutralButton(R.string.migration_prompt_never, (d, which) -> disableMigrationNotice())
+                .show();
+    }
+
+    private void onMigrationTreeSelected(Uri uri) {
+        if (uri == null || isFinishing() || isDestroyed()) {
+            clearMigrationNoticeSnooze();
+            return;
+        }
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.migration_progress_warning_title)
+                .setMessage(R.string.migration_progress_warning_summary)
+                .setPositiveButton(R.string.migration_prompt_start,
+                        (d, which) -> new DataMigrator(this, uri).migrateData())
+                .setNegativeButton(android.R.string.cancel, (d, which) -> clearMigrationNoticeSnooze())
+                .show();
+    }
+
+    private void snoozeMigrationNotice() {
+        snoozeMigrationNotice(MIGRATION_NOTICE_SNOOZE_MILLIS);
+    }
+
+    private void snoozeMigrationNotice(long durationMillis) {
+        if (LauncherPreferences.DEFAULT_PREF == null) return;
+        LauncherPreferences.DEFAULT_PREF.edit()
+                .putLong(PREF_MIGRATION_NOTICE_SNOOZED_UNTIL,
+                        System.currentTimeMillis() + durationMillis)
+                .apply();
+    }
+
+    private void clearMigrationNoticeSnooze() {
+        if (LauncherPreferences.DEFAULT_PREF != null) {
+            LauncherPreferences.DEFAULT_PREF.edit().remove(PREF_MIGRATION_NOTICE_SNOOZED_UNTIL).apply();
+        }
+    }
+
+    private void disableMigrationNotice() {
+        if (LauncherPreferences.DEFAULT_PREF != null) {
+            LauncherPreferences.DEFAULT_PREF.edit()
+                    .putBoolean("migrationNotice", false)
+                    .remove(PREF_MIGRATION_NOTICE_SNOOZED_UNTIL)
+                    .apply();
+        }
+        LauncherPreferences.PREF_MIGRATION_NOTICE = false;
     }
 
     private void showNotificationPermissionReasoning() {

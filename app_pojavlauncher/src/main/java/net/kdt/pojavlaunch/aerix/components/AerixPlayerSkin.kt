@@ -54,6 +54,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -213,6 +214,18 @@ class AerixPlayerSkin(private val context: Context) {
         webview?.evaluateJavascript("setInteractionEnabled($enabled)", null)
     }
 
+    fun setAutoRotate(enabled: Boolean, speed: Float = 0.3f) {
+        val safeSpeed = speed.takeIf { it.isFinite() }?.coerceIn(0.05f, 1.5f) ?: 0.3f
+        webview?.evaluateJavascript("setAutoRotate($enabled, $safeSpeed)", null)
+    }
+
+    fun startAnimation(name: String, speed: Float = 1f) {
+        val allowed = setOf("DefaultIdle", "NewIdle", "Walking", "Running", "Flying", "Wave", "Crouch", "Hit")
+        if (name !in allowed) return
+        val safeSpeed = speed.takeIf { it.isFinite() }?.coerceIn(0.1f, 3f) ?: 1f
+        webview?.evaluateJavascript("startAnim('$name', $safeSpeed)", null)
+    }
+
     fun setRenderPaused(paused: Boolean) {
         webview?.evaluateJavascript("setRenderPaused($paused)", null)
     }
@@ -249,7 +262,11 @@ fun AerixSkinPreview3D(
     interactionEnabled: Boolean = false,
     isVisible: Boolean = true,
     useClientCape: Boolean = false,
-    showOfficialCape: Boolean = false
+    showOfficialCape: Boolean = false,
+    animationName: String? = null,
+    cameraDistance: Int = 48,
+    autoRotate: Boolean = false,
+    autoRotateSpeed: Float = 0.3f
 ) {
     val context = LocalContext.current
     val playerSkin = remember { AerixPlayerSkin(context.applicationContext) }
@@ -259,7 +276,7 @@ fun AerixSkinPreview3D(
     var webglPainted by remember { mutableStateOf(false) }
     var fallbackBody by remember { mutableStateOf<ImageBitmap?>(null) }
     var skinLoadTrigger by remember { mutableIntStateOf(0) }
-    val cameraAngles = remember { Channel<Pair<Int, Int>>(Channel.CONFLATED) }
+    val cameraAngles = remember { Channel<Triple<Int, Int, Int>>(Channel.CONFLATED) }
 
     DisposableEffect(playerSkin) {
         playerSkin.viewerReadyCallback = {
@@ -284,7 +301,6 @@ fun AerixSkinPreview3D(
     val wardrobeRevision = PojavAccountBridge.wardrobeRevision
     val clientCapeId = if (useClientCape) net.kdt.pojavlaunch.aerix.client.AerixClientStore.equippedCapeId else null
     val capeOwner = if (useClientCape) net.kdt.pojavlaunch.aerix.social.SocialBackend.email else null
-
     // Always decode the crisp 2D full-body preview immediately so the skin shows up on the very
     // first frame after returning to Dashboard — and stays visible on devices without WebGL.
     LaunchedEffect(account?.key, account?.username, account?.authType, wardrobeRevision) {
@@ -355,19 +371,29 @@ fun AerixSkinPreview3D(
         }
 
         val ready = viewerReady
-        LaunchedEffect(ready, isVisible) {
+        LaunchedEffect(ready, isVisible, animationName, autoRotate) {
             if (!ready) return@LaunchedEffect
-            playerSkin.setRenderPaused(true)
+            when {
+                !isVisible -> playerSkin.setRenderPaused(true)
+                !animationName.isNullOrBlank() -> playerSkin.startAnimation(animationName)
+                autoRotate -> playerSkin.setRenderPaused(false)
+                else -> playerSkin.setRenderPaused(true)
+            }
         }
-        LaunchedEffect(ready, azimuth, pitch, isVisible) {
+        LaunchedEffect(ready, autoRotate, autoRotateSpeed, isVisible) {
+            if (!ready) return@LaunchedEffect
+            playerSkin.setAutoRotate(autoRotate && isVisible, autoRotateSpeed)
+        }
+        LaunchedEffect(ready, azimuth, pitch, cameraDistance, isVisible) {
             if (!ready || !isVisible) return@LaunchedEffect
-            cameraAngles.trySend(azimuth to pitch)
+            cameraAngles.trySend(Triple(azimuth, pitch, cameraDistance.coerceIn(24, 120)))
         }
         LaunchedEffect(ready, isVisible) {
             if (!ready || !isVisible) return@LaunchedEffect
-            for ((azimuthDeg, pitchDeg) in cameraAngles) {
-                playerSkin.setAzimuthAndPitch(azimuthDeg, pitchDeg)
-                delay(16)
+            for ((azimuthDeg, pitchDeg, distance) in cameraAngles) {
+                // Consume only the latest pointer-driven camera state once per display frame.
+                withFrameNanos { }
+                playerSkin.setAzimuthAndPitch(azimuthDeg, pitchDeg, distance)
             }
         }
         LaunchedEffect(ready, interactionEnabled, isVisible) {
@@ -379,7 +405,7 @@ fun AerixSkinPreview3D(
             val (skinBytes, capeBytes, model) = withContext(Dispatchers.IO) {
                 Triple(
                     PojavAccountBridge.resolveAccountSkinBytes(account),
-                    if (useClientCape && account != null)
+                    if (useClientCape)
                         net.kdt.pojavlaunch.aerix.client.AerixClientCosmetics.resolveInGameCapeBytes(context)
                     else PojavAccountBridge.resolveCapeBytes(account, includeOfficial = showOfficialCape),
                     if (PojavAccountBridge.isSlimModel(account)) "slim" else "default"

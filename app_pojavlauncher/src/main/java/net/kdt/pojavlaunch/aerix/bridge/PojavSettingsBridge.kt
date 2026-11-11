@@ -45,12 +45,14 @@ import net.kdt.pojavlaunch.LauncherActivity
 import net.kdt.pojavlaunch.PojavApplication
 import net.kdt.pojavlaunch.R
 import net.kdt.pojavlaunch.Tools
+import net.kdt.pojavlaunch.utils.jre.LaunchMemory
 import net.kdt.pojavlaunch.fragments.GamepadMapperFragment
 import net.kdt.pojavlaunch.game.renderer.RendererCache
 import net.kdt.pojavlaunch.game.renderer.def.Renderers
 import net.kdt.pojavlaunch.game.renderer.extra.GLESProvider
 import net.kdt.pojavlaunch.mobileglues.MainActivity as MobileGluesActivity
 import net.kdt.pojavlaunch.prefs.LauncherPreferences
+import net.kdt.pojavlaunch.utils.DisplayRefreshMode
 import net.kdt.pojavlaunch.prefs.screens.LauncherPreferenceControlFragment
 import net.kdt.pojavlaunch.prefs.screens.LauncherPreferenceExperimentalFragment
 import net.kdt.pojavlaunch.prefs.screens.LauncherPreferenceFragment
@@ -197,6 +199,24 @@ object PojavSettingsBridge {
         else deviceRam - (if (deviceRam < 3064) 800 else 1024)
     }
 
+    /**
+     * The highest heap this device can actually run Minecraft on, which is lower than [maxRam].
+     *
+     * Pojav's own ceiling is "device RAM minus a gigabyte", and the whole launcher process lives
+     * beside the JVM: the GL driver, native texture allocations, mapped modpack archives and
+     * Android itself. A player who drags that slider to the end - which is what "1GB of ram is not
+     * enough for me, it takes 10 fps, freezes when switching settings, cannot even enter a world"
+     * reads like - gets exactly that: a heap the kernel cannot honour. Three phones reported their
+     * slider maximum back to us (6063, 4778, 3979 MB), so the ceiling was the trap.
+     *
+     * The policy lives in [InstanceMemory] so the UI sliders, the instance editor and the JVM
+     * arguments that are really passed cannot drift apart.
+     */
+    fun safeMaxRam(context: Context): Int = LaunchMemory.safeMaxMb(context)
+
+    /** A stored allocation that a previous, wider ceiling allowed. Applied at launch and in UI. */
+    fun clampRam(context: Context, requestedMb: Int): Int = LaunchMemory.clamp(context, requestedMb)
+
     /** LauncherPreferenceVideoFragment "#724" fix: values under 25 show as 100. */
     fun resolutionPercent(): Int {
         val value = (LauncherPreferences.PREF_SCALE_FACTOR * 100).toInt()
@@ -277,10 +297,14 @@ object PojavSettingsBridge {
                 step = 5, suffix = " %", current = { resolutionPercent() }),
             PojavSetting.Toggle("sustainedPerformance", R.string.preference_sustained_performance_title, R.string.preference_sustained_performance_description,
                 current = { LauncherPreferences.PREF_SUSTAINED_PERFORMANCE }, visible = { Build.VERSION.SDK_INT >= Build.VERSION_CODES.N }),
+            PojavSetting.Toggle("show_fps", R.string.preference_show_fps_title, R.string.preference_show_fps_description,
+                current = { LauncherPreferences.PREF_SHOW_FPS }),
             PojavSetting.Toggle("alternate_surface", R.string.mcl_setting_title_use_surface_view, R.string.mcl_setting_subtitle_use_surface_view,
                 current = { LauncherPreferences.PREF_USE_ALTERNATE_SURFACE }),
             PojavSetting.Toggle("force_vsync", R.string.preference_force_vsync_title, R.string.preference_force_vsync_description,
                 current = { LauncherPreferences.PREF_FORCE_VSYNC }, visible = { LauncherPreferences.PREF_USE_ALTERNATE_SURFACE }),
+            PojavSetting.Toggle(DisplayRefreshMode.PREF_KEY, R.string.aerix_max_refresh_title, R.string.aerix_max_refresh_desc,
+                current = { LauncherPreferences.PREF_MAX_REFRESH_RATE }),
             PojavSetting.Toggle("use_angle", R.string.preference_use_angle_title, R.string.preference_use_angle_description,
                 current = { LauncherPreferences.PREF_USE_ANGLE }, visible = { hasAngle(it) }),
             PojavSetting.Toggle("use_system_angle", R.string.preference_use_system_angle_title, R.string.preference_use_angle_description,
@@ -360,7 +384,7 @@ object PojavSettingsBridge {
             PojavSetting.Action("install_jre", R.string.multirt_title, R.string.multirt_subtitle,
                 run = { open(it, LauncherPreferenceJavaFragment::class.java) }),
             PojavSetting.Slider("allocation", R.string.mcl_memory_allocation, R.string.mcl_memory_allocation_subtitle,
-                min = { integer(it, R.integer.memory_seekbar_min) }, max = { maxRam(it) },
+                min = { integer(it, R.integer.memory_seekbar_min) }, max = { safeMaxRam(it) },
                 step = 8, suffix = " MB", current = { LauncherPreferences.PREF_RAM_ALLOCATION }),
             PojavSetting.Text("javaArgs", R.string.mcl_setting_title_javaargs, R.string.mcl_setting_subtitle_javaargs,
                 current = { LauncherPreferences.PREF_CUSTOM_JAVA_ARGS ?: "" }),

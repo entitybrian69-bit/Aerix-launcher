@@ -96,8 +96,10 @@ public class AndroidPointerCapture implements ViewTreeObserver.OnWindowFocusChan
                 mScroller.performScroll(mVector);
             }
         } else {
-            // Position is updated by many events, hence it is send regardless of the event value
-            applyMotionVector(view, 1);
+            // Position is updated by many events, hence it is send regardless of the event value.
+            // This is the aim path, so the game's own sensitivity applies - not the launcher
+            // cursor's, which is what made "mouse speed" feel like it changed the whole game.
+            applyMotionVector(view, LauncherPreferences.PREF_GAME_MOUSE_SENSITIVITY);
         }
 
         switch (event.getActionMasked()) {

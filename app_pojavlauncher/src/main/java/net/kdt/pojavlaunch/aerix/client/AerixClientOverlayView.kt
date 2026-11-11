@@ -68,6 +68,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
@@ -118,6 +119,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 import net.kdt.pojavlaunch.R
+import net.kdt.pojavlaunch.aerix.components.bringFocusedItemIntoView
 import net.kdt.pojavlaunch.aerix.bridge.AerixPreferences
 import net.kdt.pojavlaunch.aerix.bridge.PojavAccountBridge
 import net.kdt.pojavlaunch.aerix.theme.AerixLauncherTheme
@@ -227,6 +229,7 @@ class AerixClientOverlayView @JvmOverloads constructor(
             return
         }
         activeClientInstance = instance
+        ClientLiveOptionsBridge.activeGameDir = instance.gameDirectory
         AerixClientStore.reload(context.applicationContext)
         ClientPerformanceSettings.reload(context.applicationContext)
         AerixClientInputBridge.resetSessionState(instance.versionId)
@@ -247,6 +250,7 @@ class AerixClientOverlayView @JvmOverloads constructor(
         if (visibility != VISIBLE) return
         bootOverlayVisible = false
         menuSubPage = ClientMenuSubPage.GRID
+        AerixOverlayInput.noteOpened()
         activeModal = InGameClientModal.MODULES
     }
 
@@ -259,6 +263,7 @@ class AerixClientOverlayView @JvmOverloads constructor(
 
     fun onHostDestroy() {
         activeClientInstance?.gameDirectory?.let { runCatching { ClientTelemetryBridge.setEnabled(it, false) } }
+        ClientLiveOptionsBridge.activeGameDir = null
         AerixClientInputBridge.clientSessionActive = false
         unregisterGyro()
     }
@@ -270,6 +275,10 @@ class AerixClientOverlayView @JvmOverloads constructor(
             return true
         }
         if (activeModal != InGameClientModal.NONE) {
+            // A tap on the Client button can reach the game as an escape key as well as a touch, in
+            // which case the panel that the tap opened is closed by the very same tap. Key and tap
+            // share one grace window, so the menu only answers BACK/ESC once it has been on screen.
+            if (!AerixOverlayInput.acceptKeyDismiss()) return true
             if (activeModal == InGameClientModal.OLED_AFK) {
                 AerixClientInputBridge.setRightClickHold(false)
             }
@@ -366,6 +375,9 @@ class AerixClientOverlayView @JvmOverloads constructor(
                         if (next == InGameClientModal.MODULES) {
                             menuSubPage = ClientMenuSubPage.GRID
                         }
+                        if (next != InGameClientModal.NONE) {
+                            AerixOverlayInput.noteOpened()
+                        }
                         activeModal = next
                         syncGyroRegistration()
                     },
@@ -434,7 +446,7 @@ private fun AerixClientRootOverlay(
 
     var telemetry by remember { mutableStateOf<ClientTelemetrySnapshot?>(null) }
     var wallClock by remember { mutableStateOf("") }
-    val needsTelemetry = (mcVersion == "26.3" && (AerixClientStore.perfPillEnabled || AerixClientStore.fpsHistoryEnabled || AerixClientStore.adaptiveDistanceEnabled || modal == InGameClientModal.OLED_AFK)) || AerixClientStore.coordsHudEnabled || AerixClientStore.armorHudEnabled ||
+    val needsTelemetry = (mcVersion == "26.3" && (AerixClientStore.perfPillEnabled || net.kdt.pojavlaunch.prefs.LauncherPreferences.PREF_SHOW_FPS || AerixClientStore.fpsHistoryEnabled || AerixClientStore.adaptiveDistanceEnabled || modal == InGameClientModal.OLED_AFK)) || AerixClientStore.coordsHudEnabled || AerixClientStore.armorHudEnabled ||
         AerixClientStore.effectsHudEnabled || AerixClientStore.worldTimeHudEnabled ||
         AerixClientStore.serverHudEnabled || AerixClientStore.pingHudEnabled || AerixClientStore.lightHudEnabled || AerixClientStore.biomeHudEnabled ||
         AerixClientStore.compassEnabled || AerixClientStore.waypointHudEnabled || AerixClientStore.deathWaypointEnabled || AerixClientStore.healthHudEnabled || AerixClientStore.selectedSlotHudEnabled || AerixClientStore.hotbarSwipeEnabled || AerixClientStore.adaptiveDistanceEnabled || ClientAdaptiveBridge.recovering ||
@@ -661,15 +673,33 @@ private fun AerixClientRootOverlay(
         }
     }
 
+    // A modal may only be dismissed by an outside tap or by back/escape once it has actually been
+    // drawn, and then only for a gesture that started after that plus the grace window - see
+    // AerixOverlayInput. This is armed here rather than inside the client menu because every modal
+    // answers the same two dismissal paths: a subpage that could never be left would be a far worse
+    // bug than the flicker this guard is for.
+    LaunchedEffect(modal, bootVisible) {
+        if (bootVisible || modal == InGameClientModal.NONE) return@LaunchedEffect
+        withFrameNanos { }
+        AerixOverlayInput.arm()
+    }
+
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val wPx = constraints.maxWidth.toFloat().coerceAtLeast(1f)
         val hPx = constraints.maxHeight.toFloat().coerceAtLeast(1f)
 
-        // Compact non-overlapping `[✦ Client]` button in safe gap (x=0.57, y=0.018 — clear of TAB at 0.46 & A at 0.77)
+        // Compact non-overlapping `[✦ Client]` button in the safe gap (x=0.57, clear of TAB at 0.46
+        // & A at 0.77). Its height comes from the player's own saved position, floored below the
+        // system's top-edge gesture strip so the tap that opens the menu stays a tap.
         if (!bootVisible && modal == InGameClientModal.NONE) {
             val btnPos = AerixClientStore.hudPositions["client_btn"]
             val bx = ((btnPos?.xNorm ?: 0.57f) * wPx).roundToInt()
-            val by = ((btnPos?.yNorm ?: 0.018f) * hPx).roundToInt()
+            // 1.8% of the screen height is about nineteen pixels, which is inside the strip Android
+            // hands to the system as a top-edge gesture on many phones: the tap is eaten or repeated,
+            // and the panel flashes open and shut. Anything higher than this stays a launcher touch.
+            val pillDensity = LocalDensity.current
+            val topSafePx = with(pillDensity) { 26.dp.roundToPx() }
+            val by = maxOf(((btnPos?.yNorm ?: 0.035f) * hPx).roundToInt(), topSafePx)
             Row(
                 modifier = Modifier
                     .offset { IntOffset(bx, by) }
@@ -813,7 +843,7 @@ private fun FamousClientRectangleMenu(
             .fillMaxSize()
             .background(Color(0x990A0B0E))
             .pointerInput(Unit) {
-                detectTapGestures(onTap = { onClose() })
+                detectTapGestures(onTap = { if (AerixOverlayInput.acceptTapDismiss()) onClose() })
             },
         contentAlignment = Alignment.Center
     ) {
@@ -1163,6 +1193,7 @@ private fun ClientSquaresGridPage(
             statusText = { if (AerixClientStore.fullbrightEnabled) "ENABLED" else "DISABLED" },
             onClick = {
                 AerixClientStore.fullbrightEnabled = !AerixClientStore.fullbrightEnabled
+                ClientLiveOptionsBridge.syncAll()
                 AerixClientStore.persist()
                 onSyncOptionsTxt()
                 Toast.makeText(
@@ -1720,7 +1751,7 @@ private fun ClientResourcePacksPage(gameDir: File?) {
                     Text(pack.name, color = Color.White, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(if (pack.queued != null) "Queued: ${if (selected) "on" else "off"}" else if (pack.active) "Selected" else "Not selected", color = LiquidCrystalPalette.TextMuted, fontSize = 10.sp)
                 }
-                Switch(checked = selected, onCheckedChange = { value ->
+                Switch(modifier = Modifier.bringFocusedItemIntoView(), checked = selected, onCheckedChange = { value ->
                     if (gameDir != null) scope.launch {
                         val result = withContext(Dispatchers.IO) { runCatching { ClientInstanceOptions.queuePack(gameDir, pack.name, value) } }
                         result.exceptionOrNull()?.let { Toast.makeText(context, it.message ?: "Could not queue pack", Toast.LENGTH_LONG).show() }
@@ -1938,7 +1969,7 @@ private fun ClientInformationToggle(label: String, checked: Boolean, onChange: (
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween) {
         Text(label, color = Color.White, fontSize = 12.sp)
-        Switch(checked = checked, onCheckedChange = { onChange(it); AerixClientStore.persist() })
+        Switch(modifier = Modifier.bringFocusedItemIntoView(), checked = checked, onCheckedChange = { onChange(it); AerixClientStore.persist() })
     }
 }
 
@@ -2007,6 +2038,10 @@ private fun findInstalledOptimizationMods(gameDir: File?): List<String> {
 
 @Composable
 private fun ClientPerformancePage(gameDir: File?, onClose: () -> Unit) {
+    // Read from the composition, once. LocalContext.current is itself a composable getter, so the
+    // click and slider callbacks below cannot ask for it themselves.
+    val pageContext = LocalContext.current
+    val pageActivity = pageContext as? net.kdt.pojavlaunch.game.GameActivity
     val context = LocalContext.current
     val options = ClientPerformanceSettings.overrides
     var installedMods by remember(gameDir) { mutableStateOf<List<String>>(emptyList()) }
@@ -2017,10 +2052,82 @@ private fun ClientPerformancePage(gameDir: File?, onClose: () -> Unit) {
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
+        // The pill that draws frames per second belongs to the launcher's window, and until now an
+        // Aerix Client instance could neither show it nor hide it: the setting existed only on the
+        // classic video page. It lives here, next to the counters it belongs to.
+        ClientInformationToggle("FPS pill on screen", AerixClientStore.fpsOverlayEnabled) {
+            AerixClientStore.fpsOverlayEnabled = it
+            AerixClientStore.persist()
+            pageActivity?.refreshFpsViewVisibility()
+        }
+        Text("Cursor size  ${net.kdt.pojavlaunch.aerix.client.AerixCursorSkin.scalePercent}%",
+            color = Color.White, fontSize = 11.sp)
+        Slider(value = (net.kdt.pojavlaunch.aerix.client.AerixCursorSkin.scalePercent / 100f).coerceIn(0.25f, 3f),
+            onValueChange = {
+                val percent = (it * 100).roundToInt()
+                net.kdt.pojavlaunch.aerix.client.AerixCursorSkin.setScale(pageContext, percent)
+                pageActivity?.applyAerixPointerPreferences()
+            }, valueRange = 0.25f..3f)
+        Row(modifier = Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            listOf("Tiny" to 45, "Normal" to 100, "Large" to 165, "Huge" to 240).forEach { (label, percent) ->
+                LiquidCrystalPill(label, onClick = {
+                    net.kdt.pojavlaunch.aerix.client.AerixCursorSkin.setScale(pageContext, percent)
+                    pageActivity?.applyAerixPointerPreferences()
+                })
+            }
+        }
+        Text(net.kdt.pojavlaunch.aerix.client.AerixCursorSkin.report(pageContext),
+            color = LiquidCrystalPalette.TextMuted, fontSize = 10.sp)
+        Text(AerixOverlayInput.report(), color = LiquidCrystalPalette.TextMuted, fontSize = 10.sp)
         ClientInformationToggle("Show FPS history HUD", AerixClientStore.fpsHistoryEnabled) { AerixClientStore.fpsHistoryEnabled = it }
         ClientInformationToggle("Frame time and stutters HUD", AerixClientStore.frameTimingEnabled) { AerixClientStore.frameTimingEnabled = it }
         ClientInformationToggle("Adaptive render distance", AerixClientStore.adaptiveDistanceEnabled) { AerixClientStore.adaptiveDistanceEnabled = it }
         Text("${ClientAdaptiveBridge.status}. Changes only client render distance; it returns to the original when disabled. Compatibility varies by version/mod.", color = LiquidCrystalPalette.TextMuted, fontSize = 10.sp)
+        // A server costs far more than a world of your own: chunks arrive from the network and every
+        // player on screen brings entities. This profile is therefore applied only inside a server and
+        // given straight back when you leave, so your own settings stay yours.
+        var gameReport by remember(gameDir) { mutableStateOf(ClientLiveOptionsBridge.describeGameStatus()) }
+        LaunchedEffect(gameDir) {
+            while (true) {
+                ClientLiveOptionsBridge.refreshGameStatus(gameDir)
+                gameReport = ClientLiveOptionsBridge.describeGameStatus()
+                delay(2_000L)
+            }
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Server Boost", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Text("Lowers chunk, entity and particle load while you are on a server only. Applied live - no restart, and your own options come back when you leave.",
+                    color = LiquidCrystalPalette.TextSecondary, fontSize = 10.sp)
+            }
+            Switch(
+                checked = AerixClientStore.serverBoostEnabled,
+                onCheckedChange = {
+                    AerixClientStore.serverBoostEnabled = it
+                    AerixClientStore.persist()
+                    ClientLiveOptionsBridge.syncAll(gameDir)
+                },
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = Color.White,
+                    checkedTrackColor = LiquidCrystalPalette.CrimsonPrimary,
+                    uncheckedThumbColor = LiquidCrystalPalette.TextSecondary,
+                    uncheckedTrackColor = LiquidCrystalPalette.DarkOuter
+                )
+            )
+        }
+        Row(modifier = Modifier.horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+            Text("Strength", color = Color.White, fontSize = 11.sp)
+            ClientLiveOptionsBridge.BoostPreset.values().forEach { preset ->
+                LiquidCrystalPill(preset.label, selected = AerixClientStore.serverBoostPreset == preset.name, onClick = {
+                    AerixClientStore.serverBoostPreset = preset.name
+                    AerixClientStore.persist()
+                    ClientLiveOptionsBridge.syncAll(gameDir)
+                })
+            }
+        }
+        Text("Zoom strength and cursor size are in Quick Settings (the menu button in game); the ZOOM pill works without any zoom mod installed.",
+            color = LiquidCrystalPalette.TextMuted, fontSize = 10.sp)
+        Text(gameReport, color = LiquidCrystalPalette.TextSecondary, fontSize = 10.sp)
         Row(modifier = Modifier.horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
             Text("Target FPS", color = Color.White, fontSize = 11.sp)
             listOf(30, 45, 60, 90, 120).forEach { value -> LiquidCrystalPill("$value", selected = AerixClientStore.adaptiveFpsTarget == value, onClick = { AerixClientStore.adaptiveFpsTarget = value; AerixClientStore.persist() }) }
@@ -2063,9 +2170,48 @@ private fun ClientPerformancePage(gameDir: File?, onClose: () -> Unit) {
         PerformanceChoice("Mipmap levels", "mipmapLevels", options, listOf("0" to "Off", "2" to "2", "4" to "4"))
         PerformanceChoice("VSync", "enableVsync", options, listOf("false" to "Off", "true" to "On"))
         PerformanceChoice("FPS limit", "maxFps", options, listOf("30" to "30", "60" to "60", "120" to "120", "260" to "Unlimited"))
+        // The in-game FPS limit is not what holds a phone at 60. Two launcher-side decisions are:
+        // the panel being left in its default mode, and "force vsync", which is switched on for
+        // devices this launcher considers powerful - a Dimensity 6000-series phone therefore paints
+        // at the refresh rate the display was never asked to raise, whatever the sliders above say.
+        // So the ceiling is measured here, stated here, and lifted here.
+        val displayContext = pageContext
+        val liveHz = net.kdt.pojavlaunch.utils.DisplayRefreshMode.activeRefreshHz(displayContext)
+        val ceilingHz = net.kdt.pojavlaunch.utils.DisplayRefreshMode.ceilingRefreshHz(displayContext)
+        val vsyncForced = net.kdt.pojavlaunch.prefs.LauncherPreferences.PREF_FORCE_VSYNC
+        val refreshRequested = net.kdt.pojavlaunch.prefs.LauncherPreferences.PREF_MAX_REFRESH_RATE
+        Text(
+            "Panel serving ${Math.round(liveHz)} Hz · fastest at this resolution ${Math.round(ceilingHz)} Hz · " +
+                "launcher vsync ${if (vsyncForced) "forced on" else "off"} · " +
+                "max refresh request ${if (refreshRequested) "on" else "off"}",
+            color = LiquidCrystalPalette.TextMuted,
+            fontSize = 10.sp
+        )
+        if (ceilingHz > liveHz + 1f || vsyncForced || !refreshRequested) {
+            val label = when {
+                ceilingHz > liveHz + 1f -> "Unlock ${Math.round(ceilingHz)} Hz and drop vsync"
+                vsyncForced -> "Release the vsync cap"
+                else -> "Ask the display for its fastest mode"
+            }
+            LiquidCrystalPill(label, onClick = {
+                val prefs = net.kdt.pojavlaunch.prefs.LauncherPreferences.DEFAULT_PREF
+                prefs?.edit()
+                    ?.putBoolean(net.kdt.pojavlaunch.utils.DisplayRefreshMode.PREF_KEY, true)
+                    ?.putBoolean("force_vsync", false)
+                    ?.apply()
+                net.kdt.pojavlaunch.prefs.LauncherPreferences.PREF_MAX_REFRESH_RATE = true
+                net.kdt.pojavlaunch.prefs.LauncherPreferences.PREF_FORCE_VSYNC = false
+                // Apply to this window at once; the next launch reads the same preferences.
+                net.kdt.pojavlaunch.utils.DisplayRefreshMode.applyTo(
+                    displayContext as? android.app.Activity
+                )
+                ClientPerformanceSettings.set("enableVsync", "false")
+                ClientPerformanceSettings.set("maxFps", "260")
+            })
+        }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Animated item textures · next launch", color = Color.White, fontSize = 11.sp)
-            Switch(checked = AerixClientStore.packVanillaAnimatedGear, onCheckedChange = {
+            Switch(modifier = Modifier.bringFocusedItemIntoView(), checked = AerixClientStore.packVanillaAnimatedGear, onCheckedChange = {
                 AerixClientStore.packVanillaAnimatedGear = it
                 AerixClientStore.persist()
             })
@@ -2227,14 +2373,26 @@ private fun ClientCapesSubPage(onSyncCape: () -> Unit) {
                     fontSize = 13.sp,
                     fontWeight = FontWeight.ExtraBold
                 )
-                Text(
-                    text = "Equipped: ${activeCape.title}",
-                    color = LiquidCrystalPalette.CrimsonGlow,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        text = "Equipped: ${activeCape.title}",
+                        color = LiquidCrystalPalette.CrimsonGlow,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Game side: ${ClientLiveOptionsBridge.readGameStatus()["cape"] ?: "not reporting yet"} · mod: ${AerixClientModBridge.lastStatus}",
+                        color = LiquidCrystalPalette.TextMuted,
+                        fontSize = 9.sp
+                    )
+                }
             }
 
+            LiquidCrystalPill("Re-send cape frames to the game", onClick = {
+                onSyncCape()
+                Toast.makeText(context, AerixClientCosmetics.lastCapeSyncStatus, Toast.LENGTH_LONG).show()
+            })
+            Spacer(Modifier.height(6.dp))
             val capeRows = AerixClientCosmetics.capes.chunked(3)
             Column(
                 modifier = Modifier

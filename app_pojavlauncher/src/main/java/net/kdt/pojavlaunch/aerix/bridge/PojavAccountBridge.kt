@@ -90,6 +90,7 @@ object PojavAccountBridge : LoginListener {
     /** Key of the account currently opened in the Account Details & Skin Wardrobe page, or null for the list view. */
     var focusedAccountKey by mutableStateOf<String?>(null)
     /** Bumped whenever an account's skin, cape, or Wide/Slim model changes. */
+    /** Bumped whenever the appearance the launcher serves to a game changes. */
     var wardrobeRevision by mutableIntStateOf(0)
         private set
     /** 0..1 login progress, shown as the bar AccountSpinner used to draw. */
@@ -979,9 +980,12 @@ object PojavAccountBridge : LoginListener {
             val ok = runCatching {
                 val bytes = appCtx.contentResolver.openInputStream(uri)?.use { it.readBytes() }
                     ?: return@runCatching false
+                if (bytes.size > 8 * 1024 * 1024) return@runCatching false
                 val decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
                     ?: return@runCatching false
+                val validCape = decoded.width in 22..1024 && decoded.height in 17..1024
                 decoded.recycle()
+                if (!validCape) return@runCatching false
                 val target = customCapeFile(account.source)
                 target.parentFile?.mkdirs()
                 target.writeBytes(bytes)

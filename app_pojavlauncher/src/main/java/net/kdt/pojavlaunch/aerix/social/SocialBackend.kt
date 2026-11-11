@@ -209,6 +209,56 @@ object SocialBackend {
         }
     }
 
+    // ---- launcher activity, for the friends list ---------------------------------------------
+
+    /**
+     * What the player is doing in the launcher, in the words the friends list shows: which mod they
+     * are reading, which pack they are hunting for, which instance they are rebuilding.
+     *
+     * It rides the status line the game session already owns, so there is nothing new to store and
+     * nothing for a friend's client to learn. A game session keeps priority: while the world is up,
+     * "in game" is the true sentence.
+     */
+    @Volatile private var launcherActivityLine: String? = null
+
+    /** Off means off: not one word about what the player is looking at leaves the device. */
+    @JvmStatic
+    var shareLauncherActivity: Boolean = true
+        private set
+
+    @JvmStatic
+    fun toggleShareLauncherActivity(enabled: Boolean) {
+        shareLauncherActivity = enabled
+        prefs()?.edit()?.putBoolean("share_activity", enabled)?.apply()
+        if (!enabled) launcherActivityLine = null
+        if (signedIn) bgScope.launch { syncRichPresenceToServer() }
+    }
+
+    /** Report one activity line, or null to stop. Unchanged text is dropped, so a scroll is silent. */
+    @JvmStatic
+    fun reportLauncherActivity(line: String?) {
+        if (!shareLauncherActivity) return
+        val clean = line?.trim()?.takeIf { it.isNotEmpty() }?.take(52)
+        if (clean == launcherActivityLine) return
+        launcherActivityLine = clean
+        // Discord reads the launcher's own IPC socket, not the friends-list row, so this has to be
+        // handed over directly - and before the sign-in gate, since a player without an Aerix
+        // account still expects their card to say what they are doing.
+        runCatching { net.kdt.pojavlaunch.aerix.discord.AerixDiscordPresence.launcherActivity(clean) }
+        if (!signedIn) return
+        bgScope.launch { syncRichPresenceToServer() }
+    }
+
+    /** Drop the line, but only when nothing newer has already replaced it. */
+    @JvmStatic
+    fun clearLauncherActivity(expected: String?) {
+        if (expected == null || launcherActivityLine != expected) return
+        launcherActivityLine = null
+        runCatching { net.kdt.pojavlaunch.aerix.discord.AerixDiscordPresence.launcherActivity(null) }
+        if (!signedIn) return
+        bgScope.launch { syncRichPresenceToServer() }
+    }
+
     fun toggleBackgroundNotifications(enabled: Boolean) {
         backgroundNotificationsEnabled = enabled
         prefs()?.edit()?.putBoolean("bg_notifications_enabled", enabled)?.apply()
@@ -1306,6 +1356,7 @@ object SocialBackend {
         offlineQueueSize = readOutbox().size
         val p = prefs() ?: return
         chatSoundsEnabled = p.getBoolean("chat_sounds_enabled", true)
+        shareLauncherActivity = p.getBoolean("share_activity", true)
         val me = userId ?: return
         isAutoPresence = p.getBoolean("status_auto_$me", true)
         myPresenceMode = SocialPresenceMode.fromKey(p.getString("presence_mode_$me", null))
@@ -1900,6 +1951,10 @@ object SocialBackend {
             // Append pending offline outbox messages for this conversation.
             val meId = userId ?: ""
             readOutbox().filter { it.recipientId == otherId }.forEachIndexed { index, queued ->
+                // Only while nothing else in this conversation carries it: the socket usually
+                // confirms a send before the outbox entry is dropped, and the queued copy shown
+                // next to the delivered one is a message that reads as two, one stuck "sending".
+                if (alreadySent(enriched, meId, queued)) return@forEachIndexed
                 enriched.add(
                     SocialMessage(
                         id = -(queued.createdAtMs + index),
@@ -3204,6 +3259,7 @@ object SocialBackend {
             }.toMutableList()
 
             readOutbox().filter { it.partyId == partyId }.forEachIndexed { idx, q ->
+                if (alreadySent(enriched, me, q)) return@forEachIndexed
                 enriched.add(
                     SocialMessage(
                         id = -(q.createdAtMs + idx),
@@ -3223,6 +3279,19 @@ object SocialBackend {
             enriched
         } ?: emptyList()
     }
+
+    /**
+     * Whether one queued send is already present in the conversation, under its temp id or as the
+     * same text from the same sender at the same moment. The outbox is emptied a beat after the
+     * server confirms a message, and that beat is a duplicate bubble unless it is checked here.
+     */
+    private fun alreadySent(rows: List<SocialMessage>, me: String, queued: SocialOutboxItem): Boolean =
+        rows.any { row ->
+            row.sender == me && (
+                (!queued.localId.isNullOrBlank() && row.localTempId == queued.localId) ||
+                    (row.body == queued.body && kotlin.math.abs(row.atMs - queued.createdAtMs) < 5_000L)
+            )
+        }
 
     fun getCachedPartyMessages(partyId: String): List<SocialMessage> {
         val list = broadcastPartyMessages[partyId] ?: return emptyList()
@@ -3776,6 +3845,7 @@ object SocialBackend {
         val hosting = parties.firstOrNull { it.hostId == userId && !it.isExpired() }
         val baseStatus = activeGameStatusLine
             ?: hosting?.let { "In party: ${it.title}" }
+            ?: launcherActivityLine
             ?: myCustomStatus
             ?: myProfile?.statusText
         val wireStatus = SocialPresenceCodec.encodeForWire(eff, baseStatus)

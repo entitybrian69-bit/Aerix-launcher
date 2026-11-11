@@ -3,9 +3,7 @@ package net.kdt.pojavlaunch.aerix.client
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.graphics.Canvas
 import android.graphics.Color as AndroidColor
-import android.graphics.Paint
 import net.kdt.pojavlaunch.aerix.social.SocialBackend
 import net.kdt.pojavlaunch.instances.Instances
 import java.io.ByteArrayOutputStream
@@ -52,7 +50,6 @@ data class ClientCapeSpec(
 }
 
 object AerixClientCosmetics {
-
     const val OWNER_EMAIL = "entitybrian69@gmail.com"
     const val CO_OWNER_EMAIL = "kushaladhikari982648@gmail.com"
 
@@ -210,6 +207,17 @@ object AerixClientCosmetics {
         return capes.first()
     }
 
+    private fun resolveImportedCapeBytes(): ByteArray? = runCatching {
+        val account = net.kdt.pojavlaunch.aerix.bridge.PojavAccountBridge.current ?: return@runCatching null
+        val file = net.kdt.pojavlaunch.aerix.bridge.PojavAccountBridge.customCapeFile(account.source)
+        if (!file.isFile || file.length() <= 0L) return@runCatching null
+        val bytes = file.readBytes()
+        val decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return@runCatching null
+        val valid = decoded.width in 22..1024 && decoded.height in 17..1024
+        decoded.recycle()
+        bytes.takeIf { valid }
+    }.getOrNull()
+
     /**
      * Generates a genuine `64×32` Minecraft Cape + Elytra PNG byte array served by `AerixSkinServer`:
      * - Front/Back/Sides Cape UV: `(0..21, 0..16)` (Front visible face = `1..10, 1..16`)
@@ -217,8 +225,11 @@ object AerixClientCosmetics {
      */
     fun resolveInGameCapeBytes(context: Context): ByteArray? = runCatching {
         AerixClientStore.init(context)
-        val spec = effectiveCapeSpec()
-        val bmp = buildAnimatedCapeFrameBitmap(spec, frameIndex = 0, totalFrames = 12)
+        if (AerixClientStore.equippedCapeId == "custom") {
+            resolveImportedCapeBytes()?.let { return@runCatching it }
+        }
+
+        val bmp = buildAnimatedCapeFrameBitmap(effectiveCapeSpec(), frameIndex = 0, totalFrames = 12)
         ByteArrayOutputStream().use { out ->
             bmp.compress(Bitmap.CompressFormat.PNG, 100, out)
             out.toByteArray()
@@ -230,26 +241,36 @@ object AerixClientCosmetics {
      * into `<instanceGameDir>/config/aerix_cape_frames/` and syncs `<instanceGameDir>/config/waveycapes.json`
      * so `AerixClientMod` + `WaveyCapes` animate AND wave the cape live in-game!
      */
+    /** Last outcome of [syncCapeAssetsToInstance], shown in the Client menu so a silent failure
+     *  cannot hide behind a switch that looks enabled. */
+    @Volatile
+    @JvmStatic
+    var lastCapeSyncStatus: String = "Not synced in this session"
+        private set
+
     fun syncCapeAssetsToInstance(context: Context, instanceGameDir: File) {
         runCatching {
             AerixClientStore.init(context)
             val spec = effectiveCapeSpec()
+            val importedCape = if (AerixClientStore.equippedCapeId == "custom") resolveImportedCapeBytes() else null
             val configDir = File(instanceGameDir, "config").apply { mkdirs() }
             val framesDir = File(configDir, "aerix_cape_frames").apply { mkdirs() }
 
             val total = 12
             for (i in 0 until total) {
-                val bmp = buildAnimatedCapeFrameBitmap(spec, frameIndex = i, totalFrames = total)
                 val outFile = File(framesDir, String.format(java.util.Locale.ROOT, "frame_%02d.png", i))
-                FileOutputStream(outFile).use { fos ->
-                    bmp.compress(Bitmap.CompressFormat.PNG, 100, fos)
+                if (importedCape != null) {
+                    FileOutputStream(outFile).use { it.write(importedCape) }
+                } else {
+                    val bmp = buildAnimatedCapeFrameBitmap(spec, frameIndex = i, totalFrames = total)
+                    FileOutputStream(outFile).use { fos -> bmp.compress(Bitmap.CompressFormat.PNG, 100, fos) }
                 }
             }
             val now = System.currentTimeMillis()
             val metaFile = File(framesDir, "meta.properties")
             metaFile.writeText(
                 buildString {
-                    appendLine("capeId=${spec.id}")
+                    appendLine("capeId=${if (importedCape != null) "custom" else spec.id}")
                     appendLine("frames=$total")
                     appendLine("waving=${AerixClientStore.wavingCapeEnabled}")
                     appendLine("updatedAtMs=$now")
@@ -273,6 +294,13 @@ object AerixClientCosmetics {
             val waveyFile = File(configDir, "waveycapes.json")
             waveyFile.writeText(waveyJson)
             waveyFile.setLastModified(now)
+            val bytes = framesDir.listFiles()?.sumOf { it.length() } ?: 0L
+            lastCapeSyncStatus = "Wrote $total frames (${bytes} B) for " +
+                "${if (importedCape != null) "your imported cape" else spec.id} into ${framesDir.name}; " +
+                "bridge mod: ${AerixClientModBridge.lastStatus}"
+        }.onFailure { error ->
+            lastCapeSyncStatus = "Could not write cape frames: ${error.message ?: error.javaClass.simpleName}"
+            android.util.Log.w("AerixCapes", "Cape frame sync failed", error)
         }
     }
 
@@ -280,7 +308,7 @@ object AerixClientCosmetics {
         runCatching {
             val all = Instances.loadAllInstances()
             for (inst in all) {
-                if (inst.isAerixClient || inst.name?.startsWith("Aerix Client", ignoreCase = true) == true) {
+                if (AerixClientInstaller.isManagedInstance(inst)) {
                     inst.gameDirectory?.let { syncCapeAssetsToInstance(context, it) }
                 }
             }
@@ -395,25 +423,6 @@ object AerixClientCosmetics {
             }
         }
         return bmp
-    }
-
-    /**
-     * Preserved hook for `AerixSkinServer.kt`; returns [existingSkinPng] untouched when no hat is equipped.
-     */
-    fun applyHatAccessoryToSkin(
-        context: Context,
-        existingSkinPng: ByteArray?,
-        @Suppress("UNUSED_PARAMETER") slim: Boolean
-    ): ByteArray? {
-        AerixClientStore.init(context)
-        if (AerixClientStore.equippedHatId == "none" || existingSkinPng == null) return existingSkinPng
-        val decoded = BitmapFactory.decodeByteArray(existingSkinPng, 0, existingSkinPng.size) ?: return existingSkinPng
-        val copy = Bitmap.createBitmap(64, 64, Bitmap.Config.ARGB_8888)
-        Canvas(copy).drawBitmap(decoded, 0f, 0f, Paint().apply { isFilterBitmap = false })
-        return ByteArrayOutputStream().use { out ->
-            copy.compress(Bitmap.CompressFormat.PNG, 100, out)
-            out.toByteArray()
-        }
     }
 
     fun buildCapeAndElytraBitmap(spec: ClientCapeSpec): Bitmap {

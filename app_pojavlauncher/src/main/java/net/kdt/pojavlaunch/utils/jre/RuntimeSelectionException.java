@@ -35,11 +35,18 @@ public class RuntimeSelectionException extends Exception implements ContextExecu
             case RUNTIME_STATE_SELECTION_FAILED: msgString = R.string.multirt_nocompatiblert; break;
             default: throw new RuntimeException("Unknown runtime state");
         }
-        builder.setMessage(activity.getString(msgString, mRuntimeVersion));
+        String message = activity.getString(msgString, mRuntimeVersion);
+        builder.setMessage(message);
         builder.setPositiveButton(android.R.string.ok, (d,i)->{});
         if(mRuntimeState == RUNTIME_STATE_INSTALLATION_FAILED || getCause() != null) {
+            // The install-failed state offers "Show more" even when nothing was attached as the cause, so
+            // the detail dialog is handed this dialog's own message as its text and the cause only as the
+            // trace behind "Show less". Passing the absent cause straight through used to read getMessage()
+            // off a null inside Tools.showError, which crashed the very dialog the user tapped to find out
+            // why the runtime did not install.
             builder.setNegativeButton(R.string.error_show_more, (d, i)->
-                    Tools.showError(activity, R.string.runtime_error_title, getCause(), activity instanceof ShowErrorActivity)
+                    Tools.showError(activity, R.string.runtime_error_title, message, getCause(),
+                            activity instanceof ShowErrorActivity)
             );
         }
         ShowErrorActivity.installRemoteDialogHandling(activity, builder);

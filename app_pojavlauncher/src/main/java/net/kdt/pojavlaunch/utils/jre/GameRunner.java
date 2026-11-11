@@ -385,10 +385,10 @@ public class GameRunner {
         FileUtils.ensureDirectory(lwjglExtractDir);
         javaArgList.add("-Dorg.lwjgl.system.SharedLibraryExtractPath="+lwjglExtractDir.getAbsolutePath());
 
-        // The skin chosen in the wardrobe only reaches the game this way: the game reads its own
-        // profile from the session service, so the launcher serves that profile (with the skin,
-        // cape and arm model) from a loopback endpoint and points the shipped authlib-injector at
-        // it. Without an equipped skin this adds nothing and the launch is unchanged.
+        // The account's skin and cape only reach the game this way: the game reads its own profile
+        // from the session service, so the launcher serves that profile (with the skin, cape and arm
+        // model) from a loopback endpoint and points the shipped authlib-injector at it. With nothing
+        // equipped this adds nothing and the launch is unchanged.
         javaArgList.addAll(AerixSkinServer.launchArguments(activity, account));
         addAuthlibInjectorArgs(javaArgList, account);
 
@@ -446,10 +446,20 @@ public class GameRunner {
             }
         }
 
-        final int launchMemoryMb = InstanceMemory.effectiveMb(instance.jvmArgs, LauncherPreferences.PREF_RAM_ALLOCATION);
+        final int requestedMemoryMb = InstanceMemory.effectiveMb(instance.jvmArgs, LauncherPreferences.PREF_RAM_ALLOCATION);
+        // A heap the device cannot honour is worse than a smaller one: the launcher process, the GL
+        // driver and Android are all still in this memory. Clamp, and say so - the old toast just
+        // announced whatever the slider had been dragged to.
+        final int launchMemoryMb = LaunchMemory.clamp(activity, requestedMemoryMb);
+        final int deviceRamMb = net.kdt.pojavlaunch.Tools.getTotalDeviceMemory(activity);
+        final boolean clamped = launchMemoryMb != requestedMemoryMb;
         Logger.appendToLog("Java heap allocation: " + launchMemoryMb + " MB" +
-                (InstanceMemory.overrideMb(instance.jvmArgs) > 0 ? " (instance override)" : " (launcher default)") + "\n");
-        activity.runOnUiThread(() -> Toast.makeText(activity, activity.getString(R.string.autoram_info_msg, launchMemoryMb), Toast.LENGTH_SHORT).show());
+                (InstanceMemory.overrideMb(instance.jvmArgs) > 0 ? " (instance override)" : " (launcher default)") +
+                (clamped ? " (reduced from " + requestedMemoryMb + " MB; device has " + deviceRamMb
+                        + " MB total and needs room for the renderer)" : "") + "\n");
+        activity.runOnUiThread(() -> Toast.makeText(activity, activity.getString(
+                clamped ? R.string.autoram_capped_msg : R.string.autoram_info_msg,
+                launchMemoryMb, deviceRamMb), Toast.LENGTH_LONG).show());
 
         Log.i("GameRunner", "Starting Minecraft");
 

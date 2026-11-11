@@ -59,6 +59,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -113,6 +114,24 @@ import net.kdt.pojavlaunch.aerix.ui.AerixNav
 import java.net.HttpURLConnection
 import java.net.URL
 
+/** One-shot entry request used by the Home profile shortcut. */
+object SocialsNavigation {
+    private var openMyProfileOnNextEntry: Boolean = false
+    var profileRequestVersion by mutableIntStateOf(0)
+        private set
+
+    fun requestMyProfile() {
+        openMyProfileOnNextEntry = true
+        profileRequestVersion++
+    }
+
+    fun consumeMyProfileRequest(): Boolean {
+        val requested = openMyProfileOnNextEntry
+        openMyProfileOnNextEntry = false
+        return requested
+    }
+}
+
 private enum class SocialTab(val label: String) {
     FRIENDS("Friends"),
     MESSAGES("Messages"),
@@ -148,6 +167,15 @@ fun SocialsScreen(activity: FragmentActivity, onExit: () -> Unit = {}) {
     var profileUser by remember { mutableStateOf<String?>(null) }
     var statusDialogOpen by remember { mutableStateOf(false) }
     val signedIn = SocialBackend.signedIn
+
+    LaunchedEffect(SocialsNavigation.profileRequestVersion) {
+        if (SocialsNavigation.consumeMyProfileRequest()) {
+            activeDmFriendId = null
+            activePartyChatId = null
+            profileUser = null
+            profileOpen = true
+        }
+    }
     val motion = ThemeMotion.rememberEnabled()
 
     if (statusDialogOpen && signedIn) {

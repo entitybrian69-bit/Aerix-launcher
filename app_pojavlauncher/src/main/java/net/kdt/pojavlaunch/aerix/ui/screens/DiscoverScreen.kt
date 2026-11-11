@@ -8,7 +8,7 @@
  *   MiraiLauncher/src/main/java/com/movtery/zalithlauncher/ui/screens/content/download/assets/elements/DownloadAssetsElements.kt
  * Top pill bar (Modpacks, Mods, Resource Packs, Shaders, Worlds, Install Vanilla, Favorites),
  * filter bar (Search..., Modrinth/CurseForge dropdown, Category dropdown, MC version dropdown,
- * Loader dropdown, Sort dropdown), 3-column ResultProjectLayout cards with Installed/Install button
+ * Loader dropdown), big search field + scrollable filter pills, 3-column ResultProjectLayout cards
  * and Favorite toggle, floating PageController ("1 / N  <  >"), and the in-page project detail
  * view with hero card, screenshots carousel between the hero and the grouped version list, and
  * project links rail.
@@ -30,6 +30,7 @@
 
 package net.kdt.pojavlaunch.aerix.ui.screens
 
+import net.kdt.pojavlaunch.aerix.ui.aerixLauncherActivity
 import android.graphics.BitmapFactory
 import android.text.format.Formatter
 import android.util.LruCache
@@ -129,7 +130,6 @@ import net.kdt.pojavlaunch.aerix.bridge.AssetProject
 import net.kdt.pojavlaunch.aerix.bridge.AssetProjectDetails
 import net.kdt.pojavlaunch.aerix.bridge.AssetScreenshot
 import net.kdt.pojavlaunch.aerix.bridge.AssetTarget
-import net.kdt.pojavlaunch.aerix.bridge.AssetSort
 import net.kdt.pojavlaunch.aerix.bridge.AssetType
 import net.kdt.pojavlaunch.aerix.bridge.InstanceTarget
 import net.kdt.pojavlaunch.aerix.bridge.PojavAssetBridge
@@ -149,6 +149,7 @@ import net.kdt.pojavlaunch.aerix.theme.AerixSurface
 import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
 import net.kdt.pojavlaunch.aerix.ui.AerixNav
 import net.kdt.pojavlaunch.aerix.ui.LauncherSection
+import net.kdt.pojavlaunch.aerix.social.SocialActivity
 import net.kdt.pojavlaunch.utils.DownloadUtils
 import java.io.ByteArrayOutputStream
 
@@ -203,6 +204,11 @@ private val commonMcVersions = listOf(
     "1.19.4", "1.19.2",
     "1.18.2", "1.17.1", "1.16.5", "1.12.2", "1.8.9", "1.7.10"
 )
+
+/** "fabric" reads "Fabric" in the note that explains a search that had to drop a filter. */
+private fun loaderLabel(loader: String?): String = loader?.let { id ->
+    filterLoaders.firstOrNull { it.first == id }?.second ?: id.replaceFirstChar { it.uppercase() }
+} ?: "any loader"
 
 private val filterLoaders = listOf(
     "fabric" to "Fabric",
@@ -269,6 +275,13 @@ fun DiscoverScreen(activity: FragmentActivity, navigate: (LauncherSection) -> Un
         activeProject = null
         returnToReleases = false
         AerixDownloadRequest.type = null
+    }
+
+    // The friends list reads this: which mod or pack the player is actually looking at. Only the
+    // detail card is named - a list of thirty cards is not "browsing something" yet.
+    LaunchedEffect(activeProject) {
+        val project = activeProject
+        if (project != null) SocialActivity.reading(project) else SocialActivity.idle()
     }
 
     BackHandler(enabled = activeProject != null, onBack = closeDetail)
@@ -366,8 +379,10 @@ private fun SearchAssetsContent(
     var selectedCategories by rememberSaveable(type) { mutableStateOf(arrayListOf<String>()) }
     val resultsState = rememberLazyListState()
     var mcVersion by rememberSaveable(type) { mutableStateOf<String?>(null) }
+    // The search is an activity: "Hunting for modpack: fabric optimization" is what a friend sees
+    // while the results are still being scrolled through.
+    aerixLauncherActivity(if (query.isBlank()) null else "Hunting for ${if (type.name == "MODPACK") "modpack" else "mod"}: ${query.trim().take(34)}")
     var loader by rememberSaveable(type) { mutableStateOf<String?>(null) }
-    var sort by rememberSaveable(type) { mutableStateOf(AssetSort.RELEVANCE) }
     var pageIndex by rememberSaveable(type) { mutableIntStateOf(1) }
 
     var page by remember { mutableStateOf<AssetPage?>(null) }
@@ -375,6 +390,12 @@ private fun SearchAssetsContent(
     var failed by remember { mutableStateOf(false) }
     var reloadNonce by remember { mutableIntStateOf(0) }
     var installedFingerprints by remember { mutableStateOf<Set<String>>(emptySet()) }
+    // Set when a filtered search came back empty and had to be asked again with less on it: the
+    // rows below then say so, rather than pretending they all match the pills above.
+    var relaxedNote by remember { mutableStateOf<String?>(null) }
+    // The version and loader of the instance the player is on, used until a pill is touched.
+    var followsInstance by rememberSaveable(type) { mutableStateOf(true) }
+    var showFollowMenu by remember { mutableStateOf(false) }
 
     // The filters of the source: every Minecraft version it knows, and the categories of the
     // content type as that source names them. They follow the platform switch, because the two
@@ -402,16 +423,28 @@ private fun SearchAssetsContent(
         installedFingerprints = PojavAssetBridge.installedFingerprints(type)
     }
 
+    // Searching for a pack or a mod while an instance is selected is a search *for that instance*,
+    // so its version and loader are the filters to start with: "Fabric 1.21.4" instead of
+    // everything, which is what made a pack for the client the player picked hard to find. The
+    // player's own choice wins the moment a pill is touched - that turns following off.
+    LaunchedEffect(type, followsInstance, selectedInstance?.source) {
+        if (!followsInstance || !type.supportsLoaderFilter) return@LaunchedEffect
+        val target = PojavAssetBridge.instanceTarget()
+        mcVersion = target.mcVersion
+        loader = filterLoaders.firstOrNull { it.first == target.loader?.lowercase() }?.first
+        pageIndex = 1
+    }
+
     LaunchedEffect(type, platform) {
         facets = AssetFacets()
         facets = PojavAssetBridge.facets(context, platform, type)
     }
 
-    LaunchedEffect(type, platform, submittedQuery, selectedCategories, mcVersion, loader, sort, pageIndex, reloadNonce) {
+    LaunchedEffect(type, platform, submittedQuery, selectedCategories, mcVersion, loader, pageIndex, reloadNonce) {
         loading = true
         failed = false
         val offset = (pageIndex - 1).coerceAtLeast(0) * PojavAssetBridge.PAGE_SIZE
-        val result = PojavAssetBridge.search(
+        val result = PojavAssetBridge.searchFollowing(
             context = context,
             platform = platform,
             type = type,
@@ -419,11 +452,19 @@ private fun SearchAssetsContent(
             mcVersion = mcVersion,
             loader = if (type.supportsLoaderFilter) loader else null,
             offset = offset,
-            categories = selectedCategories,
-            sort = sort
+            categories = selectedCategories
         )
-        page = result
-        failed = result == null
+        page = result.page
+        failed = result.page == null
+        relaxedNote = when {
+            result.relaxedLoader && result.relaxedVersion ->
+                "Nothing is tagged ${loaderLabel(loader)} for ${mcVersion ?: "this version"} - " +
+                    "showing every loader and every version, so check each card."
+            result.relaxedLoader ->
+                "Nothing is tagged ${loaderLabel(loader)} - showing every loader for " +
+                    "${mcVersion ?: "every version"}."
+            else -> null
+        }
         loading = false
     }
 
@@ -433,88 +474,92 @@ private fun SearchAssetsContent(
     var showCategoryPicker by remember { mutableStateOf(false) }
     var showVersionPicker by remember { mutableStateOf(false) }
     var showLoaderMenu by remember { mutableStateOf(false) }
-    var showSortMenu by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
     ) {
-        // Compact Horizontal Search & Filter Bar (Mirai SearchAssetsScreen.kt lines 357-609)
+        // The search field is the primary control on this screen, so it gets a full-width row of
+        // its own at touch-field height instead of sharing a cramped strip with the filter pills.
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(58.dp)
+                .clip(RoundedCornerShape(AerixRadii.control))
+                .background(AerixSurface.panelRaised)
+                .border(AerixSpacing.hairline, AerixSurface.borderSoft, RoundedCornerShape(AerixRadii.control))
+                .padding(horizontal = AerixSpacing.md),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(AerixSpacing.smCompact)
+            horizontalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
         ) {
-            // Search Box
-            Row(
+            Icon(
+                painter = painterResource(R.drawable.aerix_ic_search),
+                contentDescription = null,
+                tint = AerixSurface.textSecondary,
                 modifier = Modifier
-                    .weight(1f)
-                    .height(36.dp)
-                    .clip(RoundedCornerShape(AerixRadii.controlSmall))
-                    .background(AerixSurface.panelRaised)
-                    .border(AerixSpacing.hairline, AerixSurface.borderSoft, RoundedCornerShape(AerixRadii.controlSmall))
-                    .padding(horizontal = AerixSpacing.smPlus),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(AerixSpacing.smCompact)
+                    .size(22.dp)
+                    .clickable {
+                        pageIndex = 1
+                        submittedQuery = query
+                    }
+            )
+            Box(
+                modifier = Modifier.weight(1f),
+                contentAlignment = Alignment.CenterStart
             ) {
+                if (query.isEmpty()) {
+                    Text(
+                        text = "Search mods, packs, shaders...",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Normal,
+                        color = AerixSurface.textMuted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                BasicTextField(
+                    value = query,
+                    onValueChange = {
+                        query = it
+                        pageIndex = 1
+                        submittedQuery = it
+                    },
+                    singleLine = true,
+                    textStyle = TextStyle(color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Medium),
+                    cursorBrush = SolidColor(AerixThemeManager.currentAccent()),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = {
+                        pageIndex = 1
+                        submittedQuery = query
+                    }),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+            if (query.isNotEmpty()) {
                 Icon(
-                    painter = painterResource(R.drawable.aerix_ic_search),
+                    painter = painterResource(R.drawable.aerix_ic_close),
                     contentDescription = null,
                     tint = AerixSurface.textSecondary,
                     modifier = Modifier
-                        .size(16.dp)
+                        .size(20.dp)
                         .clickable {
+                            query = ""
+                            submittedQuery = ""
                             pageIndex = 1
-                            submittedQuery = query
                         }
                 )
-                Box(
-                    modifier = Modifier.weight(1f),
-                    contentAlignment = Alignment.CenterStart
-                ) {
-                    if (query.isEmpty()) {
-                        Text(
-                            text = "Search...",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = AerixSurface.textMuted,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                    BasicTextField(
-                        value = query,
-                        onValueChange = {
-                            query = it
-                            pageIndex = 1
-                            submittedQuery = it
-                        },
-                        singleLine = true,
-                        textStyle = TextStyle(color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium),
-                        cursorBrush = SolidColor(AerixThemeManager.currentAccent()),
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                        keyboardActions = KeyboardActions(onSearch = {
-                            pageIndex = 1
-                            submittedQuery = query
-                        }),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-                if (query.isNotEmpty()) {
-                    Icon(
-                        painter = painterResource(R.drawable.aerix_ic_close),
-                        contentDescription = null,
-                        tint = AerixSurface.textSecondary,
-                        modifier = Modifier
-                            .size(15.dp)
-                            .clickable {
-                                query = ""
-                                submittedQuery = ""
-                                pageIndex = 1
-                            }
-                    )
-                }
             }
+        }
 
+        // Filter pills, in a scrollable strip under the search field. Sorting is not offered:
+        // results follow the query, so there is no sort control to tune first.
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(AerixSpacing.smCompact)
+        ) {
             // Platform Dropdown Pill (Modrinth / CurseForge)
             Box {
                 DiscoverFilterDropdownPill(
@@ -559,6 +604,41 @@ private fun SearchAssetsContent(
                 onClick = { showVersionPicker = true }
             )
 
+            // Which filters belong to the instance, and the way out of them. Following is a switch
+            // rather than a filter of its own: it decides what the two pills beside it start at.
+            if (type.supportsLoaderFilter) {
+                Box {
+                    DiscoverFilterDropdownPill(
+                        label = if (followsInstance)
+                            "Instance: ${selectedInstance?.name?.take(18) ?: "selected"}"
+                        else "Filters: manual",
+                        onClick = { showFollowMenu = true }
+                    )
+                    DropdownMenu(
+                        expanded = showFollowMenu,
+                        onDismissRequest = { showFollowMenu = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Follow this instance") },
+                            onClick = {
+                                showFollowMenu = false
+                                followsInstance = true
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Search every instance") },
+                            onClick = {
+                                showFollowMenu = false
+                                followsInstance = false
+                                loader = null
+                                mcVersion = null
+                                pageIndex = 1
+                            }
+                        )
+                    }
+                }
+            }
+
             // Loader Dropdown Pill ("Loader: All ▾")
             if (type.supportsLoaderFilter) {
                 Box {
@@ -575,6 +655,7 @@ private fun SearchAssetsContent(
                             text = { Text("All Loaders") },
                             onClick = {
                                 showLoaderMenu = false
+                                followsInstance = false
                                 loader = null
                                 pageIndex = 1
                             }
@@ -584,6 +665,7 @@ private fun SearchAssetsContent(
                                 text = { Text(label) },
                                 onClick = {
                                     showLoaderMenu = false
+                                    followsInstance = false
                                     loader = id
                                     pageIndex = 1
                                 }
@@ -593,28 +675,6 @@ private fun SearchAssetsContent(
                 }
             }
 
-            // Sort Dropdown Pill ("Sort: Relevance ▾")
-            Box {
-                DiscoverFilterDropdownPill(
-                    label = "Sort: ${sort.label}",
-                    onClick = { showSortMenu = true }
-                )
-                DropdownMenu(
-                    expanded = showSortMenu,
-                    onDismissRequest = { showSortMenu = false }
-                ) {
-                    AssetSort.entries.forEach { s ->
-                        DropdownMenuItem(
-                            text = { Text(s.label) },
-                            onClick = {
-                                showSortMenu = false
-                                sort = s
-                                pageIndex = 1
-                            }
-                        )
-                    }
-                }
-            }
         }
 
         // Outside the scrolling pill row, because a dialog is a window of its own.
@@ -626,6 +686,8 @@ private fun SearchAssetsContent(
                 selectedId = mcVersion,
                 onPick = {
                     mcVersion = it
+                    // Touching the version pill is the player speaking for the instance.
+                    followsInstance = false
                     pageIndex = 1
                     showVersionPicker = false
                 },
@@ -649,6 +711,28 @@ private fun SearchAssetsContent(
                 },
                 onDismiss = { showCategoryPicker = false }
             )
+        }
+
+        // Why the rows below are not all tagged for the pills above, said out loud: a Forge pack on
+        // a Fabric screen is worse than an honest empty list, so the note has to be visible.
+        relaxedNote?.let { note ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(AerixRadii.controlSmall))
+                    .background(AerixSurface.panelRaised)
+                    .padding(horizontal = AerixSpacing.smPlus, vertical = AerixSpacing.xs),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(AerixSpacing.xs)
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.aerix_ic_info_outlined),
+                    contentDescription = null,
+                    tint = AerixSurface.textSecondary,
+                    modifier = Modifier.size(16.dp)
+                )
+                Text(text = note, fontSize = 12.sp, color = AerixSurface.textSecondary)
+            }
         }
 
         // Results area
@@ -1086,6 +1170,7 @@ private fun AssetDetailContent(
     val scope = rememberCoroutineScope()
     val accent = AerixThemeManager.currentAccent()
 
+    aerixLauncherActivity("Reading ${project.title.take(38)}")
     var details by remember(project.id) { mutableStateOf<AssetProjectDetails?>(null) }
     var files by remember(project.id) { mutableStateOf<List<AssetFile>?>(null) }
     var target by remember { mutableStateOf(InstanceTarget(null, null)) }

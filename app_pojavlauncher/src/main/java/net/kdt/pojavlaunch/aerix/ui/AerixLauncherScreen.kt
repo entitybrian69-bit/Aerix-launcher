@@ -93,6 +93,8 @@ import net.kdt.pojavlaunch.aerix.ui.screens.DiscoverScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.FileManagerScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.HomeScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.InstanceEditorScreen
+import net.kdt.pojavlaunch.aerix.ui.screens.InstanceSelectorScreen
+import net.kdt.pojavlaunch.aerix.ui.screens.QuickToolsScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.LibraryScreen
 import net.kdt.pojavlaunch.aerix.bridge.AerixInstallQueue
 import net.kdt.pojavlaunch.aerix.ui.screens.AerixInstallPanel
@@ -102,6 +104,7 @@ import net.kdt.pojavlaunch.aerix.ui.screens.OfflineAccountScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.SettingsScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.ServersScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.SocialsScreen
+import net.kdt.pojavlaunch.aerix.ui.screens.SocialsNavigation
 import net.kdt.pojavlaunch.aerix.ui.screens.WallpapersScreen
 
 @Composable
@@ -180,8 +183,8 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
         // itself stays clear of the camera cutout and of the system bars.
         Box(modifier = Modifier.fillMaxSize().padding(AerixWindowInsets.padding())) {
             Row(modifier = Modifier.fillMaxSize()) {
-                // The social space has its own sidebar and takes the whole window; every other
-                // section keeps the launcher's rail.
+                // Socials has its own navigation. The utility rail at the far right stays in the
+                // shell for every destination.
                 if (section != LauncherSection.SOCIALS) {
                     AerixNavigationRail(
                         selectedSection = section,
@@ -202,6 +205,8 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
                         when (target) {
                             LauncherSection.OTHER_RELEASES -> net.kdt.pojavlaunch.aerix.ui.screens.OtherReleasesScreen(activity, navigate)
                             LauncherSection.HOME -> HomeScreen(activity, navigate)
+                            LauncherSection.QUICK_TOOLS -> QuickToolsScreen(activity, navigate)
+                            LauncherSection.INSTANCE_SELECTOR -> InstanceSelectorScreen(activity, navigate)
                             LauncherSection.AERIX_CLIENT -> ClientHubScreen(activity, clientOwnerPage) { clientOwnerPage = it }
                             LauncherSection.LIBRARY -> LibraryScreen(activity)
                             LauncherSection.SERVERS -> ServersScreen(activity)
@@ -264,6 +269,18 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
                         )
                     }
                 }
+                // Keep Home's utility shortcuts pinned to the launcher shell so they remain
+                // available while any destination from this rail is open.
+                AerixHomeUtilityRail(
+                    selectedSection = section,
+                    onNavigate = navigate,
+                    onOpenProfile = {
+                        SocialsNavigation.requestMyProfile()
+                        navigate(LauncherSection.SOCIALS)
+                    },
+                    onQuickTools = { navigate(LauncherSection.QUICK_TOOLS) },
+                    onInstances = { navigate(LauncherSection.INSTANCE_SELECTOR) }
+                )
             }
 
             FestivalTitleText(
