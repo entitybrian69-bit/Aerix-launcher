@@ -34,6 +34,14 @@ object FakeScreen {
     /** Whether this emulated Activity has a display at all. */
     var hasDisplay: Boolean = true
 
+    /**
+     * Whether a Context that is *not* associated with a display is answered with a throw. That is what
+     * Android 11+ does - `Context.getDisplay()` raises `UnsupportedOperationException` rather than
+     * returning null for the Application context - and it is the behaviour that crashed the launcher
+     * while `LauncherPreferences.loadPreferences` was still running inside `Application.onCreate`.
+     */
+    var refusesDisplaylessContext: Boolean = true
+
     fun reset() {
         modes = emptyList()
         current = null
@@ -44,6 +52,7 @@ object FakeScreen {
         writtenFrameRateCategory = null
         logs.clear()
         hasDisplay = true
+        refusesDisplaylessContext = true
     }
 
     /** A 1080x2400 panel offering 60/90/120 as separate modes, sitting on the 60Hz entry. */

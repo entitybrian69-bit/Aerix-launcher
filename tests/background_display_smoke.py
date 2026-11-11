@@ -111,6 +111,29 @@ def run_checks() -> list[str]:
     check("surfaceDisplay != null" in surface,
           "GameView must ask the surface's display for a rate only when it answered")
 
+    # 7. the crash has to stay reproducible in CI, not just grepped: the Kotlin harness compiles the real
+    #    DisplayRefreshMode against stub android classes, so the stub must model the refusing context.
+    stub_dir = ROOT / "tests/refresh_display_stubs"
+    stubs = "\n".join(path.read_text() for path in sorted(stub_dir.glob("*.kt")))
+    harness = (ROOT / "tests/DisplayRefreshModeAndroidTest.kt").read_text()
+    check("UnsupportedOperationException" in stubs,
+          "the display stubs must model Android answering a display-less Context with a throw, the way "
+          "API 30+ does - that is the crash, and without it the harness proves nothing about it")
+    check("android.hardware.display.DisplayManager" in stubs or "package android.hardware.display" in stubs,
+          "the stubs must include a DisplayManager, or the fallback the fix depends on is untested")
+    check("associatedWithDisplay" in stubs,
+          "the Context stub has to distinguish a visual context from one tied to no window")
+    check("refusesDisplaylessContext" in stubs,
+          "FakeScreen must be able to emulate the refusing platform and the answering one")
+    check("refusesDisplaylessContext = false" in harness,
+          "the harness must also cover a platform that answers null instead of throwing")
+    check("override val associatedWithDisplay: Boolean get() = false" in harness,
+          "the harness must ask DisplayRefreshMode a question from a context like the Application's")
+    check("isAvailable(background)" in harness,
+          "the harness must assert the loadPreferences call site - isAvailable from a background context - "
+          "returns instead of escaping")
+
+
     return failures
 
 

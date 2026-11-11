@@ -127,5 +127,34 @@ fun main() {
     expect(!DisplayRefreshMode.applyTo(mute), "the game must not be told anything changed")
     expectEquals(DisplayRefreshMode.activeRefreshHz(mute), 0f, "an unreadable panel reads as 0")
 
+    // 9. The Application context - which is what `LauncherPreferences.loadPreferences` holds while
+    //    `Application.onCreate` is still running - is answered with a throw on Android 11+, not with
+    //    null. That throw took the launcher down before a single window existed (2.1.0 and 2.3.0, on
+    //    Android 13 among others), so the read path is required to come back answered through the
+    //    display service, or unanswered as "nothing", but never as an exception.
+    FakeScreen.reset(); FakeScreen.tripleRatePanel(); enable()
+    val background = object : android.content.Context() {
+        override val associatedWithDisplay: Boolean get() = false
+    }
+    expect(DisplayRefreshMode.isAvailable(background),
+        "a context Android refuses to answer must still be told a faster mode exists, via DisplayManager")
+    expectEquals(DisplayRefreshMode.ceilingRefreshHz(background), 120f,
+        "the ceiling of the default display must be readable from a background context")
+    expectEquals(DisplayRefreshMode.activeRefreshHz(background), 60f,
+        "and the live rate must read back, not throw")
+    expectEquals(DisplayRefreshMode.planFor(background)?.modeId, 3,
+        "a background context must be handed the same plan an Activity gets")
+    expect(FakeScreen.logs.none { it.contains("Exception") },
+        "falling back must not be reported as an exception")
+    // 10. when even the display service has no panel to name, the answer is "nothing available" - the
+    //     preference then simply defaults to off instead of the process dying over it.
+    FakeScreen.hasDisplay = false
+    expect(!DisplayRefreshMode.isAvailable(background), "an unanswerable device must read as nothing available")
+    expectEquals(DisplayRefreshMode.activeRefreshHz(background), 0f, "and as no rate, rather than a crash")
+    expectEquals(DisplayRefreshMode.ceilingRefreshHz(background), 0f, "and no ceiling")
+    // 11. a platform that answers null instead of throwing takes the same route, unchanged.
+    FakeScreen.reset(); FakeScreen.tripleRatePanel(); FakeScreen.refusesDisplaylessContext = false
+    expect(DisplayRefreshMode.isAvailable(background), "a null answer must fall through to the display service too")
+
     println("display refresh: $checks checks passed")
 }

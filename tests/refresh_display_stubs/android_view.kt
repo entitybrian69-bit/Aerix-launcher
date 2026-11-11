@@ -35,6 +35,11 @@ class Display {
          */
         @Suppress("unused") fun getId(): Int = spec.modeId
     }
+
+    companion object {
+        /** `Display.DEFAULT_DISPLAY` on the real SDK, which the background fallback asks for. */
+        const val DEFAULT_DISPLAY = 0
+    }
 }
 
 class WindowManager {
