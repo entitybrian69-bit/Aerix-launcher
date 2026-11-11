@@ -7,8 +7,8 @@ name: Release CI
 # A marked push has to touch this file to be seen at all, so each release cuts a
 # one line note here recording what it shipped.
 #
-# Last cut: v2.3.0 - the new app ID, one memory ceiling, the A menu that stays put,
-# a recording library, cursor fixes and the modpack version picker.
+# Last cut: v2.3.0 on 8 Nov 2026 - the new app ID, one memory ceiling, the A menu that
+# stays put, a recording library, cursor fixes and the modpack version picker.
 #
 # The publish job uploads the build artifacts after the build job succeeds.
 # Each edition goes up three times, named after version.properties:
