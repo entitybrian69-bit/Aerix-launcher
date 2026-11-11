@@ -32,8 +32,12 @@ workflow = (root / '.github/workflows/aerix-debug.yml').read_text()
 
 # The key is declared once, in the Kotlin object, and every other file points at it.
 assert f'const val PREF_KEY = "{KEY}"' in adapter, 'the preference key must live in DisplayRefreshMode'
-assert 'DEFAULT_PREF.getBoolean(DisplayRefreshMode.PREF_KEY,\n                DisplayRefreshMode.isAvailable(ctx))' in prefs, \
-    'PREF_MAX_REFRESH_RATE must be loaded from the shared key'
+# The default is asked while the Application is still being created, against a Context that has no
+# display of its own, so the loader goes through maxRefreshDefault rather than straight at Android: a
+# refusal there used to crash the launcher in onCreate (2.1.0 and 2.3.0, Android 11+).
+# tests/background_display_smoke.py pins the guard itself; this pins that the loader uses it.
+assert 'DEFAULT_PREF.getBoolean(DisplayRefreshMode.PREF_KEY,\n                maxRefreshDefault(ctx))' in prefs, \
+    'PREF_MAX_REFRESH_RATE must be loaded from the shared key, through the query that cannot throw'
 # The default used to be a flat false, which left a 90 or 120 Hz panel painting at 60 until someone\n# found the switch - and a player who did find it and still saw 60 had no way to tell that the\n# display, not the game, was the ceiling. It is now on exactly when a faster mode exists at the\n# current resolution, so a 60 Hz device is untouched while a fast one is asked, and the row that\n# reports the rate actually reached stays the source of truth.
 assert re.search(r'public static boolean PREF_MAX_REFRESH_RATE = false;', prefs), \
     'the field must exist with an explicit false default for the first read'

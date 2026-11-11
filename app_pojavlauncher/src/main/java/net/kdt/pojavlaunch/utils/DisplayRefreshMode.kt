@@ -3,6 +3,7 @@ package net.kdt.pojavlaunch.utils
 import android.app.Activity
 import android.content.Context
 import android.graphics.Point
+import android.hardware.display.DisplayManager
 import android.os.Build
 import android.view.Display
 import android.view.View
@@ -74,12 +75,32 @@ object DisplayRefreshMode {
         return runCatching { mode.refreshRate }.getOrDefault(0f)
     }
 
-    /** The display this context is on. `Context.getDisplay()` only exists on API 30+. */
-    private fun displayOf(context: Context): Display? =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) context.display else runCatching {
-            @Suppress("DEPRECATION")
-            (context.getSystemService(Context.WINDOW_SERVICE) as? WindowManager)?.defaultDisplay
+    /**
+     * The display this context is on, or null when the display cannot be named at all.
+     *
+     * `Context.getDisplay()` only exists on API 30+, and it does not return null for a context that has
+     * no display of its own - it throws `UnsupportedOperationException`. The Application context is such
+     * a context, and `LauncherPreferences.loadPreferences` asks this object whether a faster mode exists
+     * while `Application.onCreate` is still running, so an unguarded read crashed the launcher on every
+     * start on Android 13 before a single window existed. Hence: read it defensively, and fall back to
+     * `DisplayManager` with the default display, which a background context is allowed to name and which
+     * reports the same panel modes this question is about.
+     */
+    private fun displayOf(context: Context): Display? {
+        val fromContext = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            runCatching { context.display }.getOrNull()
+        } else {
+            runCatching {
+                @Suppress("DEPRECATION")
+                (context.getSystemService(Context.WINDOW_SERVICE) as? WindowManager)?.defaultDisplay
+            }.getOrNull()
+        }
+        if (fromContext != null) return fromContext
+        return runCatching {
+            (context.getSystemService(Context.DISPLAY_SERVICE) as? DisplayManager)
+                ?.getDisplay(Display.DEFAULT_DISPLAY)
         }.getOrNull()
+    }
 
     /**
      * The id WindowManager wants. Public as `Display.Mode.getModeId` from API 30; before that the

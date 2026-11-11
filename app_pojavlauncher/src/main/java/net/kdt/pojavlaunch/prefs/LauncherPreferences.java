@@ -142,7 +142,7 @@ public class LauncherPreferences {
         // exists at the current resolution, and DisplayRefreshMode reports whether the device
         // honoured it, so a 60 Hz panel is unaffected rather than being promised something it lacks.
         PREF_MAX_REFRESH_RATE = DEFAULT_PREF.getBoolean(DisplayRefreshMode.PREF_KEY,
-                DisplayRefreshMode.isAvailable(ctx));
+                maxRefreshDefault(ctx));
         PREF_VIRTUAL_MOUSE_START = DEFAULT_PREF.getBoolean("mouse_start", false);
         PREF_USE_ALTERNATE_SURFACE = DEFAULT_PREF.getBoolean("alternate_surface", isDevicePowerful);
         PREF_JAVA_SANDBOX = DEFAULT_PREF.getBoolean("java_sandbox", true);
@@ -226,6 +226,23 @@ public class LauncherPreferences {
      * @return The best default value found.
      */
     /** Mouse sensitivity percentages stay in a range the pointer can actually be used at. */
+    /**
+     * Whether this screen has a faster mode at its own resolution, which is what decides the default for
+     * the max-refresh-rate switch. The question is asked from Application.onCreate, against a Context
+     * that has no display of its own, and DisplayRefreshMode answers it through Android APIs an OEM ROM
+     * is free to refuse - so the answer is optional here. A launcher that cannot ask falls back to "off"
+     * and keeps working; one that lets the query escape takes the process down on every start, which is
+     * what 2.1.0 through 2.3.0 did to Android 11+ devices that hit that path.
+     */
+    private static boolean maxRefreshDefault(Context ctx) {
+        try {
+            return DisplayRefreshMode.isAvailable(ctx);
+        } catch (Throwable t) {
+            Log.w("LauncherPreferences", "max refresh rate default unavailable, leaving it off", t);
+            return false;
+        }
+    }
+
     private static int clampPercent(int percent) {
         if (percent <= 0) return 100;
         return Math.max(10, Math.min(400, percent));

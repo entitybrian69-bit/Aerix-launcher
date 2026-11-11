@@ -296,7 +296,15 @@ public class GameView extends FrameLayout implements PlatformGrabListener, Surfa
             Log.w("MGLSurface", "Attempt to refresh size on null surface");
             return;
         }
-        windowRate = mSurface.getDisplay().getRefreshRate();
+        // The surface belongs to us, its display belongs to the system. While a window is being torn
+        // down or re-attached - backgrounding the launcher, returning to it, a fold, a second screen -
+        // Surface.getDisplay() is allowed to answer null, and reading a rate off that would take the
+        // render surface down mid-resize. Keep the last rate the surface did report in that case.
+        android.view.Display surfaceDisplay = mSurface.getDisplay();
+        float reportedRate = surfaceDisplay != null ? surfaceDisplay.getRefreshRate() : 0f;
+        if (reportedRate > 0f) {
+            windowRate = reportedRate;
+        }
         MojoExec.setDisplayParams(windowWidth, windowHeight, windowRate);
         mSurfaceProvider.updateSize();
     }
