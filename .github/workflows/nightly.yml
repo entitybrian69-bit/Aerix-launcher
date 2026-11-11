@@ -1,7 +1,9 @@
-name: Nightly CI
+name: Nightly CI (legacy)
 
-# Publishes a prerelease on GitHub. Like Release CI, it needs the owner's
-# confirmation; testing builds come from aerix-debug.yml instead.
+# Superseded: Aerix Nightly, the only testing channel, is built and published by
+# aerix-debug.yml. This legacy workflow builds a different app
+# (net.kdt.pojavlaunch.pub) and its build/publish steps only run for the upstream
+# repository owner. Like Release CI, it needs the owner's confirmation.
 
 on:
   workflow_dispatch:

@@ -4,7 +4,7 @@ Everything here can be done from the phone browser. Nothing needs a computer.
 Total time: **about 25 minutes**. Do the steps in order; the later ones depend on the earlier ones.
 
 What you end up with: Google sign-in that works for every user of the launcher, a free database that
-holds profiles, friend lists and messages, and a debug APK on your phone that you can test in.
+holds profiles, friend lists and messages, and an Aerix Nightly APK on your phone that you can test in.
 
 ---
 
@@ -162,12 +162,12 @@ works with any email. Part 2 only adds the Google button on top.
 
 ## Part 4 — Testing each stage · ~5 minutes each
 
-> **Warning:** this testing build installs alongside the current release as
-> `net.al.aerixlauncher.debug`. Older Aerix builds used `net.kdt.pojavlaunch.debug`;
-> that is a separate app ID and will not be updated by this APK.
+> **Warning:** the testing build is **Aerix Nightly**, and it installs alongside the current release
+> as `net.al.aerixlauncher.debug`. Older Aerix debug builds used `net.kdt.pojavlaunch.debug`;
+> that is a separate app ID and is not updated by this APK.
 
 1. Tap the APK link I send →
-   `https://github.com/entitybrian69-bit/Aerix-launcher/releases/download/debug-latest/Aerix-Launcher-debug.apk`
+   `https://github.com/entitybrian69-bit/Aerix-launcher/releases/download/debug-latest/Aerix-Nightly.apk`
 2. When Android says this same-package app is already installed, choose **Update / Install anyway**. Do **not**
    uninstall your normal **Aerix Launcher**. An older debug app under `net.kdt.pojavlaunch.debug` is a
    different package; keep it until you have imported any data you need.
@@ -196,7 +196,7 @@ rail with its own while it is up.
 ## Part 5 — When we release 1.5.7
 
 Nothing changes for Google. The browser flow in Part 2 has no package name and no certificate
-fingerprint in it, so the release build signs in exactly like the debug one — same project, same
+fingerprint in it, so the release build signs in exactly like the Nightly one — same project, same
 client, same redirect. The only thing to do at release time is the normal signing ritual you already
 have.
 

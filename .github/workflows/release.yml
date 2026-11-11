@@ -7,7 +7,8 @@ name: Release CI
 # A marked push has to touch this file to be seen at all, so each release cuts a
 # one line note here recording what it shipped.
 #
-# Last cut: v2.1.0 - FastClient, world sharing and recorder improvements.
+# Last cut: v2.3.0 - the new app ID, one memory ceiling, the A menu that stays put,
+# a recording library, cursor fixes and the modpack version picker.
 #
 # The publish job uploads the build artifacts after the build job succeeds.
 # Each edition goes up three times, named after version.properties:
@@ -29,7 +30,7 @@ on:
   # build can be started by pushing a change to this file whose commit message carries the marker
   # below. Any other push only skips the job: the marker is the confirmation.
   push:
-    branches: [ "arena/98ca5d96-aerix-launcher" ]
+    branches: [ "arena/98ca5d96-aerix-launcher", "arena/1b7d7ded-aerix-launcher", "arena/993cdf6f-aerix-launcher", "v3_openjdk" ]
     paths: [ ".github/workflows/release.yml" ]
 
 permissions:
@@ -86,6 +87,7 @@ jobs:
         run: |
           python3 tests/branding_identity_smoke.py
           python3 tests/data_migration_smoke.py
+          python3 tests/nightly_channel_smoke.py
           python3 tests/social_profile_cosmetics_smoke.py
           python3 tests/client_background_smoke.py
           python3 tests/instance_renderer_smoke.py

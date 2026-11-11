@@ -199,6 +199,17 @@ android {
             resValue 'string', 'application_package', 'net.al.aerixlauncher.debug'
             resValue 'string', 'storageProviderAuthorities', 'net.al.aerixlauncher.scoped.gamefolder.debug'
         }
+        // Aerix Nightly is the testing channel. It keeps the debug applicationId, signing key and
+        // versionCode, so it installs over an existing debug build and behaves exactly like it.
+        // Only the launcher label changes.
+        nightly {
+            initWith debug
+            signingConfig signingConfigs.customDebug
+            matchingFallbacks += List.of("debug")
+            resValue "string", "app_name", "Aerix Nightly"
+            resValue "string", "app_short_name", "Aerix Nightly"
+            resValue "string", "aerix_app_label", "Aerix Nightly"
+        }
         proguard {
             initWith debug
             minifyEnabled true
@@ -278,6 +289,13 @@ android {
 
 androidComponents {
     onVariants(selector().withBuildType("debug")) { variant ->
+        variant.outputs.each { output ->
+            output.versionCode.set(AERIX_DEBUG_VERSION_CODE)
+        }
+    }
+    // Nightly shares the debug applicationId, so it needs the same monotonically increasing
+    // versionCode. Otherwise installing it over a debug build would be a downgrade.
+    onVariants(selector().withBuildType("nightly")) { variant ->
         variant.outputs.each { output ->
             output.versionCode.set(AERIX_DEBUG_VERSION_CODE)
         }
