@@ -258,6 +258,10 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
+          # Read it here rather than borrowing it from the step above: a step's shell variables die with
+          # its shell, and `set -u` is right to kill anything that pretends otherwise. This step failed a
+          # published release exactly that way, over a line whose only job was to report.
+          VERSION=$(sed -n 's/^versionName=//p' version.properties | tr -d '[:space:]')
           status=$(gh api "repos/$GITHUB_REPOSITORY/compare/v3_openjdk...$GITHUB_SHA" --jq .status 2>/dev/null || echo unknown)
           case "$status" in
             identical) echo "This commit is the tip of v3_openjdk: the website publishes with it." ;;
