@@ -64,7 +64,7 @@ public class MultiRTUtils {
         for (NewJREUtil.ExternalRuntime downloadableruntime : downloadableRuntimes) {
             if(getExactJreName(downloadableruntime.majorVersion) == null){
                 // x86 isn't supported for JRE21+
-                if (!(Tools.DEVICE_ARCHITECTURE == Architecture.ARCH_X86 && downloadableruntime.majorVersion >= 21))
+                if (!(Tools.deviceArchitecture() == Architecture.ARCH_X86 && downloadableruntime.majorVersion >= 21))
                     runtimesToDownload.add(downloadableruntime);
             }
         }

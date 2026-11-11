@@ -185,7 +185,7 @@ public class RTRecyclerViewAdapter extends RecyclerView.Adapter<RTRecyclerViewAd
             mCurrentDownloadableRuntime = null;
             mCurrentPosition = pos;
 
-            if(runtime.versionString != null && Tools.DEVICE_ARCHITECTURE == Architecture.archAsInt(runtime.arch)) {
+            if(runtime.versionString != null && Tools.deviceArchitecture() == Architecture.archAsInt(runtime.arch)) {
                 mJavaVersionTextView.setText(runtime.name
                         .replace(".tar.xz", "")
                         .replace("-", " "));

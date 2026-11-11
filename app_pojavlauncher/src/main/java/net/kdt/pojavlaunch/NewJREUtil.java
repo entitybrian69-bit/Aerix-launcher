@@ -108,15 +108,24 @@ public class NewJREUtil {
         throw e;
     }
 
-    private static void throwInstallFail(InternalRuntime internalRuntime) throws RuntimeSelectionException {
-        throw new RuntimeSelectionException(RuntimeSelectionException.RUNTIME_STATE_INSTALLATION_FAILED, internalRuntime.majorVersion);
+    /**
+     * An install failure the launcher can already explain. The cause is not decoration: it is what the
+     * dialog's "Show more" prints, and without one the only sentence a player ever sees is "check your
+     * Internet connection" - which is wrong when the real reason is a missing architecture entry.
+     */
+    private static void throwInstallFail(InternalRuntime internalRuntime, String reason)
+            throws RuntimeSelectionException {
+        throwInstallFail(internalRuntime, new IOException(reason));
     }
 
     private static void unpackInternalRuntime(AssetManager assetManager, InternalRuntime internalRuntime, String versionSignatures) throws RuntimeSelectionException {
         Map<String, byte[]> signatures = SignatureCheckUtil.decodeSignatureBundle(versionSignatures);
-        String platformBinFile = "bin-"+archAsString(Tools.DEVICE_ARCHITECTURE)+".tar.xz";
+        String platformBinFile = "bin-"+archAsString(Tools.deviceArchitecture())+".tar.xz";
         if(!signatures.containsKey("universal.tar.xz") || !signatures.containsKey(platformBinFile)) {
-            throwInstallFail(internalRuntime);
+            // Not a network problem, and saying so is the difference between a report we can act on and
+            // a player rebooting their router.
+            throwInstallFail(internalRuntime, "this APK's runtime bundle has no entry named "
+                    + platformBinFile + " (architecture " + Tools.deviceArchitecture() + ")");
         }
 
         File universalCache = null, platformCache = null;
@@ -127,7 +136,8 @@ public class NewJREUtil {
             RuntimeDownloaderVerifier runtimeDownloaderVerifier = new RuntimeDownloaderVerifier(signatures, internalRuntime, signatureCheckUtil);
             if (!runtimeDownloaderVerifier.downloadAndVerify("universal.tar.xz", universalCache, R.string.downloading_java_runtime_uni) ||
                     !runtimeDownloaderVerifier.downloadAndVerify(platformBinFile, platformCache, R.string.downloading_java_runtime_platform)) {
-                throwInstallFail(internalRuntime);
+                throwInstallFail(internalRuntime, "the runtime download was refused, cut short, or did not "
+                        + "verify its signature");
             }
 
             try (FileInputStream universal = new FileInputStream(universalCache); FileInputStream platform = new FileInputStream(platformCache)) {
@@ -293,7 +303,7 @@ public class NewJREUtil {
             DownloadUtils.downloadFileMonitored(
                     externalRuntime.zipUrl, archive, null,
                     new DownloaderProgressWrapper(R.string.downloading_java_runtime_uni, ProgressLayout.UNPACK_RUNTIME));
-            String platformName = "bin-" + archAsString(Tools.DEVICE_ARCHITECTURE) + ".tar.xz";
+            String platformName = "bin-" + archAsString(Tools.deviceArchitecture()) + ".tar.xz";
             String version = "zip-" + archive.length();
             try (ZipFile zipFile = new ZipFile(archive)) {
                 ZipEntry versionEntry = findZipEntry(zipFile, "version");
@@ -355,15 +365,23 @@ public class NewJREUtil {
             String remoteVersion = DownloadUtils.downloadString(DOWNLOAD_URL + externalRuntime.path + "/version");
             unpackExternalRuntime(assetManager, externalRuntime, remoteVersion);
         } catch (IOException e) {
-            throw new RuntimeSelectionException(RuntimeSelectionException.RUNTIME_STATE_INSTALLATION_FAILED, externalRuntime.majorVersion);
+            // Keep the reason. This is the one path that is genuinely about the network, and a report
+            // without the socket failure in it cannot be told apart from a broken runtime source.
+            RuntimeSelectionException failed = new RuntimeSelectionException(
+                    RuntimeSelectionException.RUNTIME_STATE_INSTALLATION_FAILED, externalRuntime.majorVersion);
+            failed.initCause(e);
+            throw failed;
         }
     }
 
     private static void unpackExternalRuntime(AssetManager assetManager, ExternalRuntime externalRuntime, String versionSignatures) throws RuntimeSelectionException {
         Map<String, byte[]> signatures = SignatureCheckUtil.decodeSignatureBundle(versionSignatures);
-        String platformBinFile = "bin-"+archAsString(Tools.DEVICE_ARCHITECTURE)+".tar.xz";
+        String platformBinFile = "bin-"+archAsString(Tools.deviceArchitecture())+".tar.xz";
         if(!signatures.containsKey("universal.tar.xz") || !signatures.containsKey(platformBinFile)) {
-            throw new RuntimeSelectionException(RuntimeSelectionException.RUNTIME_STATE_INSTALLATION_FAILED, externalRuntime.majorVersion);
+            RuntimeSelectionException missing = new RuntimeSelectionException(
+                    RuntimeSelectionException.RUNTIME_STATE_INSTALLATION_FAILED, externalRuntime.majorVersion);
+            missing.initCause(new IOException("the runtime source has no entry named " + platformBinFile));
+            throw missing;
         }
 
         File universalCache = null, platformCache = null;

@@ -91,6 +91,7 @@ jobs:
           python3 tests/nightly_channel_smoke.py
           python3 tests/background_display_smoke.py
           python3 tests/error_dialog_smoke.py
+          python3 tests/startup_runtime_smoke.py
           python3 tests/social_profile_cosmetics_smoke.py
           python3 tests/client_background_smoke.py
           python3 tests/instance_renderer_smoke.py

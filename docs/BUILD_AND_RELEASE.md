@@ -14,7 +14,7 @@ APK is only built when the owner asks for a release and confirms it.
 | Build info | `https://github.com/entitybrian69-bit/Aerix-launcher/releases/download/debug-latest/NIGHTLY_BUILD.txt` (commit, versionCode, sha256) |
 | CI workflow | **Aerix Nightly (testing)** (`aerix-debug.yml`) |
 | CI artifact | `aerix-nightly-apk` |
-| Source | this branch (`version.properties` = `2.3.1`) |
+| Source | this branch (`version.properties` = `2.3.2`) |
 | Variant | `noruntimeNightly` |
 | applicationId | `net.al.aerixlauncher.debug` |
 | Label | Aerix Nightly |
@@ -76,8 +76,8 @@ Public APKs are **not** stored in the Git repository. The universal APK is
 147 MB, above GitHub's 100 MB limit for repository files, so release builds live
 as assets on the GitHub Releases page and nowhere else.
 
-Current public release: **v2.3.1** (notes in
-`docs/releases/v2.3.1.md`).
+Current public release: **v2.3.2** (notes in
+`docs/releases/v2.3.2.md`).
 
 The website is a second step, not part of the cut. GitHub Pages is set to *GitHub Actions*, and
 `pages.yml` deploys only from `v3_openjdk` - a side branch verifies `docs/` and stops there, on purpose,
