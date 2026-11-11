@@ -26,8 +26,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.foundation.lazy.items
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -49,17 +47,6 @@ import net.kdt.pojavlaunch.aerix.theme.AerixRadii
 import net.kdt.pojavlaunch.aerix.theme.AerixSpacing
 import net.kdt.pojavlaunch.aerix.theme.AerixSurface
 import net.kdt.pojavlaunch.instances.Instances
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.TextButton
-import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.window.Dialog
-import net.kdt.pojavlaunch.aerix.bridge.AerixPreferences
-import net.kdt.pojavlaunch.aerix.bridge.AssetProject
-import net.kdt.pojavlaunch.aerix.bridge.AssetType
-import net.kdt.pojavlaunch.aerix.bridge.PojavAssetBridge
-import java.io.File
 
 /**
  * Minimal Liquid Glass `Aerix Client` Sidebar Tab:
@@ -152,7 +139,7 @@ fun AerixClientScreen(activity: FragmentActivity, onBack: () -> Unit) {
         }
 
         if (modpackSearchOpen) {
-            AerixModpackSearchDialog(activity, onDismiss = { modpackSearchOpen = false }) {
+            AerixPackSearchDialog(activity, ClientOwnerPage.SAHIL, onDismiss = { modpackSearchOpen = false }) {
                 // A pack creates its own instance, so the version list below is stale.
                 refreshTick++
             }
@@ -425,226 +412,5 @@ fun AerixClientScreen(activity: FragmentActivity, onBack: () -> Unit) {
                 }
             }
         }
-    }
-}
-
-
-/**
- * Modpack search for the Aerix Client page, with the choice the players asked for: a pack installed
- * on its own, or the same pack with Aerix Client put into it.
- *
- * "With client" adds only what the launcher itself owns - the Aerix Client mod and the Fabric API it
- * needs - and never the third-party optimization mods the client bundle ships with. A modpack decides
- * its own mod list, and overwriting that with ours is how packs break; [AerixClientInstaller.updateOwnMods]
- * is the routine that already keeps that line for existing instances, so it is used here unchanged.
- */
-@Composable
-private fun AerixModpackSearchDialog(
-    activity: FragmentActivity,
-    onDismiss: () -> Unit,
-    onInstalled: () -> Unit,
-) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var query by remember { mutableStateOf(TextFieldValue("")) }
-    var results by remember { mutableStateOf<List<AssetProject>?>(null) }
-    var busy by remember { mutableStateOf(false) }
-    var status by remember { mutableStateOf("Search Modrinth and CurseForge for a modpack.") }
-    var pending by remember { mutableStateOf<AssetProject?>(null) }
-    var installing by remember { mutableStateOf<String?>(null) }
-
-    Dialog(onDismissRequest = { if (installing == null) onDismiss() }) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(22.dp))
-                .background(Color(0xF20B141B))
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Text("Modpacks", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                BasicTextField(
-                    value = query,
-                    onValueChange = { query = it },
-                    singleLine = true,
-                    cursorBrush = androidx.compose.ui.graphics.SolidColor(Color.White),
-                    textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontSize = 13.sp),
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0x33FFFFFF))
-                        .padding(horizontal = 12.dp, vertical = 10.dp),
-                    decorationBox = { inner ->
-                        Box {
-                            if (query.text.isBlank()) Text("Search packs...", color = Color(0x88FFFFFF), fontSize = 13.sp)
-                            inner()
-                        }
-                    }
-                )
-                Text(
-                    text = if (busy) "Searching..." else "Search",
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(if (busy) Color(0x33FFFFFF) else AerixSurface.accent.copy(alpha = 0.25f))
-                        .clickable(enabled = !busy) {
-                            val term = query.text.trim()
-                            if (term.isEmpty()) { status = "Type something to search for."; return@clickable }
-                            busy = true
-                            scope.launch {
-                                val page = runCatching {
-                                    PojavAssetBridge.search(
-                                        context, AerixPreferences.assetPlatformSource, AssetType.MODPACK,
-                                        term, null, null, 0
-                                    )
-                                }.getOrNull()
-                                results = page?.projects.orEmpty()
-                                busy = false
-                                status = when {
-                                    page == null -> "The search could not be reached."
-                                    results.isNullOrEmpty() -> "No pack matches \"$term\" on this source."
-                                    else -> "${results?.size} pack(s) for \"$term\"."
-                                }
-                            }
-                        }
-                        .padding(horizontal = 14.dp, vertical = 10.dp),
-                    color = Color.White,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-            Text(status, color = Color(0xAAFFFFFF), fontSize = 11.sp, maxLines = 2)
-
-            LazyColumn(
-                modifier = Modifier.weight(1f, fill = false),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                items(results.orEmpty().take(40)) { project ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(Color(0x1AFFFFFF))
-                            .padding(horizontal = 12.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(project.title, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold,
-                                maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text("${project.author} · ${project.downloads} downloads",
-                                color = Color(0x99FFFFFF), fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        }
-                        Text(
-                            text = if (installing == project.id) "Working..." else "Install",
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(11.dp))
-                                .background(AerixSurface.accent.copy(alpha = 0.22f))
-                                .clickable(enabled = installing == null) { pending = project }
-                                .padding(horizontal = 12.dp, vertical = 8.dp),
-                            color = Color.White,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-            }
-
-            Text(
-                text = "Close",
-                modifier = Modifier.align(androidx.compose.ui.Alignment.End)
-                    .clickable(enabled = installing == null) { onDismiss() }
-                    .padding(vertical = 4.dp),
-                color = Color(0xAAFFFFFF),
-                fontSize = 12.sp
-            )
-        }
-    }
-
-    val project = pending
-    if (project != null) {
-        AlertDialog(
-            onDismissRequest = { if (installing == null) pending = null },
-            title = { Text(project.title) },
-            text = {
-                Text("Install \"${project.title}\"?\n\n" +
-                    "With client adds the Aerix Client mod and the Fabric API only - the pack keeps " +
-                    "every mod it ships with, and no optimization mods are put in beside them.")
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    pending = null
-                    runModpackInstall(context, scope, activity, project, withClient = true) { message ->
-                        status = message
-                        installing = null
-                        onInstalled()
-                    }.also { installing = project.id }
-                }) { Text("Install with client") }
-            },
-            dismissButton = {
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    TextButton(onClick = {
-                        pending = null
-                        runModpackInstall(context, scope, activity, project, withClient = false) { message ->
-                            status = message
-                            installing = null
-                            onInstalled()
-                        }.also { installing = project.id }
-                    }) { Text("Install without client") }
-                    TextButton(onClick = { pending = null }) { Text("Cancel") }
-                }
-            }
-        )
-    }
-}
-
-/**
- * Start the install and report back one line, either way.
- *
- * The pack is installed through the same path the Discover page uses - which creates the instance the
- * pack describes - and only afterwards is the client added to the instance that appeared. The before
- * and after instance names are diffed rather than guessed, because a pack chooses its own instance
- * name and a wrong guess would add the client mod to some unrelated install.
- */
-private fun runModpackInstall(
-    context: android.content.Context,
-    scope: kotlinx.coroutines.CoroutineScope,
-    activity: FragmentActivity,
-    project: AssetProject,
-    withClient: Boolean,
-    report: (String) -> Unit,
-) {
-    scope.launch {
-        val before = runCatching { Instances.loadAllInstances().mapNotNull { it.name }.toSet() }
-            .getOrDefault(emptySet())
-        val files = runCatching { PojavAssetBridge.files(context, project) }.getOrNull()
-        val file = files?.firstOrNull()
-        if (file == null) {
-            report("This pack has no downloadable file on ${project.platform}.")
-            return@launch
-        }
-        val ok = runCatching { PojavAssetBridge.install(context, project, file) }.getOrDefault(false)
-        if (!ok) {
-            report("The pack could not be installed.")
-            return@launch
-        }
-        PojavInstanceBridge.reload()
-        val created = runCatching { Instances.loadAllInstances() }.getOrDefault(emptyList())
-            .firstOrNull { instance -> instance.name != null && instance.name !in before }
-        if (!withClient) {
-            report("Installed \"${project.title}\" as its own instance.")
-            if (created != null) Instances.setSelectedInstance(created)
-            return@launch
-        }
-        if (created == null) {
-            report("Installed, but the new instance could not be found - open it and use \"Update my mods\".")
-            return@launch
-        }
-        val summary = AerixClientInstaller.updateOwnMods(activity, created).getOrElse { error ->
-            report("Pack installed; the client could not be added (${error.message}).")
-            return@launch
-        }
-        Instances.setSelectedInstance(created)
-        report("Pack + client ready · $summary")
     }
 }

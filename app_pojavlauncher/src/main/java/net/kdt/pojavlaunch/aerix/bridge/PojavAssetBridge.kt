@@ -856,7 +856,11 @@ object PojavAssetBridge {
                 title = hit.string("title") ?: "",
                 description = hit.string("description") ?: "",
                 author = hit.string("author") ?: "",
-                iconUrl = hit.string("icon_url")?.takeIf { it.isNotBlank() },
+                // Modrinth v2's search rows keep the logo in an "icon_urls" *array* - "icon_url"
+                // exists only on the project endpoint - so reading the bare field left every search
+                // row, here and on Discover, without a logo to draw.
+                iconUrl = hit.string("icon_url")?.takeIf { it.isNotBlank() }
+                    ?: hit.arr("icon_urls").strings().firstOrNull { it.isNotBlank() },
                 downloads = hit.long("downloads"),
                 loaders = loaders
             )

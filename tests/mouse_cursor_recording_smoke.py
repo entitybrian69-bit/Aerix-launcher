@@ -232,16 +232,49 @@ check("bursts are spaced about a frame apart", "TEXT_CHUNK_INTERVAL_MS" in backe
 check("the first characters still go immediately", "if (burst == 0) GLFW.sendBulkUnicodeEvent" in backend_glfw)
 check("chunking is by code point, not char", "offsetByCodePoints" in backend_glfw)
 
-print("13. modpacks can be installed with or without the client")
+print("13. modpacks: logos, a version to choose, and the client choice")
 client_screen = read(os.path.join(JAVA, "aerix", "ui", "screens"), "AerixClientScreen.kt")
-check("the client tab can search for packs", "AssetType.MODPACK" in client_screen)
-check("install asks with three answers",
-      'Text("Install with client")' in client_screen and 'Text("Install without client")' in client_screen
-      and 'Text("Cancel")' in client_screen)
-check("a pack keeps its own mods", "updateOwnMods" in client_screen)
-check("the new instance is found by diffing, not guessing", "instance.name !in before" in client_screen)
+pack_dialog_path = os.path.join(JAVA, "aerix", "ui", "screens")
+pack_dialog = read(pack_dialog_path, "AerixPackSearchDialog.kt")
+check("the client tab can search for packs", "AerixPackSearchDialog(activity, ClientOwnerPage.SAHIL" in client_screen)
+check("both client pages open the same search",
+      "AerixPackSearchDialog(activity, ClientOwnerPage.MX_INSPIRE"
+      in read(pack_dialog_path, "FastClientScreen.kt"))
+check("the row draws the pack's own logo",
+      "rememberRemoteBitmap(project.iconUrl" in pack_dialog and "Image(bitmap = icon" in pack_dialog)
+# Modrinth v2 puts the logo in an "icon_urls" array on search rows; reading "icon_url" alone is what
+# left every result blank, on this page and on Discover.
+bridge = read(os.path.join(JAVA, "aerix", "bridge"), "PojavAssetBridge.kt")
+modrinth_search = bridge[bridge.index("private fun searchModrinth"):bridge.index("private fun modrinthDetails")]
+check("the logo is read where the search actually puts it",
+      'hit.arr("icon_urls").strings()' in modrinth_search)
+check("install no longer takes the first file it is handed", "offer.file) }" in pack_dialog)
+check("the version window names what it is asking", "Which version of Minecraft?" in pack_dialog)
+check("only versions the client exists for are offered",
+      "PackVersionFilter.match(" in pack_dialog and "profile.minecraftVersions" in pack_dialog)
+check("Aerix Client's list is its own release table",
+      "ClientVersions.RELEASES.toList()" in pack_dialog)
+check("FastClient's list is the builds it actually ships",
+      "FastClientInstaller.builds.map { it.minecraft }" in pack_dialog)
+check("install still asks with three answers",
+      'Text("Install with client")' in pack_dialog and 'Text("Install without client")' in pack_dialog
+      and 'Text("Cancel")' in pack_dialog)
+check("a pack keeps its own mods", "updateOwnMods" in pack_dialog)
+check("FastClient is never pushed into somebody else's pack",
+      "canJoinThePack = false" in pack_dialog and "canJoinThePack) {" in pack_dialog)
+check("the new instance is found by diffing, not guessing", "instance.name !in before" in pack_dialog)
 check("the pack install goes through the launcher's own path",
-      "PojavAssetBridge.install(context, project, file)" in client_screen)
+      "PojavAssetBridge.install(context, project, offer.file)" in pack_dialog)
+check("the answer always says which version it did", "Minecraft ${offer.minecraft}" in pack_dialog)
+# The filter is pure Java, so CI runs it with javac rather than trusting this grep.
+workflow = read(os.path.join(ROOT, ".github", "workflows"), "aerix-debug.yml")
+check("the filter's own test runs in CI", "PackVersionFilterSmokeTest" in workflow)
+filter_java = read(os.path.join(JAVA, "aerix", "client"), "PackVersionFilter.java")
+check("a file with no download is never offered", 'url == null || url.trim().isEmpty()' in filter_java)
+check("the wrong loader is never offered", "containsIgnoreCase(loaders, requiredLoader)" in filter_java)
+check("no neighbour version is guessed", "rankOf(version, clientVersions)" in filter_java)
+check("the smoke test pins the real client list",
+      "ClientVersions.RELEASES" in read(os.path.join(ROOT, "tests"), "PackVersionFilterSmokeTest.java"))
 
 print("14. the in-game A menu survives a tap the device reports twice")
 guard = read(os.path.join(JAVA, "aerix", "client"), "AerixOverlayInput.kt")

@@ -170,6 +170,11 @@ jobs:
             tests/InstanceMemorySmokeTest.java
           java -cp "$RUNNER_TEMP/aerix-memory-test" InstanceMemorySmokeTest
           javac -d "$RUNNER_TEMP/aerix-memory-test" \
+            app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/client/ClientVersions.java \
+            app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/client/PackVersionFilter.java \
+            tests/PackVersionFilterSmokeTest.java
+          java -cp "$RUNNER_TEMP/aerix-memory-test" PackVersionFilterSmokeTest
+          javac -d "$RUNNER_TEMP/aerix-memory-test" \
             app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/client/ClientLogoMigration.java \
             tests/ClientLogoMigrationSmokeTest.java
           java -cp "$RUNNER_TEMP/aerix-memory-test" ClientLogoMigrationSmokeTest
