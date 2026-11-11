@@ -38,9 +38,19 @@ public class FatalErrorActivity extends AppCompatActivity {
                 + "Package: " + getPackageName() + "\n"
                 + "Android: " + android.os.Build.VERSION.RELEASE + "\n\n"
                 + resolveStackTrace(preformatted, throwable, strSavePath);
-		String errHeader = storageAllow ?
-			"Crash stack trace saved to " + strSavePath + "." :
-			"Storage permission is required to save crash stack trace!";
+		String errHeader;
+		if (storageAllow && strSavePath != null) {
+			errHeader = "Crash stack trace saved to " + strSavePath + ".";
+		} else {
+			// "Storage permission is required" is not an explanation, it is a dead end: there is no such
+			// permission left to grant for this on Android 11+, and the sentence lands on the one screen
+			// where a player is already frightened of losing the evidence. So write the trace where the
+			// launcher always can - its own files, no permission involved - and fall back to the clipboard.
+			String keptWhere = saveIntoAppFiles(stackTrace);
+			errHeader = keptWhere != null
+				? "Saved in the launcher's own files at " + keptWhere + " - no permission needed."
+				: "Could not write it to a file - use COPY below and paste it into your report.";
+		}
 		
 		new AlertDialog.Builder(this)
 			.setTitle(R.string.error_fatal)
@@ -55,6 +65,26 @@ public class FatalErrorActivity extends AppCompatActivity {
 			})
 			.setCancelable(false)
 			.show();
+	}
+
+	/**
+	 * Keeps the trace inside the app's own directory, which needs no runtime permission on any Android we
+	 * support. Returns the directory worth naming in the dialog, or null when even that failed - in which
+	 * case the dialog admits it and points at COPY instead of blaming the player for a permission that
+	 * is not the problem.
+	 */
+	private String saveIntoAppFiles(String stackTrace) {
+		try {
+			java.io.File dir = new java.io.File(getFilesDir(), "crashes");
+			if (!dir.isDirectory() && !dir.mkdirs()) return null;
+			java.io.File out = new java.io.File(dir, "crash-" + System.currentTimeMillis() + ".log");
+			try (java.io.FileWriter writer = new java.io.FileWriter(out)) {
+				writer.write(stackTrace);
+			}
+			return dir.getAbsolutePath();
+		} catch (Throwable ignored) {
+			return null;
+		}
 	}
 
 	private static String resolveStackTrace(String preformatted, Throwable throwable, String savePath) {

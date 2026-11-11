@@ -357,6 +357,11 @@ def build_index():
             <span><b>2.3.1: the two crashes players reported</b>
             A display question asked from the wrong kind of Context was killing the launcher on start on Android 11+, and the runtime dialog crashed while trying to explain a failed install. Both are fixed, and the surface rate read that went with them is guarded.</span>
           </li>
+          <li>
+            <span class="n">07</span>
+            <span><b>2.3.2: sorry - the missing Java was ours, not your internet</b>
+            That same crash skipped the two startup lines after it, which were the CPU read and the bundled runtime unpack, so the launcher went looking for a runtime named after no architecture at all and blamed the connection when it could not find one. Startup steps are independent now, the architecture is worked out on demand, an install failure carries the reason behind "Show more", and the crash screen keeps the trace without asking for a permission.</span>
+          </li>
         </ol>
         <div class="log-foot">
           <span>Minor release · published {RELEASE_DATE} · Android 6.0+ · arm64-v8a, armeabi-v7a and universal</span>

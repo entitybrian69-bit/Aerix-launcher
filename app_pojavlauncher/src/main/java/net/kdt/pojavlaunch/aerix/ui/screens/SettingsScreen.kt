@@ -1342,7 +1342,7 @@ private fun JavaManageTabContent(activity: FragmentActivity) {
                 val runtime: Runtime = installed[index]
                 val isDefault = runtime.name == defaultName
                 val compatible = runtime.versionString != null &&
-                    Tools.DEVICE_ARCHITECTURE == Architecture.archAsInt(runtime.arch)
+                    Tools.deviceArchitecture() == Architecture.archAsInt(runtime.arch)
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(AerixRadii.card),

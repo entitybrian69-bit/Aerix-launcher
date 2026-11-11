@@ -108,6 +108,26 @@ public final class Tools {
     public static String MULTIRT_HOME;
     public static int DEVICE_ARCHITECTURE;
 
+    /**
+     * The device architecture, computed on first use instead of only if some earlier startup step
+     * reached its assignment.
+     *
+     * `DEVICE_ARCHITECTURE` is an int, so a launcher that never assigned it reads 0 - which is not a
+     * architecture at all, since the real values are 0x1/0x2/0x4/0x8 - and every consumer here builds a
+     * runtime file name out of it: `bin-` + archAsString(0) + `.tar.xz`. That is how one crash on open
+     * in 2.3.0 also turned into "no runtime is being downloaded": the exception skipped the assignment
+     * in `PojavApplication.onCreate`, the bundled JRE unpacking then asked for a file that does not
+     * exist, and the manual download blamed the player's internet for it.
+     */
+    public static int deviceArchitecture() {
+        int arch = DEVICE_ARCHITECTURE;
+        if (arch == 0) {
+            arch = Architecture.getDeviceArchitecture();
+            DEVICE_ARCHITECTURE = arch;
+        }
+        return arch;
+    }
+
     // New since 3.3.1
     public static String DIR_ACCOUNT_NEW;
     public static String DIR_GAME_HOME = Environment.getExternalStorageDirectory().getAbsolutePath() + "/games/PojavLauncher";
@@ -578,7 +598,7 @@ public final class Tools {
     public static void printLauncherInfo(String gameVersion, String javaArguments, RenderSpec renderer, Context ctx) {
         Logger.appendToLog("Info: Launcher version: " + BuildConfig.VERSION_NAME);
         Logger.appendToLog("Info: Build type: " + BuildConfig.BUILD_TYPE);
-        Logger.appendToLog("Info: Architecture: " + Architecture.archAsString(DEVICE_ARCHITECTURE));
+        Logger.appendToLog("Info: Architecture: " + Architecture.archAsString(deviceArchitecture()));
         Logger.appendToLog("Info: Device model: " + Build.MANUFACTURER + " " +Build.MODEL);
         Logger.appendToLog("Info: API version: " + SDK_INT);
         Logger.appendToLog("Info: Selected game version: " + gameVersion);

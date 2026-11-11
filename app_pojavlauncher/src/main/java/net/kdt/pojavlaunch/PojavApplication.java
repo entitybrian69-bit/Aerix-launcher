@@ -104,6 +104,14 @@ public class PojavApplication extends MGApplication {
         //noinspection ConstantValue
         if(!BuildConfig.BUILD_TYPE.equals("gplay")) installFatalErrorHandler();
 		
+
+		// Three separate attempts, one reported failure. They used to be a single block, which meant
+		// that anything thrown by the preference load skipped the architecture read AND the bundled
+		// runtime unpacking below it - and 2.3.0 is the proof of what that costs: a launcher that crashed
+		// on open also had no Java runtime, because Tools.DEVICE_ARCHITECTURE was left unset and the JRE
+		// file name built from it is `bin-null.tar.xz`. Reading a preference is optional; knowing the CPU
+		// and installing the runtime that ships inside the APK are not.
+		Throwable startupFailure = null;
 		try {
 			super.onCreate();
 			if(Tools.checkStorageRoot(this)){
@@ -115,18 +123,30 @@ public class PojavApplication extends MGApplication {
 				// and not explode.
 				Tools.initEarlyConstants(this);
 			}
+		} catch (Throwable throwable) {
+			startupFailure = throwable;
+		}
+		try {
 			Tools.DEVICE_ARCHITECTURE = Architecture.getDeviceArchitecture();
 			//Force x86 lib directory for Asus x86 based zenfones
 			if(Architecture.isx86Device() && Architecture.is32BitsDevice()) {
 				String originalJNIDirectory = getApplicationInfo().nativeLibraryDir;
 				getApplicationInfo().nativeLibraryDir = originalJNIDirectory.substring(0,
-								originalJNIDirectory.lastIndexOf("/"))
+						originalJNIDirectory.lastIndexOf("/"))
 						.concat("/x86");
 			}
+		} catch (Throwable throwable) {
+			if (startupFailure == null) startupFailure = throwable;
+		}
+		try {
 			AsyncAssetManager.unpackRuntime(getAssets());
 		} catch (Throwable throwable) {
+			if (startupFailure == null) startupFailure = throwable;
+		}
+		if (startupFailure != null) {
+			// Reported, not fatal: the steps above already ran, and the launcher can go on.
 			Intent ferrorIntent = new Intent(this, FatalErrorActivity.class);
-			ferrorIntent.putExtra("throwable", throwable);
+			ferrorIntent.putExtra("throwable", startupFailure);
 			ferrorIntent.setFlags(FLAG_ACTIVITY_NEW_TASK);
 			startActivity(ferrorIntent);
 		}

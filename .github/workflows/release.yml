@@ -7,9 +7,10 @@ name: Release CI
 # A marked push has to touch this file to be seen at all, so each release cuts a
 # one line note here recording what it shipped.
 #
-# Last cut: v2.3.1 on 11 Nov 2026 - the two crash reports 2.3.0 brought back: the launcher
-# dying on start on Android 11+ over a display query, and the runtime dialog crashing while
-# it explained a failed install.
+# Last cut: v2.3.2 on 11 Nov 2026 - the sorry release. 2.3.0's startup throw skipped the CPU
+# read and the bundled runtime unpack, so a crash on open also looked like "no runtime is
+# being downloaded"; startup steps are independent, the architecture is on demand, and an
+# install failure finally carries the reason behind "Show more".
 #
 # The publish job uploads the build artifacts after the build job succeeds.
 # Each edition goes up three times, named after version.properties:
@@ -31,7 +32,11 @@ on:
   # build can be started by pushing a change to this file whose commit message carries the marker
   # below. Any other push only skips the job: the marker is the confirmation.
   push:
-    branches: [ "arena/98ca5d96-aerix-launcher", "arena/1b7d7ded-aerix-launcher", "arena/993cdf6f-aerix-launcher", "v3_openjdk" ]
+    # Any branch of this repo, because the confirmation is the marker in the commit message and the
+    # fact that this file was touched - not the branch name. Listing session branches here was a trap:
+    # the arena/* names change every session, so a marked push on a new one was silently ignored, and
+    # the release only "worked" when somebody remembered to add the latest name.
+    branches: [ "v3_openjdk", "arena/**", "main" ]
     paths: [ ".github/workflows/release.yml" ]
 
 permissions:
@@ -91,6 +96,7 @@ jobs:
           python3 tests/nightly_channel_smoke.py
           python3 tests/background_display_smoke.py
           python3 tests/error_dialog_smoke.py
+          python3 tests/startup_runtime_smoke.py
           python3 tests/social_profile_cosmetics_smoke.py
           python3 tests/client_background_smoke.py
           python3 tests/instance_renderer_smoke.py
@@ -252,6 +258,10 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
+          # Read it here rather than borrowing it from the step above: a step's shell variables die with
+          # its shell, and `set -u` is right to kill anything that pretends otherwise. This step failed a
+          # published release exactly that way, over a line whose only job was to report.
+          VERSION=$(sed -n 's/^versionName=//p' version.properties | tr -d '[:space:]')
           status=$(gh api "repos/$GITHUB_REPOSITORY/compare/v3_openjdk...$GITHUB_SHA" --jq .status 2>/dev/null || echo unknown)
           case "$status" in
             identical) echo "This commit is the tip of v3_openjdk: the website publishes with it." ;;

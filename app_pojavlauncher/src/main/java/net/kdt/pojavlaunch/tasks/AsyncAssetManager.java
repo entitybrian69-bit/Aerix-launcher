@@ -51,7 +51,7 @@ public class AsyncAssetManager {
             try {
                 MultiRTUtils.installRuntimeNamedBinpack(
                         am.open("components/jre/universal.tar.xz"),
-                        am.open("components/jre/bin-" + archAsString(Tools.DEVICE_ARCHITECTURE) + ".tar.xz"),
+                        am.open("components/jre/bin-" + archAsString(Tools.deviceArchitecture()) + ".tar.xz"),
                         "Internal", finalRt_version);
                 MultiRTUtils.postPrepare("Internal");
             }catch (IOException e) {
