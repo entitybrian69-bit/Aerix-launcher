@@ -274,7 +274,7 @@ def build_index():
         </p>
         <div class="btn-row">
           <a class="btn btn-primary" href="{DOWNLOAD_URL}" download data-primary-download>
-            <span class="nowrap">Download for Android</span> <span class="btn-size">85 MB</span>
+            <span class="nowrap">Download for Android</span> <span class="btn-size">89 MB</span>
           </a>
           <a class="btn btn-ghost" href="#whats-new">What's new</a>
         </div>
@@ -537,25 +537,25 @@ def build_index():
           <a class="dl-card" href="{DOWNLOAD_URL}" download data-dl="arm64">
             <strong>arm64-v8a <span class="tag hot">recommended</span></strong>
             <small class="asset">Aerix-Launcher-{VERSION}-arm64-v8a.apk</small>
-            <span class="size">85.4 MB</span>
+            <span class="size">88.8 MB</span>
             <small>64-bit phones — nearly all of them</small>
           </a>
           <a class="dl-card" href="https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest" target="_blank" rel="noopener" data-dl="armv7">
             <strong>armeabi-v7a</strong>
             <small class="asset">Aerix-Launcher-{VERSION}-armeabi-v7a.apk</small>
-            <span class="size">85.6 MB</span>
+            <span class="size">89.0 MB</span>
             <small>Older 32-bit phones</small>
           </a>
           <a class="dl-card" href="{DOWNLOAD_URL}" download data-dl="universal">
             <strong>Universal</strong>
             <small class="asset">Aerix-Launcher-{VERSION}.apk</small>
-            <span class="size">140.6 MB</span>
+            <span class="size">144.0 MB</span>
             <small>Every architecture, including x86 — the fallback</small>
           </a>
         </div>
 
         <div class="dl-foot">
-          <span>Also on the release: <a href="https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest/download/Aerix-Launcher-noruntime.apk" download>no-runtime build</a> (112.9 MB) — same launcher, Java fetched on first launch.</span>
+          <span>Also on the release: <a href="https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest/download/Aerix-Launcher-noruntime.apk" download>no-runtime build</a> (116.2 MB) — same launcher, Java fetched on first launch.</span>
           <span><a href="https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest/download/SHA256SUMS" target="_blank" rel="noopener">SHA-256 checksums</a></span>
           <span>Downloaded <b data-downloads>—</b> times from GitHub</span>
           <span>Signed with the project key · updates in place</span>
@@ -974,19 +974,19 @@ def build_install():
               <a class="dl-card" href="{DOWNLOAD_URL}" download data-dl="arm64">
                 <strong>arm64-v8a <span class="tag hot">recommended</span></strong>
                 <small class="asset">Aerix-Launcher-{VERSION}-arm64-v8a.apk</small>
-                <span class="size">85.4 MB</span>
+                <span class="size">88.8 MB</span>
                 <small>64-bit phones — nearly all of them</small>
               </a>
               <a class="dl-card" href="{DOWNLOAD_URL}" download data-dl="armv7">
                 <strong>armeabi-v7a</strong>
                 <small class="asset">Aerix-Launcher-{VERSION}-armeabi-v7a.apk</small>
-                <span class="size">85.6 MB</span>
+                <span class="size">89.0 MB</span>
                 <small>Older 32-bit phones</small>
               </a>
               <a class="dl-card" href="{DOWNLOAD_URL}" download data-dl="universal">
                 <strong>Universal</strong>
                 <small class="asset">Aerix-Launcher-{VERSION}.apk</small>
-                <span class="size">140.6 MB</span>
+                <span class="size">144.0 MB</span>
                 <small>Every architecture — the safe fallback</small>
               </a>
             </div>
@@ -1042,7 +1042,7 @@ def build_install():
         <h2 style="margin-top:0">Ready?</h2>
         <p class="muted">Android 6.0+ · signed with the project key · updates in place.</p>
         <div class="btn-row">
-          <a class="btn btn-primary" href="{DOWNLOAD_URL}" download data-primary-download><span class="nowrap">Download for Android</span> <span class="btn-size">85 MB</span></a>
+          <a class="btn btn-primary" href="{DOWNLOAD_URL}" download data-primary-download><span class="nowrap">Download for Android</span> <span class="btn-size">89 MB</span></a>
           <a class="btn btn-ghost" href="faq.html">Common questions</a>
         </div>
       </div>
