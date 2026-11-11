@@ -352,6 +352,11 @@ def build_index():
             <span><b>Recordings you can find again</b>
             Clips land in a library you import, share and delete from inside the launcher, with a recents row on Discover - and a take interrupted before it was finalised is kept as <code>-unfinished.mp4</code> instead of thrown away.</span>
           </li>
+          <li>
+            <span class="n">06</span>
+            <span><b>2.3.1: the two crashes players reported</b>
+            A display question asked from the wrong kind of Context was killing the launcher on start on Android 11+, and the runtime dialog crashed while trying to explain a failed install. Both are fixed, and the surface rate read that went with them is guarded.</span>
+          </li>
         </ol>
         <div class="log-foot">
           <span>Minor release · published {RELEASE_DATE} · Android 6.0+ · arm64-v8a, armeabi-v7a and universal</span>

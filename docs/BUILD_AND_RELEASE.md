@@ -14,7 +14,7 @@ APK is only built when the owner asks for a release and confirms it.
 | Build info | `https://github.com/entitybrian69-bit/Aerix-launcher/releases/download/debug-latest/NIGHTLY_BUILD.txt` (commit, versionCode, sha256) |
 | CI workflow | **Aerix Nightly (testing)** (`aerix-debug.yml`) |
 | CI artifact | `aerix-nightly-apk` |
-| Source | this branch (`version.properties` = `2.3.0`) |
+| Source | this branch (`version.properties` = `2.3.1`) |
 | Variant | `noruntimeNightly` |
 | applicationId | `net.al.aerixlauncher.debug` |
 | Label | Aerix Nightly |
@@ -76,8 +76,8 @@ Public APKs are **not** stored in the Git repository. The universal APK is
 147 MB, above GitHub's 100 MB limit for repository files, so release builds live
 as assets on the GitHub Releases page and nowhere else.
 
-Current public release: **v2.3.0** (notes in
-`docs/releases/v2.3.0.md`).
+Current public release: **v2.3.1** (notes in
+`docs/releases/v2.3.1.md`).
 
 The release carries three builds per edition, named after `version.properties`:
 `Aerix-Launcher-<version>-arm64-v8a.apk`, `-armeabi-v7a.apk` and the universal
