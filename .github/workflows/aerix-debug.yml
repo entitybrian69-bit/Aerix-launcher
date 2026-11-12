@@ -94,6 +94,7 @@ jobs:
           python3 tests/background_display_smoke.py
           python3 tests/error_dialog_smoke.py
           python3 tests/startup_runtime_smoke.py
+          python3 tests/release_signing_smoke.py
           python3 tests/rust_removed_smoke.py
           python3 tests/offline_username_smoke.py
           python3 tests/aerix_cloud_skin_smoke.py
