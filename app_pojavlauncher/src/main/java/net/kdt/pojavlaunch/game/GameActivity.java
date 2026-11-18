@@ -852,6 +852,17 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         if (mRecorder != null) mRecorder.show();
     }
 
+    /**
+     * The recorder, for the in-game options panel.
+     *
+     * The panel is Compose and owns no recorder state of its own: it reads the saved choices from
+     * here and calls back through [net.kdt.pojavlaunch.recording.RecorderController.startWithChoice],
+     * so there is exactly one copy of "which quality is selected" and one owner of the lifecycle.
+     */
+    public net.kdt.pojavlaunch.recording.RecorderController getAerixRecorder() {
+        return mRecorder;
+    }
+
     private void openQuickSettings() {
         hideGameMenu();
         if(mQuickSettingSideDialog == null) {

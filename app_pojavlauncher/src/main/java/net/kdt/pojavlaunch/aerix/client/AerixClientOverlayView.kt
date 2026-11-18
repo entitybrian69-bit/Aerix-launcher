@@ -128,6 +128,9 @@ import net.kdt.pojavlaunch.game.FrameTimingStats
 import net.kdt.pojavlaunch.game.platform.Platform
 import net.kdt.pojavlaunch.game.platform.input.PlatformGrabListener
 import net.kdt.pojavlaunch.instances.Instance
+import net.kdt.pojavlaunch.recording.RecorderOptions
+import net.kdt.pojavlaunch.recording.RecorderPanel
+import net.kdt.pojavlaunch.recording.RecorderUiState
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
@@ -181,7 +184,8 @@ private enum class FeatureIconKind {
     GYRO,
     AUTOGG,
     THERMAL,
-    OLED_AFK
+    OLED_AFK,
+    RECORD
 }
 
 class AerixClientOverlayView @JvmOverloads constructor(
@@ -269,6 +273,13 @@ class AerixClientOverlayView @JvmOverloads constructor(
     }
 
     fun handleBackPress(): Boolean {
+        // The recorder panel is the topmost surface, and it is the newest thing the player opened.
+        // Guarded on visibility: the panel can be opened on an instance that is not an Aerix Client,
+        // where this overlay stays GONE and the activity handles back itself.
+        if (visibility == VISIBLE && net.kdt.pojavlaunch.recording.RecorderUiState.show.value) {
+            net.kdt.pojavlaunch.recording.RecorderUiState.show.value = false
+            return true
+        }
         if (visibility != VISIBLE) return false
         if (activeModal == InGameClientModal.MODULES && menuSubPage != ClientMenuSubPage.GRID) {
             menuSubPage = ClientMenuSubPage.GRID
@@ -289,7 +300,8 @@ class AerixClientOverlayView @JvmOverloads constructor(
     }
 
     fun isBlockingModalOpen(): Boolean =
-        visibility == VISIBLE && (bootOverlayVisible || activeModal != InGameClientModal.NONE)
+        visibility == VISIBLE && (bootOverlayVisible || activeModal != InGameClientModal.NONE ||
+            net.kdt.pojavlaunch.recording.RecorderUiState.show.value)
 
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
         if (visibility != VISIBLE) return false
@@ -807,6 +819,45 @@ private fun AerixClientRootOverlay(
         ) {
             CrimsonBootSplash()
         }
+
+        // The screen recorder's options panel lives at the top of the overlay, above the menu and the
+        // HUD: it is opened from the menu but it is not part of it, and the game under it must not
+        // take a single touch while its presets are being picked.
+        val recorderOpen by RecorderUiState.show
+        if (recorderOpen) {
+            val game = remember(context) {
+                var candidate: android.content.Context? = context
+                while (candidate is android.content.ContextWrapper &&
+                    candidate !is net.kdt.pojavlaunch.game.GameActivity
+                ) {
+                    candidate = candidate.baseContext
+                }
+                candidate as? net.kdt.pojavlaunch.game.GameActivity
+            }
+            val controller = remember(game) { game?.getAerixRecorder() }
+            RecorderPanel(
+                configs = controller?.options.orEmpty(),
+                initialQuality = controller?.savedQuality ?: RecordingOptions.DEFAULT_QUALITY,
+                initialFps = controller?.savedFps ?: RecordingOptions.DEFAULT_FPS,
+                initialAudio = controller?.savedAudio ?: RecordingOptions.AudioSource.GAME,
+                initialWithControls = controller?.savedWithControls ?: true,
+                onStart = { config, audio, withControls ->
+                    controller?.startWithChoice(config, audio, withControls) ?: run {
+                        Toast.makeText(context, "Screen recorder unavailable", Toast.LENGTH_SHORT).show()
+                        RecorderUiState.show.value = false
+                    }
+                },
+                onStop = {
+                    controller?.stop()
+                    RecorderUiState.show.value = false
+                },
+                onRecordings = {
+                    RecorderUiState.show.value = false
+                    controller?.showRecordingsList()
+                },
+                onDismiss = { RecorderUiState.show.value = false }
+            )
+        }
     }
 }
 
@@ -1016,8 +1067,14 @@ private fun FamousClientRectangleMenu(
                             var candidate: Context? = context
                             while (candidate is ContextWrapper && candidate !is net.kdt.pojavlaunch.game.GameActivity) candidate = candidate.baseContext
                             val game = candidate as? net.kdt.pojavlaunch.game.GameActivity
-                            if (game == null) Toast.makeText(context, "Screen recorder unavailable", Toast.LENGTH_SHORT).show()
-                            else { onClose(); game.openAerixScreenRecorder() }
+                            if (game == null) {
+                                Toast.makeText(context, "Screen recorder unavailable", Toast.LENGTH_SHORT).show()
+                            } else {
+                                onClose()
+                                // Prepare on the controller (permission, codec list, the "already
+                                // recording" case), which then opens the panel this overlay draws.
+                                game.openAerixScreenRecorder()
+                            }
                         },
                         onOpenOledAfk = onOpenOledAfk,
                         onSyncOptionsTxt = onSyncOptionsTxt
@@ -1078,7 +1135,7 @@ private fun ClientSquaresGridPage(
     onSyncOptionsTxt: () -> Unit
 ) {
     val modules = listOf(
-        ClientSquareModule("screen_recorder", "Screen Recorder", FeatureIconKind.HOTBAR,
+        ClientSquareModule("screen_recorder", "Screen Recorder", FeatureIconKind.RECORD,
             { net.kdt.pojavlaunch.recording.RecordingState.isActive() },
             { if (net.kdt.pojavlaunch.recording.RecordingState.isActive()) "RECORDING" else "OPEN ›" }, onOpenRecorder),
         ClientSquareModule("world_sharing", "World Sharing", FeatureIconKind.COMPASS,
@@ -1614,6 +1671,10 @@ private fun DrawScope.drawFeatureSymbol(kind: FeatureIconKind, color: Color) {
             )
             drawLine(color, Offset(cx - 3.3.dp.toPx(), cy - 4.dp.toPx()), Offset(cx - 3.3.dp.toPx(), cy + 4.dp.toPx()), sw * 0.8f)
             drawLine(color, Offset(cx + 3.3.dp.toPx(), cy - 4.dp.toPx()), Offset(cx + 3.3.dp.toPx(), cy + 4.dp.toPx()), sw * 0.8f)
+        }
+        FeatureIconKind.RECORD -> {
+            drawCircle(color = color, radius = 9.dp.toPx(), center = Offset(cx, cy), style = Stroke(sw * 0.9f))
+            drawCircle(color = color, radius = 4.4.dp.toPx(), center = Offset(cx, cy))
         }
         FeatureIconKind.GYRO -> {
             drawOval(color, Offset(cx - 9.dp.toPx(), cy - 4.dp.toPx()), Size(18.dp.toPx(), 8.dp.toPx()), style = Stroke(sw * 0.85f))
