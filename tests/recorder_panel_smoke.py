@@ -106,6 +106,26 @@ in_progress = controller[controller.index("if (RecordingState.isActive() || star
 check("openPanel(" in in_progress[:400],
       "the recording-in-progress path must open the same window, not just set the flag")
 
+# 4b. Every symbol this change reaches for must be imported. CI is the only Kotlin compiler this
+#     project has, so a missing import costs a whole build to discover - one already did.
+import_lines = [line for line in controller.splitlines() if line.startswith("import ")]
+imports = {line[len("import "):].strip() for line in import_lines}
+used = {
+    "findViewTreeOnBackPressedDispatcherOwner", "setViewTreeOnBackPressedDispatcherOwner",
+    "findViewTreeLifecycleOwner", "setViewTreeLifecycleOwner",
+    "findViewTreeViewModelStoreOwner", "setViewTreeViewModelStoreOwner",
+    "findViewTreeSavedStateRegistryOwner", "setViewTreeSavedStateRegistryOwner",
+    "OnBackPressedDispatcherOwner", "LifecycleOwner", "ViewModelStoreOwner",
+    "SavedStateRegistryOwner", "ViewCompositionStrategy", "ComposeView",
+    "AerixLauncherTheme", "Dialog", "Context", "KeyEvent",
+}
+imported_names = {line[len("import "):].strip().split(".")[-1] for line in import_lines}
+missing = sorted(sym for sym in used if sym not in imported_names and sym in controller)
+check(not missing, "used but not imported in RecorderController, which fails the build: " + ", ".join(missing))
+
+dupes = sorted({line for line in import_lines if import_lines.count(line) > 1})
+check(not dupes, "duplicate imports: " + ", ".join(dupes))
+
 # 5. One path into a take, so the saved choice and the started take cannot disagree.
 check("fun startWithChoice(" in controller, "the panel must hand its choices to the controller")
 check("controlsInRecording = withControls" in controller,

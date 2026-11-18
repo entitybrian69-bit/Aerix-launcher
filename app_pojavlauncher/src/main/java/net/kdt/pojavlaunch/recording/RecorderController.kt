@@ -3,6 +3,8 @@ package net.kdt.pojavlaunch.recording
 import android.Manifest
 import android.app.Activity
 import android.app.AlertDialog
+import android.app.Dialog
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
@@ -10,16 +12,14 @@ import android.graphics.drawable.GradientDrawable
 import android.media.projection.MediaProjectionManager
 import android.os.Build
 import android.view.Gravity
+import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
-import android.app.Dialog
-import android.content.Context
-import android.view.KeyEvent
-import android.view.View
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedDispatcherOwner
+import androidx.activity.findViewTreeOnBackPressedDispatcherOwner
 import androidx.activity.setViewTreeOnBackPressedDispatcherOwner
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
@@ -332,7 +332,10 @@ class RecorderController @JvmOverloads constructor(private val activity: Activit
     @android.annotation.SuppressLint("RestrictedApi")
     private fun ensureViewTreeOwners(view: View) {
         val owner = activity
-        for (target in listOf(view, activity.window?.decorView).filterNotNull()) {
+        // Everything from the view up to the dialog's root: a composition walks up from its own
+        // ComposeView, so the closest ancestor that carries the owners is what matters.
+        val chain = generateSequence(view) { it.parent as? View }.toList()
+        for (target in chain) {
             if (target.findViewTreeLifecycleOwner() == null && owner is LifecycleOwner) {
                 target.setViewTreeLifecycleOwner(owner)
             }
