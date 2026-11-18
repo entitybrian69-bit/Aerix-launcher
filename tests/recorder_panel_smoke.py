@@ -10,8 +10,10 @@ What must stay true:
 
 * Every option the panel offers comes from what the device can actually encode, so nothing on screen
   can be chosen and then fail.
-* The panel is hosted by the in-game overlay, takes the touches while it is open, and gives them back
-  when it closes. A panel under a live game that still receives taps is worse than no panel.
+* The panel is a window of its own, owned by the recorder controller rather than by the in-game
+  overlay: the overlay is GONE on a non-Client instance, so a panel drawn there was invisible on
+  exactly the instances where the menu still opens the recorder. It takes the touches while it is
+  open, and gives them back when it closes.
 * Back closes the panel before it closes the menu or leaves the game.
 * One recorder state: the choices are saved through the same controller that starts the take.
 """
@@ -43,8 +45,13 @@ check("val active = mutableStateOf(false)" in ui_state, "the panel must know whe
 for name in ("show", "active", "detail"):
     check(re.search(rf"\bRecorderUiState\.{name}\b", controller) is not None,
           f"the controller must drive RecorderUiState.{name}")
-    check(re.search(rf"\bRecorderUiState\.{name}\b", overlay) is not None or name != "show",
-          f"the overlay must read RecorderUiState.{name}")
+    if name != "show":
+        # `show` is the controller's own switch now - a dialog either exists or it does not, so the
+        # panel has nothing to read. The live phase is still shared, because the panel draws it.
+        check(re.search(rf"\bRecorderUiState\.{name}\b", panel) is not None,
+              f"the panel must read RecorderUiState.{name}")
+    check(re.search(rf"\bRecorderUiState\.{name}\b", overlay) is None,
+          f"the overlay must not read RecorderUiState.{name}: it no longer draws the panel")
 
 # 2. The options shown are the options this device has, and the pair is resolved before starting.
 check("configs.firstOrNull { it.quality == quality && it.fps == fps }" in panel,
@@ -58,35 +65,52 @@ check("configs.map { it.quality }" in panel and "configs.map { it.fps }" in pane
 check("RecordingOptions.supported(" in controller,
       "the controller is what enumerates encoders; the panel must not do it itself")
 
-# 3. The panel is hosted by the in-game overlay, above the menu.
-check("RecorderPanel(" in overlay, "the overlay must host the panel")
-check("import net.kdt.pojavlaunch.recording.RecorderPanel" in overlay,
-      "the panel must be imported where it is used")
-host_at = overlay.index("RecorderPanel(")
-boot_at = overlay.index("CrimsonBootSplash()")
-check(host_at > boot_at,
-      "the panel must be drawn last, so it sits above the boot splash, menu and HUD")
+# 3. The panel is a window of its own, owned by the controller.
+#    It used to be hosted inside AerixClientOverlayView, which is visibility=GONE on any instance
+#    that is not an Aerix Client - so on a vanilla instance the recorder set "open", drew nothing,
+#    and looked broken. A dialog belongs to the activity, so it opens from wherever it is reached.
+check("RecorderPanel(" not in overlay,
+      "the panel must not be hosted by the overlay: that view is GONE on non-Client instances")
+check("Dialog(" in controller and "setContentView(view)" in controller,
+      "the panel must be a dialog window the controller opens")
+check("RecorderPanel(" in controller, "the dialog is what composes the panel")
+check("ComposeView(context)" in controller, "the dialog hosts a ComposeView")
 
-# 4. Touches reach the panel and never the game while it is open.
-check("RecorderUiState.show.value)" in overlay.replace(" ", "") or
-      "RecorderUiState.show.value\n" in overlay,
-      "the open panel must count as a blocking modal")
-blocking = overlay[overlay.index("fun isBlockingModalOpen()"):]
-blocking = blocking[:blocking.index("\n    }")]
-check("RecorderUiState.show.value" in blocking,
-      "isBlockingModalOpen must include the recorder panel, or the game takes its taps")
-check("if (visibility == VISIBLE && net.kdt.pojavlaunch.recording.RecorderUiState" in overlay,
-      "back must close the panel, and only while this overlay is the one on screen")
-back = overlay[overlay.index("fun handleBackPress()"):]
-back = back[:back.index("fun isBlockingModalOpen")]
-check(back.index("RecorderUiState.show.value") < back.index("menuSubPage"),
-      "back must close the recorder panel before it walks the client menu back")
+# A ComposeView in a dialog window has no lifecycle/ViewModel/saved-state owners, and a composition
+# without a lifecycle owner silently never starts - which looks exactly like the bug being fixed.
+check("setViewTreeLifecycleOwner" in controller and "setViewTreeSavedStateRegistryOwner" in controller,
+      "the dialog's view tree must be given the activity's owners or the panel never composes")
+check("ensureViewTreeOwners(window.decorView)" in controller,
+      "the owners go on the dialog's decor view, which is the tree the ComposeView lives in")
+check("ViewCompositionStrategy.DisposeOnDetachedFromWindowOrReleasedFromPool" in controller,
+      "closing the panel must dispose the composition, not leak a recomposer")
+
+# 4. Touches reach the panel and never the game while it is open, and back closes only the panel.
+check("setCanceledOnTouchOutside(false)" in controller,
+      "a stray tap outside must not dismiss the panel that is being configured")
+check("KeyEvent.KEYCODE_BACK" in controller and "KeyEvent.KEYCODE_ESCAPE" in controller,
+      "back and escape must close the panel")
+check("RecorderUiState.show.value" not in overlay,
+      "the overlay must no longer gate touches or back on recorder state it does not draw")
+
+# The window must be taken down on every exit: a leaked one is a Crimson sheet over the next launch.
+for exit_point in ("fun dismissPanel()", "fun destroy()"):
+    check("dismissPanel()" in controller[controller.index(exit_point):][:400],
+          exit_point + " must close the panel window")
+check("panelDialog = null" in controller and "dialog.isShowing" in controller,
+      "the panel window must be dropped, not just flagged closed")
+check("dismissPanel()" in controller[controller.index("fun startWithChoice("):][:600],
+      "starting a take must close the panel it was configured in")
+# The "already recording" path reached the panel state without ever making a window - the same bug.
+in_progress = controller[controller.index("if (RecordingState.isActive() || startRequested)"):]
+check("openPanel(" in in_progress[:400],
+      "the recording-in-progress path must open the same window, not just set the flag")
 
 # 5. One path into a take, so the saved choice and the started take cannot disagree.
 check("fun startWithChoice(" in controller, "the panel must hand its choices to the controller")
 check("controlsInRecording = withControls" in controller,
       "the controls choice must be applied through the controller, not just remembered by the panel")
-check("RecorderUiState.show.value = false" in controller[controller.index("fun startWithChoice("):][:400],
+check("dismissPanel()" in controller[controller.index("fun startWithChoice("):][:600],
       "starting a take must close the panel it was configured in")
 check("putBoolean(WITH_CONTROLS, withControls)" in controller,
       "the controls choice must be saved, or the next panel opens on the wrong value")
@@ -104,7 +128,8 @@ check(len(dialogs) <= 1,
 # 7. The activity exposes the controller the panel reads from.
 check("public net.kdt.pojavlaunch.recording.RecorderController getAerixRecorder()" in activity,
       "GameActivity must expose its recorder for the panel")
-check("getAerixRecorder()" in overlay, "the overlay must fetch the controller from the activity")
+check("getAerixRecorder()" in activity.split("public net.kdt.pojavlaunch.recording.RecorderController")[1],
+      "the activity must return the controller the panel reads from")
 check("val savedQuality" in controller and "val savedFps" in controller,
       "the panel opens on the last used settings, so they must be readable")
 check("fun showRecordingsList()" in controller,

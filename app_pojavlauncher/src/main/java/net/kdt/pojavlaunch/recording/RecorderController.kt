@@ -13,12 +13,30 @@ import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import android.app.Dialog
+import android.content.Context
+import android.view.KeyEvent
+import android.view.View
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.OnBackPressedDispatcherOwner
+import androidx.activity.setViewTreeOnBackPressedDispatcherOwner
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.ViewModelStoreOwner
+import androidx.lifecycle.findViewTreeLifecycleOwner
+import androidx.lifecycle.findViewTreeViewModelStoreOwner
+import androidx.lifecycle.setViewTreeLifecycleOwner
+import androidx.lifecycle.setViewTreeViewModelStoreOwner
+import androidx.savedstate.SavedStateRegistryOwner
+import androidx.savedstate.findViewTreeSavedStateRegistryOwner
+import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import net.kdt.pojavlaunch.Tools
 import net.kdt.pojavlaunch.PojavApplication
+import net.kdt.pojavlaunch.aerix.theme.AerixLauncherTheme
 import net.kdt.pojavlaunch.game.GameActivity
 import java.io.File
 
@@ -27,6 +45,11 @@ class RecorderController @JvmOverloads constructor(private val activity: Activit
     private val prefs = activity.getSharedPreferences("aerix_recorder", 0)
     private var pending: RecordingOptions.Config? = null
     private var dialog: AlertDialog? = null
+
+    /** The Compose options panel's window, while it is up. Separate from [dialog]: the stock dialog is
+     *  only ever the "this device cannot encode H.264" dead end now, and one must never close the
+     *  other by accident. */
+    private var panelDialog: Dialog? = null
     private var startRequested = false
     private var awaitingConsentSheet = false
     /**
@@ -203,7 +226,7 @@ class RecorderController @JvmOverloads constructor(private val activity: Activit
             // A take is running: the panel itself says so, shows the clock, and offers to stop. One
             // surface for the whole recorder instead of a Compose panel for starting it and a stock
             // dialog for stopping it.
-            RecorderUiState.show.value = true
+            openPanel(options)
             return
         }
         val screen = screenSize()
@@ -234,19 +257,118 @@ class RecorderController @JvmOverloads constructor(private val activity: Activit
             return
         }
         options = configs
+        openPanel(configs)
+    }
+
+    /**
+     * Shows the Compose panel in its own window.
+     *
+     * It cannot live inside the in-game overlay: that view is GONE on anything that is not an Aerix
+     * Client instance, so a player who opened the recorder from the in-game menu on a vanilla
+     * instance got silence - the state said "open" and nothing was drawn. A dialog belongs to the
+     * activity, not to one of its children, so it opens from wherever the recorder can be reached.
+     *
+     * It is also why the panel now gets back for free: a dialog with a back handler consumes the
+     * key before the activity ever sees it, instead of being rescued out of `dispatchKeyEvent`.
+     */
+    private fun openPanel(configs: List<RecordingOptions.Config>) {
+        dismissPanel()
+        val context = activity as? Context ?: return
+        val view = ComposeView(context).apply {
+            setContent {
+                AerixLauncherTheme {
+                    RecorderPanel(
+                        configs = configs,
+                        initialQuality = savedQuality,
+                        initialFps = savedFps,
+                        initialAudio = savedAudio,
+                        initialWithControls = savedWithControls,
+                        onStart = { config, audio, withControls -> startWithChoice(config, audio, withControls) },
+                        onStop = { stop() },
+                        onRecordings = { showRecordingsList() },
+                        onDismiss = { dismissPanel() }
+                    )
+                }
+            }
+        }
+        val dialog = Dialog(context, android.R.style.Theme_Translucent_NoTitleBar_Fullscreen).apply {
+            setContentView(view)
+            window?.setDimAmount(0f)
+            setOnDismissListener { RecorderUiState.show.value = false }
+            setCanceledOnTouchOutside(false)
+        }
+        // A dialog owns a window of its own, and that window has none of the lifecycle, saved-state or
+        // back-dispatcher owners a composition needs. Without them the ComposeView inflates, finds no
+        // owner, and silently never composes - the same blank result as the bug this is fixing, from a
+        // different direction. AerixLoadingWallpaper does this for its layer; this does it for the
+        // dialog's decor view and the panel view inside it.
+        dialog.window?.let { window ->
+            ensureViewTreeOwners(window.decorView)
+            view.setViewCompositionStrategy(
+                ViewCompositionStrategy.DisposeOnDetachedFromWindowOrReleasedFromPool
+            )
+        }
+        // Back closes the panel, and only the panel: the game keeps running underneath.
+        dialog.setOnKeyListener { _, keyCode, event ->
+            if ((keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_ESCAPE) &&
+                event.action == KeyEvent.ACTION_UP
+            ) {
+                dismissPanel()
+                true
+            } else {
+                false
+            }
+        }
+        dialog.show()
+        panelDialog = dialog
         RecorderUiState.show.value = true
+    }
+
+
+    /**
+     * Gives [view] the owners the activity provides. A ComposeView added straight to a dialog window
+     * has none of them, and a composition that cannot find a lifecycle owner never starts.
+     */
+    @android.annotation.SuppressLint("RestrictedApi")
+    private fun ensureViewTreeOwners(view: View) {
+        val owner = activity
+        for (target in listOf(view, activity.window?.decorView).filterNotNull()) {
+            if (target.findViewTreeLifecycleOwner() == null && owner is LifecycleOwner) {
+                target.setViewTreeLifecycleOwner(owner)
+            }
+            if (target.findViewTreeViewModelStoreOwner() == null && owner is ViewModelStoreOwner) {
+                target.setViewTreeViewModelStoreOwner(owner)
+            }
+            if (target.findViewTreeSavedStateRegistryOwner() == null && owner is SavedStateRegistryOwner) {
+                target.setViewTreeSavedStateRegistryOwner(owner)
+            }
+            if (target.findViewTreeOnBackPressedDispatcherOwner() == null &&
+                owner is OnBackPressedDispatcherOwner
+            ) {
+                target.setViewTreeOnBackPressedDispatcherOwner(owner)
+            }
+        }
+    }
+
+    /** Closes the panel, if one is open, without touching the take that may be running behind it. */
+    private fun dismissPanel() {
+        RecorderUiState.show.value = false
+        val dialog = panelDialog
+        panelDialog = null
+        if (dialog != null && dialog.isShowing) dialog.dismiss()
     }
 
     /** The choices the Compose panel hands back, resolved against what this device can encode. */
     fun startWithChoice(config: RecordingOptions.Config, audio: RecordingOptions.AudioSource, withControls: Boolean) {
         // The panel is showing the options; it has no part in the take itself.
-        RecorderUiState.show.value = false
+        dismissPanel()
         controlsInRecording = withControls
         start(config.copy(audioSource = audio), withControls)
     }
 
     /** The Recordings list, opened from the panel. */
     fun showRecordingsList() {
+        dismissPanel()
         showRecordings()
     }
 
@@ -424,9 +546,9 @@ class RecorderController @JvmOverloads constructor(private val activity: Activit
     fun destroy() {
         dialog?.dismiss()
         dialog = null
-        // The panel draws over the game; leaving it up past the activity would be a sheet with no
-        // game behind it the next time an instance launches.
-        RecorderUiState.show.value = false
+        // The panel is a window of its own now, so it has to be taken down explicitly: leaking it
+        // would leave a Crimson sheet with no game behind it over whatever launches next.
+        dismissPanel()
         // Never leave the controls faded out on the strength of a recording this controller is about
         // to stop: the phase callback may not arrive before the activity goes away.
         ghostingControls = false

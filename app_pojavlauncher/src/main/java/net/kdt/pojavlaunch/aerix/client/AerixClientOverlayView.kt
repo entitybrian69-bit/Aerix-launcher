@@ -128,9 +128,6 @@ import net.kdt.pojavlaunch.game.FrameTimingStats
 import net.kdt.pojavlaunch.game.platform.Platform
 import net.kdt.pojavlaunch.game.platform.input.PlatformGrabListener
 import net.kdt.pojavlaunch.instances.Instance
-import net.kdt.pojavlaunch.recording.RecordingOptions
-import net.kdt.pojavlaunch.recording.RecorderPanel
-import net.kdt.pojavlaunch.recording.RecorderUiState
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
@@ -273,13 +270,6 @@ class AerixClientOverlayView @JvmOverloads constructor(
     }
 
     fun handleBackPress(): Boolean {
-        // The recorder panel is the topmost surface, and it is the newest thing the player opened.
-        // Guarded on visibility: the panel can be opened on an instance that is not an Aerix Client,
-        // where this overlay stays GONE and the activity handles back itself.
-        if (visibility == VISIBLE && net.kdt.pojavlaunch.recording.RecorderUiState.show.value) {
-            net.kdt.pojavlaunch.recording.RecorderUiState.show.value = false
-            return true
-        }
         if (visibility != VISIBLE) return false
         if (activeModal == InGameClientModal.MODULES && menuSubPage != ClientMenuSubPage.GRID) {
             menuSubPage = ClientMenuSubPage.GRID
@@ -300,8 +290,7 @@ class AerixClientOverlayView @JvmOverloads constructor(
     }
 
     fun isBlockingModalOpen(): Boolean =
-        visibility == VISIBLE && (bootOverlayVisible || activeModal != InGameClientModal.NONE ||
-            net.kdt.pojavlaunch.recording.RecorderUiState.show.value)
+        visibility == VISIBLE && (bootOverlayVisible || activeModal != InGameClientModal.NONE)
 
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
         if (visibility != VISIBLE) return false
@@ -820,49 +809,6 @@ private fun AerixClientRootOverlay(
             CrimsonBootSplash()
         }
 
-        // The screen recorder's options panel lives at the top of the overlay, above the menu and the
-        // HUD: it is opened from the menu but it is not part of it, and the game under it must not
-        // take a single touch while its presets are being picked.
-        val recorderOpen by RecorderUiState.show
-        if (recorderOpen) {
-            val game = remember(context) {
-                var candidate: android.content.Context? = context
-                while (candidate is android.content.ContextWrapper &&
-                    candidate !is net.kdt.pojavlaunch.game.GameActivity
-                ) {
-                    candidate = candidate.baseContext
-                }
-                candidate as? net.kdt.pojavlaunch.game.GameActivity
-            }
-            val controller = remember(game) { game?.getAerixRecorder() }
-            RecorderPanel(
-                configs = controller?.options.orEmpty(),
-                initialQuality = controller?.savedQuality ?: RecordingOptions.DEFAULT_QUALITY,
-                initialFps = controller?.savedFps ?: RecordingOptions.DEFAULT_FPS,
-                initialAudio = controller?.savedAudio ?: RecordingOptions.AudioSource.GAME,
-                initialWithControls = controller?.savedWithControls ?: true,
-                onStart = { config, audio, withControls ->
-                    val recorder = controller
-                    if (recorder == null) {
-                        // The panel can only be opened from a GameActivity, so this is the case where
-                        // the activity went away underneath it. Say so instead of starting nothing.
-                        Toast.makeText(context, "Screen recorder unavailable", Toast.LENGTH_SHORT).show()
-                        RecorderUiState.show.value = false
-                    } else {
-                        recorder.startWithChoice(config, audio, withControls)
-                    }
-                },
-                onStop = {
-                    controller?.stop()
-                    RecorderUiState.show.value = false
-                },
-                onRecordings = {
-                    RecorderUiState.show.value = false
-                    controller?.showRecordingsList()
-                },
-                onDismiss = { RecorderUiState.show.value = false }
-            )
-        }
     }
 }
 
@@ -1116,6 +1062,16 @@ private fun FamousClientRectangleMenu(
     }
 }
 
+/** The running [net.kdt.pojavlaunch.game.GameActivity] behind [context], if there is one. */
+private fun gameActivityOf(context: Context?): net.kdt.pojavlaunch.game.GameActivity? {
+    var candidate: Context? = context
+    while (candidate is ContextWrapper) {
+        if (candidate is net.kdt.pojavlaunch.game.GameActivity) return candidate
+        candidate = candidate.baseContext
+    }
+    return null
+}
+
 @Composable
 private fun ClientSquaresGridPage(
     context: Context,
@@ -1210,6 +1166,10 @@ private fun ClientSquaresGridPage(
             onClick = {
                 AerixClientStore.fpsOverlayEnabled = !AerixClientStore.fpsOverlayEnabled
                 AerixClientStore.persist()
+                // Flipping the flag is not enough on its own: the readout is a plain View whose
+                // visibility is decided when the activity resumes or the menu closes, so without
+                // this the switch said ENABLED and the counter stayed gone until you left the game.
+                gameActivityOf(context)?.refreshFpsViewVisibility()
             }
         ),
         ClientSquareModule(

@@ -53,7 +53,7 @@ assert 'var withControls by remember { mutableStateOf(initialWithControls) }' in
     'the panel must open on the saved choice'
 assert 'onStart(config, audio, withControls)' in panel, 'the panel must report the toggle with the start'
 assert 'controlsInRecording = withControls' in controller
-assert 'RecorderUiState.show.value = false' in controller.split('fun startWithChoice(')[1][:400], \
+assert 'dismissPanel()' in controller.split('fun startWithChoice(')[1][:400], \
     'starting a take must close the panel it was configured in'
 assert 'CheckBox' not in controller, 'the old dialog widget must be deleted, not left unused'
 assert 'Spinner(' not in controller, 'the old dialog widgets must be deleted, not left unused'

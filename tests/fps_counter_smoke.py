@@ -84,6 +84,13 @@ check("AerixClientStore.fpsOverlayEnabled" in tile,
 check("AerixClientStore.fpsOverlayEnabled = !AerixClientStore.fpsOverlayEnabled" in tile,
       "tapping it must toggle the counter on and off")
 check("AerixClientStore.persist()" in tile, "the choice must survive the session")
+# Flipping the flag is not the whole job. FpsView is a plain View whose visibility is only decided
+# when the activity resumes or the menu closes, so without an explicit refresh the tile read ENABLED
+# while the counter stayed gone until the player left the game.
+check("refreshFpsViewVisibility()" in tile,
+      "the tile must re-evaluate the readout, or the switch does nothing until the next resume")
+check("fun gameActivityOf(context: Context?)" in overlay,
+      "the grid page only has a Context; it needs the activity behind it to reach the readout")
 check('id = "fps_counter"' in overlay and '"fps"' not in tile,
       "the new tile must not be confused with the in-HUD performance pill")
 
