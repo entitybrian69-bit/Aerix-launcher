@@ -572,6 +572,8 @@
 
 
     <!-- Aerix menu: the wallpaper behind the controls while the game starts. -->
+    <string name="aerix_ingame_menu_fps_counter">FPS counter</string>
+    <string name="aerix_ingame_menu_fps_counter_summary">Frame rate readout over the game</string>
     <string name="aerix_ingame_menu_loading_wallpaper">Use wallpaper as loading background</string>
     <string name="aerix_ingame_menu_loading_wallpaper_summary">Your wallpaper - or animation - instead of black until the game window appears.</string>
 

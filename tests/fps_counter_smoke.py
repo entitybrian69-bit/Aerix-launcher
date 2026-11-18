@@ -102,6 +102,45 @@ check("var fpsOverlayEnabled by mutableStateOf(" in store,
 check('putBoolean("fpsOverlayEnabled", fpsOverlayEnabled)' in store,
       "the switch must be saved")
 
+# 5. The pause menu the player is actually looking at must carry the switch too.
+#    The A-overlay tile only exists on Aerix Client instances; everyone else opens this menu and
+#    found no FPS control in it at all.
+screen = (JAVA / "aerix/ui/game/GameMenuScreen.kt").read_text()
+menu_view = (JAVA / "aerix/ui/game/GameMenuOverlayView.kt").read_text()
+check("fun isFpsCounterOn(): Boolean" in screen and "fun onToggleFpsCounter(enabled: Boolean)" in screen,
+      "the pause menu must expose the readout switch through its callbacks")
+# Assert on the rendered row, not on a mention in a comment: the mutation that replaced the
+# callback with a no-op still passed while these were plain substring checks.
+row_at = screen.find("SwitchRow(")
+check(row_at >= 0, "the switch must be a row the player can actually tap")
+row = screen[row_at:row_at + 700]
+check("onToggle = callbacks::onToggleFpsCounter" in row,
+      "the row must call the real toggle, not a callback that does nothing")
+check("checked = callbacks.isFpsCounterOn()" in row,
+      "the row must show the current value, not a constant")
+check("label = stringResource(R.string.aerix_ingame_menu_fps_counter)" in row,
+      "the row must be labelled from resources")
+check("aerix_ingame_menu_fps_counter" in screen,
+      "the row must have a label string, not a hardcoded title")
+check("override fun isFpsCounterOn()" in menu_view and "override fun onToggleFpsCounter(" in menu_view,
+      "the placeholder callbacks must satisfy the interface, or the menu cannot compile")
+
+activity = (JAVA / "game/GameActivity.java").read_text()
+check("public boolean isFpsCounterOn()" in activity,
+      "the activity is where the per-instance answer lives")
+# The row must report the setting the readout follows, not the menu it is drawn in: asking for the
+# visibility while the menu is open would always answer "off" and the switch would lie, so the second
+# argument is the one that matters: true would subtract "the menu is open" from the
+# answer, so the switch would always read off while the player is looking at it.
+getter = activity[activity.index("public boolean isFpsCounterOn()"):]
+getter = getter[:getter.index("}")]
+check("updateFpsViewVisibility(true, false)" in getter,
+      "the row must ask for the setting without the menu-open discount")
+check("PREF_SHOW_FPS = enabled" in activity and '"show_fps"' in activity,
+      "toggling it must save the same preference the video options own")
+check("setFpsOverlayEnabled(enabled)" in activity and "AerixClientStore.INSTANCE.persist()" in activity,
+      "an Aerix Client instance keeps its own switch, and it must be the one written")
+
 if problems:
     print("fps counter check: FAILED")
     for problem in problems:
@@ -109,3 +148,4 @@ if problems:
     sys.exit(1)
 
 print("fps counter check: the readout stays inside its pill, and the A menu can turn it on and off")
+

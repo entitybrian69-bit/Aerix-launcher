@@ -121,6 +121,15 @@ interface GameMenuCallbacks {
     fun onQuickSettings()
     fun onCustomControls()
     /** Opens the system dialog that gives the launcher access to the instance storage. */
+    /**
+     * Whether to draw the frame rate readout over the game, and what to do about it.
+     *
+     * The switch lives here because this menu is where a player already is mid-game and already
+     * waits for a toggle. It reads and writes the launcher's own `show_fps` preference - the same
+     * value the video options own - so the two can never disagree.
+     */
+    fun isFpsCounterOn(): Boolean
+    fun onToggleFpsCounter(enabled: Boolean)
     fun onRequestStoragePermission()
     /**
      * Signs the game in as [account].
@@ -386,6 +395,15 @@ private fun GameMenuMainPage(
                         height = rowHeight,
                         onClick = { onCloseRequest(); callbacks.onForceCloseGame() }
                     )
+                    SwitchRow(
+                        label = stringResource(R.string.aerix_ingame_menu_fps_counter),
+                        iconRes = R.drawable.ic_px_fps,
+                        accent = palette.accent,
+                        compact = compact,
+                        height = rowHeight,
+                        checked = callbacks.isFpsCounterOn(),
+                        onToggle = callbacks::onToggleFpsCounter
+                    )
                     LoadingWallpaperRow(accent = palette.accent, compact = compact, height = rowHeight)
                 }
 
@@ -447,6 +465,77 @@ private fun MenuHeader(compact: Boolean, versionLine: String) {
  * first seconds - which means it can be flipped while the game is still booting and the change
  * lands immediately, rather than on the next launch.
  */
+/**
+ * A switch row in the same shape as the wallpaper one, for settings that are not the wallpaper's.
+ *
+ * The FPS readout is the launcher's own preference (`show_fps`), not an Aerix-only switch: it is the
+ * same value the launcher's video options and the Aerix Client overlay tile drive. Sharing one value
+ * is the point - a player who turns it on here must not find it off there.
+ */
+@Composable
+private fun SwitchRow(
+    label: String,
+    iconRes: Int,
+    accent: Color,
+    compact: Boolean,
+    height: Dp,
+    checked: Boolean,
+    onToggle: (Boolean) -> Unit
+) {
+    val shape = RoundedCornerShape(AerixRadii.controlSmall)
+    fun apply(value: Boolean) = onToggle(value)
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(height)
+            .clip(shape)
+            .background(accent.copy(alpha = 0.10f))
+            .border(1.dp, accent.copy(alpha = 0.35f), shape)
+            .bringFocusedItemIntoView()
+            .clickable(role = Role.Switch) { apply(!checked) }
+            .padding(horizontal = AerixSpacing.smPlus),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(if (compact) 28.dp else 32.dp)
+                .clip(RoundedCornerShape(AerixRadii.compact))
+                .background(accent.copy(alpha = 0.24f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                painter = painterResource(iconRes),
+                contentDescription = null,
+                tint = accent,
+                modifier = Modifier.size(if (compact) 16.dp else 18.dp)
+            )
+        }
+        Spacer(Modifier.width(AerixSpacing.sm))
+        Text(
+            text = label,
+            color = AerixSurface.textPrimary,
+            fontSize = if (compact) 11.sp else 12.5.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
+        )
+        Switch(
+            modifier = Modifier.bringFocusedItemIntoView(),
+            checked = checked,
+            onCheckedChange = { apply(it) },
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = AerixSurface.onAccent,
+                checkedTrackColor = accent,
+                uncheckedThumbColor = AerixSurface.textSecondary,
+                uncheckedTrackColor = AerixSurface.panelTrack,
+                uncheckedBorderColor = AerixSurface.borderSoft
+            )
+        )
+    }
+}
+
 @Composable
 private fun LoadingWallpaperRow(accent: Color, compact: Boolean, height: Dp) {
     val context = LocalContext.current

@@ -366,6 +366,28 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
                 mRecorder.show();
             }
 
+            /**
+             * The readout's own answer, not the raw preference: an Aerix Client instance ignores
+             * `show_fps` and follows its overlay switch instead, so a row that read the preference
+             * directly would show the opposite of what is on screen.
+             */
+            @Override
+            public boolean isFpsCounterOn() {
+                return updateFpsViewVisibility(true, false);
+            }
+
+            @Override
+            public void onToggleFpsCounter(boolean enabled) {
+                if (instance != null && instance.isAerixClient) {
+                    net.kdt.pojavlaunch.aerix.client.AerixClientStore.INSTANCE.setFpsOverlayEnabled(enabled);
+                    net.kdt.pojavlaunch.aerix.client.AerixClientStore.INSTANCE.persist();
+                } else {
+                    LauncherPreferences.PREF_SHOW_FPS = enabled;
+                    LauncherPreferences.DEFAULT_PREF.edit().putBoolean("show_fps", enabled).apply();
+                }
+                updateFpsViewVisibility();
+            }
+
             @Override
             public void onResumeGame() {
                 hideGameMenu();
@@ -563,7 +585,18 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
 
     /** Show the frame rate readout only when the player asked for it and the Aerix menu is hidden. */
     private void updateFpsViewVisibility() {
-        if (mFpsView == null) return;
+        updateFpsViewVisibility(false, true);
+    }
+
+    /**
+     * @param askOnly when true nothing is touched and the answer is just the player's choice.
+     * @param requireMenuHidden when true the menu being open counts as "not shown", because the
+     *        readout sits under the menu. The switch row asks without that, so it reports the
+     *        setting rather than reporting that the menu it lives in is open.
+     * @return whether the player wants the readout.
+     */
+    private boolean updateFpsViewVisibility(boolean askOnly, boolean requireMenuHidden) {
+        if (mFpsView == null && !askOnly) return false;
         boolean isClient = instance != null && instance.isAerixClient;
         // An Aerix Client instance used to have no readout at all, so "turn the FPS overlay off" was
         // a setting nobody could reach there and "turn it on" nobody could obey: the A overlay now
@@ -571,9 +604,11 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         boolean wanted = isClient
                 ? net.kdt.pojavlaunch.aerix.client.AerixClientStore.INSTANCE.getFpsOverlayEnabled()
                 : LauncherPreferences.PREF_SHOW_FPS;
+        if (askOnly) return wanted;
         boolean show = wanted
-                && (mGameMenuOverlay == null || !mGameMenuOverlay.isMenuShown());
+                && (!requireMenuHidden || mGameMenuOverlay == null || !mGameMenuOverlay.isMenuShown());
         mFpsView.setVisibility(show ? View.VISIBLE : View.GONE);
+        return wanted;
     }
 
     @Override
