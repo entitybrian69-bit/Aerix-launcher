@@ -100,8 +100,10 @@ assert 'mControlLayout.setOnPlayerControlsToggle' in game and 'mRecorder.onContr
 # player commits. The long two-paragraph explanation that used to swap under a checkbox is now one
 # short line per state - the switch is the choice, so the caption only says what that choice means.
 hint = panel.split('private fun ControlsRow(')[1]
-assert "Game frames only: controls stay usable but stay out of the video." in hint, \
+assert "Game frames only" in hint, \
     'the caption has to name the capture source, not just the visual effect'
+assert 'never appear in the video' in hint and 'stay tappable' in hint, \
+    'the promise the mode makes has to be the one stated'
 assert 'Your touch controls appear in the video.' in hint
 # The render-path caveat is still surfaced - it moved to the recorder, which is the side that knows
 # whether the device refused the frames, rather than to a caption written before the take.

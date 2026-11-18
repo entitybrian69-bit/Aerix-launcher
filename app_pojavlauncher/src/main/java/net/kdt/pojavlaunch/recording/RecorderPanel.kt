@@ -56,6 +56,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import net.kdt.pojavlaunch.aerix.client.LiquidCrystalPalette
+import net.kdt.pojavlaunch.prefs.LauncherPreferences
 
 /**
  * The recorder's options, laid out as a capture panel rather than a settings form.
@@ -84,6 +85,12 @@ fun RecorderPanel(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
+    // Whether this device can hand the game's frames back at all. The SurfaceView path is the one
+    // some devices refuse, and the caption has to say so before the player commits - the fallback
+    // notice afterwards is honest, but it is a correction, not a choice.
+    val directFrames = remember {
+        GameCapture.readbackIsDirect(LauncherPreferences.PREF_USE_ALTERNATE_SURFACE)
+    }
     val active by RecorderUiState.active
     val detail by RecorderUiState.detail
 
@@ -242,6 +249,7 @@ fun RecorderPanel(
 
             ControlsRow(
                 withControls = withControls,
+                directFrames = directFrames,
                 enabled = !active,
                 onToggle = { withControls = it }
             )
@@ -639,7 +647,12 @@ private fun RecordButton(
  * choice, so the caption says what the current position means and no more.
  */
 @Composable
-private fun ControlsRow(withControls: Boolean, enabled: Boolean, onToggle: (Boolean) -> Unit) {
+private fun ControlsRow(
+    withControls: Boolean,
+    directFrames: Boolean,
+    enabled: Boolean,
+    onToggle: (Boolean) -> Unit
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -673,10 +686,17 @@ private fun ControlsRow(withControls: Boolean, enabled: Boolean, onToggle: (Bool
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = if (withControls) {
-                    "Your touch controls appear in the video."
-                } else {
-                    "Game frames only: controls stay usable but stay out of the video."
+                text = when {
+                    withControls -> "Your touch controls appear in the video."
+                    // The promise, and the odds, in the same breath: on the SurfaceView path some
+                    // devices will not give up their frames, and the controls are hidden for that
+                    // take instead - they keep working where they were, but they are not readable.
+                    directFrames ->
+                        "Game frames only: the controls stay tappable and never appear in the video."
+                    else ->
+                        "Game frames only: the controls stay tappable and out of the video, unless " +
+                            "this device's SurfaceView path refuses the frames - then they are hidden " +
+                            "for the take instead."
                 },
                 color = LiquidCrystalPalette.TextMuted,
                 fontSize = 9.5.sp
