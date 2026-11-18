@@ -246,7 +246,9 @@ class RecorderController @JvmOverloads constructor(private val activity: Activit
     }
 
     /** The Recordings list, opened from the panel. */
-    fun showRecordingsList() = showRecordings()
+    fun showRecordingsList() {
+        showRecordings()
+    }
 
     private fun showRecordings() {
         val root = instanceDir ?: return

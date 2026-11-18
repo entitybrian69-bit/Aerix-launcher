@@ -128,7 +128,7 @@ import net.kdt.pojavlaunch.game.FrameTimingStats
 import net.kdt.pojavlaunch.game.platform.Platform
 import net.kdt.pojavlaunch.game.platform.input.PlatformGrabListener
 import net.kdt.pojavlaunch.instances.Instance
-import net.kdt.pojavlaunch.recording.RecorderOptions
+import net.kdt.pojavlaunch.recording.RecordingOptions
 import net.kdt.pojavlaunch.recording.RecorderPanel
 import net.kdt.pojavlaunch.recording.RecorderUiState
 import kotlin.math.PI
@@ -842,9 +842,14 @@ private fun AerixClientRootOverlay(
                 initialAudio = controller?.savedAudio ?: RecordingOptions.AudioSource.GAME,
                 initialWithControls = controller?.savedWithControls ?: true,
                 onStart = { config, audio, withControls ->
-                    controller?.startWithChoice(config, audio, withControls) ?: run {
+                    val recorder = controller
+                    if (recorder == null) {
+                        // The panel can only be opened from a GameActivity, so this is the case where
+                        // the activity went away underneath it. Say so instead of starting nothing.
                         Toast.makeText(context, "Screen recorder unavailable", Toast.LENGTH_SHORT).show()
                         RecorderUiState.show.value = false
+                    } else {
+                        recorder.startWithChoice(config, audio, withControls)
                     }
                 },
                 onStop = {
