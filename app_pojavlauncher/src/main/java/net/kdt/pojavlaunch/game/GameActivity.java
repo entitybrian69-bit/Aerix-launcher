@@ -593,6 +593,9 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         if(PREF_ENABLE_GYRO && mGyroControl != null) mGyroControl.enable();
         PLATFORM.setHovered(true);
         updateFpsViewVisibility();
+        // The hide-while-playing switch also lives in the launcher's Controls settings. Coming back
+        // from there must not need a game restart to be seen.
+        if (mDrawerPullButton != null) mDrawerPullButton.refreshVisibility();
     }
 
     /** Show the frame rate readout only when the player asked for it and the Aerix menu is hidden. */
@@ -1089,14 +1092,6 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         // The game window is here: the wallpaper, and anything decoding it, goes now.
         net.kdt.pojavlaunch.aerix.loading.AerixLoadingWallpaper.detach();
         if (mAerixClientOverlay != null) mAerixClientOverlay.onGlWindowReady();
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        // The hide-while-playing switch also lives in the launcher's Controls settings. Coming back
-        // from there must not need a game restart to be seen.
-        if (mDrawerPullButton != null) mDrawerPullButton.refreshVisibility();
     }
 
     @Override
