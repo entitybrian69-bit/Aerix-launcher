@@ -93,6 +93,12 @@ check("setVisibility(mControlLayout.hasMenuButton() ? View.GONE : View.VISIBLE)"
       "the old direct setVisibility calls would now fight the new rules")
 check("mDrawerPullButton.refreshVisibility()" in activity,
       "a change made in the launcher's settings has to be picked up when the game comes back")
+# The field used to be declared as a plain View, so none of the button's methods resolved and the
+# whole build failed on eight "cannot find symbol" errors. A missing base class is worth a check.
+check("private View mDrawerPullButton;" not in activity
+      and "DrawerPullButton mDrawerPullButton;" in activity,
+      "the activity must hold the logo as a DrawerPullButton, not a View: as a View, every method "
+      "this feature calls on it fails to resolve")
 
 # ── The way back, from outside the game ─────────────────────────────────────────────────────
 check("MenuButtonVisibility" in settings,

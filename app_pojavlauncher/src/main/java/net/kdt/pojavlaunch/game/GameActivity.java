@@ -112,7 +112,12 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     private LoggerView loggerView;
     private DrawerLayout drawerLayout;
     private ListView navDrawer;
-    private View mDrawerPullButton;
+    /**
+     * The floating Aerix logo. Typed as the button rather than a View because it owns the rules for
+     * when it is drawn: the layout can have its own MENU button, the menu can be open, the player
+     * can have asked for it to stay out of the way during play.
+     */
+    private net.kdt.pojavlaunch.customcontrols.handleview.DrawerPullButton mDrawerPullButton;
     private FpsView mFpsView;
     private GameMenuOverlayView mGameMenuOverlay;
     private net.kdt.pojavlaunch.aerix.client.AerixClientOverlayView mAerixClientOverlay;
