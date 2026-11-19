@@ -83,6 +83,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -201,6 +203,16 @@ fun GameMenuScreen(
     var page by remember { mutableStateOf(GameMenuPage.MAIN) }
     var choosingInviteRecipient by remember { mutableStateOf(false) }
     var shown by remember { mutableStateOf(false) }
+    // The switch's own copy of the setting.
+    //
+    // `callbacks.isFpsCounterOn()` is an ordinary function call on a plain object, so Compose has
+    // nothing to observe: flipping the switch changed the game's readout but not the switch, which
+    // went on drawing the old position. A player reads a switch that does not move as one that does
+    // not work. This is also the only value the row draws, so it cannot disagree with itself.
+    var fpsOverlayOn by remember { mutableStateOf(callbacks.isFpsCounterOn()) }
+    // Re-read when the menu is opened: the A overlay has its own switch for the same readout, and
+    // a value opened hours ago would be a stale answer.
+    LaunchedEffect(revision) { fpsOverlayOn = callbacks.isFpsCounterOn() }
 
     LaunchedEffect(revision) {
         page = GameMenuPage.MAIN
@@ -331,6 +343,22 @@ private fun GameMenuMainPage(
                         emphasized = true,
                         onClick = callbacks::onResumeGame
                     )
+                    // The frame rate readout is the one thing a player flips mid-game and then
+                    // looks at immediately, so it sits under Resume rather than at the end of a
+                    // scrolling list where the fold hides it.
+                    SwitchRow(
+                        label = stringResource(R.string.aerix_ingame_menu_fps_counter),
+                        iconRes = R.drawable.ic_px_fps,
+                        accent = palette.accent,
+                        compact = compact,
+                        height = rowHeight,
+                        checked = fpsOverlayOn,
+                        onToggle = { enabled ->
+                            fpsOverlayOn = enabled
+                            callbacks.onToggleFpsCounter(enabled)
+                        },
+                        description = stringResource(R.string.aerix_ingame_menu_fps_counter_hint)
+                    )
                     CompactMenuButton(
                         label = stringResource(R.string.aerix_ingame_menu_logs),
                         iconRes = R.drawable.aerix_ic_terminal_outlined,
@@ -412,15 +440,6 @@ private fun GameMenuMainPage(
                         height = rowHeight,
                         onClick = { onCloseRequest(); callbacks.onOpenKeyTap() }
                     )
-                    SwitchRow(
-                        label = stringResource(R.string.aerix_ingame_menu_fps_counter),
-                        iconRes = R.drawable.ic_px_fps,
-                        accent = palette.accent,
-                        compact = compact,
-                        height = rowHeight,
-                        checked = callbacks.isFpsCounterOn(),
-                        onToggle = callbacks::onToggleFpsCounter
-                    )
                     LoadingWallpaperRow(accent = palette.accent, compact = compact, height = rowHeight)
                 }
 
@@ -497,7 +516,8 @@ private fun SwitchRow(
     compact: Boolean,
     height: Dp,
     checked: Boolean,
-    onToggle: (Boolean) -> Unit
+    onToggle: (Boolean) -> Unit,
+    description: String? = null
 ) {
     val shape = RoundedCornerShape(AerixRadii.controlSmall)
     fun apply(value: Boolean) = onToggle(value)
@@ -510,6 +530,11 @@ private fun SwitchRow(
             .background(accent.copy(alpha = 0.10f))
             .border(1.dp, accent.copy(alpha = 0.35f), shape)
             .bringFocusedItemIntoView()
+            .semantics {
+                // A switch row is one line, so there is no room for a hint under it. The sentence
+                // goes where it stays reachable instead of becoming text nothing draws.
+                if (description != null) stateDescription = description
+            }
             .clickable(role = Role.Switch) { apply(!checked) }
             .padding(horizontal = AerixSpacing.smPlus),
         verticalAlignment = Alignment.CenterVertically

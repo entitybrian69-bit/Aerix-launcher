@@ -77,8 +77,8 @@ check("getPaddingLeft(), -textPaint" not in view,
 # 4. The A menu grid carries an FPS Counter tile bound to the real switch.
 tile = overlay[overlay.index('id = "fps_counter"'):]
 tile = tile[:tile.index("ClientSquareModule(")]
-check('title = "FPS Counter"' in tile, "the tile must be called FPS Counter")
-check("FPS Counter" in overlay, "the grid must list it")
+check('title = "FPS overlay"' in tile, "the tile must be called FPS overlay")
+check("FPS overlay" in overlay, "the grid must list it")
 check("AerixClientStore.fpsOverlayEnabled" in tile,
       "the tile must read the same switch the launcher shows")
 check("AerixClientStore.fpsOverlayEnabled = !AerixClientStore.fpsOverlayEnabled" in tile,
@@ -114,10 +114,28 @@ check("fun isFpsCounterOn(): Boolean" in screen and "fun onToggleFpsCounter(enab
 row_at = screen.find("SwitchRow(")
 check(row_at >= 0, "the switch must be a row the player can actually tap")
 row = screen[row_at:row_at + 700]
-check("onToggle = callbacks::onToggleFpsCounter" in row,
+check("callbacks.onToggleFpsCounter(enabled)" in row,
       "the row must call the real toggle, not a callback that does nothing")
-check("checked = callbacks.isFpsCounterOn()" in row,
-      "the row must show the current value, not a constant")
+# This used to read `checked = callbacks.isFpsCounterOn()`, which is an ordinary call on a plain
+# object: Compose cannot observe it, so the switch changed the game's readout while it went on
+# drawing its old position. A switch that does not move reads as one that does not work.
+check("checked = callbacks.isFpsCounterOn()" not in row,
+      "the row must not read the setting through a call Compose cannot observe")
+check("checked = fpsOverlayOn" in row,
+      "the row must draw state, so flipping it visibly moves the switch")
+check("var fpsOverlayOn by remember { mutableStateOf(callbacks.isFpsCounterOn()) }" in screen,
+      "that state must start from the real setting, not from a guess")
+check("callbacks.onToggleFpsCounter(enabled)" in row and "fpsOverlayOn = enabled" in row,
+      "the row must update its own state and the setting together, or they disagree")
+# The A overlay has its own switch for the same readout, so an old value would be a stale answer.
+check("LaunchedEffect(revision) { fpsOverlayOn = callbacks.isFpsCounterOn() }" in screen,
+      "the value must be re-read whenever the menu opens")
+# One setting, one name: the pause menu, the A menu tile and the information page all drive the
+# same readout, so three different names for it just made the third look like something else.
+check("FPS pill on screen" not in overlay,
+      "the same setting must not be offered under a third name")
+check(overlay.count('"FPS overlay"') >= 2,
+      "the tile and the information page must both call it FPS overlay")
 check("label = stringResource(R.string.aerix_ingame_menu_fps_counter)" in row,
       "the row must be labelled from resources")
 check("aerix_ingame_menu_fps_counter" in screen,

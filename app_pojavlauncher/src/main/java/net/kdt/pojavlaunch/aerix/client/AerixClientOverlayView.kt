@@ -1157,7 +1157,10 @@ private fun ClientSquaresGridPage(
         ),
         ClientSquareModule(
             id = "fps_counter",
-            title = "FPS Counter",
+            // "FPS Counter" read as a counter to watch rather than the switch that turns the readout
+            // on and off, and the pause menu calls the same thing "FPS overlay". One name for one
+            // setting, wherever it is offered.
+            title = "FPS overlay",
             icon = FeatureIconKind.FPS,
             // The same switch the launch screen shows and the launcher's video options own, exposed
             // where the player actually is when they want it: mid-game, in the A menu.
@@ -2094,7 +2097,7 @@ private fun ClientPerformancePage(gameDir: File?, onClose: () -> Unit) {
         // The pill that draws frames per second belongs to the launcher's window, and until now an
         // Aerix Client instance could neither show it nor hide it: the setting existed only on the
         // classic video page. It lives here, next to the counters it belongs to.
-        ClientInformationToggle("FPS pill on screen", AerixClientStore.fpsOverlayEnabled) {
+        ClientInformationToggle("FPS overlay", AerixClientStore.fpsOverlayEnabled) {
             AerixClientStore.fpsOverlayEnabled = it
             AerixClientStore.persist()
             pageActivity?.refreshFpsViewVisibility()
