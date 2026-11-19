@@ -132,8 +132,18 @@ private fun collectSources(context: Context): List<LogSource> {
     // retry that every player makes after a startup crash has already destroyed its own evidence.
     net.kdt.pojavlaunch.aerix.log.PreviousLaunchLog.list(File(Tools.DIR_GAME_HOME))
         .forEach { sources.add(LogSource(previousLaunchLabel(it), it)) }
-    File(context.filesDir, net.kdt.pojavlaunch.lifecycle.LaunchDiagnostics.FILE_NAME)
-        .takeIf { it.isFile }?.let { sources.add(LogSource("Launch status", it)) }
+    // A stopped or crashed launch goes first: it is the answer to "why was I kicked back to the
+    // home screen", and putting it below two game logs makes the player scroll past their answer.
+    val launchStatus = File(context.filesDir, net.kdt.pojavlaunch.lifecycle.LaunchDiagnostics.FILE_NAME)
+        .takeIf { it.isFile }
+    if (launchStatus != null) {
+        val lastStage = runCatching { launchStatus.readText() }.getOrDefault("")
+            .substringAfter("Last stage: ", "")
+            .lineSequence().firstOrNull().orEmpty()
+        val failed = lastStage.startsWith("Stopped:") || lastStage.startsWith("Crashed:")
+        if (failed) sources.add(0, LogSource("Launch status (failed)", launchStatus))
+        else sources.add(LogSource("Launch status", launchStatus))
+    }
     File(Tools.DIR_GAME_HOME, "latestcrash.txt")
         .takeIf { it.isFile }?.let { sources.add(LogSource("Launcher crash", it)) }
     File(Tools.DIR_DATA, "latestcrash.txt")

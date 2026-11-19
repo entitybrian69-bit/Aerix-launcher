@@ -572,6 +572,8 @@
 
 
     <!-- Aerix menu: the wallpaper behind the controls while the game starts. -->
+    <string name="aerix_ingame_menu_tap_key">Tap a key</string>
+    <string name="aerix_ingame_menu_tap_key_summary">Press a key into the game, for clients bound to a key you have no button for</string>
     <string name="aerix_ingame_menu_fps_counter">FPS counter</string>
     <string name="aerix_ingame_menu_fps_counter_summary">Frame rate readout over the game</string>
     <string name="aerix_ingame_menu_loading_wallpaper">Use wallpaper as loading background</string>

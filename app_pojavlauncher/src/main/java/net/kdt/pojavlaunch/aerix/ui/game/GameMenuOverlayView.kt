@@ -243,6 +243,7 @@ class GameMenuOverlayView @JvmOverloads constructor(
         override fun onCustomControls() = Unit
         override fun isFpsCounterOn(): Boolean = false
         override fun onToggleFpsCounter(enabled: Boolean) = Unit
+        override fun onOpenKeyTap() = Unit
         override fun onRequestStoragePermission() = Unit
         override fun onSwitchAccount(account: net.kdt.pojavlaunch.aerix.bridge.AerixAccount) = Unit
     }

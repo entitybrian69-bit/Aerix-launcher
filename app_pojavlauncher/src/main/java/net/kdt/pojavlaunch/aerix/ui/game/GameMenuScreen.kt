@@ -130,6 +130,15 @@ interface GameMenuCallbacks {
      */
     fun isFpsCounterOn(): Boolean
     fun onToggleFpsCounter(enabled: Boolean)
+
+    /**
+     * Opens the panel that presses a key on request.
+     *
+     * A ghost/hack client opens on a key binding, and a touch layout has no button for most of
+     * them - Right Shift being the usual one. Sending the key from the launcher is the only way a
+     * player on a phone can reach a client that only listens for a keyboard.
+     */
+    fun onOpenKeyTap()
     fun onRequestStoragePermission()
     /**
      * Signs the game in as [account].
@@ -394,6 +403,14 @@ private fun GameMenuMainPage(
                         compact = compact,
                         height = rowHeight,
                         onClick = { onCloseRequest(); callbacks.onForceCloseGame() }
+                    )
+                    CompactMenuButton(
+                        label = stringResource(R.string.aerix_ingame_menu_tap_key),
+                        iconRes = R.drawable.aerix_ic_keyboard_outlined,
+                        color = palette.tiles[1],
+                        compact = compact,
+                        height = rowHeight,
+                        onClick = { onCloseRequest(); callbacks.onOpenKeyTap() }
                     )
                     SwitchRow(
                         label = stringResource(R.string.aerix_ingame_menu_fps_counter),

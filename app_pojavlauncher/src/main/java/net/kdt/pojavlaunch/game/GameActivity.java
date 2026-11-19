@@ -198,7 +198,7 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         }
         account = Accounts.getCurrent();
         if(instance == null) {
-            LaunchDiagnostics.mark(this, "Instance unavailable");
+            LaunchDiagnostics.fail(this, "Stopped: the selected instance could not be loaded", null);
             Logger.appendToLog("Aerix: selected instance could not be loaded");
             Toast.makeText(this, R.string.instance_dir_missing, Toast.LENGTH_LONG).show();
             finish();
@@ -215,6 +215,9 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         if (resolvedRenderer == null) resolvedRenderer = launchRenderer;
         boolean plugin = resolvedRenderer.startsWith("plugin:");
         if (instanceRenderer && !plugin && GameRenderer.getKnownRenderer(resolvedRenderer) == null) {
+            LaunchDiagnostics.fail(this,
+                    "Stopped: this instance asks for renderer '" + resolvedRenderer
+                            + "', which this build does not have", null);
             Toast.makeText(this, R.string.aerix_instance_renderer_unavailable, Toast.LENGTH_LONG).show();
             finish();
             return;
@@ -223,6 +226,8 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         mGameRenderer = new GameRenderer(resolvedRenderer, instanceRenderer);
         net.kdt.pojavlaunch.aerix.bridge.PojavPluginBridge.applyLaunchOverride(this, mGameRenderer, resolvedRenderer);
         if (instanceRenderer && plugin && !resolvedRenderer.equals(mGameRenderer.getCurrentRenderer().tag())) {
+            LaunchDiagnostics.fail(this,
+                    "Stopped: renderer plugin '" + resolvedRenderer + "' did not load", null);
             Toast.makeText(this, R.string.aerix_instance_renderer_unavailable, Toast.LENGTH_LONG).show();
             finish();
             return;
@@ -409,6 +414,11 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
             }
 
             @Override
+            public void onOpenKeyTap() {
+                openKeyTapPanel();
+            }
+
+            @Override
             public void onQuickSettings() {
                 openQuickSettings();
             }
@@ -486,12 +496,13 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
                     LaunchDiagnostics.mark(this, "Game surface ready; starting Minecraft");
                     runCraft(version, classpath);
                 }catch (Throwable e){
+                    LaunchDiagnostics.fail(this, "Stopped: starting Minecraft threw", e);
                     Tools.showErrorRemote(e);
                 }
             });
             mStartupPrepared = true;
         } catch (Throwable e) {
-            LaunchDiagnostics.mark(this, "Game setup failed");
+            LaunchDiagnostics.fail(this, "Stopped: game setup failed", e);
             Logger.appendToLog("Aerix: game setup failed: " + e.getClass().getName());
             Tools.showError(this, e, true);
         }
@@ -713,6 +724,7 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         // The loopback endpoint that gave the game its profile and skin is done with the game.
         net.kdt.pojavlaunch.aerix.bridge.AerixSkinServer.stop();
         if (mRecorder != null) mRecorder.destroy();
+        net.kdt.pojavlaunch.aerix.client.AerixKeyTapWindow.dismiss();
         super.onDestroy();
         ContextExecutor.clearActivity();
     }
@@ -826,6 +838,41 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         // Let the launch request reach the system before this process dies, so the switch cannot
         // be swallowed on the way out.
         Tools.MAIN_HANDLER.postDelayed(Tools::fullyExit, 700L);
+    }
+
+    /**
+     * The panel that presses a key on request.
+     *
+     * The window is built in Kotlin next door: a @Composable cannot be called from Java at all, since
+     * the Compose compiler adds parameters the Java compiler cannot see. This keeps the composition
+     * where it belongs and leaves the activity owning only the press itself.
+     */
+    private void openKeyTapPanel() {
+        net.kdt.pojavlaunch.aerix.client.AerixKeyTapWindow.show(this, this::sendHeldKeyPress);
+    }
+
+    /**
+     * Presses a key with a real hold instead of a single-frame tap.
+     *
+     * {@code CallbackBridge.sendKeyPress} sends down and up in the same call, which a client that
+     * polls {@code wasPressed()} once per tick can miss entirely - and a client that only listens
+     * for a held modifier can miss it always. Holding the key for a few frames is what a control
+     * button does, so it is what this does.
+     */
+    public void sendHeldKeyPress(int keyCode) {
+        final int holdMs = 90;
+        try {
+            CallbackBridge.setModifiers(keyCode, true);
+            PLATFORM.sendKeyEvent(keyCode, true, CallbackBridge.getCurrentMods());
+            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                try {
+                    CallbackBridge.setModifiers(keyCode, false);
+                    PLATFORM.sendKeyEvent(keyCode, false, CallbackBridge.getCurrentMods());
+                } catch (Throwable ignored) { }
+            }, holdMs);
+        } catch (Throwable t) {
+            net.kdt.pojavlaunch.Logger.appendToLog("Aerix key tap failed: " + t + "\n");
+        }
     }
 
     private void dialogSendCustomKey() {

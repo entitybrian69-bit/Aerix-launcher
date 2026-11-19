@@ -65,6 +65,8 @@ public class GameView extends FrameLayout implements PlatformGrabListener, Surfa
     private final InGUIEventProcessor mInGUIProcessor = new InGUIEventProcessor(this);
     private TouchEventProcessor mCurrentTouchProcessor = mInGUIProcessor;
     private AndroidPointerCapture mPointerCapture;
+    /** Last value handed to the cursor view, so this is not a per-event invalidation. */
+    private boolean mHardwarePointerNoted;
     private boolean mLastGrabState = false;
     double cursorRatioX = 0;
     double cursorRatioY = 0;
@@ -118,6 +120,53 @@ public class GameView extends FrameLayout implements PlatformGrabListener, Surfa
     }
 
     /**
+     * Android's button constant to the one the game expects.
+     *
+     * `getActionButton()` returns [MotionEvent.BUTTON_PRIMARY] (1) for the left button, but the
+     * game's backend takes GLFW numbering, where 0 is the left button. The two were being passed
+     * straight through, so a left click arrived as button 1 - the right button - and a physical
+     * mouse could not perform the most ordinary action in the game.
+     */
+    private static int glfwButton(int androidButton) {
+        switch (androidButton) {
+            case MotionEvent.BUTTON_PRIMARY: return 0;
+            case MotionEvent.BUTTON_SECONDARY: return 1;
+            case MotionEvent.BUTTON_TERTIARY: return 2;
+            case MotionEvent.BUTTON_BACK: return 3;
+            case MotionEvent.BUTTON_FORWARD: return 4;
+            default: return 0;
+        }
+    }
+
+    /**
+     * Tell the cursor view whether a real mouse is present, once.
+     *
+     * A mouse that only reports hover never moves the launcher's cursor, so the arrow this launcher
+     * draws sat at a stale position while the hand moved the real pointer somewhere else. The view
+     * stops drawing entirely once it knows a mouse is there; Android's pointer is the only one on
+     * screen from then on.
+     */
+    private void noteHardwarePointer(boolean present) {
+        if (mHardwarePointerNoted == present) return;
+        mHardwarePointerNoted = present;
+        if (mCursorView != null) mCursorView.setHardwarePointer(present);
+        // The one line that settles it on a device: whether the launcher ever saw a real pointer,
+        // and whether accessibility (which is what makes Android draw one at all) is actually on.
+        // "The old mouse still shows" has two causes and only one of them is this code.
+        try {
+            android.view.accessibility.AccessibilityManager accessibility =
+                (android.view.accessibility.AccessibilityManager) getContext()
+                    .getSystemService(android.content.Context.ACCESSIBILITY_SERVICE);
+            boolean pointerCapable = accessibility != null
+                && accessibility.isTouchExplorationEnabled();
+            net.kdt.pojavlaunch.Logger.appendToLog(
+                "Aerix mouse: " + (present ? "a physical pointer was seen" : "no physical pointer")
+                    + "; Android draws a system pointer only when accessibility is on, which is "
+                    + (pointerCapable ? "on" : "OFF") + " for this device.\n");
+        } catch (Throwable ignored) { }
+    }
+
+    /**
      * The touch event for both grabbed an non-grabbed mouse state on the touch screen
      * Does not cover the virtual mouse touchpad
      */
@@ -130,6 +179,7 @@ public class GameView extends FrameLayout implements PlatformGrabListener, Surfa
         for (int i = 0; i < e.getPointerCount(); i++) {
             int toolType = e.getToolType(i);
             if(toolType == MotionEvent.TOOL_TYPE_MOUSE) {
+                noteHardwarePointer(true);
                 if(Tools.isAndroid8OrHigher() &&
                         mPointerCapture != null) {
                     mPointerCapture.handleAutomaticCapture();
@@ -198,15 +248,23 @@ public class GameView extends FrameLayout implements PlatformGrabListener, Surfa
 
         switch(event.getActionMasked()) {
             case MotionEvent.ACTION_HOVER_MOVE:
+                noteHardwarePointer(true);
                 Platform.cursorX = event.getX(mouseCursorIndex) / cursorRatioX;
                 Platform.cursorY = event.getY(mouseCursorIndex) / cursorRatioY;
                 Platform.sendCursorPosition();
                 return true;
+            case MotionEvent.ACTION_HOVER_ENTER:
+                noteHardwarePointer(true);
+                return true;
             case MotionEvent.ACTION_SCROLL:
                 CallbackBridge.sendScroll(event.getAxisValue(MotionEvent.AXIS_HSCROLL), event.getAxisValue(MotionEvent.AXIS_VSCROLL));
                 return true;
-            case MotionEvent.ACTION_BUTTON_PRESS: sendMouseButton(event.getActionButton(),true); return true;
-            case MotionEvent.ACTION_BUTTON_RELEASE: sendMouseButton(event.getActionButton(),false); return true;
+            case MotionEvent.ACTION_BUTTON_PRESS:
+                sendMouseButton(glfwButton(event.getActionButton()), true);
+                return true;
+            case MotionEvent.ACTION_BUTTON_RELEASE:
+                sendMouseButton(glfwButton(event.getActionButton()), false);
+                return true;
             default:
                 return false;
         }

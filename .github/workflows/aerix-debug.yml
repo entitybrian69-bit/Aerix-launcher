@@ -112,6 +112,7 @@ jobs:
           python3 tests/cape_default_smoke.py
           python3 tests/layout_transparency_smoke.py
           python3 tests/fps_counter_smoke.py
+          python3 tests/key_tap_mouse_launch_smoke.py
           python3 tests/recorder_panel_smoke.py
           mkdir -p "$RUNNER_TEMP/aerix-migration-test"
           javac -d "$RUNNER_TEMP/aerix-migration-test" \

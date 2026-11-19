@@ -30,6 +30,23 @@ public class GameCursorView extends View implements PlatformCursorImplementor {
     private android.graphics.Bitmap aerixSkin;
     /** True when the image sits on the pointer rather than having its tip there. */
     private boolean aerixSkinCentered = true;
+    /**
+     * A physical mouse or trackpad is present.
+     *
+     * A mouse that only reports hover - which is most of them, since they send absolute positions
+     * instead of the relative motion the game consumes - used to leave this view drawing the
+     * launcher's own arrow at a stale position, because the launcher's cursor was never moved. With
+     * this set, [onDraw] hands the drawing over to Android's pointer entirely.
+     */
+    private boolean hardwarePointer;
+    /**
+     * The pointer sits over the game as a whole, not over a layer that should own it.
+     *
+     * Set false while a modal, a menu or the console is on top: there, Android's own pointer is the
+     * one the player is using, and a second arrow drawn at the old launcher position is the "two
+     * cursors" bug.
+     */
+    private boolean pointerOwnedByGame = true;
 
     public GameCursorView(Context context, AttributeSet attrs, int defStyleAttr) {
         this(context, attrs, defStyleAttr, 0);
@@ -53,6 +70,9 @@ public class GameCursorView extends View implements PlatformCursorImplementor {
     @Override
     protected void onDraw(@NonNull Canvas canvas) {
         if (noDraw) return;
+        // A hardware mouse draws nothing of ours. Android moves the real pointer with the hand, and
+        // anything this view painted would be a second arrow left behind at a stale position.
+        if (hardwarePointer && pointerOwnedByGame) return;
         // Scale coordinates back to the full unresized screen size
         int dx = (int) (Platform.cursorX * ((GameView)getParent()).cursorRatioX);
         int dy = (int) (Platform.cursorY * ((GameView)getParent()).cursorRatioY);
@@ -90,6 +110,20 @@ public class GameCursorView extends View implements PlatformCursorImplementor {
     @Override
     public void onGrabState(boolean isGrabbing) {
         noDraw = isGrabbing;
+        invalidate();
+    }
+
+    /** A physical mouse or trackpad was seen; from now on Android draws its pointer. */
+    public void setHardwarePointer(boolean present) {
+        if (hardwarePointer == present) return;
+        hardwarePointer = present;
+        invalidate();
+    }
+
+    /** Whether the game, rather than a menu or console above it, should own the pointer right now. */
+    public void setPointerOwnedByGame(boolean owned) {
+        if (pointerOwnedByGame == owned) return;
+        pointerOwnedByGame = owned;
         invalidate();
     }
 
