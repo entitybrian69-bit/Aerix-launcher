@@ -569,6 +569,8 @@
     <string name="aerix_logo_size_hint">Very small (20 dp) to big (96 dp). Drag the slider for a live preview. Small sizes are harder to tap.</string>
     <string name="aerix_logo_size_default">Default</string>
     <string name="aerix_logo_size_accessibility">Aerix menu. Tap to open; drag to move; hold to resize.</string>
+    <string name="aerix_logo_hide_while_playing">Hide while playing</string>
+    <string name="aerix_logo_hide_while_playing_hint">On: the logo disappears while you play and comes back when the in-game menu is open. If your layout has no MENU button, this logo is how the menu opens - Controls in the launcher can turn it back on.</string>
 
 
     <!-- Aerix menu: the wallpaper behind the controls while the game starts. -->

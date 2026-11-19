@@ -522,7 +522,8 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         } catch (Throwable th) {
             Tools.showError(this, th);
         }
-        mDrawerPullButton.setVisibility(mControlLayout.hasMenuButton() ? View.GONE : View.VISIBLE);
+        mDrawerPullButton.setLayoutHasMenuButton(mControlLayout.hasMenuButton());
+        mDrawerPullButton.refreshVisibility();
         mControlLayout.toggleControlVisible();
     }
 
@@ -890,7 +891,7 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         mControlLayout.setModifiable(true);
         navDrawer.setAdapter(ingameControlsEditorArrayAdapter);
         navDrawer.setOnItemClickListener(ingameControlsEditorListener);
-        mDrawerPullButton.setVisibility(View.VISIBLE);
+        mDrawerPullButton.setEditorMode(true);
         isInEditor = true;
     }
 
@@ -1091,6 +1092,14 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        // The hide-while-playing switch also lives in the launcher's Controls settings. Coming back
+        // from there must not need a game restart to be seen.
+        if (mDrawerPullButton != null) mDrawerPullButton.refreshVisibility();
+    }
+
+    @Override
     public void onClickedMenu() {
         if (isInEditor) {
             // While the controls are being edited the drawer holds the properties of the button
@@ -1119,11 +1128,15 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         }
         // The readout belongs to the game, not to the menu: it would sit on top of the buttons.
         if (mFpsView != null) mFpsView.setVisibility(View.GONE);
+        // Hide-while-playing puts the logo away during play; the menu is where it comes back, so it
+        // is always there to open the menu a second time.
+        mDrawerPullButton.setMenuShowing(true);
         mGameMenuOverlay.showMenu();
     }
 
     private void hideGameMenu() {
         if (mGameMenuOverlay == null) return;
+        mDrawerPullButton.setMenuShowing(false);
         mGameMenuOverlay.hideMenu();
         if (launcherGLView != null) {
             launcherGLView.requestFocus();
@@ -1153,7 +1166,7 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
             mControlLayout.setModifiable(false);
             System.gc();
             mControlLayout.loadLayout(instance.getLaunchControls());
-            mDrawerPullButton.setVisibility(mControlLayout.hasMenuButton() ? View.GONE : View.VISIBLE);
+            mDrawerPullButton.setLayoutHasMenuButton(mControlLayout.hasMenuButton());
         } catch (Exception e) {
             Tools.showError(this,e);
         }
@@ -1161,6 +1174,7 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         navDrawer.setAdapter(gameActionArrayAdapter);
         navDrawer.setOnItemClickListener(gameActionClickListener);
         isInEditor = false;
+        mDrawerPullButton.setEditorMode(false);
     }
 
     @Override
