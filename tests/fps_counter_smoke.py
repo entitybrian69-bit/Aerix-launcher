@@ -114,8 +114,10 @@ check("fun isFpsCounterOn(): Boolean" in screen and "fun onToggleFpsCounter(enab
 row_at = screen.find("SwitchRow(")
 check(row_at >= 0, "the switch must be a row the player can actually tap")
 row = screen[row_at:row_at + 700]
-check("callbacks.onToggleFpsCounter(enabled)" in row,
-      "the row must call the real toggle, not a callback that does nothing")
+check("onToggle = onToggleFpsOverlay" in row,
+      "the row must call the toggle it was handed, not nothing")
+check("callbacks.onToggleFpsCounter(enabled)" in screen,
+      "and that toggle must reach the real activity, not stop at the page")
 # This used to read `checked = callbacks.isFpsCounterOn()`, which is an ordinary call on a plain
 # object: Compose cannot observe it, so the switch changed the game's readout while it went on
 # drawing its old position. A switch that does not move reads as one that does not work.
@@ -123,10 +125,25 @@ check("checked = callbacks.isFpsCounterOn()" not in row,
       "the row must not read the setting through a call Compose cannot observe")
 check("checked = fpsOverlayOn" in row,
       "the row must draw state, so flipping it visibly moves the switch")
+# The row lives in GameMenuMainPage, which is a different composable from the one that declares the
+# state: reading it directly there is an unresolved reference and the build fails. It has to be a
+# parameter of that function.
+page_start = screen.index("private fun GameMenuMainPage(")
+page = screen[page_start:]
+page_signature = page[:page.index(") {")]
+check("fpsOverlayOn: Boolean" in page_signature,
+      "GameMenuMainPage must take the value as a parameter, or the row cannot see it")
+check("onToggleFpsOverlay: (Boolean) -> Unit" in page_signature,
+      "and it must take the way to change it, or the switch cannot move")
+check("onToggle = onToggleFpsOverlay" in page,
+      "the row must call the parameter it was given")
 check("var fpsOverlayOn by remember { mutableStateOf(callbacks.isFpsCounterOn()) }" in screen,
       "that state must start from the real setting, not from a guess")
-check("callbacks.onToggleFpsCounter(enabled)" in row and "fpsOverlayOn = enabled" in row,
-      "the row must update its own state and the setting together, or they disagree")
+# The state is updated where it is declared - in GameMenuScreen, by the lambda handed to the page -
+# so the row changing it and the setting changing happen as one action, not two that can drift.
+check("onToggleFpsOverlay = { enabled ->" in screen and "fpsOverlayOn = enabled" in screen
+      and "callbacks.onToggleFpsCounter(enabled)" in screen,
+      "flipping the row must update the state and the setting together, or they disagree")
 # The A overlay has its own switch for the same readout, so an old value would be a stale answer.
 check("LaunchedEffect(revision) { fpsOverlayOn = callbacks.isFpsCounterOn() }" in screen,
       "the value must be re-read whenever the menu opens")

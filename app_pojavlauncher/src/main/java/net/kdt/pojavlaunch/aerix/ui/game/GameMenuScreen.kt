@@ -286,6 +286,11 @@ fun GameMenuScreen(
                     palette = palette,
                     account = account,
                     versionLine = versionLine,
+                    fpsOverlayOn = fpsOverlayOn,
+                    onToggleFpsOverlay = { enabled ->
+                        fpsOverlayOn = enabled
+                        callbacks.onToggleFpsCounter(enabled)
+                    },
                     onCloseRequest = onCloseRequest,
                     onOpenDownloads = { page = GameMenuPage.DOWNLOADS },
                     onOpenSocials = { choosingInviteRecipient = false; page = GameMenuPage.SOCIALS },
@@ -302,6 +307,8 @@ private fun GameMenuMainPage(
     palette: GameMenuPalette,
     account: AerixAccount?,
     versionLine: String,
+    fpsOverlayOn: Boolean,
+    onToggleFpsOverlay: (Boolean) -> Unit,
     onCloseRequest: () -> Unit,
     onOpenDownloads: () -> Unit,
     onOpenSocials: () -> Unit,
@@ -353,10 +360,7 @@ private fun GameMenuMainPage(
                         compact = compact,
                         height = rowHeight,
                         checked = fpsOverlayOn,
-                        onToggle = { enabled ->
-                            fpsOverlayOn = enabled
-                            callbacks.onToggleFpsCounter(enabled)
-                        },
+                        onToggle = onToggleFpsOverlay,
                         description = stringResource(R.string.aerix_ingame_menu_fps_counter_hint)
                     )
                     CompactMenuButton(
