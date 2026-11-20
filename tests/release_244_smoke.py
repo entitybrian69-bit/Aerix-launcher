@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""2.4.3 has to install over what people already have, and has to be the version it says it is.
+"""2.4.4 has to install over what people already have, and has to be the version it says it is.
 
 Three separate things decide whether an update lands, and all three have failed before:
 
@@ -9,9 +9,9 @@ Three separate things decide whether an update lands, and all three have failed 
    flavor appends a suffix to versionName and the check compared that against the bare tag; and it
    demanded identical signer sets, which is stricter than Android and would have refused the
    double-signed transition build that moves old installs across.
-3. **Nothing may slip back to the retired key.** The 2.4.3 cut is signed by the current key alone,
-   which is a deliberate choice: everyone on 2.4.1 updates directly, and anyone on 2.3.2 or older
-   goes through 2.4.1 once.
+3. **Every release from 2.4.4 on is double-signed permanently.** The published 2.4.1 is
+   multi-signed, and AOSP requires an identical signer set (`signaturesMatchExactly`) for updates
+   over a multi-signed package, so 2.4.4 carries both the current key and the retired key.
 """
 import re
 import sys
@@ -37,16 +37,16 @@ def check(condition, message):
 
 
 # ── 1. The version, and a versionCode that actually goes up ───────────────────────────────────
-check(version == "2.4.3", f"this release is 2.4.3, version.properties says {version}")
+check(version == "2.4.4", f"this release is 2.4.4, version.properties says {version}")
 check("def AERIX_VERSION_CODE = versionParts[0] * 10000 + versionParts[1] * 100 + versionParts[2]"
       in gradle,
       "the versionCode must keep deriving from versionName, or the two can drift apart")
 parts = [int(p) for p in version.split(".")]
 code = parts[0] * 10000 + parts[1] * 100 + parts[2]
-check(code == 20403, f"2.4.3 must be versionCode 20403, got {code}")
-check(code > 20402, "it must be above 2.4.1's 20402, or Android refuses it as a downgrade")
-check((ROOT / "docs/releases/v2.4.3.md").is_file(),
-      "the publish step requires docs/releases/v2.4.3.md and fails without it")
+check(code == 20404, f"2.4.4 must be versionCode 20404, got {code}")
+check(code > 20403, "it must be above 2.4.1's 20403, or Android refuses it as a downgrade")
+check((ROOT / "docs/releases/v2.4.4.md").is_file(),
+      "the publish step requires docs/releases/v2.4.4.md and fails without it")
 
 # ── 2. The in-app updater accepts the archive ────────────────────────────────────────────────
 check("fun versionMatchesTag(" in policy,
@@ -68,17 +68,22 @@ check("installed.any { it in incoming }" in policy,
 # knows both cases, not the overlap one on its own.
 check("LauncherUpdatePolicy.canInstallOver(" in updater,
       "the updater must ask the question Android asks, including the multi-signer case")
-check("toSet() == newSignatures.map { it.toCharsString() }.toSet()" not in updater,
-      "the exact-set requirement is the bug; it must not come back")
+# The exact-set rule is not the bug any more - canInstallOver applies it where Android applies it, to
+# multi-signed installs. What must not come back is an inline set comparison in the updater bypassing
+# the tested rule, in either direction.
+check("newSignatures.map { it.toCharsString() }.toSet()" not in updater,
+      "the updater must not compare sets inline; canInstallOver owns that rule and its tests")
 
-# ── 3. The release cut still refuses the retired key ─────────────────────────────────────────
-check("LEGACY=false" in release_wf,
-      "2.4.3 is signed by the current key alone: the retired key was published with its "
-      "password and must never sign a public build again")
+# ── 3. The release cut double-signs, on purpose and permanently ────────────────────────────────
+# 2.4.4 reverses the ban on purpose: the multi-signed 2.4.1 cannot be replaced by anything that does
+# not carry the retired certificate too. This is the one assertion that must flip when the policy
+# flips, and it is asserted here so a silent revert fails the cut.
+check("LEGACY=true" in release_wf,
+      "2.4.4 must be double-signed; a single-signed build cannot install over the published 2.4.1")
 check("leaked_cert_fingerprint.txt" in release_wf,
-      "the ban list must still be enforced")
-check("is signed by the retired key" in release_wf,
-      "the gate must still fail the build when it catches it")
+      "the workflow must still read the fingerprint record")
+check("does not carry the retired certificate" in release_wf,
+      "the gate must now fail when the retired certificate is ABSENT, not when it is present")
 marker = [l for l in release_wf.splitlines() if l.startswith("# RELEASE_MARK=")]
 check(len(marker) == 1 and marker[0].split("=", 1)[1].strip() == version,
       f"RELEASE_MARK must carry {version}, or release_signing_smoke fails the cut")
@@ -109,10 +114,9 @@ if start is not None:
           + (offenders[0].strip() if offenders else ""))
 
 # ── The version reaches the places a player reads it ─────────────────────────────────────────
-notes = (ROOT / "docs/releases/v2.4.3.md").read_text()
+notes = (ROOT / "docs/releases/v2.4.4.md").read_text()
 check("2.4.1" in notes,
-      "the notes must tell 2.3.2-and-older users to install 2.4.1 first, since 2.4.3 does not "
-      "carry the retired key")
+      "the notes must explain the 2.4.1 multi-signer wall that 2.4.4 solves")
 
 # ── 4. A testing build must not pretend it can update itself ────────────────────────────────
 #    Nightly and debug are net.al.aerixlauncher.debug; every release is net.al.aerixlauncher.
@@ -147,13 +151,15 @@ check("installed.toSet() == incoming.toSet()" in policy_src,
       "a multi-signed install requires an identical certificate set")
 check("installedIsMultiSigned" in updater_src,
       "the launcher must detect its own multi-signed install and say so")
-notes = (ROOT / "docs/releases/v2.4.3.md").read_text()
-check("will not install over 2.4.1" in notes,
-      "the notes must not promise an in-place update that the device will refuse")
-# An uninstall deletes app-specific external storage AND app-private storage on API 29+, so the notes
-# must not tell the user their files survive it. Export first is the only honest instruction.
-check("Uninstalling deletes all of it" in notes and "**Export**" in notes,
-      "the notes must warn that an uninstall deletes instances and accounts, and say to export first")
+notes = (ROOT / "docs/releases/v2.4.4.md").read_text()
+check("installs over 2.4.1 in place" in notes,
+      "2.4.4 is the release that installs over 2.4.1, and the notes must say so")
+check("permanently" in notes,
+      "the notes must not hide that every future release is double-signed too")
+# 2.4.4 needs no uninstall, so the warning belongs only where the export route is still described as
+# the alternative. What must never come back is the claim that an uninstall is harmless on API 29+.
+check("Uninstalling deletes all of it" not in notes or "sdcard" in notes,
+      "if the notes mention uninstalling, they must keep the API-29 path and the data-loss warning")
 # The advice has to describe a button that exists. Export is PojavInstanceBridge.exportModpack, reached
 # from an instance in the Library; if that goes away the notes are telling the user to press nothing.
 bridge_src = (JAVA / "aerix/bridge/PojavInstanceBridge.kt").read_text()
@@ -162,14 +168,16 @@ check("fun exportModpack(" in bridge_src and "PojavInstanceBridge.exportModpack(
       "the notes tell the user to Export their instance, so that button must still exist")
 check("\"saves\"" in library_src,
       "and it must offer Worlds (saves/), or the export cannot carry the one thing worth saving")
-check("Android.data" in notes or "Android/data" in notes,
-      "and must name where the files actually are, instead of a path that only exists on Android 9")
+# The old advice told users their files live in /sdcard/games/PojavLauncher, which is API 28 and below.
+# That false claim is what nearly cost a player their worlds; it must not reappear anywhere.
+check("/sdcard/games/PojavLauncher -" not in notes and "survive" not in notes.lower(),
+      "the notes must not claim data survives an uninstall")
 
 if problems:
-    print("release 2.4.3 check: FAILED")
+    print("release 2.4.4 check: FAILED")
     for problem in problems:
         print("  -", problem)
     sys.exit(1)
 
-print(f"release 2.4.3: versionCode {code}, the updater accepts its own archives, and the cut "
-      "still refuses the retired key")
+print(f"release 2.4.4: versionCode {code}, the updater accepts its own archives, and the cut is "
+      "double-signed on purpose")

@@ -86,17 +86,11 @@ internal object LauncherUpdater {
                     // published APK is net.al.aerixlauncher, and Android will not install one over
                     // the other whatever the signature says. Saying so is the difference between a
                     // player installing the release and a player concluding updates are broken.
-                    // Being stuck one version behind is not the same as being up to date. When the
-                    // install on this device carries more than one signer, AOSP refuses to move it
-                    // to a single-signed APK, so the next release can never install in place. Say
-                    // it here rather than let the user find out after a download and a failed tap.
-                    if (phase == LauncherUpdatePhase.CURRENT && installedIsMultiSigned(context) && !isTestChannel()) {
-                        releaseChannelNotice = "This install carries two signing certificates, which " +
-                            "Android will not let a newer single-signed release replace in place. " +
-                            "Uninstalling keeps your instances and worlds - they live in " +
-                            "/sdcard/games/PojavLauncher - so back them up, uninstall, then install " +
-                            "the release build."
-                    } else if (phase == LauncherUpdatePhase.CURRENT && isTestChannel()) {
+                    // A multi-signed install is why 2.4.4 exists, but it is no longer a warning:
+                    // from 2.4.4 every release carries the same two certificates, so a multi-signed
+                    // app updates normally. Warning here would tell every current user that their
+                    // launcher can never be updated, which is the opposite of what shipped.
+                    if (phase == LauncherUpdatePhase.CURRENT && isTestChannel()) {
                         releaseChannelNotice = "This is a testing build, so it will not update itself. " +
                             "Updates are for the release launcher - install that one from " +
                             "github.com/entitybrian69-bit/Aerix-launcher/releases/latest"
