@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""2.4.2 has to install over what people already have, and has to be the version it says it is.
+"""2.4.3 has to install over what people already have, and has to be the version it says it is.
 
 Three separate things decide whether an update lands, and all three have failed before:
 
@@ -9,7 +9,7 @@ Three separate things decide whether an update lands, and all three have failed 
    flavor appends a suffix to versionName and the check compared that against the bare tag; and it
    demanded identical signer sets, which is stricter than Android and would have refused the
    double-signed transition build that moves old installs across.
-3. **Nothing may slip back to the retired key.** The 2.4.2 cut is signed by the current key alone,
+3. **Nothing may slip back to the retired key.** The 2.4.3 cut is signed by the current key alone,
    which is a deliberate choice: everyone on 2.4.1 updates directly, and anyone on 2.3.2 or older
    goes through 2.4.1 once.
 """
@@ -37,16 +37,16 @@ def check(condition, message):
 
 
 # ── 1. The version, and a versionCode that actually goes up ───────────────────────────────────
-check(version == "2.4.2", f"this release is 2.4.2, version.properties says {version}")
+check(version == "2.4.3", f"this release is 2.4.3, version.properties says {version}")
 check("def AERIX_VERSION_CODE = versionParts[0] * 10000 + versionParts[1] * 100 + versionParts[2]"
       in gradle,
       "the versionCode must keep deriving from versionName, or the two can drift apart")
 parts = [int(p) for p in version.split(".")]
 code = parts[0] * 10000 + parts[1] * 100 + parts[2]
-check(code == 20402, f"2.4.2 must be versionCode 20402, got {code}")
-check(code > 20401, "it must be above 2.4.1's 20401, or Android refuses it as a downgrade")
-check((ROOT / "docs/releases/v2.4.2.md").is_file(),
-      "the publish step requires docs/releases/v2.4.2.md and fails without it")
+check(code == 20403, f"2.4.3 must be versionCode 20403, got {code}")
+check(code > 20402, "it must be above 2.4.1's 20402, or Android refuses it as a downgrade")
+check((ROOT / "docs/releases/v2.4.3.md").is_file(),
+      "the publish step requires docs/releases/v2.4.3.md and fails without it")
 
 # ── 2. The in-app updater accepts the archive ────────────────────────────────────────────────
 check("fun versionMatchesTag(" in policy,
@@ -71,7 +71,7 @@ check("toSet() == newSignatures.map { it.toCharsString() }.toSet()" not in updat
 
 # ── 3. The release cut still refuses the retired key ─────────────────────────────────────────
 check("LEGACY=false" in release_wf,
-      "2.4.2 is signed by the current key alone: the retired key was published with its "
+      "2.4.3 is signed by the current key alone: the retired key was published with its "
       "password and must never sign a public build again")
 check("leaked_cert_fingerprint.txt" in release_wf,
       "the ban list must still be enforced")
@@ -107,16 +107,38 @@ if start is not None:
           + (offenders[0].strip() if offenders else ""))
 
 # ── The version reaches the places a player reads it ─────────────────────────────────────────
-notes = (ROOT / "docs/releases/v2.4.2.md").read_text()
+notes = (ROOT / "docs/releases/v2.4.3.md").read_text()
 check("2.4.1" in notes,
-      "the notes must tell 2.3.2-and-older users to install 2.4.1 first, since 2.4.2 does not "
+      "the notes must tell 2.3.2-and-older users to install 2.4.1 first, since 2.4.3 does not "
       "carry the retired key")
 
+# ── 4. A testing build must not pretend it can update itself ────────────────────────────────
+#    Nightly and debug are net.al.aerixlauncher.debug; every release is net.al.aerixlauncher.
+#    Android treats those as two different apps, so no signature makes the release install over a
+#    testing build. Reporting that as "no update available" is the misleading half of the bug.
+updater_src = (JAVA / "aerix/bridge/LauncherUpdater.kt").read_text()
+dialog_src = (JAVA / "aerix/ui/screens/LauncherUpdateDialog.kt").read_text()
+check("applicationIdSuffix '.debug'" in gradle,
+      "the testing channel must still be a different package, which is why it cannot be updated")
+check('fun isTestChannel(): Boolean = BuildConfig.APPLICATION_ID.endsWith(".debug")' in updater_src,
+      "the updater must know when it is the testing channel")
+check("releaseChannelNotice" in updater_src,
+      "and it must have something to say about it instead of 'no update available'")
+check("releaseChannelNotice" in dialog_src,
+      "the update screen must show that notice, or it is a variable nobody reads")
+
+# ── 5. The cut must publish where the updater looks ─────────────────────────────────────────
+check("releases/latest" in updater_src,
+      "the updater reads releases/latest, so a release that is not the latest is not an update")
+check('gh release create "v$VERSION"' in release_wf and "--latest" in release_wf,
+      "the publish step must mark the new release latest, or releases/latest keeps serving the old "
+      "one and the updater honestly reports that nothing is newer")
+
 if problems:
-    print("release 2.4.2 check: FAILED")
+    print("release 2.4.3 check: FAILED")
     for problem in problems:
         print("  -", problem)
     sys.exit(1)
 
-print(f"release 2.4.2: versionCode {code}, the updater accepts its own archives, and the cut "
+print(f"release 2.4.3: versionCode {code}, the updater accepts its own archives, and the cut "
       "still refuses the retired key")

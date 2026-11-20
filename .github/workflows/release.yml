@@ -7,9 +7,16 @@ name: Release CI
 # A marked push has to touch this file to be seen at all, so each release cuts a
 # one line note here recording what it shipped.
 #
-# RELEASE_MARK=2.4.2
+# RELEASE_MARK=2.4.3
 #
-# Last cut: v2.4.2 on 19 Nov 2026 - the FPS overlay switch now moves when it is flipped and sits
+# Last cut: v2.4.3 on 20 Nov 2026 - 2.4.2's release disappeared from Releases after it was
+# published, which left releases/latest on v2.4.1 and the in-app updater correctly reporting "no
+# update": there was nothing newer to offer. This cut is that release again, plus the one thing it
+# was missing - a testing build now says out loud that it is a testing build and will never update
+# itself, because its package name is net.al.aerixlauncher.debug and Android will not install the
+# release APK (net.al.aerixlauncher) over it, whatever the signature says.
+#
+# Previous cut: v2.4.2 on 19 Nov 2026 - the FPS overlay switch now moves when it is flipped and sits
 # under Resume instead of below the fold; the floating logo can be put away while playing without
 # putting the menu away with it; a client's menu key can be pressed from the pause menu; a physical
 # mouse gets its own pointer and its left click arrives as the left button; and a launch that dies
@@ -178,7 +185,7 @@ jobs:
           python3 tests/fps_counter_smoke.py
           python3 tests/key_tap_mouse_launch_smoke.py
           python3 tests/logo_visibility_smoke.py
-          python3 tests/release_242_smoke.py
+          python3 tests/release_243_smoke.py
           python3 tests/recorder_panel_smoke.py
           python3 tests/fastclient_performance_download_test.py
           python3 tests/recorder_wiring_smoke.py

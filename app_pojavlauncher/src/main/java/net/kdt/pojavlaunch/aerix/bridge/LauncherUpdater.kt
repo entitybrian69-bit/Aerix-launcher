@@ -37,6 +37,8 @@ internal object LauncherUpdater {
     var speedTestReceived by mutableLongStateOf(0L); private set
     private var speedTestJob: Job? = null
     /** Whole-file test: the real update path, so the number it prints is the update's number. */
+    /** Shown when this build is on the testing channel and therefore updates nothing. */
+    var releaseChannelNotice by mutableStateOf(""); private set
     var fullTestRunning by mutableStateOf(false); private set
     var fullTestResult by mutableStateOf(""); private set
     var fullTestReceived by mutableLongStateOf(0L); private set
@@ -78,6 +80,19 @@ internal object LauncherUpdater {
                     val installed = LauncherVersion.parse(BuildConfig.VERSION_NAME)
                     require(installed != null) { "This build does not have a stable release version" }
                     phase = if (result != null && result.version > installed) LauncherUpdatePhase.AVAILABLE else LauncherUpdatePhase.CURRENT
+                    // "Up to date" and "this build is not the release channel" look identical from
+                    // the outside, and the second one is not an update problem at all: a Nightly (or
+                    // any debug-flavoured build) ships under net.al.aerixlauncher.debug, while every
+                    // published APK is net.al.aerixlauncher, and Android will not install one over
+                    // the other whatever the signature says. Saying so is the difference between a
+                    // player installing the release and a player concluding updates are broken.
+                    if (phase == LauncherUpdatePhase.CURRENT && isTestChannel()) {
+                        releaseChannelNotice = "This is a testing build, so it will not update itself. " +
+                            "Updates are for the release launcher - install that one from " +
+                            "github.com/entitybrian69-bit/Aerix-launcher/releases/latest"
+                    } else {
+                        releaseChannelNotice = ""
+                    }
                 }
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
@@ -347,6 +362,16 @@ internal object LauncherUpdater {
             } finally { withContext(Dispatchers.Main) { installing = false } }
         }
     }
+    /**
+     * Whether this build is on the testing channel rather than the release one.
+     *
+     * The package name is the answer, not a flavour flag: nightly and debug both add
+     * `.debug` to the applicationId, and that suffix is exactly what makes them a different app
+     * to Android. Every published release is `net.al.aerixlauncher`, so a testing build can never
+     * be replaced by one, signature or no signature.
+     */
+    fun isTestChannel(): Boolean = BuildConfig.APPLICATION_ID.endsWith(".debug")
+
     fun permissionReturned(context: Context) {
         if (!awaitingPermission) return
         awaitingPermission = false
