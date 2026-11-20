@@ -7,11 +7,14 @@ name: Release CI
 # A marked push has to touch this file to be seen at all, so each release cuts a
 # one line note here recording what it shipped.
 #
-# RELEASE_MARK=2.4.4
+# RELEASE_MARK=2.4.5
 #
-# Last cut: v2.4.4 on 21 Nov 2026 - the release that can actually install over 2.4.1, because it is
-# double-signed with the retired key exactly as 2.4.1 is, and it stays that way from here on. See
-# docs/signing-policy.md for why, what it costs, and why the fingerprint gate is inverted.
+# Last cut: v2.4.5 on 20 Nov 2026 - fixes FastDownload's mid-chunk cursor/double-counting bug at
+# 100% ("The update download is incomplete. Please retry."), retries probe/single-stream drops, and
+# republishes the double-signed release so 2.4.1 updates in place.
+#
+# Previous cut: v2.4.4 on 20 Nov 2026 - restored permanent double-signing so 2.4.1 can update in
+# place; see docs/signing-policy.md for why, what it costs, and why the fingerprint gate is inverted.
 #
 # Previous cut: v2.4.3 on 20 Nov 2026 - 2.4.2's release disappeared from Releases after it was
 # published, which left releases/latest on v2.4.1 and the in-app updater correctly reporting "no
@@ -197,7 +200,7 @@ jobs:
           python3 tests/fps_counter_smoke.py
           python3 tests/key_tap_mouse_launch_smoke.py
           python3 tests/logo_visibility_smoke.py
-          python3 tests/release_244_smoke.py
+          python3 tests/release_245_smoke.py
           python3 tests/recorder_panel_smoke.py
           python3 tests/fastclient_performance_download_test.py
           python3 tests/recorder_wiring_smoke.py

@@ -238,18 +238,27 @@ internal object FastDownload {
      * Asks for a single byte and reads the file's total size out of the answer. Returns the size
      * when the server honours ranges, null when it does not.
      */
-    private fun probe(url: String, userAgent: String, connections: DownloadConnections): Long? {
-        val connection = open(url, userAgent, "bytes=0-0", true) ?: return null
-        connections.attach(connection)
-        return try {
-            if (connection.responseCode != HttpURLConnection.HTTP_PARTIAL) return null
-            totalFromContentRange(connection.getHeaderField("Content-Range"))
-        } catch (e: Exception) {
-            null
-        } finally {
-            connections.detach(connection)
-            runCatching { connection.disconnect() }
+    private suspend fun probe(url: String, userAgent: String, connections: DownloadConnections): Long? {
+        repeat(3) { attempt ->
+            val connection = open(url, userAgent, "bytes=0-0", true)
+            if (connection != null) {
+                connections.attach(connection)
+                try {
+                    val code = connection.responseCode
+                    if (code == HttpURLConnection.HTTP_PARTIAL) {
+                        return totalFromContentRange(connection.getHeaderField("Content-Range"))
+                    }
+                    // A 200 OK explicitly tells us the server ignores Range; no need to retry.
+                    if (code == HttpURLConnection.HTTP_OK) return null
+                } catch (_: Exception) {
+                } finally {
+                    connections.detach(connection)
+                    runCatching { connection.disconnect() }
+                }
+            }
+            if (attempt < 2) delay(200L * (attempt + 1))
         }
+        return null
     }
 
     /** The total size out of a `bytes 0-0/12345` header. */
@@ -347,12 +356,16 @@ internal object FastDownload {
         attempts: Int = MAX_ATTEMPTS,
         readTimeoutMs: Int = 30_000
     ) {
-        var position = start
+        // Keep the cursor in an AtomicLong updated byte-for-byte with [written]. If copyRange throws
+        // an IOException mid-chunk after writing some bytes, retrying from the old cursor would
+        // double-count those bytes in [written] and fail the final size check at 100%.
+        val position = AtomicLong(start)
         var attempt = 0
         val buffer = ByteArray(BUFFER_BYTES)
-        while (position <= endInclusive) {
+        while (position.get() <= endInclusive) {
             currentCoroutineContext().ensureActive()
-            val connection = open(url, userAgent, "bytes=$position-$endInclusive", true, readTimeoutMs)
+            val cur = position.get()
+            val connection = open(url, userAgent, "bytes=$cur-$endInclusive", true, readTimeoutMs)
                 ?: throw IOException("Cannot open the update download")
             connections.attach(connection)
             try {
@@ -362,19 +375,19 @@ internal object FastDownload {
                 // Writing at the wrong offset would corrupt the file, so the answer has to begin
                 // exactly where the request asked.
                 val answeredStart = contentRangeStart(connection.getHeaderField("Content-Range"))
-                if (answeredStart != null && answeredStart != position) {
+                if (answeredStart != null && answeredStart != cur) {
                     throw IOException("The server answered a different byte range than was asked for")
                 }
                 if (target != null) {
                     RandomAccessFile(target, "rw").use { file ->
-                        file.seek(position)
-                        position = copyRange(connection, file, position, endInclusive, buffer, written, reporter)
+                        file.seek(cur)
+                        copyRange(connection, file, position, endInclusive, buffer, written, reporter)
                     }
                 } else {
                     // Sampling: read and discard, only the byte count matters.
-                    position = copyRange(connection, null, position, endInclusive, buffer, written, reporter)
+                    copyRange(connection, null, position, endInclusive, buffer, written, reporter)
                 }
-                if (position <= endInclusive) {
+                if (position.get() <= endInclusive) {
                     attempt++
                     if (attempt >= attempts) throw IOException("The update connection kept closing early")
                     delay(250L * attempt)
@@ -390,39 +403,38 @@ internal object FastDownload {
                 runCatching { connection.disconnect() }
             }
         }
-        require(position == endInclusive + 1) { "A part of the update is incomplete" }
+        require(position.get() == endInclusive + 1) { "A part of the update is incomplete" }
     }
 
     private fun copyRange(
         connection: HttpURLConnection,
         file: RandomAccessFile?,
-        from: Long,
+        position: AtomicLong,
         endInclusive: Long,
         buffer: ByteArray,
         written: AtomicLong,
         reporter: ProgressReporter?
-    ): Long {
-        var position = from
+    ) {
         BufferedInputStream(connection.inputStream, BUFFER_BYTES).use { input ->
-            while (position <= endInclusive) {
+            while (position.get() <= endInclusive) {
                 // Stopping here is what lets a timed out sample or a cancelled download walk away
                 // from a connection that is still dribbling bytes.
                 if (Thread.currentThread().isInterrupted) break
                 val count = input.read(buffer)
                 if (count == -1) break
-                require(position + count - 1 <= endInclusive) {
+                val cur = position.get()
+                require(cur + count - 1 <= endInclusive) {
                     "The server sent more bytes than were asked for"
                 }
                 file?.write(buffer, 0, count)
-                position += count
+                position.addAndGet(count.toLong())
                 written.addAndGet(count.toLong())
                 reporter?.add(count.toLong())
             }
         }
-        return position
     }
 
-    /** One connection, for servers that ignore range requests. */
+    /** One connection with retries, for servers that ignore range requests. */
     private suspend fun downloadSingle(
         url: String,
         target: File,
@@ -431,33 +443,63 @@ internal object FastDownload {
         connections: DownloadConnections,
         onProgress: (Long) -> Unit
     ): Long {
-        val connection = open(url, userAgent, null, true)
-            ?: throw IOException("Cannot open the update download")
-        connections.attach(connection)
         val written = AtomicLong(0L)
         val reporter = ProgressReporter(written, onProgress)
+        val buffer = ByteArray(BUFFER_BYTES)
+        var attempt = 0
         try {
-            require(connection.responseCode == HttpURLConnection.HTTP_OK) {
-                "Download returned HTTP ${connection.responseCode}"
-            }
-            val buffer = ByteArray(BUFFER_BYTES)
-            BufferedInputStream(connection.inputStream, BUFFER_BYTES).use { input ->
-                target.outputStream().use { output ->
-                    while (true) {
-                        currentCoroutineContext().ensureActive()
-                        val count = input.read(buffer)
-                        if (count == -1) break
-                        require(written.get() + count <= size) { "Update download size does not match the release" }
-                        output.write(buffer, 0, count)
-                        written.addAndGet(count.toLong())
-                        reporter.add(count.toLong())
+            while (written.get() < size) {
+                currentCoroutineContext().ensureActive()
+                val offset = written.get()
+                val range = if (offset > 0) "bytes=$offset-${size - 1}" else null
+                val connection = open(url, userAgent, range, true)
+                    ?: throw IOException("Cannot open the update download")
+                connections.attach(connection)
+                try {
+                    val code = connection.responseCode
+                    val resuming = offset > 0 && code == HttpURLConnection.HTTP_PARTIAL &&
+                        (contentRangeStart(connection.getHeaderField("Content-Range")) == offset)
+                    if (code != HttpURLConnection.HTTP_OK && !resuming) {
+                        throw IOException("Download returned HTTP $code")
                     }
+                    if (!resuming && offset > 0) {
+                        // Server ignored Range and sent the full stream from byte 0.
+                        written.set(0L)
+                    }
+                    RandomAccessFile(target, "rw").use { file ->
+                        val startPos = if (resuming) offset else 0L
+                        file.setLength(startPos)
+                        file.seek(startPos)
+                        BufferedInputStream(connection.inputStream, BUFFER_BYTES).use { input ->
+                            while (true) {
+                                currentCoroutineContext().ensureActive()
+                                val count = input.read(buffer)
+                                if (count == -1) break
+                                require(written.get() + count <= size) { "Update download size does not match the release" }
+                                file.write(buffer, 0, count)
+                                written.addAndGet(count.toLong())
+                                reporter.add(count.toLong())
+                            }
+                        }
+                    }
+                    if (written.get() < size) {
+                        attempt++
+                        if (attempt >= MAX_ATTEMPTS) break
+                        delay(250L * attempt)
+                    }
+                } catch (e: Exception) {
+                    if (e is CancellationException) throw e
+                    if (!currentCoroutineContext().isActive) throw e
+                    attempt++
+                    if (attempt >= MAX_ATTEMPTS) throw e
+                    delay(250L * attempt)
+                } finally {
+                    connections.detach(connection)
+                    runCatching { connection.disconnect() }
                 }
             }
         } finally {
             reporter.flush()
-            connections.detach(connection)
-            runCatching { connection.disconnect() }
         }
         return written.get()
     }

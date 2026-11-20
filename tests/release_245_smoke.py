@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""2.4.4 has to install over what people already have, and has to be the version it says it is.
+"""2.4.5 has to install over what people already have, and has to be the version it says it is.
 
 Three separate things decide whether an update lands, and all three have failed before:
 
@@ -11,7 +11,7 @@ Three separate things decide whether an update lands, and all three have failed 
    double-signed transition build that moves old installs across.
 3. **Every release from 2.4.4 on is double-signed permanently.** The published 2.4.1 is
    multi-signed, and AOSP requires an identical signer set (`signaturesMatchExactly`) for updates
-   over a multi-signed package, so 2.4.4 carries both the current key and the retired key.
+   over a multi-signed package, so 2.4.5 carries both the current key and the retired key.
 """
 import re
 import sys
@@ -37,16 +37,16 @@ def check(condition, message):
 
 
 # ── 1. The version, and a versionCode that actually goes up ───────────────────────────────────
-check(version == "2.4.4", f"this release is 2.4.4, version.properties says {version}")
+check(version == "2.4.5", f"this release is 2.4.5, version.properties says {version}")
 check("def AERIX_VERSION_CODE = versionParts[0] * 10000 + versionParts[1] * 100 + versionParts[2]"
       in gradle,
       "the versionCode must keep deriving from versionName, or the two can drift apart")
 parts = [int(p) for p in version.split(".")]
 code = parts[0] * 10000 + parts[1] * 100 + parts[2]
-check(code == 20404, f"2.4.4 must be versionCode 20404, got {code}")
-check(code > 20403, "it must be above 2.4.1's 20403, or Android refuses it as a downgrade")
-check((ROOT / "docs/releases/v2.4.4.md").is_file(),
-      "the publish step requires docs/releases/v2.4.4.md and fails without it")
+check(code == 20405, f"2.4.5 must be versionCode 20405, got {code}")
+check(code > 20404, "it must be above 2.4.1's 20404, or Android refuses it as a downgrade")
+check((ROOT / "docs/releases/v2.4.5.md").is_file(),
+      "the publish step requires docs/releases/v2.4.5.md and fails without it")
 
 # ── 2. The in-app updater accepts the archive ────────────────────────────────────────────────
 check("fun versionMatchesTag(" in policy,
@@ -75,11 +75,11 @@ check("newSignatures.map { it.toCharsString() }.toSet()" not in updater,
       "the updater must not compare sets inline; canInstallOver owns that rule and its tests")
 
 # ── 3. The release cut double-signs, on purpose and permanently ────────────────────────────────
-# 2.4.4 reverses the ban on purpose: the multi-signed 2.4.1 cannot be replaced by anything that does
+# 2.4.4 reversed the ban on purpose: the multi-signed 2.4.1 cannot be replaced by anything that does
 # not carry the retired certificate too. This is the one assertion that must flip when the policy
 # flips, and it is asserted here so a silent revert fails the cut.
 check("LEGACY=true" in release_wf,
-      "2.4.4 must be double-signed; a single-signed build cannot install over the published 2.4.1")
+      "2.4.5 must be double-signed; a single-signed build cannot install over the published 2.4.1")
 check("leaked_cert_fingerprint.txt" in release_wf,
       "the workflow must still read the fingerprint record")
 check("does not carry the retired certificate" in release_wf,
@@ -114,9 +114,9 @@ if start is not None:
           + (offenders[0].strip() if offenders else ""))
 
 # ── The version reaches the places a player reads it ─────────────────────────────────────────
-notes = (ROOT / "docs/releases/v2.4.4.md").read_text()
+notes = (ROOT / "docs/releases/v2.4.5.md").read_text()
 check("2.4.1" in notes,
-      "the notes must explain the 2.4.1 multi-signer wall that 2.4.4 solves")
+      "the notes must explain the 2.4.1 multi-signer wall that 2.4.5 solves")
 
 # ── 4. A testing build must not pretend it can update itself ────────────────────────────────
 #    Nightly and debug are net.al.aerixlauncher.debug; every release is net.al.aerixlauncher.
@@ -151,12 +151,12 @@ check("installed.toSet() == incoming.toSet()" in policy_src,
       "a multi-signed install requires an identical certificate set")
 check("installedIsMultiSigned" in updater_src,
       "the launcher must detect its own multi-signed install and say so")
-notes = (ROOT / "docs/releases/v2.4.4.md").read_text()
+notes = (ROOT / "docs/releases/v2.4.5.md").read_text()
 check("installs over 2.4.1 in place" in notes,
-      "2.4.4 is the release that installs over 2.4.1, and the notes must say so")
+      "2.4.5 is the release that installs over 2.4.1, and the notes must say so")
 check("permanently" in notes,
       "the notes must not hide that every future release is double-signed too")
-# 2.4.4 needs no uninstall, so the warning belongs only where the export route is still described as
+# 2.4.5 needs no uninstall, so the warning belongs only where the export route is still described as
 # the alternative. What must never come back is the claim that an uninstall is harmless on API 29+.
 check("Uninstalling deletes all of it" not in notes or "sdcard" in notes,
       "if the notes mention uninstalling, they must keep the API-29 path and the data-loss warning")
@@ -173,11 +173,19 @@ check("\"saves\"" in library_src,
 check("/sdcard/games/PojavLauncher -" not in notes and "survive" not in notes.lower(),
       "the notes must not claim data survives an uninstall")
 
+
+# ── 7. FastDownload must advance the range cursor with written bytes ──────────────────────────
+fast_src = (JAVA / "aerix/bridge/FastDownload.kt").read_text()
+check("val position = AtomicLong(start)" in fast_src and "position.addAndGet(count.toLong())" in fast_src,
+      "readRange must advance its cursor inside copyRange so mid-chunk resets never double-count written bytes")
+check("while (written.get() < size)" in fast_src,
+      "downloadSingle must retry/resume on early stream close instead of failing on the first drop")
+
 if problems:
-    print("release 2.4.4 check: FAILED")
+    print("release 2.4.5 check: FAILED")
     for problem in problems:
         print("  -", problem)
     sys.exit(1)
 
-print(f"release 2.4.4: versionCode {code}, the updater accepts its own archives, and the cut is "
+print(f"release 2.4.5: versionCode {code}, the updater accepts its own archives, and the cut is "
       "double-signed on purpose")

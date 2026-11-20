@@ -108,14 +108,67 @@ class FastDownloadTest {
         }
     }
 
+    @Test fun resumesMidChunkResetWithoutDoubleCountingWrittenBytes() = runBlocking {
+        val payload = ByteArray(700_000) { (it % 251).toByte() }
+        // Reset the first non-probe range connection mid-stream after sending 300 KB. Previously,
+        // readRange left its local cursor at 0 when copyRange threw, so the retry re-counted the
+        // 300 KB in `written` and failed the final size check right at 100%.
+        val server = TestFileServer(payload, honoursRanges = true, resetFirstChunkAfter = 300_000)
+        val target = File.createTempFile("fastdownload-reset", ".bin")
+        try {
+            val result = FastDownload.download(
+                url = "http://127.0.0.1:${server.port}/asset",
+                target = target,
+                expectedSize = payload.size.toLong(),
+                userAgent = "FastDownloadTest",
+                connections = DownloadConnections(),
+                onProgress = {}
+            )
+            assertEquals(payload.size.toLong(), result.bytes)
+            assertArrayEquals(payload, target.readBytes())
+            assertEquals(sha256(payload), result.sha256)
+        } finally {
+            server.close()
+            target.delete()
+        }
+    }
+
+    @Test fun retriesSingleStreamWhenFirstTransferClosesEarly() = runBlocking {
+        val payload = ByteArray(300_000) { (it % 97).toByte() }
+        val server = TestFileServer(payload, honoursRanges = false, truncateFirstFullBodyTo = 100_000)
+        val target = File.createTempFile("fastdownload-single-retry", ".bin")
+        try {
+            val result = FastDownload.download(
+                url = "http://127.0.0.1:${server.port}/asset",
+                target = target,
+                expectedSize = payload.size.toLong(),
+                userAgent = "FastDownloadTest",
+                connections = DownloadConnections(),
+                onProgress = {}
+            )
+            assertEquals(payload.size.toLong(), result.bytes)
+            assertArrayEquals(payload, target.readBytes())
+        } finally {
+            server.close()
+            target.delete()
+        }
+    }
+
     /**
      * A one-file HTTP server that answers byte ranges, so the downloader is tested against real
      * sockets instead of a mock. It serves [payload] at every path and closes each connection.
      */
-    private class TestFileServer(private val payload: ByteArray, private val honoursRanges: Boolean) {
+    private class TestFileServer(
+        private val payload: ByteArray,
+        private val honoursRanges: Boolean,
+        private val resetFirstChunkAfter: Int? = null,
+        private val truncateFirstFullBodyTo: Int? = null
+    ) {
         private val socket = ServerSocket(0, 16, java.net.InetAddress.getByName("127.0.0.1"))
         val port: Int get() = socket.localPort
         @Volatile private var running = true
+        private val droppedChunk = java.util.concurrent.atomic.AtomicBoolean(false)
+        private val truncatedFull = java.util.concurrent.atomic.AtomicBoolean(false)
 
         init {
             thread(isDaemon = true, name = "FastDownloadTest-server") {
@@ -153,6 +206,13 @@ class FastDownloadTest {
                         "Accept-Ranges: bytes\r\n" +
                         "Connection: close\r\n\r\n").toByteArray()
                 )
+                val dropAt = resetFirstChunkAfter
+                if (dropAt != null && length > 1 && length > dropAt && droppedChunk.compareAndSet(false, true)) {
+                    output.write(payload, start.toInt(), dropAt)
+                    output.flush()
+                    client.setSoLinger(true, 0)
+                    return
+                }
                 output.write(payload, start.toInt(), length)
             } else {
                 output.write(
@@ -160,6 +220,12 @@ class FastDownloadTest {
                         "Content-Length: ${payload.size}\r\n" +
                         "Connection: close\r\n\r\n").toByteArray()
                 )
+                val truncAt = truncateFirstFullBodyTo
+                if (truncAt != null && range == null && truncatedFull.compareAndSet(false, true)) {
+                    output.write(payload, 0, truncAt)
+                    output.flush()
+                    return
+                }
                 output.write(payload)
             }
             output.flush()
