@@ -124,8 +124,9 @@ class LauncherUpdatePolicyTest {
     }
 
     /**
-     * Android accepts an update when any signer matches. The 2.4.1 transition build relied on this
-     * to move installs off the retired key, so an exact-set rule breaks the only build that works.
+     * A single-signed install accepts an update when any signer matches, because rotation history can
+     * prove the old certificate. This is the rule for one signer only - see canInstallOver: an
+     * install carrying two signers needs the identical set back, which is the wall 2.4.1 sits behind.
      */
     @Test fun anySharedSignerIsEnoughJustLikeAndroid() {
         val current = "current-key"
@@ -140,5 +141,48 @@ class LauncherUpdatePolicyTest {
         assertFalse("no signers at all is never an update",
             LauncherUpdatePolicy.signaturesCompatible(emptySet(), setOf(current)))
         assertFalse(LauncherUpdatePolicy.signaturesCompatible(setOf(current), emptySet()))
+    }
+
+    /**
+     * The wall that made "install 2.4.3 over 2.4.1" impossible, written down so it stays impossible.
+     *
+     * AOSP SigningDetails.checkCapability: "multiple-signer packages cannot rotate signing certs, so
+     * we must have an exact match." The published 2.4.1 is signed with both the current and the
+     * retired key, so it is a multiple-signer install, and a single-signed APK is refused by the
+     * device with INSTALL_FAILED_UPDATE_INCOMPATIBLE no matter which certificate it shares.
+     */
+    @Test fun aMultiSignedInstallCannotMoveToASingleSignature() {
+        val current = "current-key"
+        val retired = "retired-key"
+        assertFalse("2.4.1 is double-signed; a 2.4.3 signed with only the current key is refused",
+            LauncherUpdatePolicy.canInstallOver(
+                setOf(current, retired), setOf(current), sdkInt = 30, installedIsMultiSigned = true))
+        assertFalse("even though one certificate is shared, which is the part that fooled us",
+            LauncherUpdatePolicy.signaturesCompatible(setOf(current, retired), setOf(current)))
+        assertTrue("the only APK that installs over it carries both certificates",
+            LauncherUpdatePolicy.canInstallOver(
+                setOf(current, retired), setOf(current, retired), sdkInt = 30, installedIsMultiSigned = true))
+    }
+
+    /** A single-signed install may still move, because rotation history can prove the old key. */
+    @Test fun aSingleSignedInstallCanRotate() {
+        val current = "current-key"
+        val retired = "retired-key"
+        assertTrue(LauncherUpdatePolicy.canInstallOver(
+            setOf(retired), setOf(current, retired), sdkInt = 30, installedIsMultiSigned = false))
+        assertTrue("an ordinary update is unaffected", LauncherUpdatePolicy.canInstallOver(
+            setOf(current), setOf(current), sdkInt = 30, installedIsMultiSigned = false))
+        assertFalse("and a stranger is still refused", LauncherUpdatePolicy.canInstallOver(
+            setOf(current), setOf(retired), sdkInt = 30, installedIsMultiSigned = false))
+    }
+
+    /** Below API 28 there is no SigningDetails history, so only the sets themselves can be compared. */
+    @Test fun oldAndroidComparesCertificateSetsDirectly() {
+        val current = "current-key"
+        val retired = "retired-key"
+        assertFalse(LauncherUpdatePolicy.canInstallOver(
+            setOf(current, retired), setOf(current), sdkInt = 26, installedIsMultiSigned = false))
+        assertTrue(LauncherUpdatePolicy.canInstallOver(
+            setOf(current), setOf(current), sdkInt = 26, installedIsMultiSigned = false))
     }
 }

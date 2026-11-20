@@ -86,7 +86,17 @@ internal object LauncherUpdater {
                     // published APK is net.al.aerixlauncher, and Android will not install one over
                     // the other whatever the signature says. Saying so is the difference between a
                     // player installing the release and a player concluding updates are broken.
-                    if (phase == LauncherUpdatePhase.CURRENT && isTestChannel()) {
+                    // Being stuck one version behind is not the same as being up to date. When the
+                    // install on this device carries more than one signer, AOSP refuses to move it
+                    // to a single-signed APK, so the next release can never install in place. Say
+                    // it here rather than let the user find out after a download and a failed tap.
+                    if (phase == LauncherUpdatePhase.CURRENT && installedIsMultiSigned(context) && !isTestChannel()) {
+                        releaseChannelNotice = "This install carries two signing certificates, which " +
+                            "Android will not let a newer single-signed release replace in place. " +
+                            "Uninstalling keeps your instances and worlds - they live in " +
+                            "/sdcard/games/PojavLauncher - so back them up, uninstall, then install " +
+                            "the release build."
+                    } else if (phase == LauncherUpdatePhase.CURRENT && isTestChannel()) {
                         releaseChannelNotice = "This is a testing build, so it will not update itself. " +
                             "Updates are for the release launcher - install that one from " +
                             "github.com/entitybrian69-bit/Aerix-launcher/releases/latest"
@@ -321,14 +331,17 @@ internal object LauncherUpdater {
         if (Build.VERSION.SDK_INT >= 24) require((next.applicationInfo?.minSdkVersion ?: 23) <= Build.VERSION.SDK_INT) { "This update requires a newer Android version" }
         val installedSignatures = if (Build.VERSION.SDK_INT >= 28) current.signingInfo?.apkContentsSigners else current.signatures
         val newSignatures = if (Build.VERSION.SDK_INT >= 28) next.signingInfo?.apkContentsSigners else next.signatures
-        // Android accepts an update when ANY signer matches the installed app, not when the sets are
-        // identical - which is exactly how the double-signed 2.4.1 moved installs off the retired
-        // key. This asked for set equality, so the one build that could carry a player across the
-        // rotation was refused by our own updater with "certificate does not match". Overlap is the
-        // right question: a file sharing no signer with the installed app is the impostor.
-        require(LauncherUpdatePolicy.signaturesCompatible(
+        // Ask the question the device will ask. A single-signed install can move to a new key,
+        // because rotation history proves the old one; a MULTI-signed install cannot, and needs the
+        // same set back. This comment used to claim Android accepts any overlap, and that claim is
+        // why a single-signed 2.4.3 was expected to install over the double-signed 2.4.1 when AOSP
+        // refuses exactly that. LauncherUpdatePolicy.canInstallOver carries the rule and its source.
+        require(LauncherUpdatePolicy.canInstallOver(
             installedSignatures?.map { it.toCharsString() }.orEmpty(),
-            newSignatures?.map { it.toCharsString() }.orEmpty()
+            newSignatures?.map { it.toCharsString() }.orEmpty(),
+            Build.VERSION.SDK_INT,
+            (current.signingInfo?.hasMultipleSigners() == true) ||
+                (current.signatures?.size ?: 0) > 1
         )) { "Update signing certificate does not match the installed launcher" }
     }
     fun install(context: Context) {
@@ -371,6 +384,19 @@ internal object LauncherUpdater {
      * be replaced by one, signature or no signature.
      */
     fun isTestChannel(): Boolean = BuildConfig.APPLICATION_ID.endsWith(".debug")
+
+    /**
+     * Whether the install on this device is signed with more than one certificate.
+     *
+     * Such an install cannot move to a single-signed APK at all - AOSP's SigningDetails.checkCapability
+     * requires an exact match when the installed package has several signers. Detecting it is the
+     * difference between "you are up to date" and "the next release can never install here".
+     */
+    fun installedIsMultiSigned(context: Context): Boolean = runCatching {
+        val info = context.packageManager.getPackageInfo(context.packageName, 0)
+        if (Build.VERSION.SDK_INT >= 28) info.signingInfo?.hasMultipleSigners() == true
+        else (info.signatures?.size ?: 0) > 1
+    }.getOrDefault(false)
 
     fun permissionReturned(context: Context) {
         if (!awaitingPermission) return

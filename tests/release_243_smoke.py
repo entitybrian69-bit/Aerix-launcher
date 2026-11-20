@@ -62,10 +62,12 @@ check("next.versionName == expectedVersion" not in updater,
 check("fun signaturesCompatible(" in policy,
       "the signer rule belongs where it can be tested")
 check("installed.any { it in incoming }" in policy,
-      "Android accepts an update when ANY signer matches; an exact-set comparison refuses the "
-      "double-signed transition build, which is the one build that moves old installs across")
-check("LauncherUpdatePolicy.signaturesCompatible(" in updater,
-      "the updater must use that rule")
+      "a single-signed install accepts any shared signer, which is how rotation history is proven")
+# The overlap rule above is only the single-signer case. A multi-signed install needs the exact set
+# back, and that is the wall the published 2.4.1 sits behind - so the updater must call the rule that
+# knows both cases, not the overlap one on its own.
+check("LauncherUpdatePolicy.canInstallOver(" in updater,
+      "the updater must ask the question Android asks, including the multi-signer case")
 check("toSet() == newSignatures.map { it.toCharsString() }.toSet()" not in updater,
       "the exact-set requirement is the bug; it must not come back")
 
@@ -133,6 +135,23 @@ check("releases/latest" in updater_src,
 check('gh release create "v$VERSION"' in release_wf and "--latest" in release_wf,
       "the publish step must mark the new release latest, or releases/latest keeps serving the old "
       "one and the updater honestly reports that nothing is newer")
+
+# ── 6. The device's own signature rule, not the one we wish it were ─────────────────────────
+#    AOSP SigningDetails.checkCapability: a multi-signed install needs an exact set back. 2.4.1 is
+#    multi-signed, so it cannot move to a single-signed release - and the notes must say so instead
+#    of promising an update that Android will refuse.
+policy_src = (JAVA / "aerix/bridge/LauncherUpdatePolicy.kt").read_text()
+check("fun canInstallOver(" in policy_src,
+      "the updater must ask the question Android asks, including the multi-signer case")
+check("installed.toSet() == incoming.toSet()" in policy_src,
+      "a multi-signed install requires an identical certificate set")
+check("installedIsMultiSigned" in updater_src,
+      "the launcher must detect its own multi-signed install and say so")
+notes = (ROOT / "docs/releases/v2.4.3.md").read_text()
+check("will not install over 2.4.1" in notes,
+      "the notes must not promise an in-place update that the device will refuse")
+check("/sdcard/games/PojavLauncher" in notes,
+      "and must say where instances live, so an uninstall is not feared")
 
 if problems:
     print("release 2.4.3 check: FAILED")
