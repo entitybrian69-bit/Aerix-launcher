@@ -150,8 +150,20 @@ check("installedIsMultiSigned" in updater_src,
 notes = (ROOT / "docs/releases/v2.4.3.md").read_text()
 check("will not install over 2.4.1" in notes,
       "the notes must not promise an in-place update that the device will refuse")
-check("/sdcard/games/PojavLauncher" in notes,
-      "and must say where instances live, so an uninstall is not feared")
+# An uninstall deletes app-specific external storage AND app-private storage on API 29+, so the notes
+# must not tell the user their files survive it. Export first is the only honest instruction.
+check("Uninstalling deletes all of it" in notes and "**Export**" in notes,
+      "the notes must warn that an uninstall deletes instances and accounts, and say to export first")
+# The advice has to describe a button that exists. Export is PojavInstanceBridge.exportModpack, reached
+# from an instance in the Library; if that goes away the notes are telling the user to press nothing.
+bridge_src = (JAVA / "aerix/bridge/PojavInstanceBridge.kt").read_text()
+library_src = (JAVA / "aerix/ui/screens/LibraryScreen.kt").read_text()
+check("fun exportModpack(" in bridge_src and "PojavInstanceBridge.exportModpack(" in library_src,
+      "the notes tell the user to Export their instance, so that button must still exist")
+check("\"saves\"" in library_src,
+      "and it must offer Worlds (saves/), or the export cannot carry the one thing worth saving")
+check("Android.data" in notes or "Android/data" in notes,
+      "and must name where the files actually are, instead of a path that only exists on Android 9")
 
 if problems:
     print("release 2.4.3 check: FAILED")
