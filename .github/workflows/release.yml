@@ -55,13 +55,17 @@ permissions:
 
 jobs:
   build:
+    # Any marker, not a literal one. The condition used to name 2.4.0, so bumping the marker above
+    # to the next version meant the cut built nothing at all and said nothing. Which version ships
+    # still comes from version.properties, and release_signing_smoke.py fails the cut if the marker
+    # and that file disagree.
+    #
+    # Keep comments out of the block below: inside a `if: >-` block every line is part of the
+    # expression, so a `#` there is not a comment - it is text, the expression stops parsing, and
+    # the run fails before any job is created, which looks exactly like a skipped release.
     if: >-
       github.event.inputs.confirm == 'RELEASE' ||
       (github.event_name == 'push' && contains(github.event.head_commit.message, '[build-release]')) ||
-      # Any marker, not a literal one: the condition used to name 2.4.0, so bumping the marker
-      # above to the next version meant the cut silently built nothing. The marker in the commit
-      # message is the confirmation; which version ships still comes from version.properties, and
-      # release_signing_smoke.py fails the build if the two disagree.
       (github.event_name == 'push' && contains(github.event.head_commit.message, 'RELEASE_MARK='))
     runs-on: ubuntu-22.04
     env:

@@ -85,6 +85,27 @@ check(condition and "contains(github.event.head_commit.message, 'RELEASE_MARK=')
       "the trigger must accept the marker it carries: it once named a literal version, so a bump "
       "built nothing at all and said nothing")
 
+# A `#` inside an `if: >-` block is not a comment - every line of the block is the expression. A
+# comment there made the whole run fail before any job was created, which reads as "the release did
+# not trigger" and is invisible from the outside.
+lines = release_wf.splitlines()
+try:
+    start = next(i for i, l in enumerate(lines) if l.strip() == "if: >-")
+except StopIteration:
+    start = None
+check(start is not None, "the build job's if: expression must be findable for this check")
+if start is not None:
+    block = []
+    for line in lines[start + 1:]:
+        if line.strip() and not line.startswith("      "):
+            break
+        block.append(line)
+    offenders = [l for l in block if "#" in l]
+    check(not offenders,
+          "a comment inside the if: >- block is expression text, not a comment: it makes the "
+          "expression invalid and the run fails before any job exists - "
+          + (offenders[0].strip() if offenders else ""))
+
 # ── The version reaches the places a player reads it ─────────────────────────────────────────
 notes = (ROOT / "docs/releases/v2.4.2.md").read_text()
 check("2.4.1" in notes,
