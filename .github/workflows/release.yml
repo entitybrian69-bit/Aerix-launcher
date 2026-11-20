@@ -7,12 +7,15 @@ name: Release CI
 # A marked push has to touch this file to be seen at all, so each release cuts a
 # one line note here recording what it shipped.
 #
-# RELEASE_MARK=2.4.0
+# RELEASE_MARK=2.4.2
 #
-# Last cut: v2.4.0 on 16 Nov 2026 - the first clean-signed release, and the one that stops the
-# FPS counter printing garbage: its "no frame source" message was a whole sentence inside a
-# pill sized to its own text. Messages are short again, the pill caps what it draws, and the
-# A menu finally has an FPS Counter tile that turns the readout on and off mid-game.
+# Last cut: v2.4.2 on 19 Nov 2026 - the FPS overlay switch now moves when it is flipped and sits
+# under Resume instead of below the fold; the floating logo can be put away while playing without
+# putting the menu away with it; a client's menu key can be pressed from the pause menu; a physical
+# mouse gets its own pointer and its left click arrives as the left button; and a launch that dies
+# leaves a breadcrumb with the reason. Also fixes two things that stopped updates installing in
+# place: the in-app updater rejected every -noruntime archive, and it demanded identical signer
+# sets, which is stricter than Android and would have refused the double-signed 2.4.1 itself.
 #
 # The publish job uploads the build artifacts after the build job succeeds.
 #
@@ -55,7 +58,11 @@ jobs:
     if: >-
       github.event.inputs.confirm == 'RELEASE' ||
       (github.event_name == 'push' && contains(github.event.head_commit.message, '[build-release]')) ||
-      (github.event_name == 'push' && contains(github.event.head_commit.message, 'RELEASE_MARK=2.4.0'))
+      # Any marker, not a literal one: the condition used to name 2.4.0, so bumping the marker
+      # above to the next version meant the cut silently built nothing. The marker in the commit
+      # message is the confirmation; which version ships still comes from version.properties, and
+      # release_signing_smoke.py fails the build if the two disagree.
+      (github.event_name == 'push' && contains(github.event.head_commit.message, 'RELEASE_MARK='))
     runs-on: ubuntu-22.04
     env:
       POJAV_KEYSTORE_PASSWORD: ${{ secrets.POJAV_KEYSTORE_PASSWORD }}
@@ -167,6 +174,7 @@ jobs:
           python3 tests/fps_counter_smoke.py
           python3 tests/key_tap_mouse_launch_smoke.py
           python3 tests/logo_visibility_smoke.py
+          python3 tests/release_242_smoke.py
           python3 tests/recorder_panel_smoke.py
           python3 tests/fastclient_performance_download_test.py
           python3 tests/recorder_wiring_smoke.py

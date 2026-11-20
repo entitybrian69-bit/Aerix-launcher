@@ -295,13 +295,26 @@ internal object LauncherUpdater {
         require(next.packageName == context.packageName) { "This APK is for a different launcher edition" }
         val code = if (Build.VERSION.SDK_INT >= 28) next.longVersionCode else next.versionCode.toLong()
         val currentCode = if (Build.VERSION.SDK_INT >= 28) current.longVersionCode else current.versionCode.toLong()
-        val expectedVersion = update.tag.removePrefix("v") + if (BuildConfig.FLAVOR == "noruntime") "-noruntime" else ""
-        require(code > currentCode && next.versionName == expectedVersion) { "APK version or runtime edition does not match a newer release" }
+        // The archive reports the version it was built with, and the noruntime flavor appends its
+        // own suffix to versionName. Comparing against the tag alone rejected every noruntime
+        // update with "version or runtime edition does not match" - so a player on the noruntime
+        // edition could never install an update in place, while the tag and the release page both
+        // looked right. The suffix is the flavor's, so accept it rather than demand it be absent.
+        require(code > currentCode && LauncherUpdatePolicy.versionMatchesTag(next.versionName, update.tag)) {
+            "APK version or runtime edition does not match a newer release"
+        }
         if (Build.VERSION.SDK_INT >= 24) require((next.applicationInfo?.minSdkVersion ?: 23) <= Build.VERSION.SDK_INT) { "This update requires a newer Android version" }
         val installedSignatures = if (Build.VERSION.SDK_INT >= 28) current.signingInfo?.apkContentsSigners else current.signatures
         val newSignatures = if (Build.VERSION.SDK_INT >= 28) next.signingInfo?.apkContentsSigners else next.signatures
-        require(!installedSignatures.isNullOrEmpty() && !newSignatures.isNullOrEmpty() &&
-            installedSignatures.map { it.toCharsString() }.toSet() == newSignatures.map { it.toCharsString() }.toSet()) { "Update signing certificate does not match the installed launcher" }
+        // Android accepts an update when ANY signer matches the installed app, not when the sets are
+        // identical - which is exactly how the double-signed 2.4.1 moved installs off the retired
+        // key. This asked for set equality, so the one build that could carry a player across the
+        // rotation was refused by our own updater with "certificate does not match". Overlap is the
+        // right question: a file sharing no signer with the installed app is the impostor.
+        require(LauncherUpdatePolicy.signaturesCompatible(
+            installedSignatures?.map { it.toCharsString() }.orEmpty(),
+            newSignatures?.map { it.toCharsString() }.orEmpty()
+        )) { "Update signing certificate does not match the installed launcher" }
     }
     fun install(context: Context) {
         if (installing) return

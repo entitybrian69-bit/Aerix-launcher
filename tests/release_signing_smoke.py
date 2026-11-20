@@ -183,8 +183,13 @@ if marker_lines:
                if l.startswith("versionName=")][0]
     check(marker == version,
           f"RELEASE_MARK ({marker}) must equal version.properties ({version}), or the cut ships nothing")
-    check(f"contains(github.event.head_commit.message, 'RELEASE_MARK={marker}')" in wf_text,
-          "the build condition must test for the marker the file actually carries")
+    # The condition used to name one literal version, so bumping the marker above left a cut that
+    # matched nothing and built nothing, silently. It accepts any marker now; the version that
+    # actually ships is still version.properties, and the mismatch check above guards that.
+    check("contains(github.event.head_commit.message, 'RELEASE_MARK=')" in wf_text,
+          "the build condition must accept the marker the file carries, whatever version it names")
+    check(f"'RELEASE_MARK={marker}'" not in wf_text or "RELEASE_MARK='" in wf_text,
+          "the build condition must not be pinned to a single literal version again")
 
 if failures:
     for f in failures:

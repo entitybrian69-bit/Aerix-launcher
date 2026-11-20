@@ -110,4 +110,35 @@ class LauncherUpdatePolicyTest {
         assertEquals("arm32", LauncherUpdateAsset("Aerix-Launcher-1.1.4-armeabi-v7a.apk", "", 1, null).archLabel)
         assertNull(LauncherUpdateAsset("Aerix-Launcher-1.1.4.apk", "", 1, null).archLabel)
     }
+
+    /** The noruntime flavor appends a suffix to versionName; the tag never has it. */
+    @Test fun noruntimeArchivesAreAcceptedForTheirOwnTag() {
+        assertTrue(LauncherUpdatePolicy.versionMatchesTag("2.4.2", "v2.4.2"))
+        assertTrue("a noruntime archive reports 2.4.2-noruntime and is still 2.4.2",
+            LauncherUpdatePolicy.versionMatchesTag("2.4.2-noruntime", "v2.4.2"))
+        assertTrue(LauncherUpdatePolicy.versionMatchesTag("2.4.2-noruntime", "2.4.2"))
+        assertFalse("a different version is still a different version",
+            LauncherUpdatePolicy.versionMatchesTag("2.4.1-noruntime", "v2.4.2"))
+        assertFalse("a missing version cannot be accepted",
+            LauncherUpdatePolicy.versionMatchesTag(null, "v2.4.2"))
+    }
+
+    /**
+     * Android accepts an update when any signer matches. The 2.4.1 transition build relied on this
+     * to move installs off the retired key, so an exact-set rule breaks the only build that works.
+     */
+    @Test fun anySharedSignerIsEnoughJustLikeAndroid() {
+        val current = "current-key"
+        val retired = "retired-key"
+        assertTrue("the double-signed transition must install over an old install",
+            LauncherUpdatePolicy.signaturesCompatible(setOf(retired), setOf(current, retired)))
+        assertTrue("and over a new one",
+            LauncherUpdatePolicy.signaturesCompatible(setOf(current), setOf(current, retired)))
+        assertTrue(LauncherUpdatePolicy.signaturesCompatible(setOf(current), setOf(current)))
+        assertFalse("an unrelated key is the impostor",
+            LauncherUpdatePolicy.signaturesCompatible(setOf(current), setOf(retired)))
+        assertFalse("no signers at all is never an update",
+            LauncherUpdatePolicy.signaturesCompatible(emptySet(), setOf(current)))
+        assertFalse(LauncherUpdatePolicy.signaturesCompatible(setOf(current), emptySet()))
+    }
 }

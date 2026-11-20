@@ -47,6 +47,27 @@ internal object LauncherUpdatePolicy {
         else -> null
     }
 
+    /**
+     * What the downloaded archive's version string is allowed to be for [tag].
+     *
+     * The noruntime flavor appends `-noruntime` to versionName, so an archive built from tag v2.4.2
+     * reports `2.4.2-noruntime`. Comparing it against the bare tag rejected every noruntime update
+     * with "version or runtime edition does not match", while the tag and the release page were
+     * both correct. Kept here, out of the Compose class, so it can be tested.
+     */
+    fun versionMatchesTag(reportedVersionName: String?, tag: String): Boolean =
+        reportedVersionName?.removeSuffix("-noruntime") == tag.removePrefix("v")
+
+    /**
+     * Whether Android would refuse an update from [incoming] over [installed].
+     *
+     * The rule is that any signer of the new APK may match any signer of the installed app - that
+     * is how a double-signed transition build moves installs off a retired key. Demanding that the
+     * two sets be identical, as this used to, refuses the one build that can carry a player across.
+     */
+    fun signaturesCompatible(installed: Collection<String>, incoming: Collection<String>): Boolean =
+        installed.isNotEmpty() && incoming.isNotEmpty() && installed.any { it in incoming }
+
     /** The asset names to look for, best first. Every release keeps a universal fallback. */
     fun candidateNames(version: String, noRuntime: Boolean, abi: String?): List<String> {
         val plain = version.removePrefix("v")
