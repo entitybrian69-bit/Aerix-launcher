@@ -111,6 +111,16 @@ internal fun LauncherUpdateDialog(activity: FragmentActivity, automatic: Boolean
                         }
                         LauncherUpdatePhase.CURRENT -> {
                             Text("No newer published release is available for this version.")
+                            // A testing build is a different app to Android, so it updates nothing
+                            // and Android refuses a release APK over it. Saying "no update" without
+                            // that is the same lie a broken updater would tell.
+                            if (updater.releaseChannelNotice.isNotBlank()) {
+                                Text(
+                                    updater.releaseChannelNotice,
+                                    color = AerixSurface.textSecondary,
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
                             if (BuildConfig.DEBUG && release != null) {
                                 Text(
                                     "Debug build: measure how fast this release downloads, one connection against the full pool.",

@@ -66,6 +66,11 @@ public class PojavApplication extends MGApplication {
 				Log.e(CRASH_REPORT_TAG, " - The crash stack trace was:", th);
 			}
 
+			// The breadcrumb is the only record a player can still reach after the process died:
+			// the game is gone by the time anybody looks, and the crash file may live on storage
+			// this screen cannot read. Record that the run failed, and why.
+			net.kdt.pojavlaunch.lifecycle.LaunchDiagnostics.fail(
+					PojavApplication.this, "Crashed: uncaught exception in the game process", th);
 			FatalErrorActivity.showError(PojavApplication.this, crashFile.getAbsolutePath(), storagePermAllowed, th);
 			Tools.fullyExit();
 		});

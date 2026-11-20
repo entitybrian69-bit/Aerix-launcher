@@ -31,6 +31,7 @@ ROOT = Path(__file__).resolve().parents[1]
 GRADLE = ROOT / "app_pojavlauncher/build.gradle"
 RELEASE_WF = ROOT / ".github/workflows/release.yml"
 BAN_LIST = ROOT / "tests/leaked_cert_fingerprint.txt"
+LEGACY_KEY = ROOT / "tests/aerix_legacy.p12.b64"
 failures = []
 
 
@@ -102,8 +103,15 @@ check(len(active) >= 1, "the ban list has no live entries; comments do not block
 for digest in active:
     check(re.fullmatch(r"[0-9a-f]{64}", digest) is not None,
           f"ban list entry {digest!r} is not a bare lowercase SHA-256, so apksigner output will never match it")
+# The list is inverted from 2.4.4 on: this certificate is REQUIRED, not banned, because the published
+# 2.4.1 is multi-signed and AOSP refuses to move a multi-signed install to a single-signed APK.
 check("fba0764460bf766ac2491c714ded1859201e5bf7ef3e8c276e49261845b279db" in active,
-      "the fingerprint of the key that signed v2.3.0-v2.3.2 must be banned permanently")
+      "the certificate every release must carry has to name exactly one fingerprint")
+# The workflow decodes this file to sign with. It lives only on branches that carry the committed key,
+# so its absence is a build that cannot sign at all rather than a policy choice.
+check(LEGACY_KEY.exists(), "the committed retired keystore must be present for the double-sign to work")
+check("REQUIRED" in BAN_LIST.read_text(),
+      "the file must say it is a requirement, not a ban, or the next reader inverts it back")
 
 # ---- 4. the release job matches the gradle side ----
 wf = RELEASE_WF.read_text()
@@ -116,9 +124,10 @@ check("AERIX_KEYSTORE_P12 is not set" in unpack,
       "a release with no key configured must stop with an error, not continue unsigned")
 check("::error::AERIX_KEYSTORE_PASSWORD is not set" in unpack,
       "a key without its password is the same hole wearing a hat")
-check("leaked_cert_fingerprint.txt" in wf, "the workflow must read the ban list")
+check("leaked_cert_fingerprint.txt" in wf, "the workflow must read the fingerprint record")
 check("verify --print-certs" in wf, "the gate must read the real signers out of the built APK")
-check("is signed by the retired key" in wf, "the gate message must say what it caught")
+check("does not carry the retired certificate" in wf,
+      "the gate must fail when the retired certificate is ABSENT, which is the 2.4.3 mistake")
 sign_at = wf.index("Align and sign every APK with both keys")
 collect_at = wf.index("Name the assets after the version")
 sums_at = wf.index("sha256sum Aerix-Launcher-*.apk")
@@ -132,19 +141,24 @@ check("build/outputs/apk/full/release" in sign_block and "build/outputs/apk/noru
       "yet at that point, and an empty glob would sign nothing without failing")
 check("test \"$signed\" -ge 6" in sign_block,
       "a zero-APK re-sign must be an error, not a successful no-op")
-check("--v2-signer" in wf and "aerix_legacy.p12" in wf,
-      "the transition release needs two signers; Android accepts an update when any signer matches "
-      "the installed app, which is the only reason anyone can update without uninstalling")
-check("legacy_key_present" in wf,
-      "the double-sign must be driven by whether the retired key was provided, so the step after the "
-      "transition can be deleted without editing the loop")
-# v2.4.1 is the double-signed transition release: sign with both keys so installs update in place.
+check("--next-signer" in sign_block and "aerix_legacy.p12" in sign_block,
+      "every release now needs two signers via --next-signer: the multi-signed 2.4.1 cannot otherwise be replaced")
+check("--v3-signing-enabled false" in sign_block and "--min-sdk-version 24" in sign_block,
+      "v2 double-signing requires v3 disabled and --min-sdk-version 24")
+check("--v2-signer" not in sign_block,
+      "--v2-signer is not a valid apksigner flag and breaks the build")
+check("sha-256 digest:" in wf and "tr '[:upper:]' '[:lower:]'" in wf,
+      "apksigner verification must lowercase all output and count sha-256 digest lines (1 per signer)")
+check("head -1 tests/leaked_cert_fingerprint.txt" not in wf,
+      "leaked_cert_fingerprint.txt begins with comments, so head -1 reads a comment, not the digest")
 check("LEGACY=true" in sign_block,
-      "the transition release must sign with both keys: sign_block must pin LEGACY=true")
-check('if [ "${LEGACY:-false}" = "true" ]' in wf,
-      "the transition release checks both signers are present")
-check("carries $n signer(s)" in wf or "signer(s); the transition release" in wf,
-      "a single-signed transition release must fail the build rather than brick existing installs")
+      "the double-sign must be pinned ON, not left to whether a secret happens to be set")
+# An exact count, not "at least two": a second signer that is neither key would be an unknown party, and
+# the whole point of this gate is that the certificate set is exactly what Android will compare.
+check('if [ "$n" -ne 2 ]' in wf,
+      "every published APK must carry exactly two signers")
+check('if [ "${LEGACY:-false}" = "true" ] && [ "$n" -lt 2 ]' not in wf,
+      "the two-signer requirement must not still be conditional on a transition flag that no longer exists")
 
 # ---- 5. the debug key stays in its lane ----
 check("signingConfig signingConfigs.customDebug" in gradle,
@@ -182,8 +196,13 @@ if marker_lines:
                if l.startswith("versionName=")][0]
     check(marker == version,
           f"RELEASE_MARK ({marker}) must equal version.properties ({version}), or the cut ships nothing")
-    check(f"contains(github.event.head_commit.message, 'RELEASE_MARK={marker}')" in wf_text,
-          "the build condition must test for the marker the file actually carries")
+    # The condition used to name one literal version, so bumping the marker above left a cut that
+    # matched nothing and built nothing, silently. It accepts any marker now; the version that
+    # actually ships is still version.properties, and the mismatch check above guards that.
+    check("contains(github.event.head_commit.message, 'RELEASE_MARK=')" in wf_text,
+          "the build condition must accept the marker the file carries, whatever version it names")
+    check(f"'RELEASE_MARK={marker}'" not in wf_text or "RELEASE_MARK='" in wf_text,
+          "the build condition must not be pinned to a single literal version again")
 
 if failures:
     for f in failures:
@@ -191,4 +210,4 @@ if failures:
     sys.exit(1)
 
 print("signing: no in-tree key with a public password, no fallback in any signing config, the "
-      "retired fingerprint banned, the transition double-signed before checksums")
+      "two signers including the retired certificate, signed before checksums")

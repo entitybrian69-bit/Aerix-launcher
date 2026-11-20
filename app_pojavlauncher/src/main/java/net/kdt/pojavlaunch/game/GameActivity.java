@@ -112,7 +112,12 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     private LoggerView loggerView;
     private DrawerLayout drawerLayout;
     private ListView navDrawer;
-    private View mDrawerPullButton;
+    /**
+     * The floating Aerix logo. Typed as the button rather than a View because it owns the rules for
+     * when it is drawn: the layout can have its own MENU button, the menu can be open, the player
+     * can have asked for it to stay out of the way during play.
+     */
+    private net.kdt.pojavlaunch.customcontrols.handleview.DrawerPullButton mDrawerPullButton;
     private FpsView mFpsView;
     private GameMenuOverlayView mGameMenuOverlay;
     private net.kdt.pojavlaunch.aerix.client.AerixClientOverlayView mAerixClientOverlay;
@@ -198,7 +203,7 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         }
         account = Accounts.getCurrent();
         if(instance == null) {
-            LaunchDiagnostics.mark(this, "Instance unavailable");
+            LaunchDiagnostics.fail(this, "Stopped: the selected instance could not be loaded", null);
             Logger.appendToLog("Aerix: selected instance could not be loaded");
             Toast.makeText(this, R.string.instance_dir_missing, Toast.LENGTH_LONG).show();
             finish();
@@ -215,6 +220,9 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         if (resolvedRenderer == null) resolvedRenderer = launchRenderer;
         boolean plugin = resolvedRenderer.startsWith("plugin:");
         if (instanceRenderer && !plugin && GameRenderer.getKnownRenderer(resolvedRenderer) == null) {
+            LaunchDiagnostics.fail(this,
+                    "Stopped: this instance asks for renderer '" + resolvedRenderer
+                            + "', which this build does not have", null);
             Toast.makeText(this, R.string.aerix_instance_renderer_unavailable, Toast.LENGTH_LONG).show();
             finish();
             return;
@@ -223,6 +231,8 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         mGameRenderer = new GameRenderer(resolvedRenderer, instanceRenderer);
         net.kdt.pojavlaunch.aerix.bridge.PojavPluginBridge.applyLaunchOverride(this, mGameRenderer, resolvedRenderer);
         if (instanceRenderer && plugin && !resolvedRenderer.equals(mGameRenderer.getCurrentRenderer().tag())) {
+            LaunchDiagnostics.fail(this,
+                    "Stopped: renderer plugin '" + resolvedRenderer + "' did not load", null);
             Toast.makeText(this, R.string.aerix_instance_renderer_unavailable, Toast.LENGTH_LONG).show();
             finish();
             return;
@@ -366,6 +376,28 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
                 mRecorder.show();
             }
 
+            /**
+             * The readout's own answer, not the raw preference: an Aerix Client instance ignores
+             * `show_fps` and follows its overlay switch instead, so a row that read the preference
+             * directly would show the opposite of what is on screen.
+             */
+            @Override
+            public boolean isFpsCounterOn() {
+                return updateFpsViewVisibility(true, false);
+            }
+
+            @Override
+            public void onToggleFpsCounter(boolean enabled) {
+                if (instance != null && instance.isAerixClient) {
+                    net.kdt.pojavlaunch.aerix.client.AerixClientStore.INSTANCE.setFpsOverlayEnabled(enabled);
+                    net.kdt.pojavlaunch.aerix.client.AerixClientStore.INSTANCE.persist();
+                } else {
+                    LauncherPreferences.PREF_SHOW_FPS = enabled;
+                    LauncherPreferences.DEFAULT_PREF.edit().putBoolean("show_fps", enabled).apply();
+                }
+                updateFpsViewVisibility();
+            }
+
             @Override
             public void onResumeGame() {
                 hideGameMenu();
@@ -384,6 +416,11 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
             @Override
             public void onSendCustomKey() {
                 dialogSendCustomKey();
+            }
+
+            @Override
+            public void onOpenKeyTap() {
+                openKeyTapPanel();
             }
 
             @Override
@@ -464,12 +501,13 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
                     LaunchDiagnostics.mark(this, "Game surface ready; starting Minecraft");
                     runCraft(version, classpath);
                 }catch (Throwable e){
+                    LaunchDiagnostics.fail(this, "Stopped: starting Minecraft threw", e);
                     Tools.showErrorRemote(e);
                 }
             });
             mStartupPrepared = true;
         } catch (Throwable e) {
-            LaunchDiagnostics.mark(this, "Game setup failed");
+            LaunchDiagnostics.fail(this, "Stopped: game setup failed", e);
             Logger.appendToLog("Aerix: game setup failed: " + e.getClass().getName());
             Tools.showError(this, e, true);
         }
@@ -489,7 +527,8 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         } catch (Throwable th) {
             Tools.showError(this, th);
         }
-        mDrawerPullButton.setVisibility(mControlLayout.hasMenuButton() ? View.GONE : View.VISIBLE);
+        mDrawerPullButton.setLayoutHasMenuButton(mControlLayout.hasMenuButton());
+        mDrawerPullButton.refreshVisibility();
         mControlLayout.toggleControlVisible();
     }
 
@@ -559,11 +598,25 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         if(PREF_ENABLE_GYRO && mGyroControl != null) mGyroControl.enable();
         PLATFORM.setHovered(true);
         updateFpsViewVisibility();
+        // The hide-while-playing switch also lives in the launcher's Controls settings. Coming back
+        // from there must not need a game restart to be seen.
+        if (mDrawerPullButton != null) mDrawerPullButton.refreshVisibility();
     }
 
     /** Show the frame rate readout only when the player asked for it and the Aerix menu is hidden. */
     private void updateFpsViewVisibility() {
-        if (mFpsView == null) return;
+        updateFpsViewVisibility(false, true);
+    }
+
+    /**
+     * @param askOnly when true nothing is touched and the answer is just the player's choice.
+     * @param requireMenuHidden when true the menu being open counts as "not shown", because the
+     *        readout sits under the menu. The switch row asks without that, so it reports the
+     *        setting rather than reporting that the menu it lives in is open.
+     * @return whether the player wants the readout.
+     */
+    private boolean updateFpsViewVisibility(boolean askOnly, boolean requireMenuHidden) {
+        if (mFpsView == null && !askOnly) return false;
         boolean isClient = instance != null && instance.isAerixClient;
         // An Aerix Client instance used to have no readout at all, so "turn the FPS overlay off" was
         // a setting nobody could reach there and "turn it on" nobody could obey: the A overlay now
@@ -571,9 +624,11 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         boolean wanted = isClient
                 ? net.kdt.pojavlaunch.aerix.client.AerixClientStore.INSTANCE.getFpsOverlayEnabled()
                 : LauncherPreferences.PREF_SHOW_FPS;
+        if (askOnly) return wanted;
         boolean show = wanted
-                && (mGameMenuOverlay == null || !mGameMenuOverlay.isMenuShown());
+                && (!requireMenuHidden || mGameMenuOverlay == null || !mGameMenuOverlay.isMenuShown());
         mFpsView.setVisibility(show ? View.VISIBLE : View.GONE);
+        return wanted;
     }
 
     @Override
@@ -678,6 +733,7 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         // The loopback endpoint that gave the game its profile and skin is done with the game.
         net.kdt.pojavlaunch.aerix.bridge.AerixSkinServer.stop();
         if (mRecorder != null) mRecorder.destroy();
+        net.kdt.pojavlaunch.aerix.client.AerixKeyTapWindow.dismiss();
         super.onDestroy();
         ContextExecutor.clearActivity();
     }
@@ -793,6 +849,41 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         Tools.MAIN_HANDLER.postDelayed(Tools::fullyExit, 700L);
     }
 
+    /**
+     * The panel that presses a key on request.
+     *
+     * The window is built in Kotlin next door: a @Composable cannot be called from Java at all, since
+     * the Compose compiler adds parameters the Java compiler cannot see. This keeps the composition
+     * where it belongs and leaves the activity owning only the press itself.
+     */
+    private void openKeyTapPanel() {
+        net.kdt.pojavlaunch.aerix.client.AerixKeyTapWindow.show(this, this::sendHeldKeyPress);
+    }
+
+    /**
+     * Presses a key with a real hold instead of a single-frame tap.
+     *
+     * {@code CallbackBridge.sendKeyPress} sends down and up in the same call, which a client that
+     * polls {@code wasPressed()} once per tick can miss entirely - and a client that only listens
+     * for a held modifier can miss it always. Holding the key for a few frames is what a control
+     * button does, so it is what this does.
+     */
+    public void sendHeldKeyPress(int keyCode) {
+        final int holdMs = 90;
+        try {
+            CallbackBridge.setModifiers(keyCode, true);
+            PLATFORM.sendKeyEvent(keyCode, true, CallbackBridge.getCurrentMods());
+            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                try {
+                    CallbackBridge.setModifiers(keyCode, false);
+                    PLATFORM.sendKeyEvent(keyCode, false, CallbackBridge.getCurrentMods());
+                } catch (Throwable ignored) { }
+            }, holdMs);
+        } catch (Throwable t) {
+            net.kdt.pojavlaunch.Logger.appendToLog("Aerix key tap failed: " + t + "\n");
+        }
+    }
+
     private void dialogSendCustomKey() {
         AlertDialog.Builder dialog = new AlertDialog.Builder(this);
         dialog.setTitle(R.string.control_customkey);
@@ -808,7 +899,7 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         mControlLayout.setModifiable(true);
         navDrawer.setAdapter(ingameControlsEditorArrayAdapter);
         navDrawer.setOnItemClickListener(ingameControlsEditorListener);
-        mDrawerPullButton.setVisibility(View.VISIBLE);
+        mDrawerPullButton.setEditorMode(true);
         isInEditor = true;
     }
 
@@ -850,6 +941,17 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
 
     public void openAerixScreenRecorder() {
         if (mRecorder != null) mRecorder.show();
+    }
+
+    /**
+     * The recorder, for the in-game options panel.
+     *
+     * The panel is Compose and owns no recorder state of its own: it reads the saved choices from
+     * here and calls back through [net.kdt.pojavlaunch.recording.RecorderController.startWithChoice],
+     * so there is exactly one copy of "which quality is selected" and one owner of the lifecycle.
+     */
+    public net.kdt.pojavlaunch.recording.RecorderController getAerixRecorder() {
+        return mRecorder;
     }
 
     private void openQuickSettings() {
@@ -1026,11 +1128,15 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         }
         // The readout belongs to the game, not to the menu: it would sit on top of the buttons.
         if (mFpsView != null) mFpsView.setVisibility(View.GONE);
+        // Hide-while-playing puts the logo away during play; the menu is where it comes back, so it
+        // is always there to open the menu a second time.
+        mDrawerPullButton.setMenuShowing(true);
         mGameMenuOverlay.showMenu();
     }
 
     private void hideGameMenu() {
         if (mGameMenuOverlay == null) return;
+        mDrawerPullButton.setMenuShowing(false);
         mGameMenuOverlay.hideMenu();
         if (launcherGLView != null) {
             launcherGLView.requestFocus();
@@ -1060,7 +1166,7 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
             mControlLayout.setModifiable(false);
             System.gc();
             mControlLayout.loadLayout(instance.getLaunchControls());
-            mDrawerPullButton.setVisibility(mControlLayout.hasMenuButton() ? View.GONE : View.VISIBLE);
+            mDrawerPullButton.setLayoutHasMenuButton(mControlLayout.hasMenuButton());
         } catch (Exception e) {
             Tools.showError(this,e);
         }
@@ -1068,6 +1174,7 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         navDrawer.setAdapter(gameActionArrayAdapter);
         navDrawer.setOnItemClickListener(gameActionClickListener);
         isInEditor = false;
+        mDrawerPullButton.setEditorMode(false);
     }
 
     @Override

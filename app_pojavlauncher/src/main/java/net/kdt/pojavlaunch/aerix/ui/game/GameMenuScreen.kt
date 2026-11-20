@@ -83,6 +83,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -121,6 +123,24 @@ interface GameMenuCallbacks {
     fun onQuickSettings()
     fun onCustomControls()
     /** Opens the system dialog that gives the launcher access to the instance storage. */
+    /**
+     * Whether to draw the frame rate readout over the game, and what to do about it.
+     *
+     * The switch lives here because this menu is where a player already is mid-game and already
+     * waits for a toggle. It reads and writes the launcher's own `show_fps` preference - the same
+     * value the video options own - so the two can never disagree.
+     */
+    fun isFpsCounterOn(): Boolean
+    fun onToggleFpsCounter(enabled: Boolean)
+
+    /**
+     * Opens the panel that presses a key on request.
+     *
+     * A ghost/hack client opens on a key binding, and a touch layout has no button for most of
+     * them - Right Shift being the usual one. Sending the key from the launcher is the only way a
+     * player on a phone can reach a client that only listens for a keyboard.
+     */
+    fun onOpenKeyTap()
     fun onRequestStoragePermission()
     /**
      * Signs the game in as [account].
@@ -183,6 +203,16 @@ fun GameMenuScreen(
     var page by remember { mutableStateOf(GameMenuPage.MAIN) }
     var choosingInviteRecipient by remember { mutableStateOf(false) }
     var shown by remember { mutableStateOf(false) }
+    // The switch's own copy of the setting.
+    //
+    // `callbacks.isFpsCounterOn()` is an ordinary function call on a plain object, so Compose has
+    // nothing to observe: flipping the switch changed the game's readout but not the switch, which
+    // went on drawing the old position. A player reads a switch that does not move as one that does
+    // not work. This is also the only value the row draws, so it cannot disagree with itself.
+    var fpsOverlayOn by remember { mutableStateOf(callbacks.isFpsCounterOn()) }
+    // Re-read when the menu is opened: the A overlay has its own switch for the same readout, and
+    // a value opened hours ago would be a stale answer.
+    LaunchedEffect(revision) { fpsOverlayOn = callbacks.isFpsCounterOn() }
 
     LaunchedEffect(revision) {
         page = GameMenuPage.MAIN
@@ -256,6 +286,11 @@ fun GameMenuScreen(
                     palette = palette,
                     account = account,
                     versionLine = versionLine,
+                    fpsOverlayOn = fpsOverlayOn,
+                    onToggleFpsOverlay = { enabled ->
+                        fpsOverlayOn = enabled
+                        callbacks.onToggleFpsCounter(enabled)
+                    },
                     onCloseRequest = onCloseRequest,
                     onOpenDownloads = { page = GameMenuPage.DOWNLOADS },
                     onOpenSocials = { choosingInviteRecipient = false; page = GameMenuPage.SOCIALS },
@@ -272,6 +307,8 @@ private fun GameMenuMainPage(
     palette: GameMenuPalette,
     account: AerixAccount?,
     versionLine: String,
+    fpsOverlayOn: Boolean,
+    onToggleFpsOverlay: (Boolean) -> Unit,
     onCloseRequest: () -> Unit,
     onOpenDownloads: () -> Unit,
     onOpenSocials: () -> Unit,
@@ -312,6 +349,19 @@ private fun GameMenuMainPage(
                         height = rowHeight,
                         emphasized = true,
                         onClick = callbacks::onResumeGame
+                    )
+                    // The frame rate readout is the one thing a player flips mid-game and then
+                    // looks at immediately, so it sits under Resume rather than at the end of a
+                    // scrolling list where the fold hides it.
+                    SwitchRow(
+                        label = stringResource(R.string.aerix_ingame_menu_fps_counter),
+                        iconRes = R.drawable.ic_px_fps,
+                        accent = palette.accent,
+                        compact = compact,
+                        height = rowHeight,
+                        checked = fpsOverlayOn,
+                        onToggle = onToggleFpsOverlay,
+                        description = stringResource(R.string.aerix_ingame_menu_fps_counter_hint)
                     )
                     CompactMenuButton(
                         label = stringResource(R.string.aerix_ingame_menu_logs),
@@ -386,6 +436,14 @@ private fun GameMenuMainPage(
                         height = rowHeight,
                         onClick = { onCloseRequest(); callbacks.onForceCloseGame() }
                     )
+                    CompactMenuButton(
+                        label = stringResource(R.string.aerix_ingame_menu_tap_key),
+                        iconRes = R.drawable.aerix_ic_keyboard_outlined,
+                        color = palette.tiles[1],
+                        compact = compact,
+                        height = rowHeight,
+                        onClick = { onCloseRequest(); callbacks.onOpenKeyTap() }
+                    )
                     LoadingWallpaperRow(accent = palette.accent, compact = compact, height = rowHeight)
                 }
 
@@ -447,6 +505,83 @@ private fun MenuHeader(compact: Boolean, versionLine: String) {
  * first seconds - which means it can be flipped while the game is still booting and the change
  * lands immediately, rather than on the next launch.
  */
+/**
+ * A switch row in the same shape as the wallpaper one, for settings that are not the wallpaper's.
+ *
+ * The FPS readout is the launcher's own preference (`show_fps`), not an Aerix-only switch: it is the
+ * same value the launcher's video options and the Aerix Client overlay tile drive. Sharing one value
+ * is the point - a player who turns it on here must not find it off there.
+ */
+@Composable
+private fun SwitchRow(
+    label: String,
+    iconRes: Int,
+    accent: Color,
+    compact: Boolean,
+    height: Dp,
+    checked: Boolean,
+    onToggle: (Boolean) -> Unit,
+    description: String? = null
+) {
+    val shape = RoundedCornerShape(AerixRadii.controlSmall)
+    fun apply(value: Boolean) = onToggle(value)
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(height)
+            .clip(shape)
+            .background(accent.copy(alpha = 0.10f))
+            .border(1.dp, accent.copy(alpha = 0.35f), shape)
+            .bringFocusedItemIntoView()
+            .semantics {
+                // A switch row is one line, so there is no room for a hint under it. The sentence
+                // goes where it stays reachable instead of becoming text nothing draws.
+                if (description != null) stateDescription = description
+            }
+            .clickable(role = Role.Switch) { apply(!checked) }
+            .padding(horizontal = AerixSpacing.smPlus),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(if (compact) 28.dp else 32.dp)
+                .clip(RoundedCornerShape(AerixRadii.compact))
+                .background(accent.copy(alpha = 0.24f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                painter = painterResource(iconRes),
+                contentDescription = null,
+                tint = accent,
+                modifier = Modifier.size(if (compact) 16.dp else 18.dp)
+            )
+        }
+        Spacer(Modifier.width(AerixSpacing.sm))
+        Text(
+            text = label,
+            color = AerixSurface.textPrimary,
+            fontSize = if (compact) 11.sp else 12.5.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
+        )
+        Switch(
+            modifier = Modifier.bringFocusedItemIntoView(),
+            checked = checked,
+            onCheckedChange = { apply(it) },
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = AerixSurface.onAccent,
+                checkedTrackColor = accent,
+                uncheckedThumbColor = AerixSurface.textSecondary,
+                uncheckedTrackColor = AerixSurface.panelTrack,
+                uncheckedBorderColor = AerixSurface.borderSoft
+            )
+        )
+    }
+}
+
 @Composable
 private fun LoadingWallpaperRow(accent: Color, compact: Boolean, height: Dp) {
     val context = LocalContext.current

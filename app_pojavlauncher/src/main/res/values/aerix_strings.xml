@@ -569,9 +569,18 @@
     <string name="aerix_logo_size_hint">Very small (20 dp) to big (96 dp). Drag the slider for a live preview. Small sizes are harder to tap.</string>
     <string name="aerix_logo_size_default">Default</string>
     <string name="aerix_logo_size_accessibility">Aerix menu. Tap to open; drag to move; hold to resize.</string>
+    <string name="aerix_logo_hide_while_playing">Hide while playing</string>
+    <string name="aerix_logo_hide_while_playing_hint">On: the logo disappears while you play and comes back when the in-game menu is open. If your layout has no MENU button, this logo is how the menu opens - Controls in the launcher can turn it back on.</string>
 
 
     <!-- Aerix menu: the wallpaper behind the controls while the game starts. -->
+    <string name="aerix_ingame_menu_tap_key">Tap a key</string>
+    <string name="aerix_ingame_menu_tap_key_summary">Press a key into the game, for clients bound to a key you have no button for</string>
+    <string name="aerix_ingame_menu_fps_counter">FPS overlay</string>
+    <string name="aerix_ingame_menu_fps_counter_summary">The frame rate readout drawn over the game</string>
+    <!-- The switch is in the A menu, which most players read as "A overlay"; the row says which
+         readout it controls so it is not mistaken for a setting of the A menu itself. -->
+    <string name="aerix_ingame_menu_fps_counter_hint">Shown while you play, hidden while this menu is open. It moves with a drag.</string>
     <string name="aerix_ingame_menu_loading_wallpaper">Use wallpaper as loading background</string>
     <string name="aerix_ingame_menu_loading_wallpaper_summary">Your wallpaper - or animation - instead of black until the game window appears.</string>
 

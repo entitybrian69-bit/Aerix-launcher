@@ -47,6 +47,58 @@ internal object LauncherUpdatePolicy {
         else -> null
     }
 
+    /**
+     * What the downloaded archive's version string is allowed to be for [tag].
+     *
+     * The noruntime flavor appends `-noruntime` to versionName, so an archive built from tag v2.4.2
+     * reports `2.4.2-noruntime`. Comparing it against the bare tag rejected every noruntime update
+     * with "version or runtime edition does not match", while the tag and the release page were
+     * both correct. Kept here, out of the Compose class, so it can be tested.
+     */
+    fun versionMatchesTag(reportedVersionName: String?, tag: String): Boolean =
+        reportedVersionName?.removeSuffix("-noruntime") == tag.removePrefix("v")
+
+    /**
+     * Whether Android would refuse an update from [incoming] over [installed].
+     *
+     * The rule is that any signer of the new APK may match any signer of the installed app - that
+     * is how a double-signed transition build moves installs off a retired key. Demanding that the
+     * two sets be identical, as this used to, refuses the one build that can carry a player across.
+     */
+    /**
+     * Whether Android will actually accept [incoming] over [installed] - the device's rule, not ours.
+     *
+     * `PackageManagerServiceUtils.verifySignatures` asks the installed package's SigningDetails to
+     * `checkCapability(incoming)`, and that method branches on the installed signer count:
+     *
+     *  - installed has ONE signer: the incoming APK may prove that certificate through its signing
+     *    history, so a rotation succeeds and any shared signer is enough.
+     *  - installed has MORE THAN ONE signer: "multiple-signer packages cannot rotate signing certs,
+     *    so we must have an exact match" - the two sets must be identical.
+     *
+     * The 2.4.1 APK carries two signers, so it is the second case, and shipping a single-signed APK
+     * to install over it throws INSTALL_FAILED_UPDATE_INCOMPATIBLE on the device however clean our
+     * own check is. That is the wall: an install signed with two keys cannot move to an install
+     * signed with one, and no amount of overlapping certificates changes it.
+     */
+    fun canInstallOver(
+        installed: Collection<String>,
+        incoming: Collection<String>,
+        sdkInt: Int,
+        installedIsMultiSigned: Boolean
+    ): Boolean {
+        // Only the v3 SigningDetails path can carry rotation history; before it there is nothing
+        // but the certificate sets themselves.
+        if (sdkInt >= 28 && !installedIsMultiSigned) {
+            return signaturesCompatible(installed, incoming)
+        }
+        if (installed.size > 1) return installed.toSet() == incoming.toSet()
+        return signaturesCompatible(installed, incoming)
+    }
+
+    fun signaturesCompatible(installed: Collection<String>, incoming: Collection<String>): Boolean =
+        installed.isNotEmpty() && incoming.isNotEmpty() && installed.any { it in incoming }
+
     /** The asset names to look for, best first. Every release keeps a universal fallback. */
     fun candidateNames(version: String, noRuntime: Boolean, abi: String?): List<String> {
         val plain = version.removePrefix("v")

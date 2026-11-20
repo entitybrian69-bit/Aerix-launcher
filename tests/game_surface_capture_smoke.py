@@ -220,13 +220,21 @@ if fallback_fn >= 0:
           "the fallback must latch and fade the controls for the rest of the take")
 check("RecordingOptions.CaptureMode.GAME" in controller and "config.copy(" in controller,
       "the chosen mode must reach the pending config the start intent is built from")
-caption_start = controller.find("fun describeControls")
-caption = controller[caption_start:controller.find("withControls.setOnCheckedChangeListener")]
-check("game's own frames" in caption and "tappable" in caption,
+# The caption lives with the choice, which is now the Compose panel. Same three promises, checked
+# where they are now written: what the mode does, which render path this device is on, and what that
+# means if the device refuses the frames.
+panel = (ROOT / 'java/net/kdt/pojavlaunch/recording/RecorderPanel.kt').read_text()
+caption_start = panel.find("private fun ControlsRow(")
+check(caption_start >= 0, "the record-with-controls choice must live in the panel")
+caption = panel[caption_start:]
+check("game frames only" in caption.lower() and "tappable" in caption,
       "the setting must describe what the new architecture actually does")
-check("GameCapture.readbackIsDirect" in caption,
+check("GameCapture.readbackIsDirect" in panel and "directFrames" in caption,
       "the caption must say which render path this device is on, because that decides the odds")
-check("never appear in the recording" in caption, "the promise has to be stated where it is chosen")
+check("never appear in the video" in caption,
+      "the promise has to be stated where it is chosen")
+check("refuses the frames" in caption,
+      "and the device that refuses must be told about before the take, not only afterwards")
 
 # --- the game must expose the surface, and only as a view
 check("public View getRecordingSurfaceView()" in game_view and "return mSurface;" in game_view,

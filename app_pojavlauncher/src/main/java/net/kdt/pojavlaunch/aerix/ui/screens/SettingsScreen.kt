@@ -1293,6 +1293,14 @@ private fun LauncherTabContent(activity: FragmentActivity) {
 private fun ControlsTabContent(activity: FragmentActivity) {
     val revision = PojavSettingsBridge.revision
     val gyroEnabled = remember(revision) { LauncherPreferences.PREF_ENABLE_GYRO }
+    // The logo preference lives in the logo's own file rather than in LauncherPreferences, so it
+    // needs a state of its own to redraw the switch when it is flipped here.
+    var hideLogoWhilePlaying by remember {
+        mutableStateOf(
+            net.kdt.pojavlaunch.customcontrols.handleview.MenuButtonVisibility
+                .isHiddenWhilePlaying(activity)
+        )
+    }
 
     LazyColumn(
         modifier = Modifier
@@ -1326,6 +1334,25 @@ private fun ControlsTabContent(activity: FragmentActivity) {
                     fontSize = 14.sp
                 )
                 AerixMouseSettingsSection()
+            }
+        }
+
+        // The floating logo: its size is edited by holding it in the game, but whether it is drawn
+        // at all during play belongs here too - otherwise a player who hides it and has no MENU
+        // button on their layout would have no way back to that switch.
+        item {
+            SettingsCardColumn(modifier = Modifier.fillMaxWidth()) {
+                MiraiSwitchSettingsCard(
+                    position = CardPosition.Single,
+                    title = stringResource(R.string.aerix_logo_hide_while_playing),
+                    summary = stringResource(R.string.aerix_logo_hide_while_playing_hint),
+                    checked = hideLogoWhilePlaying,
+                    onCheckedChange = { hidden ->
+                        hideLogoWhilePlaying = hidden
+                        net.kdt.pojavlaunch.customcontrols.handleview.MenuButtonVisibility
+                            .setHiddenWhilePlaying(activity, hidden)
+                    }
+                )
             }
         }
 

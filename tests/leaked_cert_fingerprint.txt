@@ -1,18 +1,46 @@
-# Certificate fingerprints that must never appear on a published Aerix release.
+# The certificate the launcher signs with, and the one it must keep signing with.
 #
-# The release job prints `apksigner verify --print-certs` for every APK and fails if any signer's
-# certificate digest matches a line below. Add a fingerprint here the day a key is retired and it
-# stays banned forever, including in forks that keep this workflow.
+# READ THIS BEFORE CHANGING IT. This file used to be a ban list: the fingerprint below was retired in
+# Nov 2026 because its keystore had been committed to this repository together with its password, so
+# anyone who could read the repository could sign an APK that every installed copy would accept as an
+# update. For 2.4.0 through 2.4.3 the release job failed if this certificate appeared in an APK.
+#
+# It is now REQUIRED instead, by the owner's explicit decision. The reason is Android's own rule, from
+# AOSP SigningDetails.checkCapability:
+#
+#     if (oldDetails.mSignatures.length > 1) {
+#         // multiple-signer packages cannot rotate signing certs, so we must have an exact match
+#         return signaturesMatchExactly(oldDetails);
+#     }
+#
+# The published 2.4.1 carries two certificates - the current key plus this one - so it is a
+# multi-signed install. Nothing single-signed can ever install over it: not 2.4.2, not 2.4.3, not any
+# later release. The only in-place update path is an APK that carries this certificate too, and once
+# a release is double-signed, every release after it must be double-signed as well, forever.
+#
+# What that costs, stated plainly so no one has to rediscover it:
+#
+#   * This private key is public. It is committed at tests/aerix_legacy.p12.b64, and its password is
+#     the default in the release workflow. Anyone with repository access can build an APK that
+#     installs over a player's launcher.
+#   * "The retired key is banned" is no longer true, and the 2.4.0-2.4.3 gate that enforced it has
+#     been inverted on purpose.
+#   * Going back to a single-signed release would strand every install that is currently on a
+#     double-signed one. There is no migration back that skips an uninstall.
+#
+# The alternatives, for the record: exporting each instance and reinstalling single-signed, which
+# costs the user their app-private data but keeps the key out of circulation. The owner was shown both
+# and chose this one twice, the second time with the permanence spelled out.
+#
+# An assistant or contributor must not revert this on their own initiative. Reverting it is a product
+# and security decision for the owner, not a code change.
 #
 # fba0764460bf766ac2491c714ded1859201e5bf7ef3e8c276e49261845b279db
-#   app_pojavlauncher/aerix_release.p12 - the key that shipped v2.3.0, v2.3.1 and v2.3.2, committed
-#   to this repository with its password written next to it in build.gradle. Removed Nov 2026.
-#   2048-bit RSA, subject "C = NP, O = Aerix, CN = Aerix Launcher". Anyone with the repository could
-#   sign a forged update, so it is retired rather than trusted-again; the one release signed by BOTH
-#   this key and its replacement exists purely so installs from before the rotation can update
-#   in place instead of uninstalling and losing their worlds.
+#   app_pojavlauncher/aerix_release.p12 - shipped v2.3.0 through v2.3.2 before the rotation, and again
+#   from 2.4.4 as the second signer. 2048-bit RSA, subject "C = NP, O = Aerix, CN = Aerix Launcher".
+#   The release job requires exactly this certificate on every published APK.
 #
 # The debug/nightly channel is signed with app_pojavlauncher/debug.keystore, which is the public AOSP
-# debug key. That is normal for debug builds and is not listed here, because a debug certificate must
-# never reach a release signing config - and the checks above would catch it the moment it did.
+# debug key. That is normal for debug builds and is not listed here: nothing on the release path signs
+# with it, and a debug certificate must never reach a release signing config.
 fba0764460bf766ac2491c714ded1859201e5bf7ef3e8c276e49261845b279db

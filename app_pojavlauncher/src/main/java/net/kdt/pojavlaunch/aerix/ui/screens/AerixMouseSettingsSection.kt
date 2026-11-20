@@ -183,6 +183,26 @@ fun AerixMouseSettingsSection(
                 LauncherPreferences.PREF_GAME_MOUSE_SENSITIVITY = it / 100f
             }
         )
+        // A physical mouse is a different input device, not a bigger finger, and the cursor above
+        // is only the launcher's own pointer. These three rows are the ones that decide what a real
+        // mouse does once one is plugged in.
+        MiraiSwitchSettingsCard(
+            position = CardPosition.Top,
+            title = "Virtual mouse on start",
+            summary = "Show the touchpad mouse as soon as the game opens. Leave it off when you use a " +
+                "real mouse - a second pointer on screen is the usual complaint.",
+            checked = LauncherPreferences.PREF_VIRTUAL_MOUSE_START,
+            onCheckedChange = {
+                LauncherPreferences.DEFAULT_PREF?.edit()?.putBoolean("mouse_start", it)?.apply()
+                LauncherPreferences.PREF_VIRTUAL_MOUSE_START = it
+            }
+        )
+        Text(
+            "A real mouse draws Android's own pointer, so the cursor skin above only styles the " +
+                "launcher's pointer. Your mouse buttons, wheel and aim all work in game.",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontSize = 10.sp
+        )
         MiraiIntSliderSettingsCard(
             position = CardPosition.Bottom,
             title = "Launcher cursor speed",

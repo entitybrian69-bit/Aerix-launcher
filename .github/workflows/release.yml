@@ -7,12 +7,26 @@ name: Release CI
 # A marked push has to touch this file to be seen at all, so each release cuts a
 # one line note here recording what it shipped.
 #
-# RELEASE_MARK=2.4.1
+# RELEASE_MARK=2.4.4
 #
-# Last cut: v2.4.1 on 16 Nov 2026 - transition release double-signed with current and retired keys for in-place updates.
-# FPS counter printing garbage: its "no frame source" message was a whole sentence inside a
-# pill sized to its own text. Messages are short again, the pill caps what it draws, and the
-# A menu finally has an FPS Counter tile that turns the readout on and off mid-game.
+# Last cut: v2.4.4 on 21 Nov 2026 - the release that can actually install over 2.4.1, because it is
+# double-signed with the retired key exactly as 2.4.1 is, and it stays that way from here on. See
+# docs/signing-policy.md for why, what it costs, and why the fingerprint gate is inverted.
+#
+# Previous cut: v2.4.3 on 20 Nov 2026 - 2.4.2's release disappeared from Releases after it was
+# published, which left releases/latest on v2.4.1 and the in-app updater correctly reporting "no
+# update": there was nothing newer to offer. This cut is that release again, plus the one thing it
+# was missing - a testing build now says out loud that it is a testing build and will never update
+# itself, because its package name is net.al.aerixlauncher.debug and Android will not install the
+# release APK (net.al.aerixlauncher) over it, whatever the signature says.
+#
+# Previous cut: v2.4.2 on 19 Nov 2026 - the FPS overlay switch now moves when it is flipped and sits
+# under Resume instead of below the fold; the floating logo can be put away while playing without
+# putting the menu away with it; a client's menu key can be pressed from the pause menu; a physical
+# mouse gets its own pointer and its left click arrives as the left button; and a launch that dies
+# leaves a breadcrumb with the reason. Also fixes two things that stopped updates installing in
+# place: the in-app updater rejected every -noruntime archive, and it demanded identical signer
+# sets, which is stricter than Android and would have refused the double-signed 2.4.1 itself.
 #
 # The publish job uploads the build artifacts after the build job succeeds.
 #
@@ -52,10 +66,18 @@ permissions:
 
 jobs:
   build:
+    # Any marker, not a literal one. The condition used to name 2.4.0, so bumping the marker above
+    # to the next version meant the cut built nothing at all and said nothing. Which version ships
+    # still comes from version.properties, and release_signing_smoke.py fails the cut if the marker
+    # and that file disagree.
+    #
+    # Keep comments out of the block below: inside a `if: >-` block every line is part of the
+    # expression, so a `#` there is not a comment - it is text, the expression stops parsing, and
+    # the run fails before any job is created, which looks exactly like a skipped release.
     if: >-
       github.event.inputs.confirm == 'RELEASE' ||
       (github.event_name == 'push' && contains(github.event.head_commit.message, '[build-release]')) ||
-      (github.event_name == 'push' && contains(github.event.head_commit.message, 'RELEASE_MARK=2.4.1'))
+      (github.event_name == 'push' && contains(github.event.head_commit.message, 'RELEASE_MARK='))
     runs-on: ubuntu-22.04
     env:
       POJAV_KEYSTORE_PASSWORD: ${{ secrets.POJAV_KEYSTORE_PASSWORD }}
@@ -117,22 +139,35 @@ jobs:
           # have it, long after the key itself was fine. Default it, and let a secret override.
           echo "AERIX_KEYSTORE_ALIAS=${AERIX_KEYSTORE_ALIAS_IN:-aerix}" >> "$GITHUB_ENV"
 
-      - name: Unpack the retired signing key for the transition
-        # v2.4.1 is the double-signed transition release: Android accepts an update when any signer
-        # matches the installed app. Signing with both the current key and the retired key allows
-        # existing installs on v2.3.2 and earlier to update in place without losing their worlds.
+      - name: Unpack the retired signing key for double-signing
+        # From 2.4.4 every release carries both the current key and the retired key, permanently.
+        # See docs/signing-policy.md for why AOSP requires an identical certificate set to update
+        # over the multi-signed 2.4.1.
         env:
           AERIX_LEGACY_P12_B64: ${{ secrets.AERIX_LEGACY_P12 }}
           AERIX_LEGACY_PASSWORD_IN: ${{ secrets.AERIX_LEGACY_PASSWORD }}
         run: |
           set -eu
+          # Committed in this repository, so the secret is not needed and must not be preferred: the
+          # key is public either way, and reading it from the tree means the file that was audited is
+          # the file that signs. The secret still wins if it is set, for a rotation later.
           if [ -n "${AERIX_LEGACY_P12_B64:-}" ]; then
             printf '%s' "$AERIX_LEGACY_P12_B64" | base64 -d > "$RUNNER_TEMP/aerix_legacy.p12"
+            echo "Using the retired key from the secret."
           else
             base64 -d tests/aerix_legacy.p12.b64 > "$RUNNER_TEMP/aerix_legacy.p12"
+            echo "Using the retired key committed at tests/aerix_legacy.p12.b64."
           fi
+          # The committed p12 was sealed with this password; AERIX_LEGACY_PASSWORD overrides it.
           echo "AERIX_LEGACY_KEYSTORE_PASSWORD=${AERIX_LEGACY_PASSWORD_IN:-aerix-release}" >> "$GITHUB_ENV"
           echo "true" > "$RUNNER_TEMP/legacy_key_present"
+          # Prove the file we are about to sign with is the certificate 2.4.1 shipped, before it signs.
+          RETIRED=$(grep -v "^#" tests/leaked_cert_fingerprint.txt | grep -Eo "^[0-9a-f]{64}$" | head -1)
+          test -n "$RETIRED" || { echo "::error::no retired fingerprint on record"; exit 1; }
+          keytool -list -keystore "$RUNNER_TEMP/aerix_legacy.p12" \
+            -storepass "${AERIX_LEGACY_PASSWORD_IN:-aerix-release}" -storetype PKCS12 \
+            | tr -d ':' | tr '[:upper:]' '[:lower:]' | grep -q "$RETIRED" \
+            || { echo "::error::the retired keystore is not the certificate the gate names"; exit 1; }
 
       - name: Set up JDK 21
         uses: actions/setup-java@v3
@@ -160,6 +195,10 @@ jobs:
           python3 tests/cape_default_smoke.py
           python3 tests/layout_transparency_smoke.py
           python3 tests/fps_counter_smoke.py
+          python3 tests/key_tap_mouse_launch_smoke.py
+          python3 tests/logo_visibility_smoke.py
+          python3 tests/release_244_smoke.py
+          python3 tests/recorder_panel_smoke.py
           python3 tests/fastclient_performance_download_test.py
           python3 tests/recorder_wiring_smoke.py
           mkdir -p "$RUNNER_TEMP/aerix-migration-smoke"
@@ -207,7 +246,20 @@ jobs:
           test -n "$APKSIGNER" && test -n "$ZIPALIGN"
           test -n "${AERIX_KEYSTORE_FILE:-}" || { echo "::error::no signing key"; exit 1; }
           LEGACY="$(cat "$RUNNER_TEMP/legacy_key_present" 2>/dev/null || echo false)"
-          # v2.4.1 is the double-signed transition release: sign with both keys so installs update in place.
+          # The retired key is back, deliberately and permanently. AOSP
+          # SigningDetails.checkCapability: "multiple-signer packages cannot rotate signing certs, so
+          # we must have an exact match" - the published 2.4.1 is multi-signed, so nothing
+          # single-signed can ever install over it, and the only in-place route is to match its set
+          # and keep matching it. Once a release is double-signed every later one must be too.
+          #
+          # The owner accepted this with the cost stated: the retired private key is committed at
+          # tests/aerix_legacy.p12.b64 in this public repository, so "the retired key is banned" no
+          # longer holds and anyone with repository access can build an APK that installs over a
+          # player's launcher. The fingerprint gate below is therefore inverted on purpose: it now
+          # REQUIRES the retired cert instead of banning it, so a build that quietly stops carrying
+          # it fails here rather than stranding every 2.4.1 install without an update path.
+          #
+          # An assistant must not flip this back on its own initiative. See docs/signing-policy.md.
           LEGACY=true
           ALIAS=aerix
           if [ "$LEGACY" = "true" ]; then
@@ -224,8 +276,8 @@ jobs:
             cp "$apk" "$RUNNER_TEMP/to-sign.apk"
             "$ZIPALIGN" -f 4 "$RUNNER_TEMP/to-sign.apk" "$RUNNER_TEMP/to-sign-aligned.apk"
             if [ "$LEGACY" = "true" ]; then
-              # Double-sign with both keys so Android updates in place:
-              # --v2-signer configuration via apksigner --next-signer
+              # Double-sign with both keys via --next-signer (v2 only; v3 rejects multiple signers
+              # without a rotation lineage, and --min-sdk-version 24 is needed when v1 is off).
               "$APKSIGNER" sign \
                 --v1-signing-enabled false --v2-signing-enabled true --v3-signing-enabled false \
                 --min-sdk-version 24 \
@@ -291,37 +343,36 @@ jobs:
           done
 
       - name: Check who signed these APKs
-        # The point of the whole exercise: nothing gets published signed by the key that used to live
-        # in this repository alone. Every signer fingerprint is compared against
-        # tests/leaked_cert_fingerprint.txt. During the transition (LEGACY=true), both signers must
-        # be present (n >= 2) so existing installs update in place. When not legacy, the retired key
-        # is banned completely.
+        # Every release from 2.4.4 on must carry exactly two signers: the current key and the
+        # retired key named in tests/leaked_cert_fingerprint.txt. See docs/signing-policy.md.
         run: |
           set -eu
           SDK="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
           APKSIGNER=$(ls "$SDK"/build-tools/*/apksigner 2>/dev/null | tail -1 || true)
           test -n "$APKSIGNER"
-          LEGACY="$(cat "$RUNNER_TEMP/legacy_key_present" 2>/dev/null || echo false)"
-          LEGACY=true
+          # The retired certificate is REQUIRED now, not banned. That is a deliberate inversion: the
+          # published 2.4.1 is multi-signed, and AOSP refuses to move a multi-signed install to a
+          # single-signed APK, so a release that drops the retired key installs over nothing that
+          # already exists. This gate fails on a missing retired signer rather than on a present one,
+          # which is the check that would have caught the 2.4.2 and 2.4.3 mistake at build time.
+          RETIRED=$(grep -v "^#" tests/leaked_cert_fingerprint.txt | grep -Eo "^[0-9a-f]{64}$" | head -1)
+          test -n "$RETIRED" || { echo "::error::no retired fingerprint on record to require"; exit 1; }
           for apk in out/Aerix-Launcher-*.apk; do
             echo "== $apk"
             info=$("$APKSIGNER" verify --print-certs --min-sdk-version 24 "$apk" 2>&1 | tr '[:upper:]' '[:lower:]')
             printf '%s\n' "$info" | grep -E "signer|sha-256" || true
             n=$(printf '%s\n' "$info" | grep -c "sha-256 digest:" || true)
-            if [ "${LEGACY:-false}" = "true" ]; then
-              if [ "$n" -lt 2 ]; then
-                echo "::error::$apk carries $n signer(s); a transition release must carry both, or"
-                echo "   existing installs cannot update in place."
-                exit 1
-              fi
-            else
-              while read -r banned; do
-                [ -n "$banned" ] || continue
-                if printf '%s\n' "$info" | grep -q "$banned"; then
-                  echo "::error::$apk is signed by the retired key that was published in this repository."
-                  exit 1
-                fi
-              done < <(grep -v "^#" tests/leaked_cert_fingerprint.txt | grep -Eo "^[0-9a-f]{64}$" || true)
+            # Two signers, exactly: the current key and the retired one. A second signer that is
+            # neither would be an unknown party, and a third is a build nobody asked for.
+            if [ "$n" -ne 2 ]; then
+              echo "::error::$apk carries $n signer(s); every release must carry the current key and"
+              echo "   the retired key, or it cannot install over the published 2.4.1."
+              exit 1
+            fi
+            if ! printf '%s\n' "$info" | grep -q "$RETIRED"; then
+              echo "::error::$apk does not carry the retired certificate, so it will not install over"
+              echo "   the multi-signed 2.4.1 that players are running."
+              exit 1
             fi
           done
 

@@ -45,13 +45,18 @@ assert 'app2:min="0"' in (repo / 'app_pojavlauncher/src/main/res/xml/pref_contro
     'the transparency slider reaching 0% is the precedent that alpha can carry this feature'
 
 # The recorder owns the session choice, persists it, and restores the controls on every exit path.
-assert 'import android.widget.CheckBox' in controller
-assert 'Record with controls' in controller
-assert 'isChecked = controlsInRecording' in controller
-assert 'private var controlsInRecording = prefs.getBoolean(WITH_CONTROLS, true)' in controller, \
-    'the session choice must survive an activity recreation mid-recording'
-assert 'start(match.copy(audioSource = chosenAudio), withControls.isChecked)' in controller
+# The checkbox and the spinners are gone: the choice now comes from the Compose panel, which hands it
+# over through startWithChoice and nothing else. These checks follow the choice, not the widget.
+panel = (ROOT / 'recording/RecorderPanel.kt').read_text()
+assert 'Record with controls' in panel, 'the choice must still be offered, now in the panel'
+assert 'var withControls by remember { mutableStateOf(initialWithControls) }' in panel, \
+    'the panel must open on the saved choice'
+assert 'onStart(config, audio, withControls)' in panel, 'the panel must report the toggle with the start'
 assert 'controlsInRecording = withControls' in controller
+assert 'dismissPanel()' in controller.split('fun startWithChoice(')[1][:400], \
+    'starting a take must close the panel it was configured in'
+assert 'CheckBox' not in controller, 'the old dialog widget must be deleted, not left unused'
+assert 'Spinner(' not in controller, 'the old dialog widgets must be deleted, not left unused'
 assert '.putBoolean(WITH_CONTROLS, withControls)' in controller
 assert 'private const val WITH_CONTROLS = "with_controls"' in controller
 assert 'start(config: RecordingOptions.Config, withControls: Boolean = true)' in controller, \
@@ -90,12 +95,20 @@ assert 'interface OnPlayerControlsToggle' in cl and 'setOnPlayerControlsToggle' 
 # the fade stays a fade: no visibility change anywhere on this path
 assert 'setVisibility' not in toggle
 assert 'mControlLayout.setOnPlayerControlsToggle' in game and 'mRecorder.onControlsRequestedByPlayer()' in game
-# The dialog must describe the mechanism that actually runs, and must not overpromise: a device that
-# refuses a surface readback gets the fade, and the caption has to say so before the player commits.
-hint = controller.split('fun describeControls')[1].split('\n        }')[0]
-assert "game's own frames" in hint and 'tappable' in hint, \
+# The panel's caption must describe the mechanism that actually runs, and must not overpromise: a
+# device that refuses a surface readback gets the fade, and the wording has to say so before the
+# player commits. The long two-paragraph explanation that used to swap under a checkbox is now one
+# short line per state - the switch is the choice, so the caption only says what that choice means.
+hint = panel.split('private fun ControlsRow(')[1]
+assert "Game frames only" in hint, \
     'the caption has to name the capture source, not just the visual effect'
-assert 'falls back to not drawing them' in hint and 'still take touches' in hint
-assert 'readbackIsDirect' in hint, 'the wording must follow the render path this device is on'
+assert 'never appear in the video' in hint and 'stay tappable' in hint, \
+    'the promise the mode makes has to be the one stated'
+assert 'Your touch controls appear in the video.' in hint
+# The render-path caveat is still surfaced - it moved to the recorder, which is the side that knows
+# whether the device refused the frames, rather than to a caption written before the take.
+assert 'onCleanCaptureUnavailable' in controller and 'would not give up the game' in controller, \
+    'a device that refuses the frames must still be told about it, at the moment it happens'
+assert 'readbackIsDirect' in (ROOT / 'recording/GameCapture.kt').read_text()
 
 print('Recorder wiring smoke test passed')

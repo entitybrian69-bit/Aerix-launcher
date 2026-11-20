@@ -5,6 +5,7 @@ import android.app.AlertDialog;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.SeekBar;
+import android.widget.Switch;
 import android.content.SharedPreferences;
 import android.graphics.Canvas;
 import android.graphics.Paint;
@@ -50,6 +51,20 @@ public class DrawerPullButton extends View {
     private int mSizeDp;
     private boolean mLongPressHandled;
     private AlertDialog mSizeDialog;
+    /** The player asked for the logo to stay out of the way during play. */
+    private boolean mHiddenWhilePlaying;
+    /** The game menu is open right now, so the logo has to be reachable from it. */
+    private boolean mMenuShowing;
+    /**
+     * The layout carries its own MENU button, so a second way to open the menu is clutter.
+     *
+     * Starts false on purpose, and the button starts visible: until the activity has loaded a layout
+     * and said otherwise, showing the logo is the safe answer. A logo that should not be there is
+     * clutter for a moment; a logo that is missing is a player with no way into the menu.
+     */
+    private boolean mLayoutHasMenuButton;
+    /** The editor needs the logo whatever the player asked for, or they cannot leave the editor. */
+    private boolean mEditorMode;
 
 
     private final Paint mBackgroundPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -77,6 +92,7 @@ public class DrawerPullButton extends View {
 
     private void init(){
         mSizeDp = MenuButtonSize.read(getContext());
+        mHiddenWhilePlaying = MenuButtonVisibility.isHiddenWhilePlaying(getContext());
         setContentDescription(getContext().getString(R.string.aerix_logo_size_accessibility));
         setOnLongClickListener(view -> { showSizeDialog(); return true; });
         mDrawable = ContextCompat.getDrawable(getContext(), R.drawable.ic_aerix_mark);
@@ -215,27 +231,113 @@ public class DrawerPullButton extends View {
         }
     }
 
+    /**
+     * Tell the logo whether the in-game menu is on screen.
+     *
+     * With hide-while-playing on, the menu is the one place the logo has to be: it is how the menu
+     * was opened, and how a player with no MENU button reaches it again after closing.
+     */
+    public void setMenuShowing(boolean showing) {
+        if (mMenuShowing == showing) return;
+        mMenuShowing = showing;
+        applyVisibility();
+    }
+
+    /** The layout has its own MENU button, so this logo is not needed to reach the menu. */
+    public void setLayoutHasMenuButton(boolean hasMenuButton) {
+        if (mLayoutHasMenuButton == hasMenuButton) return;
+        mLayoutHasMenuButton = hasMenuButton;
+        applyVisibility();
+    }
+
+    /** While the controls are being edited the logo is always reachable, editor rules aside. */
+    public void setEditorMode(boolean editing) {
+        if (mEditorMode == editing) return;
+        mEditorMode = editing;
+        applyVisibility();
+    }
+
+    /** Re-read the hide-while-playing preference, for when it is changed from the launcher. */
+    public void refreshVisibility() {
+        mHiddenWhilePlaying = MenuButtonVisibility.isHiddenWhilePlaying(getContext());
+        applyVisibility();
+    }
+
+    /**
+     * Show the logo when it is wanted, hide it when it is not.
+     *
+     * The caller still owns the "does this layout have its own MENU button" decision - a logo for a
+     * menu the player can already open is clutter. This only answers the other question: did the
+     * player ask for the logo to be out of the way during play?
+     */
+    private void applyVisibility() {
+        boolean wanted;
+        if (mEditorMode) {
+            wanted = true;
+        } else if (mLayoutHasMenuButton) {
+            // A second way to open a menu that already has a button is clutter, as before.
+            wanted = false;
+        } else {
+            wanted = !mHiddenWhilePlaying || mMenuShowing;
+        }
+        // GONE, never INVISIBLE: an invisible view still takes the touches meant for the game.
+        setVisibility(wanted ? VISIBLE : GONE);
+    }
+
     private void setSizeDp(int sizeDp) {
         mSizeDp = MenuButtonSize.clamp(sizeDp);
         requestLayout();
         invalidate();
     }
 
-    /** Long-press opens a live preview. Only Done/Default persist; Cancel restores the old size. */
+    /**
+     * Long-press opens a live preview: the size slider resizes the logo as it is dragged, and the
+     * hide switch takes it away as it is flipped. Only OK/Default persist; Cancel restores both.
+     */
     public void showSizeDialog() {
         if (mSizeDialog != null && mSizeDialog.isShowing()) return;
         final int originalSize = mSizeDp;
+        final boolean originalHidden = mHiddenWhilePlaying;
         final float originalX = getTranslationX();
         final float originalY = getTranslationY();
         final Runnable restorePreview = () -> {
             setSizeDp(originalSize);
             setTranslationX(originalX);
             setTranslationY(originalY);
+            // Cancel has to undo the switch as well, or the preview setting would survive as if it
+            // had been confirmed - the one outcome a Cancel button must never produce.
+            mHiddenWhilePlaying = originalHidden;
+            applyVisibility();
         };
         LinearLayout panel = new LinearLayout(getContext());
         panel.setOrientation(LinearLayout.VERTICAL);
         int padding = dpToPx(24);
         panel.setPadding(padding, dpToPx(8), padding, dpToPx(8));
+
+        // Hide-while-playing sits above the size slider: it is the decision a player makes once,
+        // while the size is the one they come back to tune.
+        Switch hideSwitch = new Switch(getContext());
+        hideSwitch.setText(R.string.aerix_logo_hide_while_playing);
+        hideSwitch.setChecked(mHiddenWhilePlaying);
+        hideSwitch.setContentDescription(getContext()
+                .getString(R.string.aerix_logo_hide_while_playing));
+        hideSwitch.setOnCheckedChangeListener((button, checked) -> {
+            mHiddenWhilePlaying = checked;
+            // Live, like the size: the point is to see whether the screen is cleaner without it.
+            applyVisibility();
+        });
+        panel.addView(hideSwitch, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+        TextView hideHint = new TextView(getContext());
+        hideHint.setText(R.string.aerix_logo_hide_while_playing_hint);
+        hideHint.setPadding(dpToPx(4), 0, 0, dpToPx(8));
+        hideHint.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12);
+        hideHint.setAlpha(0.75f);
+        panel.addView(hideHint, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+
         TextView label = new TextView(getContext());
         label.setText(getContext().getString(R.string.aerix_logo_size_value, mSizeDp));
         panel.addView(label);
@@ -257,9 +359,15 @@ public class DrawerPullButton extends View {
         });
         mSizeDialog = new AlertDialog.Builder(getContext())
                 .setTitle(R.string.aerix_logo_size_title).setView(panel)
-                .setPositiveButton(android.R.string.ok, (dialog, which) -> MenuButtonSize.save(getContext(), mSizeDp))
+                .setPositiveButton(android.R.string.ok, (dialog, which) -> {
+                    MenuButtonSize.save(getContext(), mSizeDp);
+                    MenuButtonVisibility.setHiddenWhilePlaying(getContext(), mHiddenWhilePlaying);
+                    applyVisibility();
+                })
                 .setNegativeButton(android.R.string.cancel, (dialog, which) -> restorePreview.run())
                 .setNeutralButton(R.string.aerix_logo_size_default, (dialog, which) -> {
+                    // Default means the default size. The hide switch is its own decision, so it is
+                    // left alone here rather than silently reset with the slider.
                     setSizeDp(MenuButtonSize.DEFAULT_DP);
                     MenuButtonSize.save(getContext(), mSizeDp);
                 }).create();

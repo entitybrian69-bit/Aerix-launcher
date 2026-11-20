@@ -181,7 +181,8 @@ private enum class FeatureIconKind {
     GYRO,
     AUTOGG,
     THERMAL,
-    OLED_AFK
+    OLED_AFK,
+    RECORD
 }
 
 class AerixClientOverlayView @JvmOverloads constructor(
@@ -807,6 +808,7 @@ private fun AerixClientRootOverlay(
         ) {
             CrimsonBootSplash()
         }
+
     }
 }
 
@@ -1016,8 +1018,14 @@ private fun FamousClientRectangleMenu(
                             var candidate: Context? = context
                             while (candidate is ContextWrapper && candidate !is net.kdt.pojavlaunch.game.GameActivity) candidate = candidate.baseContext
                             val game = candidate as? net.kdt.pojavlaunch.game.GameActivity
-                            if (game == null) Toast.makeText(context, "Screen recorder unavailable", Toast.LENGTH_SHORT).show()
-                            else { onClose(); game.openAerixScreenRecorder() }
+                            if (game == null) {
+                                Toast.makeText(context, "Screen recorder unavailable", Toast.LENGTH_SHORT).show()
+                            } else {
+                                onClose()
+                                // Prepare on the controller (permission, codec list, the "already
+                                // recording" case), which then opens the panel this overlay draws.
+                                game.openAerixScreenRecorder()
+                            }
                         },
                         onOpenOledAfk = onOpenOledAfk,
                         onSyncOptionsTxt = onSyncOptionsTxt
@@ -1054,6 +1062,16 @@ private fun FamousClientRectangleMenu(
     }
 }
 
+/** The running [net.kdt.pojavlaunch.game.GameActivity] behind [context], if there is one. */
+private fun gameActivityOf(context: Context?): net.kdt.pojavlaunch.game.GameActivity? {
+    var candidate: Context? = context
+    while (candidate is ContextWrapper) {
+        if (candidate is net.kdt.pojavlaunch.game.GameActivity) return candidate
+        candidate = candidate.baseContext
+    }
+    return null
+}
+
 @Composable
 private fun ClientSquaresGridPage(
     context: Context,
@@ -1078,7 +1096,7 @@ private fun ClientSquaresGridPage(
     onSyncOptionsTxt: () -> Unit
 ) {
     val modules = listOf(
-        ClientSquareModule("screen_recorder", "Screen Recorder", FeatureIconKind.HOTBAR,
+        ClientSquareModule("screen_recorder", "Screen Recorder", FeatureIconKind.RECORD,
             { net.kdt.pojavlaunch.recording.RecordingState.isActive() },
             { if (net.kdt.pojavlaunch.recording.RecordingState.isActive()) "RECORDING" else "OPEN ›" }, onOpenRecorder),
         ClientSquareModule("world_sharing", "World Sharing", FeatureIconKind.COMPASS,
@@ -1139,7 +1157,10 @@ private fun ClientSquaresGridPage(
         ),
         ClientSquareModule(
             id = "fps_counter",
-            title = "FPS Counter",
+            // "FPS Counter" read as a counter to watch rather than the switch that turns the readout
+            // on and off, and the pause menu calls the same thing "FPS overlay". One name for one
+            // setting, wherever it is offered.
+            title = "FPS overlay",
             icon = FeatureIconKind.FPS,
             // The same switch the launch screen shows and the launcher's video options own, exposed
             // where the player actually is when they want it: mid-game, in the A menu.
@@ -1148,6 +1169,10 @@ private fun ClientSquaresGridPage(
             onClick = {
                 AerixClientStore.fpsOverlayEnabled = !AerixClientStore.fpsOverlayEnabled
                 AerixClientStore.persist()
+                // Flipping the flag is not enough on its own: the readout is a plain View whose
+                // visibility is decided when the activity resumes or the menu closes, so without
+                // this the switch said ENABLED and the counter stayed gone until you left the game.
+                gameActivityOf(context)?.refreshFpsViewVisibility()
             }
         ),
         ClientSquareModule(
@@ -1615,6 +1640,10 @@ private fun DrawScope.drawFeatureSymbol(kind: FeatureIconKind, color: Color) {
             drawLine(color, Offset(cx - 3.3.dp.toPx(), cy - 4.dp.toPx()), Offset(cx - 3.3.dp.toPx(), cy + 4.dp.toPx()), sw * 0.8f)
             drawLine(color, Offset(cx + 3.3.dp.toPx(), cy - 4.dp.toPx()), Offset(cx + 3.3.dp.toPx(), cy + 4.dp.toPx()), sw * 0.8f)
         }
+        FeatureIconKind.RECORD -> {
+            drawCircle(color = color, radius = 9.dp.toPx(), center = Offset(cx, cy), style = Stroke(sw * 0.9f))
+            drawCircle(color = color, radius = 4.4.dp.toPx(), center = Offset(cx, cy))
+        }
         FeatureIconKind.GYRO -> {
             drawOval(color, Offset(cx - 9.dp.toPx(), cy - 4.dp.toPx()), Size(18.dp.toPx(), 8.dp.toPx()), style = Stroke(sw * 0.85f))
             drawOval(color, Offset(cx - 4.dp.toPx(), cy - 9.dp.toPx()), Size(8.dp.toPx(), 18.dp.toPx()), style = Stroke(sw * 0.85f))
@@ -2068,7 +2097,7 @@ private fun ClientPerformancePage(gameDir: File?, onClose: () -> Unit) {
         // The pill that draws frames per second belongs to the launcher's window, and until now an
         // Aerix Client instance could neither show it nor hide it: the setting existed only on the
         // classic video page. It lives here, next to the counters it belongs to.
-        ClientInformationToggle("FPS pill on screen", AerixClientStore.fpsOverlayEnabled) {
+        ClientInformationToggle("FPS overlay", AerixClientStore.fpsOverlayEnabled) {
             AerixClientStore.fpsOverlayEnabled = it
             AerixClientStore.persist()
             pageActivity?.refreshFpsViewVisibility()

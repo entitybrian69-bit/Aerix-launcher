@@ -37,6 +37,8 @@ internal object LauncherUpdater {
     var speedTestReceived by mutableLongStateOf(0L); private set
     private var speedTestJob: Job? = null
     /** Whole-file test: the real update path, so the number it prints is the update's number. */
+    /** Shown when this build is on the testing channel and therefore updates nothing. */
+    var releaseChannelNotice by mutableStateOf(""); private set
     var fullTestRunning by mutableStateOf(false); private set
     var fullTestResult by mutableStateOf(""); private set
     var fullTestReceived by mutableLongStateOf(0L); private set
@@ -78,6 +80,23 @@ internal object LauncherUpdater {
                     val installed = LauncherVersion.parse(BuildConfig.VERSION_NAME)
                     require(installed != null) { "This build does not have a stable release version" }
                     phase = if (result != null && result.version > installed) LauncherUpdatePhase.AVAILABLE else LauncherUpdatePhase.CURRENT
+                    // "Up to date" and "this build is not the release channel" look identical from
+                    // the outside, and the second one is not an update problem at all: a Nightly (or
+                    // any debug-flavoured build) ships under net.al.aerixlauncher.debug, while every
+                    // published APK is net.al.aerixlauncher, and Android will not install one over
+                    // the other whatever the signature says. Saying so is the difference between a
+                    // player installing the release and a player concluding updates are broken.
+                    // A multi-signed install is why 2.4.4 exists, but it is no longer a warning:
+                    // from 2.4.4 every release carries the same two certificates, so a multi-signed
+                    // app updates normally. Warning here would tell every current user that their
+                    // launcher can never be updated, which is the opposite of what shipped.
+                    if (phase == LauncherUpdatePhase.CURRENT && isTestChannel()) {
+                        releaseChannelNotice = "This is a testing build, so it will not update itself. " +
+                            "Updates are for the release launcher - install that one from " +
+                            "github.com/entitybrian69-bit/Aerix-launcher/releases/latest"
+                    } else {
+                        releaseChannelNotice = ""
+                    }
                 }
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
@@ -295,13 +314,29 @@ internal object LauncherUpdater {
         require(next.packageName == context.packageName) { "This APK is for a different launcher edition" }
         val code = if (Build.VERSION.SDK_INT >= 28) next.longVersionCode else next.versionCode.toLong()
         val currentCode = if (Build.VERSION.SDK_INT >= 28) current.longVersionCode else current.versionCode.toLong()
-        val expectedVersion = update.tag.removePrefix("v") + if (BuildConfig.FLAVOR == "noruntime") "-noruntime" else ""
-        require(code > currentCode && next.versionName == expectedVersion) { "APK version or runtime edition does not match a newer release" }
+        // The archive reports the version it was built with, and the noruntime flavor appends its
+        // own suffix to versionName. Comparing against the tag alone rejected every noruntime
+        // update with "version or runtime edition does not match" - so a player on the noruntime
+        // edition could never install an update in place, while the tag and the release page both
+        // looked right. The suffix is the flavor's, so accept it rather than demand it be absent.
+        require(code > currentCode && LauncherUpdatePolicy.versionMatchesTag(next.versionName, update.tag)) {
+            "APK version or runtime edition does not match a newer release"
+        }
         if (Build.VERSION.SDK_INT >= 24) require((next.applicationInfo?.minSdkVersion ?: 23) <= Build.VERSION.SDK_INT) { "This update requires a newer Android version" }
         val installedSignatures = if (Build.VERSION.SDK_INT >= 28) current.signingInfo?.apkContentsSigners else current.signatures
         val newSignatures = if (Build.VERSION.SDK_INT >= 28) next.signingInfo?.apkContentsSigners else next.signatures
-        require(!installedSignatures.isNullOrEmpty() && !newSignatures.isNullOrEmpty() &&
-            installedSignatures.map { it.toCharsString() }.toSet() == newSignatures.map { it.toCharsString() }.toSet()) { "Update signing certificate does not match the installed launcher" }
+        // Ask the question the device will ask. A single-signed install can move to a new key,
+        // because rotation history proves the old one; a MULTI-signed install cannot, and needs the
+        // same set back. This comment used to claim Android accepts any overlap, and that claim is
+        // why a single-signed 2.4.3 was expected to install over the double-signed 2.4.1 when AOSP
+        // refuses exactly that. LauncherUpdatePolicy.canInstallOver carries the rule and its source.
+        require(LauncherUpdatePolicy.canInstallOver(
+            installedSignatures?.map { it.toCharsString() }.orEmpty(),
+            newSignatures?.map { it.toCharsString() }.orEmpty(),
+            Build.VERSION.SDK_INT,
+            (current.signingInfo?.hasMultipleSigners() == true) ||
+                (current.signatures?.size ?: 0) > 1
+        )) { "Update signing certificate does not match the installed launcher" }
     }
     fun install(context: Context) {
         if (installing) return
@@ -334,6 +369,29 @@ internal object LauncherUpdater {
             } finally { withContext(Dispatchers.Main) { installing = false } }
         }
     }
+    /**
+     * Whether this build is on the testing channel rather than the release one.
+     *
+     * The package name is the answer, not a flavour flag: nightly and debug both add
+     * `.debug` to the applicationId, and that suffix is exactly what makes them a different app
+     * to Android. Every published release is `net.al.aerixlauncher`, so a testing build can never
+     * be replaced by one, signature or no signature.
+     */
+    fun isTestChannel(): Boolean = BuildConfig.APPLICATION_ID.endsWith(".debug")
+
+    /**
+     * Whether the install on this device is signed with more than one certificate.
+     *
+     * Such an install cannot move to a single-signed APK at all - AOSP's SigningDetails.checkCapability
+     * requires an exact match when the installed package has several signers. Detecting it is the
+     * difference between "you are up to date" and "the next release can never install here".
+     */
+    fun installedIsMultiSigned(context: Context): Boolean = runCatching {
+        val info = context.packageManager.getPackageInfo(context.packageName, 0)
+        if (Build.VERSION.SDK_INT >= 28) info.signingInfo?.hasMultipleSigners() == true
+        else (info.signatures?.size ?: 0) > 1
+    }.getOrDefault(false)
+
     fun permissionReturned(context: Context) {
         if (!awaitingPermission) return
         awaitingPermission = false
