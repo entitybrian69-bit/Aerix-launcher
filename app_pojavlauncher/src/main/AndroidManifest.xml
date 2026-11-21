@@ -165,6 +165,14 @@
         </provider>
 
         <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.files"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/shared_paths" />
+        </provider>
+
+        <provider
             android:name="net.kdt.pojavlaunch.scoped.FolderProvider"
             android:authorities="@string/storageProviderAuthorities"
             android:exported="true"

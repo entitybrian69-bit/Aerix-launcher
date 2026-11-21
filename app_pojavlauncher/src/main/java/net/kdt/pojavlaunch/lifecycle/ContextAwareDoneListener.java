@@ -58,6 +58,11 @@ public class ContextAwareDoneListener implements MoJsonExtras.DoneListener, Cont
 
     @Override
     public void onDownloadFailed(Throwable throwable) {
+        if (throwable instanceof net.kdt.pojavlaunch.downloader.DownloadControl.CancelledException
+                || (throwable != null && throwable.getCause() instanceof net.kdt.pojavlaunch.downloader.DownloadControl.CancelledException)) {
+            Tools.showErrorRemote(new net.kdt.pojavlaunch.utils.PresentableException(R.string.dock_cancelled, R.string.dock_cancelled_detail));
+            return;
+        }
         Tools.showErrorRemote(mErrorString, throwable);
     }
 

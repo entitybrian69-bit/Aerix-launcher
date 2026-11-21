@@ -39,7 +39,7 @@ public class CompleteMetadataTask extends DownloaderTask {
         if(LauncherPreferences.PREF_RAPID_START && mMetadata.size != -1 && mMetadata.path.length() == mMetadata.size) return;
 
         try {
-            mMetadata.sha1Hash = mDownloader.downloadString(new URL(mMetadata.url + ".sha1"));
+            mMetadata.sha1Hash = mDownloader.downloadString(new URL(mMetadata.url + ".sha1"), 2000);
         }catch (IOException e) {
             Log.i("CompleteMetadataTask", "Failed to get server hash for "+mMetadata.path.getName(), e);
         }

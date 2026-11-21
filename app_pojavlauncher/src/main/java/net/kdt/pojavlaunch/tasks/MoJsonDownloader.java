@@ -147,7 +147,7 @@ public class MoJsonDownloader extends Downloader {
             throw new PresentableException(e, R.string.mjdl_download_error_title, R.string.mjdl_download_error_subtitle_2);
         } catch (IOException e) {
             if (e instanceof net.kdt.pojavlaunch.downloader.DownloadControl.CancelledException)
-                throw new PresentableException(e, R.string.dock_cancelled, R.string.dock_cancelled_detail);
+                throw new PresentableException(R.string.dock_cancelled, R.string.dock_cancelled_detail);
             throw new PresentableException(e, R.string.mjdl_download_error_title, R.string.mjdl_download_error_subtitle);
         }
 

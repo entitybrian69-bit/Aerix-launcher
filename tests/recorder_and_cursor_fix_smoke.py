@@ -38,4 +38,23 @@ assert "MotionEvent.ACTION_HOVER_EXIT" in game_view
 assert "onWindowFocusChanged(boolean hasWindowFocus)" in game_view
 assert "restoreVirtualCursorIfTouch()" in game_activity and "TOOL_TYPE_FINGER" in game_activity
 
-print("Recorder MP4 save/playback & virtual cursor restoration: smoke checks passed")
+# 3. Download cancellation UX & insertMetadata immediate shutdown + FileProvider sharing
+downloader = (JAVA / "downloader/Downloader.java").read_text()
+complete_meta = (JAVA / "downloader/CompleteMetadataTask.java").read_text()
+mojson = (JAVA / "tasks/MoJsonDownloader.java").read_text()
+done_listener = (JAVA / "lifecycle/ContextAwareDoneListener.java").read_text()
+manifest = (ROOT / "app_pojavlauncher/src/main/AndroidManifest.xml").read_text()
+shared_paths = (ROOT / "app_pojavlauncher/src/main/res/xml/shared_paths.xml").read_text()
+
+assert "try (ExecutorService executorService" not in downloader
+assert "executorService.shutdownNow();" in downloader
+assert "downloadString(new URL(mMetadata.url + \".sha1\"), 2000)" in complete_meta
+assert "throw new PresentableException(R.string.dock_cancelled, R.string.dock_cancelled_detail);" in mojson
+assert "DownloadControl.CancelledException" in done_listener
+assert "FileProvider.getUriForFile(" in tools and "ClipData.newRawUri(" in tools
+assert "${applicationId}.files" in manifest and "@xml/shared_paths" in manifest
+assert "<root-path" in shared_paths
+assert "IS_PENDING} = 0" in library and "SIZE} > 0" in library
+assert "Could not open MediaStore output stream" in library
+
+print("Recorder MP4 save/playback, virtual cursor restoration, download cancel & file save: smoke checks passed")

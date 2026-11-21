@@ -50,8 +50,11 @@ object RecordingLibrary {
                 } else {
                     Intent(Intent.ACTION_VIEW).setDataAndType(media, "video/mp4")
                 }
+                intent.clipData = android.content.ClipData.newRawUri(file.name, media)
                 intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                context.startActivity(Intent.createChooser(intent, file.name).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                val chooser = Intent.createChooser(intent, file.name)
+                chooser.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(chooser)
             }.isSuccess
             if (opened) return
         }
@@ -74,7 +77,7 @@ object RecordingLibrary {
                 context.contentResolver.query(
                     collection,
                     arrayOf(MediaStore.MediaColumns._ID),
-                    "${MediaStore.MediaColumns.DISPLAY_NAME} = ? AND ${MediaStore.MediaColumns.RELATIVE_PATH} LIKE ?",
+                    "${MediaStore.MediaColumns.DISPLAY_NAME} = ? AND ${MediaStore.MediaColumns.RELATIVE_PATH} LIKE ? AND ${MediaStore.MediaColumns.SIZE} > 0 AND ${MediaStore.MediaColumns.IS_PENDING} = 0",
                     arrayOf(displayName, "Movies/$ALBUM%"),
                     null
                 )
@@ -91,7 +94,7 @@ object RecordingLibrary {
             context.contentResolver.query(
                 collection,
                 arrayOf(MediaStore.MediaColumns._ID),
-                "${MediaStore.MediaColumns.DATA} = ?",
+                "${MediaStore.MediaColumns.DATA} = ? AND ${MediaStore.MediaColumns.SIZE} > 0",
                 arrayOf(path),
                 null
             )
@@ -113,9 +116,11 @@ object RecordingLibrary {
         val resolver = context.contentResolver
         val target = runCatching { resolver.insert(collection(), values) }.getOrNull() ?: return null
         return runCatching {
-            resolver.openOutputStream(target)?.use { output ->
+            val stream = resolver.openOutputStream(target)
+                ?: throw java.io.IOException("Could not open MediaStore output stream")
+            stream.use { output ->
                 file.inputStream().use { input -> input.copyTo(output, 1 shl 16) }
-            } ?: return null
+            }
             values.clear()
             values.put(MediaStore.Video.Media.IS_PENDING, 0)
             resolver.update(target, values, null, null)

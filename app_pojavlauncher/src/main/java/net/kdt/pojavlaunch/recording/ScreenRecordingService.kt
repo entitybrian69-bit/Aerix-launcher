@@ -588,7 +588,8 @@ class ScreenRecordingService : Service() {
 
         val notice = when {
             saved == null -> "Recording failed — no video frames captured"
-            saved.playable -> "Saved to Movies/Aerix"
+            saved.playable && saved.mediaUri != null -> "Saved to Movies/Aerix"
+            saved.playable -> "Saved to instance recordings"
             else -> "Recording saved as incomplete clip"
         }
         RecordingState.publish(this, RecordingState.Phase.IDLE, "", notice = notice)

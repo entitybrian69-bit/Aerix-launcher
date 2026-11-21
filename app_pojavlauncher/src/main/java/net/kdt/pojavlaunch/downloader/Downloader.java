@@ -118,7 +118,10 @@ public class Downloader {
             reducedList.add(element);
         }
         if(reducedList.isEmpty()) return;
-        try (ExecutorService executorService = Executors.newFixedThreadPool(4)) {
+        // Do NOT use try-with-resources here: ExecutorService.close() awaits up to 1 day for queued tasks
+        // instead of interrupting them when checkCancelled() throws CancelledException.
+        ExecutorService executorService = Executors.newFixedThreadPool(4);
+        try {
             for(TaskMetadata element : reducedList) executorService.submit(new CompleteMetadataTask(element, this));
             executorService.shutdown();
             while (!executorService.awaitTermination(33, TimeUnit.MILLISECONDS)) {
@@ -127,6 +130,8 @@ public class Downloader {
                 if(exception != null) throw exception;
                 reportCountProgress(R.string.newerdl_inserting_metadata_count, reducedList.size());
             }
+        } finally {
+            executorService.shutdownNow();
         }
     }
 
@@ -199,29 +204,40 @@ public class Downloader {
         }
     }
 
-    private static HttpURLConnection openConnection(URL url) throws IOException {
+    private static HttpURLConnection openConnection(URL url, int timeoutMs) throws IOException {
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-        connection.setConnectTimeout(10000);
-        connection.setReadTimeout(10000);
+        connection.setConnectTimeout(timeoutMs);
+        connection.setReadTimeout(timeoutMs);
         connection.setRequestProperty("User-Agent", DownloadUtils.USER_AGENT);
         connection.setDoInput(true);
         connection.setDoOutput(false);
         return connection;
     }
 
+    private static HttpURLConnection openConnection(URL url) throws IOException {
+        return openConnection(url, 10000);
+    }
+
     protected void downloadToStream(HttpURLConnection connection, OutputStream outputStream, BytesCopiedListener listener) throws IOException {
-        InputStream inputStream = connection.getInputStream();
-        copy(inputStream, outputStream, listener);
+        try (InputStream inputStream = connection.getInputStream()) {
+            copy(inputStream, outputStream, listener);
+        }
     }
 
     protected String downloadString(URL url) throws IOException {
-        HttpURLConnection connection = openConnection(url);
-        int length = connection.getContentLength();
-        if(length < 0) length = 32;
-        try(ByteArrayOutputStream outputStream = new ByteArrayOutputStream(length)) {
-            downloadToStream(connection, outputStream, null);
-            return new String(outputStream.toByteArray(), StandardCharsets.UTF_8);
-        }finally {
+        return downloadString(url, 10000);
+    }
+
+    protected String downloadString(URL url, int timeoutMs) throws IOException {
+        HttpURLConnection connection = openConnection(url, timeoutMs);
+        try {
+            int length = connection.getContentLength();
+            if(length < 0) length = 32;
+            try(ByteArrayOutputStream outputStream = new ByteArrayOutputStream(length)) {
+                downloadToStream(connection, outputStream, null);
+                return new String(outputStream.toByteArray(), StandardCharsets.UTF_8);
+            }
+        } finally {
             connection.disconnect();
         }
     }
@@ -255,18 +271,18 @@ public class Downloader {
     }
 
     protected long getFileContentLength(URL url) throws IOException {
-        HttpURLConnection connection = openConnection(url);
-
-        connection.setConnectTimeout(2000);
-        connection.setReadTimeout(2000);
-
-        connection.setRequestMethod("HEAD");
-        connection.connect();
-        int response = connection.getResponseCode();
-        if(response >= 400) {
-            return -1;
-        }else {
-            return connection.getContentLength();
+        HttpURLConnection connection = openConnection(url, 2000);
+        try {
+            connection.setRequestMethod("HEAD");
+            connection.connect();
+            int response = connection.getResponseCode();
+            if(response >= 400) {
+                return -1;
+            }else {
+                return connection.getContentLength();
+            }
+        } finally {
+            connection.disconnect();
         }
     }
 

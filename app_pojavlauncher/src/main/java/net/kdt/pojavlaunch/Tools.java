@@ -43,6 +43,7 @@ import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AlertDialog;
 import androidx.core.app.NotificationManagerCompat;
+import androidx.core.content.FileProvider;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentActivity;
 import androidx.fragment.app.FragmentManager;
@@ -897,20 +898,26 @@ public final class Tools {
      * @param share whether to open a "Share" or an "Open" dialog.
      */
     public static void openPath(Context context, File file, boolean share) {
-        Uri contentUri = DocumentsContract.buildDocumentUri(context.getString(R.string.storageProviderAuthorities), file.getAbsolutePath());
+        Uri contentUri;
+        try {
+            contentUri = FileProvider.getUriForFile(context, context.getPackageName() + ".files", file);
+        } catch (IllegalArgumentException ignored) {
+            contentUri = DocumentsContract.buildDocumentUri(context.getString(R.string.storageProviderAuthorities), file.getAbsolutePath());
+        }
         String mimeType = getMimeType(file);
         Intent intent = new Intent();
         if(share) {
             intent.setAction(Intent.ACTION_SEND);
-            intent.setType(getMimeType(file));
+            intent.setType(mimeType);
             intent.putExtra(Intent.EXTRA_STREAM, contentUri);
         }else {
             intent.setAction(Intent.ACTION_VIEW);
             intent.setDataAndType(contentUri, mimeType);
         }
-        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        intent.setClipData(ClipData.newRawUri(file.getName(), contentUri));
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
         Intent chooserIntent = Intent.createChooser(intent, file.getName());
+        chooserIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
         context.startActivity(chooserIntent);
     }
 
