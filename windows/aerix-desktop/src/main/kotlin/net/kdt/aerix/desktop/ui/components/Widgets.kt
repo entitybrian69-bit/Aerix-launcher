@@ -103,6 +103,16 @@ abstract class AerixControl : JComponent() {
 open class ClearPanel(layout: java.awt.LayoutManager? = null) : JPanel(layout) {
     init { isOpaque = false }
     override fun paintComponent(g: Graphics) { /* deliberately empty */ }
+
+    /**
+     * Rows inside a `BoxLayout.Y_AXIS` must not grow. Swing's default maximum is 32767, so a box
+     * with spare height hands the space to its children and a label ends up 80 pixels tall.
+     * Panels that really do want to stretch (page bodies) declare it with [grow].
+     */
+    var grow: Boolean = false
+
+    override fun getMaximumSize(): Dimension =
+        if (grow) super.getMaximumSize() else Dimension(Int.MAX_VALUE, preferredSize.height)
 }
 
 /** A glass card, the direct descendant of the Compose `Surface` with `liquidGlass`. */
@@ -588,8 +598,18 @@ class AerixSlider(
 // Text
 // ---------------------------------------------------------------------------------------------
 
+/**
+ * A one-line label that refuses to grow vertically.
+ *
+ * Everything sits in `BoxLayout` page bodies, and a plain `JLabel` reports a maximum size of
+ * 32767×32767 — so the box hands it all the leftover height and the text floats in a tall cell.
+ */
+open class AerixLabel(text: String) : JLabel(text) {
+    override fun getMaximumSize(): Dimension = Dimension(Int.MAX_VALUE, preferredSize.height)
+}
+
 fun label(text: String, font: Font = Fonts.body(), color: Color = AerixColors.textPrimary): JLabel =
-    JLabel(text).apply {
+    AerixLabel(text).apply {
         this.font = font
         foreground = color
         isOpaque = false
@@ -602,7 +622,7 @@ fun label(text: String, font: Font = Fonts.body(), color: Color = AerixColors.te
 fun paragraph(text: String, width: Int, font: Font = Fonts.body(12.5f), color: Color = AerixColors.textSecondary): JLabel {
     val safe = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
         .replace("\n", "<br>")
-    return JLabel("<html><body style='width:${width}px'>$safe</body></html>").apply {
+    return AerixLabel("<html><body style='width:${width}px'>$safe</body></html>").apply {
         this.font = font
         foreground = color
         isOpaque = false
@@ -610,7 +630,7 @@ fun paragraph(text: String, width: Int, font: Font = Fonts.body(12.5f), color: C
 }
 
 fun heading(text: String, size: Float = 22f, color: Color = AerixColors.textPrimary): JLabel =
-    JLabel(text).apply {
+    AerixLabel(text).apply {
         font = Fonts.headline(size)
         foreground = color
         isOpaque = false
@@ -622,6 +642,8 @@ class EyebrowText(var text: String, var color: Color = Color(0xB4, 0x3F, 0xC4, 0
         font = Fonts.labelStrong(10.5f)
         preferredSize = Dimension(UiScale.px(font.size + text.length * 9), UiScale.px(18))
     }
+
+    override fun getMaximumSize(): Dimension = preferredSize
 
     override fun getPreferredSize(): Dimension {
         val fm = getFontMetrics(font)

@@ -50,7 +50,7 @@ object Content {
         val gameVersions: List<String>,
         val source: Source
     ) {
-        val projectType: String = ""
+        var projectType: String = ""
     }
 
     class ProjectVersion(
@@ -169,6 +169,40 @@ object Content {
             Source.MODRINTH -> versionsModrinth(project, gameVersion, loader)
             Source.CURSEFORGE -> versionsCurseForge(project, gameVersion, loader)
         }
+
+    /** A single Modrinth version by id, used to resolve `required` dependencies exactly. */
+    fun modrinthVersion(versionId: String): ProjectVersion? = runCatching {
+        val doc = Http.getJson("$MODRINTH/version/$versionId", cacheSeconds = 3600)
+        parseModrinthVersion(doc)
+    }.onFailure { Log.w("content", "could not fetch version $versionId: ${it.message}") }.getOrNull()
+
+    /** The current project document for [projectId] (title, slug, kind), for dependency picks. */
+    fun modrinthProject(projectId: String): Project? = runCatching {
+        val o = Http.getJson("$MODRINTH/project/$projectId", cacheSeconds = 3600)
+        val type = o.str("project_type")
+        Project(
+            id = projectId,
+            slug = o.str("slug") ?: projectId,
+            title = o.str("title") ?: projectId,
+            description = o.str("description") ?: "",
+            author = "",
+            iconUrl = o.str("icon_url"),
+            downloads = 0,
+            follows = 0,
+            categories = emptyList(),
+            loaders = o.arr("loaders")?.strings() ?: emptyList(),
+            gameVersions = o.arr("game_versions")?.strings() ?: emptyList(),
+            source = Source.MODRINTH
+        ).also {
+            it.projectType = when (type) {
+                "resourcepack" -> "resourcepack"
+                "shader" -> "shader"
+                "modpack" -> "modpack"
+                "datapack" -> "datapack"
+                else -> "mod"
+            }
+        }
+    }.onFailure { Log.w("content", "could not fetch project $projectId: ${it.message}") }.getOrNull()
 
     private fun versionsModrinth(project: Project, gameVersion: String?, loader: String?): List<ProjectVersion> {
         val url = "$MODRINTH/project/${project.id}/version"

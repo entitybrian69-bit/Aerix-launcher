@@ -9,6 +9,7 @@
 #   ./build.sh                 compile + package build/aerix-launcher.jar
 #   ./build.sh --test          compile and run the built-in test suite
 #   ./build.sh --selftest      run the headless UI/data self test (writes screenshots)
+#   ./build.sh --screenshot    render every page to build/screenshots (no display needed)
 #   ./build.sh --dist          jar + portable app image in dist/AerixLauncher/
 #   ./build.sh --installer     dist + .msi (needs WiX 3 on Windows) or .exe
 #   ./build.sh --clean
@@ -117,6 +118,13 @@ run_selftest() {
       net.kdt.aerix.desktop.MainKt --selftest "$@"
 }
 
+run_screenshot() {
+  log "rendering every page to build/screenshots"
+  "$JAVA" -Djava.awt.headless=true -Dfile.encoding=UTF-8 -cp "$OUT/aerix-launcher.jar" \
+      net.kdt.aerix.desktop.MainKt --screenshot "$@"
+  log "pages: $OUT/screenshots"
+}
+
 make_dist() {
   local appdir="$DIST/AerixLauncher"
   rm -rf "$appdir"; mkdir -p "$appdir"
@@ -169,8 +177,9 @@ case "${1:-build}" in
   jar) compile ;;
   --test|test) compile; run_tests ;;
   --selftest|selftest) compile; shift || true; run_selftest "$@" ;;
+  --screenshot|screenshot) compile; shift || true; run_screenshot "$@" ;;
   --dist|dist) compile; make_dist ;;
   --installer|installer) compile; make_installer ;;
   --clean|clean) rm -rf "$OUT" "$DIST"; log "cleaned" ;;
-  *) echo "usage: $0 [build|--test|--selftest|--dist|--installer|--clean]" >&2; exit 2 ;;
+  *) echo "usage: $0 [build|--test|--selftest|--screenshot|--dist|--installer|--clean]" >&2; exit 2 ;;
 esac

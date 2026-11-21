@@ -100,6 +100,7 @@ class CreateInstanceScreen(private val shell: Shell) : JPanel(BorderLayout()), R
     private val stableSwitch = AerixSwitch(true)
     private val versionTabs = ClearPanel(FlowLayout(FlowLayout.LEFT, 6, 0))
     private var versionTabButtons: List<PillTab> = emptyList()
+    private var headerPill: MetaPill? = null
 
     init {
         isOpaque = false
@@ -122,6 +123,7 @@ class CreateInstanceScreen(private val shell: Shell) : JPanel(BorderLayout()), R
             override fun changedUpdate(e: javax.swing.event.DocumentEvent?) {}
         })
         stableSwitch.addChangeListener { stableOnly = stableSwitch.on; loadBuilds() }
+        rebuildLoaderPane()
         loadVersions()
     }
 
@@ -140,7 +142,8 @@ class CreateInstanceScreen(private val shell: Shell) : JPanel(BorderLayout()), R
             addActionListener { if (!shell.goBack()) shell.navigate(Page.HOME) }
         })
         left.add(heading("Create instance", 20f))
-        left.add(MetaPill("${selectedVersion ?: "…"}  •  ${Loader.displayName(loader)}", accented = true))
+        headerPill = MetaPill("${selectedVersion ?: "…"}  •  ${Loader.displayName(loader)}", accented = true)
+        left.add(headerPill!!)
         header.add(left, BorderLayout.WEST)
 
         val right = ClearPanel(FlowLayout(FlowLayout.RIGHT, UiScale.px(8), 0))
@@ -151,7 +154,7 @@ class CreateInstanceScreen(private val shell: Shell) : JPanel(BorderLayout()), R
     }
 
     private fun buildBody(): JPanel {
-        val body = ClearPanel(GridLayout(1, 2, UiScale.px(14), 0))
+        val body = ClearPanel(GridLayout(1, 2, UiScale.px(14), 0)).apply { grow = true }
         body.border = BorderFactory.createEmptyBorder(0, UiScale.px(Spacing.xl), UiScale.px(Spacing.xl), UiScale.px(Spacing.xl))
 
         // ---- left: versions
@@ -183,9 +186,9 @@ class CreateInstanceScreen(private val shell: Shell) : JPanel(BorderLayout()), R
         rightCard.border = BorderFactory.createEmptyBorder(UiScale.px(14), UiScale.px(14), UiScale.px(14), UiScale.px(14))
 
         // name row
-        val nameRow = ClearPanel(BorderLayout())
+        val nameRow = ClearPanel(BorderLayout()).apply { grow = true }
         nameRow.add(Eyebrow("INSTANCE INFO"), BorderLayout.NORTH)
-        val nameInner = ClearPanel(FlowLayout(FlowLayout.LEFT, UiScale.px(10), UiScale.px(6)))
+        val nameInner = ClearPanel(FlowLayout(FlowLayout.LEFT, UiScale.px(10), UiScale.px(6))).apply { grow = true }
         nameInner.add(IconTilePreview {  })
         nameField.preferredSize = Dimension(UiScale.px(240), UiScale.px(46))
         nameInner.add(nameField)
@@ -222,6 +225,7 @@ class CreateInstanceScreen(private val shell: Shell) : JPanel(BorderLayout()), R
                 Scheduler.ui {
                     rebuildVersionList()
                     rebuildLoaderPane()
+                    syncHeaderPill()
                     updateInstallButton()
                 }
             }
@@ -234,7 +238,12 @@ class CreateInstanceScreen(private val shell: Shell) : JPanel(BorderLayout()), R
      */
     private fun effectiveMc(): String? = if (loader == Loader.BTA) "b1.7.3" else selectedVersion
 
+    private fun syncHeaderPill() {
+        headerPill?.text0 = "${selectedVersion ?: "…"}  •  ${Loader.displayName(loader)}"
+    }
+
     private fun loadBuilds() {
+        syncHeaderPill()
         val mc = effectiveMc() ?: return
         if (loader == Loader.VANILLA) return
         buildsLoading = true
@@ -326,6 +335,7 @@ class CreateInstanceScreen(private val shell: Shell) : JPanel(BorderLayout()), R
                     stableOnly = true
                     stableSwitch.on = true
                     build = null
+                    syncHeaderPill()
                     rebuildLoaderPane()
                     loadBuilds()
                     updateInstallButton()
@@ -343,7 +353,11 @@ class CreateInstanceScreen(private val shell: Shell) : JPanel(BorderLayout()), R
             val stableRow = ClearPanel(FlowLayout(FlowLayout.LEFT, UiScale.px(8), 0))
             stableRow.add(label("Only stable builds", Fonts.body(12f), AerixColors.textSecondary))
             stableRow.add(stableSwitch)
-            val labelText = if (build != null) "${Loader.displayName(loader)} ${build?.label}" else "Loading ${Loader.displayName(loader)} builds…"
+            val labelText = when {
+                build != null -> "${Loader.displayName(loader)} ${build?.label}"
+                buildsLoading -> "Loading ${Loader.displayName(loader)} builds…"
+                else -> "${Loader.displayName(loader)} builds"
+            }
             val head = ClearPanel(BorderLayout())
             head.add(label(labelText, Fonts.titleMedium(12.5f)), BorderLayout.WEST)
             head.add(stableRow, BorderLayout.EAST)
@@ -483,9 +497,13 @@ class CreateInstanceScreen(private val shell: Shell) : JPanel(BorderLayout()), R
 
     private fun paddedSectionEyebrow(text: String): JComponent = Eyebrow(text).also { it.alignmentX = 0f }
 
+    /** A ghost button sized to its text, left aligned, so it does not stretch across the column. */
     private fun linkButton(text: String, action: () -> Unit): JComponent {
         val b = AerixButton(text, ButtonStyle.GHOST).apply { compact = true; addActionListener { action() } }
-        return b
+        val row = ClearPanel(FlowLayout(FlowLayout.LEFT, 0, 0))
+        row.add(b)
+        row.alignmentX = 0f
+        return row
     }
 }
 
@@ -502,7 +520,8 @@ private class GlassPane : JPanel(BorderLayout()) {
 }
 
 private class MetaPill(text: String, val accented: Boolean = false) : JComponent() {
-    private val text0 = text
+    var text0 = text
+        set(value) { field = value; revalidate(); repaint() }
     init { preferredSize = Dimension(UiScale.px(10), UiScale.px(26)) }
     override fun getPreferredSize(): Dimension {
         val fm = getFontMetrics(Fonts.labelStrong(10.5f))

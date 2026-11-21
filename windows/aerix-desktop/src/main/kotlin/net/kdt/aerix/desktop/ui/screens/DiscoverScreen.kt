@@ -5,6 +5,7 @@ import net.kdt.aerix.desktop.app.Scheduler
 import net.kdt.aerix.desktop.app.Settings
 import net.kdt.aerix.desktop.core.content.Content
 import net.kdt.aerix.desktop.core.content.ContentInstaller
+import java.nio.file.Files
 import net.kdt.aerix.desktop.core.instance.Instance
 import net.kdt.aerix.desktop.core.instance.Instances
 import net.kdt.aerix.desktop.ui.components.AerixButton
@@ -306,9 +307,70 @@ class DiscoverScreen(private val shell: Shell) : JPanel(BorderLayout()), Refresh
         val path = ContentInstaller.installFile(target, folder, url, fileName, version.sha1) { p ->
             progress(p.phase, 0.5f + p.fraction * 0.5f)
         }
+        // Required dependencies (Fabric API and friends) are not optional: a mod without them
+        // crashes on launch, so install them too and say how many came along.
+        val dependencyNote = if (project.source == Content.Source.MODRINTH) {
+            installRequiredDependencies(version, target, progress)
+        } else ""
         progress("Installed", 1f)
-        return 1 to "Installed ${path.fileName} into ${target.name} → ${folder.folder}"
+        return 1 to "Installed ${path.fileName} into ${target.name} → ${folder.folder}$dependencyNote"
     }
+
+    /**
+     * Installs every `required` Modrinth dependency of [version] that the instance does not already
+     * have. Each one is resolved to its own best matching version, and the list is walked breadth
+     * first with a visited set so a dependency cycle cannot loop forever.
+     */
+    private fun installRequiredDependencies(
+        version: Content.ProjectVersion,
+        target: Instance,
+        progress: (String, Float) -> Unit
+    ): String {
+        val queue = ArrayDeque(version.dependencies.filter { it.kind.equals("required", true) })
+        val visited = hashSetOf(version.projectId)
+        var installed = 0
+        val failures = ArrayList<String>()
+        while (queue.isNotEmpty() && installed < 12) {
+            val dependency = queue.removeFirst()
+            if (!visited.add(dependency.projectId)) continue
+            progress("Resolving dependencies", 0.75f)
+            val picked = dependency.versionId?.let { id -> Content.modrinthVersion(id) }
+                ?: Content.modrinthProject(dependency.projectId)?.let { dep ->
+                    runCatching { Content.versions(dep, target.mcVersion.ifBlank { null }, target.loader.ifBlank { null }) }
+                        .getOrDefault(emptyList()).firstOrNull()
+                }
+            if (picked == null) { failures.add(dependency.projectId); continue }
+            val url = picked.downloadUrl ?: continue
+            val fileName = picked.fileName ?: "${dependency.projectId}-${picked.versionNumber}.jar"
+            val kind = Content.modrinthProject(dependency.projectId)?.let { dep ->
+                when (dep.projectType) {
+                    "resourcepack" -> Content.Kind.RESOURCE_PACK
+                    "shader" -> Content.Kind.SHADER
+                    "datapack" -> Content.Kind.WORLD
+                    else -> Content.Kind.MOD
+                }
+            } ?: Content.Kind.MOD
+            if (!hasInstalled(target, kind, fileName)) {
+                runCatching {
+                    ContentInstaller.installFile(target, kind, url, fileName, picked.sha1) { p ->
+                        progress("Dependency ${p.phase}", 0.78f + p.fraction * 0.15f)
+                    }
+                    installed++
+                }.onFailure { failures.add("${picked.name}: ${it.message}") }
+            }
+            queue.addAll(picked.dependencies.filter { it.kind.equals("required", true) })
+        }
+        return when {
+            installed > 0 && failures.isEmpty() -> " (plus $installed ${if (installed == 1) "dependency" else "dependencies"})"
+            failures.isNotEmpty() -> " — ${failures.size} dependency download(s) failed"
+            else -> ""
+        }
+    }
+
+    /** True when a file with this name is already in the instance's folder for [kind]. */
+    private fun hasInstalled(target: Instance, kind: Content.Kind, fileName: String): Boolean =
+        runCatching { Files.isRegularFile(ContentInstaller.folderFor(target, kind).resolve(ContentInstaller.sanitiseFile(fileName))) }
+            .getOrDefault(false)
 
     private fun installPackFromArchive(
         project: Content.Project,

@@ -588,6 +588,7 @@ private class EmptyHintCard : JComponent() {
 
 fun Eyebrow(text: String): JComponent = object : JComponent() {
     init { font = Fonts.labelStrong(10.5f) }
+    override fun getMaximumSize(): Dimension = preferredSize
     override fun getPreferredSize(): Dimension {
         val fm = getFontMetrics(font)
         return Dimension(fm.stringWidth(spaced(text)) + 2, fm.height + 2)
@@ -606,6 +607,7 @@ fun spaced(text: String): String = text.uppercase().map { it.toString() }.joinTo
 
 fun Label(text: String, font: java.awt.Font = Fonts.body(), color: Color = AerixColors.textPrimary): JComponent =
     object : JComponent() {
+        override fun getMaximumSize(): Dimension = preferredSize
         var text0 = text
         init { this.font = font }
         override fun getPreferredSize(): Dimension {

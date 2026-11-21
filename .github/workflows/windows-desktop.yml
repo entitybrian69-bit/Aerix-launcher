@@ -1,0 +1,72 @@
+name: Windows desktop launcher
+
+# Builds windows/aerix-desktop and runs its headless self test.
+#
+# The desktop target deliberately does not use Gradle: build.sh only needs a JDK and the Kotlin
+# compiler, so the CI job is a plain JDK + kotlinc + build.sh pipeline that anyone can reproduce on
+# a laptop. It runs the self test (settings, sealed tokens, instance CRUD, bundled assets, loader
+# parsing, Java discovery) and the offscreen page renderer, then uploads the screenshots so a
+# design review is possible without a Windows machine.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "v3_openjdk", "arena/**" ]
+    paths:
+      - "windows/aerix-desktop/**"
+      - ".github/workflows/windows-desktop.yml"
+  pull_request:
+    paths:
+      - "windows/aerix-desktop/**"
+      - ".github/workflows/windows-desktop.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    # Windows, because the launcher is a Windows product: the tray, DPAPI token sealing and the
+    # process handling are all exercised there for real.
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+        working-directory: windows/aerix-desktop
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Install the Kotlin compiler
+        run: |
+          curl -fsSL -o kotlin.zip https://github.com/JetBrains/kotlin/releases/download/v2.1.0/kotlin-compiler-2.1.0.zip
+          unzip -q kotlin.zip -d "$RUNNER_TOOL_CACHE/kotlin"
+          echo "KOTLINC=$RUNNER_TOOL_CACHE/kotlin/kotlinc/bin/kotlinc" >> "$GITHUB_ENV"
+
+      - name: Build
+        run: ./build.sh
+
+      - name: Self test
+        run: ./build.sh --selftest
+
+      - name: Render every page
+        run: ./build.sh --screenshot
+
+      - name: Upload the build
+        uses: actions/upload-artifact@v4
+        with:
+          name: aerix-launcher-jar
+          path: windows/aerix-desktop/build/aerix-launcher.jar
+          if-no-files-found: error
+
+      - name: Upload the screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: aerix-launcher-pages
+          path: windows/aerix-desktop/build/screenshots
+          if-no-files-found: error

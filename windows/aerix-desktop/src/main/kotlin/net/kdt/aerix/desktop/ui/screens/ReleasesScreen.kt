@@ -51,6 +51,7 @@ import javax.swing.JPanel
 class ReleasesScreen(private val shell: Shell) : JPanel(BorderLayout()), Refreshable {
     private var versions: List<VersionSummary> = emptyList()
     private var loading = false
+    private var loadError: String? = null
     private var tab = 0
     private var filter = ""
     private val listHost = ClearPanel().apply { layout = BoxLayout(this, BoxLayout.Y_AXIS) }
@@ -96,6 +97,7 @@ class ReleasesScreen(private val shell: Shell) : JPanel(BorderLayout()), Refresh
     private fun load() {
         if (loading) return
         loading = true
+        loadError = null
         listHost.removeAll()
         listHost.add(label("Loading the version list…", Fonts.body(12.5f), AerixColors.textMuted))
         listHost.revalidate(); listHost.repaint()
@@ -104,8 +106,11 @@ class ReleasesScreen(private val shell: Shell) : JPanel(BorderLayout()), Refresh
             val local = runCatching { Mojang.localVersions(Instances.sharedDataDir()) }.getOrDefault(emptyList())
             Scheduler.ui {
                 loading = false
-                outcome.onSuccess { manifest -> versions = manifest.versions }
-                    .onFailure { Log.w("releases", "manifest failed: ${it.message}") }
+                outcome.onSuccess { manifest -> versions = manifest.versions; loadError = null }
+                    .onFailure {
+                        Log.w("releases", "manifest failed: ${it.message}")
+                        loadError = it.message
+                    }
                 installed.clear(); installed.addAll(local)
                 rebuild()
             }
@@ -123,7 +128,28 @@ class ReleasesScreen(private val shell: Shell) : JPanel(BorderLayout()), Refresh
             } && (filter.isBlank() || v.id.contains(filter, true))
         }.take(300)
         if (shown.isEmpty()) {
-            listHost.add(label("Nothing to show.", Fonts.body(12.5f), AerixColors.textMuted))
+            // Distinguish "the catalogue could not be reached" from "this tab is empty", because
+            // the fix is different: a retry, versus switching tabs or clearing the filter.
+            val message = when {
+                loadError != null -> "Could not reach Mojang: $loadError"
+                versions.isEmpty() && !loading -> "No version list yet. Check your connection and retry."
+                filter.isNotBlank() -> "Nothing matches “$filter”."
+                else -> "Nothing to show in this tab."
+            }
+            val empty = ClearPanel().apply {
+                layout = BoxLayout(this, BoxLayout.Y_AXIS)
+                alignmentX = 0f
+                add(label(message, Fonts.body(12.5f), AerixColors.textSecondary).apply { alignmentX = 0f })
+                if (loadError != null || versions.isEmpty()) {
+                    add(Box.createVerticalStrut(UiScale.px(8)))
+                    add(AerixButton("Try again", ButtonStyle.GHOST, "refresh").apply {
+                        compact = true
+                        alignmentX = 0f
+                        addActionListener { load() }
+                    })
+                }
+            }
+            listHost.add(empty)
         }
         shown.forEach { v ->
             listHost.add(ReleaseRow(v, installed.contains(v.id)) { install(v) })
