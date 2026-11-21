@@ -157,6 +157,23 @@ public class GameView extends FrameLayout implements PlatformGrabListener, Surfa
         } catch (Throwable ignored) { }
     }
 
+    private boolean isPhysicalMouseDevice(MotionEvent event) {
+        return event.getDevice() != null && !event.getDevice().isVirtual();
+    }
+
+    /** Restore Aerix's virtual cursor when touch focus returns after a system popup or overlay. */
+    public void restoreVirtualCursorIfTouch() {
+        noteHardwarePointer(false);
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasWindowFocus) {
+        super.onWindowFocusChanged(hasWindowFocus);
+        if (hasWindowFocus) {
+            noteHardwarePointer(false);
+        }
+    }
+
     /**
      * The touch event for both grabbed an non-grabbed mouse state on the touch screen
      * Does not cover the virtual mouse touchpad
@@ -170,11 +187,13 @@ public class GameView extends FrameLayout implements PlatformGrabListener, Surfa
         for (int i = 0; i < e.getPointerCount(); i++) {
             int toolType = e.getToolType(i);
             if(toolType == MotionEvent.TOOL_TYPE_MOUSE) {
-                noteHardwarePointer(true);
-                if(Tools.isAndroid8OrHigher() &&
-                        mPointerCapture != null) {
-                    mPointerCapture.handleAutomaticCapture();
-                    return true;
+                if (hasWindowFocus() && isPhysicalMouseDevice(e)) {
+                    noteHardwarePointer(true);
+                    if(Tools.isAndroid8OrHigher() &&
+                            mPointerCapture != null) {
+                        mPointerCapture.handleAutomaticCapture();
+                        return true;
+                    }
                 }
             }else if(toolType != MotionEvent.TOOL_TYPE_STYLUS) continue;
 
@@ -186,6 +205,7 @@ public class GameView extends FrameLayout implements PlatformGrabListener, Surfa
             Platform.sendCursorPosition();
             return true; //mouse event handled successfully
         }
+        noteHardwarePointer(false);
         if (mIngameProcessor == null || mInGUIProcessor == null) return true;
         boolean ret = mCurrentTouchProcessor.processTouchEvent(e);
         // Keep cursor on screen if panning with IME inset
@@ -239,13 +259,20 @@ public class GameView extends FrameLayout implements PlatformGrabListener, Surfa
 
         switch(event.getActionMasked()) {
             case MotionEvent.ACTION_HOVER_MOVE:
-                noteHardwarePointer(true);
+                if (hasWindowFocus() && isPhysicalMouseDevice(event)) {
+                    noteHardwarePointer(true);
+                }
                 Platform.cursorX = event.getX(mouseCursorIndex) / cursorRatioX;
                 Platform.cursorY = event.getY(mouseCursorIndex) / cursorRatioY;
                 Platform.sendCursorPosition();
                 return true;
             case MotionEvent.ACTION_HOVER_ENTER:
-                noteHardwarePointer(true);
+                if (hasWindowFocus() && isPhysicalMouseDevice(event)) {
+                    noteHardwarePointer(true);
+                }
+                return true;
+            case MotionEvent.ACTION_HOVER_EXIT:
+                noteHardwarePointer(false);
                 return true;
             case MotionEvent.ACTION_SCROLL:
                 CallbackBridge.sendScroll(event.getAxisValue(MotionEvent.AXIS_HSCROLL), event.getAxisValue(MotionEvent.AXIS_VSCROLL));

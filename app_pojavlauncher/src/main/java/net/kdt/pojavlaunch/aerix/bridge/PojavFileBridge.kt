@@ -357,6 +357,10 @@ object PojavFileBridge {
     }
 
     fun open(context: Context, file: File, share: Boolean) {
+        if (file.isFile && file.extension.equals("mp4", ignoreCase = true)) {
+            net.kdt.pojavlaunch.recording.RecordingLibrary.view(context, file, share)
+            return
+        }
         Tools.openPath(context, file, share)
     }
 }

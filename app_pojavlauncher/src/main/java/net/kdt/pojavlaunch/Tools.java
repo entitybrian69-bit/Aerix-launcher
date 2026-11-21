@@ -35,6 +35,7 @@ import android.view.Window;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 import android.view.WindowManager;
+import android.webkit.MimeTypeMap;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -880,6 +881,12 @@ public final class Tools {
         if(mimeType != null) return mimeType;
         mimeType = URLConnection.guessContentTypeFromName(file.getName());
         if(mimeType != null) return mimeType;
+        String name = file.getName();
+        int dot = name.lastIndexOf('.');
+        if (dot >= 0 && dot + 1 < name.length()) {
+            mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(name.substring(dot + 1).toLowerCase(java.util.Locale.ROOT));
+            if (mimeType != null) return mimeType;
+        }
         return "*/*";
     }
 

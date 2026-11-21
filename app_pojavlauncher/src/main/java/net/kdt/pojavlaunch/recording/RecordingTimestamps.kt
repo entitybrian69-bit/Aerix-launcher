@@ -6,8 +6,8 @@ internal class RecordingTimestamps(private val epochUs: Long) {
     private var lastVideo = -1L
     private var lastAudio = -1L
     fun video(raw: Long): Long {
-        if (videoBase == null) videoBase = if (raw >= epochUs - 10_000_000) epochUs else raw
-        // Also handles vendor-relative surface clocks and repeated timestamps without invalid MP4 samples.
+        if (videoBase == null) videoBase = raw
+        // Anchor directly to the encoder surface's own clock so sleep-skewed uptime/boottime clocks never clamp frames to 0.
         lastVideo = maxOf(lastVideo + 1, (raw - videoBase!!).coerceAtLeast(0))
         return lastVideo
     }

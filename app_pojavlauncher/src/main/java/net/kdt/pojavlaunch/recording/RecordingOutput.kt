@@ -39,7 +39,17 @@ internal class RecordingOutput(private val context: Context, private val instanc
                 extractor.getTrackFormat(it).getString(MediaFormat.KEY_MIME)?.startsWith("video/") == true
             } ?: return false
             extractor.selectTrack(track)
-            extractor.sampleSize > 0 && extractor.sampleFlags and MediaExtractor.SAMPLE_FLAG_SYNC != 0
+            var checked = 0
+            while (checked < 30) {
+                val size = extractor.sampleSize
+                if (size < 0) break
+                if (size > 0 && (extractor.sampleFlags and MediaExtractor.SAMPLE_FLAG_SYNC) != 0) {
+                    return true
+                }
+                if (!extractor.advance()) break
+                checked++
+            }
+            false
         } catch (error: Exception) {
             Log.w("AerixRecorder", "Saved MP4 validation failed", error)
             false

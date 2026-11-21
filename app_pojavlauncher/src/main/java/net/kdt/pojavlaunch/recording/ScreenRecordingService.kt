@@ -46,8 +46,9 @@ class ScreenRecordingService : Service() {
         private const val TAG = "AerixRecorderService"
         private const val CHANNEL_ID = "aerix_recorder"
         private const val NOTIF_ID = 4401
-        private const val STOP_TIMEOUT_MS = 1_200L
-        private const val MAX_PRE_START_BYTES = 512 * 1024
+        private const val STOP_TIMEOUT_MS = 3_000L
+        private const val AUDIO_WAIT_TIMEOUT_MS = 600L
+        private const val MAX_PRE_START_BYTES = 4 * 1024 * 1024
     }
 
     private data class PendingSample(val isVideo: Boolean, val data: ByteBuffer, val info: MediaCodec.BufferInfo)
@@ -76,13 +77,24 @@ class ScreenRecordingService : Service() {
     private var muxerStarted = false
     private var videoTrack = -1
     private var audioTrack = -1
+    private var pendingVideoFormat: MediaFormat? = null
+    private var pendingAudioFormat: MediaFormat? = null
+    private var hasPreStartKeyframe = false
+    private var hasPreStartAudio = false
     private var muxedVideoFrames = 0
+    private var muxedAudioFrames = 0
     private var sessionDetail = ""
 
     private val preStartSamples = ArrayList<PendingSample>()
     private var preStartBytes = 0
 
     private val stopTimeout = Runnable { finishStop() }
+    private val audioStartTimeout = Runnable {
+        if (!muxerStarted && active && !finished) {
+            expectAudio = false
+            tryStartMuxer(forceVideoOnly = true)
+        }
+    }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -216,7 +228,12 @@ class ScreenRecordingService : Service() {
         muxerStarted = false
         videoTrack = -1
         audioTrack = -1
+        pendingVideoFormat = null
+        pendingAudioFormat = null
+        hasPreStartKeyframe = false
+        hasPreStartAudio = false
         muxedVideoFrames = 0
+        muxedAudioFrames = 0
         preStartSamples.clear()
         preStartBytes = 0
         sessionDetail = config.label
@@ -257,25 +274,14 @@ class ScreenRecordingService : Service() {
         projectionCallback = projCb
         proj.registerCallback(projCb, worker)
 
-        val codec = createConfiguredVideoEncoder(config)
-        if (codec == null) {
+        val startedPair = createConfiguredVideoEncoder(config)
+        if (startedPair == null) {
             failStart("No working hardware video encoder found", null)
             return
         }
+        val (codec, surface) = startedPair
         videoEncoder = codec
-
-        val surface = runCatching { codec.createInputSurface() }.getOrNull()
-        if (surface == null) {
-            failStart("Could not create encoder surface", null)
-            return
-        }
         inputSurface = surface
-
-        val startedCodec = runCatching { codec.start() }.isSuccess
-        if (!startedCodec) {
-            failStart("Video encoder failed to start", null)
-            return
-        }
 
         val dpi = resources.displayMetrics.densityDpi.coerceAtLeast(160)
         val display = runCatching {
@@ -303,6 +309,7 @@ class ScreenRecordingService : Service() {
             expectAudio = true
             audioFinished = false
             audio = RecordingAudio(worker, audioSource, proj, audioListener).also { it.start() }
+            worker.postDelayed(audioStartTimeout, AUDIO_WAIT_TIMEOUT_MS)
         } else {
             expectAudio = false
             audioFinished = true
@@ -317,7 +324,7 @@ class ScreenRecordingService : Service() {
         )
     }
 
-    private fun createConfiguredVideoEncoder(config: RecordingOptions.Config): MediaCodec? {
+    private fun createConfiguredVideoEncoder(config: RecordingOptions.Config): Pair<MediaCodec, Surface>? {
         val candidates = ArrayList<() -> MediaCodec>(2)
         if (config.encoder.isNotBlank()) {
             candidates.add { MediaCodec.createByCodecName(config.encoder) }
@@ -327,13 +334,17 @@ class ScreenRecordingService : Service() {
         for (factory in candidates) {
             for (richFormat in listOf(true, false)) {
                 var codec: MediaCodec? = null
+                var surface: Surface? = null
                 try {
                     codec = factory()
                     codec.setCallback(videoCallback, worker)
                     codec.configure(buildVideoFormat(config, richFormat), null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
-                    return codec
+                    surface = codec.createInputSurface()
+                    codec.start()
+                    return codec to surface
                 } catch (err: Throwable) {
                     Log.w(TAG, "Encoder setup failed (rich=$richFormat): ${err.message}")
+                    runCatching { surface?.release() }
                     runCatching { codec?.release() }
                 }
             }
@@ -358,15 +369,9 @@ class ScreenRecordingService : Service() {
         override fun onInputBufferAvailable(codec: MediaCodec, index: Int) {}
 
         override fun onOutputFormatChanged(codec: MediaCodec, format: MediaFormat) {
-            val m = muxer ?: return
-            if (videoTrack >= 0) return
-            runCatching {
-                videoTrack = m.addTrack(format)
-                tryStartMuxer()
-            }.onFailure {
-                Log.w(TAG, "Failed adding video track", it)
-                stopRecording()
-            }
+            if (finished || pendingVideoFormat != null) return
+            pendingVideoFormat = format
+            tryStartMuxer()
         }
 
         override fun onOutputBufferAvailable(codec: MediaCodec, index: Int, info: MediaCodec.BufferInfo) {
@@ -377,25 +382,38 @@ class ScreenRecordingService : Service() {
                 if (out != null && info.size > 0 && !isConfig && !finished) {
                     val isSync = (info.flags and MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0
                     val pts = timestamps?.video(info.presentationTimeUs) ?: info.presentationTimeUs.coerceAtLeast(0L)
-                    val sampleInfo = MediaCodec.BufferInfo().apply {
-                        set(info.offset, info.size, pts, info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM.inv())
-                    }
+                    val cleanFlags = info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM.inv()
                     if (muxerStarted) {
                         if (muxedVideoFrames > 0 || isSync) {
+                            out.position(info.offset)
+                            out.limit(info.offset + info.size)
+                            val sampleInfo = MediaCodec.BufferInfo().apply {
+                                set(info.offset, info.size, pts, cleanFlags)
+                            }
                             muxer?.writeSampleData(videoTrack, out, sampleInfo)
                             muxedVideoFrames++
                         }
-                    } else if ((muxedVideoFrames > 0 || isSync) && preStartBytes + info.size <= MAX_PRE_START_BYTES) {
-                        val copy = ByteBuffer.allocateDirect(info.size)
-                        out.position(info.offset)
-                        out.limit(info.offset + info.size)
-                        copy.put(out)
-                        copy.flip()
-                        val copyInfo = MediaCodec.BufferInfo().apply {
-                            set(0, info.size, pts, sampleInfo.flags)
+                    } else if (hasPreStartKeyframe || isSync) {
+                        if (preStartBytes + info.size > MAX_PRE_START_BYTES && isSync) {
+                            // Keep only audio samples + this fresh IDR keyframe so GOP remains intact.
+                            preStartSamples.removeAll { it.isVideo }
+                            preStartBytes = preStartSamples.sumOf { it.info.size }
+                            hasPreStartKeyframe = false
                         }
-                        preStartSamples += PendingSample(isVideo = true, data = copy, info = copyInfo)
-                        preStartBytes += info.size
+                        if (preStartBytes + info.size <= MAX_PRE_START_BYTES) {
+                            val copy = ByteBuffer.allocateDirect(info.size)
+                            out.position(info.offset)
+                            out.limit(info.offset + info.size)
+                            copy.put(out)
+                            copy.flip()
+                            val copyInfo = MediaCodec.BufferInfo().apply {
+                                set(0, info.size, pts, cleanFlags)
+                            }
+                            preStartSamples += PendingSample(isVideo = true, data = copy, info = copyInfo)
+                            preStartBytes += info.size
+                            if (isSync) hasPreStartKeyframe = true
+                            tryStartMuxer()
+                        }
                     }
                 }
                 if (isEos && stopping) {
@@ -417,16 +435,9 @@ class ScreenRecordingService : Service() {
 
     private val audioListener = object : RecordingAudio.Listener {
         override fun onAudioFormat(format: MediaFormat) {
-            val m = muxer ?: return
-            if (audioTrack >= 0 || finished) return
-            runCatching {
-                audioTrack = m.addTrack(format)
-                tryStartMuxer()
-            }.onFailure {
-                Log.w(TAG, "Failed adding audio track", it)
-                expectAudio = false
-                tryStartMuxer()
-            }
+            if (finished || pendingAudioFormat != null) return
+            pendingAudioFormat = format
+            tryStartMuxer()
         }
 
         override fun onAudioSample(buffer: ByteBuffer, info: MediaCodec.BufferInfo) {
@@ -436,18 +447,23 @@ class ScreenRecordingService : Service() {
                 set(0, info.size, pts, info.flags)
             }
             if (muxerStarted && audioTrack >= 0) {
-                runCatching { muxer?.writeSampleData(audioTrack, buffer, sampleInfo) }
-            } else if (preStartBytes + info.size <= MAX_PRE_START_BYTES) {
+                runCatching {
+                    muxer?.writeSampleData(audioTrack, buffer, sampleInfo)
+                    muxedAudioFrames++
+                }
+            } else if (!muxerStarted && expectAudio && preStartBytes + info.size <= MAX_PRE_START_BYTES) {
                 preStartSamples += PendingSample(isVideo = false, data = buffer, info = sampleInfo)
                 preStartBytes += info.size
+                hasPreStartAudio = true
+                tryStartMuxer()
             }
         }
 
         override fun onAudioFinished() {
             audioFinished = true
-            if (!muxerStarted && audioTrack < 0) {
+            if (!muxerStarted && !hasPreStartAudio) {
                 expectAudio = false
-                tryStartMuxer()
+                tryStartMuxer(forceVideoOnly = true)
             }
             if (stopping) checkFinishStop()
         }
@@ -462,24 +478,44 @@ class ScreenRecordingService : Service() {
         }
     }
 
-    private fun tryStartMuxer() {
+    private fun tryStartMuxer(forceVideoOnly: Boolean = false) {
         if (muxerStarted || finished) return
         val m = muxer ?: return
-        if (videoTrack < 0) return
-        if (expectAudio && audioTrack < 0) return
+        val vFormat = pendingVideoFormat ?: return
+        if (!hasPreStartKeyframe) return
+
+        val includeAudio = expectAudio && pendingAudioFormat != null && hasPreStartAudio
+        if (expectAudio && !includeAudio && !forceVideoOnly) return
+
+        videoTrack = runCatching { m.addTrack(vFormat) }.getOrElse { err ->
+            Log.w(TAG, "Failed adding video track", err)
+            stopRecording()
+            return
+        }
+        if (includeAudio) {
+            audioTrack = runCatching { m.addTrack(pendingAudioFormat!!) }.getOrElse { err ->
+                Log.w(TAG, "Failed adding audio track; continuing video-only", err)
+                expectAudio = false
+                -1
+            }
+        } else {
+            expectAudio = false
+            audioTrack = -1
+        }
 
         val started = runCatching { m.start() }.isSuccess
         if (!started) {
             stopRecording()
             return
         }
+        worker.removeCallbacks(audioStartTimeout)
         muxerStarted = true
         for (sample in preStartSamples) {
             val track = if (sample.isVideo) videoTrack else audioTrack
             if (track < 0) continue
             runCatching {
                 m.writeSampleData(track, sample.data, sample.info)
-                if (sample.isVideo) muxedVideoFrames++
+                if (sample.isVideo) muxedVideoFrames++ else muxedAudioFrames++
             }
         }
         preStartSamples.clear()
@@ -489,14 +525,15 @@ class ScreenRecordingService : Service() {
     private fun stopRecording() {
         if (!active || stopping) return
         stopping = true
+        worker.removeCallbacks(audioStartTimeout)
         RecordingState.publish(this, RecordingState.Phase.STOPPING, sessionDetail)
         updateNotification("Saving recording…")
 
-        runCatching { virtualDisplay?.release() }
-        virtualDisplay = null
-
         val signaled = runCatching { videoEncoder?.signalEndOfInputStream() }.isSuccess
         if (!signaled) videoEos = true
+
+        runCatching { virtualDisplay?.release() }
+        virtualDisplay = null
 
         audio?.stop()
         worker.postDelayed(stopTimeout, STOP_TIMEOUT_MS)
@@ -513,6 +550,11 @@ class ScreenRecordingService : Service() {
         if (finished) return
         finished = true
         worker.removeCallbacks(stopTimeout)
+        worker.removeCallbacks(audioStartTimeout)
+
+        if (!muxerStarted && hasPreStartKeyframe) {
+            tryStartMuxer(forceVideoOnly = true)
+        }
 
         runCatching { virtualDisplay?.release() }
         virtualDisplay = null
@@ -523,8 +565,10 @@ class ScreenRecordingService : Service() {
         inputSurface = null
 
         val hasFrames = muxerStarted && muxedVideoFrames > 0
-        if (hasFrames) {
-            runCatching { muxer?.stop() }.onFailure { Log.w(TAG, "Muxer stop failed", it) }
+        val muxerStoppedCleanly = if (hasFrames) {
+            runCatching { muxer?.stop() }.onFailure { Log.w(TAG, "Muxer stop failed", it) }.isSuccess
+        } else {
+            false
         }
         runCatching { muxer?.release() }
         muxer = null
@@ -534,7 +578,7 @@ class ScreenRecordingService : Service() {
         runCatching { projection?.stop() }
         projection = null
 
-        val saved = runCatching { output?.finish(hasFrames) }.getOrNull()
+        val saved = runCatching { output?.finish(muxerStoppedCleanly) }.getOrNull()
         output = null
         audio = null
         preStartSamples.clear()
@@ -553,6 +597,8 @@ class ScreenRecordingService : Service() {
 
     private fun failStart(message: String, error: Throwable?) {
         Log.e(TAG, message, error)
+        worker.removeCallbacks(stopTimeout)
+        worker.removeCallbacks(audioStartTimeout)
         runCatching { virtualDisplay?.release() }
         virtualDisplay = null
         runCatching { videoEncoder?.release() }

@@ -65,9 +65,28 @@ object RecordingLibrary {
         }
     }
 
-    /** @return a media URI already in the library for [path], for files an older build scanned. */
+    /** @return a media URI already in the library for [path], for files an older build scanned or published. */
     private fun findByPath(context: Context, path: String): Uri? {
         val collection = collection()
+        if (Build.VERSION.SDK_INT >= 29) {
+            val displayName = File(path).name
+            val cursor = runCatching {
+                context.contentResolver.query(
+                    collection,
+                    arrayOf(MediaStore.MediaColumns._ID),
+                    "${MediaStore.MediaColumns.DISPLAY_NAME} = ? AND ${MediaStore.MediaColumns.RELATIVE_PATH} LIKE ?",
+                    arrayOf(displayName, "Movies/$ALBUM%"),
+                    null
+                )
+            }.getOrNull()
+            if (cursor != null) {
+                try {
+                    if (cursor.moveToFirst()) return android.content.ContentUris.withAppendedId(collection, cursor.getLong(0))
+                } finally {
+                    cursor.close()
+                }
+            }
+        }
         val cursor = runCatching {
             context.contentResolver.query(
                 collection,

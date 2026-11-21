@@ -1225,6 +1225,14 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     }
 
     @Override
+    public boolean dispatchTouchEvent(MotionEvent ev) {
+        if (launcherGLView != null && ev.getPointerCount() > 0 && ev.getToolType(0) == MotionEvent.TOOL_TYPE_FINGER) {
+            launcherGLView.restoreVirtualCursorIfTouch();
+        }
+        return super.dispatchTouchEvent(ev);
+    }
+
+    @Override
     public boolean dispatchTrackballEvent(MotionEvent ev) {
         if(Tools.isAndroid8OrHigher() && checkCaptureDispatchConditions(ev))
             return launcherGLView.dispatchCapturedPointerEvent(ev);

@@ -91,7 +91,7 @@ internal class RecordingAudio(
         // Prime with 20 ms of silence at PTS=0 so AAC emits csd-0 immediately and MediaMuxer
         // never stalls waiting for the game to play its first sound.
         queueSilentPrimeFrame(aac)
-        drainEncoder(aac, endOfStream = false)
+        drainEncoder(aac, endOfStream = false, waitUs = 5_000L)
 
         runCatching { gameRecord?.startRecording() }
         runCatching { micRecord?.startRecording() }
@@ -106,10 +106,9 @@ internal class RecordingAudio(
     fun stop() {
         running = false
         val thread = captureThread
+        captureThread = null
         if (thread != null) {
             thread.interrupt()
-            runCatching { thread.join(450L) }
-            captureThread = null
         } else {
             releaseRecords()
             reportFinished()
@@ -252,12 +251,17 @@ internal class RecordingAudio(
         runCatching { aac.queueInputBuffer(inIndex, 0, bytesPerChunk, 0L, 0) }
     }
 
-    private fun drainEncoder(aac: MediaCodec, endOfStream: Boolean) {
+    private fun drainEncoder(aac: MediaCodec, endOfStream: Boolean, waitUs: Long = 0L) {
         val info = MediaCodec.BufferInfo()
         val maxLoops = if (endOfStream) 32 else 8
         for (i in 0 until maxLoops) {
+            val timeout = when {
+                endOfStream -> 10_000L
+                i == 0 -> waitUs
+                else -> 0L
+            }
             val index = runCatching {
-                aac.dequeueOutputBuffer(info, if (endOfStream) 10_000L else 0L)
+                aac.dequeueOutputBuffer(info, timeout)
             }.getOrDefault(MediaCodec.INFO_TRY_AGAIN_LATER)
             when {
                 index == MediaCodec.INFO_TRY_AGAIN_LATER -> if (!endOfStream) return

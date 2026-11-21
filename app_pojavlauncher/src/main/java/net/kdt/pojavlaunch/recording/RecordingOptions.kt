@@ -66,8 +66,8 @@ object RecordingOptions {
         require(quality in qualities) { "Unknown quality: $quality" }
         require(alignW > 0 && alignH > 0) { "Alignment must be positive" }
 
-        val wStep = maxOf(2, alignW)
-        val hStep = maxOf(2, alignH)
+        val wStep = maxOf(8, alignW)
+        val hStep = maxOf(8, alignH)
         val landscape = screenWidth >= screenHeight
         val shortSide = minOf(screenWidth, screenHeight)
         val longSide = maxOf(screenWidth, screenHeight)
