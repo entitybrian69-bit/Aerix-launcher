@@ -153,28 +153,8 @@ object GameLauncher {
         instance.effectiveJavaArgs().let { raw ->
             if (raw.isNotBlank()) jvmArgs.addAll(splitArguments(raw))
         }
-        // metadata JVM args (natives dir, classpath, Forge/NeoForge -p/-D flags, module path, …)
-        for (arg in merged.jvmArgs) {
-            when (arg) {
-                is JsonValue -> {
-                    val s = arg.asString()
-                    if (s != null) {
-                        val expanded = substitute(s, vars)
-                        if (s.startsWith("-Dorg.lwjgl.librarypath") || s.startsWith("-Djava.library.path")) continue
-                        jvmArgs.add(expanded)
-                    } else if (arg is JsonArray) {
-                        val rule = JsonObject().put("rules", arg.let { it.items.firstOrNull()?.get("rules") ?: it })
-                        // conditional argument: {"rules":[…], "value":"…"|["…"]}
-                        val rules = arg.items.firstOrNull()?.get("rules") as? JsonArray
-                        if (MetadataRules.allowed(rules)) {
-                            val value = arg.items.firstOrNull()?.get("value")
-                            if (value is JsonArray) value.strings().forEach { jvmArgs.add(substitute(it, vars)) }
-                            else value?.asString()?.let { jvmArgs.add(substitute(it, vars)) }
-                        }
-                    }
-                }
-            }
-        }
+        // Metadata JVM arguments (natives dir, classpath, loader -D flags, module path, …).
+        jvmArgs.addAll(metadataJvmArgs(merged, vars, classpath))
         jvmArgs.add(merged.mainClass.ifBlank { throw LaunchException("The version metadata has no main class.") })
 
         val gameArgs = ArrayList<String>()
@@ -249,16 +229,14 @@ object GameLauncher {
         val argDir = AppEnv.cacheDir.resolve("launch")
         Files.createDirectories(argDir)
         val argFile = argDir.resolve("launch-${spec.instance.id}-${System.currentTimeMillis()}.txt")
-        // Java argument files: one argument per line, backslashes must be escaped.
-        val content = spec.command.drop(1).joinToString("\n") { arg ->
-            arg.replace("\\", "\\\\").replace("\"", "\\\"")
-        }
-        Files.writeString(argFile, content, StandardCharsets.UTF_8)
+        Files.writeString(argFile, encodeArgFile(spec.command.drop(1)), StandardCharsets.UTF_8)
         runCatching {
             argFile.toFile().setReadable(false, false); argFile.toFile().setReadable(true, true)
             argFile.toFile().setWritable(false, false); argFile.toFile().setWritable(true, true)
         }
 
+        // The @file must be the FIRST argument: java only expands argument files in the options
+        // position, before the main class. After the main class it is passed to Minecraft verbatim.
         val builder = ProcessBuilder(spec.command.first(), "@${argFile.toAbsolutePath()}")
             .directory(spec.gameDir.toFile())
             .redirectErrorStream(true)
@@ -308,6 +286,20 @@ object GameLauncher {
         return game
     }
 
+    /**
+     * Encodes arguments for a Java argument file.
+     *
+     * The format is *not* shell quoting: outside quotes a backslash is literal, and inside quotes a
+     * backslash must be doubled. Windows paths are all backslashes and launcher paths contain
+     * spaces ("AppData\Roaming\Aerix Launcher\…"), so getting this wrong either splits the
+     * classpath or mangles every library path. Verified against a real JVM: a quoted
+     * `C:\Users\Test User\game` survives intact, and an unquoted one splits on the space.
+     */
+    fun encodeArgFile(args: List<String>): String = args.joinToString("\n") { arg ->
+        val needsQuotes = arg.isEmpty() || arg.any { it == ' ' || it == '\t' || it == '"' || it == '#' }
+        if (!needsQuotes) arg else "\"" + arg.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+    }
+
     /** Kills a running game gracefully (taskkill on Windows so the JVM gets a real termination). */
     fun stop(game: RunningGame) {
         val pid = runCatching { game.process.pid() }.getOrDefault(-1)
@@ -327,6 +319,53 @@ object GameLauncher {
     // ---- argument helpers --------------------------------------------------------------------
 
     /** Substitutes `${key}` placeholders, case-insensitively, leaving unknown ones untouched. */
+    /**
+     * Turns a version's `arguments.jvm` into real command-line arguments.
+     *
+     * Handles plain strings, the `{"rules":…, "value":…}` object form, and the array-wrapped
+     * variant some loader metadata emits. Rules are evaluated for this machine; a loader's own
+     * `-Djava.library.path` is dropped because ours points at the jars we extracted.
+     *
+     * The last step matters more than it looks: pre-1.13 metadata (and BTA-era profiles built on
+     * it) has no `arguments` block at all, so nothing declares a class path. Without the
+     * `-cp` fallback the JVM starts with an empty class path and dies with
+     * "Could not find or load main class". 1.6.4's fixtures in the self test cover it.
+     */
+    fun metadataJvmArgs(merged: MergedVersion, vars: Map<String, String>, classpath: String): List<String> {
+        val metadataArgs = ArrayList<String>()
+        for (arg in merged.jvmArgs) {
+            val plain = arg.asString()
+            if (plain != null) {
+                // A -Djava.library.path the loader supplies points at its own guess; ours is
+                // authoritative because we are the ones who extracted the jars.
+                if (plain.startsWith("-Dorg.lwjgl.librarypath") || plain.startsWith("-Djava.library.path")) continue
+                metadataArgs.add(substitute(plain, vars))
+                continue
+            }
+            // Object form {"rules":[…], "value":"…"|[…]} — and the array-wrapped variant some
+            // loader metadata emits, where the object is the array's only element.
+            val holder = when (arg) {
+                is JsonObject -> arg
+                is JsonArray -> arg.items.firstOrNull() as? JsonObject ?: continue
+                else -> continue
+            }
+            if (!MetadataRules.allowed(holder.arr("rules"))) continue
+            when (val value = holder.get("value")) {
+                is JsonArray -> value.strings().forEach { metadataArgs.add(substitute(it, vars)) }
+                else -> value?.asString()?.let { metadataArgs.add(substitute(it, vars)) }
+            }
+        }
+        // Pre-1.13 metadata has no `arguments` block, so nothing declares the class path. BTA-era
+        // profiles are the same. Without this the JVM starts with no class path at all and dies
+        // with "Could not find or load main class" — so supply one unless the metadata did.
+        val declaresClasspath = metadataArgs.any { it == "-cp" || it == "-classpath" || it == "-c" }
+        if (!declaresClasspath) {
+            metadataArgs.add(0, classpath)
+            metadataArgs.add(0, "-cp")
+        }
+        return metadataArgs
+    }
+
     fun substitute(input: String, vars: Map<String, String>): String {
         if (!input.contains("\${")) return input
         val sb = StringBuilder(input.length + 64)

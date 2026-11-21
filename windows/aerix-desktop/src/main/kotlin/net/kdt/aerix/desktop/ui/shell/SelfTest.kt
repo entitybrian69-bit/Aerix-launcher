@@ -23,6 +23,7 @@ import java.awt.Color
 import java.awt.Dimension
 import java.awt.image.BufferedImage
 import java.nio.file.Files
+import java.util.concurrent.TimeUnit
 import java.nio.file.Path
 import javax.imageio.ImageIO
 import javax.swing.JComponent
@@ -134,6 +135,147 @@ object SelfTest {
             if (Loaders.compareVersions("1.21.1", "1.20.2") <= 0) error("1.21.1 should sort above 1.20.2")
         }
 
+        check("version metadata resolves libraries the way the game needs") {
+            // A fake game root with hand-written version JSONs, exercising the three library
+            // shapes that appear across 1.5 → 1.21, plus an inheritance chain and a rule that
+            // must exclude a foreign-OS library. Nothing here touches the network.
+            val root = Files.createTempDirectory("aerix-meta")
+            try {
+                fun write(id: String, json: String) {
+                    val dir = root.resolve("versions").resolve(id)
+                    Files.createDirectories(dir)
+                    Files.writeString(dir.resolve("$id.json"), json)
+                }
+                // The native classifier is platform-specific, so the fixture asks MetadataRules
+                // what this machine is instead of hard-coding "windows": the same assertions then
+                // run on the Linux development box and on the Windows CI runner.
+                val osKey = net.kdt.aerix.desktop.core.game.MetadataRules.nativeKeys().first()
+                val osName = net.kdt.aerix.desktop.core.game.MetadataRules.osName
+                val natClassifier = "natives-$osKey"
+                val foreignKey = if (osKey == "osx") "windows" else "osx"
+                write("1.6.4", """
+                {
+                  "id": "1.6.4", "type": "release", "mainClass": "net.minecraft.client.main.Main",
+                  "minecraftArguments": "--username ${'$'}{auth_player_name} --gameDir ${'$'}{game_directory}",
+                  "assetIndex": {"id": "legacy", "url": "https://example.invalid/legacy.json"},
+                  "assets": "legacy", "jar": "1.6.4", "javaVersion": {"majorVersion": 8},
+                  "libraries": [
+                    {"name": "org.lwjgl.lwjgl:lwjgl:2.9.1",
+                     "downloads": {"artifact": {"path": "org/lwjgl/lwjgl/lwjgl/2.9.1/lwjgl-2.9.1.jar",
+                                                "url": "https://example.invalid/class.jar", "size": 10},
+                                   "classifiers": {"${natClassifier}": {"path": "org/lwjgl/lwjgl/lwjgl/2.9.1/lwjgl-2.9.1-${natClassifier}.jar",
+                                                                       "url": "https://example.invalid/nat.jar", "size": 20}}},
+                     "natives": {"${osKey}": "${natClassifier}", "${foreignKey}": "natives-other"},
+                     "extract": {"exclude": ["META-INF/"]}},
+                    {"name": "com.example:rawlib:1.0", "url": "https://example.invalid/maven/"},
+                    {"name": "com.example:maconly:1.0",
+                     "rules": [{"action": "allow", "os": {"name": "osx"}}],
+                     "downloads": {"artifact": {"url": "https://example.invalid/mac.jar"}}}
+                  ]
+                }
+                """.trimIndent())
+                write("1.21", """
+                {
+                  "id": "1.21", "type": "release", "mainClass": "net.minecraft.client.main.Main",
+                  "arguments": {"game": ["--username", "${'$'}{auth_player_name}"],
+                                "jvm": ["-Djava.library.path=${'$'}{natives_directory}", "-cp", "${'$'}{classpath}"]},
+                  "assetIndex": {"id": "17", "url": "https://example.invalid/17.json"},
+                  "assets": "17", "javaVersion": {"majorVersion": 21},
+                  "libraries": [
+                    {"name": "org.lwjgl:lwjgl:3.3.3",
+                     "downloads": {"artifact": {"path": "org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3.jar",
+                                                "url": "https://example.invalid/lwjgl.jar"}}},
+                    {"name": "org.lwjgl:lwjgl:3.3.3:natives-windows",
+                     "downloads": {"artifact": {"path": "org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-windows.jar",
+                                                "url": "https://example.invalid/lwjgl-natives.jar"}}}
+                  ]
+                }
+                """.trimIndent())
+                // a loader profile that inherits from 1.21 and adds its own jvm arg
+                write("fabric-loader-0.16", """
+                {
+                  "id": "fabric-loader-0.16", "inheritsFrom": "1.21",
+                  "mainClass": "net.fabricmc.loader.impl.launch.knot.KnotClient",
+                  "arguments": {"jvm": [
+                      "-DFabricMcEmu=net.minecraft.client.main.Main",
+                      {"rules": [{"action": "allow", "os": {"name": "osx"}}], "value": "-DMacOnly=1"},
+                      {"rules": [{"action": "allow", "os": {"name": "${osName}"}}], "value": ["-DThisOs=1"]},
+                      {"value": "-DNoRules=1"}
+                  ], "game": []},
+                  "libraries": [{"name": "net.fabricmc:fabric-loader:0.16", "url": "https://maven.fabricmc.net/"}]
+                }
+                """.trimIndent())
+
+                val old = net.kdt.aerix.desktop.core.game.Mojang.resolve(root, "1.6.4")
+                val oldPaths = old.libraries.map { it.relativePath }
+                if ("org/lwjgl/lwjgl/lwjgl/2.9.1/lwjgl-2.9.1.jar" !in oldPaths)
+                    error("classic library lost its class jar: $oldPaths")
+                if (oldPaths.any { it.contains("${natClassifier}.jar") })
+                    error("a native jar leaked onto the class path")
+                if (old.natives.none { it.relativePath.endsWith("lwjgl-2.9.1-${natClassifier}.jar") })
+                    error("classic native classifier was not extracted: ${old.natives.map { it.relativePath }}")
+                if (old.natives.any { it.relativePath.contains("natives-other") })
+                    error("a native for another operating system was extracted: ${old.natives.map { it.relativePath }}")
+                if (old.natives.first().excludeFromNatives != listOf("META-INF/"))
+                    error("extract.exclude ignored")
+                if (oldPaths.any { it.contains("rawlib") }.not())
+                    error("pre-1.13 raw library (url + name, no downloads) was dropped: $oldPaths")
+                if (oldPaths.any { it.contains("maconly") })
+                    error("a library for another operating system was included")
+                if (old.legacyAssets.not()) error("1.6.4 should use the virtual asset tree")
+
+                val modern = net.kdt.aerix.desktop.core.game.Mojang.resolve(root, "1.21")
+                if (modern.libraries.none { it.relativePath.endsWith("lwjgl-3.3.3.jar") })
+                    error("modern class jar missing")
+                if (modern.libraries.any { it.relativePath.contains("natives") })
+                    error("modern natives were put on the class path")
+                if (modern.natives.size != 1) error("expected exactly one modern native, got ${modern.natives.size}")
+
+                val loader = net.kdt.aerix.desktop.core.game.Mojang.resolve(root, "fabric-loader-0.16")
+                if (loader.mainClass != "net.fabricmc.loader.impl.launch.knot.KnotClient")
+                    error("loader main class did not win: ${loader.mainClass}")
+                if (loader.libraries.none { it.relativePath.contains("fabric-loader") })
+                    error("loader library missing")
+                val jvm = loader.jvmArgs.mapNotNull { it.asString() }
+                if (jvm.count { it.contains("java.library.path") } != 1)
+                    error("jvm args duplicated across the inheritance chain: $jvm")
+                if (jvm.indexOfFirst { it.contains("java.library.path") } > jvm.indexOfFirst { it.startsWith("-DFabricMcEmu") })
+                    error("parent jvm args must come before loader jvm args: $jvm")
+                if (loader.gameArgs.isEmpty()) error("inherited game args were lost")
+
+                // The launch command itself: 1.6.4 has no `arguments` block, so the class path has
+                // to be synthesised or the game cannot start at all.
+                val classicCmd = net.kdt.aerix.desktop.core.game.GameLauncher
+                    .metadataJvmArgs(old, emptyMap(), "C:\\game\\libs.jar")
+                if (!classicCmd.contains("-cp") || !classicCmd.contains("C:\\game\\libs.jar"))
+                    error("pre-1.13 launch has no class path: $classicCmd")
+                if (classicCmd.indexOf("-cp") > classicCmd.indexOf("C:\\game\\libs.jar"))
+                    error("class path flag must precede its value: $classicCmd")
+
+                // Modern metadata declares its own -cp, so no duplicate is added.
+                val modernCmd = net.kdt.aerix.desktop.core.game.GameLauncher
+                    .metadataJvmArgs(modern, mapOf("classpath" to "a;b", "natives_directory" to "n"), "a;b")
+                if (modernCmd.count { it == "-cp" } != 1)
+                    error("class path declared twice: $modernCmd")
+                if (!modernCmd.contains("-cp") || modernCmd[modernCmd.indexOf("-cp") + 1] != "a;b")
+                    error("class path value was not substituted: $modernCmd")
+
+                // Rules: a foreign-OS arg is dropped, a matching one kept, a rule-less object kept.
+                val loaderCmd = net.kdt.aerix.desktop.core.game.GameLauncher
+                    .metadataJvmArgs(loader, emptyMap(), "x")
+                if (loaderCmd.any { it.contains("MacOnly") })
+                    error("an osx-only JVM argument reached a non-mac launch: $loaderCmd")
+                if (loaderCmd.none { it == "-DThisOs=1" })
+                    error("a matching rule's JVM argument was dropped: $loaderCmd")
+                if (loaderCmd.none { it == "-DNoRules=1" })
+                    error("a rule-less object argument was dropped: $loaderCmd")
+                if (loaderCmd.none { it.startsWith("-DFabricMcEmu") })
+                    error("the loader's own argument was dropped: $loaderCmd")
+            } finally {
+                root.toFile().deleteRecursively()
+            }
+        }
+
         check("OptiFine and BTA pages parse") {
             // A trimmed copy of optifine.net/downloads: header row, then two download lines.
             val html = """
@@ -167,6 +309,51 @@ object SelfTest {
             if (Loaders.btaSemver("v7.3_04") != "7.3.4") error("BTA semver conversion is wrong")
             if (net.kdt.aerix.desktop.core.instance.Loader.normalise("Better than Adventure 7.3") !=
                 net.kdt.aerix.desktop.core.instance.Loader.BTA) error("BTA does not normalise")
+        }
+
+        check("launch argument file round-trips through a real JVM") {
+            // This is the one place where a quoting mistake means *every* launch is wrong, and the
+            // failure looks like "Minecraft started with no memory and no classpath". So it is
+            // tested end to end: the running launcher jar is copied into a folder whose name
+            // contains a space (which is what %APPDATA%\Aerix Launcher is on Windows), then the
+            // JVM is asked, through an argument file, to run that jar and print its version.
+            val mine = runCatching {
+                java.io.File(SelfTest::class.java.protectionDomain.codeSource.location.toURI())
+            }.getOrNull()
+            if (mine == null || !mine.isFile || !mine.name.endsWith(".jar")) {
+                // Running from a class directory (IDE): fall back to the encoding assertions only.
+                Log.i("selftest", "not running from a jar; encoding checked textually only")
+            } else {
+                val dir = Files.createTempDirectory("aerix args test ")
+                val copy = dir.resolve("launcher copy.jar")
+                Files.copy(mine.toPath(), copy)
+                val argFile = dir.resolve("args.txt")
+                val args = listOf(
+                    "-cp", copy.toAbsolutePath().toString(),
+                    "net.kdt.aerix.desktop.MainKt", "--version"
+                )
+                Files.writeString(argFile, net.kdt.aerix.desktop.core.game.GameLauncher.encodeArgFile(args), Charsets.UTF_8)
+                val java = JavaRuntimes.discover(force = true).firstOrNull()?.javaExe
+                    ?: error("no Java runtime to test with")
+                val process = ProcessBuilder(java.toString(), "@${argFile.toAbsolutePath()}")
+                    .redirectErrorStream(true).start()
+                val output = process.inputStream.bufferedReader().readText()
+                if (!process.waitFor(60, TimeUnit.SECONDS)) process.destroyForcibly()
+                runCatching { Files.deleteIfExists(copy) }
+                runCatching { Files.deleteIfExists(argFile) }
+                runCatching { Files.deleteIfExists(dir) }
+                if (!output.contains("Aerix Launcher")) {
+                    error("the JVM could not launch through the argument file:\n" + output.take(700))
+                }
+            }
+            // And the shape of the text itself: spaces force quotes, and inside them a backslash
+            // must be doubled (the JDK's rule — unquoted backslashes are literal).
+            val encoded = net.kdt.aerix.desktop.core.game.GameLauncher.encodeArgFile(listOf("plain", "two words"))
+            if (encoded != "plain\n\"two words\"") error("unexpected encoding: $encoded")
+            val path = net.kdt.aerix.desktop.core.game.GameLauncher.encodeArgFile(listOf("C:\\a b\\c"))
+            if (path != "\"C:\\\\a b\\\\c\"") error("backslashes inside quotes must double, got: $path")
+            val unquoted = net.kdt.aerix.desktop.core.game.GameLauncher.encodeArgFile(listOf("C:\\nospace\\x.jar"))
+            if (unquoted.contains("\\\\")) error("unquoted backslashes must not be doubled, got: $unquoted")
         }
 
         check("java discovery") {

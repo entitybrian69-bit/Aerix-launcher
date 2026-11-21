@@ -144,10 +144,28 @@ object MetadataRules {
         else -> "natives-windows"
     }
 
-    fun nativeKeys(): List<String> = listOf(
-        "natives-$osName", "natives-$osName-$osArch", "natives-$osName-${osArch.replace("x86_64", "64")}",
-        "natives-$osName-${osArch.replace("x86_64", "x86_64")}"
-    ).distinct()
+    /**
+     * Keys that can name this machine in a `libraries[].natives` map.
+     *
+     * Two spellings exist in the wild: the old one keys by operating system and puts the
+     * classifier in the value (`"natives": {"windows": "natives-windows"}`), while some
+     * libraries key by `os-arch` (`"natives": {"windows-64": "natives-windows-amd64"}`).
+     * The value is the classifier either way.
+     */
+    fun nativeKeys(): List<String> {
+        val shortArch = when (osArch) {
+            "x86_64" -> "64"
+            "x86" -> "32"
+            else -> osArch
+        }
+        return listOf(
+            osName,                       // "windows"
+            "$osName-$osArch",            // "windows-x86_64"
+            "$osName-$shortArch",         // "windows-64"
+            "natives-$osName",            // tolerated older spelling
+            "natives-$osName-$osArch"
+        ).distinct()
+    }
 }
 
 /** Maven coordinate parsing, mirroring `utils/maven/MavenName`. */

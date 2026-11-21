@@ -129,50 +129,61 @@ object Mojang {
                     }
                     url = baseUrl.trimEnd('/') + "/" + coords.toPath()
                 }
-                val resolved = ResolvedLibrary(coords, url, sha1, size, path)
-                // older metadata marks natives with a `natives` map instead of classifiers
-                val nativesMap = lib.obj("natives")
-                var isNative = false
-                if (nativesMap != null) {
-                    val key = MetadataRules.nativeKeys().firstOrNull { nativesMap.has(it) }
-                    if (key != null) {
-                        val classifier = (nativesMap[key]?.asString() ?: "").replace("\${arch}", archBits())
-                        val natCoords = MavenName(coords.group, coords.artifact, coords.version, classifier)
-                        val classArtifact = downloads?.obj("classifiers")?.obj(classifier)
-                        natives.add(
-                            ResolvedLibrary(
-                                natCoords,
-                                classArtifact?.str("url") ?: (baseUrl.trimEnd('/') + "/" + natCoords.toPath()),
-                                classArtifact?.str("sha1"),
-                                classArtifact?.num("size") ?: -1,
-                                classArtifact?.str("path") ?: natCoords.toPath(),
-                                nativeExtract = true,
-                                excludeFromNatives = lib.arr("extract", "exclude")?.strings() ?: emptyList()
-                            )
-                        )
-                        isNative = true
+                // ---- class artifact vs. natives
+                //
+                // Three shapes appear in the wild, and an entry can be two of them at once:
+                //  * modern (1.19+): natives are their own library whose classifier is
+                //    `natives-windows-x86_64`; they must never reach the class path.
+                //  * classic (1.6–1.18): one library with `downloads.artifact` plus a `natives`
+                //    map and `downloads.classifiers`. The class jar is still needed — Android's
+                //    MoJsonDownloader submits both — and the classifier jar is extracted.
+                //  * raw (pre-1.6): no `downloads` at all, just `url` + `name`; natives are
+                //    derived from the same base URL.
+                val modernNative = coords.classifier?.startsWith("natives-") == true
+                if (modernNative) {
+                    addNative(
+                        natives,
+                        ResolvedLibrary(coords, url, sha1, size, path, nativeExtract = true)
+                    )
+                } else {
+                    // the class jar (Android: processLibraryWithDownloads → submitArtifact)
+                    if (artifact != null || lib.str("url") != null || !lib.has("downloads") || downloads?.has("artifact") == true) {
+                        seen.putIfAbsent(coords.toNotation() + ":" + path, ResolvedLibrary(coords, url, sha1, size, path))
                     }
-                }
-                // modern (1.19+) natives: separate library entries whose name ends in the classifier
-                val classifierSuffix = MetadataRules.nativeClassifier()
-                if (!isNative && coords.classifier?.startsWith("natives-") == true) {
-                    natives.add(ResolvedLibrary(coords, url, sha1, size, path, nativeExtract = true))
-                    isNative = true
-                }
-                if (!isNative) {
-                    seen.putIfAbsent(coords.toNotation() + ":" + path, resolved)
+                    val nativesMap = lib.obj("natives")
+                    if (nativesMap != null) {
+                        val key = MetadataRules.nativeKeys().firstOrNull { nativesMap.has(it) }
+                        if (key != null) {
+                            val classifier = (nativesMap.str(key) ?: "").replace("\${arch}", archBits())
+                            if (classifier.isNotBlank()) {
+                                val natCoords = MavenName(coords.group, coords.artifact, coords.version, classifier, coords.extension)
+                                val natArtifact = downloads?.obj("classifiers")?.obj(classifier)
+                                addNative(
+                                    natives,
+                                    ResolvedLibrary(
+                                        natCoords,
+                                        natArtifact?.str("url") ?: (baseUrl.trimEnd('/') + "/" + natCoords.toPath()),
+                                        natArtifact?.str("sha1"),
+                                        natArtifact?.num("size") ?: -1,
+                                        natArtifact?.str("path") ?: natCoords.toPath(),
+                                        nativeExtract = true,
+                                        excludeFromNatives = lib.arr("extract", "exclude")?.strings() ?: emptyList()
+                                    )
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
 
         // ---- main class / args
         val mainClass = chain.firstOrNull { it.mainClass.isNotBlank() }?.mainClass ?: merged.mainClass
+        // Parent (vanilla) arguments first, loader arguments after, so the loader's later
+        // -Djava.library.path / -p module-path flags take precedence — that is the order the
+        // vanilla launcher builds a loader profile in. Each level contributes exactly once.
         val jvmArgs = ArrayList<net.kdt.aerix.desktop.core.json.JsonValue>()
-        for (info in chain.asReversed()) jvmArgs.addAll(info.jvmArgs)   // parent first
-        for (info in chain) {
-            // child-specific -D flags (loader tweaks) go in after the parent's
-            if (info !== merged) jvmArgs.addAll(info.jvmArgs)
-        }
+        for (info in chain.asReversed()) jvmArgs.addAll(info.jvmArgs)
         val gameArgs = ArrayList<net.kdt.aerix.desktop.core.json.JsonValue>()
         for (info in chain.asReversed()) gameArgs.addAll(info.gameArgs)
         val legacyArgs = chain.firstNotNullOfOrNull { it.minecraftArguments }
@@ -204,6 +215,11 @@ object Mojang {
             jarVersion = jarVersion,
             legacyAssets = legacyAssets
         )
+    }
+
+    /** Adds a native jar at most once: inheritance chains repeat the same libraries. */
+    private fun addNative(list: MutableList<ResolvedLibrary>, lib: ResolvedLibrary) {
+        if (list.none { it.relativePath == lib.relativePath }) list.add(lib)
     }
 
     private fun archBits(): String = when (MetadataRules.osArch) {
