@@ -64,9 +64,29 @@ jobs:
       - run: npm ci
       - name: Build installer
         shell: bash
+        env:
+          CSC_LINK: ${{ runner.os == 'Windows' && secrets.WIN_CSC_LINK || '' }}
+          CSC_KEY_PASSWORD: ${{ runner.os == 'Windows' && secrets.WIN_CSC_KEY_PASSWORD || '' }}
+          AZURE_TENANT_ID: ${{ runner.os == 'Windows' && secrets.AZURE_TENANT_ID || '' }}
+          AZURE_CLIENT_ID: ${{ runner.os == 'Windows' && secrets.AZURE_CLIENT_ID || '' }}
+          AZURE_CLIENT_SECRET: ${{ runner.os == 'Windows' && secrets.AZURE_CLIENT_SECRET || '' }}
+          AZURE_SIGNING_ENDPOINT: ${{ runner.os == 'Windows' && secrets.AZURE_SIGNING_ENDPOINT || '' }}
+          AZURE_SIGNING_ACCOUNT: ${{ runner.os == 'Windows' && secrets.AZURE_SIGNING_ACCOUNT || '' }}
+          AZURE_SIGNING_CERT_PROFILE: ${{ runner.os == 'Windows' && secrets.AZURE_SIGNING_CERT_PROFILE || '' }}
+          AZURE_SIGNING_PUBLISHER: ${{ runner.os == 'Windows' && secrets.AZURE_SIGNING_PUBLISHER || '' }}
         run: |
           set -o pipefail
-          if ! npm run ${{ matrix.script }} 2>&1 | tee build.log; then
+          ARGS=()
+          if [ "${{ runner.os }}" = "Windows" ] && [ -n "$AZURE_SIGNING_ENDPOINT" ] && [ -n "$AZURE_SIGNING_ACCOUNT" ] && [ -n "$AZURE_SIGNING_CERT_PROFILE" ]; then
+            ARGS=(
+              "--"
+              "--config.win.azureSignOptions.endpoint=$AZURE_SIGNING_ENDPOINT"
+              "--config.win.azureSignOptions.codeSigningAccountName=$AZURE_SIGNING_ACCOUNT"
+              "--config.win.azureSignOptions.certificateProfileName=$AZURE_SIGNING_CERT_PROFILE"
+              "--config.win.azureSignOptions.publisherName=${AZURE_SIGNING_PUBLISHER:-CN=Aerix Launcher}"
+            )
+          fi
+          if ! npm run ${{ matrix.script }} "${ARGS[@]}" 2>&1 | tee build.log; then
             TAIL=$(tail -n 25 build.log | tr '\n' ' ')
             echo "::error title=electron-builder failed::${TAIL}"
             exit 1
@@ -93,6 +113,7 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           pattern: aerix-pc-*
@@ -101,12 +122,22 @@ jobs:
       - name: Publish rolling pc-nightly prerelease
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WIN_SIGNED: ${{ secrets.WIN_CSC_LINK != '' || secrets.AZURE_SIGNING_ENDPOINT != '' }}
         run: |
           set -euo pipefail
+          cp aerix-pc/scripts/Install-Aerix-PC.ps1 pc-dist/Install-Aerix-PC.ps1
           cd pc-dist
-          sha256sum * > SHA256SUMS-PC.txt
+          sha256sum Aerix-PC-* Install-Aerix-PC.ps1 > SHA256SUMS-PC.txt
           ls -lh
+          SIGN_NOTE="Windows SmartScreen tip: If your browser shows 'Windows protected your PC' on an unsigned pre-release .exe, install cleanly via PowerShell (SHA-256 verified): \`irm https://github.com/$GITHUB_REPOSITORY/releases/download/pc-nightly/Install-Aerix-PC.ps1 | iex\` — or click **More info -> Run anyway**."
+          if [ "$WIN_SIGNED" = "true" ]; then
+            SIGN_NOTE="Windows binaries in this build are Authenticode-signed."
+          fi
+          NOTES=$(printf "Automated Aerix Launcher PC pre-release for Windows (x64), Linux (x64), and macOS (arm64 & x64) from commit %s.\n\n%s" "${GITHUB_SHA}" "$SIGN_NOTE")
           if gh release view pc-nightly --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release edit pc-nightly --repo "$GITHUB_REPOSITORY" \
+              --title "Aerix PC Nightly (${GITHUB_SHA::7})" \
+              --notes "$NOTES"
             gh release upload pc-nightly --repo "$GITHUB_REPOSITORY" * --clobber
           else
             gh release create pc-nightly \
@@ -114,6 +145,6 @@ jobs:
               --target "$GITHUB_SHA" \
               --prerelease \
               --title "Aerix PC Nightly (${GITHUB_SHA::7})" \
-              --notes "Automated Aerix Launcher PC builds for Windows, Linux, and macOS from commit ${GITHUB_SHA}." \
+              --notes "$NOTES" \
               *
           fi

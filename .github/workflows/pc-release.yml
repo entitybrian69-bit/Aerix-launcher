@@ -71,9 +71,29 @@ jobs:
       - run: npm ci
       - name: Build release installer
         shell: bash
+        env:
+          CSC_LINK: ${{ runner.os == 'Windows' && secrets.WIN_CSC_LINK || '' }}
+          CSC_KEY_PASSWORD: ${{ runner.os == 'Windows' && secrets.WIN_CSC_KEY_PASSWORD || '' }}
+          AZURE_TENANT_ID: ${{ runner.os == 'Windows' && secrets.AZURE_TENANT_ID || '' }}
+          AZURE_CLIENT_ID: ${{ runner.os == 'Windows' && secrets.AZURE_CLIENT_ID || '' }}
+          AZURE_CLIENT_SECRET: ${{ runner.os == 'Windows' && secrets.AZURE_CLIENT_SECRET || '' }}
+          AZURE_SIGNING_ENDPOINT: ${{ runner.os == 'Windows' && secrets.AZURE_SIGNING_ENDPOINT || '' }}
+          AZURE_SIGNING_ACCOUNT: ${{ runner.os == 'Windows' && secrets.AZURE_SIGNING_ACCOUNT || '' }}
+          AZURE_SIGNING_CERT_PROFILE: ${{ runner.os == 'Windows' && secrets.AZURE_SIGNING_CERT_PROFILE || '' }}
+          AZURE_SIGNING_PUBLISHER: ${{ runner.os == 'Windows' && secrets.AZURE_SIGNING_PUBLISHER || '' }}
         run: |
           set -o pipefail
-          if ! npm run ${{ matrix.script }} 2>&1 | tee build.log; then
+          ARGS=()
+          if [ "${{ runner.os }}" = "Windows" ] && [ -n "$AZURE_SIGNING_ENDPOINT" ] && [ -n "$AZURE_SIGNING_ACCOUNT" ] && [ -n "$AZURE_SIGNING_CERT_PROFILE" ]; then
+            ARGS=(
+              "--"
+              "--config.win.azureSignOptions.endpoint=$AZURE_SIGNING_ENDPOINT"
+              "--config.win.azureSignOptions.codeSigningAccountName=$AZURE_SIGNING_ACCOUNT"
+              "--config.win.azureSignOptions.certificateProfileName=$AZURE_SIGNING_CERT_PROFILE"
+              "--config.win.azureSignOptions.publisherName=${AZURE_SIGNING_PUBLISHER:-CN=Aerix Launcher}"
+            )
+          fi
+          if ! npm run ${{ matrix.script }} "${ARGS[@]}" 2>&1 | tee build.log; then
             TAIL=$(tail -n 25 build.log | tr '\n' ' ')
             echo "::error title=electron-builder failed::${TAIL}"
             exit 1
@@ -113,6 +133,7 @@ jobs:
         run: |
           set -euo pipefail
           VERSION=$(node -p "require('./aerix-pc/package.json').version")
+          cp aerix-pc/scripts/Install-Aerix-PC.ps1 pc-out/Install-Aerix-PC.ps1
           cd pc-out
           # Create stable unversioned filenames alongside versioned ones so website links never go stale
           test -f "Aerix-PC-$VERSION-win-x64.exe" && cp "Aerix-PC-$VERSION-win-x64.exe" "Aerix-PC-Setup.exe"
@@ -122,19 +143,19 @@ jobs:
           test -f "Aerix-PC-$VERSION-linux-x64.tar.gz" && cp "Aerix-PC-$VERSION-linux-x64.tar.gz" "Aerix-PC-linux-x64.tar.gz"
           test -f "Aerix-PC-$VERSION-mac-arm64.dmg" && cp "Aerix-PC-$VERSION-mac-arm64.dmg" "Aerix-PC-mac-arm64.dmg"
           test -f "Aerix-PC-$VERSION-mac-x64.dmg" && cp "Aerix-PC-$VERSION-mac-x64.dmg" "Aerix-PC-mac-x64.dmg"
-          sha256sum Aerix-PC-* > SHA256SUMS-PC.txt
+          sha256sum Aerix-PC-* Install-Aerix-PC.ps1 > SHA256SUMS-PC.txt
           ls -lh
 
           # Attach to existing v$VERSION release if present (keeps releases/latest unified for Android + PC),
           # otherwise create/update pc-v$VERSION.
           if gh release view "v$VERSION" >/dev/null 2>&1; then
-            gh release upload "v$VERSION" Aerix-PC-* SHA256SUMS-PC.txt --clobber
+            gh release upload "v$VERSION" Aerix-PC-* Install-Aerix-PC.ps1 SHA256SUMS-PC.txt --clobber
           elif gh release view "pc-v$VERSION" >/dev/null 2>&1; then
-            gh release upload "pc-v$VERSION" Aerix-PC-* SHA256SUMS-PC.txt --clobber
+            gh release upload "pc-v$VERSION" Aerix-PC-* Install-Aerix-PC.ps1 SHA256SUMS-PC.txt --clobber
           else
             gh release create "pc-v$VERSION" \
               --title "Aerix Launcher PC v$VERSION" \
               --notes "Aerix Launcher PC v$VERSION for Windows (x64), Linux (x64), and macOS (Apple Silicon & Intel)." \
               --target "$GITHUB_SHA" \
-              Aerix-PC-* SHA256SUMS-PC.txt
+              Aerix-PC-* Install-Aerix-PC.ps1 SHA256SUMS-PC.txt
           fi

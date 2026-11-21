@@ -17,6 +17,9 @@ extraResources:
 icon: build/icon.png
 win:
   icon: build/icon.ico
+  requestedExecutionLevel: asInvoker
+  verifyUpdateCodeSignature: false
+  legalTrademarks: Aerix Launcher Contributors
   target:
     - target: nsis
       arch:
@@ -27,6 +30,9 @@ win:
   artifactName: Aerix-PC-${version}-win-${arch}.${ext}
 nsis:
   oneClick: false
+  perMachine: false
+  allowElevation: false
+  packElevateHelper: false
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
