@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
-export const AERIX_USER_AGENT = 'Aerix-Launcher-PC/2.4.6 (https://github.com/entitybrian69-bit/Aerix-launcher)';
+export const AERIX_USER_AGENT = 'Aerix-Launcher-PC/2.4.5 (https://github.com/entitybrian69-bit/Aerix-launcher)';
 
 export async function fetchJson<T>(url: string, init: RequestInit = {}, timeoutMs = 25000): Promise<T> {
   const controller = new AbortController();
