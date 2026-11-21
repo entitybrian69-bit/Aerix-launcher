@@ -1,0 +1,109 @@
+name: Aerix PC Build & Tests
+
+on:
+  push:
+    paths:
+      - 'aerix-pc/**'
+      - '.github/workflows/pc-build.yml'
+  pull_request:
+    paths:
+      - 'aerix-pc/**'
+      - '.github/workflows/pc-build.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: aerix-pc-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Typecheck & Unit Tests
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: aerix-pc
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: aerix-pc/package-lock.json
+      - run: npm ci --ignore-scripts
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm test
+
+  build:
+    name: Build (${{ matrix.label }})
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: Windows x64
+            os: windows-latest
+            script: dist:win
+          - label: Linux x64
+            os: ubuntu-22.04
+            script: dist:linux
+          - label: macOS Universal
+            os: macos-14
+            script: dist:mac
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: aerix-pc
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: aerix-pc/package-lock.json
+      - run: npm ci
+      - run: npm run ${{ matrix.script }}
+      - name: Stage normalized artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          cp release/Aerix-PC-*.* out/ 2>/dev/null || true
+          rm -f out/*.blockmap out/*.yml out/latest*.yml 2>/dev/null || true
+          ls -la out/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: aerix-pc-${{ runner.os }}
+          path: aerix-pc/out/*
+          if-no-files-found: error
+
+  publish-nightly:
+    name: Publish PC Nightly
+    needs: build
+    if: github.event_name == 'push' && (github.ref_name == 'v3_openjdk' || github.ref_name == 'arena/fcb4aa28-aerix-launcher')
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: aerix-pc-*
+          path: pc-dist
+          merge-multiple: true
+      - name: Publish rolling pc-nightly prerelease
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          cd pc-dist
+          sha256sum * > SHA256SUMS-PC.txt
+          ls -lh
+          if gh release view pc-nightly >/dev/null 2>&1; then
+            gh release upload pc-nightly * --clobber
+          else
+            gh release create pc-nightly \
+              --prerelease \
+              --title "Aerix PC Nightly (${GITHUB_SHA::7})" \
+              --notes "Automated Aerix Launcher PC builds for Windows, Linux, and macOS from commit ${GITHUB_SHA}." \
+              *
+          fi

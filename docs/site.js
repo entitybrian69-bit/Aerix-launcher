@@ -116,6 +116,44 @@
     }
   }
 
+  function pcKindOf(name) {
+    var n = (name || '').toLowerCase();
+    if (n.indexOf('aerix-pc') !== 0) return null;
+    if (/\.exe$/.test(n)) return 'win-exe';
+    if (/\.appimage$/.test(n)) return 'linux-appimage';
+    if (/\.deb$/.test(n)) return 'linux-deb';
+    if (/mac-arm64.*\.dmg$/.test(n)) return 'mac-arm64';
+    if (/mac-x64.*\.dmg$/.test(n)) return 'mac-x64';
+    return null;
+  }
+
+  function applyPcRelease(releases) {
+    var pcCards = all('[data-pc-dl]');
+    if (!pcCards.length) return;
+    var usable = (releases || []).filter(function (r) {
+      return !!(r && !r.draft && (r.assets || []).some(function (a) { return pcKindOf(a.name); }));
+    });
+    // Prefer a stable non-prerelease PC build first, otherwise use pc-nightly
+    var chosen = usable.find(function (r) { return !r.prerelease; }) || usable[0];
+    if (!chosen) return;
+    var byKind = {};
+    (chosen.assets || []).forEach(function (asset) {
+      var kind = pcKindOf(asset.name);
+      if (kind && !byKind[kind]) byKind[kind] = asset;
+    });
+    pcCards.forEach(function (card) {
+      var kind = card.getAttribute('data-pc-dl');
+      var asset = byKind[kind];
+      if (!asset) return;
+      card.href = asset.browser_download_url;
+      card.setAttribute('download', asset.name);
+      var sizeEl = card.querySelector('.size');
+      if (sizeEl) sizeEl.textContent = megabytes(asset.size) || '';
+      var nameEl = card.querySelector('.asset');
+      if (nameEl) nameEl.textContent = asset.name;
+    });
+  }
+
   /* ── downloads, summed from the releases themselves ─────────────────────── */
 
   function setupDownloads() {
@@ -166,11 +204,13 @@
       .then(function (release) {
         if (isPublicRelease(release)) {
           applyRelease(release);
-          return null;
         }
         return fetch(API, { headers: { Accept: 'application/vnd.github+json' } })
           .then(function (r2) { return r2.ok ? r2.json() : []; })
-          .then(function (releases) { applyRelease(newestRelease(releases)); });
+          .then(function (releases) {
+            if (!isPublicRelease(release)) applyRelease(newestRelease(releases));
+            applyPcRelease(releases);
+          });
       })
       .catch(function () {
         /* Offline, rate limited, or blocked: the static links and sizes stay. */

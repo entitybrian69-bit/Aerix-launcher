@@ -1,0 +1,35 @@
+{
+  "name": "aerix-pc",
+  "productName": "Aerix Launcher PC",
+  "version": "2.4.5",
+  "description": "Aerix Launcher PC — Fast, modern cross-platform Minecraft launcher with Aerix Client, Modrinth & CurseForge Discover, Microsoft/Aerix/Offline accounts, and automatic Java runtime management.",
+  "main": "dist/main/main.js",
+  "author": "Aerix Launcher Contributors",
+  "license": "GPL-3.0-or-later",
+  "homepage": "https://entitybrian69-bit.github.io/Aerix-launcher/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/entitybrian69-bit/Aerix-launcher.git"
+  },
+  "scripts": {
+    "clean": "node -e \"const fs=require('fs'); for(const d of ['dist','dist-tests','release']) fs.rmSync(d,{recursive:true,force:true});\"",
+    "copy:assets": "node -e \"const fs=require('fs'),path=require('path'); fs.mkdirSync('dist/renderer',{recursive:true}); for(const f of ['index.html','styles.css']) fs.copyFileSync(path.join('src/renderer',f), path.join('dist/renderer',f));\"",
+    "build:main": "tsc -p tsconfig.json",
+    "build:preload": "tsc -p tsconfig.preload.json",
+    "build:renderer": "tsc -p tsconfig.renderer.json",
+    "build": "npm run build:main && npm run build:preload && npm run build:renderer && npm run copy:assets",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.preload.json --noEmit && tsc -p tsconfig.renderer.json --noEmit && tsc -p tsconfig.test.json --noEmit",
+    "test": "tsc -p tsconfig.test.json && node --test dist-tests/tests/*.test.js",
+    "start": "npm run build && electron .",
+    "pack": "npm run build && electron-builder --dir",
+    "dist:win": "npm run build && electron-builder --win --x64",
+    "dist:linux": "npm run build && electron-builder --linux --x64",
+    "dist:mac": "npm run build && electron-builder --mac --arm64 --x64"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "electron": "^35.7.5",
+    "electron-builder": "^26.18.1",
+    "typescript": "^5.9.3"
+  }
+}
