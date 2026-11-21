@@ -136,7 +136,9 @@ public class LauncherPreferences {
         PREF_DISABLE_SWAP_HAND = DEFAULT_PREF.getBoolean("disableDoubleTap", false);
         PREF_RAM_ALLOCATION = DEFAULT_PREF.getInt("allocation", findBestRAMAllocation(ctx));
         PREF_CUSTOM_JAVA_ARGS = DEFAULT_PREF.getString("javaArgs", "");
-        PREF_SUSTAINED_PERFORMANCE = DEFAULT_PREF.getBoolean("sustainedPerformance", isDevicePowerful);
+        // Never enable Android Sustained Performance Mode by default: PowerHAL caps CPU/GPU
+        // clocks to thermal floor on many devices, causing severe frame-time stutter.
+        PREF_SUSTAINED_PERFORMANCE = DEFAULT_PREF.getBoolean("sustainedPerformance", false);
         // A phone whose panel can do 90 or 120 Hz should not have to discover a hidden switch to
         // get the refresh rate it paid for: the request is on by default exactly when a faster mode
         // exists at the current resolution, and DisplayRefreshMode reports whether the device
@@ -144,7 +146,9 @@ public class LauncherPreferences {
         PREF_MAX_REFRESH_RATE = DEFAULT_PREF.getBoolean(DisplayRefreshMode.PREF_KEY,
                 maxRefreshDefault(ctx));
         PREF_VIRTUAL_MOUSE_START = DEFAULT_PREF.getBoolean("mouse_start", false);
-        PREF_USE_ALTERNATE_SURFACE = DEFAULT_PREF.getBoolean("alternate_surface", isDevicePowerful);
+        // Always default to SurfaceView (direct Hardware Composer layer) instead of TextureView,
+        // which forces a full-screen GPU/HWUI copy every frame and stutters badly on <=4GB/720p phones.
+        PREF_USE_ALTERNATE_SURFACE = DEFAULT_PREF.getBoolean("alternate_surface", true);
         PREF_JAVA_SANDBOX = DEFAULT_PREF.getBoolean("java_sandbox", true);
         PREF_SCALE_FACTOR = DEFAULT_PREF.getInt("resolutionRatio", findBestResolution(ctx, isDevicePowerful))/100f;
         PREF_ENABLE_GYRO = DEFAULT_PREF.getBoolean("enableGyro", false);
@@ -153,7 +157,9 @@ public class LauncherPreferences {
         PREF_GYRO_SMOOTHING = DEFAULT_PREF.getBoolean("gyroSmoothing", true);
         PREF_GYRO_INVERT_X = DEFAULT_PREF.getBoolean("gyroInvertX", false);
         PREF_GYRO_INVERT_Y = DEFAULT_PREF.getBoolean("gyroInvertY", false);
-        PREF_FORCE_VSYNC = DEFAULT_PREF.getBoolean("force_vsync", isDevicePowerful);
+        // Do not force EGL VSync by default: missing a swap interval stalls the render thread
+        // and halves frame cadence (60->30 or 120->60 FPS judder). Minecraft manages its own VSync/FPS cap.
+        PREF_FORCE_VSYNC = DEFAULT_PREF.getBoolean("force_vsync", false);
         PREF_USE_ANGLE = DEFAULT_PREF.getBoolean("use_angle", false);
         PREF_USE_SYSTEM_ANGLE = DEFAULT_PREF.getBoolean("use_system_angle", false);
         PREF_BUTTON_ALL_CAPS = DEFAULT_PREF.getBoolean("buttonAllCaps", true);

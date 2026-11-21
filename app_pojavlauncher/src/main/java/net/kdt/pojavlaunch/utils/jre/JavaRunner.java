@@ -92,10 +92,15 @@ public class JavaRunner {
      * @return A list filled with args.
      */
     private static List<String> getJavaArgs(String runtimeHome, List<String> userArguments, int memoryMb) {
+        return getJavaArgs(runtimeHome, userArguments, memoryMb, true);
+    }
+
+    private static List<String> getJavaArgs(String runtimeHome, List<String> userArguments, int memoryMb, boolean allowG1Gc) {
         String resolvFile;
         resolvFile = new File(Tools.DIR_DATA,"resolv.conf").getAbsolutePath();
 
         userArguments.addAll(0, Arrays.asList(InstanceMemory.heapOptions(memoryMb)));
+        JvmGcTuning.appendDefaultGcArgs(userArguments, memoryMb, allowG1Gc);
 
         ArrayList<String> overridableArguments = new ArrayList<>(Arrays.asList(
                 "-Djava.home=" + runtimeHome,
@@ -283,9 +288,10 @@ public class JavaRunner {
         }
 
         boolean hasJavaAgent = preprocessUserArgs(vmArgs);
+        boolean isClientVm = vmPath.getParentFile() != null && "client".equals(vmPath.getParentFile().getName());
         List<String> runtimeArgs = new ArrayList<>();
         if(getCacioJavaArgs(runtimeArgs,runtime.javaVersion == 8)) hasJavaAgent = true;
-        runtimeArgs.addAll(getJavaArgs(runtimeHomeDir.getAbsolutePath(), vmArgs, memoryMb));
+        runtimeArgs.addAll(getJavaArgs(runtimeHomeDir.getAbsolutePath(), vmArgs, memoryMb, !isClientVm));
         vmArgs.clear();
 
 

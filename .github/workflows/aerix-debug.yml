@@ -117,6 +117,7 @@ jobs:
           python3 tests/logo_visibility_smoke.py
           python3 tests/release_245_smoke.py
           python3 tests/recorder_panel_smoke.py
+          python3 tests/stutter_fixes_smoke.py
           mkdir -p "$RUNNER_TEMP/aerix-migration-test"
           javac -d "$RUNNER_TEMP/aerix-migration-test" \
             app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/tasks/DataMigrationPolicy.java \
@@ -193,6 +194,10 @@ jobs:
             tests/InstanceMemorySmokeTest.java
           java -cp "$RUNNER_TEMP/aerix-memory-test" InstanceMemorySmokeTest
           javac -d "$RUNNER_TEMP/aerix-memory-test" \
+            app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/utils/jre/JvmGcTuning.java \
+            tests/JvmGcTuningSmokeTest.java
+          java -cp "$RUNNER_TEMP/aerix-memory-test" net.kdt.pojavlaunch.utils.jre.JvmGcTuningSmokeTest
+          javac -d "$RUNNER_TEMP/aerix-memory-test" \
             app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/client/ClientVersions.java \
             app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/client/PackVersionFilter.java \
             tests/PackVersionFilterSmokeTest.java
@@ -226,6 +231,10 @@ jobs:
             -I app_pojavlauncher/src/main/jni/fps tests/frame_counter_smoke.c \
             app_pojavlauncher/src/main/jni/fps/frame_counter.c -o "$RUNNER_TEMP/aerix-frame-test"
           "$RUNNER_TEMP/aerix-frame-test"
+          gcc -std=c11 -Wall -Wextra -Werror \
+            tests/affinity_smoke.c app_pojavlauncher/src/main/jni/affinity.c \
+            -o "$RUNNER_TEMP/aerix-affinity-test"
+          "$RUNNER_TEMP/aerix-affinity-test"
           javac -d "$RUNNER_TEMP/aerix-memory-test" \
             aerix_client_mod/src/main/java/aerix/client/mod/ClientTelemetry.java tests/ModernTelemetrySmokeTest.java
           java -cp "$RUNNER_TEMP/aerix-memory-test" aerix.client.mod.ModernTelemetrySmokeTest

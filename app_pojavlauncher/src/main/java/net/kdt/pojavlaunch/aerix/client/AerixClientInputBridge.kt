@@ -353,13 +353,17 @@ object AerixClientInputBridge {
         zoomHolding = false
     }
 
-    fun pollLatestLog(context: Context) {
-        runCatching {
+    private val logLock = Any()
+
+    data class LogPollChunk(val lines: List<String>, val lanIp: String?)
+
+    fun readLatestLogChunk(): LogPollChunk? = runCatching {
+        synchronized(logLock) {
             val logFile = File(Tools.DIR_GAME_HOME, "latestlog.txt")
-            if (!logFile.isFile) return
+            if (!logFile.isFile) return null
             val len = logFile.length()
             if (len < logReadOffset) logReadOffset = 0L
-            if (len == logReadOffset) return
+            if (len == logReadOffset) return null
 
             RandomAccessFile(logFile, "r").use { raf ->
                 // On first attach skip huge old logs except tail 16 KB
@@ -369,16 +373,27 @@ object AerixClientInputBridge {
                 raf.seek(logReadOffset)
                 val bytes = ByteArray((len - logReadOffset).coerceAtMost(32_768L).toInt())
                 val read = raf.read(bytes)
-                if (read > 0) {
-                    logReadOffset += read
-                    val chunk = String(bytes, 0, read, Charsets.UTF_8)
-                    chunk.lineSequence().forEach { line -> inspectLogLine(context, line) }
-                }
+                if (read <= 0) return null
+                logReadOffset += read
+                val chunk = String(bytes, 0, read, Charsets.UTF_8)
+                val lines = chunk.lines()
+                val needsLanIp = lines.any { it.contains("Local game hosted on port ") }
+                val lanIp = if (needsLanIp) resolveLocalWifiIp() else null
+                LogPollChunk(lines, lanIp)
             }
         }
+    }.getOrNull()
+
+    fun applyLatestLogChunk(context: Context, chunk: LogPollChunk?) {
+        if (chunk == null) return
+        chunk.lines.forEach { line -> inspectLogLine(context, line, chunk.lanIp) }
     }
 
-    private fun inspectLogLine(context: Context, line: String) {
+    fun pollLatestLog(context: Context) {
+        applyLatestLogChunk(context, readLatestLogChunk())
+    }
+
+    private fun inspectLogLine(context: Context, line: String, preResolvedLanIp: String? = null) {
         val actualVersion = ClientBootLabels.fromLoadingLog(line)
         if (actualVersion != null && actualVersion != sessionMinecraftVersion) {
             sessionMinecraftVersion = actualVersion
@@ -425,7 +440,7 @@ object AerixClientInputBridge {
             val port = portStr.toIntOrNull()
             if (port != null && port > 0) {
                 hostedLanPort = port
-                hostedLanAddress = "${resolveLocalWifiIp()}:$port"
+                hostedLanAddress = "${preResolvedLanIp ?: resolveLocalWifiIp()}:$port"
             }
         }
 

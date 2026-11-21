@@ -578,7 +578,8 @@ private fun AerixClientRootOverlay(
         var lastNativeFrames = -1L
         var lastSampleNanos = 0L
         val recentFpsWindow = ArrayDeque<Int>(20)
-        var slowTick = 0
+        var lastSlowSampleMs = 0L
+        var lastSysSampleMs = 0L
 
         while (true) {
             val nowMs = System.currentTimeMillis()
@@ -587,8 +588,8 @@ private fun AerixClientRootOverlay(
             if (AerixClientStore.cpsPillEnabled || AerixClientStore.keystrokesEnabled) AerixClientInputBridge.refreshCps(nowMs)
             if (AerixClientStore.matchStatsEnabled) sessionElapsedSec = (nowMs - startWall) / 1000L
 
-            slowTick++
-            if (slowTick % 10 == 0) {
+            if (nowMs - lastSlowSampleMs >= 1000L) {
+                lastSlowSampleMs = nowMs
                 val totalFrames = if (mcVersion != "26.3" && (AerixClientStore.perfPillEnabled || AerixClientStore.fpsHistoryEnabled || AerixClientStore.frameTimingEnabled || AerixClientStore.adaptiveDistanceEnabled || modal == InGameClientModal.OLED_AFK)) NativeFrameCounter.read() else -1L
                 val nowNanos = System.nanoTime()
                 if (totalFrames >= 0) {
@@ -597,7 +598,8 @@ private fun AerixClientRootOverlay(
                         val elapsedNs = nowNanos - lastSampleNanos
                         val instantFps = ((deltaFrames * 1_000_000_000.0) / elapsedNs).roundToInt().coerceAtLeast(0)
                         currentFps = instantFps
-                        if (AerixClientStore.fpsHistoryEnabled) fpsHistory = (fpsHistory + instantFps).takeLast(60) else fpsHistory = emptyList()
+                        if (AerixClientStore.fpsHistoryEnabled) fpsHistory = (fpsHistory + instantFps).takeLast(60)
+                        else if (fpsHistory.isNotEmpty()) fpsHistory = emptyList()
                         if (recentFpsWindow.size >= 20) recentFpsWindow.removeFirst()
                         recentFpsWindow.addLast(instantFps)
                         onePercentLowFps = recentFpsWindow.minOrNull() ?: instantFps
@@ -610,7 +612,8 @@ private fun AerixClientRootOverlay(
                     val gameFps = if (mcVersion == "26.3") telemetry?.fps else null
                     if (gameFps != null) {
                         currentFps = gameFps
-                        if (AerixClientStore.fpsHistoryEnabled) fpsHistory = (fpsHistory + gameFps).takeLast(60) else fpsHistory = emptyList()
+                        if (AerixClientStore.fpsHistoryEnabled) fpsHistory = (fpsHistory + gameFps).takeLast(60)
+                        else if (fpsHistory.isNotEmpty()) fpsHistory = emptyList()
                         if (recentFpsWindow.size >= 20) recentFpsWindow.removeFirst()
                         recentFpsWindow.addLast(gameFps)
                         onePercentLowFps = recentFpsWindow.minOrNull() ?: gameFps
@@ -621,31 +624,35 @@ private fun AerixClientRootOverlay(
                     frameTiming = FrameTimingStats.calculate(previousTiming, current)
                     previousTiming = current
                 }
-                AerixClientInputBridge.pollLatestLog(context)
+                val logChunk = withContext(Dispatchers.IO) { AerixClientInputBridge.readLatestLogChunk() }
+                if (logChunk != null) AerixClientInputBridge.applyLatestLogChunk(context, logChunk)
             }
 
-            if (slowTick % 50 == 1 && (AerixClientStore.perfPillEnabled || AerixClientStore.fpsHistoryEnabled || AerixClientStore.frameTimingEnabled || AerixClientStore.thermalGuardEnabled || modal == InGameClientModal.OLED_AFK)) {
-                runCatching {
-                    val am = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
-                    if (am != null) {
-                        val mi = ActivityManager.MemoryInfo()
-                        am.getMemoryInfo(mi)
-                        usedRamMb = (android.os.Debug.getPss() / 1024L).toInt()
-                    }
-                    val bmIntent = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
-                    if (bmIntent != null) {
-                        val lvl = bmIntent.getIntExtra(BatteryManager.EXTRA_LEVEL, 100)
-                        val scl = bmIntent.getIntExtra(BatteryManager.EXTRA_SCALE, 100).coerceAtLeast(1)
-                        batteryPct = ((lvl * 100f) / scl).roundToInt()
-                        val tenthsC = bmIntent.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 320)
-                        batteryTempC = tenthsC / 10f
-                    }
+            if (nowMs - lastSysSampleMs >= 5000L && (AerixClientStore.perfPillEnabled || AerixClientStore.fpsHistoryEnabled || AerixClientStore.frameTimingEnabled || AerixClientStore.thermalGuardEnabled || modal == InGameClientModal.OLED_AFK)) {
+                lastSysSampleMs = nowMs
+                val sysSample = withContext(Dispatchers.IO) {
+                    runCatching {
+                        val ram = (android.os.Debug.getPss() / 1024L).toInt()
+                        val bmIntent = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+                        val pct = if (bmIntent != null) {
+                            val lvl = bmIntent.getIntExtra(BatteryManager.EXTRA_LEVEL, 100)
+                            val scl = bmIntent.getIntExtra(BatteryManager.EXTRA_SCALE, 100).coerceAtLeast(1)
+                            ((lvl * 100f) / scl).roundToInt()
+                        } else null
+                        val temp = if (bmIntent != null) bmIntent.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 320) / 10f else null
+                        Triple(ram, pct, temp)
+                    }.getOrNull()
+                }
+                if (sysSample != null) {
+                    usedRamMb = sysSample.first
+                    sysSample.second?.let { batteryPct = it }
+                    sysSample.third?.let { batteryTempC = it }
                 }
             }
-            val needsFastUpdates = AerixClientStore.perfPillEnabled || AerixClientStore.fpsHistoryEnabled || AerixClientStore.frameTimingEnabled || AerixClientStore.adaptiveDistanceEnabled || AerixClientStore.cpsPillEnabled ||
+            val needsFastUpdates = AerixClientStore.cpsPillEnabled ||
                 AerixClientStore.keystrokesEnabled || AerixClientStore.swordCooldownBarEnabled ||
                 AerixClientStore.hitmarkerEnabled || AerixClientStore.speedrunTimerEnabled
-            delay(if (needsFastUpdates) 100L else 500L)
+            delay(if (needsFastUpdates) 100L else 1000L)
         }
     }
 
