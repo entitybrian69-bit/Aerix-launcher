@@ -533,23 +533,10 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     }
 
     /**
-     * The view the game renders into, for the recorder's game-surface capture. Null until the game has a
-     * window, which is the case the recorder treats as "this session cannot be clean" and mirrors the
-     * display instead.
-     */
-    public View getRecordingSurfaceView() {
-        return launcherGLView != null ? launcherGLView.getRecordingSurfaceView() : null;
-    }
-
-    /**
      * Puts the on-screen controls in or out of what a screen recording captures.
      *
-     * A recording built from the game's own frames never contains them, which is the preferred path. This
-     * is the fallback for when a session captures the display instead: the only way to leave the buttons
-     * out of a mirrored display is to stop drawing them, and the only safe way to do that mid-game is
-     * alpha, since a hidden control stops receiving touches and the player would be unable to play until
-     * the recording ended. The recorder calls this when a session that opted out of controls starts, and
-     * when it finishes.
+     * Uses alpha rather than view visibility so touch controls stay responsive while hidden from
+     * the recording's display capture.
      */
     public void setControlsCapturedInRecording(boolean captured) {
         if (mControlLayout == null) return;
@@ -1017,6 +1004,21 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
+        if (mRecorder != null && mRecorder.isPanelOpen()) {
+            int keyCode = event.getKeyCode();
+            if (keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN
+                    || keyCode == KeyEvent.KEYCODE_VOLUME_MUTE) {
+                return super.dispatchKeyEvent(event);
+            }
+            if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_ESCAPE) {
+                if (event.getAction() == KeyEvent.ACTION_UP) {
+                    mRecorder.dismissPanel();
+                }
+                return true;
+            }
+            super.dispatchKeyEvent(event);
+            return true;
+        }
         // The menu is on top of the game and takes the back button: if the soft keyboard is up
         // inside In-Game Socials / Downloads it dismisses the keyboard first, then navigates back.
         if (mGameMenuOverlay != null && mGameMenuOverlay.isMenuShown()) {

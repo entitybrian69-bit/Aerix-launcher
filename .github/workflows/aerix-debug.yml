@@ -84,7 +84,6 @@ jobs:
           python3 tests/fastclient_assets_smoke.py
           python3 tests/fastclient_performance_download_test.py
           python3 tests/recorder_wiring_smoke.py
-          python3 tests/game_surface_capture_smoke.py
           python3 tests/complaint_fixes_smoke.py
           python3 tests/mouse_cursor_recording_smoke.py
           python3 tests/authlib_263_smoke.py
@@ -175,6 +174,10 @@ jobs:
             app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/recording/RecordingPaths.java \
             tests/RecordingPathsSmokeTest.java
           java -cp "$RUNNER_TEMP/aerix-recorder-test" RecordingPathsSmokeTest
+          "$RUNNER_TEMP/aerix-kotlin/bin/kotlinc" \
+            app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/recording/RecordingTimestamps.kt \
+            tests/RecordingTimestampsOfflineTest.kt -d "$RUNNER_TEMP/aerix-recorder-ts.jar"
+          java -cp "$RUNNER_TEMP/aerix-recorder-ts.jar:$RUNNER_TEMP/aerix-kotlin/lib/kotlin-stdlib.jar" RecordingTimestampsOfflineTestKt
           mkdir -p "$RUNNER_TEMP/aerix-worldshare-test"
           javac -d "$RUNNER_TEMP/aerix-worldshare-test" \
             app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/aerix/worldshare/WorldSharePolicy.java \

@@ -7,7 +7,7 @@ internal object AudioMixer {
         mic: ShortArray,
         frames: Int,
         output: java.nio.ByteBuffer,
-        source: RecordingOptions.AudioSource = RecordingOptions.AudioSource.GAME
+        source: RecordingOptions.AudioSource = RecordingOptions.AudioSource.BOTH
     ) {
         require(frames >= 0 && (!source.game || frames * 2 <= game.size) && (!source.microphone || frames <= mic.size))
         require(output.remaining() >= frames * 4)

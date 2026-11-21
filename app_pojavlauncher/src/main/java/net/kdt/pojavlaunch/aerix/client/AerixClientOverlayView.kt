@@ -1022,8 +1022,7 @@ private fun FamousClientRectangleMenu(
                                 Toast.makeText(context, "Screen recorder unavailable", Toast.LENGTH_SHORT).show()
                             } else {
                                 onClose()
-                                // Prepare on the controller (permission, codec list, the "already
-                                // recording" case), which then opens the panel this overlay draws.
+                                // Open the controller's in-activity Compose recorder panel.
                                 game.openAerixScreenRecorder()
                             }
                         },

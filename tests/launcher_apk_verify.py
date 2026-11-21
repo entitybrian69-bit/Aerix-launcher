@@ -52,4 +52,10 @@ with zipfile.ZipFile(Path(sys.argv[1])) as apk:
         dex = apk.read(dex_name)
         assert b'Lnet/kdt/pojavlaunch/mobileglues/' not in dex, f'{dex_name} still contains MobileGlues classes'
         assert b'MobileGluesWarning' not in dex, f'{dex_name} still contains MobileGluesWarning'
-print('APK carries no MobileGlues libraries, assets, or classes')
+        assert b'Lnet/kdt/pojavlaunch/recording/GameSurfaceFeed;' not in dex, (
+            f'{dex_name} still contains removed GameSurfaceFeed'
+        )
+        assert b'Lnet/kdt/pojavlaunch/recording/GameCapture;' not in dex, (
+            f'{dex_name} still contains removed GameCapture'
+        )
+print('APK carries no MobileGlues or removed CPU-readback recorder classes')

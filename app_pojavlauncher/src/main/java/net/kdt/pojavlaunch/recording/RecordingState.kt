@@ -6,88 +6,103 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.Handler
 import android.os.Looper
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
+import android.os.SystemClock
+import android.widget.Toast
 import androidx.core.content.ContextCompat
-import java.util.concurrent.CopyOnWriteArraySet
-import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.CopyOnWriteArrayList
 
-/**
- * Syncs recorder phase & status across `:recorder` (`ScreenRecordingService`) and `:game`
- * (`RecorderController` / `GameMenuScreen`) so isolating `MediaCodec` + `VirtualDisplay` in
- * `:recorder` never touches `:game`'s OpenGL/Vulkan drivers or JVM signal handlers.
- */
+/** Cross-process recording phase synchronized between `:recorder` and `:game`. */
 object RecordingState {
-    const val ACTION_STATE_SYNC = "net.kdt.pojavlaunch.recording.ACTION_STATE_SYNC"
+    const val ACTION = "net.al.aerixlauncher.RECORDING_STATE"
     private const val EXTRA_PHASE = "phase"
     private const val EXTRA_DETAIL = "detail"
+    private const val EXTRA_STARTED_AT = "started_at"
+    private const val EXTRA_NOTICE = "notice"
+    private const val EXTRA_LONG = "long_notice"
 
     enum class Phase { IDLE, STARTING, RECORDING, STOPPING }
 
-    var phase by mutableStateOf(Phase.IDLE)
-        private set
-    var detail by mutableStateOf("")
+    @Volatile
+    var phase: Phase = Phase.IDLE
         private set
 
-    @JvmStatic
-    fun isActive() = phase != Phase.IDLE
+    @Volatile
+    var detail: String = ""
+        private set
 
-    private val listeners = CopyOnWriteArraySet<Runnable>()
+    @Volatile
+    var startedAtElapsedMs: Long = 0L
+        private set
+
+    private val listeners = CopyOnWriteArrayList<() -> Unit>()
     private val main = Handler(Looper.getMainLooper())
-    private val receiverRegistered = AtomicBoolean(false)
 
-    fun registerSyncReceiver(context: Context) {
-        val app = context.applicationContext
-        if (!receiverRegistered.compareAndSet(false, true)) return
-        val receiver = object : BroadcastReceiver() {
-            override fun onReceive(ctx: Context?, intent: Intent?) {
-                if (intent?.action != ACTION_STATE_SYNC) return
-                val name = intent.getStringExtra(EXTRA_PHASE) ?: return
-                val nextPhase = Phase.values().firstOrNull { it.name == name } ?: Phase.IDLE
-                val nextDetail = intent.getStringExtra(EXTRA_DETAIL).orEmpty()
-                applyLocal(nextPhase, nextDetail)
-            }
-        }
-        runCatching {
-            ContextCompat.registerReceiver(
-                app,
-                receiver,
-                IntentFilter(ACTION_STATE_SYNC),
-                ContextCompat.RECEIVER_NOT_EXPORTED
-            )
-        }
+    fun isActive(): Boolean = phase != Phase.IDLE
+
+    fun addListener(listener: () -> Unit) {
+        listeners.addIfAbsent(listener)
     }
 
-    private fun applyLocal(value: Phase, message: String) {
-        main.post {
-            phase = value
-            detail = message
-            listeners.forEach { it.run() }
-        }
-    }
-
-    fun update(value: Phase, message: String = "", broadcastContext: Context? = null) {
-        applyLocal(value, message)
-        if (broadcastContext != null) {
-            runCatching {
-                val app = broadcastContext.applicationContext
-                app.sendBroadcast(
-                    Intent(ACTION_STATE_SYNC)
-                        .setPackage(app.packageName)
-                        .putExtra(EXTRA_PHASE, value.name)
-                        .putExtra(EXTRA_DETAIL, message)
-                )
-            }
-        }
-    }
-
-    fun addListener(listener: Runnable) {
-        listeners.add(listener)
-        listener.run()
-    }
-
-    fun removeListener(listener: Runnable) {
+    fun removeListener(listener: () -> Unit) {
         listeners.remove(listener)
+    }
+
+    fun update(next: Phase, info: String = "", startedAt: Long = 0L) {
+        phase = next
+        detail = info
+        startedAtElapsedMs = if (next == Phase.RECORDING && startedAt > 0L) {
+            startedAt
+        } else if (next == Phase.RECORDING) {
+            if (startedAtElapsedMs > 0L) startedAtElapsedMs else SystemClock.elapsedRealtime()
+        } else {
+            0L
+        }
+        val active = next != Phase.IDLE
+        main.post {
+            RecorderUiState.phase.value = next
+            RecorderUiState.active.value = active
+            RecorderUiState.detail.value = info
+            RecorderUiState.startedAtElapsedMs.longValue = startedAtElapsedMs
+            listeners.forEach { it() }
+        }
+    }
+
+    fun publish(
+        context: Context,
+        next: Phase,
+        info: String = "",
+        startedAt: Long = 0L,
+        notice: String? = null,
+        longNotice: Boolean = false
+    ) {
+        update(next, info, startedAt)
+        val intent = Intent(ACTION)
+            .setPackage(context.packageName)
+            .putExtra(EXTRA_PHASE, next.name)
+            .putExtra(EXTRA_DETAIL, info)
+            .putExtra(EXTRA_STARTED_AT, startedAtElapsedMs)
+            .putExtra(EXTRA_LONG, longNotice)
+        if (notice != null) intent.putExtra(EXTRA_NOTICE, notice)
+        context.sendBroadcast(intent)
+    }
+
+    fun register(context: Context): BroadcastReceiver {
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(ctx: Context, intent: Intent) {
+                val parsed = runCatching {
+                    Phase.valueOf(intent.getStringExtra(EXTRA_PHASE) ?: Phase.IDLE.name)
+                }.getOrDefault(Phase.IDLE)
+                val info = intent.getStringExtra(EXTRA_DETAIL).orEmpty()
+                val startedAt = intent.getLongExtra(EXTRA_STARTED_AT, 0L)
+                update(parsed, info, startedAt)
+                val notice = intent.getStringExtra(EXTRA_NOTICE)
+                if (!notice.isNullOrBlank()) {
+                    val duration = if (intent.getBooleanExtra(EXTRA_LONG, false)) Toast.LENGTH_LONG else Toast.LENGTH_SHORT
+                    Toast.makeText(ctx, notice, duration).show()
+                }
+            }
+        }
+        ContextCompat.registerReceiver(context, receiver, IntentFilter(ACTION), ContextCompat.RECEIVER_NOT_EXPORTED)
+        return receiver
     }
 }
