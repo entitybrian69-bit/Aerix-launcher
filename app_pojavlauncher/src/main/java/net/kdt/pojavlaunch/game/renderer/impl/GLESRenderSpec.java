@@ -119,36 +119,6 @@ public abstract class GLESRenderSpec implements RenderSpec {
        }
      }
 
-     public static class MgRenderSpec extends GLESRenderSpec {
-       public boolean compatibleDevice(Context context) {
-         return JREUtils.getDetectedVersion() >= 3 && new File(Tools.NATIVE_LIB_DIR, this.library()).exists(); 
-      }
-       public String name() {
-         return "MG-ES";
-       }
-
-       public int displayName() {
-         return R.string.mcl_setting_renderer_mobileglues;
-       }
-
-       public void setupEnvironment(Context context, Map<String, String> envMap) {
-          envMap.put("MG_DIR_PATH", Tools.DIR_DATA + "/MobileGlues");
-       }
-
-       public String tag() {
-         return Renderers.MOBILEGLUES_RENDERER;
-       }
-
-       public String library() {
-         return "libmobileglues.so";
-       }
-
-       protected int glesVersion() {
-        return 3;
-       }
-
-     }
-
      public static class SFPEWRenderSpec extends GLESRenderSpec {
        public boolean compatibleDevice(Context context) {
          return new File(Tools.NATIVE_LIB_DIR, this.library()).exists();
@@ -174,9 +144,10 @@ public abstract class GLESRenderSpec implements RenderSpec {
          boolean hasAngelica = GameRunner.hasAngelica(gamedir);
 
          if (!hasAngelica) {
-           // SFPEW wraps MobileGlues for better stability but why not LTW? Idk
-           envMap.put("SFPEW_EGL", "libmobileglues.so");
-           envMap.put("MG_DIR_PATH", Tools.DIR_DATA + "/MobileGlues");
+           // Wrap LTW when bundled; otherwise SimpleFPEWrapper falls back to libEGL.so directly.
+           if (new File(Tools.NATIVE_LIB_DIR, "libltw.so").exists()) {
+             envMap.put("SFPEW_EGL", "libltw.so");
+           }
          }
          // If Angelica is present, don't set SFPEW_EGL (Angelica provides its own FPE)
        }

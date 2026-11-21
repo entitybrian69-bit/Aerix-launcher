@@ -15,6 +15,7 @@ public final class RetiredRendererCleanup {
     }
 
     public static boolean isRetiredTag(String tag) {
+        if ("opengles_mobileglues".equals(tag) || "mobileglues".equals(tag)) return true;
         return tag != null && tag.startsWith("plugin:") && isRetiredPackage(tag.substring(7));
     }
 

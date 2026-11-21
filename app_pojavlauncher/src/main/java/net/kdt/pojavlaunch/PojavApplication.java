@@ -17,7 +17,6 @@ import androidx.core.app.ActivityCompat;
 import net.kdt.pojavlaunch.aerix.bridge.PojavPluginBridge;
 import net.kdt.pojavlaunch.aerix.social.SocialBackend;
 import net.kdt.pojavlaunch.lifecycle.ContextExecutor;
-import net.kdt.pojavlaunch.mobileglues.MGApplication;
 import net.kdt.pojavlaunch.prefs.LauncherPreferences;
 import net.kdt.pojavlaunch.tasks.AsyncAssetManager;
 import net.kdt.pojavlaunch.tasks.MoJsonDownloader;
@@ -35,10 +34,11 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import android.app.Application;
 import net.kdt.pojavlaunch.BuildConfig;
 import net.kdt.pojavlaunch.R;
 
-public class PojavApplication extends MGApplication {
+public class PojavApplication extends Application {
 	public static final String CRASH_REPORT_TAG = "PojavCrashReport";
 	public static final ExecutorService sExecutorService = new ThreadPoolExecutor(4, 4, 500, TimeUnit.MILLISECONDS,  new LinkedBlockingQueue<>());
 
@@ -96,7 +96,7 @@ public class PojavApplication extends MGApplication {
 	public void onCreate() {
 		ContextExecutor.setApplication(this);
 		String procName = resolveCurrentProcessName(this);
-		if (procName != null && (procName.endsWith(":recorder") || procName.endsWith(":mgquery"))) {
+		if (procName != null && procName.endsWith(":recorder")) {
 			super.onCreate();
 			try {
 				Tools.initEarlyConstants(this);

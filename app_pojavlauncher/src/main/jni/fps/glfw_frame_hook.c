@@ -2,7 +2,7 @@
 #include "frame_counter.h"
 
 // Only context.c's original entry point is renamed by CMake. All callers still use
-// this public GLFW API, regardless of their GL renderer (including MobileGlues).
+// this public GLFW API, regardless of their GL renderer.
 GLFWAPI void aerixOriginalSwapBuffers(GLFWwindow* handle);
 GLFWAPI void glfwSwapBuffers(GLFWwindow* handle) {
     aerixOriginalSwapBuffers(handle);

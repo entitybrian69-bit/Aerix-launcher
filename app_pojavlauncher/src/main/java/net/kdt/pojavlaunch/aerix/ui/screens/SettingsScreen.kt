@@ -141,7 +141,6 @@ import net.kdt.pojavlaunch.aerix.ui.AerixNav
 import net.kdt.pojavlaunch.aerix.ui.LauncherSection
 import net.kdt.pojavlaunch.contracts.OpenDocumentWithExtension
 import net.kdt.pojavlaunch.game.renderer.def.Renderers
-import net.kdt.pojavlaunch.mobileglues.MainActivity as MobileGluesActivity
 import net.kdt.pojavlaunch.multirt.MultiRTUtils
 import net.kdt.pojavlaunch.multirt.Runtime
 import net.kdt.pojavlaunch.prefs.LauncherPreferences
@@ -435,9 +434,6 @@ private fun RendererTabContent(activity: FragmentActivity) {
 
         // 3. Detailed Renderer, Vulkan Driver, Graphics API, Resolution & Fullscreen SettingsCardColumn (Mirai RendererSettingsScreen — Photos 1 & 2)
         item {
-            // With no global picker on this tab, the MobileGlues settings only matter when the
-            // renderer in effect is the one chosen on an instance.
-            val showMgSettings = currentRenderer == Renderers.MOBILEGLUES_RENDERER
             val vulkanDrivers = remember(installedVulkanDrivers) {
                 buildList {
                     add(VulkanDriverManager.SYSTEM_DRIVER to "System Vulkan driver")
@@ -471,19 +467,8 @@ private fun RendererTabContent(activity: FragmentActivity) {
             )
 
             SettingsCardColumn(modifier = Modifier.fillMaxWidth()) {
-                if (showMgSettings) {
-                    // First in the column now that the Global Renderer list is gone, so it takes
-                    // the rounded top edge and the Vulkan card below becomes a middle segment.
-                    MiraiActionSettingsCard(
-                        position = CardPosition.Top,
-                        title = stringResource(R.string.mcl_setting_title_renderer_settings),
-                        summary = stringResource(R.string.aerix_settings_renderer_settings_sub),
-                        value = "Configure",
-                        onClick = { activity.startActivity(Intent(activity, MobileGluesActivity::class.java)) }
-                    )
-                }
                 MiraiListSettingsCard(
-                    position = if (showMgSettings) CardPosition.Middle else CardPosition.Top,
+                    position = CardPosition.Top,
                     items = vulkanDrivers,
                     currentId = globalVulkanDriver,
                     defaultId = VulkanDriverManager.TURNIP_DRIVER,

@@ -1,12 +1,8 @@
-"""Checks the version-to-renderer rule and the MobileGlues warning, without an Android device.
+"""Checks the version-to-renderer rule without an Android device.
 
-Two things are pinned here:
-
-1. RendererDefaults picks LTW at 1.17 and newer and Emesis below it, for every shape of version id
-   the launcher produces, and the launch path, the instance installer and the auto default all go
-   through it instead of each carrying their own copy of the rule.
-2. MobileGlues is never chosen silently: every picker that can write the "renderer" preference asks
-   MobileGluesWarning first, and that warning says it is experimental and not recommended.
+RendererDefaults picks LTW at 1.17 and newer and Emesis below it, for every shape of version id
+the launcher produces, and the launch path, the instance installer and the auto default all go
+through it instead of each carrying their own copy of the rule.
 
 The Java class is compiled and run for real against small Android stubs, so the version parsing is
 executed rather than pattern-matched: a regex that only looks right is exactly the kind of thing
@@ -69,7 +65,6 @@ STUBS = {
         public final class Renderers {
             public static final String LTW_RENDERER = "opengles3_ltw";
             public static final String GL4ES_RENDERER = "opengles2";
-            public static final String MOBILEGLUES_RENDERER = "opengles_mobileglues";
             public static final String EMESIS_RENDERER = "emesis";
         }''',
     'net/kdt/pojavlaunch/game/renderer/RenderSpec.java': '''
@@ -99,7 +94,6 @@ STUBS = {
 HARNESS = '''
 import net.kdt.pojavlaunch.JVersionList;
 import net.kdt.pojavlaunch.game.renderer.RendererDefaults;
-import net.kdt.pojavlaunch.game.renderer.MobileGluesWarning;
 
 public class RendererDefaultsSmoke {
     static int failures = 0;
@@ -172,23 +166,6 @@ public class RendererDefaultsSmoke {
         check("opengles3_ltw".equals(RendererDefaults.tagForVersion(snapshot, "24w14a")),
                 "the boundary day itself is the LTW era");
 
-        // The warning itself.
-        check(MobileGluesWarning.applies("opengles_mobileglues"), "the warning applies to MobileGlues");
-        check(!MobileGluesWarning.applies("emesis"), "the warning does not apply to Emesis");
-        check(!MobileGluesWarning.applies(null), "the warning does not apply to nothing");
-        check(MobileGluesWarning.message().toLowerCase().contains("experimental"),
-                "the warning says it is experimental");
-        check(MobileGluesWarning.message().toLowerCase().contains("don't recommend"),
-                "the warning says it is not recommended");
-        check(MobileGluesWarning.recommendedInstead("1.16.5").equals("emesis"),
-                "the recommended alternative below 1.17 is Emesis");
-        check(MobileGluesWarning.recommendedInstead("1.20.1").equals("opengles3_ltw"),
-                "the recommended alternative at 1.17+ is LTW");
-        // The button label is built from the tag the action stores, so the two cannot disagree.
-        check(MobileGluesWarning.recommendedLabel("opengles3_ltw").contains("LTW"),
-                "the alternative button names LTW when it stores LTW");
-        check(MobileGluesWarning.recommendedLabel("emesis").contains("Emesis"),
-                "the alternative button names Emesis when it stores Emesis");
         check(RendererDefaults.launchTagForVersion(null, "1.20.1").equals("opengles3_ltw")
                         || RendererDefaults.launchTagForVersion(null, "1.20.1").equals("emesis"),
                 "the resolved alternative is always one of the two bundled renderers");
@@ -197,7 +174,7 @@ public class RendererDefaultsSmoke {
             System.out.println(failures + " checks failed");
             System.exit(1);
         }
-        System.out.println("Renderer version rule + MobileGlues warning smoke test passed");
+        System.out.println("Renderer version rule smoke test passed");
     }
 }
 '''
@@ -212,7 +189,6 @@ with tempfile.TemporaryDirectory() as tmp:
     paths = [str(p) for p in tmp.rglob('*.java')]
     paths += [
         str(src / 'net/kdt/pojavlaunch/game/renderer/RendererDefaults.java'),
-        str(src / 'net/kdt/pojavlaunch/game/renderer/MobileGluesWarning.java'),
     ]
     subprocess.run(shlex.split(os.environ.get('JAVAC', 'javac'))
                    + ['-source', '8', '-target', '8', '-nowarn', '-d', str(tmp), *paths], check=True)
@@ -225,9 +201,6 @@ runner = (src / 'net/kdt/pojavlaunch/utils/jre/GameRunner.java').read_text()
 prefs = (src / 'net/kdt/pojavlaunch/prefs/LauncherPreferences.java').read_text()
 create = (src / 'net/kdt/pojavlaunch/aerix/bridge/PojavCreateInstanceBridge.kt').read_text()
 settings = (src / 'net/kdt/pojavlaunch/aerix/ui/screens/SettingsScreen.kt').read_text()
-editor = (src / 'net/kdt/pojavlaunch/aerix/ui/screens/InstanceEditorScreen.kt').read_text()
-classic = (src / 'net/kdt/pojavlaunch/prefs/screens/LauncherPreferenceVideoFragment.java').read_text()
-dialog = (src / 'net/kdt/pojavlaunch/aerix/ui/screens/MobileGluesWarningDialog.kt').read_text()
 
 # The launch path asks the rule, and only for a renderer the player did not pin.
 assert 'RendererDefaults.launchTagForVersion(versionInfo, versionId)' in runner, \
@@ -248,33 +221,17 @@ fast = (src / 'net/kdt/pojavlaunch/aerix/fastclient/FastClientInstaller.kt').rea
 assert 'launchTagForVersion(null, build.minecraft)' in fast, \
     'a FastClient instance must carry the renderer its Minecraft build calls for'
 
-# The launcher's own automatic pick is no longer MobileGlues.
+# The launcher's own automatic pick is Emesis/LTW, never MobileGlues.
 default_body = prefs.split('public static String defaultRendererId')[1].split('\n    }')[0]
-assert 'MOBILEGLUES_RENDERER' not in default_body, \
-    'the automatic default must not be MobileGlues - it is the choice the launcher warns about'
+assert 'MOBILEGLUES_RENDERER' not in default_body
 assert 'RendererDefaults.isBundled' in default_body
 
-# Settings no longer offers a renderer picker at all: the Global Renderer list was removed, so the
-# only places a renderer is chosen are the per-instance editor and the classic instance editor, and
-# both must warn before they write MobileGlues.
+# Settings no longer offers a renderer picker at all: the Global Renderer list was removed.
 assert 'title = "Global Renderer"' not in settings, \
     'the Global Renderer card was removed from Settings and must not come back'
 assert 'setMiraiGlobalRenderer(' not in settings, \
     'Settings must not write the global renderer now that the picker is gone'
 assert 'MiraiListSettingsCard(' in settings, 'the Vulkan driver and API cards must stay'
 assert 'title = "Global Vulkan Driver"' in settings
-assert 'MobileGluesWarningDialog(' in editor
-assert 'MobileGluesWarning.applies(entry.backendRendererId)' in editor
-assert 'MobileGluesWarning.applies(entry.backendRendererId)' in editor
-assert 'setOnPreferenceChangeListener' in classic and 'showMobileGluesWarning' in classic
-assert 'return false;' in classic.split('showMobileGluesWarning(chosen);')[1][:80], \
-    'the classic list must refuse the write so the warning can ask first'
-assert 'MobileGluesWarning.message()' in dialog
-
-# The classic per-instance editor writes the renderer on Save, so that is where it asks.
-fragment = (src / 'net/kdt/pojavlaunch/fragments/InstanceEditorFragment.java').read_text()
-assert 'askAboutMobileGlues(this::saveAndLeave)' in fragment, \
-    'saving an instance on MobileGlues must ask first'
-assert 'MobileGluesWarning.message()' in fragment
 
 print('Renderer defaults wiring smoke test passed')

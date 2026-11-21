@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Renderers — Aerix Launcher</title>
-<meta name="description" content="Aerix Launcher ships twelve renderers: Emesis, Zink, OpenLTW, GL4ES, MobileGlues, SFPEW and more. What each one is for, which to try first, and how the automatic fallback works.">
+<meta name="description" content="Aerix Launcher ships eleven renderers: Emesis, Zink, OpenLTW, GL4ES, SFPEW and more. What each one is for, which to try first, and how the automatic fallback works.">
 <meta name="theme-color" content="#c8102e">
 <meta name="color-scheme" content="light">
 <link rel="icon" href="assets/aerix-logo.png">
@@ -13,7 +13,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Aerix Launcher">
 <meta property="og:title" content="Renderers — Aerix Launcher">
-<meta property="og:description" content="Aerix Launcher ships twelve renderers: Emesis, Zink, OpenLTW, GL4ES, MobileGlues, SFPEW and more. What each one is for, which to try first, and how the automatic fallback works.">
+<meta property="og:description" content="Aerix Launcher ships eleven renderers: Emesis, Zink, OpenLTW, GL4ES, SFPEW and more. What each one is for, which to try first, and how the automatic fallback works.">
 <meta property="og:url" content="https://entitybrian69-bit.github.io/Aerix-launcher/renderers.html">
 <meta property="og:image" content="https://entitybrian69-bit.github.io/Aerix-launcher/assets/screenshots/shot-home.jpg">
 <meta property="og:image:alt" content="The Aerix Launcher home screen">
@@ -56,7 +56,7 @@
   <section class="page-head">
     <div class="wrap">
       <span class="kicker">Renderers</span>
-      <h1>Twelve ways to draw the same world</h1>
+      <h1>Eleven ways to draw the same world</h1>
       <p>Android GPUs, drivers and game versions disagree about almost everything. Aerix ships several translation layers so a phone that will not run one renderer can still run the game.</p>
     </div>
   </section>
@@ -69,7 +69,7 @@
         <span aria-hidden="true">◆</span>
         <p><strong>Nothing to choose.</strong> The automatic pick follows the game version: <strong>1.17
         and newer run on OpenLTW</strong>, and <strong>anything below 1.17 runs on Emesis</strong>. Both are
-        bundled, need no plugin APK, and are set per instance. MobileGlues, Zink and the rest stay
+        bundled, need no plugin APK, and are set per instance. Zink, SFPEW and the rest stay
         available in the renderer list for the cases that need them - change the renderer per
         instance, not globally, so a game that needs Zink does not force everything else onto it.</p>
       </div>
@@ -87,7 +87,6 @@
             <tr><td><b>OpenLTW</b></td><td>Bundled, default at 1.17+</td><td>A modern translation path that suits current versions and modern mod loaders. Every instance at 1.17 and newer starts on it.</td><td><span class="tag">Modern versions</span></td></tr>
             <tr><td><b>GL4ES</b></td><td>Classic GLES1/2 shim</td><td>The long-standing fallback. Broadest device support, lowest feature level; used automatically if nothing else can load.</td><td><span class="tag">Last resort</span></td></tr>
             <tr><td><b>NG-GL4ES</b></td><td>Newer GL4ES</td><td>A newer GL4ES build with fixes the original never got.</td><td><span class="tag">GL4ES with fixes</span></td></tr>
-            <tr><td><b>MG-ES</b></td><td>MobileGlues</td><td>A GL 4.x translation layer for modern versions, 1.17+ only. Wants a capable GPU, and the launcher warns you before you pick it: it is experimental and we do not recommend it.</td><td><span class="tag">Not recommended</span></td></tr>
             <tr><td><b>SFPEW</b></td><td>Fixed-pipeline wrapper</td><td>Simple FPE Wrapper: translates the fixed-function GL that old mods and Angelica-style mods rely on.</td><td><span class="tag">Old mods</span></td></tr>
             <tr><td><b>Mesa</b></td><td>Desktop GL via Mesa</td><td>Mesa's software/hardware desktop GL path, for the cases that need real desktop GL semantics.</td><td><span class="tag">Experimental</span></td></tr>
             <tr><td><b>Mesa (external)</b></td><td>External Mesa build</td><td>The same, using a Mesa build supplied outside the launcher.</td><td><span class="tag">Experimental</span></td></tr>

@@ -69,12 +69,6 @@ class BrandingIdentitySmoke(unittest.TestCase):
         self.assertIn("getLaunchIntentForPackage(packageName)", activity)
         self.assertIn("R.string.migration_notice", activity)
 
-        angle_provider = (
-            APP / "src/main/java/net/kdt/pojavlaunch/mobileglues/settings/AngleProvider.kt"
-        ).read_text()
-        for package in ACTIVE_PACKAGES | LEGACY_PACKAGES:
-            self.assertIn(f'"{package}"', angle_provider)
-
     def test_localized_app_labels_and_notifications(self):
         count = 0
         visible_keys = {"app_name", "app_short_name", "error_fatal", "lazy_service_default_title",

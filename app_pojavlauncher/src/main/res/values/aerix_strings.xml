@@ -215,8 +215,6 @@
     <string name="aerix_settings_animate_speed_sub">0 turns section transitions off</string>
     <string name="aerix_settings_open_classic">Open full page</string>
     <string name="aerix_settings_open_classic_sub">All options of this category, including runtime and controller tools</string>
-    <string name="aerix_settings_renderer_settings_sub">MobileGlues configuration</string>
-    <string name="aerix_settings_mobileglues_only">Only available with the MobileGlues renderer</string>
     <string name="aerix_settings_memory_info">Device RAM %1$d MB · free %2$d MB</string>
     <string name="aerix_settings_choose">Choose</string>
     <string name="aerix_settings_cancel">Cancel</string>

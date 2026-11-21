@@ -255,7 +255,7 @@ def shot_grid(items):
 def build_index():
     return head(
         "Aerix Launcher — Minecraft: Java Edition on Android",
-        "Aerix Launcher runs Minecraft: Java Edition on Android. Instances, twelve renderers, "
+        "Aerix Launcher runs Minecraft: Java Edition on Android. Instances, eleven renderers, "
         "accounts and skin wardrobe, eleven animated control themes, 25 wallpapers and a content "
         "browser — private by design, tested on real phones.",
         "index.html",
@@ -268,7 +268,7 @@ def build_index():
         <p class="eyebrow"><span class="dot" aria-hidden="true"></span>Version <span data-release-version>{VERSION}</span> is out</p>
         <h1>Minecraft: Java&nbsp;Edition, <span class="accent">on your phone</span>.</h1>
         <p class="lede">
-          Instances, twelve renderers, accounts and a full skin wardrobe, animated control
+          Instances, eleven renderers, accounts and a full skin wardrobe, animated control
           themes and a content browser — in one launcher that stays out of the way once the
           game is running.
         </p>
@@ -294,7 +294,7 @@ def build_index():
   <section class="section" aria-label="At a glance" style="padding-top:clamp(28px,4vw,44px)">
     <div class="wrap">
       <div class="stats reveal">
-        <div><strong data-count="12">12</strong><span>renderers, one picker</span></div>
+        <div><strong data-count="11">11</strong><span>renderers, one picker</span></div>
         <div><strong data-count="11">11</strong><span>animated control themes</span></div>
         <div><strong data-count="31">31</strong><span>wallpapers, photos and clips</span></div>
         <div><strong>1.7–1.21+</strong><span>every Minecraft version</span></div>
@@ -304,8 +304,8 @@ def build_index():
 
   <div class="ticker" aria-hidden="true">
     <div class="ticker-track">
-      <span>Instances</span><span>Twelve renderers</span><span>Control themes</span><span>Accounts and skins</span><span>Content browser</span><span>HD clips</span><span>No telemetry</span><span>Windows, worlds, mods</span>
-      <span>Instances</span><span>Twelve renderers</span><span>Control themes</span><span>Accounts and skins</span><span>Content browser</span><span>HD clips</span><span>No telemetry</span><span>Windows, worlds, mods</span>
+      <span>Instances</span><span>Eleven renderers</span><span>Control themes</span><span>Accounts and skins</span><span>Content browser</span><span>HD clips</span><span>No telemetry</span><span>Windows, worlds, mods</span>
+      <span>Instances</span><span>Eleven renderers</span><span>Control themes</span><span>Accounts and skins</span><span>Content browser</span><span>HD clips</span><span>No telemetry</span><span>Windows, worlds, mods</span>
     </div>
   </div>
 
@@ -423,8 +423,8 @@ def build_index():
         </article>
         <article class="card">
           <div class="icon" aria-hidden="true">◇</div>
-          <h3>Twelve renderers</h3>
-          <p>Emesis is bundled and works almost everywhere. Zink, LTW, GL4ES, MobileGlues and
+          <h3>Eleven renderers</h3>
+          <p>Emesis is bundled and works almost everywhere. Zink, OpenLTW, GL4ES, SFPEW and
              the rest are one tap away when a device wants something else.</p>
           <div class="tag-row"><span class="tag">auto fallback</span></div>
         </article>
@@ -612,7 +612,7 @@ def build_index():
 def build_features():
     return head(
         "Features — Aerix Launcher",
-        "Everything in Aerix Launcher: instances for every modloader, twelve renderers, accounts "
+        "Everything in Aerix Launcher: instances for every modloader, eleven renderers, accounts "
         "and skin wardrobe, animated control themes, custom controls, 31 wallpapers, a content "
         "browser and an in-game menu built around your character.",
         "features.html",
@@ -816,7 +816,6 @@ def build_renderers():
         ("OpenLTW", "Bundled, default at 1.17+", "A modern translation path that suits current versions and modern mod loaders. Every instance at 1.17 and newer starts on it.", "Modern versions"),
         ("GL4ES", "Classic GLES1/2 shim", "The long-standing fallback. Broadest device support, lowest feature level; used automatically if nothing else can load.", "Last resort"),
         ("NG-GL4ES", "Newer GL4ES", "A newer GL4ES build with fixes the original never got.", "GL4ES with fixes"),
-        ("MG-ES", "MobileGlues", "A GL 4.x translation layer for modern versions, 1.17+ only. Wants a capable GPU, and the launcher warns you before you pick it: it is experimental and we do not recommend it.", "Not recommended"),
         ("SFPEW", "Fixed-pipeline wrapper", "Simple FPE Wrapper: translates the fixed-function GL that old mods and Angelica-style mods rely on.", "Old mods"),
         ("Mesa", "Desktop GL via Mesa", "Mesa's software/hardware desktop GL path, for the cases that need real desktop GL semantics.", "Experimental"),
         ("Mesa (external)", "External Mesa build", "The same, using a Mesa build supplied outside the launcher.", "Experimental"),
@@ -829,12 +828,12 @@ def build_renderers():
     )
     return head(
         "Renderers — Aerix Launcher",
-        "Aerix Launcher ships twelve renderers: Emesis, Zink, OpenLTW, GL4ES, MobileGlues, SFPEW and more. "
+        "Aerix Launcher ships eleven renderers: Emesis, Zink, OpenLTW, GL4ES, SFPEW and more. "
         "What each one is for, which to try first, and how the automatic fallback works.",
         "renderers.html",
     ) + nav("renderers.html") + page_head_block(
         "Renderers",
-        "Twelve ways to draw the same world",
+        "Eleven ways to draw the same world",
         "Android GPUs, drivers and game versions disagree about almost everything. Aerix ships "
         "several translation layers so a phone that will not run one renderer can still run the game.",
     ) + f"""
@@ -846,7 +845,7 @@ def build_renderers():
         <span aria-hidden="true">◆</span>
         <p><strong>Nothing to choose.</strong> The automatic pick follows the game version: <strong>1.17
         and newer run on OpenLTW</strong>, and <strong>anything below 1.17 runs on Emesis</strong>. Both are
-        bundled, need no plugin APK, and are set per instance. MobileGlues, Zink and the rest stay
+        bundled, need no plugin APK, and are set per instance. Zink, SFPEW and the rest stay
         available in the renderer list for the cases that need them - change the renderer per
         instance, not globally, so a game that needs Zink does not force everything else onto it.</p>
       </div>

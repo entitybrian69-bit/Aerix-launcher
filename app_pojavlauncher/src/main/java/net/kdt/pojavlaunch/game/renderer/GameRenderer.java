@@ -8,7 +8,6 @@ import static net.kdt.pojavlaunch.game.renderer.def.Renderers.MESA_RENDERER;
 import static net.kdt.pojavlaunch.game.renderer.def.Renderers.MESA_RENDERER_EXT;
 import static net.kdt.pojavlaunch.game.renderer.def.Renderers.ZINK_RENDERER;
 import static net.kdt.pojavlaunch.game.renderer.def.Renderers.NGGL4ES_RENDERER;
-import static net.kdt.pojavlaunch.game.renderer.def.Renderers.MOBILEGLUES_RENDERER;
 import static net.kdt.pojavlaunch.game.renderer.def.Renderers.SFPEW_RENDERER;
 import static net.kdt.pojavlaunch.game.renderer.def.Renderers.PROTON_RENDERER;
 import static net.kdt.pojavlaunch.game.renderer.def.Renderers.EMESIS_RENDERER;
@@ -86,7 +85,6 @@ public class GameRenderer {
             case MESA_RENDERER_EXT: return new MesaRenderSpec.ExtMesaRenderSpec();
             case LEGACYZINK_RENDERER: return new MesaRenderSpec.LegacyZinkRenderSpec();
             case NGGL4ES_RENDERER: return new GLESRenderSpec.NGGL4ESRenderSpec();
-            case MOBILEGLUES_RENDERER: return new GLESRenderSpec.MgRenderSpec();
             case SFPEW_RENDERER: return new GLESRenderSpec.SFPEWRenderSpec();
             case PROTON_RENDERER: return new net.kdt.pojavlaunch.game.renderer.impl.ProtonRenderSpec();
             case EMESIS_RENDERER: return new net.kdt.pojavlaunch.game.renderer.impl.EmesisRenderSpec();

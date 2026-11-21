@@ -184,8 +184,7 @@ public final class RendererDefaults {
 
     /**
      * Whether a renderer is one of the launcher's automatic picks - the two this class chooses
-     * between, plus the historic auto defaults (GL4ES, and MobileGlues where it was picked for the
-     * device rather than by the player).
+     * between, plus the historic GL4ES auto default.
      *
      * Only an automatic pick may be replaced by the version rule. A renderer the player deliberately
      * chose - Zink, Proton, SFPEW, an external plugin - is left exactly as it is, because "my game
@@ -196,7 +195,6 @@ public final class RendererDefaults {
         String tag = spec.tag();
         return Renderers.LTW_RENDERER.equals(tag)
                 || Renderers.EMESIS_RENDERER.equals(tag)
-                || Renderers.GL4ES_RENDERER.equals(tag)
-                || Renderers.MOBILEGLUES_RENDERER.equals(tag);
+                || Renderers.GL4ES_RENDERER.equals(tag);
     }
 }

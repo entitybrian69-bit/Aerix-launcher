@@ -71,8 +71,7 @@
     <string name="mcl_setting_renderer_nggl4es">Krypton Wrapper (OpenGL ES 3.2) - 26.2 and lower</string>
     <string name="mcl_setting_renderer_vulkan_zink">Zink (Vulkan) - all versions</string>
     <string name="mcl_setting_renderer_ltw">LTW (OpenGL ES 3) - 1.17+ only, the default there</string>
-    <string name="mcl_setting_renderer_mobileglues">MobileGlues (OpenGL ES) - 1.17+ only, experimental</string>
-    <string name="mcl_setting_renderer_sfpew">SFPEW/MobileGlues (OpenGL ES) - (all versions)</string>
+    <string name="mcl_setting_renderer_sfpew">SFPEW (OpenGL ES) - (all versions)</string>
     <string name="mcl_setting_renderer_proton">Proton (OpenGL over PowerVR) - 32-bit devices only</string>
     <string name="aerix_wallpaper_tab_wallpaper">Wallpapers</string>
     <string name="aerix_wallpaper_tab_animations">Animations</string>
@@ -574,7 +573,6 @@ Your original layout is kept unchanged. Continue importing?</string>
     <string name="vk_mod_title">Vulkan Mod Detected</string>
     <string name="vk_mod_message">It appears you are using VulkanMod This is unsupported and may lead to crashes as most devices have poor Vulkan drivers You will be on your own. We will not provide any help if you encounter any crashes. Please do not report any bugs to the mods community</string>
     <string name="continue_button">Continue</string>
-    <string name="mcl_setting_title_renderer_settings">MobileGlues Renderer Settings</string>
     <string name="install_button">Install</string>
     <string name="no_ffmpeg_title">No FFmpeg</string>
     <string name="no_ffmpeg_message">Replay Mod needs the FFmpeg plugin to export videos. Please Install it.</string>

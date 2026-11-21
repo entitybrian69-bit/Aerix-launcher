@@ -19,7 +19,7 @@ public class InstanceLoaderUpdateTest {
         target.mInstanceRoot = new File("existing-modpack");
         target.name = "Fabulously Optimized";
         target.versionId = "fabric-loader-old-1.18.2";
-        target.renderer = "mobileglues";
+        target.renderer = "opengles3_ltw";
         target.jvmArgs = "-Xmx2G";
         target.selectedRuntime = "Java17";
         target.controlLayout = "custom.json";
@@ -30,7 +30,7 @@ public class InstanceLoaderUpdateTest {
         assertEquals(1, target.writes);
         assertSame(root, target.mInstanceRoot);
         assertEquals("Fabulously Optimized", target.name);
-        assertEquals("mobileglues", target.renderer);
+        assertEquals("opengles3_ltw", target.renderer);
         assertEquals("-Xmx2G", target.jvmArgs);
         assertEquals("Java17", target.selectedRuntime);
         assertEquals("custom.json", target.controlLayout);

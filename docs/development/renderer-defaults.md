@@ -1,4 +1,4 @@
-# Renderer defaults by game version, and the MobileGlues warning
+# Renderer defaults by game version
 
 ## The rule
 
@@ -41,40 +41,18 @@ being the safe answer, so an unknown version keeps the renderer that still speak
   version's renderer already written onto the instance, so the choice is visible in the editor and
   survives a later change to the global renderer.
 * **Launch** (`GameRunner.launchGame`) replaces an *automatic* renderer that the version makes wrong.
-  `RendererDefaults.appliesToAutoSelection` limits that to LTW, Emesis, GL4ES and MobileGlues: a pick
+  `RendererDefaults.appliesToAutoSelection` limits that to LTW, Emesis and GL4ES: a pick
   the player made - Zink, Proton, SFPEW, an external plugin, or an explicit per-instance renderer - is
   never touched. The older compatibility switches (Sodium on 1.17+, compat-context on LTW) stay exactly
   where they were, as the last word on a device that cannot start the version's renderer.
-* **Automatic default** (`LauncherPreferences.defaultRendererId`) is Emesis, not MobileGlues. The
-  launcher used to pick the one renderer it now warns about, silently.
-
-## The MobileGlues warning
-
-MobileGlues is experimental by policy, not by accident: its releases are made outside this launcher,
-it is 1.17+ only, and its failures look like a broken game rather than a renderer problem. So it is
-never selected silently. `MobileGluesWarning` owns the text, the "not recommended" title and the
-alternative; `MobileGluesWarningDialog` draws it. Every picker that can write the `renderer`
-preference asks first, and nothing is written until the answer:
-
-| Picker | File |
-|---|---|
-| Renderer tiles, plugin cards, Global Renderer list | `SettingsScreen.kt` |
-| Per-instance renderer list (Compose) | `InstanceEditorScreen.kt` |
-| Per-instance renderer spinner, on Save (classic) | `InstanceEditorFragment.java` |
-| Renderer list preference (classic settings) | `LauncherPreferenceVideoFragment.java` |
-
-The dialog offers three answers: keep MobileGlues ("Use it anyway"), take the renderer recommended for
-this version, or cancel without changing anything. The recommended button is resolved once, in the
-dialog, from `RendererDefaults.launchTagForVersion`, and the same value labels the button - so the
-button can never promise a renderer the action does not write.
+* **Automatic default** (`LauncherPreferences.defaultRendererId`) is Emesis.
+* **Retired selections** (`RetiredRendererCleanup.isRetiredTag`) clears legacy `opengles_mobileglues`
+  and `mobileglues` preferences or instance overrides so existing installs fall back cleanly.
 
 ## Tests
 
-`tests/renderer_defaults_smoke.py` compiles and runs `RendererDefaults` and `MobileGluesWarning`
+`tests/renderer_defaults_smoke.py` compiles and runs `RendererDefaults`
 against Android stubs, checks 20+ real version ids on both sides of 1.17, and then asserts the wiring:
-the launch path asks the rule and only for automatic picks, new instances are pinned, the automatic
-default is not MobileGlues, and every picker above goes through the warning. It runs in the Aerix
-Nightly test step next to `instance_renderer_smoke.py`.
-
-Device testing is still required for the dialogs themselves (font scaling, landscape, long text).
-No version bump is made with this change.
+the launch path asks the rule and only for automatic picks, new instances are pinned, and the Global
+Renderer picker stays removed from Settings. It runs in the Aerix Nightly test step next to
+`instance_renderer_smoke.py`.

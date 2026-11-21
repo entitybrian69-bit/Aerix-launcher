@@ -48,9 +48,7 @@ import net.kdt.pojavlaunch.Tools
 import net.kdt.pojavlaunch.utils.jre.LaunchMemory
 import net.kdt.pojavlaunch.fragments.GamepadMapperFragment
 import net.kdt.pojavlaunch.game.renderer.RendererCache
-import net.kdt.pojavlaunch.game.renderer.def.Renderers
 import net.kdt.pojavlaunch.game.renderer.extra.GLESProvider
-import net.kdt.pojavlaunch.mobileglues.MainActivity as MobileGluesActivity
 import net.kdt.pojavlaunch.prefs.LauncherPreferences
 import net.kdt.pojavlaunch.utils.DisplayRefreshMode
 import net.kdt.pojavlaunch.prefs.screens.LauncherPreferenceControlFragment
@@ -287,9 +285,6 @@ object PojavSettingsBridge {
         settings = listOf(
             PojavSetting.Choice("renderer", R.string.mcl_setting_category_renderer, null,
                 entries = { renderers(it) }, current = { LauncherPreferences.PREF_RENDERER }),
-            PojavSetting.Action("renderer_settings", R.string.mcl_setting_title_renderer_settings, R.string.aerix_settings_renderer_settings_sub,
-                run = { it.startActivity(Intent(it, MobileGluesActivity::class.java)) },
-                visible = { Renderers.MOBILEGLUES_RENDERER == LauncherPreferences.DEFAULT_PREF.getString("renderer", LauncherPreferences.defaultRendererId(it)) }),
             PojavSetting.Toggle("ignoreNotch", R.string.mcl_setting_title_ignore_notch, R.string.mcl_setting_subtitle_ignore_notch,
                 current = { LauncherPreferences.PREF_IGNORE_NOTCH }, visible = { LauncherPreferences.hasNotch(it) }),
             PojavSetting.Slider("resolutionRatio", R.string.mcl_setting_title_resolution_scaler, R.string.mcl_setting_subtitle_resolution_scaler,

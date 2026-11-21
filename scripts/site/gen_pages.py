@@ -84,7 +84,6 @@ RENDERERS = [
     ("Auto (Smart Pick)", "default", "Reads the Minecraft version you are about to launch and picks the renderer that fits it."),
     ("LTW", "1.17+", "Built from source in this repository. The modern core renderer for current versions."),
     ("LTW Legacy", "1.8 – 1.16.5", "Also built from source here, for the older versions that need the legacy path."),
-    ("MobileGlues", "1.17+", "Bundled for the versions where its GL translation fits best."),
     ("vGPU", "up to 1.16.5 · fast", "The quick one for older versions, when raw speed matters more than effects."),
     ("VGPU 1.3.6β", "up to 1.16.5", "The shaderconv build, for older versions when a pack needs shader conversion."),
     ("Kopper Zink", "Vulkan", "A Vulkan path, chosen per instance alongside its Vulkan driver."),
@@ -327,7 +326,7 @@ def build_index():
       <div class="split-copy reveal">
         <p class="eyebrow">Renderers</p>
         <h2>Picked per version, not per launcher</h2>
-        <p class="section-lede">Aerix bundles MobileGlues for Minecraft 1.17+, two VGPU options for 1.16.5 and older, and chooses the right renderer for each version by default — with every option still one tap away.</p>
+        <p class="section-lede">Aerix bundles two VGPU options for 1.16.5 and older alongside LTW for 1.17+, and chooses the right renderer for each version by default — with every option still one tap away.</p>
         <a class="card-link" href="renderers.html">See the whole lineup</a>
       </div>
     </div>
@@ -428,7 +427,7 @@ def build_features():
     </div>
   </section>
 
-{cta_band("Renderers get their own page", "LTW, LTW Legacy, MobileGlues, vGPU, Kopper Zink and the rest, with the Minecraft versions each one covers.",
+{cta_band("Renderers get their own page", "LTW, LTW Legacy, vGPU, Kopper Zink and the rest, with the Minecraft versions each one covers.",
           '<a class="btn btn-ghost" href="renderers.html">Renderer lineup</a>')}
 </main>
 '''
@@ -462,7 +461,7 @@ def build_renderers():
           <li><strong>Renderer</strong> per instance, with a recommended default.</li>
           <li><strong>Vulkan driver</strong> and <strong>graphics API</strong> chosen alongside it.</li>
           <li><strong>LTW</strong> for 1.17+ and <strong>LTW Legacy</strong> for 1.8–1.16.5, both built from source in this repository.</li>
-          <li><strong>MobileGlues</strong> for 1.17+ and <strong>two VGPU options</strong> for 1.16.5 and older.</li>
+          <li><strong>Two VGPU options</strong> for 1.16.5 and older.</li>
         </ul>
       </div>
     </div>
@@ -472,7 +471,7 @@ def build_renderers():
     <header class="section-head reveal">
       <p class="eyebrow">The lineup</p>
       <h2>Every backend, and where it fits</h2>
-      <p class="section-lede">Ranges are the Minecraft versions each renderer is meant for. MobileGlues and the VGPU pair ship with the launcher; LTW and LTW Legacy are built from its source.</p>
+      <p class="section-lede">Ranges are the Minecraft versions each renderer is meant for. The VGPU pair ships with the launcher; LTW and LTW Legacy are built from its source.</p>
     </header>
     <div class="spec-grid">
 {specs}    </div>
@@ -483,7 +482,7 @@ def build_renderers():
 </main>
 '''
     return head("Renderers — Aerix Launcher",
-                "The renderer lineup in Aerix Launcher: Auto Smart Pick, LTW, LTW Legacy, MobileGlues, vGPU, Kopper Zink, GL4ES, VirGL and Mesa.",
+                "The renderer lineup in Aerix Launcher: Auto Smart Pick, LTW, LTW Legacy, vGPU, Kopper Zink, GL4ES, VirGL and Mesa.",
                 "renderers.html") + nav("renderers.html") + body + FOOTER
 
 

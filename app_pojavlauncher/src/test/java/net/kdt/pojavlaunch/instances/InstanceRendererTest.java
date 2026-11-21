@@ -16,13 +16,13 @@ public class InstanceRendererTest {
             Instance first = new Instance();
             Instance second = new Instance();
             first.renderer = "emesis";
-            second.renderer = "opengles_mobileglues";
+            second.renderer = "opengles3_ltw";
             LauncherPreferences.PREF_RENDERER = "opengles2";
             assertEquals("emesis", first.getLaunchRenderer());
-            assertEquals("opengles_mobileglues", second.getLaunchRenderer());
+            assertEquals("opengles3_ltw", second.getLaunchRenderer());
             LauncherPreferences.PREF_RENDERER = "vulkan_zink";
             assertEquals("emesis", first.getLaunchRenderer());
-            assertEquals("opengles_mobileglues", second.getLaunchRenderer());
+            assertEquals("opengles3_ltw", second.getLaunchRenderer());
             second.renderer = null;
             assertEquals("vulkan_zink", second.getLaunchRenderer());
             second.renderer = "";

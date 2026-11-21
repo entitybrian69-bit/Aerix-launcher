@@ -13,8 +13,11 @@ class RetiredRendererCleanupTest {
     @Test fun onlyRetiredSelectionsAreInvalidated() {
         assertTrue(RetiredRendererCleanup.isRetiredTag("plugin:net.kdt.pojavlaunch.renderer.rustgl"))
         assertTrue(RetiredRendererCleanup.isRetiredTag("plugin:dev.rustrenderer.plugin"))
+        assertTrue(RetiredRendererCleanup.isRetiredTag("opengles_mobileglues"))
+        assertTrue(RetiredRendererCleanup.isRetiredTag("mobileglues"))
         assertFalse(RetiredRendererCleanup.isRetiredTag(null))
-        assertFalse(RetiredRendererCleanup.isRetiredTag("mobileglues"))
+        assertFalse(RetiredRendererCleanup.isRetiredTag("emesis"))
+        assertFalse(RetiredRendererCleanup.isRetiredTag("opengles3_ltw"))
         assertFalse(RetiredRendererCleanup.isRetiredTag("plugin:example.other"))
     }
 

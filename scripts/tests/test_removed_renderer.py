@@ -19,11 +19,12 @@ class RemovedRendererTest(unittest.TestCase):
         return temporary.name
 
     def test_other_renderers_are_allowed(self):
-        removed.verify(self.container('lib/arm64-v8a/libmobileglues.so'))
+        removed.verify(self.container('lib/arm64-v8a/libltw.so'))
 
     def test_retired_assets_native_and_probe_are_rejected(self):
         for name in ('assets/renderer-bundles/rustgl/index.json', 'lib/arm64-v8a/librust_gl.so',
-                     'lib/arm64-v8a/libaerix_vulkan_probe.so'):
+                     'lib/arm64-v8a/libaerix_vulkan_probe.so', 'lib/arm64-v8a/libmobileglues.so',
+                     'lib/arm64-v8a/libmobileglues_info_getter.so'):
             with self.subTest(name=name), self.assertRaises(ValueError):
                 removed.verify(self.container(name))
 

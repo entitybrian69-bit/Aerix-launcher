@@ -16,7 +16,7 @@ def verify(path):
     with zipfile.ZipFile(path) as archive:
         for entry in archive.infolist():
             name = entry.filename.lower()
-            if any(marker in name for marker in ('rustgl', 'rust_gl', 'rust_renderer', 'aerix_vulkan_probe')):
+            if any(marker in name for marker in ('rustgl', 'rust_gl', 'rust_renderer', 'aerix_vulkan_probe', 'mobileglues')):
                 raise ValueError(f'Retired renderer entry in APK: {entry.filename}')
             if name.endswith('.so'):
                 digest = hashlib.sha256()

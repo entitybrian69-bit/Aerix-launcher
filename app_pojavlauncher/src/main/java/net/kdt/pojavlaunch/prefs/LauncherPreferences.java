@@ -201,11 +201,9 @@ public class LauncherPreferences {
     /**
      * Renderer used until one is picked in the settings.
      *
-     * This used to be MobileGlues on any device with OpenGL ES 3 - which meant the launcher itself
-     * made the one choice it now warns players about, silently. The automatic pick is Emesis (the
-     * renderer that ships every ABI and covers old and new versions), and the version rule in
-     * {@link net.kdt.pojavlaunch.game.renderer.RendererDefaults} moves a 1.17+ instance onto LTW at
-     * launch. MobileGlues stays available, by name, in every renderer list.
+     * The automatic pick is Emesis (the renderer that ships every ABI and covers old and new
+     * versions), and the version rule in {@link net.kdt.pojavlaunch.game.renderer.RendererDefaults}
+     * moves a 1.17+ instance onto LTW at launch.
      *
      * @param ctx Context needed to read the graphics capabilities of the device.
      * @return The renderer id to use when nothing was picked yet.

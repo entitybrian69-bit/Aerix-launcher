@@ -24,7 +24,7 @@ public class Stub implements RenderSpec { public boolean compatibleDevice(Contex
 public class GLESRenderSpec extends Stub {
  public static class GL4ESRenderSpec extends Stub { public String tag(){return "opengles2";} }
  public static class LTWRenderSpec extends Stub {} public static class NGGL4ESRenderSpec extends Stub {}
- public static class MgRenderSpec extends Stub {} public static class SFPEWRenderSpec extends Stub {} }''',
+ public static class SFPEWRenderSpec extends Stub {} }''',
     'net/kdt/pojavlaunch/game/renderer/impl/MesaRenderSpec.java': '''package net.kdt.pojavlaunch.game.renderer.impl;
 public class MesaRenderSpec extends Stub { public static class ZinkRenderSpec extends Stub {} public static class FreedrenoRenderSpec extends Stub {} public static class ExtMesaRenderSpec extends Stub {} public static class LegacyZinkRenderSpec extends Stub {} }''',
     'net/kdt/pojavlaunch/game/renderer/impl/ProtonRenderSpec.java': 'package net.kdt.pojavlaunch.game.renderer.impl; public class ProtonRenderSpec extends Stub {}',
