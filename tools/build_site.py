@@ -276,12 +276,11 @@ def build_index():
           <a class="btn btn-primary" href="{DOWNLOAD_URL}" download data-primary-download>
             <span class="nowrap">Download for Android</span> <span class="btn-size">89 MB</span>
           </a>
-          <a class="btn btn-ghost" href="#download-pc">Aerix for PC (Win / Mac / Linux)</a>
           <a class="btn btn-ghost" href="#whats-new">What's new</a>
         </div>
         <p class="hero-meta">
-          <span>Android 6.0+ · Windows · macOS · Linux</span>
-          <span>arm64, armv7, x64 and universal builds</span>
+          <span>Android 6.0+</span>
+          <span>arm64, armv7 and universal builds</span>
           <span id="downloadFacts">v{VERSION} · {RELEASE_DATE}</span>
         </p>
       </div>
@@ -580,43 +579,6 @@ def build_index():
           <span><a href="https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest/download/SHA256SUMS" target="_blank" rel="noopener">SHA-256 checksums</a></span>
           <span>Downloaded <b data-downloads>—</b> times from GitHub</span>
           <span>Signed with the project key · updates in place</span>
-        </div>
-      </div>
-
-      <div class="download reveal" id="download-pc" style="margin-top:24px">
-        <span class="kicker">Desktop · Electron + TypeScript</span>
-        <h2>Get Aerix Launcher PC <span class="muted" style="font-size:0.55em;font-weight:600">Windows · Linux · macOS</span></h2>
-        <p class="muted" style="max-width:60ch">
-          Native desktop edition with Microsoft, Aerix Auth &amp; Offline accounts, Fabric / Forge /
-          NeoForge / Quilt &amp; 1-click Aerix Client PC, Modrinth &amp; CurseForge Discover,
-          resource-pack unwrapping, and automatic Eclipse Temurin Java management.
-        </p>
-
-        <div class="dl-grid">
-          <a class="dl-card" href="https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest/download/Aerix-PC-Setup.exe" download data-pc-dl="win-exe">
-            <strong>Windows (x64) <span class="tag hot">installer</span></strong>
-            <small class="asset">Aerix-PC-{VERSION}-win-x64.exe</small>
-            <span class="size">Windows 10/11</span>
-            <small>NSIS installer + Start Menu shortcut</small>
-          </a>
-          <a class="dl-card" href="https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest/download/Aerix-PC-linux-x86_64.AppImage" download data-pc-dl="linux-appimage">
-            <strong>Linux AppImage (x64)</strong>
-            <small class="asset">Aerix-PC-{VERSION}-linux-x64.AppImage</small>
-            <span class="size">Universal Linux</span>
-            <small>Also available as .deb &amp; .tar.gz</small>
-          </a>
-          <a class="dl-card" href="https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest/download/Aerix-PC-mac-arm64.dmg" download data-pc-dl="mac-arm64">
-            <strong>macOS Apple Silicon</strong>
-            <small class="asset">Aerix-PC-{VERSION}-mac-arm64.dmg</small>
-            <span class="size">M1 / M2 / M3 / M4</span>
-            <small>Universal Intel x64 .dmg also built</small>
-          </a>
-        </div>
-
-        <div class="dl-foot">
-          <span><a href="https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest/download/Aerix-PC-linux-amd64.deb" download data-pc-dl="linux-deb">Ubuntu / Debian (.deb)</a></span>
-          <span><a href="https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest/download/Aerix-PC-mac-x64.dmg" download data-pc-dl="mac-x64">macOS Intel (.dmg)</a></span>
-          <span><a href="https://github.com/entitybrian69-bit/Aerix-launcher/releases" target="_blank" rel="noopener">All PC builds &amp; SHA256SUMS-PC</a></span>
         </div>
       </div>
     </div>
@@ -1091,39 +1053,6 @@ def build_install():
         <article class="card"><h3>2. Lower the resolution</h3><p>It fixes more launches than any renderer change, and it is reversible.</p></article>
         <article class="card"><h3>3. Give it more memory</h3><p>A pack that closes itself mid-load is usually short of heap, not broken.</p></article>
         <article class="card"><h3>4. Read the log</h3><p>In-game menu → Log output, or the log in the launcher. The last line before the crash names the mod almost every time.</p></article>
-      </div>
-    </div>
-  </section>
-
-  <section class="section">
-    <div class="wrap">
-      <div class="download reveal">
-        <h2 style="margin-top:0">Desktop? Install Aerix Launcher PC</h2>
-        <p class="muted">Native installers for Windows 10/11 (x64), Linux (AppImage, .deb, .tar.gz), and macOS (Apple Silicon &amp; Intel) with automatic Adoptium Java runtimes.</p>
-        <div class="dl-grid">
-          <a class="dl-card" href="https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest/download/Aerix-PC-Setup.exe" download data-pc-dl="win-exe">
-            <strong>Windows (x64)</strong>
-            <small class="asset">Aerix-PC-{VERSION}-win-x64.exe</small>
-            <span class="size">NSIS Setup</span>
-            <small>Windows 10 &amp; 11</small>
-          </a>
-          <a class="dl-card" href="https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest/download/Aerix-PC-linux-x86_64.AppImage" download data-pc-dl="linux-appimage">
-            <strong>Linux (x64)</strong>
-            <small class="asset">Aerix-PC-{VERSION}-linux-x64.AppImage</small>
-            <span class="size">AppImage / .deb</span>
-            <small>chmod +x &amp; run</small>
-          </a>
-          <a class="dl-card" href="https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest/download/Aerix-PC-mac-arm64.dmg" download data-pc-dl="mac-arm64">
-            <strong>macOS (arm64 / x64)</strong>
-            <small class="asset">Aerix-PC-{VERSION}-mac-arm64.dmg</small>
-            <span class="size">Apple Silicon &amp; Intel</span>
-            <small>Drag to Applications</small>
-          </a>
-        </div>
-        <p class="small muted mt-32">
-          <b>Windows SmartScreen note:</b> Pre-release or unsigned <code>.exe</code> downloads show SmartScreen unless signed with a Windows Authenticode / Azure Trusted Signing certificate. On Windows, you can install cleanly with SHA-256 verification via PowerShell:
-          <code>irm https://github.com/entitybrian69-bit/Aerix-launcher/releases/latest/download/Install-Aerix-PC.ps1 | iex</code>
-        </p>
       </div>
     </div>
   </section>

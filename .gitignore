@@ -1,8 +1,6 @@
 /.gradle
 /build
 /*/build
-!/aerix-pc/build/
-!/aerix-pc/build/**
 app_pojavlauncher/src/main/assets/components/jre
 /app_pojavlauncher/src/main/assets/components/jre-new/
 /app_pojavlauncher/src/main/assets/components/jre-21/
@@ -14,13 +12,6 @@ app_pojavlauncher/.cxx/
 /app_pojavlauncher/libs/ltw-release.aar
 site-preview/
 apk/
-
-# Aerix PC build & npm artifacts
-aerix-pc/node_modules/
-aerix-pc/dist/
-aerix-pc/dist-tests/
-aerix-pc/release/
-aerix-pc/.npm/
 
 # Python tooling scratch, never an artifact of the asset generator.
 __pycache__/
