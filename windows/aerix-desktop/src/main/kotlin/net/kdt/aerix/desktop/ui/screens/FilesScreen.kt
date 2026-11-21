@@ -9,6 +9,7 @@ import net.kdt.aerix.desktop.ui.components.AerixField
 import net.kdt.aerix.desktop.ui.components.ButtonStyle
 import net.kdt.aerix.desktop.ui.components.ClearPanel
 import net.kdt.aerix.desktop.ui.components.EmptyState
+import net.kdt.aerix.desktop.ui.components.VerticalStack
 import net.kdt.aerix.desktop.ui.components.IconButton
 import net.kdt.aerix.desktop.ui.components.aerixScroll
 import net.kdt.aerix.desktop.ui.components.heading
@@ -53,7 +54,9 @@ import javax.swing.SwingUtilities
 class FilesScreen(private val shell: Shell) : JPanel(BorderLayout()), Refreshable {
     private var instance: Instance? = null
     private var current: Path? = null
-    private val listHost = ClearPanel().apply { layout = BoxLayout(this, BoxLayout.Y_AXIS) }
+    // VerticalStack, not BoxLayout: the empty state is centred and would otherwise be squeezed
+    // into a half-width cell. See VerticalLayout.
+    private val listHost = VerticalStack()
     private val pathField = AerixField(placeholder = "Path", icon = "folder").apply {
         preferredSize = Dimension(UiScale.px(380), UiScale.px(34))
         isEditable = false

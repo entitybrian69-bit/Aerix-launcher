@@ -115,6 +115,96 @@ open class ClearPanel(layout: java.awt.LayoutManager? = null) : JPanel(layout) {
         if (grow) super.getMaximumSize() else Dimension(Int.MAX_VALUE, preferredSize.height)
 }
 
+/**
+ * A vertical layout that does exactly what it says.
+ *
+ * `BoxLayout` is the obvious choice and it is what this launcher used first, but it has two
+ * behaviours that produced visible bugs on the shipped pages: it hands children their *maximum*
+ * size (so a label becomes as tall as the page), and when a child's maximum width is smaller than
+ * the container it distributes the leftover in ways that depend on the container's own maximum —
+ * measured on the accounts page: a 171-pixel button in a 330-pixel column landed at x=161 with a
+ * 161-pixel cell, and an empty-state message centred in 1070 pixels was drawn from x=0 and ran off
+ * the card entirely.
+ *
+ * This layout has no such rules. Children are stacked top to bottom at their preferred height,
+ * every cell is the full available width, and [alignment] decides where inside that cell the child
+ * is drawn. Children with an unbounded maximum width (rows, rules, buttons) fill the cell; labels
+ * keep their preferred width so that their own alignment can centre or right-align them.
+ *
+ * Used both as a `LayoutManager` ([of]) and as a panel ([VerticalStack]).
+ */
+open class VerticalLayout(
+    var gap: Int = 0,
+    /** 0 = left, 0.5 = centre, 1 = right. A child's own [java.awt.Component.getAlignmentX] wins. */
+    var alignment: Float = 0f
+) : java.awt.LayoutManager {
+
+    companion object {
+        /** A transparent panel using this layout; the usual way to build a column. */
+        fun of(gap: Int = 0, alignment: Float = 0f, vararg rows: java.awt.Component): ClearPanel {
+            val panel = ClearPanel()
+            panel.layout = VerticalLayout(gap, alignment)
+            rows.forEach { panel.add(it) }
+            return panel
+        }
+    }
+
+    override fun addLayoutComponent(name: String?, comp: java.awt.Component) = Unit
+    override fun removeLayoutComponent(comp: java.awt.Component) = Unit
+
+    private fun visible(parent: java.awt.Container) = parent.components.filter { it.isVisible }
+
+    override fun preferredLayoutSize(parent: java.awt.Container): Dimension {
+        var w = 0
+        var h = 0
+        visible(parent).forEachIndexed { index, c ->
+            val p = c.preferredSize
+            w = maxOf(w, p.width)
+            h += p.height
+            if (index > 0) h += gap
+        }
+        val insets = parent.insets
+        return Dimension(w + insets.left + insets.right, h + insets.top + insets.bottom)
+    }
+
+    override fun minimumLayoutSize(parent: java.awt.Container): Dimension = preferredLayoutSize(parent)
+
+    override fun layoutContainer(parent: java.awt.Container) {
+        val insets = parent.insets
+        val availW = parent.width - insets.left - insets.right
+        var y = insets.top
+        val rows = visible(parent)
+        rows.forEachIndexed { index, c ->
+            val p = c.preferredSize
+            // Text keeps its own width so that `alignmentX` decides where it sits. Anything else
+            // that reports an unbounded maximum width (buttons, rows, rules) fills the column.
+            val stretch = c.maximumSize.width >= Int.MAX_VALUE &&
+                c !is javax.swing.JLabel && c !is javax.swing.AbstractButton
+            // Buttons hug their label; rows, rules and cards fill the column.
+            val w = if (stretch) availW else minOf(p.width, availW)
+            val align = if (c.alignmentX == 0.5f || c.alignmentX == 1f) c.alignmentX else alignment
+            val x = insets.left + when {
+                stretch -> 0
+                align >= 0.99f -> availW - w
+                align >= 0.49f -> (availW - w) / 2
+                else -> 0
+            }
+            c.setBounds(x, y, w, p.height)
+            y += p.height
+            if (index < rows.size - 1) y += gap
+        }
+    }
+}
+
+/** A transparent column. See [VerticalLayout]. */
+open class VerticalStack(gap: Int = 0, alignment: Float = 0f) : ClearPanel() {
+    init {
+        layout = VerticalLayout(gap, alignment)
+    }
+
+    override fun getMaximumSize(): Dimension = Dimension(Int.MAX_VALUE, preferredSize.height)
+}
+
 /** A glass card, the direct descendant of the Compose `Surface` with `liquidGlass`. */
 open class GlassCard(
     var radius: Int = Radii.panel,
@@ -604,6 +694,22 @@ class AerixSlider(
  * Everything sits in `BoxLayout` page bodies, and a plain `JLabel` reports a maximum size of
  * 32767×32767 — so the box hands it all the leftover height and the text floats in a tall cell.
  */
+/**
+ * A label that behaves inside a `BoxLayout`.
+ *
+ * Two Swing traps live here, both found by photographing the real pages:
+ *
+ *  * `BoxLayout` hands every child its **maximum** size. The default maximum is 32767 in both
+ *    axes, so a label in a vertical box becomes as tall as the box and its text floats in the
+ *    middle of a cell far taller than it needs. The height is therefore capped at the preferred
+ *    height.
+ *  * The width must stay uncapped. Capping it at the preferred width looks like the obvious fix
+ *    for horizontal alignment, but `BoxLayout` then hands the child only *half* of a floating
+ *    maximum (a max of 264 in a 900-pixel box becomes a 132-pixel cell, measured, not guessed)
+ *    and the text is produced from a negative origin and clipped — an eyebrow rendered as
+ *    "YOUR NEXT WOR". Leaving the width free gives the label the full row, which is what an
+ *    alignment of 0 already means; the text simply starts at the left edge of that row.
+ */
 open class AerixLabel(text: String) : JLabel(text) {
     override fun getMaximumSize(): Dimension = Dimension(Int.MAX_VALUE, preferredSize.height)
 }
@@ -807,7 +913,9 @@ class AerixProgress(var value: Float = 0f) : JComponent() {
 /** The empty-state block used by lists that have nothing to show yet. */
 class EmptyState(icon: String, title: String, message: String) : ClearPanel() {
     init {
-        layout = javax.swing.BoxLayout(this, javax.swing.BoxLayout.Y_AXIS)
+        // A stack rather than a BoxLayout: the message is longer than its preferred width allows
+        // for, and BoxLayout centred it in a cell it then drew from x=0, running off the card.
+        layout = VerticalLayout(gap = 0, alignment = 0.5f)
         val art = object : JComponent() {
             init { preferredSize = Dimension(UiScale.px(76), UiScale.px(76)); alignmentX = CENTER_ALIGNMENT }
             // BoxLayout would otherwise stretch the badge into a card-sized ellipse
@@ -825,7 +933,7 @@ class EmptyState(icon: String, title: String, message: String) : ClearPanel() {
         add(vspace(Spacing.md))
         add(label(title, Fonts.title(17f)).apply { alignmentX = CENTER_ALIGNMENT })
         add(vspace(Spacing.xs))
-        add(label(message, Fonts.body(12.5f), AerixColors.textMuted).apply { alignmentX = CENTER_ALIGNMENT })
+        add(paragraph(message, UiScale.px(420), Fonts.body(12.5f), AerixColors.textMuted).apply { alignmentX = CENTER_ALIGNMENT })
         alignmentX = CENTER_ALIGNMENT
     }
 }

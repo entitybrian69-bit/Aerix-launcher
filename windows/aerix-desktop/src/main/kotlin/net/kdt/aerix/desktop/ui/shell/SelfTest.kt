@@ -450,6 +450,50 @@ object SelfTest {
         }
 
         // ---- rendering ---------------------------------------------------------------------
+        check("text is never clipped by its own cell") {
+            // The home page shipped with an eyebrow rendered as "YOUR NEXT WOR" and a headline
+            // drawn from a negative origin, both because a vertical BoxLayout centred a child
+            // whose preferred width did not fill the row. Nothing about the build or the
+            // screenshots flagged it — the page just looked slightly wrong. This walks every
+            // rendered page and reports any component whose preferred width does not fit the cell
+            // the layout gave it.
+            val width = 1440
+            val height = 900
+            val host = JPanel(CardLayout())
+            host.isOpaque = false
+            val problems = ArrayList<String>()
+            val shell = HeadlessShell
+            for (page in Page.values()) {
+                val component = HeadlessPages.create(page, shell)
+                host.add(component, page.name)
+                (host.layout as CardLayout).show(host, page.name)
+                host.setSize(width, height)
+                host.doLayout()
+                layoutRecursively(host)
+                settle(host)
+                fun walk(c: java.awt.Component, path: String) {
+                    val pref = c.preferredSize
+                    // 2 px of slack: preferred sizes are computed to the pixel and borders differ.
+                    if (c.width in 1..(pref.width - 3) && c.height > 4) {
+                        problems.add("$page: $path ${c.javaClass.simpleName} cell=${c.width} wants=${pref.width}")
+                    }
+                    // Horizontal overflow poisons a whole page: one long label widens every
+                    // ancestor, so report the outermost component whose content wants more width
+                    // than the window instead of a hundred children.
+                    if (c.width > 0 && pref.width > c.width + 2 && (c.parent == null || c.parent.width <= 0 ||
+                            c.preferredSize.width <= c.width + 2)) {
+                        problems.add("$page: $path ${c.javaClass.simpleName} is ${pref.width}px wide in a ${c.width}px window")
+                    }
+                    if (c is java.awt.Container) {
+                        c.components.forEachIndexed { i, child -> walk(child, "$path/$i") }
+                    }
+                }
+                walk(component, page.name)
+                host.remove(component)
+            }
+            if (problems.isNotEmpty()) error(problems.take(12).joinToString("\n"))
+        }
+
         check("every page renders offscreen") {
             val width = 1440
             val height = 900

@@ -8,6 +8,7 @@ import net.kdt.aerix.desktop.ui.components.SectionCard
 import net.kdt.aerix.desktop.ui.components.aerixScroll
 import net.kdt.aerix.desktop.ui.components.heading
 import net.kdt.aerix.desktop.ui.components.label
+import net.kdt.aerix.desktop.ui.components.paragraph
 import net.kdt.aerix.desktop.ui.components.vspace
 import net.kdt.aerix.desktop.ui.shell.Page
 import net.kdt.aerix.desktop.ui.shell.Shell
@@ -56,13 +57,15 @@ class AboutScreen(private val shell: Shell) : JPanel(BorderLayout()) {
         host.add(vspace(14))
 
         val credits = SectionCard("Credits and licence", "Aerix Launcher is free software under GPL-3.0")
-        credits.body.add(label(
-            "Aerix Launcher is a fork of PojavLauncher (GPL-3.0) and keeps its licence, notices and\n" +
-                    "attribution. It bundles no third-party launcher code beyond the Android fork it came\n" +
-                    "from; the desktop UI, its settings and its launch pipeline are a reimplementation for\n" +
-                    "Windows, sharing the game-installation concepts and the public APIs (Mojang, Modrinth,\n" +
+        // paragraph(), not label(): a JLabel treats "\n" as one long line, so this text used to
+        // run off the card and widen the whole page to 2879 pixels.
+        credits.body.add(paragraph(
+            "Aerix Launcher is a fork of PojavLauncher (GPL-3.0) and keeps its licence, notices and " +
+                    "attribution. It bundles no third-party launcher code beyond the Android fork it came " +
+                    "from; the desktop UI, its settings and its launch pipeline are a reimplementation for " +
+                    "Windows, sharing the game-installation concepts and the public APIs (Mojang, Modrinth, " +
                     "CurseForge, Fabric, Quilt, Forge, NeoForge, Adoptium).",
-            Fonts.body(12.5f), AerixColors.textSecondary))
+            width = 760, font = Fonts.body(12.5f), color = AerixColors.textSecondary))
         credits.body.add(vspace(10))
         val links = ClearPanel(FlowLayout(FlowLayout.LEFT, UiScale.px(8), 0))
         links.add(AerixButton("Source on GitHub", ButtonStyle.SECONDARY, "github").apply {

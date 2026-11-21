@@ -82,10 +82,13 @@ class HomeScreen(private val shell: Shell) : JPanel(BorderLayout()), Refreshable
         val page = ClearPanel(BorderLayout())
         page.border = javax.swing.border.EmptyBorder(UiScale.px(Spacing.lg), UiScale.px(Spacing.xl), UiScale.px(Spacing.xxl), UiScale.px(Spacing.xxl))
 
+        // The hero panel below already says "Make room for wonder." — this header used to repeat
+        // it word for word, so the top of the page showed the same sentence twice. Here it carries
+        // a greeting instead, which is also the only place the player's name appears.
         val header = ClearPanel(BorderLayout())
         val headline = ClearPanel().apply {
             layout = BoxLayout(this, BoxLayout.Y_AXIS)
-            add(Eyebrow("YOUR NEXT WORLD STARTS HERE"))
+            add(Eyebrow(greetingEyebrow()))
             add(Box.createVerticalStrut(UiScale.px(6)))
             val title = object : JComponent() {
                 init { alignmentX = 0f; preferredSize = Dimension(UiScale.px(600), UiScale.px(52)) }
@@ -94,13 +97,13 @@ class HomeScreen(private val shell: Shell) : JPanel(BorderLayout()), Refreshable
                     Paint.quality(g2)
                     g2.font = Fonts.display(38f)
                     g2.color = AerixColors.textPrimary
-                    g2.drawString("Make room for wonder.", 0, UiScale.px(36))
+                    g2.drawString(greetingTitle(), 0, UiScale.px(36))
                     g2.dispose()
                 }
             }
             add(title)
             add(Box.createVerticalStrut(UiScale.px(4)))
-            val subtitle = Label("Build a world, choose your style, and make it yours.", Fonts.body(14.5f), AerixColors.textSecondary)
+            val subtitle = Label(greetingSubtitle(), Fonts.body(14.5f), AerixColors.textSecondary)
             subtitle.alignmentX = 0f
             add(subtitle)
         }
@@ -133,6 +136,29 @@ class HomeScreen(private val shell: Shell) : JPanel(BorderLayout()), Refreshable
         page.add(body, BorderLayout.CENTER)
         content.add(page, BorderLayout.CENTER)
         revalidate(); repaint()
+    }
+
+    /** "WELCOME BACK" is for the first run only; after that the name is the point. */
+    private fun greetingEyebrow(): String {
+        val name = Accounts.current()?.username?.ifBlank { null }
+        return if (name == null) "WELCOME TO AERIX LAUNCHER" else "WELCOME BACK"
+    }
+
+    private fun greetingTitle(): String {
+        val name = Accounts.current()?.username?.ifBlank { null }
+            ?: return "Set up your first instance."
+        return "Good to see you, $name."
+    }
+
+    private fun greetingSubtitle(): String {
+        val instances = Instances.list()
+        if (instances.isEmpty()) return "Create an instance to install a version, a loader, and everything it needs."
+        val profiles = Accounts.all().size
+        val unset = instances.count { it.versionId.isBlank() }
+        if (unset == instances.size) return "Open Your space to install a version for your instance."
+        val inst = "${instances.size} instance${if (instances.size == 1) "" else "s"}"
+        val prof = if (profiles == 0) "no profile signed in" else "$profiles profile${if (profiles == 1) "" else "s"} signed in"
+        return "$inst, $prof."
     }
 
     private fun pillButton(text: String, icon: String, action: () -> Unit): AerixButton =
@@ -174,7 +200,7 @@ class HomeScreen(private val shell: Shell) : JPanel(BorderLayout()), Refreshable
 // ---------------------------------------------------------------------------------------------
 
 private class HeroCard(private val shell: Shell) : JComponent() {
-    private val create = AerixButton("CREATE A WORLD", ButtonStyle.PRIMARY, "create")
+    private val create = AerixButton("CREATE AN INSTANCE", ButtonStyle.PRIMARY, "create")
     private val library = AerixButton("OPEN LIBRARY", ButtonStyle.GHOST, "library").apply { horizontalPadding = 14 }
     private var heroImage: BufferedImage? = null
     private var heroKey = ""
@@ -587,8 +613,10 @@ private class EmptyHintCard : JComponent() {
 // ---------------------------------------------------------------------------------------------
 
 fun Eyebrow(text: String): JComponent = object : JComponent() {
-    init { font = Fonts.labelStrong(10.5f) }
-    override fun getMaximumSize(): Dimension = preferredSize
+    init { font = Fonts.labelStrong(10.5f); alignmentX = 0f }
+    // Height capped, width free: see the note on AerixLabel. A floating maximum width is halved
+    // by BoxLayout and the text is then clipped mid-word.
+    override fun getMaximumSize(): Dimension = Dimension(Int.MAX_VALUE, preferredSize.height)
     override fun getPreferredSize(): Dimension {
         val fm = getFontMetrics(font)
         return Dimension(fm.stringWidth(spaced(text)) + 2, fm.height + 2)
@@ -607,9 +635,10 @@ fun spaced(text: String): String = text.uppercase().map { it.toString() }.joinTo
 
 fun Label(text: String, font: java.awt.Font = Fonts.body(), color: Color = AerixColors.textPrimary): JComponent =
     object : JComponent() {
-        override fun getMaximumSize(): Dimension = preferredSize
+        // Height capped, width free (see AerixLabel): a floating maximum width would be halved.
+        override fun getMaximumSize(): Dimension = Dimension(Int.MAX_VALUE, preferredSize.height)
         var text0 = text
-        init { this.font = font }
+        init { this.font = font; alignmentX = 0f }
         override fun getPreferredSize(): Dimension {
             val fm = getFontMetrics(font)
             return Dimension(fm.stringWidth(text0) + 2, fm.height)

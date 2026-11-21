@@ -7,6 +7,7 @@ import net.kdt.aerix.desktop.core.auth.MicrosoftAuth
 import net.kdt.aerix.desktop.core.auth.accounts.Account
 import net.kdt.aerix.desktop.core.auth.accounts.Accounts
 import net.kdt.aerix.desktop.ui.components.AerixButton
+import net.kdt.aerix.desktop.ui.components.VerticalStack
 import net.kdt.aerix.desktop.ui.components.AerixField
 import net.kdt.aerix.desktop.ui.components.AerixSwitch
 import net.kdt.aerix.desktop.ui.components.ButtonStyle
@@ -66,7 +67,9 @@ import javax.swing.filechooser.FileNameExtensionFilter
 class AccountsScreen(private val shell: Shell) : JPanel(BorderLayout()), Refreshable {
     private var selected: Account? = null
     private var addMode = 0 // 0 = microsoft, 1 = offline
-    private val listHost = ClearPanel().apply { layout = BoxLayout(this, BoxLayout.Y_AXIS) }
+    // Deliberately not BoxLayout: see VerticalStack. The "Add account" button and the empty-state
+    // label both ended up in half-width cells that pushed them against the middle of the column.
+    private val listHost = VerticalStack(gap = UiScale.px(8))
     private val detailHost = ClearPanel(BorderLayout())
 
     init {
@@ -112,7 +115,6 @@ class AccountsScreen(private val shell: Shell) : JPanel(BorderLayout()), Refresh
         }
         all.forEach { acc ->
             listHost.add(AccountRow(acc, acc === selected) { selected = acc; rebuild() })
-            listHost.add(Box.createVerticalStrut(UiScale.px(8)))
         }
         listHost.add(Box.createVerticalStrut(UiScale.px(8)))
         val addButton = AerixButton("Add account", ButtonStyle.PRIMARY, "add").apply {
