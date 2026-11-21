@@ -10,6 +10,7 @@ import net.kdt.aerix.desktop.core.instance.Instance
 import net.kdt.aerix.desktop.core.instance.Instances
 import net.kdt.aerix.desktop.core.json.Json
 import net.kdt.aerix.desktop.core.json.JsonObject
+import net.kdt.aerix.desktop.core.instance.Loader
 import net.kdt.aerix.desktop.core.loaders.Loaders
 import net.kdt.aerix.desktop.ui.components.SkinFace
 import net.kdt.aerix.desktop.ui.theme.AerixTheme
@@ -273,6 +274,63 @@ object SelfTest {
                     error("the loader's own argument was dropped: $loaderCmd")
             } finally {
                 root.toFile().deleteRecursively()
+            }
+        }
+
+        check("a modpack import unpacks overrides, adopts its metadata and refuses to escape the instance") {
+            // .mrpack import is the headline feature and the one path where a bug is destructive:
+            // a path traversal writes outside the instance, and a zip-slip in `overrides/` is the
+            // classic way a downloaded pack takes over a machine. The pack below has no downloadable
+            // files (so nothing hits the network), one traversal attempt, one override, and a
+            // dependencies block.
+            val tmp = Files.createTempDirectory("aerix-mrpack")
+            val instancesRoot = Files.createTempDirectory("aerix-mrpack-inst")
+            try {
+                val index = """
+                {
+                  "formatVersion": 1,
+                  "game": "minecraft",
+                  "versionId": "1.0",
+                  "name": "Test Factory",
+                  "summary": "a pack",
+                  "files": [{"path": "../escaped.jar", "hashes": {"sha1": "00"}, "downloads": ["https://example.invalid/x.jar"]}],
+                  "dependencies": {"minecraft": "1.20.1", "fabric-loader": "0.15.11"}
+                }
+                """.trimIndent()
+                val pack = tmp.resolve("pack.mrpack")
+                java.util.zip.ZipOutputStream(Files.newOutputStream(pack)).use { zip ->
+                    zip.putNextEntry(java.util.zip.ZipEntry("modrinth.index.json"))
+                    zip.write(index.toByteArray()); zip.closeEntry()
+                    zip.putNextEntry(java.util.zip.ZipEntry("overrides/config/mod.toml"))
+                    zip.write("enabled = true".toByteArray()); zip.closeEntry()
+                    zip.putNextEntry(java.util.zip.ZipEntry("overrides/../../escape.txt"))
+                    zip.write("nope".toByteArray()); zip.closeEntry()
+                }
+                val previousRoot = Settings.string("gameDirectory", AppEnv.defaultGameDir.toString())
+                Settings.set("gameDirectory", instancesRoot.toString())
+                // create() derives its directory from Instances.rootDir() (gameDirectory/instances),
+                // so nothing here needs to second-guess it.
+                val instance = Instances.create("Pack test", "", "", Loader.VANILLA)
+                val result = net.kdt.aerix.desktop.core.content.ContentInstaller.installPack(instance, pack)
+                val game = instance.gameDir
+                if (!Files.isRegularFile(game.resolve("config/mod.toml")))
+                    error("overrides/ was not unpacked into the instance")
+                if (Files.exists(instancesRoot.parent.resolve("escape.txt")) || Files.exists(tmp.resolve("escape.txt")))
+                    error("a path traversal in overrides/ wrote outside the instance")
+                @Suppress("UNUSED_EXPRESSION") previousRoot
+                if (!result.skipped.any { it.contains("escape") || it.contains("..") })
+                    error("the traversal was not reported: ${result.skipped}")
+                // metadata: name, version, loader
+                Instances.load()
+                val reloaded = Instances.list().firstOrNull { it.id == instance.id }
+                    ?: error("the instance was not saved")
+                if (reloaded.name != "Test Factory") error("pack name not adopted: ${reloaded.name}")
+                if (reloaded.mcVersion != "1.20.1") error("pack Minecraft version not adopted: ${reloaded.mcVersion}")
+                if (reloaded.loader != Loader.FABRIC) error("pack loader not adopted: ${reloaded.loader}")
+                if (reloaded.loaderVersion != "0.15.11") error("pack loader version not adopted: ${reloaded.loaderVersion}")
+            } finally {
+                tmp.toFile().deleteRecursively()
+                instancesRoot.toFile().deleteRecursively()
             }
         }
 

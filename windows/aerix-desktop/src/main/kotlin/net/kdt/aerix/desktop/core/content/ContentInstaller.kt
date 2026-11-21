@@ -2,6 +2,7 @@ package net.kdt.aerix.desktop.core.content
 
 import net.kdt.aerix.desktop.app.Log
 import net.kdt.aerix.desktop.core.instance.Instance
+import net.kdt.aerix.desktop.core.instance.Loader
 import net.kdt.aerix.desktop.core.json.Json
 import net.kdt.aerix.desktop.core.json.JsonObject
 import net.kdt.aerix.desktop.core.net.Downloader
@@ -123,12 +124,40 @@ object ContentInstaller {
             Files.createDirectories(target.parent)
             Files.write(target, data)
         }
-        // the pack's own settings (name, icon) are worth keeping
+        // The pack names itself, and says which loader and version it was built for. Adopting that
+        // is what makes an imported pack launchable: without it the instance keeps whatever it had,
+        // which for a fresh import is nothing.
+        val notes = ArrayList<String>()
         runCatching {
-            Files.readAllBytes(archive).let { }
-        }
+            val name = doc.str("name")?.ifBlank { null }
+            if (name != null) {
+                instance.name = name
+                notes.add("named “$name”")
+            }
+            val deps = doc.obj("dependencies") ?: return@runCatching
+            val mcVersion = deps.str("minecraft")?.ifBlank { null }
+            if (mcVersion != null) {
+                instance.mcVersion = mcVersion
+                if (instance.versionId.isBlank()) instance.versionId = mcVersion
+                notes.add("Minecraft $mcVersion")
+            }
+            val loaders = listOf(
+                "fabric-loader" to Loader.FABRIC,
+                "quilt-loader" to Loader.QUILT,
+                "forge" to Loader.FORGE,
+                "neoforge" to Loader.NEOFORGE
+            )
+            for ((key, id) in loaders) {
+                val raw = deps.str(key)?.ifBlank { null } ?: continue
+                instance.loader = id
+                instance.loaderVersion = raw
+                notes.add("${Loader.displayName(id)} $raw")
+                break
+            }
+            instance.save()
+        }.onFailure { Log.w("content", "pack metadata could not be applied: ${it.message}") }
         onProgress(Progress("Pack installed", 1, 1))
-        return Result(count + overrides.size, skipped, listOf("Minecraft ${instance.mcVersion}"))
+        return Result(count + overrides.size, skipped, notes.ifEmpty { listOf("Minecraft ${instance.mcVersion}") })
     }
 
     private fun installCurseZip(instance: Instance, archive: Path, onProgress: (Progress) -> Unit): Result {
