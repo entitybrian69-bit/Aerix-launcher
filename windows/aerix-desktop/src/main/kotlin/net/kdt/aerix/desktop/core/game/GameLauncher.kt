@@ -240,6 +240,9 @@ object GameLauncher {
         val builder = ProcessBuilder(spec.command.first(), "@${argFile.toAbsolutePath()}")
             .directory(spec.gameDir.toFile())
             .redirectErrorStream(true)
+            // Deliberately NOT inheriting the launcher's stream pipes into the child, and detached
+            // from the launcher's own lifetime: on Windows a child dies with its parent's console
+            // job unless it is left alone, and a launcher restart must never take a game down.
         // Minecraft's own log output on stdout/stderr
         Log.i("launch", "starting ${spec.instance.name} with ${spec.runtime.label} (${spec.instance.effectiveMemoryMb()} MB)")
         val process = try {
@@ -298,6 +301,21 @@ object GameLauncher {
     fun encodeArgFile(args: List<String>): String = args.joinToString("\n") { arg ->
         val needsQuotes = arg.isEmpty() || arg.any { it == ' ' || it == '\t' || it == '"' || it == '#' }
         if (!needsQuotes) arg else "\"" + arg.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+    }
+
+    /**
+     * Runs when the launcher process is about to exit.
+     *
+     * The game is a separate process with its own window; killing the launcher must not kill it.
+     * The one thing worth doing is stopping the stdout reader threads' dependency on this JVM, and
+     * letting the child keep its log file. [stopAll] is only for the explicit "close the game with
+     * the launcher" setting.
+     */
+    fun detachAll() {
+        for (game in running) {
+            Log.i("launch", "launcher exiting; ${game.instance.name} continues on its own")
+        }
+        running.clear()
     }
 
     /** Kills a running game gracefully (taskkill on Windows so the JVM gets a real termination). */

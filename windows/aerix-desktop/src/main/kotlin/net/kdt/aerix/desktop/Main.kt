@@ -160,26 +160,38 @@ private fun installTray(window: AerixWindow) {
             ).getScaledInstance(16, 16, java.awt.Image.SCALE_SMOOTH)
         }.getOrNull() ?: return
         val popup = java.awt.PopupMenu("Aerix Launcher")
-        val open = java.awt.MenuItem("Open Aerix Launcher")
-        open.addActionListener { SwingUtilities.invokeLater { window.isVisible = true; window.toFront() } }
-        popup.add(open)
-        popup.addSeparator()
-        val playing = net.kdt.aerix.desktop.core.game.GameLauncher.runningGames()
-        if (playing.isNotEmpty()) {
-            playing.forEach { game ->
-                val stop = java.awt.MenuItem("Stop ${game.instance.name}")
-                stop.addActionListener { net.kdt.aerix.desktop.core.game.GameLauncher.stop(game) }
-                popup.add(stop)
-            }
+        // The menu is rebuilt whenever the set of running games changes: it used to be filled once
+        // at startup, so a game launched afterwards never got its "Stop" entry, and one that quit
+        // kept a menu item that did nothing.
+        fun rebuildMenu() {
+            popup.removeAll()
+            val open = java.awt.MenuItem("Open Aerix Launcher")
+            open.addActionListener { SwingUtilities.invokeLater { window.isVisible = true; window.toFront() } }
+            popup.add(open)
             popup.addSeparator()
+            val playing = net.kdt.aerix.desktop.core.game.GameLauncher.runningGames()
+            if (playing.isNotEmpty()) {
+                playing.forEach { game ->
+                    val stop = java.awt.MenuItem("Stop ${game.instance.name}")
+                    stop.addActionListener { net.kdt.aerix.desktop.core.game.GameLauncher.stop(game) }
+                    popup.add(stop)
+                }
+                popup.addSeparator()
+            }
+            val quit = java.awt.MenuItem("Quit")
+            quit.addActionListener {
+                Settings.saveNow()
+                // Quitting from the tray never stops a game unless the player asked for that in
+                // Settings; the game is a separate process and stays up.
+                if (Settings.bool("closeGameWithLauncher", false)) net.kdt.aerix.desktop.core.game.GameLauncher.stopAll()
+                else net.kdt.aerix.desktop.core.game.GameLauncher.detachAll()
+                System.exit(0)
+            }
+            popup.add(quit)
         }
-        val quit = java.awt.MenuItem("Quit")
-        quit.addActionListener {
-            if (Settings.bool("closeGameWithLauncher", false)) net.kdt.aerix.desktop.core.game.GameLauncher.stopAll()
-            Settings.saveNow()
-            System.exit(0)
-        }
-        popup.add(quit)
+        rebuildMenu()
+        net.kdt.aerix.desktop.core.game.GameLauncher.onStarted { SwingUtilities.invokeLater { runCatching { rebuildMenu() } } }
+        net.kdt.aerix.desktop.core.game.GameLauncher.onExited { _, _, _ -> SwingUtilities.invokeLater { runCatching { rebuildMenu() } } }
         val icon = java.awt.TrayIcon(image, "Aerix Launcher", popup)
         icon.addActionListener { window.isVisible = true; window.toFront() }
         icon.isImageAutoSize = true

@@ -204,17 +204,33 @@ class AerixWindow : JFrame("Aerix Launcher") {
     }
 
     private fun onCloseRequested() {
-        if (GameLauncher.runningGames().isNotEmpty()) {
-            val choice = javax.swing.JOptionPane.showConfirmDialog(
-                this,
-                "Minecraft is still running. Close the launcher anyway?\nThe game keeps running in its own window.",
-                "Aerix Launcher",
-                javax.swing.JOptionPane.OK_CANCEL_OPTION,
-                javax.swing.JOptionPane.QUESTION_MESSAGE
+        val playing = GameLauncher.runningGames()
+        val stopGames = Settings.bool("closeGameWithLauncher", false)
+        if (playing.isNotEmpty()) {
+            // Three real answers, not two: keep the game running, stop it, or go back. Which ones
+            // are offered depends on the setting, so the dialog never claims something it will
+            // not do — "close anyway, the game keeps running" was shown even when the setting
+            // said the opposite.
+            val options = if (stopGames)
+                arrayOf("Stop the game and quit", "Keep the game running and quit", "Cancel")
+            else
+                arrayOf("Quit, leave the game running", "Stop the game and quit", "Cancel")
+            val message = if (stopGames)
+                "Minecraft is still running.\n\"Close the game with the launcher\" is on, so quitting stops it."
+            else
+                "Minecraft is still running.\nIt keeps running in its own window if you quit."
+            val choice = javax.swing.JOptionPane.showOptionDialog(
+                this, message, "Aerix Launcher",
+                javax.swing.JOptionPane.DEFAULT_OPTION, javax.swing.JOptionPane.QUESTION_MESSAGE,
+                null, options, options[0]
             )
-            if (choice != javax.swing.JOptionPane.OK_OPTION) return
+            val selected = options.getOrNull(choice) ?: return
+            if (selected == "Cancel") return
+            if (selected.startsWith("Stop")) GameLauncher.stopAll()
+            else GameLauncher.detachAll()
+        } else if (stopGames) {
+            GameLauncher.stopAll()
         }
-        if (Settings.bool("closeGameWithLauncher", false)) GameLauncher.stopAll()
         persistWindowState()
         Settings.saveNow()
         Shell.saveNavState()
