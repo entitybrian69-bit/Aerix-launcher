@@ -66,8 +66,8 @@ object RecordingOptions {
         require(quality in qualities) { "Unknown quality: $quality" }
         require(alignW > 0 && alignH > 0) { "Alignment must be positive" }
 
-        val wStep = maxOf(8, alignW)
-        val hStep = maxOf(8, alignH)
+        val wStep = maxOf(2, alignW)
+        val hStep = maxOf(2, alignH)
         val landscape = screenWidth >= screenHeight
         val shortSide = minOf(screenWidth, screenHeight)
         val longSide = maxOf(screenWidth, screenHeight)
@@ -155,8 +155,8 @@ object RecordingOptions {
             val caps = runCatching { info.getCapabilitiesForType(MediaFormat.MIMETYPE_VIDEO_AVC) }.getOrNull() ?: continue
             if (!caps.colorFormats.contains(MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)) continue
             val video = caps.videoCapabilities ?: continue
-            val alignW = video.widthAlignment.coerceAtLeast(2)
-            val alignH = video.heightAlignment.coerceAtLeast(2)
+            val alignW = video.widthAlignment.coerceAtLeast(8)
+            val alignH = video.heightAlignment.coerceAtLeast(8)
 
             for (quality in qualities) {
                 if (quality > maxQuality) continue

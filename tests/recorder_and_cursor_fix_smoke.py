@@ -22,8 +22,8 @@ assert "AUDIO_WAIT_TIMEOUT_MS" in service and "forceVideoOnly" in service
 assert "out.position(info.offset)" in service and "out.limit(info.offset + info.size)" in service
 assert service.index("videoEncoder?.signalEndOfInputStream()") < service.index("virtualDisplay?.release()", service.index("private fun stopRecording()"))
 assert "thread.join(" not in audio, "RecordingAudio.stop must not block worker thread"
-assert "if (videoBase == null) videoBase = raw" in timestamps
-assert "maxOf(8, alignW)" in options and "maxOf(8, alignH)" in options
+assert "if (videoBase == null) videoBase = if (raw >= epochUs) epochUs else raw" in timestamps
+assert "video.widthAlignment.coerceAtLeast(8)" in options and "video.heightAlignment.coerceAtLeast(8)" in options
 assert "while (checked < 30)" in output
 assert 'file.extension.equals("mp4", ignoreCase = true)' in file_bridge
 assert "RecordingLibrary.view(context, file, share)" in file_bridge
