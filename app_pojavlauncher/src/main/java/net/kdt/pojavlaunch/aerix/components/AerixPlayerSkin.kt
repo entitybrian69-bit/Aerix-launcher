@@ -317,19 +317,28 @@ fun AerixSkinPreview3D(
                     .alpha(if (webglPainted) 1f else 0.01f),
                 factory = { viewContext ->
                     TouchGateLayout(viewContext).apply {
-                        val wv = playerSkin.loadWebView(viewContext) { pageFinished = true }
-                        wv.addOnLayoutChangeListener { _, l, t, r, b, ol, ot, or2, ob ->
-                            if ((r - l) != (or2 - ol) || (b - t) != (ob - ot)) {
-                                playerSkin.requestResize()
+                        val wv = runCatching {
+                            playerSkin.loadWebView(viewContext) { pageFinished = true }
+                        }.getOrNull()
+                        if (wv != null) {
+                            wv.addOnLayoutChangeListener { _, l, t, r, b, ol, ot, or2, ob ->
+                                if ((r - l) != (or2 - ol) || (b - t) != (ob - ot)) {
+                                    playerSkin.requestResize()
+                                }
+                            }
+                            addView(
+                                wv,
+                                ViewGroup.LayoutParams(
+                                    ViewGroup.LayoutParams.MATCH_PARENT,
+                                    ViewGroup.LayoutParams.MATCH_PARENT
+                                )
+                            )
+                        } else {
+                            post {
+                                webglFailed = true
+                                webglPainted = false
                             }
                         }
-                        addView(
-                            wv,
-                            ViewGroup.LayoutParams(
-                                ViewGroup.LayoutParams.MATCH_PARENT,
-                                ViewGroup.LayoutParams.MATCH_PARENT
-                            )
-                        )
                     }
                 },
                 update = { container ->

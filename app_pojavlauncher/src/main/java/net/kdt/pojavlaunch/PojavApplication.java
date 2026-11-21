@@ -92,10 +92,43 @@ public class PojavApplication extends Application {
 		return null;
 	}
 
+	private static void configureWebViewDataDirectory(String procName) {
+		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return;
+		try {
+			android.webkit.WebView.setDataDirectorySuffix(webViewDataDirSuffixForProcess(procName));
+		} catch (Throwable error) {
+			Log.w("PojavApplication", "Could not configure process WebView data directory", error);
+		}
+	}
+
+	/**
+	 * Android 9+ forbids multiple processes (such as :launcher and :game) from locking the same
+	 * Chromium WebView data directory concurrently. Give each process a sanitized, deterministic
+	 * suffix before any WebView is constructed.
+	 */
+	public static String webViewDataDirSuffixForProcess(String processName) {
+		if (processName == null || processName.isEmpty()) return "main";
+		int colon = processName.lastIndexOf(':');
+		String raw = colon >= 0 ? processName.substring(colon + 1) : "main";
+		if (raw.isEmpty()) return "main";
+		StringBuilder sanitized = new StringBuilder(raw.length());
+		for (int i = 0; i < raw.length(); i++) {
+			char c = raw.charAt(i);
+			if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+					|| (c >= '0' && c <= '9') || c == '_' || c == '-') {
+				sanitized.append(c);
+			} else {
+				sanitized.append('_');
+			}
+		}
+		return sanitized.length() > 0 ? sanitized.toString() : "main";
+	}
+
 	@Override
 	public void onCreate() {
 		ContextExecutor.setApplication(this);
 		String procName = resolveCurrentProcessName(this);
+		configureWebViewDataDirectory(procName);
 		if (procName != null && procName.endsWith(":recorder")) {
 			super.onCreate();
 			try {
