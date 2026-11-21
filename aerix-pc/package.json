@@ -1,7 +1,7 @@
 {
   "name": "aerix-pc",
   "productName": "Aerix Launcher PC",
-  "version": "2.4.5",
+  "version": "2.4.6",
   "description": "Aerix Launcher PC — Fast, modern cross-platform Minecraft launcher with Aerix Client, Modrinth & CurseForge Discover, Microsoft/Aerix/Offline accounts, and automatic Java runtime management.",
   "main": "dist/main/main.js",
   "author": "Aerix Launcher Contributors <support@aerixlauncher.org>",

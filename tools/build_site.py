@@ -22,7 +22,7 @@ def current_version() -> str:
 
 
 VERSION = current_version()
-RELEASE_DATE = "16 Nov 2026"
+RELEASE_DATE = "21 Nov 2026"
 
 NAV = [
     ("index.html", "Home"),
@@ -372,6 +372,11 @@ def build_index():
             <span class="n">09</span>
             <span><b>2.3.3: the signing key that should never have been public</b>
             The warning some security apps raised on install had a real reason - releases were signed with a key committed to this repository, with its password in the file beside it. That key is retired and permanently banned in CI, releases now sign from a secret no clone can read, and 2.3.3 carries both signatures so you can update without uninstalling and losing your worlds.</span>
+          </li>
+          <li>
+            <span class="n">10</span>
+            <span><b>2.4.6: resource packs, stutter fixes, zero-copy recorder &amp; Aerix PC</b>
+            Nested resource packs now unwrap cleanly, user packs always override the Aerix Client pack, WebView processes are isolated, the floating A button returns on rejoin, GC/affinity tuning removes device stutters, and Aerix Launcher PC ships for Windows, Linux and macOS — permanently double-signed so updates land in place.</span>
           </li>
         </ol>
         <div class="log-foot">

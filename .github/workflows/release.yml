@@ -7,9 +7,14 @@ name: Release CI
 # A marked push has to touch this file to be seen at all, so each release cuts a
 # one line note here recording what it shipped.
 #
-# RELEASE_MARK=2.4.5
+# RELEASE_MARK=2.4.6
 #
-# Last cut: v2.4.5 on 20 Nov 2026 - fixes FastDownload's mid-chunk cursor/double-counting bug at
+# Last cut: v2.4.6 on 21 Nov 2026 - resource-pack loading/priority/unwrap/stamp fixes, WebView
+# multiprocess isolation, floating A button rejoin fix, GC/affinity/overlay stutter fixes,
+# zero-copy screen recorder, MobileGlues removal, and Aerix Launcher PC (Win/Linux/macOS);
+# permanently double-signed so 2.4.5, 2.4.1, and 2.3.2 update in place.
+#
+# Previous cut: v2.4.5 on 20 Nov 2026 - fixes FastDownload's mid-chunk cursor/double-counting bug at
 # 100% ("The update download is incomplete. Please retry."), retries probe/single-stream drops, and
 # republishes the double-signed release so 2.4.1 updates in place.
 #
@@ -200,7 +205,7 @@ jobs:
           python3 tests/fps_counter_smoke.py
           python3 tests/key_tap_mouse_launch_smoke.py
           python3 tests/logo_visibility_smoke.py
-          python3 tests/release_245_smoke.py
+          python3 tests/release_246_smoke.py
           python3 tests/recorder_panel_smoke.py
           python3 tests/fastclient_performance_download_test.py
           python3 tests/recorder_wiring_smoke.py
