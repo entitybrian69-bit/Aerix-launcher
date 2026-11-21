@@ -356,6 +356,85 @@ object SelfTest {
             if (unquoted.contains("\\\\")) error("unquoted backslashes must not be doubled, got: $unquoted")
         }
 
+        check("downloads survive a server that ignores or shifts ranges") {
+            // Resuming is where a launcher quietly corrupts files: appending a full body to an
+            // existing fragment produces a jar that only fails much later, at hash time. A real
+            // socket server inside the test answers three ways — honours the range, ignores it,
+            // and shifts it — and every case must still produce the exact bytes.
+            val body = ByteArray(64 * 1024) { (it % 251).toByte() }
+            val sha1 = run {
+                val md = java.security.MessageDigest.getInstance("SHA-1")
+                md.digest(body).joinToString("") { "%02x".format(it) }
+            }
+            val server = java.net.ServerSocket(0, 8, java.net.InetAddress.getLoopbackAddress())
+            val port = server.localPort
+            val worker = Thread {
+                while (!server.isClosed) {
+                    val socket = runCatching { server.accept() }.getOrNull() ?: break
+                    socket.use { sck ->
+                        val input = sck.getInputStream().bufferedReader()
+                        val requestLine = input.readLine() ?: return@use
+                        var range: String? = null
+                        while (true) {
+                            val line = input.readLine() ?: break
+                            if (line.isEmpty()) break
+                            if (line.lowercase().startsWith("range:")) range = line.substringAfter("=").trim().removeSuffix("-").toLongOrNull()?.toString()
+                        }
+                        val mode = requestLine.split(' ').getOrNull(1)?.trim('/') ?: "honour"
+                        val start = if (range == null) 0L else range!!.toLong()
+                        // A server cannot legally send *less* than asked for and call it a range
+                        // response; the only realistic refusal of an offset it cannot honour is a
+                        // plain 200. So "shift" starts later than requested (a legal 206 that the
+                        // launcher must reject, because the fragment no longer lines up).
+                        val effective = when {
+                            mode == "ignore" || range == null -> 0L
+                            mode == "shift" -> (start + 1000).coerceAtMost(body.size.toLong())
+                            else -> start
+                        }
+                        val out = sck.getOutputStream()
+                        if (range != null && (mode == "honour" || mode == "shift")) {
+                            out.write("HTTP/1.1 206 Partial Content\r\nContent-Range: bytes $effective-${body.size - 1}/${body.size}\r\nContent-Length: ${body.size - effective.toInt()}\r\nConnection: close\r\n\r\n".toByteArray())
+                        } else {
+                            out.write("HTTP/1.1 200 OK\r\nContent-Length: ${body.size}\r\nConnection: close\r\n\r\n".toByteArray())
+                        }
+                        out.write(body.copyOfRange(effective.toInt(), body.size))
+                        out.flush()
+                    }
+                }
+            }.apply { isDaemon = true; start() }
+            try {
+                for (mode in listOf("honour", "ignore", "shift")) {
+                    for (partial in listOf(0, 20000)) {
+                        val dir = Files.createTempDirectory("aerix-resume")
+                        try {
+                            val dest = dir.resolve("file.bin")
+                            if (partial > 0) Files.write(dest.resolveSibling("file.bin.part"), body.copyOfRange(0, partial))
+                            val job = net.kdt.aerix.desktop.core.net.DownloadJob("resume-test")
+                            var errors = 0
+                            job.onError = { errors++ }
+                            net.kdt.aerix.desktop.core.net.Downloader.run(
+                                job,
+                                listOf(net.kdt.aerix.desktop.core.net.DownloadJob.Task(
+                                    "http://127.0.0.1:$port/$mode", dest, sha1 = sha1, size = body.size.toLong()
+                                )),
+                                threads = 1
+                            )
+                            if (errors > 0) error("$mode/$partial reported an error")
+                            if (!Files.isRegularFile(dest)) error("$mode/$partial produced no file")
+                            if (!Files.readAllBytes(dest).contentEquals(body)) error("$mode/$partial produced the wrong bytes")
+                            if (job.bytes != body.size.toLong())
+                                error("$mode/$partial counted ${job.bytes} bytes for a ${body.size}-byte file")
+                            if (Files.exists(dest.resolveSibling("file.bin.part"))) error("$mode/$partial left a .part file")
+                        } finally {
+                            dir.toFile().deleteRecursively()
+                        }
+                    }
+                }
+            } finally {
+                runCatching { server.close() }
+            }
+        }
+
         check("java discovery") {
             val runtimes = JavaRuntimes.discover(force = true)
             // The launcher itself runs on one, so at least one must be found even headless.

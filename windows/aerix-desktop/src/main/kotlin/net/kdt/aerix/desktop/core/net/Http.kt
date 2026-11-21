@@ -119,13 +119,20 @@ object Http {
     }
 
     /** Streams a download to [sink], calling [onProgress] with bytes copied so far. */
+    /**
+     * Streams a response body into [sink] and reports how the request was actually answered.
+     *
+     * [onProgress] counts **total bytes now on disk**, not bytes from this request: a resumed
+     * download that has 900 MB on disk and receives 100 MB must report 1 GB, otherwise the
+     * progress bar restarts from zero on every resume.
+     */
     fun downloadStream(
         url: String,
         headers: Map<String, String> = emptyMap(),
         rangeStart: Long = 0,
         onProgress: (Long) -> Unit = {},
-        sink: (java.io.InputStream) -> Unit
-    ): Long {
+        sink: (java.io.InputStream, Long) -> Unit
+    ): StreamResult {
         val builder = defaultHeaders(HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofMinutes(30)))
         headers.forEach { (k, v) -> builder.header(k, v) }
         if (rangeStart > 0) builder.header("Range", "bytes=$rangeStart-")
@@ -134,16 +141,32 @@ object Http {
         if (code !in 200..299 && code != 206) {
             throw HttpException("HTTP $code for $url", code)
         }
+        // A server may ignore Range and answer 200 with the whole body, or shift the range.
+        // Both are legal, and both mean the existing partial file is unusable — reporting the
+        // answer is what lets the caller decide instead of silently appending a full body to
+        // a fragment and producing a file that only fails its hash check.
+        val contentRange = response.headers().firstValue("Content-Range").orElse(null)
+        val rangeStartUsed = when {
+            code == 206 -> contentRange?.let { Regex("bytes\\s+(\\d+)-").find(it)?.groupValues?.get(1)?.toLongOrNull() } ?: rangeStart
+            else -> 0L
+        }
         var copied = 0L
         response.body().use { input ->
             val counting = object : java.io.FilterInputStream(input) {
-                override fun read(): Int = super.read().also { if (it >= 0) { copied++; onProgress(copied) } }
+                override fun read(): Int = super.read().also { if (it >= 0) { copied++; onProgress(rangeStartUsed + copied) } }
                 override fun read(b: ByteArray, off: Int, len: Int): Int =
-                    super.read(b, off, len).also { if (it > 0) { copied += it; onProgress(copied) } }
+                    super.read(b, off, len).also { if (it > 0) { copied += it; onProgress(rangeStartUsed + copied) } }
             }
-            sink(counting)
+            // The sink is told where the body actually starts, so it can truncate instead of
+            // appending when the server ignored the range.
+            sink(counting, rangeStartUsed)
         }
-        return copied
+        return StreamResult(status = code, resumedFrom = rangeStartUsed, bytesWritten = copied)
+    }
+
+    /** How a stream request was answered; see [downloadStream]. */
+    class StreamResult(val status: Int, val resumedFrom: Long, val bytesWritten: Long) {
+        val isPartial: Boolean get() = status == 206
     }
 
     fun clearCache() = cache.clear()

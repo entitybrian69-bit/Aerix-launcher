@@ -401,7 +401,7 @@ object Loaders {
         Files.newOutputStream(tmp).use { out ->
             Http.downloadStream(url, onProgress = { bytes ->
                 onProgress((bytes / expected).coerceIn(0f, 0.99f))
-            }) { input -> input.copyTo(out) }
+            }) { input, _ -> input.copyTo(out) }
         }
         Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING)
     }

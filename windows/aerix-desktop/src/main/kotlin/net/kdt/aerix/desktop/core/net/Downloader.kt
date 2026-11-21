@@ -222,31 +222,54 @@ object Downloader {
         }
     }
 
+    /**
+     * Fetches one file, resuming a `.part` left by an earlier attempt when the server allows it.
+     *
+     * Progress accounting is deliberately explicit rather than incremental: the job is credited
+     * with what is on disk now minus what it was credited with for this file before, so a resumed
+     * transfer continues the bar instead of restarting it, and a server that refuses the range
+     * does not leave the bar showing more than the file's size.
+     */
     private fun fetchWithResume(job: DownloadJob, task: DownloadJob.Task) {
         val dest = task.destination
         val part = dest.resolveSibling(dest.fileName.toString() + ".part")
-        var resumeFrom = if (Files.isRegularFile(part)) Files.size(part) else 0L
-        if (task.size in 1 until resumeFrom) { Files.deleteIfExists(part); resumeFrom = 0 }
-        var appended = false
-        Http.downloadStream(
+        val fragment = if (Files.isRegularFile(part)) Files.size(part) else 0L
+        // A fragment that is already the full size cannot be resumed.
+        val resumeFrom = if (task.size in 1..fragment) { Files.deleteIfExists(part); 0L } else fragment
+        var credited = 0L
+        fun credit(onDisk: Long) {
+            val delta = onDisk - credited
+            if (delta != 0L) { job.addBytes(delta); credited = onDisk }
+        }
+        if (resumeFrom > 0) credit(resumeFrom)
+        val result = Http.downloadStream(
             task.url,
             task.headers,
             rangeStart = resumeFrom,
-            onProgress = { job.addBytes(it) },
-            sink = { input: java.io.InputStream ->
-                // A server that ignores Range answers 200 with the whole body; start over in that case.
-                val streamStart = 0L
+            onProgress = { onDisk -> credit(onDisk) },
+            sink = { input: java.io.InputStream, startsAt: Long ->
+                // Append only when the body really continues our fragment. A 200 (range ignored)
+                // or a shifted Content-Range means the body does not line up, so the fragment is
+                // discarded: appending produced a corrupt file that only failed later at hash time.
+                val append = resumeFrom > 0 && startsAt == resumeFrom
                 val out: OutputStream = Files.newOutputStream(
                     part,
                     java.nio.file.StandardOpenOption.CREATE,
                     java.nio.file.StandardOpenOption.WRITE,
-                    if (resumeFrom > 0) java.nio.file.StandardOpenOption.APPEND else java.nio.file.StandardOpenOption.TRUNCATE_EXISTING
+                    if (append) java.nio.file.StandardOpenOption.APPEND else java.nio.file.StandardOpenOption.TRUNCATE_EXISTING
                 )
                 out.use { o -> input.copyTo(o, 128 * 1024) }
-                appended = resumeFrom > 0 || streamStart == 0L
             }
         )
-        if (!appended) Files.deleteIfExists(part)
+        if (resumeFrom > 0 && result.resumedFrom != resumeFrom) {
+            // The server answered with a different range than asked for, so the fragment and the
+            // body do not line up. Drop it now rather than hashing a file we know is wrong; the
+            // retry loop then fetches the whole thing, which it would have had to do anyway.
+            credit(0)
+            Files.deleteIfExists(part)
+            throw IOException("Server restarted the transfer of ${dest.fileName}; fetching it whole")
+        }
+        credit(Files.size(part))
         Files.move(part, dest, StandardCopyOption.REPLACE_EXISTING)
     }
 
