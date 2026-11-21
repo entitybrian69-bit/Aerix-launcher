@@ -33,6 +33,9 @@ import com.google.gson.JsonParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import net.kdt.pojavlaunch.R
+import net.kdt.pojavlaunch.aerix.client.AerixClientPackGenerator
+import net.kdt.pojavlaunch.aerix.client.ClientInstanceOptions
+import net.kdt.pojavlaunch.aerix.resourcepack.ResourcePackArchive
 import net.kdt.pojavlaunch.instances.Instance
 import net.kdt.pojavlaunch.instances.Instances
 import net.kdt.pojavlaunch.modloaders.modpacks.api.ApiHandler
@@ -715,20 +718,25 @@ object PojavAssetBridge {
     ): Boolean {
         val kind = type.folder ?: return false
         val root = target.gameDirectory ?: return false
-        return install(type, file, File(root, kind.directoryName), onProgress)
+        return install(type, file, File(root, kind.directoryName), onProgress, activateInOptions = true)
     }
 
-    suspend fun install(type: AssetType, file: AssetFile): Boolean = withContext(Dispatchers.IO) {
+    suspend fun install(
+        type: AssetType,
+        file: AssetFile,
+        activateInOptions: Boolean = true
+    ): Boolean = withContext(Dispatchers.IO) {
         val folder = type.folder ?: return@withContext false
         val dir = PojavContentBridge.directory(folder) ?: return@withContext false
-        install(type, file, dir)
+        install(type, file, dir, activateInOptions = activateInOptions)
     }
 
     private suspend fun install(
         type: AssetType,
         file: AssetFile,
         dir: File,
-        onProgress: ((Long, Long) -> Unit)? = null
+        onProgress: ((Long, Long) -> Unit)? = null,
+        activateInOptions: Boolean = true
     ): Boolean = withContext(Dispatchers.IO) {
         val url = file.url ?: return@withContext false
         if (!dir.isDirectory && !dir.mkdirs()) return@withContext false
@@ -746,6 +754,14 @@ object PojavAssetBridge {
             } else {
                 val target = File(dir, safeName)
                 DownloadUtils.ensureSha1(target, file.sha1) { download(url, target, onProgress) }
+                if (type == AssetType.RESOURCE_PACK && target.name.endsWith(".zip", ignoreCase = true)) {
+                    runCatching { ResourcePackArchive.unwrapSingleRootInPlace(target) }
+                    if (activateInOptions && target.name != AerixClientPackGenerator.PACK_FILE_NAME) {
+                        dir.parentFile?.let { gameDir ->
+                            runCatching { ClientInstanceOptions.setPackEnabledNow(gameDir, target.name, true) }
+                        }
+                    }
+                }
             }
         }.isSuccess
     }

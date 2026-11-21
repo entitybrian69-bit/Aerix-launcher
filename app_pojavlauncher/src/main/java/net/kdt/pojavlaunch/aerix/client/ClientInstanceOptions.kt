@@ -1,5 +1,6 @@
 package net.kdt.pojavlaunch.aerix.client
 
+import net.kdt.pojavlaunch.aerix.resourcepack.ResourcePackOptions
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -37,14 +38,39 @@ object ClientInstanceOptions {
     }
 
     private fun packsFromOptions(lines: List<String>): MutableList<String> {
-        val raw = lines.lastOrNull { it.startsWith("resourcePacks:") }?.substringAfter(':') ?: return mutableListOf("vanilla")
-        val array = JSONArray(raw) // Do not overwrite a malformed pack list.
-        return (0 until array.length()).map { array.getString(it) }.toMutableList()
+        val raw = lines.lastOrNull { it.startsWith("resourcePacks:") }?.substringAfter(':')?.trim()
+        return ResourcePackOptions.parseStrict(raw).toMutableList()
     }
 
     private fun validPackName(name: String) = name.isNotBlank() && name.length <= 200 &&
         name != "." && name != ".." && !name.contains('/') && !name.contains('\\') &&
         !name.contains('\n') && !name.contains('\r')
+
+    fun isPackActive(dir: File, name: String): Boolean {
+        if (!validPackName(name)) return false
+        return runCatching { ResourcePackOptions.isPackEnabled(readLines(dir), name) }.getOrDefault(false)
+    }
+
+    /** Immediately updates `options.txt` for an instance while the game is not running. */
+    fun setPackEnabledNow(dir: File, name: String, enabled: Boolean) {
+        require(validPackName(name) && name != AerixClientPackGenerator.PACK_FILE_NAME)
+        val file = File(File(dir, "resourcepacks"), name)
+        if (enabled) {
+            require(file.exists() && (file.isDirectory || file.extension.equals("zip", true))) { "Pack no longer exists" }
+        }
+        val merged = ResourcePackOptions.setPackEnabled(readLines(dir), name, enabled)
+        writeAtomic(optionFile(dir), merged.joinToString("\n", postfix = "\n"))
+        val queueFile = packQueue(dir)
+        if (queueFile.isFile) {
+            val queue = readJson(queueFile)
+            val id = "file/$name"
+            if (queue.has(id)) {
+                queue.remove(id)
+                if (queue.length() == 0) queueFile.delete()
+                else writeAtomic(queueFile, queue.toString())
+            }
+        }
+    }
 
     fun listPacks(dir: File): List<Pack> {
         val selected = packsFromOptions(readLines(dir)).toSet()

@@ -41,6 +41,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import net.kdt.pojavlaunch.R
 import net.kdt.pojavlaunch.Tools
+import net.kdt.pojavlaunch.aerix.client.AerixClientPackGenerator
+import net.kdt.pojavlaunch.aerix.client.ClientInstanceOptions
+import net.kdt.pojavlaunch.aerix.resourcepack.ResourcePackArchive
+import net.kdt.pojavlaunch.aerix.resourcepack.ResourcePackOptions
 import net.kdt.pojavlaunch.instances.Instances
 import org.apache.commons.io.FileUtils
 import java.io.File
@@ -125,6 +129,14 @@ object PojavContentBridge {
     suspend fun list(kind: ContentKind): List<ContentEntry>? = withContext(Dispatchers.IO) {
         val dir = directory(kind) ?: return@withContext null
         val files = dir.listFiles() ?: return@withContext emptyList()
+        val enabledPackIds = if (kind == ContentKind.RESOURCE_PACKS) {
+            runCatching {
+                val opt = dir.parentFile?.let { File(it, "options.txt") }
+                if (opt != null && opt.isFile && opt.length() <= 2_000_000L) {
+                    ResourcePackOptions.parseResourcePacks(ResourcePackOptions.findRawValue(opt.readLines())).toSet()
+                } else emptySet()
+            }.getOrDefault(emptySet())
+        } else null
         files.filter { accepts(kind, it) }
             .map { file ->
                 val disabled = file.name.endsWith(DISABLED_SUFFIX)
@@ -135,13 +147,18 @@ object PojavContentBridge {
                     ContentKind.SCREENSHOTS -> Triple(cleanName, emptyList(), decodeImageFile(file, 160))
                     ContentKind.SAVES -> Triple(cleanName, emptyList(), decodeImageFile(File(file, "icon.png"), 96))
                 }
+                val isEnabled = if (enabledPackIds != null) {
+                    ("file/$cleanName") in enabledPackIds
+                } else {
+                    !disabled
+                }
                 ContentEntry(
                     file = file,
                     name = cleanName,
                     displayTitle = title,
                     loaders = loaders,
                     icon = icon,
-                    enabled = !disabled,
+                    enabled = isEnabled,
                     isDirectory = file.isDirectory,
                     sizeBytes = if (file.isDirectory) runCatching { FileUtils.sizeOfDirectory(file) }.getOrDefault(0L) else file.length(),
                     lastModified = file.lastModified()
@@ -307,6 +324,15 @@ object PojavContentBridge {
         !target.exists() && entry.file.renameTo(target)
     }
 
+    /** Enables or disables a resource pack in the instance's `options.txt` without renaming files. */
+    suspend fun setResourcePackEnabled(entry: ContentEntry, enabled: Boolean): Boolean = withContext(Dispatchers.IO) {
+        if (entry.name == AerixClientPackGenerator.PACK_FILE_NAME) return@withContext false
+        val instanceDir = entry.file.parentFile?.parentFile ?: return@withContext false
+        runCatching {
+            ClientInstanceOptions.setPackEnabledNow(instanceDir, entry.name, enabled)
+        }.isSuccess
+    }
+
     suspend fun delete(entry: ContentEntry): Boolean = withContext(Dispatchers.IO) {
         runCatching {
             if (entry.file.isDirectory) FileUtils.deleteDirectory(entry.file) else FileUtils.forceDelete(entry.file)
@@ -315,7 +341,9 @@ object PojavContentBridge {
 
     /**
      * Copies the picked document into the [kind] folder. A .zip picked for saves is extracted as a
-     * world (one folder per archive); every other file is copied as-is.
+     * world (one folder per archive); a .zip picked for resource packs unwraps any single wrapping
+     * folder so `pack.mcmeta` sits at root and activates the pack in `options.txt`; every other
+     * file is copied as-is.
      */
     suspend fun import(context: Context, kind: ContentKind, uri: Uri): Boolean = withContext(Dispatchers.IO) {
         val dir = directory(kind) ?: return@withContext false
@@ -324,6 +352,23 @@ object PojavContentBridge {
         runCatching {
             if (kind == ContentKind.SAVES && name.lowercase().endsWith(".zip")) {
                 extractWorld(context, uri, dir, name.substring(0, name.length - 4))
+            } else if (kind == ContentKind.RESOURCE_PACKS && name.lowercase().endsWith(".zip")) {
+                val target = uniqueFile(dir, name)
+                val temp = File.createTempFile(".aerix-rp-import-", ".zip", dir)
+                try {
+                    context.contentResolver.openInputStream(uri).use { input ->
+                        if (input == null) throw IOException("Unable to open $uri")
+                        FileOutputStream(temp).use { output -> input.copyTo(output) }
+                    }
+                    ResourcePackArchive.unwrapSingleRootIfNeeded(temp, target)
+                } finally {
+                    temp.delete()
+                }
+                if (target.name != AerixClientPackGenerator.PACK_FILE_NAME) {
+                    dir.parentFile?.let { gameDir ->
+                        runCatching { ClientInstanceOptions.setPackEnabledNow(gameDir, target.name, true) }
+                    }
+                }
             } else {
                 val target = uniqueFile(dir, name)
                 context.contentResolver.openInputStream(uri).use { input ->

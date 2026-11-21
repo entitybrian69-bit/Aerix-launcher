@@ -8,6 +8,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import net.kdt.pojavlaunch.JVersionList
 import net.kdt.pojavlaunch.Tools
+import net.kdt.pojavlaunch.aerix.client.AerixClientPackGenerator
+import net.kdt.pojavlaunch.aerix.client.ClientInstanceOptions
 import net.kdt.pojavlaunch.instances.Instance
 import net.kdt.pojavlaunch.instances.Instances
 import java.io.File
@@ -263,9 +265,19 @@ object PojavGameDownloadsBridge {
         val file = pickFile(files, target.mcVersion)
             ?: return@withContext DownloadOutcome(null, DownloadError.FILE)
 
-        val installed = runCatching { PojavAssetBridge.install(type, file) }.getOrDefault(false)
-        if (installed) DownloadOutcome(file.fileName, null)
-        else DownloadOutcome(null, if (!isOnline(context)) DownloadError.OFFLINE else DownloadError.FILE)
+        val installed = runCatching { PojavAssetBridge.install(type, file, activateInOptions = false) }.getOrDefault(false)
+        if (installed) {
+            if (type == AssetType.RESOURCE_PACK) {
+                val safeName = File(file.fileName).name
+                runCatching {
+                    val instance = Instances.loadSelectedInstance()
+                    if (instance != null && instance.isAerixClient && safeName != AerixClientPackGenerator.PACK_FILE_NAME) {
+                        ClientInstanceOptions.queuePack(instance.gameDirectory, safeName, true)
+                    }
+                }
+            }
+            DownloadOutcome(file.fileName, null)
+        } else DownloadOutcome(null, if (!isOnline(context)) DownloadError.OFFLINE else DownloadError.FILE)
     }
 
     /**

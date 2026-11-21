@@ -12,6 +12,7 @@ import android.graphics.Shader
 import android.graphics.Typeface
 import net.kdt.pojavlaunch.R
 import net.kdt.pojavlaunch.Tools
+import net.kdt.pojavlaunch.aerix.resourcepack.ResourcePackOptions
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
@@ -63,7 +64,10 @@ object AerixClientPackGenerator {
         AerixClientStore.init(context)
         val rpDir = File(instanceGameDir, "resourcepacks").apply { mkdirs() }
         val zipFile = File(rpDir, PACK_FILE_NAME)
-        val stampFile = File(rpDir, ".aerix_pack_stamp")
+        val legacyStampFile = File(rpDir, ".aerix_pack_stamp")
+        if (legacyStampFile.isFile) runCatching { legacyStampFile.delete() }
+        val configDir = File(instanceGameDir, "config").apply { mkdirs() }
+        val stampFile = File(configDir, ".aerix_pack_stamp")
         val jarReady = findVanillaClientJar(mcVersion, instanceGameDir) != null
         val desiredStamp = buildString {
             append(PACK_SCHEMA_REV).append('|')
@@ -229,14 +233,11 @@ object AerixClientPackGenerator {
             }
         }
 
-        if (AerixClientStore.installClientResourcePack) {
-            val currentPacks = map["resourcePacks"].orEmpty()
-            if (!currentPacks.contains(PACK_FILE_NAME)) {
-                val packs = runCatching { org.json.JSONArray(currentPacks) }.getOrElse { org.json.JSONArray().put("vanilla") }
-                packs.put("file/$PACK_FILE_NAME")
-                map["resourcePacks"] = packs.toString()
-            }
-        }
+        map["resourcePacks"] = ResourcePackOptions.mergeClientPack(
+            map["resourcePacks"].orEmpty(),
+            "file/$PACK_FILE_NAME",
+            AerixClientStore.installClientResourcePack
+        )
 
         if (!map.containsKey("panoramaScrollSpeed")) map["panoramaScrollSpeed"] = "0.0"
         if (!map.containsKey("monochromeLogo")) map["monochromeLogo"] = if (AerixClientStore.packCustomMojangSplash) "true" else "false"

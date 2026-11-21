@@ -1204,10 +1204,42 @@ private fun InstanceContentPane(
                                 )
                                 Text(
                                     text = Formatter.formatShortFileSize(context, entry.sizeBytes) + " \u00B7 " +
-                                        DateFormat.getMediumDateFormat(context).format(Date(entry.lastModified)),
+                                        DateFormat.getMediumDateFormat(context).format(Date(entry.lastModified)) +
+                                        if (kind == ContentKind.RESOURCE_PACKS) {
+                                            " \u00B7 " + if (entry.enabled) "Active" else "Inactive"
+                                        } else "",
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = AerixSurface.textSecondary,
-                                    maxLines = 1
+                                    color = if (kind == ContentKind.RESOURCE_PACKS && entry.enabled) accent else AerixSurface.textSecondary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            if (!selection.selecting && kind == ContentKind.RESOURCE_PACKS &&
+                                entry.name != net.kdt.pojavlaunch.aerix.client.AerixClientPackGenerator.PACK_FILE_NAME
+                            ) {
+                                Switch(
+                                    modifier = Modifier.scale(0.75f),
+                                    checked = entry.enabled,
+                                    enabled = !selection.busy && !loading && !optimizing,
+                                    onCheckedChange = { enabled ->
+                                        if (!selection.busy && !loading && !optimizing) scope.launch {
+                                            selection.busy = true
+                                            try {
+                                                val ok = try { PojavContentBridge.setResourcePackEnabled(entry, enabled) }
+                                                catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                                                catch (_: Exception) { false }
+                                                if (!ok) Toast.makeText(context, failedText, Toast.LENGTH_SHORT).show()
+                                                revision++
+                                            } finally { selection.busy = false }
+                                        }
+                                    },
+                                    colors = SwitchDefaults.colors(
+                                        checkedThumbColor = AerixSurface.onAction,
+                                        checkedTrackColor = AerixSurface.action,
+                                        uncheckedThumbColor = AerixSurface.textSecondary,
+                                        uncheckedTrackColor = AerixSurface.panelRaised,
+                                        uncheckedBorderColor = AerixSurface.panelRaised
+                                    )
                                 )
                             }
                             if (!selection.selecting && kind == ContentKind.RESOURCE_PACKS && entry.file.isFile && entry.name.endsWith(".zip", ignoreCase = true)) {
