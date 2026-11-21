@@ -202,6 +202,25 @@ Unit/integration tests (JUnit 5 when Gradle is used; `selftest` CLI otherwise):
 * `level.dat` parsing on generated NBT fixtures.
 * Downloader: resume, hash mismatch retry, concurrent limit (against a local HttpServer).
 
+Several of these are now implemented as checks in `--selftest` rather than left to a future
+Gradle setup, because they are the ones that break silently:
+
+* **Argument files.** `GameLauncher.encodeArgFile` is verified by running a real JVM with the
+  generated file, from a directory whose name contains a space, and asking it to run this jar.
+  Two rules bite here: `java` expands `@file` only in the options position (after the main class
+  it is passed to Minecraft verbatim), and inside quotes a backslash doubles while outside them
+  it is literal. Both were wrong in the first version.
+* **Library resolution.** Fixtures for raw pre-1.6 libraries, classic 1.6–1.18 entries that carry
+  a class artifact *and* a natives classifier, and modern 1.19+ separate natives entries, plus an
+  inheritance chain: native jars must not reach the class path, class jars must not be dropped,
+  and a loader's arguments must not be added twice.
+* **Resume.** A socket server inside the test honours, ignores and shifts `Range`; the download
+  must produce the right bytes and never count more than the file's size.
+* **Layout.** BoxLayout hands children their maximum size and splits a floating maximum width in
+  half, which clipped an eyebrow to "YOUR NEXT WOR". Columns use `VerticalLayout`; the check walks
+  every rendered page and fails on a component narrower than its contents or a page wider than
+  the window.
+
 End-to-end in this sandbox: launcher UI renders (headless paint harness), settings persist,
 instances create/duplicate/delete, `.mrpack` import from a local archive, skin preview renders.
 **Not executable here:** real Minecraft launch (no GPU/display, no Mojang network) and Windows

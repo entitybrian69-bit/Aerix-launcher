@@ -75,10 +75,22 @@ java -jar build/aerix-launcher.jar
 
 ## Self test and screenshots
 
-`--selftest` is the guard rail: ten checks over the settings store, sealed token storage, instance
-CRUD and trash, bundled assets (wallpapers, skins, icons, team logos), version comparison, the
-OptiFine page parser, BTA version normalisation, Java discovery and the data folders, then an
-offscreen render of all thirteen pages. It exits non-zero if anything fails, so CI can gate on it.
+`--selftest` is the guard rail, in fourteen checks. The first ones cover the data layer: settings
+round-trip, sealed token storage (and that no token is ever written in plain text), instance CRUD
+with trash and restore, bundled assets, version comparison, the OptiFine and BTA metadata parsers,
+Java discovery, and the data folders.
+
+The rest cover the parts that only fail at runtime, on a player's machine:
+
+| check | what it protects |
+| --- | --- |
+| launch argument file | writes an `@argfile`, then starts a real JVM from a directory whose name contains a space and runs this very jar through it. `java` only expands argument files in the options position, and its quoting rules are not a shell's; getting either wrong means every launch starts with no memory and no class path. |
+| version metadata | resolves fixtures for the three library shapes that appear from 1.5 to 1.21 (raw `url`+`name`, classic `downloads`+`natives` map, modern `natives-<os>-<arch>` entries), a loader profile with `inheritsFrom`, an OS rule that must be excluded, and the class path that pre-1.13 metadata never declares. |
+| resumed downloads | an embedded socket server honours, ignores and shifts `Range`; every combination must produce the exact bytes and count no more than the file's size. |
+| text clipping | walks all thirteen rendered pages and fails if any component is narrower than its contents, or if a page wants more width than the window. |
+| every page renders | paints all thirteen pages offscreen and writes them to `build/screenshots`. |
+
+It exits non-zero if anything fails, so CI can gate on it.
 
 `--screenshot` uses the same renderer and writes one PNG per page. Both run with
 `-Djava.awt.headless=true`; the pages are laid out and painted without ever creating a window,
