@@ -42,3 +42,14 @@ with zipfile.ZipFile(Path(sys.argv[1])) as apk:
         assert b'TrinkiesWardrobeScreen' not in dex, f'{dex_name} still contains the wardrobe screen'
         assert b'aerix/client/mod/TrinkiesLoadout' not in dex, f'{dex_name} still contains the reader'
 print('APK carries no Trinkies catalog, reader, or wardrobe screen')
+
+with zipfile.ZipFile(Path(sys.argv[1])) as apk:
+    names = apk.namelist()
+    for name in names:
+        lower = name.lower()
+        assert 'mobileglues' not in lower, f'{name}: removed MobileGlues asset or library is packaged'
+    for dex_name in [n for n in names if n.startswith('classes') and n.endswith('.dex')]:
+        dex = apk.read(dex_name)
+        assert b'Lnet/kdt/pojavlaunch/mobileglues/' not in dex, f'{dex_name} still contains MobileGlues classes'
+        assert b'MobileGluesWarning' not in dex, f'{dex_name} still contains MobileGluesWarning'
+print('APK carries no MobileGlues libraries, assets, or classes')
