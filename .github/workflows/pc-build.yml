@@ -106,10 +106,12 @@ jobs:
           cd pc-dist
           sha256sum * > SHA256SUMS-PC.txt
           ls -lh
-          if gh release view pc-nightly >/dev/null 2>&1; then
-            gh release upload pc-nightly * --clobber
+          if gh release view pc-nightly --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload pc-nightly --repo "$GITHUB_REPOSITORY" * --clobber
           else
             gh release create pc-nightly \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
               --prerelease \
               --title "Aerix PC Nightly (${GITHUB_SHA::7})" \
               --notes "Automated Aerix Launcher PC builds for Windows, Linux, and macOS from commit ${GITHUB_SHA}." \
