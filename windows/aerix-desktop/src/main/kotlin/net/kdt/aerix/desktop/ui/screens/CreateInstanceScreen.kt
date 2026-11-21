@@ -358,7 +358,21 @@ class CreateInstanceScreen(private val shell: Shell) : JPanel(BorderLayout()), R
         loaderPane.add(grid)
         loaderPane.add(vspace(10))
 
-        val mc = effectiveMc() ?: "…"
+        val mc = effectiveMc()
+        if (mc == null) {
+            // No version is known yet (offline, or the list is still arriving). Say that instead
+            // of rendering a literal "…" in the middle of a sentence.
+            loaderPane.add(padded(net.kdt.aerix.desktop.ui.components.paragraph(
+                "Choose a Minecraft version once the version list is available — the loader builds " +
+                        "for it are listed here. Loaders can still be picked now.",
+                width = UiScale.px(380), font = Fonts.body(12f), color = AerixColors.textMuted)))
+            loaderPane.revalidate(); loaderPane.repaint()
+            if (installing) {
+                loaderPane.add(vspace(10))
+                loaderPane.add(InstallProgressPanel(progressText, progressFraction))
+            }
+            return
+        }
         if (loader == Loader.VANILLA) {
             loaderPane.add(padded(label("Vanilla has nothing to choose on top of Minecraft $mc — it is the base game itself.", Fonts.body(12f), AerixColors.textSecondary)))
         } else {
@@ -379,11 +393,16 @@ class CreateInstanceScreen(private val shell: Shell) : JPanel(BorderLayout()), R
             if (buildsLoading) {
                 loaderPane.add(padded(label("Contacting the ${Loader.displayName(loader)} metadata server…", Fonts.body(12f), AerixColors.textMuted)))
             } else if (builds.isEmpty()) {
-                loaderPane.add(padded(label(
-                    buildsError?.let { "Could not load builds: $it" }
-                        ?: "No ${Loader.displayName(loader)} builds for Minecraft $mc.",
-                    Fonts.body(12f), AerixColors.warning
-                )))
+                // The raw exception is a URL; say what happened and what to do about it.
+                val name = Loader.displayName(loader)
+                val message = when {
+                    buildsError != null ->
+                        "Could not reach the $name list. Check your connection, then retry."
+                    else -> "No $name builds for Minecraft $mc."
+                }
+                loaderPane.add(padded(net.kdt.aerix.desktop.ui.components.paragraph(
+                    message, width = UiScale.px(360), font = Fonts.body(12f), color = AerixColors.warning)
+                    .apply { horizontalAlignment = javax.swing.SwingConstants.LEFT }))
                 loaderPane.add(padded(linkButton("Try again") { loadBuilds() }))
             } else {
                 buildList.removeAll()
