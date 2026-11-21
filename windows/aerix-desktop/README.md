@@ -75,7 +75,7 @@ java -jar build/aerix-launcher.jar
 
 ## Self test and screenshots
 
-`--selftest` is the guard rail, in fourteen checks. The first ones cover the data layer: settings
+`--selftest` is the guard rail, in fifteen checks. The first ones cover the data layer: settings
 round-trip, sealed token storage (and that no token is ever written in plain text), instance CRUD
 with trash and restore, bundled assets, version comparison, the OptiFine and BTA metadata parsers,
 Java discovery, and the data folders.
@@ -88,6 +88,7 @@ The rest cover the parts that only fail at runtime, on a player's machine:
 | version metadata | resolves fixtures for the three library shapes that appear from 1.5 to 1.21 (raw `url`+`name`, classic `downloads`+`natives` map, modern `natives-<os>-<arch>` entries), a loader profile with `inheritsFrom`, an OS rule that must be excluded, and the class path that pre-1.13 metadata never declares. |
 | resumed downloads | an embedded socket server honours, ignores and shifts `Range`; every combination must produce the exact bytes and count no more than the file's size. |
 | text clipping | walks all thirteen rendered pages and fails if any component is narrower than its contents, or if a page wants more width than the window. |
+| modpack import | imports a fixture `.mrpack` with a dependency block, an override and a deliberate `../../escape` entry. The overrides must land in the instance, the traversal must not, and the reloaded instance must carry the pack's name, version and loader. |
 | every page renders | paints all thirteen pages offscreen and writes them to `build/screenshots`. |
 
 It exits non-zero if anything fails, so CI can gate on it.
