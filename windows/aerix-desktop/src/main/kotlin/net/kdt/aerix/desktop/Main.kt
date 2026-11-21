@@ -88,7 +88,18 @@ fun main(args: Array<String>) {
         System.err.println("This machine has no display. Use --selftest or --screenshot.")
         kotlin.system.exitProcess(3)
     }
-    launchGui()
+    // AWT can fail to initialise for reasons that are not "headless" — a missing native library on
+    // a stripped-down system image, or a graphics driver that cannot be loaded. Without this the
+    // player gets a Java stack trace in a console window that closes immediately.
+    try {
+        launchGui()
+    } catch (t: Throwable) {
+        val cause = generateSequence(t) { it.cause }.last()
+        System.err.println("Aerix Launcher could not start its window: ${cause.javaClass.simpleName}: ${cause.message}")
+        System.err.println("This is usually a missing native library or graphics driver. The self test can tell you more: --selftest")
+        runCatching { Log.e("main", "window startup failed", t) }
+        kotlin.system.exitProcess(4)
+    }
 }
 
 private fun launchGui() {
