@@ -131,20 +131,21 @@ class ReleasesScreen(private val shell: Shell) : JPanel(BorderLayout()), Refresh
             // Distinguish "the catalogue could not be reached" from "this tab is empty", because
             // the fix is different: a retry, versus switching tabs or clearing the filter.
             val message = when {
-                loadError != null -> "Could not reach Mojang: $loadError"
+                // No host name here: the exception text carries a full URL, which is useless to
+                // the player and long enough to run off the card. The reason is in the Logs page.
+                loadError != null -> "Could not reach Mojang. Check your connection, then retry."
                 versions.isEmpty() && !loading -> "No version list yet. Check your connection and retry."
                 filter.isNotBlank() -> "Nothing matches “$filter”."
                 else -> "Nothing to show in this tab."
             }
-            val empty = ClearPanel().apply {
-                layout = BoxLayout(this, BoxLayout.Y_AXIS)
-                alignmentX = 0f
-                add(label(message, Fonts.body(12.5f), AerixColors.textSecondary).apply { alignmentX = 0f })
+            val empty = net.kdt.aerix.desktop.ui.components.VerticalStack(alignment = 0.5f).apply {
+                border = javax.swing.BorderFactory.createEmptyBorder(UiScale.px(28), 0, 0, 0)
+                add(label(message, Fonts.body(12.5f), AerixColors.textSecondary).apply { alignmentX = 0.5f })
                 if (loadError != null || versions.isEmpty()) {
                     add(Box.createVerticalStrut(UiScale.px(8)))
                     add(AerixButton("Try again", ButtonStyle.GHOST, "refresh").apply {
                         compact = true
-                        alignmentX = 0f
+                        alignmentX = 0.5f
                         addActionListener { load() }
                     })
                 }

@@ -75,7 +75,16 @@ class DiscoverScreen(private val shell: Shell) : JPanel(BorderLayout()), Refresh
     }
     private val kindRow = ClearPanel(FlowLayout(FlowLayout.LEFT, UiScale.px(6), 0))
     private val sourceButtons = ClearPanel(FlowLayout(FlowLayout.LEFT, UiScale.px(6), 0))
-    private val grid = ClearPanel(GridLayout(0, 3, UiScale.px(14), UiScale.px(14)))
+    /**
+     * Cards, or a single full-width message.
+     *
+     * A `GridLayout` cannot hold one message and cards at once: with a single child it hands that
+     * child the whole viewport height, which left "Discover is offline" and the loading text
+     * stacked at the bottom of an empty screen. The content is therefore swapped between two
+     * views, and the scroll pane is re-pointed rather than mutated in place.
+     */
+    private var grid = ClearPanel(GridLayout(0, 3, UiScale.px(14), UiScale.px(14)))
+    private val scroll = aerixScroll(grid)
     private val footer = ClearPanel(FlowLayout(FlowLayout.CENTER, UiScale.px(8), UiScale.px(10)))
     private val loadingLabel = label("", Fonts.body(12.5f), AerixColors.textMuted)
     private var versionField: AerixField
@@ -107,7 +116,6 @@ class DiscoverScreen(private val shell: Shell) : JPanel(BorderLayout()), Refresh
         add(buildHeader(), BorderLayout.NORTH)
         val body = ClearPanel(BorderLayout())
         body.border = BorderFactory.createEmptyBorder(0, UiScale.px(Spacing.xl), 0, UiScale.px(Spacing.xl))
-        val scroll = aerixScroll(grid)
         scroll.border = BorderFactory.createEmptyBorder()
         body.add(scroll, BorderLayout.CENTER)
         body.add(footer, BorderLayout.SOUTH)
@@ -179,9 +187,7 @@ class DiscoverScreen(private val shell: Shell) : JPanel(BorderLayout()), Refresh
         if (loading) return
         loading = true
         error = null
-        grid.removeAll()
-        grid.add(label("Loading ${kind.label.lowercase()}…", Fonts.body(12.5f), AerixColors.textMuted))
-        grid.revalidate(); grid.repaint()
+        showMessage(label("Loading ${kind.label.lowercase()}…", Fonts.body(12.5f), AerixColors.textMuted))
         val requestKind = kind
         val requestSource = source
         val requestQuery = query
@@ -192,7 +198,9 @@ class DiscoverScreen(private val shell: Shell) : JPanel(BorderLayout()), Refresh
             val outcome = runCatching {
                 Content.search(requestQuery, requestKind, requestSource, requestVersion, requestLoader, offset = requestOffset)
             }
+
             Scheduler.ui {
+
                 loading = false
                 outcome.onSuccess { list ->
                     results = list
@@ -200,23 +208,28 @@ class DiscoverScreen(private val shell: Shell) : JPanel(BorderLayout()), Refresh
                 }.onFailure { e ->
                     Log.w("discover", "search failed: ${e.message}")
                     error = e.message
-                    grid.removeAll()
-                    grid.add(EmptyState(
-                        "warning",
-                        if (requestSource == Content.Source.CURSEFORGE) "CurseForge needs a key" else "Discover is offline",
-                        e.message ?: "The content service could not be reached."
-                    ))
-                    grid.revalidate(); grid.repaint()
+                    // The exception text carries a URL and a stack-free reason; the player needs
+                    // the reason and a way forward, not the host name.
+                    val reason = e.message?.let { raw ->
+                        when {
+                            raw.contains("401") || raw.contains("403") -> "CurseForge needs an API key. Add one in Settings → Online."
+                            raw.contains("429") -> "Too many requests just now. Wait a minute, then retry."
+                            raw.contains("timeout", true) || raw.contains("reach", true) || raw.contains("handshake", true) ->
+                                "No connection to the content service. Check your network or proxy in Settings."
+                            else -> "The content service answered with an error. Try again in a moment."
+                        }
+                    } ?: "The content service could not be reached."
+                    showMessage(EmptyState("warning", "Discover is offline", reason))
                 }
             }
         }
     }
 
     private fun renderResults() {
-        grid.removeAll()
         if (results.isEmpty()) {
-            grid.add(EmptyState("search", "Nothing found", "Try a different search, or clear the version filter."))
+            showMessage(EmptyState("search", "Nothing found", "Try a different search, or clear the version filter."))
         } else {
+            showCards()
             results.forEach { project ->
                 grid.add(ProjectCard(project, shell, iconCache) { install(project) })
             }
@@ -225,7 +238,21 @@ class DiscoverScreen(private val shell: Shell) : JPanel(BorderLayout()), Refresh
         if (offset > 0) footer.add(pageButton("Previous") { offset = (offset - 30).coerceAtLeast(0); load() })
         if (results.size >= 30) footer.add(pageButton("Next page") { offset += 30; load() })
         footer.revalidate(); footer.repaint()
-        grid.revalidate(); grid.repaint()
+    }
+
+    /** Replaces the scroll view with a single centred message. */
+    private fun showMessage(component: JComponent) {
+        val wrap = ClearPanel(java.awt.GridBagLayout())
+        wrap.add(component, java.awt.GridBagConstraints())
+        scroll.setViewportView(wrap)
+        scroll.revalidate(); scroll.repaint()
+    }
+
+    /** A fresh grid: mutating the old one leaves the previous single-child row height behind. */
+    private fun showCards() {
+        grid = ClearPanel(GridLayout(0, 3, UiScale.px(14), UiScale.px(14)))
+        scroll.setViewportView(grid)
+        scroll.revalidate(); scroll.repaint()
     }
 
     private fun pageButton(text: String, action: () -> Unit) =

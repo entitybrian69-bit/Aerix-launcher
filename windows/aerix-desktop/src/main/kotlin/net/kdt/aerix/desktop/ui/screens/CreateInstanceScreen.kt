@@ -274,8 +274,20 @@ class CreateInstanceScreen(private val shell: Shell) : JPanel(BorderLayout()), R
         if (versionsLoading && versions.isEmpty()) {
             versionList.add(padded(label("Loading the version list…", Fonts.body(12.5f), AerixColors.textMuted)))
         } else if (versionsError != null) {
-            versionList.add(padded(label("Could not load versions: ${versionsError}", Fonts.body(12.5f), AerixColors.warning)))
-            versionList.add(padded(linkButton("Try again") { loadVersions() }))
+            // The message goes through paragraph() so a long host name wraps instead of running
+            // off the card, and the raw URL is left out: the player needs to know they are
+            // offline, not which CDN failed.
+            // VerticalStack: rows at their own height, no BoxLayout stretching.
+            val box = net.kdt.aerix.desktop.ui.components.VerticalStack()
+            box.add(label("The version list could not be loaded.", Fonts.bodyStrong(13f), AerixColors.textPrimary))
+            box.add(vspace(4))
+            box.add(net.kdt.aerix.desktop.ui.components.paragraph(
+                "No connection to Mojang. Check your network or proxy in Settings — installing and playing " +
+                        "still works for versions that are already downloaded.",
+                width = UiScale.px(430), font = Fonts.body(12.5f), color = AerixColors.textMuted))
+            box.add(vspace(8))
+            box.add(linkButton("Try again") { loadVersions() })
+            versionList.add(padded(box))
         } else {
             val typeFilter = when (tab) {
                 0 -> "release"

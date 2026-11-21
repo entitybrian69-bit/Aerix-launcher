@@ -913,9 +913,6 @@ class AerixProgress(var value: Float = 0f) : JComponent() {
 /** The empty-state block used by lists that have nothing to show yet. */
 class EmptyState(icon: String, title: String, message: String) : ClearPanel() {
     init {
-        // A stack rather than a BoxLayout: the message is longer than its preferred width allows
-        // for, and BoxLayout centred it in a cell it then drew from x=0, running off the card.
-        layout = VerticalLayout(gap = 0, alignment = 0.5f)
         val art = object : JComponent() {
             init { preferredSize = Dimension(UiScale.px(76), UiScale.px(76)); alignmentX = CENTER_ALIGNMENT }
             // BoxLayout would otherwise stretch the badge into a card-sized ellipse
@@ -929,11 +926,17 @@ class EmptyState(icon: String, title: String, message: String) : ClearPanel() {
                 g2.dispose()
             }
         }
-        add(art)
-        add(vspace(Spacing.md))
-        add(label(title, Fonts.title(17f)).apply { alignmentX = CENTER_ALIGNMENT })
-        add(vspace(Spacing.xs))
-        add(paragraph(message, UiScale.px(420), Fonts.body(12.5f), AerixColors.textMuted).apply { alignmentX = CENTER_ALIGNMENT })
+        // VerticalStack top-aligns by design (good for columns, wrong for a full-page empty state),
+        // so centre the block in whatever cell it lands in.
+        layout = java.awt.GridBagLayout()
+        val inner = VerticalStack(alignment = 0.5f).apply {
+            add(art)
+            add(vspace(Spacing.md))
+            add(label(title, Fonts.title(17f)).apply { alignmentX = CENTER_ALIGNMENT })
+            add(vspace(Spacing.xs))
+            add(paragraph(message, UiScale.px(420), Fonts.body(12.5f), AerixColors.textMuted).apply { alignmentX = CENTER_ALIGNMENT })
+        }
+        add(inner, java.awt.GridBagConstraints())
         alignmentX = CENTER_ALIGNMENT
     }
 }

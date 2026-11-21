@@ -28,6 +28,17 @@ object Http {
         .build()
 
     private const val UA = "AerixLauncher-Windows/1.0 (+https://github.com/luciferstudios/Aerix-launcherPc)"
+
+    /**
+     * How long a *stalled* transfer may hold a worker.
+     *
+     * The read timeout is deliberately small: it governs silence, not total duration. A client on
+     * a network that black-holes a host (the common case on school and hotel networks) would
+     * otherwise sit in "Loading…" for the full request timeout — thirty minutes for a game file —
+     * before the UI could say anything. The response headers must arrive within [connectTimeout];
+     * after that, every read must make progress.
+     */
+    private val connectTimeout: Duration = Duration.ofSeconds(20)
     private val cache = ConcurrentHashMap<String, CacheEntry>()
     private class CacheEntry(val body: String, val expires: Long)
 
@@ -133,7 +144,10 @@ object Http {
         onProgress: (Long) -> Unit = {},
         sink: (java.io.InputStream, Long) -> Unit
     ): StreamResult {
-        val builder = defaultHeaders(HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofMinutes(30)))
+        // Headers must arrive promptly even for a huge file; body reads are then governed by the
+        // progress timeout below rather than by a single overall deadline.
+        val builder = defaultHeaders(HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofMinutes(2)))
+            .expectContinue(false)
         headers.forEach { (k, v) -> builder.header(k, v) }
         if (rangeStart > 0) builder.header("Range", "bytes=$rangeStart-")
         val response = client.send(builder.GET().build(), HttpResponse.BodyHandlers.ofInputStream())

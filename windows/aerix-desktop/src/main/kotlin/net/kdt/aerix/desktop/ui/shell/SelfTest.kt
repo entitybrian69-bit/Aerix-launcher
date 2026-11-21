@@ -470,7 +470,7 @@ object SelfTest {
                 host.setSize(width, height)
                 host.doLayout()
                 layoutRecursively(host)
-                settle(host)
+                settleUntilReady(host)
                 fun walk(c: java.awt.Component, path: String) {
                     val pref = c.preferredSize
                     // 2 px of slack: preferred sizes are computed to the pixel and borders differ.
@@ -508,7 +508,7 @@ object SelfTest {
                 host.setSize(width, height)
                 host.doLayout()
                 layoutRecursively(host)
-                settle(host)
+                settleUntilReady(host)
                 val image = BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB)
                 val g = image.createGraphics()
                 Paint.quality(g)
@@ -569,6 +569,47 @@ object SelfTest {
             Thread.sleep(60)
             layoutRecursively(host)
         }
+    }
+
+    /**
+     * True while any visible label still reads like a placeholder ("Loading…", "…").
+     *
+     * A screenshot taken mid-request shows a spinner that the player would never see for long, and
+     * makes design review disagree with the product. Pages that fetch on creation are given a
+     * bounded time to reach a resting state; when the network is unreachable that state is the
+     * error or empty message, which is exactly what should be photographed.
+     */
+    fun isPending(host: java.awt.Container): Boolean {
+        var pending = false
+        fun walk(c: java.awt.Component) {
+            if (pending || !c.isVisible) return
+            val text = (c as? javax.swing.JLabel)?.text ?: ""
+            // Compare by code point rather than `endsWith("…")`: on this JDK, endsWith with a
+            // non-ASCII literal returns false for a string that equals the same literal, and the
+            // harness then photographs a mid-request spinner. Comparing the character directly is
+            // both clearer and immune to that.
+            val last = text.lastOrNull()?.code
+            if (last == 0x2026 || text == "…" || text.contains("Loading the version list") ||
+                text.contains("Loading", true) && text.length < 40
+            ) {
+                pending = true
+                return
+            }
+            if (c is java.awt.Container) c.components.forEach { walk(it) }
+        }
+        walk(host)
+        return pending
+    }
+
+    /** Settles until no placeholder is visible, or [maxMillis] elapses. */
+    fun settleUntilReady(host: java.awt.Container, maxMillis: Long = 12_000) {
+        val deadline = System.currentTimeMillis() + maxMillis
+        while (System.currentTimeMillis() < deadline) {
+            layoutRecursively(host)
+            if (!isPending(host)) { settle(host, 300); return }
+            Thread.sleep(120)
+        }
+        settle(host, 200)
     }
 
     /**
@@ -638,7 +679,7 @@ object ScreenshotHarness {
             host.setSize(width, height)
             host.doLayout()
             SelfTest.layoutRecursively(host)
-            SelfTest.settle(host)
+            SelfTest.settleUntilReady(host)
             val image = BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB)
             val g = image.createGraphics() as Graphics2D
             Paint.quality(g)
