@@ -103,8 +103,8 @@ jobs:
           # Create stable unversioned filenames alongside versioned ones so website links never go stale
           test -f "Aerix-PC-$VERSION-win-x64.exe" && cp "Aerix-PC-$VERSION-win-x64.exe" "Aerix-PC-Setup.exe"
           test -f "Aerix-PC-$VERSION-win-x64.zip" && cp "Aerix-PC-$VERSION-win-x64.zip" "Aerix-PC-win-x64.zip"
-          test -f "Aerix-PC-$VERSION-linux-x64.AppImage" && cp "Aerix-PC-$VERSION-linux-x64.AppImage" "Aerix-PC-linux-x86_64.AppImage"
-          test -f "Aerix-PC-$VERSION-linux-x64.deb" && cp "Aerix-PC-$VERSION-linux-x64.deb" "Aerix-PC-linux-amd64.deb"
+          test -f "Aerix-PC-$VERSION-linux-x86_64.AppImage" && cp "Aerix-PC-$VERSION-linux-x86_64.AppImage" "Aerix-PC-linux-x86_64.AppImage"
+          test -f "Aerix-PC-$VERSION-linux-amd64.deb" && cp "Aerix-PC-$VERSION-linux-amd64.deb" "Aerix-PC-linux-amd64.deb"
           test -f "Aerix-PC-$VERSION-linux-x64.tar.gz" && cp "Aerix-PC-$VERSION-linux-x64.tar.gz" "Aerix-PC-linux-x64.tar.gz"
           test -f "Aerix-PC-$VERSION-mac-arm64.dmg" && cp "Aerix-PC-$VERSION-mac-arm64.dmg" "Aerix-PC-mac-arm64.dmg"
           test -f "Aerix-PC-$VERSION-mac-x64.dmg" && cp "Aerix-PC-$VERSION-mac-x64.dmg" "Aerix-PC-mac-x64.dmg"
