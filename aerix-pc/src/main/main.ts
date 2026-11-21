@@ -194,6 +194,10 @@ function registerIpcHandlers(): void {
   });
   ipcMain.handle('aerix:windowClose', () => mainWindow?.close());
   ipcMain.handle('aerix:openExternal', (_e, url: string) => shell.openExternal(url));
+  ipcMain.handle('aerix:openDataDir', () => {
+    fs.mkdirSync(paths.root, { recursive: true });
+    return shell.openPath(paths.root);
+  });
 
   // Accounts
   ipcMain.handle('aerix:listAccounts', () => store.listAccounts());

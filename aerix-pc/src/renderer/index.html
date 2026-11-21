@@ -7,158 +7,407 @@
   <title>Aerix Launcher PC</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
-<body data-theme="aurora-teal">
+<body data-theme="aurora-teal" data-motion="on">
+  <!-- Full-bleed Wallpaper + Live Animated Canvas Layer -->
   <div id="wallpaper-backdrop" class="wallpaper-backdrop"></div>
-  <div class="wallpaper-scrim"></div>
+  <canvas id="wallpaper-canvas" class="wallpaper-canvas hidden"></canvas>
+  <div id="wallpaper-scrim" class="wallpaper-scrim"></div>
 
   <div class="app-shell">
-    <!-- Custom Titlebar -->
+    <!-- Minimal Floating Window Strip (only drag strip drags; all buttons are no-drag) -->
     <header class="titlebar">
-      <div class="titlebar-brand">
-        <img id="titlebar-logo" class="titlebar-logo" alt="Aerix" />
-        <span class="brand-name">AERIX LAUNCHER</span>
-        <span class="brand-tag">PC</span>
-        <span id="app-version-pill" class="version-pill">v2.4.5</span>
+      <div class="titlebar-drag">
+        <div class="titlebar-brand">
+          <span class="brand-dot"></span>
+          <span class="brand-name">AERIX LAUNCHER</span>
+          <span class="brand-tag">PC</span>
+          <span id="app-version-pill" class="version-pill">v2.4.5</span>
+        </div>
+        <div class="titlebar-status" id="global-status-pill">Ready</div>
       </div>
-      <div class="titlebar-status" id="global-status-pill">Ready</div>
       <div class="titlebar-controls">
-        <button class="win-btn" id="win-min" title="Minimize">&#8211;</button>
-        <button class="win-btn" id="win-max" title="Maximize">&#9633;</button>
-        <button class="win-btn win-close" id="win-close" title="Close">&#10005;</button>
+        <button type="button" class="win-btn" id="win-min" title="Minimize" aria-label="Minimize">
+          <svg width="12" height="12" viewBox="0 0 12 12"><rect x="2" y="5.5" width="8" height="1.4" rx="0.7" fill="currentColor"/></svg>
+        </button>
+        <button type="button" class="win-btn" id="win-max" title="Maximize" aria-label="Maximize">
+          <svg width="12" height="12" viewBox="0 0 12 12"><rect x="2.2" y="2.2" width="7.6" height="7.6" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>
+        </button>
+        <button type="button" class="win-btn win-close" id="win-close" title="Close" aria-label="Close">
+          <svg width="12" height="12" viewBox="0 0 12 12"><path d="M2.5 2.5L9.5 9.5M9.5 2.5L2.5 9.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+        </button>
       </div>
     </header>
 
     <div class="workspace">
-      <!-- Navigation Rail -->
-      <aside class="nav-rail">
-        <nav class="nav-items">
-          <button class="nav-btn active" data-view="home">
-            <span class="nav-icon">&#9654;</span>
+      <!-- Left Floating Capsule Navigation Rail (matching mobile AerixNavigationRail) -->
+      <aside class="capsule-rail liquid-glass" aria-label="Primary Navigation">
+        <button type="button" class="rail-brand-btn" id="rail-brand-home" title="Aerix Home">
+          <div class="rail-logo-box">
+            <img id="titlebar-logo" class="rail-logo-img" alt="Aerix" />
+          </div>
+          <span class="rail-brand-word">AERIX</span>
+        </button>
+
+        <nav class="rail-items">
+          <button type="button" class="rail-btn active" data-view="home" title="Home">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
             <span>Home</span>
           </button>
-          <button class="nav-btn" data-view="instances">
-            <span class="nav-icon">&#9638;</span>
-            <span>Instances</span>
+
+          <button type="button" class="rail-btn" data-view="client" title="Aerix Client PC">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 19 8.5 16 21 8 21 5 8.5 12 2"/><polyline points="12 2 12 21"/><polyline points="5 8.5 19 8.5"/></svg>
+            <span>Client</span>
           </button>
-          <button class="nav-btn" data-view="discover">
-            <span class="nav-icon">&#10022;</span>
+
+          <button type="button" class="rail-btn" id="rail-create-btn" title="Create Instance">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <span>Create</span>
+          </button>
+
+          <button type="button" class="rail-btn" data-view="instances" title="Library">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+            <span>Library</span>
+          </button>
+
+          <button type="button" class="rail-btn" data-view="discover" title="Discover Mods & Packs">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5L13.5 13.5L8.5 15.5L10.5 10.5Z"/></svg>
             <span>Discover</span>
           </button>
-          <button class="nav-btn" data-view="accounts">
-            <span class="nav-icon">&#9786;</span>
+
+          <button type="button" class="rail-btn" data-view="accounts" title="Accounts">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
             <span>Accounts</span>
           </button>
-          <button class="nav-btn" data-view="console">
-            <span class="nav-icon">&#9002;</span>
-            <span>Console</span>
+
+          <button type="button" class="rail-btn" data-view="console" title="Console">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+            <span>Logs</span>
           </button>
-          <button class="nav-btn" data-view="settings">
-            <span class="nav-icon">&#9881;</span>
+
+          <button type="button" class="rail-btn" data-view="settings" title="Settings">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
             <span>Settings</span>
           </button>
         </nav>
-
-        <div class="rail-footer">
-          <button class="account-chip" id="rail-account-chip" title="Switch Account">
-            <div class="account-avatar" id="rail-account-avatar">?</div>
-            <div class="account-chip-meta">
-              <div class="account-chip-name" id="rail-account-name">No Account</div>
-              <div class="account-chip-type" id="rail-account-type">Click to sign in</div>
-            </div>
-          </button>
-        </div>
       </aside>
 
       <!-- Main View Host -->
       <main class="view-host">
-        <!-- HOME VIEW -->
+        <!-- Live Launch Progress Strip (global, visible when launching) -->
+        <div class="progress-panel liquid-glass hidden" id="launch-progress-panel">
+          <div class="progress-top">
+            <span id="launch-progress-text">Preparing...</span>
+            <span id="launch-progress-pct">0%</span>
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill" id="launch-progress-fill" style="width: 0%"></div>
+          </div>
+        </div>
+
+        <!-- HOME VIEW (Matching Mobile Classic Dashboard + Clean Character Stage) -->
         <section class="view active" id="view-home">
-          <div class="hero-card glass-panel">
-            <div class="hero-info">
-              <div class="eyebrow" id="home-instance-badge">NO INSTANCE SELECTED</div>
-              <h1 class="hero-title" id="home-instance-title">Welcome to Aerix Launcher PC</h1>
-              <p class="hero-subtitle" id="home-instance-subtitle">
-                Create a Vanilla, Fabric, Forge, NeoForge, Quilt, or 1-click Aerix Client PC instance to begin.
-              </p>
-              <div class="hero-chips" id="home-instance-chips"></div>
+          <!-- UI Style Toggle Strip (mirrors AerixUiStyleSwitch) -->
+          <div class="ui-style-bar">
+            <div class="ui-style-pills liquid-glass" role="tablist" aria-label="Home Layout Style">
+              <button type="button" class="style-pill active" id="style-pill-premium" data-ui-style="premium">Premium Dashboard</button>
+              <button type="button" class="style-pill" id="style-pill-clean" data-ui-style="clean">Clean Stage</button>
             </div>
-            <div class="hero-actions">
-              <button class="btn-play" id="home-play-btn">CREATE INSTANCE</button>
-              <button class="btn-secondary" id="home-quick-aerix-btn">&#9889; Quick Aerix Client PC</button>
-            </div>
-          </div>
-
-          <div class="progress-panel glass-panel hidden" id="launch-progress-panel">
-            <div class="progress-top">
-              <span id="launch-progress-text">Preparing...</span>
-              <span id="launch-progress-pct">0%</span>
-            </div>
-            <div class="progress-track">
-              <div class="progress-fill" id="launch-progress-fill" style="width: 0%"></div>
+            <div class="ui-style-right">
+              <button type="button" class="chip-action-btn" id="home-quick-aerix-btn">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L4 14h7l-1 8 10-12h-7l1-8z"/></svg>
+                <span>Quick Aerix Client</span>
+              </button>
             </div>
           </div>
 
-          <div class="home-grid">
-            <div class="glass-panel section-card">
-              <div class="section-head">
-                <h2>Recent Instances</h2>
-                <button class="btn-ghost" id="home-view-all-instances">View All</button>
+          <!-- PREMIUM DASHBOARD MODE (7.4fr Dashboard + 2.6fr Docked 3D Character Card) -->
+          <div id="home-premium-layout" class="home-premium-layout">
+            <div class="home-main-col">
+              <!-- Top Row: Active World Card + Tasks/Quick Tools -->
+              <div class="home-top-row">
+                <div class="liquid-glass active-world-card">
+                  <div class="section-label-block">
+                    <span class="section-kicker" id="home-instance-badge">ACTIVE WORLD</span>
+                    <span class="section-sub">Your selected Minecraft profile</span>
+                  </div>
+                  <div class="active-world-body">
+                    <div class="world-icon-well" id="home-world-icon">
+                      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="3"/><line x1="7" y1="12" x2="11" y2="12"/><line x1="9" y1="10" x2="9" y2="14"/><circle cx="15.5" cy="11" r="1"/><circle cx="17.5" cy="13" r="1"/></svg>
+                    </div>
+                    <div class="world-info">
+                      <h1 class="world-title" id="home-instance-title">Welcome to Aerix Launcher PC</h1>
+                      <p class="world-subtitle" id="home-instance-subtitle">Create a Vanilla, Fabric, Forge, NeoForge, Quilt, or 1-click Aerix Client PC instance.</p>
+                      <div class="hero-chips" id="home-instance-chips"></div>
+                    </div>
+                  </div>
+                  <div class="active-world-actions">
+                    <button type="button" class="btn-play-pill" id="home-play-btn">
+                      <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"/></svg>
+                      <span id="home-play-label">CREATE INSTANCE</span>
+                    </button>
+                    <button type="button" class="btn-circle-icon" id="home-edit-inst-btn" title="Manage Instance">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Right Sub-Column: Task Summary + Quick Tools -->
+                <div class="home-side-subcol">
+                  <div class="liquid-glass task-summary-card">
+                    <div class="task-icon-well">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg>
+                    </div>
+                    <div class="task-meta">
+                      <div class="task-title">Ready Check</div>
+                      <div class="task-sub" id="home-ready-sub">Idle • Ready to launch</div>
+                    </div>
+                  </div>
+
+                  <div class="liquid-glass quick-tools-card">
+                    <span class="section-kicker">QUICK TOOLS</span>
+                    <div class="quick-tools-list">
+                      <button type="button" class="tool-action-row" id="qt-discover">
+                        <span class="tool-dot" style="--tool:#1BD96A"></span>
+                        <span>Download Mods &amp; Packs</span>
+                        <span class="tool-chevron">&#8250;</span>
+                      </button>
+                      <button type="button" class="tool-action-row" id="qt-content">
+                        <span class="tool-dot" style="--tool:#73E5B0"></span>
+                        <span>Manage Instance Content</span>
+                        <span class="tool-chevron">&#8250;</span>
+                      </button>
+                      <button type="button" class="tool-action-row" id="qt-folder">
+                        <span class="tool-dot" style="--tool:#91E9FF"></span>
+                        <span>Open Data Folder</span>
+                        <span class="tool-chevron">&#8250;</span>
+                      </button>
+                      <button type="button" class="tool-action-row" id="qt-logs">
+                        <span class="tool-dot" style="--tool:#FFC777"></span>
+                        <span>Live JVM Console</span>
+                        <span class="tool-chevron">&#8250;</span>
+                      </button>
+                      <button type="button" class="tool-action-row" id="qt-settings">
+                        <span class="tool-dot" style="--tool:#B7A9FF"></span>
+                        <span>Themes &amp; Java Settings</span>
+                        <span class="tool-chevron">&#8250;</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div id="home-instances-list" class="mini-instance-grid"></div>
+
+              <!-- 4 Tinted Quick Action Tiles (matching mobile QuickTiles) -->
+              <div class="quick-tiles-row">
+                <button type="button" class="quick-tile liquid-glass" id="tile-client" style="--tile-tint: var(--accent)">
+                  <div class="tile-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 19 8.5 16 21 8 21 5 8.5 12 2"/></svg>
+                  </div>
+                  <div class="tile-text">
+                    <strong>Aerix Client</strong>
+                    <span>Fabric + Sodium stack</span>
+                  </div>
+                </button>
+
+                <button type="button" class="quick-tile liquid-glass" id="tile-discover" style="--tile-tint: #91E9FF">
+                  <div class="tile-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                  </div>
+                  <div class="tile-text">
+                    <strong>Explore</strong>
+                    <span>Modrinth &amp; CurseForge</span>
+                  </div>
+                </button>
+
+                <button type="button" class="quick-tile liquid-glass" id="tile-library" style="--tile-tint: #B7A9FF">
+                  <div class="tile-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+                  </div>
+                  <div class="tile-text">
+                    <strong>Library</strong>
+                    <span id="tile-library-sub">0 instances</span>
+                  </div>
+                </button>
+
+                <button type="button" class="quick-tile liquid-glass" id="tile-accounts" style="--tile-tint: #F3A9D9">
+                  <div class="tile-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                  </div>
+                  <div class="tile-text">
+                    <strong>Accounts</strong>
+                    <span id="tile-accounts-sub">Sign in or switch</span>
+                  </div>
+                </button>
+              </div>
+
+              <!-- Recent Worlds + System Ready Strip -->
+              <div class="home-bottom-row">
+                <div class="liquid-glass recent-worlds-card">
+                  <div class="section-head">
+                    <div class="section-label-block">
+                      <span class="section-kicker">RECENT WORLDS</span>
+                      <span class="section-sub">Switch or launch your instances</span>
+                    </div>
+                    <button type="button" class="btn-text-accent" id="home-view-all-instances">VIEW ALL</button>
+                  </div>
+                  <div id="home-instances-list" class="recent-worlds-list"></div>
+                </div>
+
+                <div class="liquid-glass stats-card">
+                  <div class="section-head">
+                    <div class="section-label-block">
+                      <span class="section-kicker">SYSTEM</span>
+                      <span class="section-sub">Desktop hardware &amp; status</span>
+                    </div>
+                    <button type="button" class="btn-text-accent" id="home-open-settings">CONFIGURE</button>
+                  </div>
+                  <div id="home-stats-list" class="stats-stack"></div>
+                </div>
+              </div>
             </div>
 
-            <div class="glass-panel section-card">
-              <div class="section-head">
-                <h2>System &amp; Ready Check</h2>
-                <button class="btn-ghost" id="home-open-settings">Configure</button>
+            <!-- Right Docked 3D Character Card (ActionMenuCard port) -->
+            <aside class="liquid-glass action-menu-card">
+              <div class="skin-stage-wrap" id="premium-skin-stage" title="Drag to rotate character">
+                <div class="skin-pedestal-glow"></div>
+                <div class="skin-3d-viewport" id="premium-skin-3d"></div>
+                <button type="button" class="skin-account-pill" id="premium-account-pill">+ Add Account</button>
               </div>
-              <div id="home-stats-list" class="stats-stack"></div>
+
+              <div class="action-menu-footer">
+                <div class="picker-anchor">
+                  <button type="button" class="instance-selector-pill" id="premium-inst-picker-btn">
+                    <span class="picker-name" id="premium-picker-name">No Instance</span>
+                    <span class="picker-ver" id="premium-picker-ver">Select Instance</span>
+                  </button>
+                  <div class="glass-dropdown hidden" id="premium-inst-dropdown"></div>
+                </div>
+
+                <button type="button" class="btn-play-pill full-width" id="premium-play-btn">
+                  <span id="premium-play-label">PLAY</span>
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"/></svg>
+                </button>
+              </div>
+            </aside>
+          </div>
+
+          <!-- CLEAN CHARACTER STAGE MODE (HomeCharacterStage port) -->
+          <div id="home-clean-layout" class="home-clean-layout hidden">
+            <div class="clean-header">
+              <div>
+                <div class="clean-eyebrow">CHARACTER</div>
+                <div class="clean-username" id="clean-username">Aerix</div>
+              </div>
+              <button type="button" class="clean-rotate-pill" id="clean-account-btn">DRAG TO ROTATE</button>
+            </div>
+
+            <div class="clean-stage-center" id="clean-skin-stage">
+              <div class="skin-pedestal-glow large"></div>
+              <div class="skin-3d-viewport large" id="clean-skin-3d"></div>
+            </div>
+
+            <div class="clean-bottom-dock">
+              <div class="picker-anchor">
+                <button type="button" class="instance-selector-pill horizontal" id="clean-inst-picker-btn">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="3"/><line x1="7" y1="12" x2="11" y2="12"/><line x1="9" y1="10" x2="9" y2="14"/></svg>
+                  <span id="clean-picker-name">Select instance</span>
+                  <span class="picker-ver inline" id="clean-picker-ver">Choose a Minecraft instance</span>
+                </button>
+                <div class="glass-dropdown up hidden" id="clean-inst-dropdown"></div>
+              </div>
+
+              <button type="button" class="btn-play-pill full-width" id="clean-play-btn">
+                <span id="clean-play-label">PLAY</span>
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"/></svg>
+              </button>
             </div>
           </div>
         </section>
 
-        <!-- INSTANCES VIEW -->
+        <!-- AERIX CLIENT HUB VIEW (matching mobile ClientHubScreen) -->
+        <section class="view" id="view-client">
+          <div class="view-toolbar">
+            <div>
+              <h1>Aerix Client PC</h1>
+              <p class="muted">1-click Fabric performance &amp; visual stack with Sodium, Lithium, FerriteCore, Wavey Capes &amp; Aerix-Client-Pack.zip.</p>
+            </div>
+          </div>
+
+          <div class="client-hub-grid">
+            <div class="liquid-glass client-hero-card">
+              <div class="client-badge-row">
+                <span class="badge badge-aerix">LIQUID CRYSTAL CLEAR</span>
+                <span class="badge">FABRIC + 12 OPTIMIZED MODS</span>
+              </div>
+              <h2>Launch Aerix Client PC</h2>
+              <p class="muted">Select a Minecraft version below to create or launch an optimized Aerix Client PC instance automatically configured with Sodium, Lithium, ImmediatelyFast, EntityCulling, ModernFix, ModMenu, and the dynamic Aerix Resource Pack.</p>
+
+              <label class="field-label">Select Minecraft Version</label>
+              <div id="client-version-pills" class="version-pill-grid"></div>
+
+              <div class="client-cta-row">
+                <button type="button" class="btn-play-pill" id="btn-install-aerix-client">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L4 14h7l-1 8 10-12h-7l1-8z"/></svg>
+                  <span id="client-cta-label">Create &amp; Launch Aerix Client (1.21.4)</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="liquid-glass section-card">
+              <h2>Bundled Optimization Stack</h2>
+              <div class="client-mods-list">
+                <div class="mod-chip-row"><strong>Sodium</strong><span class="muted">Next-gen rendering engine</span></div>
+                <div class="mod-chip-row"><strong>Lithium</strong><span class="muted">Game physics &amp; tick speed</span></div>
+                <div class="mod-chip-row"><strong>ImmediatelyFast</strong><span class="muted">HUD &amp; entity batching</span></div>
+                <div class="mod-chip-row"><strong>FerriteCore &amp; ModernFix</strong><span class="muted">Memory &amp; startup optimizer</span></div>
+                <div class="mod-chip-row"><strong>EntityCulling &amp; Krypton</strong><span class="muted">Network &amp; occlusion culling</span></div>
+                <div class="mod-chip-row"><strong>ModMenu, AppleSkin, Zoom &amp; Capes</strong><span class="muted">Clean QoL essentials</span></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- INSTANCES / LIBRARY VIEW -->
         <section class="view" id="view-instances">
           <div class="view-toolbar">
             <div>
-              <h1>Instances</h1>
+              <h1>Instance Library</h1>
               <p class="muted">Manage profiles, loaders, mods, resource packs, shaders, and worlds.</p>
             </div>
             <div class="toolbar-actions">
               <input id="instance-search-input" class="input" type="search" placeholder="Filter instances..." />
-              <button class="btn-secondary" id="btn-new-aerix-client">&#9889; Aerix Client</button>
-              <button class="btn-primary" id="btn-new-instance">+ New Instance</button>
+              <button type="button" class="btn-secondary" id="btn-new-aerix-client">&#9889; Aerix Client</button>
+              <button type="button" class="btn-primary" id="btn-new-instance">+ New Instance</button>
             </div>
           </div>
 
           <div class="instances-layout">
             <div id="instances-grid" class="instances-grid"></div>
 
-            <div id="instance-inspector" class="glass-panel inspector-panel hidden">
+            <div id="instance-inspector" class="liquid-glass inspector-panel hidden">
               <div class="inspector-head">
                 <div>
                   <div class="eyebrow" id="inspector-loader-badge">FABRIC</div>
                   <h2 id="inspector-title">Instance</h2>
                 </div>
                 <div class="inspector-head-actions">
-                  <button class="btn-primary btn-sm" id="inspector-play-btn">Play</button>
-                  <button class="btn-secondary btn-sm" id="inspector-folder-btn">Open Folder</button>
-                  <button class="btn-ghost btn-sm" id="inspector-close-btn">&#10005;</button>
+                  <button type="button" class="btn-primary btn-sm" id="inspector-play-btn">Play</button>
+                  <button type="button" class="btn-secondary btn-sm" id="inspector-folder-btn">Open Folder</button>
+                  <button type="button" class="btn-ghost btn-sm" id="inspector-close-btn">&#10005;</button>
                 </div>
               </div>
 
               <div class="tab-bar" id="inspector-tabs">
-                <button class="tab-btn active" data-tab="mods">Mods</button>
-                <button class="tab-btn" data-tab="resourcepacks">Resource Packs</button>
-                <button class="tab-btn" data-tab="shaderpacks">Shaders</button>
-                <button class="tab-btn" data-tab="saves">Worlds</button>
-                <button class="tab-btn" data-tab="screenshots">Screenshots</button>
-                <button class="tab-btn" data-tab="config">Settings</button>
+                <button type="button" class="tab-btn active" data-tab="mods">Mods</button>
+                <button type="button" class="tab-btn" data-tab="resourcepacks">Resource Packs</button>
+                <button type="button" class="tab-btn" data-tab="shaderpacks">Shaders</button>
+                <button type="button" class="tab-btn" data-tab="saves">Worlds</button>
+                <button type="button" class="tab-btn" data-tab="screenshots">Screenshots</button>
+                <button type="button" class="tab-btn" data-tab="config">Settings</button>
               </div>
 
               <div id="inspector-content-toolbar" class="content-toolbar">
-                <button class="btn-primary btn-sm" id="inspector-import-btn">+ Import File</button>
-                <button class="btn-secondary btn-sm" id="inspector-discover-btn">&#10022; Browse Online</button>
+                <button type="button" class="btn-primary btn-sm" id="inspector-import-btn">+ Import File</button>
+                <button type="button" class="btn-secondary btn-sm" id="inspector-discover-btn">Browse Online</button>
               </div>
 
               <div id="inspector-body" class="inspector-body"></div>
@@ -179,16 +428,16 @@
             </div>
           </div>
 
-          <div class="discover-filters glass-panel">
+          <div class="discover-filters liquid-glass">
             <div class="segmented" id="discover-platform-seg">
-              <button class="seg-btn active" data-platform="modrinth">Modrinth</button>
-              <button class="seg-btn" data-platform="curseforge">CurseForge</button>
+              <button type="button" class="seg-btn active" data-platform="modrinth">Modrinth</button>
+              <button type="button" class="seg-btn" data-platform="curseforge">CurseForge</button>
             </div>
             <div class="segmented" id="discover-type-seg">
-              <button class="seg-btn active" data-type="mod">Mods</button>
-              <button class="seg-btn" data-type="modpack">Modpacks</button>
-              <button class="seg-btn" data-type="resourcepack">Resource Packs</button>
-              <button class="seg-btn" data-type="shader">Shaders</button>
+              <button type="button" class="seg-btn active" data-type="mod">Mods</button>
+              <button type="button" class="seg-btn" data-type="modpack">Modpacks</button>
+              <button type="button" class="seg-btn" data-type="resourcepack">Resource Packs</button>
+              <button type="button" class="seg-btn" data-type="shader">Shaders</button>
             </div>
             <input id="discover-query-input" class="input grow" type="search" placeholder="Search Sodium, Iris, Complementary, Cobblemon..." />
             <select id="discover-version-select" class="select">
@@ -201,7 +450,7 @@
               <option value="forge">Forge</option>
               <option value="quilt">Quilt</option>
             </select>
-            <button class="btn-primary" id="discover-search-btn">Search</button>
+            <button type="button" class="btn-primary" id="discover-search-btn">Search</button>
           </div>
 
           <div id="discover-results" class="discover-grid"></div>
@@ -217,30 +466,30 @@
           </div>
 
           <div class="accounts-layout">
-            <div class="glass-panel section-card">
+            <div class="liquid-glass section-card">
               <h2>Saved Accounts</h2>
               <div id="accounts-list" class="accounts-list"></div>
             </div>
 
-            <div class="glass-panel section-card">
+            <div class="liquid-glass section-card">
               <h2>Add Account</h2>
               <div class="auth-methods">
                 <div class="auth-card">
                   <h3>Microsoft Account</h3>
                   <p class="muted">Official Xbox Live &amp; Minecraft Services login for licensed Java Edition accounts.</p>
-                  <button class="btn-primary" id="btn-login-microsoft">Sign in with Microsoft</button>
+                  <button type="button" class="btn-primary" id="btn-login-microsoft">Sign in with Microsoft</button>
                 </div>
 
                 <div class="auth-card">
                   <h3>Aerix Account</h3>
                   <p class="muted">Use your Aerix Social account with automatic <code>authlib-injector</code> session &amp; skins.</p>
                   <div class="auth-row">
-                    <button class="btn-secondary" id="btn-login-aerix-google">Continue with Google</button>
+                    <button type="button" class="btn-secondary" id="btn-login-aerix-google">Continue with Google</button>
                   </div>
                   <div class="divider-label">or email &amp; password</div>
                   <input id="aerix-email-input" class="input" type="email" placeholder="Email address" />
                   <input id="aerix-pass-input" class="input" type="password" placeholder="Password" />
-                  <button class="btn-secondary" id="btn-login-aerix-email">Sign in with Email</button>
+                  <button type="button" class="btn-secondary" id="btn-login-aerix-email">Sign in with Email</button>
                 </div>
 
                 <div class="auth-card">
@@ -248,7 +497,7 @@
                   <p class="muted">Local LAN &amp; singleplayer profile with standard Mojang offline UUID.</p>
                   <div class="auth-row">
                     <input id="offline-username-input" class="input grow" type="text" maxlength="16" placeholder="Username (3-16 chars)" />
-                    <button class="btn-secondary" id="btn-add-offline">Add</button>
+                    <button type="button" class="btn-secondary" id="btn-add-offline">Add</button>
                   </div>
                 </div>
               </div>
@@ -265,11 +514,11 @@
             </div>
             <div class="toolbar-actions">
               <input id="console-filter-input" class="input" type="search" placeholder="Filter logs..." />
-              <button class="btn-secondary" id="console-copy-btn">Copy Log</button>
-              <button class="btn-secondary" id="console-clear-btn">Clear</button>
+              <button type="button" class="btn-secondary" id="console-copy-btn">Copy Log</button>
+              <button type="button" class="btn-secondary" id="console-clear-btn">Clear</button>
             </div>
           </div>
-          <div id="console-output" class="console-output glass-panel"></div>
+          <div id="console-output" class="console-output liquid-glass"></div>
         </section>
 
         <!-- SETTINGS VIEW -->
@@ -277,32 +526,55 @@
           <div class="view-toolbar">
             <div>
               <h1>Settings</h1>
-              <p class="muted">Customize themes, shader wallpapers, Java runtimes, memory, and updates.</p>
+              <p class="muted">Customize Liquid Glass, animated &amp; shader wallpapers, motion, Java runtimes, and memory.</p>
             </div>
-            <button class="btn-secondary" id="btn-check-updates">Check for Updates</button>
+            <button type="button" class="btn-secondary" id="btn-check-updates">Check for Updates</button>
           </div>
 
           <div class="settings-grid">
-            <div class="glass-panel section-card">
-              <h2>Theme &amp; Wallpapers</h2>
+            <div class="liquid-glass section-card">
+              <h2>Appearance &amp; Wallpapers</h2>
               <label class="field-label">Accent Preset</label>
               <div class="theme-swatches" id="theme-swatches">
-                <button class="swatch-btn" data-theme="aurora-teal" style="--sw:#8DEFE0">Aurora Teal</button>
-                <button class="swatch-btn" data-theme="aerix-crimson" style="--sw:#e11d48">Aerix Crimson</button>
-                <button class="swatch-btn" data-theme="ender-amethyst" style="--sw:#A855F7">Ender Amethyst</button>
-                <button class="swatch-btn" data-theme="sunset-amber" style="--sw:#F59E0B">Sunset Amber</button>
-                <button class="swatch-btn" data-theme="ocean-azure" style="--sw:#38BDF8">Ocean Azure</button>
-                <button class="swatch-btn" data-theme="sakura-pink" style="--sw:#F472B6">Sakura Pink</button>
+                <button type="button" class="swatch-btn" data-theme="aurora-teal" style="--sw:#8DEFE0">Aurora Teal</button>
+                <button type="button" class="swatch-btn" data-theme="aerix-crimson" style="--sw:#e11d48">Aerix Crimson</button>
+                <button type="button" class="swatch-btn" data-theme="ender-amethyst" style="--sw:#A855F7">Ender Amethyst</button>
+                <button type="button" class="swatch-btn" data-theme="sunset-amber" style="--sw:#F59E0B">Sunset Amber</button>
+                <button type="button" class="swatch-btn" data-theme="ocean-azure" style="--sw:#38BDF8">Ocean Azure</button>
+                <button type="button" class="swatch-btn" data-theme="sakura-pink" style="--sw:#F472B6">Sakura Pink</button>
               </div>
 
-              <label class="field-label">Shader Wallpaper</label>
-              <div id="wallpaper-grid" class="wallpaper-grid"></div>
+              <div class="row-2">
+                <div>
+                  <label class="field-label">Custom Accent Color</label>
+                  <div class="auth-row">
+                    <input id="setting-custom-color" type="color" value="#8DEFE0" class="color-picker" />
+                    <span class="muted" id="setting-custom-color-hex">#8DEFE0</span>
+                  </div>
+                </div>
+                <div>
+                  <label class="field-label">Theme Motion</label>
+                  <label class="checkbox-row compact">
+                    <input id="setting-theme-motion" type="checkbox" checked />
+                    <span>Breathing glow &amp; smooth spring UI</span>
+                  </label>
+                </div>
+              </div>
 
-              <label class="field-label">Wallpaper Brightness: <span id="wallpaper-opacity-val">34%</span></label>
-              <input id="setting-wallpaper-opacity" type="range" min="0" max="70" value="34" />
+              <label class="field-label">Wallpaper Brightness: <span id="wallpaper-opacity-val">44%</span></label>
+              <input id="setting-wallpaper-opacity" type="range" min="10" max="85" value="44" />
+
+              <label class="field-label">Wallpaper Blur: <span id="wallpaper-blur-val">2px</span></label>
+              <input id="setting-wallpaper-blur" type="range" min="0" max="16" value="2" />
+
+              <label class="field-label">Glass Opacity: <span id="layout-transparency-val">100%</span></label>
+              <input id="setting-layout-transparency" type="range" min="30" max="100" value="100" />
+
+              <label class="field-label">Wallpapers (8 Live Animated Scenes + 26 Shader Photos)</label>
+              <div id="wallpaper-grid" class="wallpaper-grid"></div>
             </div>
 
-            <div class="glass-panel section-card">
+            <div class="liquid-glass section-card">
               <h2>Java Runtimes &amp; Memory</h2>
               <label class="field-label">Default Memory Allocation: <span id="setting-ram-val">4096 MB</span></label>
               <input id="setting-ram-slider" type="range" min="1024" max="16384" step="256" value="4096" />
@@ -336,19 +608,19 @@
               <div class="java-section">
                 <div class="section-head">
                   <h3>Installed Java Runtimes</h3>
-                  <button class="btn-ghost btn-sm" id="btn-refresh-java">Scan</button>
+                  <button type="button" class="btn-ghost btn-sm" id="btn-refresh-java">Scan</button>
                 </div>
                 <div class="java-install-bar">
-                  <button class="btn-secondary btn-sm" data-install-java="8">Install Java 8</button>
-                  <button class="btn-secondary btn-sm" data-install-java="17">Install Java 17</button>
-                  <button class="btn-secondary btn-sm" data-install-java="21">Install Java 21</button>
-                  <button class="btn-secondary btn-sm" data-install-java="25">Install Java 25</button>
+                  <button type="button" class="btn-secondary btn-sm" data-install-java="8">Install Java 8</button>
+                  <button type="button" class="btn-secondary btn-sm" data-install-java="17">Install Java 17</button>
+                  <button type="button" class="btn-secondary btn-sm" data-install-java="21">Install Java 21</button>
+                  <button type="button" class="btn-secondary btn-sm" data-install-java="25">Install Java 25</button>
                 </div>
                 <div id="java-runtimes-list" class="java-list"></div>
               </div>
             </div>
 
-            <div class="glass-panel section-card span-2">
+            <div class="liquid-glass section-card span-2">
               <h2>Integrations &amp; Storage</h2>
               <div class="row-2">
                 <div>
@@ -361,21 +633,62 @@
                 </div>
               </div>
               <div class="save-bar">
-                <button class="btn-primary" id="btn-save-settings">Save Settings</button>
+                <button type="button" class="btn-primary" id="btn-save-settings">Save Settings</button>
               </div>
             </div>
           </div>
         </section>
       </main>
+
+      <!-- Right Floating Capsule Utility Rail (matching mobile AerixHomeUtilityRail) -->
+      <aside class="capsule-rail utility-rail liquid-glass" aria-label="Utility Rail">
+        <button type="button" class="rail-btn" id="util-settings" title="Settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <span>Settings</span>
+        </button>
+
+        <button type="button" class="rail-avatar-btn" id="rail-account-chip" title="Account Profile">
+          <div class="account-avatar-ring" id="rail-account-avatar">?</div>
+          <span class="rail-avatar-name" id="rail-account-name">Account</span>
+          <span class="rail-avatar-sub hidden" id="rail-account-type">offline</span>
+        </button>
+
+        <div class="rail-divider"></div>
+
+        <button type="button" class="rail-btn" id="util-client" title="Aerix Client PC">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 19 8.5 16 21 8 21 5 8.5 12 2"/></svg>
+          <span>Client</span>
+        </button>
+
+        <button type="button" class="rail-btn" id="util-instances" title="Instances">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="3"/><line x1="7" y1="12" x2="11" y2="12"/><line x1="9" y1="10" x2="9" y2="14"/></svg>
+          <span>Worlds</span>
+        </button>
+
+        <button type="button" class="rail-btn" id="util-discover" title="Discover">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5L13.5 13.5L8.5 15.5L10.5 10.5Z"/></svg>
+          <span>Mods</span>
+        </button>
+
+        <button type="button" class="rail-btn" id="util-folder" title="Open Data Folder">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+          <span>Files</span>
+        </button>
+
+        <button type="button" class="rail-btn" id="util-logs" title="Console Logs">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          <span>Logs</span>
+        </button>
+      </aside>
     </div>
   </div>
 
   <!-- NEW INSTANCE MODAL -->
   <div id="modal-new-instance" class="modal-backdrop hidden">
-    <div class="modal glass-panel">
+    <div class="modal liquid-glass">
       <div class="modal-head">
         <h2>Create New Instance</h2>
-        <button class="btn-ghost btn-sm" data-close-modal="modal-new-instance">&#10005;</button>
+        <button type="button" class="btn-ghost btn-sm" data-close-modal="modal-new-instance">&#10005;</button>
       </div>
       <div class="modal-body">
         <label class="field-label">Instance Name</label>
@@ -409,18 +722,18 @@
         </select>
       </div>
       <div class="modal-foot">
-        <button class="btn-ghost" data-close-modal="modal-new-instance">Cancel</button>
-        <button class="btn-primary" id="btn-confirm-create-instance">Create Instance</button>
+        <button type="button" class="btn-ghost" data-close-modal="modal-new-instance">Cancel</button>
+        <button type="button" class="btn-primary" id="btn-confirm-create-instance">Create Instance</button>
       </div>
     </div>
   </div>
 
   <!-- DISCOVER INSTALL MODAL -->
   <div id="modal-discover-install" class="modal-backdrop hidden">
-    <div class="modal glass-panel">
+    <div class="modal liquid-glass">
       <div class="modal-head">
         <h2 id="discover-modal-title">Install Project</h2>
-        <button class="btn-ghost btn-sm" data-close-modal="modal-discover-install">&#10005;</button>
+        <button type="button" class="btn-ghost btn-sm" data-close-modal="modal-discover-install">&#10005;</button>
       </div>
       <div class="modal-body">
         <p id="discover-modal-desc" class="muted"></p>

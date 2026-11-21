@@ -11,18 +11,43 @@ import {
 } from './types';
 
 export const WALLPAPER_PRESETS: WallpaperPreset[] = [
-  { id: 'aerix_twilight', title: 'Aerix Twilight', biome: 'Cozy Voxel Village at Dusk', assetFile: 'aerix_twilight.jpg', accentHex: '#8DEFE0' },
-  { id: 'wp_01_lush_caves', title: 'Lush Glowberry Cave', biome: 'Lush Caves • Complementary', assetFile: 'wp_01_lush_caves.webp', accentHex: '#8DEFE0' },
+  // Animated live scenes (matching mobile AerixAnimations.kt)
+  { id: 'anim_01_lush_cavern', title: 'Lush Cavern Glow', biome: 'Live Canvas • Fireflies & Cavern Light', assetFile: '', accentHex: '#2DD4BF', animatedScene: true },
+  { id: 'anim_02_cherry_grove', title: 'Cherry Grove Drift', biome: 'Live Canvas • Falling Petals', assetFile: '', accentHex: '#F472B6', animatedScene: true },
+  { id: 'anim_13_glacier', title: 'Glacier Aurora', biome: 'Live Canvas • Northern Lights & Snow', assetFile: '', accentHex: '#22D3EE', animatedScene: true },
+  { id: 'anim_05_nether_lava', title: 'Nether Emberfall', biome: 'Live Canvas • Rising Embers', assetFile: '', accentHex: '#F97316', animatedScene: true },
+  { id: 'anim_25_deep_dark', title: 'Sculk Abyss', biome: 'Live Canvas • Sculk Pulse & Motes', assetFile: '', accentHex: '#06B6D4', animatedScene: true },
+  { id: 'anim_08_moonlit_lake', title: 'Moonlit Lake', biome: 'Live Canvas • Starlight & Ripples', assetFile: '', accentHex: '#818CF8', animatedScene: true },
+  { id: 'anim_03_sunset_river', title: 'Golden Sunset', biome: 'Live Canvas • Sunset & Warm Motes', assetFile: '', accentHex: '#F59E0B', animatedScene: true },
+  { id: 'anim_06_the_end', title: 'The End Void', biome: 'Live Canvas • End Void & Portal Glow', assetFile: '', accentHex: '#A855F7', animatedScene: true },
+
+  // All 26 photographic shader wallpapers from mobile AerixThemeManager
+  { id: 'wp_01_lush_caves', title: 'Lush Glowberry Cave', biome: 'Lush Caves • Complementary Shaders', assetFile: 'wp_01_lush_caves.webp', accentHex: '#8DEFE0' },
   { id: 'wp_02_cherry_blossom', title: 'Cherry Blossom Grove', biome: 'Cherry Grove • BSL Shaders', assetFile: 'wp_02_cherry_blossom.webp', accentHex: '#F472B6' },
   { id: 'wp_03_sunset_river', title: 'Golden Sunset River', biome: 'River Valley • SEUS Renewed', assetFile: 'wp_03_sunset_river.webp', accentHex: '#F59E0B' },
+  { id: 'wp_04_crystal_river', title: 'Crystal River Forest', biome: 'Birch & Oak River • Complementary', assetFile: 'wp_04_crystal_river.webp', accentHex: '#06B6D4' },
   { id: 'wp_05_nether_fortress', title: 'Nether Lava Cavern', biome: 'Nether Wastes • RTX Shaders', assetFile: 'wp_05_nether_fortress.webp', accentHex: '#F97316' },
   { id: 'wp_06_the_end', title: 'The End Obsidian Pillars', biome: 'The End • Sildur Vibrant', assetFile: 'wp_06_the_end.webp', accentHex: '#A855F7' },
   { id: 'wp_07_ocean_arch', title: 'Sunlight Ocean Arch', biome: 'Warm Ocean • Complementary', assetFile: 'wp_07_ocean_arch.webp', accentHex: '#38BDF8' },
   { id: 'wp_08_moonlit_lake', title: 'Moonlit Birch Lake', biome: 'Night Forest • Nostalgia', assetFile: 'wp_08_moonlit_lake.webp', accentHex: '#818CF8' },
+  { id: 'wp_09_flower_meadow', title: 'Sunrise Flower Meadow', biome: 'Flower Forest • BSL Shaders', assetFile: 'wp_09_flower_meadow.webp', accentHex: '#EC4899' },
+  { id: 'wp_10_spruce_mist', title: 'Spruce Lake Morning Mist', biome: 'Old Growth Taiga • Bliss', assetFile: 'wp_10_spruce_mist.webp', accentHex: '#84CC16' },
+  { id: 'wp_11_cherry_bee', title: 'Honeybee Cherry Canopy', biome: 'Cherry Canopy • Complementary', assetFile: 'wp_11_cherry_bee.webp', accentHex: '#FBBF24' },
   { id: 'wp_12_snowy_valley', title: 'Snowy Peaks Valley', biome: 'Jagged Peaks • Distant Horizons', assetFile: 'wp_12_snowy_valley.webp', accentHex: '#60A5FA' },
+  { id: 'wp_13_frozen_glacier', title: 'Frozen Glacier Ridge', biome: 'Frozen Peaks • Complementary', assetFile: 'wp_13_frozen_glacier.webp', accentHex: '#22D3EE' },
+  { id: 'wp_14_cozy_village', title: 'Cozy Plains Village', biome: 'Plains Village • SEUS PTGI', assetFile: 'wp_14_cozy_village.webp', accentHex: '#10B981' },
   { id: 'wp_15_end_portal', title: 'End Portal Starfield', biome: 'Stronghold • Void Shaders', assetFile: 'wp_15_end_portal.webp', accentHex: '#14B8A6' },
+  { id: 'wp_16_ocean_monument', title: 'Deep Ocean Monument', biome: 'Deep Ocean • Prismarine', assetFile: 'wp_16_ocean_monument.webp', accentHex: '#3B82F6' },
+  { id: 'wp_17_night_clouds', title: 'Starry Night River', biome: 'Plains Night • Solas Shaders', assetFile: 'wp_17_night_clouds.webp', accentHex: '#8B5CF6' },
+  { id: 'wp_18_crater_harbor', title: 'Cherry Crater Village', biome: 'Cherry Basin • Vanilla+', assetFile: 'wp_18_crater_harbor.webp', accentHex: '#FB7185' },
+  { id: 'wp_19_sinkhole_falls', title: 'Lush Sinkhole Waterfall', biome: 'Dripstone & Lush • Iris', assetFile: 'wp_19_sinkhole_falls.webp', accentHex: '#2DD4BF' },
+  { id: 'wp_20_sakura_sunbeams', title: 'Sakura Sunbeams', biome: 'Cherry Glade • Complementary', assetFile: 'wp_20_sakura_sunbeams.webp', accentHex: '#E879F9' },
   { id: 'wp_21_crimson_forest', title: 'Crimson Forest Embers', biome: 'Nether Crimson Forest', assetFile: 'wp_21_crimson_forest.webp', accentHex: '#E11D48' },
+  { id: 'wp_22_amethyst_geode', title: 'Amethyst Geode Lake', biome: 'Amethyst Geode • Crystal', assetFile: 'wp_22_amethyst_geode.webp', accentHex: '#A855F7' },
+  { id: 'wp_23_bamboo_dawn', title: 'Bamboo Sunrise', biome: 'Bamboo Jungle • Sunrise', assetFile: 'wp_23_bamboo_dawn.webp', accentHex: '#84CC16' },
+  { id: 'wp_24_badlands_canyon', title: 'Badlands Canyon River', biome: 'Badlands Mesa • Canyon', assetFile: 'wp_24_badlands_canyon.webp', accentHex: '#F97316' },
   { id: 'wp_25_deep_dark', title: 'Deep Dark Sculk City', biome: 'Deep Dark • Sculk Shaders', assetFile: 'wp_25_deep_dark.webp', accentHex: '#06B6D4' },
+  { id: 'aerix_twilight', title: 'Aerix Twilight', biome: 'Cozy Voxel Village at Dusk', assetFile: 'aerix_twilight.jpg', accentHex: '#8DEFE0' },
 ];
 
 export function getRecommendedRamMb(): number {
@@ -44,8 +69,13 @@ export function createDefaultSettings(): LauncherSettings {
     closeOnLaunch: 'minimize',
     showSnapshots: false,
     themePreset: 'aurora-teal',
+    customAccentHex: '#8DEFE0',
+    uiStyle: 'premium',
+    themeMotion: true,
+    layoutTransparency: 100,
+    wallpaperBlur: 2,
     wallpaperId: 'wp_01_lush_caves',
-    wallpaperOpacity: 0.34,
+    wallpaperOpacity: 0.44,
     curseforgeApiKey: '',
   };
 }

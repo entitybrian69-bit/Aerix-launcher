@@ -31,6 +31,7 @@ export interface AerixBridgeApi {
   windowMaximizeToggle(): Promise<void>;
   windowClose(): Promise<void>;
   openExternal(url: string): Promise<void>;
+  openDataDir(): Promise<string>;
 
   // Accounts
   listAccounts(): Promise<Account[]>;
@@ -108,6 +109,7 @@ const api: AerixBridgeApi = {
   windowMaximizeToggle: () => ipcRenderer.invoke('aerix:windowMaximizeToggle'),
   windowClose: () => ipcRenderer.invoke('aerix:windowClose'),
   openExternal: (url) => ipcRenderer.invoke('aerix:openExternal', url),
+  openDataDir: () => ipcRenderer.invoke('aerix:openDataDir'),
 
   listAccounts: () => ipcRenderer.invoke('aerix:listAccounts'),
   addOfflineAccount: (username) => ipcRenderer.invoke('aerix:addOfflineAccount', username),

@@ -43,7 +43,10 @@ export type ThemePresetId =
   | 'ender-amethyst'
   | 'sunset-amber'
   | 'ocean-azure'
-  | 'sakura-pink';
+  | 'sakura-pink'
+  | 'custom';
+
+export type LauncherUiStyle = 'premium' | 'clean';
 
 export interface WallpaperPreset {
   id: string;
@@ -51,6 +54,7 @@ export interface WallpaperPreset {
   biome: string;
   assetFile: string;
   accentHex: string;
+  animatedScene?: boolean;
 }
 
 export interface LauncherSettings {
@@ -64,6 +68,11 @@ export interface LauncherSettings {
   closeOnLaunch: 'keep' | 'minimize' | 'hide';
   showSnapshots: boolean;
   themePreset: ThemePresetId;
+  customAccentHex?: string;
+  uiStyle?: LauncherUiStyle;
+  themeMotion?: boolean;
+  layoutTransparency?: number;
+  wallpaperBlur?: number;
   wallpaperId: string;
   wallpaperOpacity: number;
   curseforgeApiKey: string;
