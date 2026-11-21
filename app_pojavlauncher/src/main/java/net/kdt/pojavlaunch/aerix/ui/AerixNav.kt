@@ -47,6 +47,7 @@ object AerixNav {
         LauncherSection.CREATE_INSTANCE,
         LauncherSection.INSTANCE_EDITOR,
         LauncherSection.QUICK_TOOLS,
+        LauncherSection.JAR_EXECUTION,
         LauncherSection.INSTANCE_SELECTOR,
         LauncherSection.ADD_ACCOUNT,
         LauncherSection.OFFLINE_ACCOUNT,

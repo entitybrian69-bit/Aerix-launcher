@@ -108,6 +108,7 @@ enum class LauncherSection {
     INSTANCE_EDITOR,
     /** Home utility destinations; Back returns to the dashboard. */
     QUICK_TOOLS,
+    JAR_EXECUTION,
     INSTANCE_SELECTOR,
     ADD_ACCOUNT,
     OFFLINE_ACCOUNT,
@@ -311,6 +312,12 @@ fun AerixHomeUtilityRail(
                 activeAccent, expandedRail, compactRail
             ) { onQuickTools() }
             RailIconItem(
+                R.drawable.aerix_ic_java,
+                "Jar Execution",
+                selectedSection == LauncherSection.JAR_EXECUTION,
+                activeAccent, expandedRail, compactRail
+            ) { onNavigate(LauncherSection.JAR_EXECUTION) }
+            RailIconItem(
                 R.drawable.aerix_ic_videogame_asset_outlined,
                 "Instances",
                 selectedSection == LauncherSection.INSTANCE_SELECTOR,
@@ -341,7 +348,7 @@ fun AerixHomeUtilityRail(
             RailIconItem(
                 R.drawable.aerix_ic_description_outlined,
                 "Logs",
-                settingsSelected(selectedSection), activeAccent, expandedRail, compactRail
+                selectedSection == LauncherSection.LOGS, activeAccent, expandedRail, compactRail
             ) { onNavigate(LauncherSection.LOGS) }
         }
     }
@@ -359,7 +366,7 @@ private fun discoverSelected(section: LauncherSection): Boolean =
  * pairing is now simply "Settings is selected whenever Settings is open".
  */
 private fun settingsSelected(section: LauncherSection): Boolean =
-    section == LauncherSection.SETTINGS || section == LauncherSection.ABOUT || section == LauncherSection.LOGS
+    section == LauncherSection.SETTINGS || section == LauncherSection.ABOUT
 
 @Composable
 private fun RailIconItem(

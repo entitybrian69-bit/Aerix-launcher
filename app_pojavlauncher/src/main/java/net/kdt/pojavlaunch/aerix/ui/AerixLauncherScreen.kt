@@ -94,6 +94,7 @@ import net.kdt.pojavlaunch.aerix.ui.screens.FileManagerScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.HomeScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.InstanceEditorScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.InstanceSelectorScreen
+import net.kdt.pojavlaunch.aerix.ui.screens.JarExecutionScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.QuickToolsScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.LibraryScreen
 import net.kdt.pojavlaunch.aerix.bridge.AerixInstallQueue
@@ -198,6 +199,7 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
                             LauncherSection.OTHER_RELEASES -> net.kdt.pojavlaunch.aerix.ui.screens.OtherReleasesScreen(activity, navigate)
                             LauncherSection.HOME -> HomeScreen(activity, navigate)
                             LauncherSection.QUICK_TOOLS -> QuickToolsScreen(activity, navigate)
+                            LauncherSection.JAR_EXECUTION -> JarExecutionScreen(activity, navigate)
                             LauncherSection.INSTANCE_SELECTOR -> InstanceSelectorScreen(activity, navigate)
                             LauncherSection.AERIX_CLIENT -> ClientHubScreen(activity, clientOwnerPage) { clientOwnerPage = it }
                             LauncherSection.LIBRARY -> LibraryScreen(activity)

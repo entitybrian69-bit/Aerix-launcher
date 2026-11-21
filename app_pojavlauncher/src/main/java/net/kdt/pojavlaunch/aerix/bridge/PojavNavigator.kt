@@ -32,6 +32,7 @@ import androidx.fragment.app.FragmentActivity
 import net.kdt.pojavlaunch.CustomControlsActivity
 import net.kdt.pojavlaunch.R
 import net.kdt.pojavlaunch.Tools
+import net.kdt.pojavlaunch.awt.AWTActivity
 import net.kdt.pojavlaunch.fragments.BTAInstallFragment
 import net.kdt.pojavlaunch.fragments.FabricInstallFragment
 import net.kdt.pojavlaunch.fragments.ForgeInstallFragment
@@ -45,6 +46,11 @@ import net.kdt.pojavlaunch.fragments.QuiltInstallFragment
 import net.kdt.pojavlaunch.fragments.SearchModFragment
 import net.kdt.pojavlaunch.LauncherActivity
 import net.kdt.pojavlaunch.progresskeeper.ProgressKeeper
+import net.kdt.pojavlaunch.utils.jre.classfile.ClassVersionReader
+import org.apache.commons.io.IOUtils
+import java.io.File
+import java.io.FileOutputStream
+import java.util.jar.JarFile
 
 /** Installer / content entries listed on the Aerix Discover page, each owned by a Pojav fragment. */
 enum class PojavInstaller(val fragment: Class<out Fragment>, val tag: String) {
@@ -98,6 +104,15 @@ object PojavNavigator {
 
     fun openDiscord(activity: FragmentActivity) = openUrl(activity, DISCORD_INVITE)
 
+    /** Metadata inspected from a user-selected .jar before launching AWTActivity. */
+    data class JarInspection(
+        val uri: Uri,
+        val fileName: String,
+        val sizeBytes: Long,
+        val mainClass: String?,
+        val minJavaVersion: Int
+    )
+
     /** Guard used before the .jar picker, same as MainMenuFragment.runInstallerWithConfirmation. */
     fun canRunJar(context: Context): Boolean {
         if (ProgressKeeper.getTaskCount() == 0) return true
@@ -107,5 +122,78 @@ object PojavNavigator {
 
     fun runJar(context: Context, uri: Uri) {
         Tools.launchModInstaller(context, uri)
+    }
+
+    fun runJar(
+        context: Context,
+        uri: Uri,
+        javaArgs: List<String> = emptyList(),
+        trusted: Boolean = false,
+        openLogOutput: Boolean = false,
+        runtimeName: String? = null
+    ) {
+        if (!canRunJar(context)) return
+        val intent = Intent(context, AWTActivity::class.java).apply {
+            putExtra("modUri", uri)
+            if (javaArgs.isNotEmpty()) putStringArrayListExtra("javaArgs", ArrayList(javaArgs))
+            putExtra("trusted", trusted)
+            putExtra("openLogOutput", openLogOutput)
+            if (!runtimeName.isNullOrBlank()) putExtra("runtimeName", runtimeName)
+        }
+        context.startActivity(intent)
+    }
+
+    fun inspectJar(context: Context, uri: Uri): JarInspection? {
+        val fileName = Tools.getFileName(context, uri) ?: uri.lastPathSegment ?: "archive.jar"
+        val tempFile = File(context.cacheDir, "aerix-jar-inspect.jar")
+        return try {
+            context.contentResolver.openInputStream(uri)?.use { input ->
+                FileOutputStream(tempFile).use { output ->
+                    IOUtils.copy(input, output)
+                }
+            } ?: return null
+            val sizeBytes = tempFile.length()
+            var mainClass: String? = null
+            var minJava = -1
+            JarFile(tempFile).use { jar ->
+                mainClass = jar.manifest?.mainAttributes?.getValue("Main-Class")?.trim()?.takeIf { it.isNotEmpty() }
+                val entryName = mainClass?.replace('.', '/')?.plus(".class")
+                val entry = if (entryName != null) jar.getEntry(entryName) else null
+                if (entry != null) {
+                    jar.getInputStream(entry).use { classStream ->
+                        val major = ClassVersionReader.readClassMajorVersion(classStream)
+                        minJava = ClassVersionReader.classMajorToVMMajor(major)
+                    }
+                }
+            }
+            JarInspection(uri, fileName, sizeBytes, mainClass, minJava)
+        } catch (_: Throwable) {
+            null
+        } finally {
+            runCatching { tempFile.delete() }
+        }
+    }
+
+    fun parseJvmArgs(raw: String): List<String> {
+        val out = ArrayList<String>()
+        val current = StringBuilder()
+        var quote: Char? = null
+        for (ch in raw.trim()) {
+            when {
+                quote != null -> {
+                    if (ch == quote) quote = null else current.append(ch)
+                }
+                ch == '"' || ch == '\'' -> quote = ch
+                ch.isWhitespace() -> {
+                    if (current.isNotEmpty()) {
+                        out.add(current.toString())
+                        current.clear()
+                    }
+                }
+                else -> current.append(ch)
+            }
+        }
+        if (current.isNotEmpty()) out.add(current.toString())
+        return out
     }
 }

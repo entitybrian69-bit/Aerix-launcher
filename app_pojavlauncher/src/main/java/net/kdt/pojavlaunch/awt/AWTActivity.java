@@ -66,6 +66,7 @@ public class AWTActivity extends BaseActivity implements View.OnTouchListener {
 
     private boolean mIsVirtualMouseEnabled;
     private boolean mIsTrusted;
+    private String mPreferredRuntimeName;
 
     @SuppressLint("ClickableViewAccessibility")
     @Override
@@ -174,6 +175,7 @@ public class AWTActivity extends BaseActivity implements View.OnTouchListener {
                 return;
             }
             mIsTrusted = extras.getBoolean("trusted", false);
+            mPreferredRuntimeName = extras.getString("runtimeName");
             final List<String> javaArgs = extras.getStringArrayList("javaArgs");
             final Uri resourceUri = extras.getParcelable("modUri");
             final String jarPath = extras.getString("modPath");
@@ -253,6 +255,10 @@ public class AWTActivity extends BaseActivity implements View.OnTouchListener {
     }
 
     private void runModInstaller(File modFile, List<String> javaArgs) {
+        if (modFile == null || !modFile.exists()) {
+            finalErrorDialog(getString(R.string.execute_jar_failed_to_read_file));
+            return;
+        }
         JarFileProperties jarFileProperties = null;
         try {
             jarFileProperties = JarFileProperties.read(modFile);
@@ -263,7 +269,23 @@ public class AWTActivity extends BaseActivity implements View.OnTouchListener {
             finalErrorDialog(getString(R.string.execute_jar_failed_to_read_file));
             return;
         }
-        Runtime selectedRuntime = selectRuntime(jarFileProperties.minJavaVersion);
+        Runtime selectedRuntime = null;
+        if (mPreferredRuntimeName != null && !mPreferredRuntimeName.isEmpty() && !"Auto".equalsIgnoreCase(mPreferredRuntimeName)) {
+            Runtime preferred = MultiRTUtils.forceReread(mPreferredRuntimeName);
+            if (preferred != null && preferred.versionString != null && preferred.javaVersion > 0) {
+                if (jarFileProperties.minJavaVersion != -1 && preferred.javaVersion < jarFileProperties.minJavaVersion) {
+                    finalErrorDialog(getString(R.string.multirt_nocompatiblert, jarFileProperties.minJavaVersion));
+                    return;
+                }
+                selectedRuntime = preferred;
+            }
+        }
+        if (selectedRuntime == null) {
+            selectedRuntime = selectRuntime(jarFileProperties.minJavaVersion);
+        }
+        if (selectedRuntime == null) {
+            return;
+        }
         launchJavaRuntime(selectedRuntime, javaArgs,  modFile, jarFileProperties.mainClass);
     }
 
