@@ -46,7 +46,14 @@ jobs:
         run: |
           curl -fsSL -o kotlin.zip https://github.com/JetBrains/kotlin/releases/download/v2.1.0/kotlin-compiler-2.1.0.zip
           unzip -q kotlin.zip -d "$RUNNER_TOOL_CACHE/kotlin"
-          echo "KOTLINC=$RUNNER_TOOL_CACHE/kotlin/kotlinc/bin/kotlinc" >> "$GITHUB_ENV"
+          # The archive unpacks to kotlinc/bin/kotlinc (+ kotlinc.bat on Windows). build.sh resolves
+          # the Kotlin home by walking up to lib/kotlin-stdlib.jar, so either launcher works.
+          if [[ -f "$RUNNER_TOOL_CACHE/kotlin/kotlinc/bin/kotlinc.bat" ]]; then
+            echo "KOTLINC=$RUNNER_TOOL_CACHE/kotlin/kotlinc/bin/kotlinc.bat" >> "$GITHUB_ENV"
+          else
+            echo "KOTLINC=$RUNNER_TOOL_CACHE/kotlin/kotlinc/bin/kotlinc" >> "$GITHUB_ENV"
+          fi
+          ls "$RUNNER_TOOL_CACHE/kotlin/kotlinc/lib/kotlin-stdlib.jar"
 
       - name: Build
         run: ./build.sh

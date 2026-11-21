@@ -24,10 +24,22 @@ MAIN_CLASS="net.kdt.aerix.desktop.MainKt"
 APP_NAME="Aerix Launcher"
 
 # ---- toolchain discovery ---------------------------------------------------
+# On Windows the launchers are .exe/.bat, which `-x` and `command -v` treat differently, so a
+# candidate counts if the file exists and is runnable by the shell we are actually using.
+is_tool() {
+  [[ -n "${1:-}" ]] || return 1
+  if [[ "$1" == *.bat || "$1" == *.cmd ]]; then [[ -f "$1" ]]; return; fi
+  [[ -f "$1" && -x "$1" ]]
+}
+
 find_jdk() {
-  if [[ -n "${JAVA_HOME:-}" && -x "$JAVA_HOME/bin/java" ]]; then echo "$JAVA_HOME"; return; fi
+  if [[ -n "${JAVA_HOME:-}" ]]; then
+    if is_tool "$JAVA_HOME/bin/java" || is_tool "$JAVA_HOME/bin/java.exe"; then
+      echo "$JAVA_HOME"; return
+    fi
+  fi
   for c in "$HERE/../../toolchain/jdk" "$HERE/../toolchain/jdk" "$HERE/toolchain/jdk"; do
-    [[ -x "$c/bin/java" ]] && { echo "$c"; return; }
+    if is_tool "$c/bin/java" || is_tool "$c/bin/java.exe"; then echo "$c"; return; fi
   done
   if command -v javac >/dev/null 2>&1; then
     local bin; bin="$(dirname "$(readlink -f "$(command -v javac)")")"
@@ -36,11 +48,16 @@ find_jdk() {
   echo ""; }
 
 find_kotlinc() {
-  if [[ -n "${KOTLINC:-}" && -x "$KOTLINC" ]]; then echo "$KOTLINC"; return; fi
+  if is_tool "${KOTLINC:-}"; then echo "$KOTLINC"; return; fi
   for c in "$HERE/../../toolchain/kc/bin/kotlinc" "$HERE/../toolchain/kc/bin/kotlinc" "$HERE/toolchain/kc/bin/kotlinc"; do
-    [[ -x "$c" ]] && { echo "$c"; return; }
+    if is_tool "$c"; then echo "$c"; return; fi
   done
-  command -v kotlinc 2>/dev/null || echo ""; }
+  # A .bat on Windows is not found by `command -v` unless it is on the path with its extension.
+  for c in kotlinc kotlinc.bat kotlinc.cmd; do
+    local found; found="$(command -v "$c" 2>/dev/null || true)"
+    if [[ -n "$found" ]]; then echo "$found"; return; fi
+  done
+  echo ""; }
 
 JDK="$(find_jdk)"
 KOTLINC="$(find_kotlinc)"
@@ -58,6 +75,19 @@ VERSION="${VERSION:-2.4.4}"
 STDIOUT="$OUT/stdlib"
 mkdir -p "$OUT"
 
+# The Kotlin home is the directory holding `lib/kotlin-stdlib.jar`. It is normally two levels above
+# the launcher, but on Windows the launcher is a `.bat` that may live inside `bin/` of an extracted
+# archive (the CI job does exactly that), so resolve it by walking up from the real file instead of
+# assuming a depth.
+kotlin_home() {
+  local dir; dir="$(cd "$(dirname "$KOTLINC")" && pwd)"
+  for _ in 1 2 3; do
+    if [[ -f "$dir/lib/kotlin-stdlib.jar" ]]; then echo "$dir"; return; fi
+    dir="$(dirname "$dir")"
+  done
+  echo "$(dirname "$(dirname "$KOTLINC")")"
+}
+
 log() { printf '\033[38;5;44m[aerix]\033[0m %s\n' "$*"; }
 
 compile() {
@@ -73,7 +103,7 @@ compile() {
       -J-Xmx1200m -J-XX:+UseSerialGC \
       -nowarn \
       -jvm-target 17 \
-      -kotlin-home "$(dirname "$(dirname "$KOTLINC")")" \
+      -kotlin-home "$(kotlin_home)" \
       -d "$OUT/classes" \
       $sources
   log "kotlin OK"
@@ -84,7 +114,7 @@ compile() {
   # unpacked - the klib directory also holds the whole compiler and its dependencies.
   KOTLIN_LIBS="$OUT/stdlib"
   rm -rf "$KOTLIN_LIBS"; mkdir -p "$KOTLIN_LIBS"
-  local klib="$(dirname "$(dirname "$KOTLINC")")/lib"
+  local klib="$(kotlin_home)/lib"
   for jar in kotlin-stdlib.jar kotlin-stdlib-jdk8.jar kotlin-stdlib-jdk7.jar kotlin-reflect.jar; do
     [[ -f "$klib/$jar" ]] && cp "$klib/$jar" "$KOTLIN_LIBS/"
   done
@@ -102,11 +132,18 @@ compile() {
 }
 
 run_tests() {
+  if [[ ! -d src/test/kotlin ]]; then
+    # There is no separate JUnit tree: every check lives in `--selftest`, which needs nothing but
+    # the jar. Say so rather than failing on a missing directory or dropping into the REPL.
+    log "no src/test/kotlin; the checks live in --selftest"
+    run_selftest
+    return
+  fi
   log "running unit and integration tests"
   local outdir="$OUT/test-classes"
   rm -rf "$outdir"; mkdir -p "$outdir"
   "$KOTLINC" -J-Xmx1200m -J-XX:+UseSerialGC -nowarn -jvm-target 17 \
-      -kotlin-home "$(dirname "$(dirname "$KOTLINC")")" \
+      -kotlin-home "$(kotlin_home)" \
       -cp "$OUT/classes" -d "$outdir" $(find src/test/kotlin -name '*.kt' | sort | tr '\n' ' ')
   cp -r src/test/resources/. "$outdir"/ 2>/dev/null || true
   "$JAVA" -Djava.awt.headless=true -cp "$outdir:$OUT/classes" net.kdt.aerix.desktop.test.TestMainKt
