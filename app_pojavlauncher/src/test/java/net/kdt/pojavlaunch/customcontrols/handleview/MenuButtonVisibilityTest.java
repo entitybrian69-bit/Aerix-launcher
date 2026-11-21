@@ -106,6 +106,28 @@ public class MenuButtonVisibilityTest {
                 android.view.View.VISIBLE, button.getVisibility());
     }
 
+    @Test public void rejoiningTheGameBringsTheLogoBackWithoutErasingSizeOrPosition() {
+        MenuButtonSize.save(context, 64);
+        context.getSharedPreferences(MenuButtonSize.PREFERENCES, 0)
+                .edit().putFloat("menuButtonX", 123).putFloat("menuButtonY", 45).commit();
+        MenuButtonVisibility.setHiddenWhilePlaying(context, true);
+        DrawerPullButton button = new DrawerPullButton(context);
+        button.setLayoutHasMenuButton(false);
+        button.refreshVisibility();
+        assertEquals(android.view.View.GONE, button.getVisibility());
+
+        MenuButtonVisibility.showOnRejoin(context);
+        button.refreshVisibility();
+        assertFalse(MenuButtonVisibility.isHiddenWhilePlaying(context));
+        assertEquals("rejoining the game must bring the floating A button back",
+                android.view.View.VISIBLE, button.getVisibility());
+        assertEquals(64, MenuButtonSize.read(context));
+        assertEquals(123, context.getSharedPreferences(MenuButtonSize.PREFERENCES, 0)
+                .getFloat("menuButtonX", 0), 0);
+        assertEquals(45, context.getSharedPreferences(MenuButtonSize.PREFERENCES, 0)
+                .getFloat("menuButtonY", 0), 0);
+    }
+
     @Test public void hiddenMeansGoneAndThereforeUntouchable() {
         DrawerPullButton button = new DrawerPullButton(context);
         button.setLayoutHasMenuButton(false);

@@ -36,4 +36,12 @@ public final class MenuButtonVisibility {
         context.getSharedPreferences(MenuButtonSize.PREFERENCES, Context.MODE_PRIVATE)
                 .edit().putBoolean(KEY, hidden).apply();
     }
+
+    /**
+     * Bring the floating logo back when joining or rejoining the game so hiding it during a
+     * session never leaves the player locked out of the in-game menu on their next visit.
+     */
+    public static void showOnRejoin(Context context) {
+        setHiddenWhilePlaying(context, false);
+    }
 }

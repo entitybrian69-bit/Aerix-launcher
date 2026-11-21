@@ -26,8 +26,9 @@ def check(condition, message):
 
 
 # ── The preference ────────────────────────────────────────────────────────────────────────────
-check("isHiddenWhilePlaying" in visibility and "setHiddenWhilePlaying" in visibility,
-      "the switch needs a stored preference to survive a restart")
+check("isHiddenWhilePlaying" in visibility and "setHiddenWhilePlaying" in visibility
+      and "showOnRejoin" in visibility,
+      "the switch needs a stored preference and a rejoin reset so hiding never locks players out")
 check("DEFAULT_HIDDEN_WHILE_PLAYING = false" in visibility,
       "showing the logo is what every existing player already has; hiding must be opt-in")
 check("ClassCastException" in visibility,
@@ -92,7 +93,10 @@ check("mDrawerPullButton.setEditorMode(false)" in activity,
 check("setVisibility(mControlLayout.hasMenuButton() ? View.GONE : View.VISIBLE)" not in activity,
       "the old direct setVisibility calls would now fight the new rules")
 check("mDrawerPullButton.refreshVisibility()" in activity,
-      "a change made in the launcher's settings has to be picked up when the game comes back")
+      "a change made in the launcher's settings or on rejoin has to be picked up when the game comes back")
+check("MenuButtonVisibility.showOnRejoin(this)" in activity
+      and "onNewIntent" in activity and "onRestart" in activity,
+      "rejoining the game must restore the floating A button even if it was hidden in a prior session")
 # The field used to be declared as a plain View, so none of the button's methods resolved and the
 # whole build failed on eight "cannot find symbol" errors. A missing base class is worth a check.
 check("private View mDrawerPullButton;" not in activity

@@ -258,6 +258,8 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         Intent gameServiceIntent = new Intent(this, GameService.class);
         // Start the service a bit early
         ContextCompat.startForegroundService(this, gameServiceIntent);
+        // Rejoining the game always brings the floating Aerix button back if it was hidden.
+        net.kdt.pojavlaunch.customcontrols.handleview.MenuButtonVisibility.showOnRejoin(this);
         initLayout(R.layout.activity_basemain);
 
         Platform.initialize(this, launcherGLView);
@@ -576,6 +578,20 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
             // and the Aerix menu button stay usable and visible the whole time.
             net.kdt.pojavlaunch.aerix.loading.AerixLoadingWallpaper.attach(mControlLayout);
         }
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        net.kdt.pojavlaunch.customcontrols.handleview.MenuButtonVisibility.showOnRejoin(this);
+        if (mDrawerPullButton != null) mDrawerPullButton.refreshVisibility();
+    }
+
+    @Override
+    protected void onRestart() {
+        super.onRestart();
+        net.kdt.pojavlaunch.customcontrols.handleview.MenuButtonVisibility.showOnRejoin(this);
+        if (mDrawerPullButton != null) mDrawerPullButton.refreshVisibility();
     }
 
     @Override
