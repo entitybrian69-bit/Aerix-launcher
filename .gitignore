@@ -25,3 +25,11 @@ __pycache__/
 # and never a keystore whose password appears in a build file.
 *.p12
 *.pkcs12
+
+# --- Windows desktop target (windows/aerix-desktop) ---
+/windows/aerix-desktop/build/
+/windows/aerix-desktop/dist/
+/windows/aerix-desktop/.gradle/
+/windows/aerix-desktop/toolchain/
+/toolchain/
+*.iml
