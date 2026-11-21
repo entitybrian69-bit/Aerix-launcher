@@ -48,7 +48,7 @@ jobs:
             os: ubuntu-22.04
             script: dist:linux
           - label: macOS Universal
-            os: macos-14
+            os: macos-latest
             script: dist:mac
     runs-on: ${{ matrix.os }}
     defaults:
@@ -62,7 +62,15 @@ jobs:
           cache: 'npm'
           cache-dependency-path: aerix-pc/package-lock.json
       - run: npm ci
-      - run: npm run ${{ matrix.script }}
+      - name: Build installer
+        shell: bash
+        run: |
+          set -o pipefail
+          if ! npm run ${{ matrix.script }} 2>&1 | tee build.log; then
+            TAIL=$(tail -n 25 build.log | tr '\n' ' ')
+            echo "::error title=electron-builder failed::${TAIL}"
+            exit 1
+          fi
       - name: Stage normalized artifacts
         shell: bash
         run: |

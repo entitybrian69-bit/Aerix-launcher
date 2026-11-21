@@ -2,6 +2,7 @@ appId: io.aerix.launcher.pc
 productName: Aerix Launcher PC
 copyright: Copyright © 2026 Aerix Launcher Contributors
 asar: true
+publish: null
 directories:
   buildResources: build
   output: release
@@ -15,6 +16,7 @@ extraResources:
       - "**/*"
 icon: build/icon.png
 win:
+  icon: build/icon.ico
   target:
     - target: nsis
       arch:
@@ -32,7 +34,7 @@ nsis:
 linux:
   category: Game
   synopsis: Aerix Launcher PC for Minecraft Java Edition
-  maintainer: Aerix Launcher Contributors
+  maintainer: Aerix Launcher Contributors <support@aerixlauncher.org>
   target:
     - target: AppImage
       arch:
