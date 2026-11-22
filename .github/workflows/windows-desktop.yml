@@ -238,8 +238,12 @@ jobs:
       # Same channel as the build job: push the output to the branch, because neither the runner's
       # stdout nor its step summary is reachable from the build sandbox.
       - name: Publish the installer log to the repository
+        # Diagnostic convenience for environments that cannot read this runner's stdout. It must
+        # never fail the job: whether the release upload worked is asserted by the step above.
         if: always()
+        continue-on-error: true
         run: |
+          set -x
           git config user.name  "aerix-ci"
           git config user.email "aerix-ci@users.noreply.github.com"
           mkdir -p ci-reports || true
