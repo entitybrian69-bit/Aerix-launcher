@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -37,6 +38,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -53,11 +55,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
+import net.kdt.pojavlaunch.aerix.bridge.AerixWindowInsets
 
 private val PanelBg = Color(0xF0111319)
 private val CardBg = Color(0xFF191D26)
@@ -77,6 +81,7 @@ fun RecorderPanel(
     initialWithControls: Boolean,
     onStart: (RecordingOptions.Config, RecordingOptions.AudioSource, Boolean) -> Unit,
     onStop: () -> Unit,
+    onToggleControlsDuringRecording: (Boolean) -> Unit = {},
     onRecordings: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -123,13 +128,16 @@ fun RecorderPanel(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
                 onClick = onDismiss
-            ),
+            )
+            .padding(AerixWindowInsets.padding())
+            .padding(horizontal = 16.dp, vertical = 10.dp),
         contentAlignment = Alignment.Center
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth(0.92f)
                 .widthIn(max = 560.dp)
+                .heightIn(max = 460.dp)
                 .clip(RoundedCornerShape(22.dp))
                 .background(
                     Brush.verticalGradient(listOf(Color(0xF5151821), PanelBg))
@@ -140,11 +148,10 @@ fun RecorderPanel(
                     indication = null,
                     onClick = {}
                 )
-                .padding(horizontal = 20.dp, vertical = 16.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(horizontal = 20.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // Header
+            // Pinned Header
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -179,46 +186,66 @@ fun RecorderPanel(
                         overflow = TextOverflow.Ellipsis
                     )
                 }
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(ChipIdleBg)
-                        .border(1.dp, BorderIdle, RoundedCornerShape(10.dp))
-                        .clickable(onClick = onDismiss)
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = ChipIdleBg,
+                    border = BorderStroke(1.dp, BorderIdle),
+                    onClick = onDismiss
                 ) {
-                    Text("Close", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                    Text(
+                        text = "Close",
+                        color = TextPrimary,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp)
+                    )
                 }
             }
 
             if (active) {
-                Box(
+                Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(CardBg)
-                        .border(1.dp, Crimson.copy(alpha = 0.45f), RoundedCornerShape(14.dp))
-                        .padding(14.dp)
+                        .weight(1f, fill = false)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(
-                            text = if (phase == RecordingState.Phase.RECORDING) {
-                                "Recording in progress (${formatDuration(elapsedSeconds)})"
-                            } else {
-                                detail.ifBlank { "Processing recording…" }
-                            },
-                            color = TextPrimary,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Text(
-                            text = "Finished videos are saved to this instance's folder and published to Movies/Aerix.",
-                            color = TextMuted,
-                            fontSize = 12.sp
-                        )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(CardBg)
+                            .border(1.dp, Crimson.copy(alpha = 0.45f), RoundedCornerShape(14.dp))
+                            .padding(14.dp)
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(
+                                text = if (phase == RecordingState.Phase.RECORDING) {
+                                    "Recording in progress (${formatDuration(elapsedSeconds)})"
+                                } else {
+                                    detail.ifBlank { "Processing recording…" }
+                                },
+                                color = TextPrimary,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = "Finished videos are saved to this instance's folder and published to Movies/Aerix.",
+                                color = TextMuted,
+                                fontSize = 12.sp
+                            )
+                        }
                     }
+
+                    ControlsRow(
+                        withControls = withControls,
+                        onToggle = { next ->
+                            withControls = next
+                            onToggleControlsDuringRecording(next)
+                        }
+                    )
                 }
 
+                // Pinned bottom actions while recording
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -242,74 +269,91 @@ fun RecorderPanel(
                     )
                 }
             } else {
-                // Quality selector
-                PresetSection(title = "Resolution") {
-                    qualities.forEach { q ->
-                        OptionChip(
-                            label = "${q}p",
-                            selected = quality == q,
-                            onClick = {
-                                quality = q
-                                if (configs.none { it.quality == q && it.fps == fps }) {
-                                    configs.filter { it.quality == q }
-                                        .minByOrNull { kotlin.math.abs(it.fps - fps) }
-                                        ?.let { fps = it.fps }
-                                }
-                            }
-                        )
-                    }
-                }
-
-                // Frame rate selector
-                PresetSection(title = "Frame rate") {
-                    frameRates.forEach { f ->
-                        val available = configs.any { it.quality == quality && it.fps == f }
-                        OptionChip(
-                            label = "$f FPS",
-                            selected = fps == f,
-                            dimmed = !available,
-                            onClick = { fps = f }
-                        )
-                    }
-                }
-
-                // Audio source selector
-                PresetSection(title = "Audio") {
-                    audioOptions.forEach { src ->
-                        OptionChip(
-                            label = src.label,
-                            selected = audio == src,
-                            onClick = { audio = src }
-                        )
-                    }
-                }
-
-                // Controls toggle
-                ControlsRow(
-                    withControls = withControls,
-                    onToggle = { withControls = it }
-                )
-
-                // Resolved encoder details
-                Box(
+                // Scrollable configuration section (keeps bottom Start / Recordings buttons always reachable on landscape phones)
+                Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(CardBg)
-                        .border(1.dp, BorderIdle, RoundedCornerShape(12.dp))
-                        .padding(horizontal = 12.dp, vertical = 9.dp)
+                        .weight(1f, fill = false)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Text(
-                        text = resolved?.let {
-                            val mode = if (it.hardwareAccelerated) "Hardware H.264" else "Compatibility H.264"
-                            "Output: ${it.width}×${it.height} · ${it.fps} FPS · ${formatBitrate(it.bitrate)} · $mode"
-                        } ?: "No compatible video encoder for ${quality}p at ${fps} FPS on this device.",
-                        color = if (resolved != null) TextMuted else Color(0xFFFCA5A5),
-                        fontSize = 12.sp
+                    // Quality selector
+                    PresetSection(title = "Resolution") {
+                        qualities.forEach { q ->
+                            OptionChip(
+                                label = "${q}p",
+                                selected = quality == q,
+                                onClick = {
+                                    quality = q
+                                    if (configs.none { it.quality == q && it.fps == fps }) {
+                                        configs.filter { it.quality == q }
+                                            .minByOrNull { kotlin.math.abs(it.fps - fps) }
+                                            ?.let { fps = it.fps }
+                                    }
+                                }
+                            )
+                        }
+                    }
+
+                    // Frame rate selector — auto-selects closest compatible resolution if current quality lacks that FPS
+                    PresetSection(title = "Frame rate") {
+                        frameRates.forEach { f ->
+                            val exactMatch = configs.any { it.quality == quality && it.fps == f }
+                            OptionChip(
+                                label = "$f FPS",
+                                selected = fps == f,
+                                dimmed = !exactMatch,
+                                onClick = {
+                                    fps = f
+                                    if (configs.none { it.quality == quality && it.fps == f }) {
+                                        val candidates = configs.filter { it.fps == f }
+                                        val pick = candidates.filter { it.quality <= quality }
+                                            .maxByOrNull { it.quality }
+                                            ?: candidates.minByOrNull { kotlin.math.abs(it.quality - quality) }
+                                        pick?.let { quality = it.quality }
+                                    }
+                                }
+                            )
+                        }
+                    }
+
+                    // Audio source selector
+                    PresetSection(title = "Audio") {
+                        audioOptions.forEach { src ->
+                            OptionChip(
+                                label = src.label,
+                                selected = audio == src,
+                                onClick = { audio = src }
+                            )
+                        }
+                    }
+
+                    // Controls toggle
+                    ControlsRow(
+                        withControls = withControls,
+                        onToggle = { withControls = it }
                     )
+
+                    // Resolved encoder details
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(CardBg)
+                            .border(1.dp, BorderIdle, RoundedCornerShape(12.dp))
+                            .padding(horizontal = 12.dp, vertical = 9.dp)
+                    ) {
+                        Text(
+                            text = resolved?.let {
+                                val mode = if (it.hardwareAccelerated) "Hardware H.264" else "Compatibility H.264"
+                                "Output: ${it.width}×${it.height} · ${it.fps} FPS · ${formatBitrate(it.bitrate)} · $mode"
+                            } ?: "No compatible video encoder for ${quality}p at ${fps} FPS on this device.",
+                            color = if (resolved != null) TextMuted else Color(0xFFFCA5A5),
+                            fontSize = 12.sp
+                        )
+                    }
                 }
 
-                // Actions
+                // Pinned bottom actions
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -367,32 +411,25 @@ private fun OptionChip(
     dimmed: Boolean = false,
     onClick: () -> Unit
 ) {
-    val bg = when {
-        selected -> CrimsonSoft
-        else -> ChipIdleBg
-    }
-    val border = when {
-        selected -> Crimson
-        else -> BorderIdle
-    }
+    val bg = if (selected) CrimsonSoft else ChipIdleBg
+    val border = if (selected) Crimson else BorderIdle
     val textColor = when {
         selected -> TextPrimary
-        dimmed -> TextMuted.copy(alpha = 0.45f)
+        dimmed -> TextMuted.copy(alpha = 0.55f)
         else -> TextMuted
     }
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(10.dp))
-            .background(bg)
-            .border(BorderStroke(1.dp, border), RoundedCornerShape(10.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 13.dp, vertical = 7.dp)
+    Surface(
+        shape = RoundedCornerShape(10.dp),
+        color = bg,
+        border = BorderStroke(1.dp, border),
+        onClick = onClick
     ) {
         Text(
             text = label,
             color = textColor,
             fontSize = 12.sp,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+            modifier = Modifier.padding(horizontal = 13.dp, vertical = 7.dp)
         )
     }
 }
@@ -408,7 +445,7 @@ private fun ControlsRow(
             .clip(RoundedCornerShape(12.dp))
             .background(CardBg)
             .border(1.dp, BorderIdle, RoundedCornerShape(12.dp))
-            .clickable { onToggle(!withControls) }
+            .clickable(role = Role.Switch) { onToggle(!withControls) }
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -457,21 +494,23 @@ private fun ActionButton(
         else -> ChipIdleBg
     }
     val border = if (primary && enabled) Crimson else BorderIdle
-    Box(
-        modifier = modifier
-            .height(42.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(bg)
-            .border(1.dp, border, RoundedCornerShape(12.dp))
-            .clickable(enabled = enabled, onClick = onClick),
-        contentAlignment = Alignment.Center
+    Surface(
+        modifier = modifier.height(42.dp),
+        shape = RoundedCornerShape(12.dp),
+        color = bg,
+        border = BorderStroke(1.dp, border),
+        enabled = enabled,
+        onClick = onClick
     ) {
-        Text(
-            text = label,
-            color = if (enabled) TextPrimary else TextMuted.copy(alpha = 0.5f),
-            fontSize = 13.sp,
-            fontWeight = FontWeight.SemiBold
-        )
+        Box(contentAlignment = Alignment.Center) {
+            Text(
+                text = label,
+                color = if (enabled) TextPrimary else TextMuted.copy(alpha = 0.5f),
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1
+            )
+        }
     }
 }
 

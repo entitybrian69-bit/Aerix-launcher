@@ -157,7 +157,10 @@ class ScreenRecordingService : Service() {
             }
             STOP -> {
                 worker.post {
-                    if (active) stopRecording() else stopForegroundAndSelf()
+                    if (active) stopRecording() else {
+                        RecordingState.publish(this, RecordingState.Phase.IDLE, "")
+                        stopForegroundAndSelf()
+                    }
                 }
             }
             else -> {
@@ -650,12 +653,21 @@ class ScreenRecordingService : Service() {
 
     private fun buildNotification(text: String): Notification {
         val stopIntent = Intent(this, ScreenRecordingService::class.java).setAction(STOP)
-        val stopPending = PendingIntent.getService(
-            this,
-            0,
-            stopIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
+        val stopPending = if (Build.VERSION.SDK_INT >= 26) {
+            PendingIntent.getForegroundService(
+                this,
+                0,
+                stopIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+        } else {
+            PendingIntent.getService(
+                this,
+                0,
+                stopIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+        }
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.aerix_ic_record)
             .setContentTitle("Aerix Screen Recorder")

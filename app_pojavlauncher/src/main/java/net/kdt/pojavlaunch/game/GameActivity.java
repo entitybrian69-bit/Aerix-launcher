@@ -946,6 +946,18 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         if (mRecorder != null) mRecorder.show();
     }
 
+    public void onRecorderPanelVisibilityChanged(boolean shown) {
+        if (launcherGLView == null) return;
+        if (shown) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                launcherGLView.releasePointerCapture();
+            }
+            launcherGLView.clearFocus();
+        } else if (mGameMenuOverlay == null || !mGameMenuOverlay.isMenuShown()) {
+            launcherGLView.requestFocus();
+        }
+    }
+
     /**
      * The recorder, for the in-game options panel.
      *

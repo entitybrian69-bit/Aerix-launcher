@@ -87,14 +87,23 @@ class RecorderController @JvmOverloads constructor(
         }
     }
 
+    private val stopWatchdog = Runnable {
+        if (RecordingState.isActive() || startRequested) {
+            startRequested = false
+            RecordingState.update(RecordingState.Phase.IDLE, "")
+        }
+    }
+
     private val stateListener: () -> Unit = {
         mainHandler.removeCallbacks(timerTick)
         indicator.visibility = if (RecordingState.isActive()) View.VISIBLE else View.GONE
         updateIndicatorText()
         if (RecordingState.phase == RecordingState.Phase.RECORDING) {
+            mainHandler.removeCallbacks(stopWatchdog)
             startRequested = false
             mainHandler.postDelayed(timerTick, 1000L)
         } else if (!RecordingState.isActive()) {
+            mainHandler.removeCallbacks(stopWatchdog)
             startRequested = false
         }
         applyControlsToRecording()
@@ -125,6 +134,16 @@ class RecorderController @JvmOverloads constructor(
         }
         if (RecordingState.isActive() || startRequested) {
             openPanel(options)
+            if (options.isEmpty()) {
+                val screen = screenSize()
+                PojavApplication.sExecutorService.execute {
+                    val configs = runCatching { RecordingOptions.supported(screen.first, screen.second) }
+                        .getOrDefault(emptyList())
+                    if (configs.isNotEmpty()) {
+                        Tools.runOnUiThread { options = configs }
+                    }
+                }
+            }
             return
         }
         if (options.isNotEmpty()) {
@@ -158,6 +177,7 @@ class RecorderController @JvmOverloads constructor(
     private fun openPanel(configs: List<RecordingOptions.Config>) {
         dismissPanel()
         val root = activity.findViewById<ViewGroup>(android.R.id.content) ?: return
+        (activity as? GameActivity)?.onRecorderPanelVisibilityChanged(true)
         val compose = ComposeView(activity).apply {
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
             setContent {
@@ -170,6 +190,7 @@ class RecorderController @JvmOverloads constructor(
                         initialWithControls = savedWithControls,
                         onStart = { config, audio, withControls -> startWithChoice(config, audio, withControls) },
                         onStop = { stop() },
+                        onToggleControlsDuringRecording = { enabled -> setControlsDuringRecording(enabled) },
                         onRecordings = { showRecordingsList() },
                         onDismiss = { dismissPanel() }
                     )
@@ -205,6 +226,7 @@ class RecorderController @JvmOverloads constructor(
         val host = panelOverlay ?: return
         panelOverlay = null
         (host.parent as? ViewGroup)?.removeView(host)
+        (activity as? GameActivity)?.onRecorderPanelVisibilityChanged(false)
     }
 
     fun startWithChoice(
@@ -227,40 +249,55 @@ class RecorderController @JvmOverloads constructor(
             Toast.makeText(activity, "Cannot open this instance's recordings folder.", Toast.LENGTH_LONG).show()
             return
         }
-        val strays = runCatching { RecordingOutput.recoverStrays(activity, directory) }.getOrDefault(emptyList())
-        val files = directory.listFiles()
-            ?.filter { it.isFile && it.extension.equals("mp4", true) }
-            ?.sortedByDescending { it.lastModified() }
-            .orEmpty()
-        if (files.isEmpty()) {
-            val unfinished = strays.count { !it.playable }
-            Toast.makeText(
-                activity,
-                when {
-                    strays.isNotEmpty() && unfinished == 0 ->
-                        "Recovered ${strays.size} recording(s) into this instance's MP4 list."
-                    unfinished > 0 ->
-                        "$unfinished interrupted recording(s) kept as -unfinished.mp4."
-                    else -> "No recordings in this instance yet."
-                },
-                Toast.LENGTH_LONG
-            ).show()
-            return
-        }
-        dialog = AlertDialog.Builder(activity)
-            .setTitle("Instance recordings")
-            .setItems(files.map { it.name }.toTypedArray()) { _, which ->
-                val file = files.getOrNull(which) ?: return@setItems
-                dialog = AlertDialog.Builder(activity)
-                    .setTitle(file.name)
-                    .setItems(arrayOf("Open video", "Share video")) { _, action ->
-                        RecordingLibrary.view(activity, file, action == 1)
+        PojavApplication.sExecutorService.execute {
+            val strays = runCatching { RecordingOutput.recoverStrays(activity, directory) }.getOrDefault(emptyList())
+            val files = directory.listFiles()
+                ?.filter { it.isFile && it.extension.equals("mp4", true) }
+                ?.sortedByDescending { it.lastModified() }
+                .orEmpty()
+            Tools.runOnUiThread {
+                if (activity.isFinishing || activity.isDestroyed) return@runOnUiThread
+                if (files.isEmpty()) {
+                    val unfinished = strays.count { !it.playable }
+                    val msg = when {
+                        strays.isNotEmpty() && unfinished == 0 ->
+                            "Recovered ${strays.size} recording(s) into this instance's MP4 list."
+                        unfinished > 0 ->
+                            "$unfinished interrupted recording(s) kept as -unfinished.mp4."
+                        else -> "No recordings in this instance yet."
                     }
-                    .setNegativeButton("Cancel", null)
+                    dialog = AlertDialog.Builder(activity)
+                        .setTitle("Instance recordings")
+                        .setMessage(msg)
+                        .setPositiveButton("Back to Recorder") { _, _ -> show() }
+                        .setNegativeButton("Close", null)
+                        .show()
+                    return@runOnUiThread
+                }
+                dialog = AlertDialog.Builder(activity)
+                    .setTitle("Instance recordings")
+                    .setItems(files.map { it.name }.toTypedArray()) { _, which ->
+                        val file = files.getOrNull(which) ?: return@setItems
+                        dialog = AlertDialog.Builder(activity)
+                            .setTitle(file.name)
+                            .setItems(arrayOf("Open video", "Share video", "Delete video")) { _, action ->
+                                if (action == 2) {
+                                    if (file.delete()) {
+                                        Toast.makeText(activity, "Deleted ${file.name}", Toast.LENGTH_SHORT).show()
+                                    }
+                                    showRecordings()
+                                } else {
+                                    RecordingLibrary.view(activity, file, action == 1)
+                                }
+                            }
+                            .setNegativeButton("Back") { _, _ -> showRecordings() }
+                            .show()
+                    }
+                    .setNeutralButton("Back to Recorder") { _, _ -> show() }
+                    .setNegativeButton("Close", null)
                     .show()
             }
-            .setNegativeButton("Close", null)
-            .show()
+        }
     }
 
     private fun start(
@@ -355,12 +392,23 @@ class RecorderController @JvmOverloads constructor(
     fun stop() {
         startRequested = false
         awaitingConsentSheet = false
-        runCatching {
-            activity.startService(
-                Intent(activity, ScreenRecordingService::class.java)
-                    .setAction(ScreenRecordingService.STOP)
-            )
+        mainHandler.removeCallbacks(stopWatchdog)
+        mainHandler.postDelayed(stopWatchdog, 4_500L)
+        val stopIntent = Intent(activity, ScreenRecordingService::class.java)
+            .setAction(ScreenRecordingService.STOP)
+        val delivered = runCatching {
+            ContextCompat.startForegroundService(activity, stopIntent)
+        }.isSuccess
+        if (!delivered) {
+            mainHandler.removeCallbacks(stopWatchdog)
+            RecordingState.update(RecordingState.Phase.IDLE, "")
         }
+    }
+
+    fun setControlsDuringRecording(visible: Boolean) {
+        controlsInRecording = visible
+        prefs.edit().putBoolean(WITH_CONTROLS, visible).apply()
+        applyControlsToRecording()
     }
 
     fun onControlsRequestedByPlayer() {
@@ -380,6 +428,7 @@ class RecorderController @JvmOverloads constructor(
 
     fun destroy() {
         mainHandler.removeCallbacks(timerTick)
+        mainHandler.removeCallbacks(stopWatchdog)
         dialog?.dismiss()
         dialog = null
         dismissPanel()

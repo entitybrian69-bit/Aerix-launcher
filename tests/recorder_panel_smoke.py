@@ -75,8 +75,22 @@ check("Spinner(" not in controller and "ArrayAdapter" not in controller,
 # 6. Activity exposes controller & all audio sources exist.
 check("public net.kdt.pojavlaunch.recording.RecorderController getAerixRecorder()" in activity,
       "GameActivity must expose getAerixRecorder()")
+check("public void onRecorderPanelVisibilityChanged(boolean shown)" in activity,
+      "GameActivity must release pointer capture / focus when recorder panel opens")
 for source in ("GAME", "MICROPHONE", "BOTH", "NONE"):
     check(source in options, f"audio source {source} must exist")
+
+# 8. Recorder button & responsiveness regressions stay fixed.
+check("AerixWindowInsets.padding()" in panel,
+      "panel must respect system bar / cutout insets so buttons are never clipped")
+check("candidates.filter { it.quality <= quality }" in panel,
+      "tapping an FPS chip must auto-pick a compatible resolution instead of disabling Start Recording")
+check("onToggleControlsDuringRecording(" in panel and "setControlsDuringRecording(" in controller,
+      "controls visibility toggle must also work while recording is active")
+check("stopWatchdog" in controller,
+      "stop() must reset state via watchdog if :recorder died")
+check("onRecorderPanelVisibilityChanged(" in controller,
+      "controller must notify GameActivity when panel opens/closes")
 
 # 7. Stay wired into CI.
 for workflow in ("aerix-debug.yml", "release.yml"):

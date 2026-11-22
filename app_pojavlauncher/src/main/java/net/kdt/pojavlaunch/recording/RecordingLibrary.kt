@@ -42,7 +42,19 @@ object RecordingLibrary {
      * media URI; the launcher's document URI is the fallback for files that could not be published.
      */
     fun view(context: Context, file: File, share: Boolean) {
+        if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) {
+            val main = android.os.Handler(android.os.Looper.getMainLooper())
+            Thread({
+                val media = runCatching { publish(context, file) }.getOrNull()
+                main.post { launchView(context, file, share, media) }
+            }, "AerixMediaOpen").start()
+            return
+        }
         val media = runCatching { publish(context, file) }.getOrNull()
+        launchView(context, file, share, media)
+    }
+
+    private fun launchView(context: Context, file: File, share: Boolean, media: Uri?) {
         if (media != null) {
             val opened = runCatching {
                 val intent = if (share) {
@@ -53,7 +65,10 @@ object RecordingLibrary {
                 intent.clipData = android.content.ClipData.newRawUri(file.name, media)
                 intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 val chooser = Intent.createChooser(intent, file.name)
-                chooser.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+                chooser.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                if (context !is android.app.Activity) {
+                    chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
                 context.startActivity(chooser)
             }.isSuccess
             if (opened) return
