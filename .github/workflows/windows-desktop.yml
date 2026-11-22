@@ -209,9 +209,15 @@ jobs:
           # Capture the output into the job summary: this runner's stdout is not reachable from the
           # build sandbox, and the summary is.
           set +e
-          gh release upload "$TAG" dist/image/*.exe dist/image/*.msi \
-            dist/AerixLauncher-*-portable.zip dist/SHA256SUMS.txt --clobber \
-            > publish.log 2>&1
+          # No .msi is produced by --installer (jpackage --type exe masks itself as an installer and
+          # writes a .exe), and a glob that matches nothing makes gh abort the whole call with
+          # "no matches found", so collect the files explicitly instead of trusting the shell.
+          files=()
+          for f in dist/image/*.exe dist/image/*.msi dist/AerixLauncher-*-portable.zip dist/SHA256SUMS.txt; do
+            [[ -f "$f" ]] && files+=("$f")
+          done
+          printf 'uploading: %s\n' "${files[@]}"
+          gh release upload "$TAG" "${files[@]}" --clobber > publish.log 2>&1
           rc=$?
           {
             echo '## Release upload (exit '"$rc"')'
