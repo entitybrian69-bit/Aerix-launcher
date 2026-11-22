@@ -182,7 +182,15 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VERSION_TAG: "2.4.4"
         run: |
+          set -euxo pipefail
           TAG="desktop-$VERSION_TAG"
+          # Create the release if a previous attempt did not; upload to it either way. This used to
+          # end in `|| echo ::warning`, which reported success while attaching nothing.
+          gh release view "$TAG" >/dev/null 2>&1 || \
+            gh release create "$TAG" --title "Aerix Launcher for Windows $VERSION_TAG" \
+              --prerelease --notes "Portable build and Windows installers for Aerix Launcher $VERSION_TAG."
           gh release upload "$TAG" dist/image/*.exe dist/image/*.msi \
-            "dist/AerixLauncher-$VERSION-portable.zip" dist/SHA256SUMS.txt --clobber \
-            || echo "::warning::could not upload to $TAG"
+            "dist/AerixLauncher-$VERSION-portable.zip" dist/SHA256SUMS.txt --clobber
+          # Prove they really landed.
+          gh release view "$TAG" --json assets --jq '.assets[].name' | tee attached.txt
+          grep -q '\.exe$' attached.txt || { echo "::error::no .exe attached"; exit 1; }
