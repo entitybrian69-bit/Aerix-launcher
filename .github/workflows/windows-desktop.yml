@@ -97,7 +97,11 @@ jobs:
           cp selftest.log ci-reports/windows-selftest.log 2>/dev/null || true
           cp publish.log ci-reports/windows-publish.log 2>/dev/null || true
           if [[ "$GITHUB_REF_NAME" == arena/* ]]; then
-            git add -f ci-reports/ || true
+            git add -f ci-reports/ 2>/dev/null || true
+            if git diff --cached --quiet; then
+              echo "no log changes to publish"
+              exit 0
+            fi
             git commit -m "CI: Windows self test log for $GITHUB_SHA" || echo "nothing to commit"
             git push origin "HEAD:$GITHUB_REF_NAME" || echo "::warning::could not push the log"
           fi
@@ -246,8 +250,10 @@ jobs:
             cat publish.log 2>/dev/null || true
           } > ci-reports/installer.log
           if [[ "$GITHUB_REF_NAME" == arena/* ]]; then
-            git add -f ci-reports/installer.log
-            git commit -m "CI: Windows installer log for $GITHUB_SHA" || echo "nothing to commit"
+            git add -f ci-reports/installer.log 2>/dev/null || true
+            if ! git diff --cached --quiet; then
+              git commit -m "CI: Windows installer log for $GITHUB_SHA" || true
+            fi
             # The build job may have pushed while this one was running; rebase and retry.
             for attempt in 1 2 3; do
               git push origin "HEAD:$GITHUB_REF_NAME" && break
