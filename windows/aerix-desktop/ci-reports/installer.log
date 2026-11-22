@@ -1,15 +1,15 @@
 publish exit: success
 --- dist ---
 total 11321
-drwxr-xr-x 1 runneradmin 197121        0 Nov 22 17:18 .
-drwxr-xr-x 1 runneradmin 197121        0 Nov 22 17:18 ..
-drwxr-xr-x 1 runneradmin 197121        0 Nov 22 17:17 AerixLauncher
--rw-r--r-- 1 runneradmin 197121 11586295 Nov 22 17:17 AerixLauncher-2.4.4-portable.zip
--rw-r--r-- 1 runneradmin 197121       90 Nov 22 17:18 SHA256SUMS.txt
-drwxr-xr-x 1 runneradmin 197121        0 Nov 22 17:18 image
+drwxr-xr-x 1 runneradmin 197121        0 Nov 22 17:25 .
+drwxr-xr-x 1 runneradmin 197121        0 Nov 22 17:25 ..
+drwxr-xr-x 1 runneradmin 197121        0 Nov 22 17:24 AerixLauncher
+-rw-r--r-- 1 runneradmin 197121 11586295 Nov 22 17:24 AerixLauncher-2.4.4-portable.zip
+-rw-r--r-- 1 runneradmin 197121       90 Nov 22 17:25 SHA256SUMS.txt
+drwxr-xr-x 1 runneradmin 197121        0 Nov 22 17:25 image
 --- dist/image ---
 dist/image:
 total 67308
-drwxr-xr-x 1 runneradmin 197121        0 Nov 22 17:18 .
-drwxr-xr-x 1 runneradmin 197121        0 Nov 22 17:18 ..
--rwxr-xr-x 1 runneradmin 197121 68921856 Nov 22 17:18 AerixLauncher-2.4.4.exe
+drwxr-xr-x 1 runneradmin 197121        0 Nov 22 17:25 .
+drwxr-xr-x 1 runneradmin 197121        0 Nov 22 17:25 ..
+-rwxr-xr-x 1 runneradmin 197121 68921856 Nov 22 17:25 AerixLauncher-2.4.4.exe
