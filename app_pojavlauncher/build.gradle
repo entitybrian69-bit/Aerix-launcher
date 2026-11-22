@@ -74,6 +74,10 @@ android {
 
     compileSdk = 36
 
+    androidResources {
+        noCompress += 'mp4'
+    }
+
     lintOptions {
         abortOnError false
     }

@@ -64,6 +64,7 @@ import java.io.IOException;
 
 public class LauncherActivity extends BaseActivity {
     public static final String SETTING_FRAGMENT_TAG = "SETTINGS_FRAGMENT";
+    public static final String EXTRA_PLAY_INTRO = "net.al.aerixlauncher.PLAY_INTRO";
     private static final String PREF_MIGRATION_NOTICE_SNOOZED_UNTIL = "migrationNoticeSnoozedUntil";
     private static final long MIGRATION_NOTICE_SNOOZE_MILLIS = 7L * 24L * 60L * 60L * 1000L;
     private static final long MIGRATION_PICKER_SNOOZE_MILLIS = 5L * 60L * 1000L;
@@ -75,6 +76,7 @@ public class LauncherActivity extends BaseActivity {
     private NotificationManager mNotificationManager;
     private static ActivityResultLauncher<String> mRequestPermissionLauncher;
     private ActivityResultLauncher<Uri> mMigrationTreeLauncher;
+    private net.kdt.pojavlaunch.aerix.ui.AerixIntroController mIntroController;
 
     /* Aerix: the floating home button is shown only while a Pojav screen sits above the Aerix shell */
     private final FragmentManager.OnBackStackChangedListener mBackStackListener = this::updateHomeButton;
@@ -256,6 +258,16 @@ public class LauncherActivity extends BaseActivity {
             return insets;
         });
         setContentView(R.layout.activity_pojav_launcher);
+        boolean playIntro = shouldPlayIntroOnLaunch(savedInstanceState, getIntent());
+        if (getIntent() != null) getIntent().removeExtra(EXTRA_PLAY_INTRO);
+        if (playIntro) {
+            android.view.ViewGroup contentRoot = findViewById(android.R.id.content);
+            View mainContent = contentRoot != null ? contentRoot.getChildAt(0) : null;
+            if (mainContent != null) {
+                mIntroController = new net.kdt.pojavlaunch.aerix.ui.AerixIntroController(
+                        this, mainContent, () -> { mIntroController = null; return kotlin.Unit.INSTANCE; });
+            }
+        }
         MoJsonDownloader.prepareSubstitutionMap(getAssets());
 
         try {
@@ -267,7 +279,7 @@ public class LauncherActivity extends BaseActivity {
 
         IconCacheJanitor.runJanitor();
 
-        getWindow().setBackgroundDrawable(null);
+        if (!playIntro) getWindow().setBackgroundDrawable(null);
         bindViews();
         mMigrationTreeLauncher = registerForActivityResult(
                 new ActivityResultContracts.OpenDocumentTree(), this::onMigrationTreeSelected);
@@ -401,14 +413,29 @@ public class LauncherActivity extends BaseActivity {
         InstanceInstaller.postInstallCheck(this);
     }
 
+    private static boolean shouldPlayIntroOnLaunch(Bundle savedInstanceState, Intent intent) {
+        if (savedInstanceState != null || intent == null) return false;
+        if (!intent.getBooleanExtra(EXTRA_PLAY_INTRO, false)) return false;
+        if (intent.getData() != null) return false;
+        return !intent.getBooleanExtra(Tools.EXTRA_RELAUNCH_GAME, false)
+                && intent.getStringExtra(Tools.EXTRA_SWITCH_ACCOUNT) == null
+                && intent.getStringExtra(Tools.EXTRA_SWITCH_INSTANCE) == null
+                && intent.getStringExtra(Tools.EXTRA_LAUNCH_SERVER) == null;
+    }
+
     @Override
     protected void onPause() {
         super.onPause();
+        if (mIntroController != null) mIntroController.onPause();
         ContextExecutor.clearActivity();
     }
 
     @Override
     protected void onDestroy() {
+        if (mIntroController != null) {
+            mIntroController.onDestroy();
+            mIntroController = null;
+        }
         super.onDestroy();
         mProgressLayout.cleanUpObservers();
         ProgressKeeper.removeTaskCountListener(mProgressLayout);

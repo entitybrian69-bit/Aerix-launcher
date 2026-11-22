@@ -104,7 +104,9 @@ fun AerixBackground(modifier: Modifier = Modifier, content: @Composable BoxScope
         }
     }
     // One switch for the whole launcher: the accent motion and everything on this page obey it.
-    val motion = ThemeMotion.rememberEnabled()
+    // Also pause background video/animation decoders while the fullscreen intro splash plays so
+    // the intro owns full hardware video decode bandwidth without contention.
+    val motion = ThemeMotion.rememberEnabled() && !net.kdt.pojavlaunch.aerix.ui.AerixIntroState.active
     val animation = animationById(id)
     Box(modifier.fillMaxSize().background(AerixSurface.canvas)) {
         // Footage that ships with the launcher: played straight from the APK, no bitmap involved.

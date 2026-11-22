@@ -97,8 +97,10 @@ public class TestStorageActivity extends Activity {
         AsyncAssetManager.unpackComponents(this);
         AsyncAssetManager.unpackSingleFiles(this);
 
-        Intent intent =  new Intent(this, LauncherActivity.class);
+        Intent intent = new Intent(this, LauncherActivity.class);
+        intent.putExtra(LauncherActivity.EXTRA_PLAY_INTRO, true);
         startActivity(intent);
+        overridePendingTransition(0, 0);
         finish();
     }
 }

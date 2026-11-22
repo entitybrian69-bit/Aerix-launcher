@@ -111,8 +111,11 @@ import net.kdt.pojavlaunch.aerix.ui.screens.ModpacksScreen
 @Composable
 fun AerixLauncherScreen(activity: FragmentActivity) {
     AerixNav.init()
-    net.kdt.pojavlaunch.aerix.ui.screens.FirstRunNotificationPopupHost(activity)
-    net.kdt.pojavlaunch.aerix.ui.screens.LauncherUpdateNoticeHost(activity)
+    val introPlaying = AerixIntroState.active
+    if (!introPlaying) {
+        net.kdt.pojavlaunch.aerix.ui.screens.FirstRunNotificationPopupHost(activity)
+        net.kdt.pojavlaunch.aerix.ui.screens.LauncherUpdateNoticeHost(activity)
+    }
     val section = AerixNav.section
     var clientOwnerPage by rememberSaveable { mutableStateOf(ClientOwnerPage.OWNERS) }
     val navigate: (LauncherSection) -> Unit = { target ->
@@ -145,8 +148,8 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
     val guideRegistry = remember { GuideRegistry() }
     val guideSteps = rememberGuideSteps()
     val notificationPromptAnswered = AerixPreferences.notificationPromptShown
-    LaunchedEffect(notificationPromptAnswered) {
-        if (!notificationPromptAnswered) return@LaunchedEffect
+    LaunchedEffect(notificationPromptAnswered, introPlaying) {
+        if (introPlaying || !notificationPromptAnswered) return@LaunchedEffect
         AerixGuideState.startOnFirstRun()
         // The steps highlight things on the home page, so the tour brings you there rather than
         // starting on whichever section the launcher was left on.
