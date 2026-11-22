@@ -32,15 +32,22 @@ object SecureStore {
 
     fun seal(plain: String): String {
         if (plain.isEmpty()) return ""
-        return if (Dpapi.available) {
-            PREFIX_DPAPI + Base64.getEncoder().encodeToString(Dpapi.protect(plain.toByteArray(StandardCharsets.UTF_8)))
-        } else {
-            val iv = ByteArray(12).also { random.nextBytes(it) }
-            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-            cipher.init(Cipher.ENCRYPT_MODE, fallbackKey(), GCMParameterSpec(128, iv))
-            val cipherText = cipher.doFinal(plain.toByteArray(StandardCharsets.UTF_8))
-            PREFIX_AES + Base64.getEncoder().encodeToString(iv) + ":" + Base64.getEncoder().encodeToString(cipherText)
+        if (Dpapi.available) {
+            // Even after a successful probe, a later call can fail (a locked profile, a policy
+            // change). Losing the ability to save an account over that is worse than using the
+            // fallback, so a failure downgrades this write instead of propagating.
+            runCatching {
+                PREFIX_DPAPI + Base64.getEncoder()
+                    .encodeToString(Dpapi.protect(plain.toByteArray(StandardCharsets.UTF_8)))
+            }.onSuccess { return it }.onFailure {
+                Log.w("securestore", "DPAPI seal failed (${it.message}); sealing with the AES-GCM fallback")
+            }
         }
+        val iv = ByteArray(12).also { random.nextBytes(it) }
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.ENCRYPT_MODE, fallbackKey(), GCMParameterSpec(128, iv))
+        val cipherText = cipher.doFinal(plain.toByteArray(StandardCharsets.UTF_8))
+        return PREFIX_AES + Base64.getEncoder().encodeToString(iv) + ":" + Base64.getEncoder().encodeToString(cipherText)
     }
 
     fun open(sealed: String): String? {
@@ -48,6 +55,8 @@ object SecureStore {
         return runCatching {
             when {
                 sealed.startsWith(PREFIX_DPAPI) -> {
+                    // A blob sealed by DPAPI can only be read by DPAPI; if this machine cannot do
+                    // that, the token is unreadable and the caller must sign in again.
                     if (!Dpapi.available) return null
                     val data = Base64.getDecoder().decode(sealed.removePrefix(PREFIX_DPAPI))
                     String(Dpapi.unprotect(data), StandardCharsets.UTF_8)
@@ -97,15 +106,35 @@ object SecureStore {
  * [SecureStore] uses its AES-GCM fallback instead; the launcher never requires DPAPI.
  */
 object Dpapi {
+    /**
+     * True only if DPAPI has *demonstrably* worked, not merely if the API that could reach it is
+     * present. The distinction matters: the JDK's foreign-function API exists from 22, but calling
+     * into it still needs native access and can be refused, and `CryptProtectData` itself can fail.
+     * An earlier version checked only for `Linker`, so on Windows it advertised DPAPI, then threw
+     * from [protect] and took account saving down with it. Now it round-trips a small buffer once
+     * and falls back to AES-GCM if anything at all goes wrong.
+     */
     val available: Boolean = detect()
+
+    private const val PROBE = "aerix-dpapi-probe"
 
     private fun detect(): Boolean {
         if (!net.kdt.aerix.desktop.app.AppEnv.isWindows) return false
-        return runCatching {
-            // java.lang.foreign (JDK 22+) provides the linker; older JDKs simply use the fallback.
+        val apiPresent = runCatching {
             val linkMethod = Class.forName("java.lang.foreign.Linker").getMethod("nativeLinker")
             linkMethod.invoke(null) != null
         }.getOrDefault(false)
+        if (!apiPresent) return false
+        // A real seal/open pair is the only honest test, and it catches the layout and
+        // native-access mistakes that a capability check cannot see.
+        return runCatching {
+            val sealed = FfmDpapi.protect(PROBE.toByteArray(StandardCharsets.UTF_8))
+            val opened = FfmDpapi.unprotect(sealed)
+            opened.contentEquals(PROBE.toByteArray(StandardCharsets.UTF_8))
+        }.getOrElse {
+            Log.w("securestore", "DPAPI is present but not usable (${it.message}); using the AES-GCM fallback")
+            false
+        }
     }
 
     fun protect(data: ByteArray): ByteArray = runCatching { FfmDpapi.protect(data) }
