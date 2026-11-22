@@ -1,0 +1,7 @@
+[38;5;44m[aerix][0m compiling (JDK 21.0.13)
+[38;5;44m[aerix][0m kotlin OK
+[38;5;44m[aerix][0m writing jar
+[38;5;44m[aerix][0m built /d/a/Aerix-launcherPc/Aerix-launcherPc/windows/aerix-desktop/build/aerix-launcher.jar (7.1M)
+[38;5;44m[aerix][0m running headless self test
+Error: Unable to initialize main class net.kdt.aerix.desktop.MainKt
+Caused by: java.lang.NoClassDefFoundError: kotlin/KotlinNothingValueException
