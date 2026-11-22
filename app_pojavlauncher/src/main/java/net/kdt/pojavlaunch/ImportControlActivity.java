@@ -1,26 +1,25 @@
 package net.kdt.pojavlaunch;
 
-import android.app.Activity;
 import android.app.AlertDialog;
-import android.graphics.Point;
-import net.kdt.pojavlaunch.customcontrols.LayoutConverter;
 import android.content.Intent;
+import android.graphics.Point;
 import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
-import android.view.inputmethod.InputMethodManager;
-import android.widget.EditText;
 import android.widget.Toast;
 
 import androidx.annotation.Nullable;
 
+import net.kdt.pojavlaunch.aerix.bridge.AerixPreferences;
+import net.kdt.pojavlaunch.aerix.ui.screens.ImportControlHost;
+import net.kdt.pojavlaunch.aerix.ui.screens.ImportControlUiState;
 import net.kdt.pojavlaunch.customcontrols.ControlLayoutImporter;
 import net.kdt.pojavlaunch.customcontrols.LayoutBitmaps;
+import net.kdt.pojavlaunch.customcontrols.LayoutConverter;
 import net.kdt.pojavlaunch.utils.FileUtils;
 
 import org.apache.commons.io.IOUtils;
-import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.File;
@@ -29,33 +28,46 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
-import net.kdt.pojavlaunch.R;
-
 /**
  * An activity dedicated to importing control files.
  */
 @SuppressWarnings("IOStreamConstructor")
-public class ImportControlActivity extends Activity {
+public class ImportControlActivity extends BaseActivity {
 
     private Uri mUriData;
     private boolean mHasIntentChanged = true;
     private volatile boolean mIsFileVerified = false;
+    private String mCompatibilityWarning;
+    private ImportControlUiState mUiState;
 
-    private EditText mEditText;
-
-    
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
+        AerixPreferences.INSTANCE.init(getApplicationContext());
         super.onCreate(savedInstanceState);
-        if(Tools.checkStorageInteractive(this)) {
+        if (Tools.checkStorageInteractive(this)) {
             Tools.initStorageConstants(getApplicationContext());
-        }else {
-            // Return early, no initialization needed.
+        } else {
             return;
         }
 
-        setContentView(R.layout.activity_import_control);
-        mEditText = findViewById(R.id.editText_import_control_file_name);
+        mUiState = new ImportControlUiState();
+        setContentView(ImportControlHost.createView(
+                this,
+                mUiState,
+                this::updateValidationState,
+                this::finishAndRemoveTask,
+                () -> startImport(null)
+        ));
+    }
+
+    @Override
+    public boolean setFullscreen() {
+        return AerixPreferences.INSTANCE.getFullScreen();
+    }
+
+    @Override
+    protected boolean shouldIgnoreNotch() {
+        return true;
     }
 
     /**
@@ -64,7 +76,8 @@ public class ImportControlActivity extends Activity {
      */
     @Override
     protected void onNewIntent(Intent intent) {
-        if(intent != null) setIntent(intent);
+        super.onNewIntent(intent);
+        if (intent != null) setIntent(intent);
         mHasIntentChanged = true;
     }
 
@@ -74,58 +87,73 @@ public class ImportControlActivity extends Activity {
     @Override
     protected void onPostResume() {
         super.onPostResume();
-        if(!Tools.checkStorageInteractive(this)) {
-            // Don't try to read the file as when this check fails, external storage paths
-            // are no longer valid (likely unmounted).
-            // checkStorageInteractive() will finish this activity for us.
+        if (!Tools.checkStorageInteractive(this)) {
             return;
         }
-        if(!mHasIntentChanged) return;
+        if (!mHasIntentChanged || mUiState == null) return;
         mIsFileVerified = false;
         mCompatibilityWarning = null;
         getUriData();
-        if(mUriData == null) {
+        if (mUriData == null) {
             finishAndRemoveTask();
             return;
         }
-        mEditText.setText(trimFileName(Tools.getFileName(this, mUriData)));
+        String initialName = trimFileName(Tools.getFileName(this, mUriData));
+        mUiState.setFileName(initialName);
+        mUiState.setVerified(false);
+        mUiState.setStatusBadge("Verifying JSON layout…");
+        updateValidationState(initialName);
         mHasIntentChanged = false;
 
-        //Import and verify thread
-        //Kill the app if the file isn't valid.
         new Thread(() -> {
             importControlFile();
 
-            if(verify())mIsFileVerified = true;
-            else runOnUiThread(() -> {
-                Toast.makeText(
-                        ImportControlActivity.this,
-                        getText(R.string.import_control_invalid_file),
-                        Toast.LENGTH_SHORT).show();
-                finishAndRemoveTask();
-            });
+            String verifiedBadge = verifyAndDescribe();
+            if (verifiedBadge != null) {
+                mIsFileVerified = true;
+                runOnUiThread(() -> {
+                    if (mUiState != null) {
+                        mUiState.setVerified(true);
+                        mUiState.setStatusBadge(verifiedBadge);
+                        updateValidationState(mUiState.getFileName());
+                    }
+                });
+            } else {
+                runOnUiThread(() -> {
+                    Toast.makeText(
+                            ImportControlActivity.this,
+                            getText(R.string.import_control_invalid_file),
+                            Toast.LENGTH_SHORT).show();
+                    finishAndRemoveTask();
+                });
+            }
         }).start();
+    }
 
-        //Auto show the keyboard
-        Tools.MAIN_HANDLER.postDelayed(() -> {
-            InputMethodManager imm = (InputMethodManager) getApplicationContext().getSystemService(INPUT_METHOD_SERVICE);
-            imm.toggleSoftInput(InputMethodManager.SHOW_IMPLICIT, 0);
-            mEditText.setSelection(mEditText.getText().length());
-        }, 100);
+    private void updateValidationState(String rawName) {
+        if (mUiState == null) return;
+        String clean = trimFileName(rawName == null ? "" : rawName);
+        if (clean.isEmpty()) {
+            mUiState.setValidationError(getString(R.string.import_control_invalid_name));
+        } else if (FileUtils.exists(Tools.CTRLMAP_PATH + "/" + clean + ".json")) {
+            mUiState.setValidationError(getString(R.string.import_control_invalid_name));
+        } else {
+            mUiState.setValidationError(null);
+        }
     }
 
     /**
      * Start the import.
-     * @param view the view which called the function
+     * @param view optional caller view
      */
-    public void startImport(View view) {
-        String fileName = trimFileName(mEditText.getText().toString());
-        //Step 1 check for suffixes.
-        if(!isFileNameValid(fileName)){
+    public void startImport(@Nullable View view) {
+        String currentName = mUiState != null ? mUiState.getFileName() : "";
+        String fileName = trimFileName(currentName);
+        if (!isFileNameValid(fileName)) {
             Toast.makeText(this, getText(R.string.import_control_invalid_name), Toast.LENGTH_SHORT).show();
             return;
         }
-        if(!mIsFileVerified){
+        if (!mIsFileVerified) {
             Toast.makeText(this, getText(R.string.import_control_verifying_file), Toast.LENGTH_LONG).show();
             return;
         }
@@ -135,11 +163,13 @@ public class ImportControlActivity extends Activity {
                     .setMessage(mCompatibilityWarning)
                     .setPositiveButton(R.string.import_control_import_button, (dialog, which) -> finishImport(fileName))
                     .setNegativeButton(android.R.string.cancel, null).show();
-        } else finishImport(fileName);
+        } else {
+            finishImport(fileName);
+        }
     }
 
     /**
-     * Copy a the file from the Intent data with a provided name into the controlmap folder.
+     * Copy the staged control file into the controlmap folder under the provided name.
      */
     private void finishImport(String fileName) {
         if (!isFileNameValid(fileName)) {
@@ -154,9 +184,7 @@ public class ImportControlActivity extends Activity {
         finishAndRemoveTask();
     }
 
-    private String mCompatibilityWarning;
-
-    private void importControlFile(){
+    private void importControlFile() {
         File staged = new File(Tools.CTRLMAP_PATH, "TMP_IMPORT_FILE.json");
         staged.delete();
         try (InputStream is = getContentResolver().openInputStream(mUriData);
@@ -169,24 +197,14 @@ public class ImportControlActivity extends Activity {
         }
     }
 
-    /**
-     * Tell if the clean version of the filename is valid.
-     * @param fileName the string to test
-     * @return whether the filename is valid
-     */
-    private static boolean isFileNameValid(String fileName){
+    private static boolean isFileNameValid(String fileName) {
         fileName = trimFileName(fileName);
-
-        if(fileName.isEmpty()) return false;
+        if (fileName.isEmpty()) return false;
         return !FileUtils.exists(Tools.CTRLMAP_PATH + "/" + fileName + ".json");
     }
 
-    /**
-     * Remove or undesirable chars from the string
-     * @param fileName The string to trim
-     * @return The trimmed string
-     */
-    private static String trimFileName(String fileName){
+    private static String trimFileName(String fileName) {
+        if (fileName == null) return "";
         return fileName
                 .replace(".json", "")
                 .replaceAll("%..", "/")
@@ -195,46 +213,37 @@ public class ImportControlActivity extends Activity {
                 .trim();
     }
 
-    /**
-     * Tries to get an Uri from the various sources
-     */
-    private void getUriData(){
+    private void getUriData() {
         mUriData = getIntent().getData();
-        if(mUriData != null) return;
+        if (mUriData != null) return;
         try {
             mUriData = getIntent().getClipData().getItemAt(0).getUri();
-        }catch (Exception ignored){}
+        } catch (Exception ignored) {}
     }
 
-    /**
-     * Verify if the control file is valid.
-     * The file may come from this launcher, from another PojavLauncher launcher, from the Zalith
-     * Launcher 2 editor or from Fold Craft Launcher: the last two are converted when the layout is
-     * loaded.
-     * @return Whether the control file can be used
-     */
-    private boolean verify() {
+    @Nullable
+    private String verifyAndDescribe() {
         try {
-            LayoutBitmaps.ControlsContainer layout = LayoutBitmaps.load(new File(Tools.CTRLMAP_PATH,"TMP_IMPORT_FILE.json"));
+            LayoutBitmaps.ControlsContainer layout = LayoutBitmaps.load(new File(Tools.CTRLMAP_PATH, "TMP_IMPORT_FILE.json"));
             JSONObject layoutJobj = new JSONObject(layout.mControlsJson);
             ControlLayoutImporter.Format format = ControlLayoutImporter.detectFormat(layoutJobj);
-            if (format == ControlLayoutImporter.Format.UNKNOWN) return false;
+            if (format == ControlLayoutImporter.Format.UNKNOWN) return null;
             if (Tools.currentDisplayMetrics == null) Tools.currentDisplayMetrics = getResources().getDisplayMetrics();
             Point size = new Point(Math.max(Tools.currentDisplayMetrics.widthPixels, Tools.currentDisplayMetrics.heightPixels),
                     Math.min(Tools.currentDisplayMetrics.widthPixels, Tools.currentDisplayMetrics.heightPixels));
             if (format == ControlLayoutImporter.Format.POJAV) {
-                return LayoutConverter.loadFromString(this, size, layout.mControlsJson) != null;
+                if (LayoutConverter.loadFromString(this, size, layout.mControlsJson) == null) return null;
+                return "Aerix / Pojav JSON · Verified";
             }
             ControlLayoutImporter.Result result = ControlLayoutImporter.convert(this, size, layoutJobj, format);
-            if (result == null) return false;
+            if (result == null) return null;
+            String sourceLabel = format == ControlLayoutImporter.Format.ZALITH ? "Zalith Launcher 2" : "Fold Craft Launcher";
             mCompatibilityWarning = getString(R.string.import_control_compatibility_warning,
-                    format == ControlLayoutImporter.Format.ZALITH ? "Zalith Launcher 2" : "Fold Craft Launcher",
-                    result.skippedEntries, result.inertButtons, result.unsupportedEvents);
-            return true;
-        }catch (Exception e) {
+                    sourceLabel, result.skippedEntries, result.inertButtons, result.unsupportedEvents);
+            return sourceLabel + " · Ready to convert";
+        } catch (Exception e) {
             Log.w("ImportControlActivity", "Failed to validate layout", e);
-            return false;
+            return null;
         }
     }
-
 }

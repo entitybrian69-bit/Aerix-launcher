@@ -39,6 +39,7 @@ import net.kdt.pojavlaunch.extra.ExtraCore;
 import net.kdt.pojavlaunch.extra.ExtraListener;
 import net.kdt.pojavlaunch.fragments.MainMenuFragment;
 import net.kdt.pojavlaunch.fragments.MicrosoftLoginFragment;
+import net.kdt.pojavlaunch.fragments.SearchModFragment;
 import net.kdt.pojavlaunch.fragments.SelectAuthFragment;
 import net.kdt.pojavlaunch.aerix.ui.AerixNav;
 import net.kdt.pojavlaunch.aerix.ui.LauncherSection;
@@ -448,7 +449,13 @@ public class LauncherActivity extends BaseActivity {
     }
 
     private void updateHomeButton() {
-        mHomeButton.setVisibility(getSupportFragmentManager().getBackStackEntryCount() > 0 ? View.VISIBLE : View.GONE);
+        Fragment top = getSupportFragmentManager().findFragmentById(R.id.container_fragment);
+        boolean hideForSearchMod = top instanceof SearchModFragment;
+        mHomeButton.setVisibility(
+                getSupportFragmentManager().getBackStackEntryCount() > 0 && !hideForSearchMod
+                        ? View.VISIBLE
+                        : View.GONE
+        );
     }
 
     /** Custom implementation to feel more natural when a backstack isn't present */
