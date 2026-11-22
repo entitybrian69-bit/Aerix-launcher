@@ -62,23 +62,29 @@ jobs:
         # tee so the report also lands in the job summary: workflow logs are not always retrievable
         # through the API, and a red Windows-only check is useless if its output cannot be read.
         run: |
-          set -o pipefail
-          ./build.sh --selftest 2>&1 | tee selftest.log
+          set +e
+          ./build.sh --selftest > selftest.log 2>&1
+          rc=$?
+          tail -40 selftest.log
           {
             echo '## Self test'
             echo '```'
             grep -E '^(PASS|FAIL)|passed, ' selftest.log || tail -40 selftest.log
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+          exit $rc
 
       - name: Render every page
         run: ./build.sh --screenshot
 
       - name: Upload the build
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: aerix-launcher-jar
-          path: windows/aerix-desktop/build/aerix-launcher.jar
+          path: |
+            windows/aerix-desktop/build/aerix-launcher.jar
+            windows/aerix-desktop/selftest.log
           if-no-files-found: error
 
       - name: Upload the screenshots
