@@ -197,11 +197,20 @@ jobs:
             windows/aerix-desktop/dist/SHA256SUMS.txt
           if-no-files-found: error
 
+      - name: Read the launcher version
+        id: version
+        run: |
+          v="$(head -1 src/main/resources/aerix/version.txt | tr -d '\r\n ')"
+          echo "value=$v" >> "$GITHUB_OUTPUT"
+          echo "launcher version: $v"
+
       - name: Publish to the desktop pre-release
         id: publish
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION_TAG: "2.4.4"
+          # Read from the build rather than repeating it: a hardcoded tag silently stops matching
+          # the artifacts the moment the launcher version moves.
+          VERSION_TAG: ${{ steps.version.outputs.value }}
         run: |
           set -euxo pipefail
           TAG="desktop-$VERSION_TAG"
@@ -214,7 +223,7 @@ jobs:
           # build sandbox, and the summary is.
           set +e
           gh release upload "$TAG" dist/image/*.exe dist/image/*.msi \
-            "dist/AerixLauncher-$VERSION-portable.zip" dist/SHA256SUMS.txt --clobber \
+            dist/AerixLauncher-*-portable.zip dist/SHA256SUMS.txt --clobber \
             > publish.log 2>&1
           rc=$?
           {
