@@ -120,7 +120,7 @@ jobs:
     runs-on: windows-latest
     needs: build
     permissions:
-      contents: write
+      contents: write   # release upload, and pushing the installer log back to the branch
     defaults:
       run:
         shell: bash
