@@ -59,7 +59,17 @@ jobs:
         run: ./build.sh
 
       - name: Self test
-        run: ./build.sh --selftest
+        # tee so the report also lands in the job summary: workflow logs are not always retrievable
+        # through the API, and a red Windows-only check is useless if its output cannot be read.
+        run: |
+          set -o pipefail
+          ./build.sh --selftest 2>&1 | tee selftest.log
+          {
+            echo '## Self test'
+            echo '```'
+            grep -E '^(PASS|FAIL)|passed, ' selftest.log || tail -40 selftest.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Render every page
         run: ./build.sh --screenshot
