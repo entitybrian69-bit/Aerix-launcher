@@ -28,6 +28,8 @@ jobs:
     # Windows, because the launcher is a Windows product: the tray, DPAPI token sealing and the
     # process handling are all exercised there for real.
     runs-on: windows-latest
+    permissions:
+      contents: write   # only for pushing the self test log back onto arena/* branches
     defaults:
       run:
         shell: bash
