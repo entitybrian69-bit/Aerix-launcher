@@ -8,10 +8,8 @@ WARNING: A restricted method in java.lang.foreign.SymbolLookup has been called
 WARNING: java.lang.foreign.SymbolLookup::libraryLookup has been called by the unnamed module
 WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for this module
 
-16:40:11.928 E/settings: could not save settings: C:\Users\runneradmin\AppData\Roaming\Aerix Launcher\settings.json.tmp
-16:40:11.928 E/settings: could not save settings: C:\Users\runneradmin\AppData\Roaming\Aerix Launcher\settings.json.tmp
 
-Aerix Launcher self test — 26185 ms
+Aerix Launcher self test — 25764 ms
 ????????????????????????????????????????????????????????????????
 PASS  settings round-trip
 PASS  secure store seals and opens
