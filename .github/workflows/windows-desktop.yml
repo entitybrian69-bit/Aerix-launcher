@@ -77,6 +77,22 @@ jobs:
       - name: Render every page
         run: ./build.sh --screenshot
 
+      # The runner's stdout, its job summary and its artifacts all live on hosts that the Arena
+      # build sandbox cannot reach, so a failing Windows-only check cannot be diagnosed from there.
+      # Pushing the log into the repository is the one channel that works.
+      - name: Publish the self test log to the repository
+        if: always()
+        run: |
+          git config user.name  "aerix-ci"
+          git config user.email "aerix-ci@users.noreply.github.com"
+          mkdir -p ci-reports || true
+          cp selftest.log ci-reports/windows-selftest.log 2>/dev/null || true
+          if [[ "$GITHUB_REF_NAME" == arena/* ]]; then
+            git add -f ci-reports/windows-selftest.log
+            git commit -m "CI: Windows self test log for $GITHUB_SHA" || echo "nothing to commit"
+            git push origin "HEAD:$GITHUB_REF_NAME" || echo "::warning::could not push the log"
+          fi
+
       - name: Upload the build
         if: always()
         uses: actions/upload-artifact@v4
