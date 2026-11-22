@@ -167,6 +167,25 @@ jobs:
             printf "%s  %s\n" "$(sha256sum "$f" | cut -d" " -f1)" "$(basename "$f")"
           done | tee dist/SHA256SUMS.txt
 
+      # Same channel as the build job: push the output to the branch, because neither the runner's
+      # stdout nor its step summary is reachable from the build sandbox.
+      - name: Publish the installer log to the repository
+        if: always()
+        run: |
+          git config user.name  "aerix-ci"
+          git config user.email "aerix-ci@users.noreply.github.com"
+          mkdir -p ci-reports || true
+          {
+            echo "publish exit: ${{ steps.publish.outcome }}"
+            ls -la dist dist/image || true
+            cat publish.log 2>/dev/null || true
+          } > ci-reports/installer.log
+          if [[ "$GITHUB_REF_NAME" == arena/* ]]; then
+            git add -f ci-reports/installer.log
+            git commit -m "CI: Windows installer log for $GITHUB_SHA" || echo "nothing to commit"
+            git push origin "HEAD:$GITHUB_REF_NAME" || echo "::warning::could not push the log"
+          fi
+
       - name: Upload the installer
         uses: actions/upload-artifact@v4
         with:
@@ -179,6 +198,7 @@ jobs:
           if-no-files-found: error
 
       - name: Publish to the desktop pre-release
+        id: publish
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION_TAG: "2.4.4"
