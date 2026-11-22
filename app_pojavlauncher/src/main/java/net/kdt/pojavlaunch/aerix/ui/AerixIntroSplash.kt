@@ -55,6 +55,21 @@ class AerixIntroController(
     private val watchdogRunnable = Runnable { finishIntro(animate = true) }
     private val revealCoverFallback = Runnable { revealVideoSurface() }
 
+    private val surfaceCallback = object : SurfaceHolder.Callback {
+        override fun surfaceCreated(holder: SurfaceHolder) {
+            if (finishing || cleanedUp) return
+            startPlayback(holder)
+        }
+
+        override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
+            applyCenterCropLayout()
+        }
+
+        override fun surfaceDestroyed(holder: SurfaceHolder) {
+            releasePlayer()
+        }
+    }
+
     init {
         AerixIntroState.active = true
         activity.window.setBackgroundDrawable(ColorDrawable(Color.BLACK))
@@ -117,21 +132,6 @@ class AerixIntroController(
         surfaceView.holder.addCallback(surfaceCallback)
         // Safety deadline in case surface creation or prepareAsync stalls on an unusual device.
         handler.postDelayed(watchdogRunnable, STARTUP_WATCHDOG_MS)
-    }
-
-    private val surfaceCallback = object : SurfaceHolder.Callback {
-        override fun surfaceCreated(holder: SurfaceHolder) {
-            if (finishing || cleanedUp) return
-            startPlayback(holder)
-        }
-
-        override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
-            applyCenterCropLayout()
-        }
-
-        override fun surfaceDestroyed(holder: SurfaceHolder) {
-            releasePlayer()
-        }
     }
 
     private fun startPlayback(holder: SurfaceHolder) {
