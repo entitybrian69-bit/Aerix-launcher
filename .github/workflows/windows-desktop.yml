@@ -8,6 +8,12 @@ name: Windows desktop launcher
 # parsing, Java discovery) and the offscreen page renderer, then uploads the screenshots so a
 # design review is possible without a Windows machine.
 
+# Both jobs push to the branch (their logs are the only output the build sandbox can read), so two
+# runs pushing at once would reject each other. Serialise per branch and cancel nothing.
+concurrency:
+  group: windows-desktop-${{ github.ref }}
+  cancel-in-progress: false
+
 on:
   workflow_dispatch:
   push:
@@ -167,25 +173,6 @@ jobs:
             printf "%s  %s\n" "$(sha256sum "$f" | cut -d" " -f1)" "$(basename "$f")"
           done | tee dist/SHA256SUMS.txt
 
-      # Same channel as the build job: push the output to the branch, because neither the runner's
-      # stdout nor its step summary is reachable from the build sandbox.
-      - name: Publish the installer log to the repository
-        if: always()
-        run: |
-          git config user.name  "aerix-ci"
-          git config user.email "aerix-ci@users.noreply.github.com"
-          mkdir -p ci-reports || true
-          {
-            echo "publish exit: ${{ steps.publish.outcome }}"
-            ls -la dist dist/image || true
-            cat publish.log 2>/dev/null || true
-          } > ci-reports/installer.log
-          if [[ "$GITHUB_REF_NAME" == arena/* ]]; then
-            git add -f ci-reports/installer.log
-            git commit -m "CI: Windows installer log for $GITHUB_SHA" || echo "nothing to commit"
-            git push origin "HEAD:$GITHUB_REF_NAME" || echo "::warning::could not push the log"
-          fi
-
       - name: Upload the installer
         uses: actions/upload-artifact@v4
         with:
@@ -236,6 +223,31 @@ jobs:
           if [[ $rc -ne 0 ]]; then
             echo "::error::gh release upload failed, see the summary"
             exit 1
+          fi
+
+      # Same channel as the build job: push the output to the branch, because neither the runner's
+      # stdout nor its step summary is reachable from the build sandbox.
+      - name: Publish the installer log to the repository
+        if: always()
+        run: |
+          git config user.name  "aerix-ci"
+          git config user.email "aerix-ci@users.noreply.github.com"
+          mkdir -p ci-reports || true
+          {
+            echo "publish exit: ${{ steps.publish.outcome }}"
+            echo "--- dist ---"; ls -la dist || true
+            echo "--- dist/image ---"; ls -laR dist/image || true
+            cat publish.log 2>/dev/null || true
+          } > ci-reports/installer.log
+          if [[ "$GITHUB_REF_NAME" == arena/* ]]; then
+            git add -f ci-reports/installer.log
+            git commit -m "CI: Windows installer log for $GITHUB_SHA" || echo "nothing to commit"
+            # The build job may have pushed while this one was running; rebase and retry.
+            for attempt in 1 2 3; do
+              git push origin "HEAD:$GITHUB_REF_NAME" && break
+              git pull --rebase origin "$GITHUB_REF_NAME" || true
+              sleep 3
+            done
           fi
           # Prove they really landed.
           gh release view "$TAG" --json assets --jq '.assets[].name' | tee attached.txt
