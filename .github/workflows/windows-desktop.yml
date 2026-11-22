@@ -190,12 +190,24 @@ jobs:
           gh release view "$TAG" >/dev/null 2>&1 || \
             gh release create "$TAG" --title "Aerix Launcher for Windows $VERSION_TAG" \
               --prerelease --notes "Portable build and Windows installers for Aerix Launcher $VERSION_TAG."
-          # Keep the output: this step's stdout is not reachable from the build sandbox, and the
-          # only channel that is, is the log file committed below.
-          : > publish.log
+          # Capture the output into the job summary: this runner's stdout is not reachable from the
+          # build sandbox, and the summary is.
+          set +e
           gh release upload "$TAG" dist/image/*.exe dist/image/*.msi \
             "dist/AerixLauncher-$VERSION-portable.zip" dist/SHA256SUMS.txt --clobber \
-            2>&1 | tee -a publish.log
+            > publish.log 2>&1
+          rc=$?
+          {
+            echo '## Release upload (exit '"$rc"')'
+            echo '```'
+            cat publish.log || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "gh exit=$rc"
+          if [[ $rc -ne 0 ]]; then
+            echo "::error::gh release upload failed, see the summary"
+            exit 1
+          fi
           # Prove they really landed.
           gh release view "$TAG" --json assets --jq '.assets[].name' | tee attached.txt
           grep -q '\.exe$' attached.txt || { echo "::error::no .exe attached"; exit 1; }
