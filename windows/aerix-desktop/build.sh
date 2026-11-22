@@ -200,16 +200,29 @@ make_installer() {
   make_dist
   local jp="$JDK/bin/jpackage"
   if [[ ! -x "$jp" ]]; then log "jpackage missing (JDK without jpackage) - portable zip only"; return; fi
+  # jpackage wants a JDK image with jlink; a JRE-based one fails here, and failing loudly is better
+  # than the quiet `|| true` this used to be, which reported success without producing anything.
+  if [[ ! -x "$JDK/bin/jlink" ]]; then log "jlink missing (JRE image) - portable zip only"; return; fi
+  local icon="$HERE/packaging/aerix.ico"
+  if [[ ! -f "$icon" ]]; then echo "error: missing $icon" >&2; exit 1; fi
   rm -rf "$DIST/image"; mkdir -p "$DIST/image"
+  # .exe and .msi are Windows-only formats. Elsewhere jpackage can still produce a runnable
+  # app-image, which is the same layout an .exe installs, so it is worth building.
   local type="app-image"
   case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) type="exe"; [[ -n "${AERIX_MSI:-}" ]] && type="msi";; esac
-  "$jp" --type "$type" --name "AerixLauncher" --app-version "$VERSION" \
+  log "jpackage --type $type"
+  if ! "$jp" --type "$type" --name "AerixLauncher" --app-version "$VERSION" \
       --dest "$DIST/image" --input "$DIST/AerixLauncher" --main-jar aerix-launcher.jar \
-      --main-class "$MAIN_CLASS" --icon "$HERE/packaging/aerix.ico" \
+      --main-class "$MAIN_CLASS" --icon "$icon" \
       --description "Aerix Launcher - Minecraft: Java Edition for Windows" \
       --vendor "Aerix Launcher contributors" \
-      --java-options "-Xmx1g" --java-options "-Dfile.encoding=UTF-8" 2>&1 | tail -5 || true
-  log "installer/app image: $DIST/image"
+      --java-options "-Xmx1g" --java-options "-Dfile.encoding=UTF-8"; then
+    echo "error: jpackage failed (on Windows this usually means WiX is not installed)" >&2
+    exit 1
+  fi
+  local found
+  found="$(find "$DIST/image" -maxdepth 1 -type f \( -name '*.exe' -o -name '*.msi' \) 2>/dev/null)"
+  if [[ -n "$found" ]]; then log "installer: $found"; else log "app image: $DIST/image/AerixLauncher"; fi
 }
 
 case "${1:-build}" in

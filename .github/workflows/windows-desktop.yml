@@ -77,3 +77,78 @@ jobs:
           name: aerix-launcher-pages
           path: windows/aerix-desktop/build/screenshots
           if-no-files-found: error
+
+  installer:
+    # The .exe and .msi cannot be cross-built: jpackage only writes them on Windows, and it needs
+    # WiX on PATH (which windows-latest has). This job is the supported way to get an installer,
+    # because the build sandbox is Linux and has no WiX.
+    runs-on: windows-latest
+    needs: build
+    permissions:
+      contents: write
+    defaults:
+      run:
+        shell: bash
+        working-directory: windows/aerix-desktop
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Install WiX
+        run: |
+          if ! command -v candle.exe >/dev/null 2>&1; then
+            choco install wixtoolset --no-progress -y
+            echo "C:\Program Files (x86)\WiX Toolset v3.11\bin" >> "$GITHUB_PATH"
+          fi
+
+      - name: Install the Kotlin compiler
+        run: |
+          curl -fsSL -o kotlin.zip https://github.com/JetBrains/kotlin/releases/download/v2.1.0/kotlin-compiler-2.1.0.zip
+          unzip -q kotlin.zip -d "$RUNNER_TOOL_CACHE/kotlin"
+          if [[ -f "$RUNNER_TOOL_CACHE/kotlin/kotlinc/bin/kotlinc.bat" ]]; then
+            echo "KOTLINC=$RUNNER_TOOL_CACHE/kotlin/kotlinc/bin/kotlinc.bat" >> "$GITHUB_ENV"
+          else
+            echo "KOTLINC=$RUNNER_TOOL_CACHE/kotlin/kotlinc/bin/kotlinc" >> "$GITHUB_ENV"
+          fi
+
+      - name: Build the portable ZIP and the installers
+        run: ./build.sh --installer
+
+      # A missing installer must fail here, not silently publish a ZIP under an "installer" name.
+      - name: Assert the installers exist
+        run: |
+          ls -la dist
+          shopt -s nullglob
+          exe=(dist/image/*.exe) msi=(dist/image/*.msi)
+          echo "exe=${exe[*]}"; echo "msi=${msi[*]}"
+          if [[ ${#exe[@]} -eq 0 ]]; then echo "::error::jpackage produced no .exe"; exit 1; fi
+          for f in "${exe[@]}" "${msi[@]}"; do
+            printf "%s  %s\n" "$(sha256sum "$f" | cut -d" " -f1)" "$(basename "$f")"
+          done | tee dist/SHA256SUMS.txt
+
+      - name: Upload the installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: aerix-launcher-installer
+          path: |
+            windows/aerix-desktop/dist/image/*.exe
+            windows/aerix-desktop/dist/image/*.msi
+            windows/aerix-desktop/dist/AerixLauncher-*-portable.zip
+            windows/aerix-desktop/dist/SHA256SUMS.txt
+          if-no-files-found: error
+
+      - name: Publish to the desktop pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION_TAG: "2.4.4"
+        run: |
+          TAG="desktop-$VERSION_TAG"
+          gh release upload "$TAG" dist/image/*.exe dist/image/*.msi \
+            "dist/AerixLauncher-$VERSION-portable.zip" dist/SHA256SUMS.txt --clobber \
+            || echo "::warning::could not upload to $TAG"
