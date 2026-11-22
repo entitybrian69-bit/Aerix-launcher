@@ -89,8 +89,9 @@ jobs:
           git config user.email "aerix-ci@users.noreply.github.com"
           mkdir -p ci-reports || true
           cp selftest.log ci-reports/windows-selftest.log 2>/dev/null || true
+          cp publish.log ci-reports/windows-publish.log 2>/dev/null || true
           if [[ "$GITHUB_REF_NAME" == arena/* ]]; then
-            git add -f ci-reports/windows-selftest.log
+            git add -f ci-reports/ || true
             git commit -m "CI: Windows self test log for $GITHUB_SHA" || echo "nothing to commit"
             git push origin "HEAD:$GITHUB_REF_NAME" || echo "::warning::could not push the log"
           fi
@@ -189,8 +190,12 @@ jobs:
           gh release view "$TAG" >/dev/null 2>&1 || \
             gh release create "$TAG" --title "Aerix Launcher for Windows $VERSION_TAG" \
               --prerelease --notes "Portable build and Windows installers for Aerix Launcher $VERSION_TAG."
+          # Keep the output: this step's stdout is not reachable from the build sandbox, and the
+          # only channel that is, is the log file committed below.
+          : > publish.log
           gh release upload "$TAG" dist/image/*.exe dist/image/*.msi \
-            "dist/AerixLauncher-$VERSION-portable.zip" dist/SHA256SUMS.txt --clobber
+            "dist/AerixLauncher-$VERSION-portable.zip" dist/SHA256SUMS.txt --clobber \
+            2>&1 | tee -a publish.log
           # Prove they really landed.
           gh release view "$TAG" --json assets --jq '.assets[].name' | tee attached.txt
           grep -q '\.exe$' attached.txt || { echo "::error::no .exe attached"; exit 1; }
