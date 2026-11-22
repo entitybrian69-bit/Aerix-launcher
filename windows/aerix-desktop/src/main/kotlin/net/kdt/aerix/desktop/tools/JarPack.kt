@@ -56,7 +56,12 @@ object JarPackMain {
             for (file in files) {
                 val name = input.relativize(file).toString().replace('\\', '/')
                 if (name.equals("META-INF/MANIFEST.MF", true)) continue
-                if (name.endsWith(".jar")) continue // nested jars are not on the class path
+                // Jars *inside* a class tree are dependencies that the JVM cannot load from a nested
+                // archive, so they are skipped there. But this packer is also used to zip a finished
+                // application directory, where a .jar is the payload itself - skipping those produced
+                // a portable ZIP containing only the launcher script. Only skip jars when packing a
+                // class tree (i.e. when a main class was given).
+                if (name.endsWith(".jar") && mainClass.isNotEmpty()) continue
                 if (!seen.add(name)) continue
                 val entry = ZipEntry(name)
                 entry.time = Files.getLastModifiedTime(file).toMillis()

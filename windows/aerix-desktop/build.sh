@@ -189,7 +189,10 @@ Run "Aerix Launcher.bat" (or double-click aerix-launcher.jar if Java 17+ is inst
 Your settings live in %APPDATA%\\Aerix Launcher and your game files in %USERPROFILE%\\Aerix.
 You can move this folder anywhere; nothing is written into it.
 EOF
-  "$JAVA" -cp "$OUT/classes" net.kdt.aerix.desktop.tools.JarPackMain "$appdir" "$DIST/AerixLauncher-$VERSION-portable.zip" "" "$VERSION"
+  # The packer is itself Kotlin, so the stdlib has to be on *its* class path while it runs. The
+  # jar-tool branch above passes it; this call used to run with only the classes directory and died
+  # with NoClassDefFoundError: kotlin/jvm/internal/Intrinsics on any JDK without a `jar` tool.
+  "$JAVA" -cp "$OUT/classes:$KOTLIN_LIBS/kotlin-stdlib.jar" net.kdt.aerix.desktop.tools.JarPackMain "$appdir" "$DIST/AerixLauncher-$VERSION-portable.zip" "" "$VERSION"
   log "portable build: $DIST/AerixLauncher-$VERSION-portable.zip"
 }
 
