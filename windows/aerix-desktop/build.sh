@@ -119,16 +119,22 @@ compile() {
     [[ -f "$klib/$jar" ]] && cp "$klib/$jar" "$KOTLIN_LIBS/"
   done
   log "writing jar"
-  if [[ -x "$JDK/bin/jar" ]]; then
-    local manifest="$OUT/MANIFEST.MF"
-    printf 'Manifest-Version: 1.0\r\nMain-Class: %s\r\nImplementation-Title: Aerix Launcher\r\nImplementation-Version: %s\r\n\r\n' \
-        "$MAIN_CLASS" "$VERSION" > "$manifest"
-    "$JDK/bin/jar" --create --file "$OUT/aerix-launcher.jar" --manifest "$manifest" -C "$OUT/classes" .
-  else
-    # Some trimmed JDK images ship without the jar tool; fall back to the in-repo packer.
-    "$JAVA" -cp "$OUT/classes:$KOTLIN_LIBS/kotlin-stdlib.jar" net.kdt.aerix.desktop.tools.JarPackMain "$OUT/classes" "$OUT/aerix-launcher.jar" "$MAIN_CLASS" "$VERSION" --libs "$KOTLIN_LIBS"
-  fi
-  log "built $OUT/aerix-launcher.jar ($(du -h "$OUT/aerix-launcher.jar" | cut -f1))"
+  # Always the in-repo packer, never the JDK's `jar`.
+  #
+  # There used to be two branches here, and the difference was not cosmetic. `jar` cannot unpack a
+  # dependency into the archive: `-C <dir-of-jars> .` *stores the jars*, and a jar inside a jar is
+  # not on the class path, so the launcher died at startup with
+  #   NoClassDefFoundError: kotlin/KotlinNothingValueException
+  # The no-`jar` branch did what was needed all along (JarPackMain --libs expands the stdlib
+  # classes), so it is simply the only path now. That also means the jar is built the same way
+  # everywhere instead of only on JRE images - which is exactly how the Windows CI runner, the one
+  # platform this product ships for, ended up with a 7.1 MB jar that could not start.
+  "$JAVA" -cp "$OUT/classes:$KOTLIN_LIBS/kotlin-stdlib.jar" \
+      net.kdt.aerix.desktop.tools.JarPackMain \
+      "$OUT/classes" "$OUT/aerix-launcher.jar" "$MAIN_CLASS" "$VERSION" --libs "$KOTLIN_LIBS"
+  # du reports allocated blocks, which made a 13 MB jar log as 25 MB on a filesystem with larger
+  # blocks; report the file size instead.
+  log "built $OUT/aerix-launcher.jar ($(wc -c < "$OUT/aerix-launcher.jar" | awk '{printf "%.1f MB", $1/1048576}'))"
 }
 
 run_tests() {

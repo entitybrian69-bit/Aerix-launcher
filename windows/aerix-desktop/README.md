@@ -26,11 +26,15 @@ cd windows/aerix-desktop
 ./build.sh --selftest     # headless data + UI self test (exit code 1 on failure)
 ./build.sh --screenshot   # render all 13 pages to build/screenshots
 ./build.sh --dist         # portable app image in dist/AerixLauncher/
-./build.sh --installer    # + .msi/.exe through jpackage (needs WiX on Windows)
+./build.sh --installer    # + .msi/.exe through jpackage (needs a full JDK and WiX on Windows)
 ```
 
 `build.sh` also finds a toolchain by itself if `JAVA_HOME`/`KOTLINC` are unset, looking in
 `toolchain/jdk` and `toolchain/kc` (the layout the dev container uses) and on `PATH`.
+
+The `.exe` and `.msi` cannot be cross-built: jpackage writes them only on Windows, and it needs
+the WiX toolset there. The `installer` job in `.github/workflows/windows-desktop.yml` builds them
+on a Windows runner and attaches them to the `desktop-*` pre-release.
 
 ## Run
 
@@ -75,7 +79,7 @@ java -jar build/aerix-launcher.jar
 
 ## Self test and screenshots
 
-`--selftest` is the guard rail, in fifteen checks. The first ones cover the data layer: settings
+`--selftest` is the guard rail, in seventeen checks. The first ones cover the data layer: settings
 round-trip, sealed token storage (and that no token is ever written in plain text), instance CRUD
 with trash and restore, bundled assets, version comparison, the OptiFine and BTA metadata parsers,
 Java discovery, and the data folders.
@@ -88,6 +92,8 @@ The rest cover the parts that only fail at runtime, on a player's machine:
 | version metadata | resolves fixtures for the three library shapes that appear from 1.5 to 1.21 (raw `url`+`name`, classic `downloads`+`natives` map, modern `natives-<os>-<arch>` entries), a loader profile with `inheritsFrom`, an OS rule that must be excluded, and the class path that pre-1.13 metadata never declares. |
 | resumed downloads | an embedded socket server honours, ignores and shifts `Range`; every combination must produce the exact bytes and count no more than the file's size. |
 | text clipping | walks all thirteen rendered pages and fails if any component is narrower than its contents, or if a page wants more width than the window. |
+| the jar is self-contained | opens the jar it is running from and fails if the Kotlin runtime classes are missing, if any jar is nested inside it (a nested jar is not on the class path), or if the manifest lost its `Main-Class`. A `jar`-based build once shipped a 7.1 MB archive that could not start, on the only platform the product ships to. |
+| offline create page | renders the CREATE page against an empty data directory, so the "a Minecraft version is needed" card is always checked rather than only when the cache happens to be cold. |
 | modpack import | imports a fixture `.mrpack` with a dependency block, an override and a deliberate `../../escape` entry. The overrides must land in the instance, the traversal must not, and the reloaded instance must carry the pack's name, version and loader. |
 | every page renders | paints all thirteen pages offscreen and writes them to `build/screenshots`. |
 

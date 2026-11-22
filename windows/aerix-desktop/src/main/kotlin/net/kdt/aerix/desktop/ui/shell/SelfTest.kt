@@ -26,6 +26,7 @@ import java.awt.image.BufferedImage
 import java.nio.file.Files
 import java.util.concurrent.TimeUnit
 import java.nio.file.Path
+import java.nio.file.Paths
 import javax.imageio.ImageIO
 import javax.swing.JComponent
 import javax.swing.JPanel
@@ -550,6 +551,80 @@ object SelfTest {
                 host.remove(component)
             }
             if (problems.isNotEmpty()) error(problems.take(12).joinToString("\n"))
+        }
+
+        // The jar has to carry the Kotlin runtime *unpacked*: a jar nested inside a jar is not on
+        // the class path, and `jar -C <dir-of-jars> .` stores them nested rather than expanding
+        // them. That produced a 7.1 MB jar on the Windows runner that could not start at all
+        // (NoClassDefFoundError: kotlin/KotlinNothingValueException) while the 13 MB jar built here
+        // was fine, because the two platforms had taken different branches. This makes the artifact
+        // assert its own soundness, so the difference cannot come back unnoticed.
+        check("the shipped jar is self-contained") {
+            val location = SelfTest::class.java.protectionDomain?.codeSource?.location
+                ?: error("no code source")
+            val jar = Paths.get(location.toURI())
+            if (!Files.isRegularFile(jar) || !jar.toString().endsWith(".jar")) {
+                Log.i("selftest", "SKIP not running from a jar ($jar)")
+                return@check
+            }
+            java.util.zip.ZipFile(jar.toFile()).use { zip ->
+                val names = zip.entries().asSequence().map { it.name }.toSet()
+                val required = listOf(
+                    "kotlin/KotlinNothingValueException.class",
+                    "kotlin/jvm/internal/Intrinsics.class",
+                    "net/kdt/aerix/desktop/MainKt.class",
+                    "aerix/version.txt",
+                )
+                val missing = required.filterNot { it in names }
+                if (missing.isNotEmpty()) error("jar is not runnable, missing: $missing")
+                val nested = names.filter { it.endsWith(".jar") }
+                if (nested.isNotEmpty()) error("nested jars are not on the class path: ${nested.take(4)}")
+                val manifest = zip.getEntry("META-INF/MANIFEST.MF")
+                    ?.let { zip.getInputStream(it).bufferedReader().readText() } ?: ""
+                if (!manifest.contains("Main-Class: net.kdt.aerix.desktop.MainKt")) {
+                    error("manifest has no Main-Class")
+                }
+            }
+            Log.i("selftest", "jar is self-contained: ${Files.size(jar) / 1024 / 1024} MB, ${jar.fileName}")
+        }
+
+        // The clipping check above only sees the states the pages happen to be in, and which state
+        // that is depends on what a previous run left in the cache: the CREATE page showed its
+        // "a version is needed" paragraph only when no cached Minecraft version list existed, so a
+        // paragraph that overflowed its card passed or failed depending on run order. This pins the
+        // offline state explicitly instead of hoping for it.
+        check("the offline create page fits its cards") {
+            val freshRoot = AppEnv.appData.resolve("selftest-offline")
+            runCatching { Instances.deleteTree(freshRoot) }
+            Files.createDirectories(freshRoot)
+            val savedGame = Settings.string("gameDirectory", AppEnv.defaultGameDir.toString())
+            try {
+                // No shared data dir means no cached version manifest, which is the offline shape.
+                Settings.set("gameDirectory", freshRoot.toString())
+                Instances.reload()
+                val host = JPanel(CardLayout())
+                val page = HeadlessPages.create(Page.CREATE, HeadlessShell)
+                host.add(page, Page.CREATE.name)
+                host.setSize(1440, 900)
+                host.doLayout()
+                layoutRecursively(host)
+                settleUntilReady(host)
+                layoutRecursively(host)
+                val problems = ArrayList<String>()
+                fun walk(c: java.awt.Component, path: String) {
+                    val pref = c.preferredSize
+                    if (c.width in 1..(pref.width - 3) && c.height > 4) {
+                        problems.add("$path ${c.javaClass.simpleName} cell=${c.width} wants=${pref.width}")
+                    }
+                    if (c is java.awt.Container) c.components.forEachIndexed { i, ch -> walk(ch, "$path/$i") }
+                }
+                walk(page, "CREATE")
+                if (problems.isNotEmpty()) error(problems.take(8).joinToString("\n"))
+            } finally {
+                Settings.set("gameDirectory", savedGame)
+                Instances.reload()
+                runCatching { Instances.deleteTree(freshRoot) }
+            }
         }
 
         check("every page renders offscreen") {

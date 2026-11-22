@@ -728,10 +728,22 @@ fun label(text: String, font: Font = Fonts.body(), color: Color = AerixColors.te
 fun paragraph(text: String, width: Int, font: Font = Fonts.body(12.5f), color: Color = AerixColors.textSecondary): JLabel {
     val safe = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
         .replace("\n", "<br>")
-    return AerixLabel("<html><body style='width:${width}px'>$safe</body></html>").apply {
-        this.font = font
-        foreground = color
-        isOpaque = false
+    // The width in the HTML is a *wrapping* width, not the width the label occupies. The Swing HTML
+    // renderer reports a preferred width that is roughly 1.3x the `width:` it was given (a 380px
+    // body measures 493), and AerixLabel asks for Int.MAX_VALUE maximum width, so a flexible layout
+    // hands the label the inflated number: a paragraph in a 398px card reported that it wanted
+    // 493px. Cap the preference at the wrapping width so the card always fits it, and let the
+    // label stretch sideways when there is room (the text still wraps at `width`).
+    return object : AerixLabel("<html><body style='width:${width}px'>$safe</body></html>") {
+        init {
+            this.font = font
+            foreground = color
+            isOpaque = false
+        }
+        override fun getPreferredSize(): Dimension {
+            val d = super.getPreferredSize()
+            return Dimension(minOf(d.width, width), d.height)
+        }
     }
 }
 
