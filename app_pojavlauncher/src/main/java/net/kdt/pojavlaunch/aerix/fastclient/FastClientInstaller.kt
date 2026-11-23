@@ -278,6 +278,7 @@ object FastClientInstaller {
         var staging: File? = null
         var created: Instance? = null
         try {
+            Tools.ensureStorageConstants(context)
             require(build in builds) { "Unknown FastClient version" }
             check(findInstalled(build, Instances.loadAllInstances()) == null) { "FastClient ${build.minecraft} is already installed" }
             status = "Checking Fabric Loader…"
@@ -320,7 +321,7 @@ object FastClientInstaller {
             ModIconCache.writeInstanceIcon(created, readEntry(client, "assets/fastclient-hud/icon.png"))
             InstanceIconProvider.dropIcon(created)
             val mods = File(created.gameDirectory, "mods")
-            if (!mods.mkdirs() && !mods.isDirectory) throw IOException("Could not create mods folder")
+            net.kdt.pojavlaunch.utils.FileUtils.ensureDirectory(mods)
             client.copyTo(File(mods, "fastclient-hud-${build.minecraft}.jar"), overwrite = false)
             api.copyTo(File(mods, "fabric-api.jar"), overwrite = false)
             performanceMods.forEach { it.copyTo(File(mods, it.name), overwrite = false) }

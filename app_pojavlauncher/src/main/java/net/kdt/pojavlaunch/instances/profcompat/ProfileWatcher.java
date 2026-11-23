@@ -12,10 +12,14 @@ import java.util.Iterator;
 import java.util.Map;
 
 public class ProfileWatcher {
-    private static final File sLauncherProfiles = new File(Tools.DIR_GAME_NEW, "launcher_profiles.json");
+    private static File getLauncherProfilesFile() {
+        Tools.ensureStorageConstantsIfUnset();
+        return new File(Tools.DIR_GAME_NEW, "launcher_profiles.json");
+    }
+
     public static String consumePendingVersion(AssetManager assetManager) throws IOException {
         Profiles store;
-        try(FileReader fileReader = new FileReader(sLauncherProfiles)) {
+        try(FileReader fileReader = new FileReader(getLauncherProfilesFile())) {
             store = Tools.GLOBAL_GSON.fromJson(fileReader, Profiles.class);
         }
         Map<String, ProfileBody> profiles = store.profiles;
@@ -29,6 +33,6 @@ public class ProfileWatcher {
         return versionId;
     }
     public static void installDefaultProfiles(AssetManager assetManager) throws IOException {
-        Tools.copyAssetFile(assetManager, "launcher_profiles.json", sLauncherProfiles, true);
+        Tools.copyAssetFile(assetManager, "launcher_profiles.json", getLauncherProfilesFile(), true);
     }
 }

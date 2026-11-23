@@ -3,6 +3,8 @@ package net.kdt.pojavlaunch.lifecycle;
 import android.app.Activity;
 import android.app.Application;
 
+import androidx.annotation.Nullable;
+
 import net.kdt.pojavlaunch.Tools;
 
 import java.lang.ref.WeakReference;
@@ -68,6 +70,14 @@ public class ContextExecutor {
      */
     public static void setApplication(Application application) {
         sApplication = new WeakReference<>(application);
+    }
+
+    /**
+     * Return the current Application reference if still alive.
+     */
+    @Nullable
+    public static Application getApplication() {
+        return Tools.getWeakReference(sApplication);
     }
 
     /**

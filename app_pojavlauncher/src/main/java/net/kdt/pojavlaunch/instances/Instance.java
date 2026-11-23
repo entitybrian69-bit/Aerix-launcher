@@ -133,7 +133,7 @@ public class Instance extends DisplayInstance {
     }
 
     public File getGameDirectory() {
-        if(sharedData) return Instances.SHARED_DATA_DIRECTORY;
+        if(sharedData) return Instances.getSharedDataDirectory();
         return mInstanceRoot;
     }
 }

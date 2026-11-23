@@ -149,15 +149,72 @@ public final class Tools {
     public static final Object WAIT_OBJECT = new Object();
 
 
+    /**
+     * Verify that [dir] actually exists (or can be created) and supports creating subdirectories.
+     * On several Android 11+ OEM builds (including Samsung One UI), getExternalFilesDir(null)
+     * can return a non-null File whose mkdirs() still fails under MediaProvider/FUSE.
+     */
+    private static boolean isWritableStorageRoot(@Nullable File dir) {
+        if (dir == null) return false;
+        if (!FileUtils.ensureDirectorySilently(dir)) return false;
+        File probe = new File(dir, ".aerix_probe_" + android.os.Process.myPid() + "_" + Thread.currentThread().getId());
+        if (probe.isDirectory()) {
+            probe.delete();
+            return true;
+        }
+        if (probe.mkdirs() || probe.isDirectory()) {
+            probe.delete();
+            return true;
+        }
+        return false;
+    }
+
+    private static @Nullable File findExternalStorageRoot(Context ctx) {
+        File primary = ctx.getExternalFilesDir(null);
+        if (isWritableStorageRoot(primary)) return primary;
+        File[] candidates = ctx.getExternalFilesDirs(null);
+        if (candidates != null) {
+            for (File candidate : candidates) {
+                if (candidate != null && !candidate.equals(primary) && isWritableStorageRoot(candidate)) {
+                    return candidate;
+                }
+            }
+        }
+        return null;
+    }
+
     private static @Nullable File getPojavStorageRoot(Context ctx) {
         if(SDK_INT >= 29) {
-            return ctx.getExternalFilesDir(null);
+            File externalRoot = findExternalStorageRoot(ctx);
+            if (externalRoot != null) return externalRoot;
+            File internalFallback = new File(ctx.getFilesDir(), "pojav_data");
+            if (isWritableStorageRoot(internalFallback)) {
+                Log.w("Tools", "External files directory is not writable; falling back to internal storage");
+                return internalFallback;
+            }
+            return primaryOrNull(ctx);
         }
         File externalStorageDirectory = Environment.getExternalStorageDirectory();
-        if(externalStorageDirectory == null) return null;
-        File launcherRoot = new File(externalStorageDirectory,"games/PojavLauncher");
-        if(!Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState(launcherRoot))) return null;
-        return launcherRoot;
+        if(externalStorageDirectory != null) {
+            File launcherRoot = new File(externalStorageDirectory, "games/PojavLauncher");
+            if(Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState(launcherRoot))) {
+                if (SDK_INT >= 23 && androidx.core.content.ContextCompat.checkSelfPermission(
+                        ctx, android.Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                        != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                    return launcherRoot;
+                }
+                if (isWritableStorageRoot(launcherRoot)) return launcherRoot;
+            }
+        }
+        File externalRoot = findExternalStorageRoot(ctx);
+        if (externalRoot != null) return externalRoot;
+        File internalFallback = new File(ctx.getFilesDir(), "pojav_data");
+        return isWritableStorageRoot(internalFallback) ? internalFallback : null;
+    }
+
+    private static @Nullable File primaryOrNull(Context ctx) {
+        File primary = ctx.getExternalFilesDir(null);
+        return primary != null ? primary : ctx.getFilesDir();
     }
 
     /**
@@ -181,7 +238,37 @@ public final class Tools {
             context.finish();
             return false;
         }
+        ensureStorageConstants(context);
         return true;
+    }
+
+    /**
+     * Ensures storage constants are initialized if they were still unset or pointing to an
+     * uninitialized default path. Safe to call repeatedly.
+     */
+    public static void ensureStorageConstants(Context ctx) {
+        if (ctx == null) return;
+        if (DIR_HOME_VERSION != null && DIR_GAME_NEW != null && DIR_GAME_HOME != null) {
+            File currentRoot = new File(DIR_GAME_HOME);
+            if (currentRoot.isDirectory() && currentRoot.canWrite()) return;
+        }
+        if (checkStorageRoot(ctx)) {
+            initStorageConstants(ctx);
+        }
+    }
+
+    /**
+     * Ensures storage constants are initialized using the Application context when available.
+     */
+    public static void ensureStorageConstantsIfUnset() {
+        if (DIR_HOME_VERSION != null && DIR_GAME_NEW != null && DIR_GAME_HOME != null) {
+            File currentRoot = new File(DIR_GAME_HOME);
+            if (currentRoot.isDirectory() && currentRoot.canWrite()) return;
+        }
+        Context app = ContextExecutor.getApplication();
+        if (app != null) {
+            ensureStorageConstants(app);
+        }
     }
 
     /**

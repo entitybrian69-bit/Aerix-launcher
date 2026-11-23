@@ -17,8 +17,17 @@ import java.util.List;
 import java.util.UUID;
 
 public class Instances {
-    private static final File sInstancePath = new File(Tools.DIR_GAME_HOME, "instances");
-    public static final File SHARED_DATA_DIRECTORY = new File(Tools.DIR_GAME_HOME, "shared_dir");
+    private static final Object sInstanceLock = new Object();
+
+    public static File getInstancePath() {
+        Tools.ensureStorageConstantsIfUnset();
+        return new File(Tools.DIR_GAME_HOME, "instances");
+    }
+
+    public static File getSharedDataDirectory() {
+        Tools.ensureStorageConstantsIfUnset();
+        return new File(Tools.DIR_GAME_HOME, "shared_dir");
+    }
 
     public final List<DisplayInstance> list;
     public final int selectedIndex;
@@ -45,7 +54,7 @@ public class Instances {
 
     private static File selectedInstanceLocation() {
         String directoryName = LauncherPreferences.DEFAULT_PREF.getString(LauncherPreferences.PREF_KEY_CURRENT_INSTANCE, "");
-        File instanceRoot = new File(sInstancePath, directoryName);
+        File instanceRoot = new File(getInstancePath(), directoryName);
         if(!instanceRoot.exists())
             Log.e("Instances", "New instance dir doesn't exist!");
         if(!metadataLocation(instanceRoot).exists()) return null;
@@ -61,10 +70,11 @@ public class Instances {
     }
 
     private static <T extends DisplayInstance> List<T> loadInstances(Class<T> tClass, int[] selectionDst) throws IOException {
-        synchronized (sInstancePath) {
-            FileUtils.ensureDirectory(sInstancePath);
+        File instancePath = getInstancePath();
+        synchronized (sInstanceLock) {
+            FileUtils.ensureDirectory(instancePath);
         }
-        File[] instanceDirectories = sInstancePath.listFiles(Instances::filterInstanceDirectories);
+        File[] instanceDirectories = instancePath.listFiles(Instances::filterInstanceDirectories);
         if(instanceDirectories == null) throw new IOException("Failed to enumerate instances");
         File selectedInstanceLocation = selectionDst != null ? selectedInstanceLocation() : null;
         ArrayList<T> instances = new ArrayList<>(instanceDirectories.length);
@@ -102,13 +112,14 @@ public class Instances {
     }
 
     private static File findNewInstanceRoot(String prefix) {
+        File instancePath = getInstancePath();
         File instanceRoot;
         do {
             String proposedDirectoryName = UUID.randomUUID().toString();
             if(prefix != null) {
                 proposedDirectoryName = prefix + "-" + proposedDirectoryName;
             }
-            instanceRoot = new File(sInstancePath, proposedDirectoryName);
+            instanceRoot = new File(instancePath, proposedDirectoryName);
         } while(instanceRoot.exists() && instanceRoot.isDirectory());
         return instanceRoot;
     }
@@ -190,7 +201,7 @@ public class Instances {
     public static Instance loadInstance(String id) throws IOException {
         if (id == null || id.isEmpty() || id.equals(".") || id.equals("..") || id.contains("/") || id.contains("\\"))
             throw new IOException("Invalid instance identity");
-        File root = new File(sInstancePath, id);
+        File root = new File(getInstancePath(), id);
         if (!filterInstanceDirectories(root)) throw new IOException("Target instance no longer exists");
         Instance instance = read(root, Instance.class);
         if (instance == null) throw new IOException("Cannot read target instance");
@@ -218,7 +229,7 @@ public class Instances {
             newName = String.valueOf(UUID.randomUUID());
         else
             newName = FileUtils.escapeFileName(newName);
-        File targetDirectory = new File(sInstancePath, newName);
+        File targetDirectory = new File(getInstancePath(), newName);
         if(targetDirectory.exists())
             targetDirectory = findNewInstanceRoot(newName);
         String oldName = instance.mInstanceRoot.getName();

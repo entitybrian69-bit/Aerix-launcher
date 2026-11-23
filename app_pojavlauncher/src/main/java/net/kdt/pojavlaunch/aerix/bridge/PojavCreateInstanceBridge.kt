@@ -245,6 +245,7 @@ object PojavCreateInstanceBridge {
         name: String,
         icon: Bitmap?
     ): Boolean {
+        Tools.ensureStorageConstants(context)
         val prefix = directoryPrefix(name)
         val instance: Instance? = when (loader) {
             AerixLoader.VANILLA -> {

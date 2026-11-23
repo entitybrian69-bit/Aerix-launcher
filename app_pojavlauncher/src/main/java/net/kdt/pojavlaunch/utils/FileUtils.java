@@ -1,7 +1,12 @@
 package net.kdt.pojavlaunch.utils;
 
+import android.os.Build;
+
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.util.ArrayList;
+import java.util.List;
 
 public class FileUtils {
     /**
@@ -36,15 +41,42 @@ public class FileUtils {
     }
 
     /**
+     * Create missing ancestors one directory at a time. Some Android FUSE/MediaProvider
+     * implementations fail recursive File.mkdirs() even when stepwise mkdir() succeeds.
+     */
+    private static void createParentsAndSelf(File targetFile) {
+        List<File> missing = new ArrayList<>();
+        File current = targetFile;
+        while (current != null && !current.exists()) {
+            missing.add(current);
+            current = current.getParentFile();
+        }
+        for (int i = missing.size() - 1; i >= 0; i--) {
+            File dir = missing.get(i);
+            if (!dir.isDirectory()) {
+                dir.mkdir();
+            }
+        }
+    }
+
+    /**
      * Ensure that a directory exists, is a directory and is writable.
      * @param targetFile the directory to check
      * @return if the check has succeeded
      */
     public static boolean ensureDirectorySilently(File targetFile) {
+        if (targetFile == null) return false;
         if(targetFile.isFile()) return false;
-        if(targetFile.exists()) return targetFile.canWrite();
-        else return targetFile.mkdirs();
-
+        if(targetFile.exists()) return targetFile.isDirectory() && targetFile.canWrite();
+        if(targetFile.mkdirs() || targetFile.isDirectory()) return true;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            try {
+                Files.createDirectories(targetFile.toPath());
+                if (targetFile.isDirectory()) return true;
+            } catch (IOException ignored) {}
+        }
+        createParentsAndSelf(targetFile);
+        return targetFile.isDirectory() && targetFile.canWrite();
     }
 
     /**
@@ -53,6 +85,7 @@ public class FileUtils {
      * @return if the check as succeeded
      */
     public static boolean ensureParentDirectorySilently(File targetFile) {
+        if (targetFile == null) return false;
         File parentFile = targetFile.getParentFile();
         if(parentFile == null) return false;
         return ensureDirectorySilently(parentFile);
@@ -64,13 +97,34 @@ public class FileUtils {
      * @throws IOException when the checks fail
      */
     public static void ensureDirectory(File targetFile) throws IOException {
-        if(targetFile.isFile()) throw new IOException("Target directory is a file");
+        if (targetFile == null) throw new IOException("Target directory is null");
+        if(targetFile.isFile()) throw new IOException("Target directory is a file: " + targetFile.getAbsolutePath());
         if(targetFile.exists()) {
-            if(!targetFile.canWrite()) throw new IOException("Target directory is not writable");
-        }else if(!targetFile.mkdirs()) {
-            // check again just in case (???)
-            if(!targetFile.isDirectory()) throw new IOException("Unable to create target directory");
+            if(!targetFile.isDirectory()) {
+                throw new IOException("Target exists and is not a directory: " + targetFile.getAbsolutePath());
+            }
+            if(!targetFile.canWrite()) {
+                throw new IOException("Target directory is not writable: " + targetFile.getAbsolutePath());
+            }
+            return;
         }
+        if(targetFile.mkdirs() || targetFile.isDirectory()) return;
+        IOException nioFailure = null;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            try {
+                Files.createDirectories(targetFile.toPath());
+                if (targetFile.isDirectory()) return;
+            } catch (IOException e) {
+                nioFailure = e;
+            }
+        }
+        createParentsAndSelf(targetFile);
+        if (targetFile.isDirectory()) return;
+        String detail = "Unable to create target directory: " + targetFile.getAbsolutePath();
+        if (nioFailure != null && nioFailure.getMessage() != null && !nioFailure.getMessage().isEmpty()) {
+            detail += " (" + nioFailure.getMessage() + ")";
+        }
+        throw new IOException(detail, nioFailure);
     }
 
     /**
@@ -79,6 +133,7 @@ public class FileUtils {
      * @throws IOException when the checks fail
      */
     public static void ensureParentDirectory(File targetFile) throws IOException{
+        if (targetFile == null) throw new IOException("Target file is null");
         File parentFile = targetFile.getParentFile();
         if(parentFile == null) throw new IOException("targetFile does not have a parent");
         ensureDirectory(parentFile);

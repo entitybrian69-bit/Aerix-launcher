@@ -90,6 +90,7 @@ public class FabriclikeUtils {
             e.printStackTrace();
             return null;
         }
+        Tools.ensureStorageConstantsIfUnset();
         File versionJsonDir = new File(Tools.DIR_HOME_VERSION, versionId);
         File versionJsonFile = new File(versionJsonDir, versionId+".json");
         FileUtils.ensureDirectory(versionJsonDir);
