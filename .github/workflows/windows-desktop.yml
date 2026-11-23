@@ -235,9 +235,15 @@ jobs:
           exe=(dist/image/*.exe) msi=(dist/image/*.msi)
           echo "exe=${exe[*]}"; echo "msi=${msi[*]}"
           if [[ ${#exe[@]} -eq 0 ]]; then echo "::error::jpackage produced no .exe"; exit 1; fi
-          for f in "${exe[@]}" "${msi[@]}"; do
-            printf "%s  %s\n" "$(sha256sum "$f" | cut -d" " -f1)" "$(basename "$f")"
-          done | tee dist/SHA256SUMS.txt
+          {
+            for f in "${exe[@]}" "${msi[@]}" dist/AerixLauncher-*-portable.zip; do
+              printf "%s  %s\n" "$(sha256sum "$f" | cut -d" " -f1)" "$(basename "$f")"
+            done
+          } | tee dist/SHA256SUMS.txt
+          # Also print it where the log step can capture it: the hashes are the one thing the
+          # release page must state accurately, and they are otherwise only inside an asset.
+          echo "--- checksums ---"
+          cat dist/SHA256SUMS.txt
 
       - name: Upload the installer
         uses: actions/upload-artifact@v4
@@ -311,8 +317,12 @@ jobs:
           mkdir -p ci-reports || true
           {
             echo "publish exit: ${{ steps.publish.outcome }}"
+            echo "--- checksums ---"; cat dist/SHA256SUMS.txt 2>/dev/null || true
             echo "--- dist ---"; ls -la dist || true
             echo "--- dist/image ---"; ls -laR dist/image || true
+            echo "--- runtime ---"
+            dist/runtime/bin/java.exe --list-modules 2>/dev/null | sort || true
+            echo "runtime size: $(du -sm dist/runtime 2>/dev/null | cut -f1) MB"
             cat publish.log 2>/dev/null || true
           } > ci-reports/installer.log
           if [[ "$GITHUB_REF_NAME" == arena/* ]]; then
