@@ -261,3 +261,128 @@ artifact as before. No identity is invented, and nothing here claims the warning
 immediate SmartScreen reputation; OV builds it over time), signed with a hardware token or a cloud
 HSM, plus consistent hashes across releases. That is a purchase and an identity decision for the
 project owner, not something a build script can supply.
+
+---
+
+## 4. The Trapmine detection
+
+### 4.1 What is being claimed, and not claimed
+
+Trapmine's `Malicious.moderate.ml.score` is a **machine-learning score, not a signature**. It is
+not saying "this file contains known-bad code"; it is saying "this binary resembles things the model
+was trained to call malicious, with moderate confidence". That distinction decides how it can be
+answered: a false positive of this kind is addressed by changing what the binary *is* (signed,
+smaller, fewer capabilities) and by getting it re-scanned, not by removing a code path.
+
+**This report does not claim the detection is resolved.** Re-scanning requires uploading the new
+binary to VirusTotal, which this environment cannot do. What follows is the evidence that the
+binary does not do the things the model is reacting to, and the concrete changes that remove the
+structural false-positive triggers.
+
+### 4.2 The model's most likely inputs, and what the evidence says
+
+| Structural trigger | Present? | Evidence |
+|---|---|---|
+| **No Authenticode signature** | **Yes — and it is the biggest single factor.** | `gh` shows no signing secrets configured; `build.sh` prints `installer is UNSIGNED`. An unsigned executable that is a few days old, has few downloads and no publisher identity is the canonical "unknown binary" input to every reputation and ML model. |
+| **Self-extracting installer that writes an executable and a full runtime** | **Yes — until this audit.** | jpackage's `.exe` is a self-extractor. Ours carried the **entire JDK**, including `jdk.compiler` and `jdk.jshell`. A bundle that drops a compiler and a shell on disk is structurally similar to a dropper. Now trimmed to 8 modules (48 MB runtime, 47.5 MB installer). |
+| Bundles a JVM/interpreter | Yes — inherent to a Java launcher | Every Minecraft launcher that bundles a runtime does this. Not removable without requiring a system JRE, which would break "works out of the box". |
+| Downloads code at runtime | **Yes, by design** | It downloads Minecraft libraries, loader installers and Java runtimes *after the player installs a version*. This is what a launcher does; the `.exe` itself downloads nothing during installation. |
+| Network callback to an unknown host | No | Section 1.3: every host is Mojang, Microsoft, a mod loader's Maven, or GitHub. No analytics, no telemetry. |
+| Persistence | No | Section 1.4: no Run key, no scheduled task, no service, no startup entry. |
+| Shell execution of user input | **Yes — until this audit.** | Section 2.1. Now removed. |
+| Packed/obfuscated code | No | The jar contains plain `.class` files from plain Kotlin source in this repository. There is no obfuscator, no packer and no custom class loader. This can be verified by extracting `aerix-launcher.jar` and running any decompiler. |
+| Android-related oddity | Cosmetic, but real | The desktop port was built from an Android launcher, so the jar carries `aerix/` resources and Java streams named after the Android origins (`PojavApplication` is even referenced in a comment). Nothing Android-specific ships, but a scanner reading strings sees "Android" and "PojavLauncher" next to network code. |
+
+### 4.3 Assessment
+
+**Most likely a false positive**, on this evidence:
+
+1. No persistence, no telemetry, no shell execution of input, no third-party dependencies, and
+   every network destination is a first-party Minecraft/Microsoft endpoint.
+2. The source is public, unobfuscated and small enough to review in an afternoon.
+3. The two structural things that *did* look like malware behaviour — an oversized runtime bundle
+   and a shell call — were real and are fixed.
+4. The score is "moderate", and the engines that do heuristic and behavioural analysis
+   (Microsoft, BitDefender, Malwarebytes, and the rest of the list) did not flag it.
+
+**But that is an assessment, not proof**, and two facts keep it from being more:
+
+* The scanned binary's hash does not match the one this repository produced (section 0a), so it is
+  possible the scan was of a different build entirely.
+* There is no re-scan after the changes in this audit. Until that happens, the honest statement is
+  "no malicious behaviour was found in the source or in the build, and the packaging causes most
+  likely to produce this score have been addressed", not "the detection is gone".
+
+### 4.4 What would settle it
+
+1. Rebuild (this audit), then verify the hash against the release's `SHA256SUMS.txt`.
+2. Rescan the new `.exe` on VirusTotal; if Trapmine still flags it, submit a false-positive report
+   to Trapmine directly — they accept them and typically respond within days.
+3. Obtain a code-signing certificate and sign every release. This is the only step that changes
+   what Windows itself thinks of the file, and therefore what every reputation-based engine thinks.
+4. Add the hash and the VirusTotal link to the release notes, so users can check the file they have
+   before running it.
+
+---
+
+## 5. What was changed, and the evidence for it
+
+| # | Change | Verified how |
+|---|---|---|
+| 1 | `cmd /c mklink` and `cmd /c rmdir` replaced with direct Win32 calls (`WinLinks.kt`) | New check asserts the sources contain no `cmd`/`mklink`/`rmdir`; **verified to fail** against the vulnerable code |
+| 2 | `sanitiseName` rejects `& % ^ ; \` $` | New check pins it, and asserts ordinary names are untouched |
+| 3 | Minimal `jlink` runtime (8 modules instead of the whole JDK) | Installer **68,921,856 → 47,467,008 bytes**; CI runs the shipped jar's self test **under the bundled runtime** and requires 0 failures |
+| 4 | Module-list completeness | New check loads every JDK package the launcher uses; caught `java.net.http` and `java.management` before shipping |
+| 5 | Reproducible jar | Two clean builds both produce `51ebc9d3…`; CI builds twice and fails on a mismatch |
+| 6 | Optional Authenticode signing | `osslsigncode` path in `build.sh`, wired to `AERIX_SIGN_CERT`/`AERIX_SIGN_PASSWORD`; inactive until a certificate exists, and says so |
+| 7 | `totalMemoryMb` no longer caches an exception | Covered by the module check (it exercises the same call path) |
+
+**Test state:** 20 checks, 20 passed, 0 failed — run on Linux here and on the Windows runner.
+The suite is in `ui/shell/SelfTest.kt`; `./build.sh --selftest` fails the build on any failure.
+
+### 5.1 Current artefacts
+
+Built by the `Windows desktop launcher` workflow on `windows-latest`, after all of the above:
+
+| File | Size | SHA-256 |
+|---|---|---|
+| `AerixLauncher-2.4.4.exe` | 47,467,008 | `130ab57ac14ad9a820172ebc3be32fa15c0f14b72d1510360347280196d20d55` |
+| `AerixLauncher-2.4.4-portable.zip` | 11,597,969 | `8a3e15c30911a6076670ed4869cfb62a52f6534386cc233507d89804a50c5ba9` |
+
+Bundled runtime: `java.base java.datatransfer java.desktop java.management java.net.http
+java.prefs java.xml jdk.unsupported` (48 MB, versus the full JDK).
+
+`java.prefs` and `java.datatransfer` are pulled in automatically by `java.desktop`.
+
+### 5.2 Compatibility
+
+* Windows 10 and 11, x64: unchanged. The runtime is jlink'd from Temurin 21, which supports both.
+* Minecraft launching: unchanged. The game is launched by whichever Java matches the version's
+  `javaVersion` requirement, including the bundled runtime when nothing else is installed —
+  `JavaRuntimes.pick` still prefers an exact match and falls back to a newer runtime.
+* Microsoft authentication: unchanged. The DPAPI bridge and its AES-GCM fallback were not touched
+  by this audit; the self test exercises seal/open on both paths.
+* UI, branding, features: unchanged. No screen was modified.
+
+---
+
+## 6. Remaining uncertainty
+
+Stated plainly, because the request asked for it:
+
+1. **The hash in the request does not match any build this repository produced.** Until that is
+   resolved, it is unknown whether the VirusTotal report describes our binary at all.
+2. **No re-scan has been done.** The detection may persist on the new binary; nobody can say it
+   will not without uploading it.
+3. **The installer is still unsigned.** SmartScreen will still warn. Everything else in this report
+   improves the odds and reduces the reasons for a heuristic to fire, but signing is the only thing
+   that removes the "unrecognised app" warning, and it needs a certificate this project does not
+   have.
+4. **The `.exe` is not byte-reproducible** (the jar is); different JDK and WiX versions produce
+   different installers, so a hash comparison across builds is only meaningful for artifacts from
+   the same workflow run.
+5. **The Win32 code paths added here (`WinLinks`) cannot be executed in this environment** — there
+   is no Windows host and no `java.lang.foreign` Win32 target available here. They are guarded by
+   `WinLinks.supported` and fall back to copy, and CI compiles and runs on Windows, but the
+   junction calls themselves have not been exercised against a real reparse point in this session.
+   This is the one part of the fix that needs a manual test on Windows before release.
