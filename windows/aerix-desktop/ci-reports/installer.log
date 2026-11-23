@@ -1,15 +1,29 @@
-publish exit: skipped
+publish exit: success
+--- checksums ---
+130ab57ac14ad9a820172ebc3be32fa15c0f14b72d1510360347280196d20d55  AerixLauncher-2.4.4.exe
+8a3e15c30911a6076670ed4869cfb62a52f6534386cc233507d89804a50c5ba9  AerixLauncher-2.4.4-portable.zip
 --- dist ---
-total 11332
-drwxr-xr-x 1 runneradmin 197121        0 Nov 23 15:05 .
-drwxr-xr-x 1 runneradmin 197121        0 Nov 23 15:07 ..
-drwxr-xr-x 1 runneradmin 197121        0 Nov 23 15:05 AerixLauncher
--rw-r--r-- 1 runneradmin 197121 11597969 Nov 23 15:05 AerixLauncher-2.4.4-portable.zip
-drwxr-xr-x 1 runneradmin 197121        0 Nov 23 15:06 image
-drwxr-xr-x 1 runneradmin 197121        0 Nov 23 15:05 runtime
+total 11333
+drwxr-xr-x 1 runneradmin 197121        0 Nov 23 15:44 .
+drwxr-xr-x 1 runneradmin 197121        0 Nov 23 15:44 ..
+drwxr-xr-x 1 runneradmin 197121        0 Nov 23 15:41 AerixLauncher
+-rw-r--r-- 1 runneradmin 197121 11597969 Nov 23 15:41 AerixLauncher-2.4.4-portable.zip
+-rw-r--r-- 1 runneradmin 197121      189 Nov 23 15:44 SHA256SUMS.txt
+drwxr-xr-x 1 runneradmin 197121        0 Nov 23 15:42 image
+drwxr-xr-x 1 runneradmin 197121        0 Nov 23 15:41 runtime
 --- dist/image ---
 dist/image:
 total 46356
-drwxr-xr-x 1 runneradmin 197121        0 Nov 23 15:06 .
-drwxr-xr-x 1 runneradmin 197121        0 Nov 23 15:05 ..
--rwxr-xr-x 1 runneradmin 197121 47467008 Nov 23 15:06 AerixLauncher-2.4.4.exe
+drwxr-xr-x 1 runneradmin 197121        0 Nov 23 15:42 .
+drwxr-xr-x 1 runneradmin 197121        0 Nov 23 15:44 ..
+-rwxr-xr-x 1 runneradmin 197121 47467008 Nov 23 15:42 AerixLauncher-2.4.4.exe
+--- runtime ---
+java.base@21.0.13
+java.datatransfer@21.0.13
+java.desktop@21.0.13
+java.management@21.0.13
+java.net.http@21.0.13
+java.prefs@21.0.13
+java.xml@21.0.13
+jdk.unsupported@21.0.13
+runtime size: 48 MB
