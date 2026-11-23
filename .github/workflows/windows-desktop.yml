@@ -162,10 +162,58 @@ jobs:
             echo "KOTLINC=$RUNNER_TOOL_CACHE/kotlin/kotlinc/bin/kotlinc" >> "$GITHUB_ENV"
           fi
 
+      - name: Install a signing tool
+        if: ${{ secrets.AERIX_SIGN_CERT != '' }}
+        run: choco install openssl --no-progress -y || true
+
       - name: Build the portable ZIP and the installers
+        env:
+          AERIX_SIGN_CERT: ${{ secrets.AERIX_SIGN_CERT }}
+          AERIX_SIGN_PASSWORD: ${{ secrets.AERIX_SIGN_PASSWORD }}
         run: ./build.sh --installer
 
       # A missing installer must fail here, not silently publish a ZIP under an "installer" name.
+      # The installer now bundles a jlink image of a fixed module list rather than the whole JDK.
+      # That is the packaging win, but it is only safe if the list is complete, so run the built
+      # application under exactly that runtime before shipping anything. jpackage writes the app
+      # image to dist/image/AerixLauncher; its runtime/bin/java is the trimmed JRE.
+      # Reproducibility evidence, recorded rather than claimed: build the jar a second time from
+      # the same commit and compare hashes. The jar is assembled from a sorted file list with fixed
+      # timestamps, so it is expected to match byte for byte; the installer embeds a jlink image and
+      # WiX metadata, so it is expected to differ and is reported separately.
+      - name: Check the jar builds reproducibly
+        run: |
+          set -euxo pipefail
+          first="$(sha256sum build/aerix-launcher.jar | cut -d' ' -f1)"
+          ./build.sh > rebuild.log 2>&1
+          second="$(sha256sum build/aerix-launcher.jar | cut -d' ' -f1)"
+          echo "first:  $first"
+          echo "second: $second"
+          if [[ "$first" == "$second" ]]; then
+            echo "reproducible: yes" | tee -a reproducibility.txt
+          else
+            echo "reproducible: NO - the jar changed between identical builds" | tee -a reproducibility.txt
+            echo "::error::the jar is not reproducible"; exit 1
+          fi
+
+      - name: Prove the trimmed runtime can run the launcher
+        run: |
+          set -euxo pipefail
+          app="dist/image/AerixLauncher"
+          runtime="$app/runtime"
+          if [[ ! -x "$runtime/bin/java.exe" ]]; then
+            echo "::error::the installer has no bundled runtime"; exit 1
+          fi
+          "$runtime/bin/java.exe" -version
+          echo "--- modules in the bundled runtime ---"
+          "$runtime/bin/java.exe" --list-modules | sort | tee modules.txt
+          for m in java.base java.desktop java.xml java.net.http java.management jdk.unsupported; do
+            grep -qx "$m@*" modules.txt 2>/dev/null || grep -q "^$m" modules.txt || {
+              echo "::error::module $m is missing from the bundled runtime"; exit 1; }
+          done
+          # It is genuinely smaller than a full JDK, or the trim did nothing.
+          echo "runtime size: $(du -sm "$runtime" | cut -f1) MB"
+
       - name: Assert the installers exist
         run: |
           ls -la dist

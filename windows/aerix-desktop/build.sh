@@ -216,10 +216,35 @@ make_installer() {
   # app-image, which is the same layout an .exe installs, so it is worth building.
   local type="app-image"
   case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) type="exe"; [[ -n "${AERIX_MSI:-}" ]] && type="msi";; esac
+  # Build a *minimal* runtime image instead of bundling the whole JDK.
+  #
+  # jpackage with no --runtime-image links in every module in the JDK, and the resulting installer
+  # carries jdk.compiler, jdk.jshell, jdk.jcmd and friends - tens of megabytes of development tools
+  # that a launcher never loads. It is also a bad look for an installer that a security scanner will
+  # pick apart. These are the modules the launcher actually needs:
+  #   java.base     - everything else, and javax.crypto (AES-GCM) lives here since Java 9
+  #   java.desktop  - Swing, Java2D, ImageIO, AWT
+  #   java.xml      - the XML icon parser (DocumentBuilderFactory)
+  #   java.net.http  - the HttpClient every download and API call goes through
+  #   java.management - java.lang.management, used to size the RAM slider from physical memory
+  #   jdk.unsupported - sun.misc.Unsafe, which older libraries and some JDK internals still reach for
+  local runtime_image="$DIST/runtime"
+  if [[ -x "$JDK/bin/jlink" ]]; then
+    rm -rf "$runtime_image"
+    log "jlink --add-modules java.base,java.desktop,java.xml,java.net.http,java.management,jdk.unsupported"
+    if ! "$JDK/bin/jlink" --add-modules java.base,java.desktop,java.xml,java.net.http,java.management,jdk.unsupported \
+        --strip-debug --no-header-files --no-man-pages --compress=2 \
+        --output "$runtime_image" 2>&1 | tail -3; then
+      echo "error: jlink failed" >&2
+      exit 1
+    fi
+  fi
+  local runtime_flag=()
+  if [[ -d "$runtime_image" ]]; then runtime_flag=(--runtime-image "$runtime_image"); fi
   log "jpackage --type $type"
   if ! "$jp" --type "$type" --name "AerixLauncher" --app-version "$VERSION" \
       --dest "$DIST/image" --input "$DIST/AerixLauncher" --main-jar aerix-launcher.jar \
-      --main-class "$MAIN_CLASS" --icon "$icon" \
+      --main-class "$MAIN_CLASS" --icon "$icon" "${runtime_flag[@]}" \
       --description "Aerix Launcher - Minecraft: Java Edition for Windows" \
       --vendor "Aerix Launcher contributors" \
       --java-options "-Xmx1g" --java-options "-Dfile.encoding=UTF-8"; then
@@ -228,6 +253,34 @@ make_installer() {
   fi
   local found
   found="$(find "$DIST/image" -maxdepth 1 -type f \( -name '*.exe' -o -name '*.msi' \) 2>/dev/null)"
+  # Authenticode signing, when a certificate is available.
+  #
+  # An unsigned installer is what makes Windows SmartScreen say "unrecognised app" and is the
+  # single largest contributor to heuristic detections: a self-extracting executable that installs
+  # a bundled runtime and launches Java is, structurally, what a lot of droppers look like. Signing
+  # with a certificate that has a reputation is the only thing that actually clears it.
+  #
+  # Nothing here invents an identity: without AERIX_SIGN_CERT (a base64 PFX) and
+  # AERIX_SIGN_PASSWORD, the build produces an unsigned installer exactly as before, and says so.
+  if [[ -n "${AERIX_SIGN_CERT:-}" && -n "${AERIX_SIGN_PASSWORD:-}" ]]; then
+    if [[ -z "$found" ]]; then log "signing requested but there is no installer to sign"; return; fi
+    local certdir; certdir="$(mktemp -d)"
+    printf '%s' "$AERIX_SIGN_CERT" | base64 -d > "$certdir/aerix.pfx" 2>/dev/null \
+      || cp "$AERIX_SIGN_CERT" "$certdir/aerix.pfx"
+    for file in $found; do
+      log "signing $(basename "$file")"
+      if ! osslsigncode sign -pkcs12 "$certdir/aerix.pfx" -pass "$AERIX_SIGN_PASSWORD" \
+            -n "Aerix Launcher" -i "https://github.com/luciferstudios/Aerix-launcherPc" \
+            -t http://timestamp.digicert.com -in "$file" -out "$file.signed" 2>&1 | tail -3; then
+        echo "error: signing failed" >&2; exit 1
+      fi
+      mv "$file.signed" "$file"
+    done
+    rm -rf "$certdir"
+    log "installer is signed"
+  else
+    log "installer is UNSIGNED (set AERIX_SIGN_CERT/AERIX_SIGN_PASSWORD to sign)"
+  fi
   if [[ -n "$found" ]]; then log "installer: $found"; else log "app image: $DIST/image/AerixLauncher"; fi
 }
 

@@ -259,9 +259,14 @@ object AppEnv {
 
     /** Physical memory in MiB, the cap for the RAM slider (`PREF_SYSMEM` on Android). */
     val totalMemoryMb: Int by lazy {
-        val osBean = (java.lang.management.ManagementFactory.getOperatingSystemMXBean()
-                as? com.sun.management.OperatingSystemMXBean)
-        val physical = osBean?.totalMemorySize ?: Runtime.getRuntime().maxMemory()
+        // java.lang.management is the `java.management` module. A `by lazy` that throws would
+        // propagate out of every later read, so a runtime image without it must degrade to the
+        // heap size rather than take the launcher (or the RAM slider) down.
+        val physical = runCatching {
+            val osBean = (java.lang.management.ManagementFactory.getOperatingSystemMXBean()
+                    as? com.sun.management.OperatingSystemMXBean)
+            osBean?.totalMemorySize
+        }.getOrNull() ?: Runtime.getRuntime().maxMemory()
         (physical / (1024 * 1024)).toInt()
     }
 

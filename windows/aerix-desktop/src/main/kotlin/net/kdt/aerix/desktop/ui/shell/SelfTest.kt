@@ -609,6 +609,27 @@ object SelfTest {
         // that and passed against the vulnerable code.) Asserting on the sources catches a
         // reintroduction wherever the build runs.
         // Folder names are player input, and they end up in paths handed to other programs.
+        // The installer bundles a jlink image of a fixed module list, not the whole JDK. A new
+        // import from a module that is not in that list would work on the developer's JDK and fail
+        // only in the installed copy - and the list is built on a runner, from build.sh, which is
+        // exactly the kind of thing nobody re-reads. Every JDK package the launcher touches is
+        // loaded here so the mismatch shows up in this test instead.
+        check("everything the launcher needs is in the runtime image") {
+            val probes = linkedMapOf<String, () -> Any?>(
+                "java.xml (icon parser)" to { javax.xml.parsers.DocumentBuilderFactory.newInstance() },
+                "java.desktop (Swing, ImageIO)" to { javax.swing.JLabel("x").preferredSize },
+                "java.net.http (HttpClient)" to { java.net.http.HttpClient.newHttpClient() },
+                "java.management (RAM slider)" to { java.lang.management.ManagementFactory.getOperatingSystemMXBean() },
+                "jdk.unsupported (Unsafe)" to { Class.forName("sun.misc.Unsafe") },
+                "java.base (AES-GCM)" to { javax.crypto.Cipher.getInstance("AES/GCM/NoPadding") },
+            )
+            val broken = probes.filter { (_, probe) -> runCatching { probe() }.isFailure }
+                .map { (name, _) -> name }
+            if (broken.isNotEmpty()) {
+                error("missing from the jlink module list in build.sh: $broken")
+            }
+        }
+
         check("instance names cannot smuggle shell characters into paths") {
             val nasty = "a&b%PATH%c^d;e`f\$g|h<i>j\"k"
             val clean = Instances.sanitiseName(nasty)

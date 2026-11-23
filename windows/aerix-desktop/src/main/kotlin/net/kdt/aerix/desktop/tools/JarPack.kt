@@ -48,7 +48,10 @@ object JarPackMain {
                         "Implementation-Title: Aerix Launcher\r\n" +
                         "Implementation-Version: $version\r\n" +
                         "Created-By: Aerix JarPack\r\n\r\n"
-                zip.putNextEntry(ZipEntry("META-INF/MANIFEST.MF"))
+                // A fresh ZipEntry() takes the current time; without pinning it here the manifest
+                // is the one entry that changes between builds, which is enough to make every
+                // jar hash different.
+                zip.putNextEntry(ZipEntry("META-INF/MANIFEST.MF").apply { time = 31_622_400_000L })
                 zip.write(manifest.toByteArray(StandardCharsets.UTF_8))
                 zip.closeEntry()
             }
@@ -64,7 +67,11 @@ object JarPackMain {
                 if (name.endsWith(".jar") && mainClass.isNotEmpty()) continue
                 if (!seen.add(name)) continue
                 val entry = ZipEntry(name)
-                entry.time = Files.getLastModifiedTime(file).toMillis()
+                // A fixed timestamp, not the file's mtime: the jar is a build output and its
+                // hash must depend only on its contents, so two builds of the same commit are
+                // byte-identical. 1980-02-01 00:00 UTC is the classic reproducible-build constant
+                // (ZIP cannot represent anything earlier than 1980).
+                entry.time = 31_622_400_000L
                 zip.putNextEntry(entry)
                 Files.newInputStream(file).use { ins ->
                     while (true) {
@@ -90,7 +97,9 @@ object JarPackMain {
                                 if (seen.contains(n)) continue // the app's own classes win
                                 seen.add(n)
                                 val ze = ZipEntry(n)
-                                ze.time = e.time
+                                // Same fixed timestamp as the class entries; otherwise the hash
+                                // depends on when the Kotlin distribution was unpacked.
+                                ze.time = 31_622_400_000L
                                 zip.putNextEntry(ze)
                                 zf.getInputStream(e).use { ins ->
                                     while (true) {
@@ -107,6 +116,17 @@ object JarPackMain {
             }
         }
         val size = Files.size(output)
+        // The digest is printed so a reproducibility check has a value to compare across builds.
+        val digest = java.security.MessageDigest.getInstance("SHA-256")
+        Files.newInputStream(output).use { ins ->
+            val buf = ByteArray(64 * 1024)
+            while (true) {
+                val n = ins.read(buf)
+                if (n <= 0) break
+                digest.update(buf, 0, n)
+            }
+        }
+        println("sha256 " + digest.digest().joinToString("") { "%02x".format(it) } + "  " + output.fileName)
         println("wrote $output (${size / 1024 / 1024} MB, ${files.size} entries)")
     }
 }
