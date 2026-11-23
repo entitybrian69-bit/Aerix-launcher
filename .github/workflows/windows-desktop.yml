@@ -206,24 +206,24 @@ jobs:
           fi
 
       - name: Prove the trimmed runtime can run the launcher
+        timeout-minutes: 6
         run: |
           set -euxo pipefail
-          # jpackage deletes its staging image once the .exe is written, so the runtime that ships is
-          # inside the installer. Extract it the way an installer would, then use it for real.
-          exe="$(ls dist/image/*.exe | head -1)"
-          "$exe" /install /quiet /norestart "INSTALLDIR=$(cygpath -w "$PWD/dist/installed")" | cat
-          installed="dist/installed"
-          ls -la "$installed"
-          runtime="$installed/runtime"
-          if [[ ! -x "$runtime/bin/java.exe" ]]; then
-            echo "::error::the installed app has no bundled runtime"; exit 1
-          fi
+          # jpackage deletes its staging app image once the .exe is written, and running the .exe
+          # silently blocks on an elevation prompt in a non-interactive session (it hung for
+          # thirteen minutes on the first attempt). The jlink image survives as dist/runtime, so
+          # run the shipped jar under that instead: same binary, same runtime, no install.
+          runtime="dist/runtime"
+          app="dist/AerixLauncher"
+          if [[ ! -d "$runtime" ]]; then echo "::error::the build produced no runtime image"; exit 1; fi
+          cp build/aerix-launcher.jar "$app/aerix-launcher.jar"
+          if [[ ! -x "$runtime/bin/java.exe" ]]; then echo "::error::no bundled runtime"; exit 1; fi
           "$runtime/bin/java.exe" -version
           "$runtime/bin/java.exe" --list-modules | sort | tee modules.txt
           echo "runtime size: $(du -sm "$runtime" | cut -f1) MB"
-          # It must actually start: run the shipped jar's own self test under the shipped runtime.
+          echo "full JDK size for comparison: $(du -sm "$JAVA_HOME" | cut -f1) MB"
           "$runtime/bin/java.exe" -Djava.awt.headless=true -Dfile.encoding=UTF-8 \
-            -cp "$installed/app/aerix-launcher.jar" net.kdt.aerix.desktop.MainKt --selftest |
+            -cp "$app/aerix-launcher.jar" net.kdt.aerix.desktop.MainKt --selftest |
             tee selftest-under-runtime.log | tail -25
           grep -qE "^[0-9]+ passed, 0 failed" selftest-under-runtime.log || {
             echo "::error::the launcher does not pass its self test under the bundled runtime"; exit 1; }
