@@ -1,15 +1,15 @@
 publish exit: skipped
 --- dist ---
 total 11332
-drwxr-xr-x 1 runneradmin 197121        0 Nov 23 14:59 .
-drwxr-xr-x 1 runneradmin 197121        0 Nov 23 15:00 ..
-drwxr-xr-x 1 runneradmin 197121        0 Nov 23 14:59 AerixLauncher
--rw-r--r-- 1 runneradmin 197121 11597969 Nov 23 14:59 AerixLauncher-2.4.4-portable.zip
-drwxr-xr-x 1 runneradmin 197121        0 Nov 23 15:00 image
-drwxr-xr-x 1 runneradmin 197121        0 Nov 23 14:59 runtime
+drwxr-xr-x 1 runneradmin 197121        0 Nov 23 15:05 .
+drwxr-xr-x 1 runneradmin 197121        0 Nov 23 15:07 ..
+drwxr-xr-x 1 runneradmin 197121        0 Nov 23 15:05 AerixLauncher
+-rw-r--r-- 1 runneradmin 197121 11597969 Nov 23 15:05 AerixLauncher-2.4.4-portable.zip
+drwxr-xr-x 1 runneradmin 197121        0 Nov 23 15:06 image
+drwxr-xr-x 1 runneradmin 197121        0 Nov 23 15:05 runtime
 --- dist/image ---
 dist/image:
 total 46356
-drwxr-xr-x 1 runneradmin 197121        0 Nov 23 15:00 .
-drwxr-xr-x 1 runneradmin 197121        0 Nov 23 14:59 ..
--rwxr-xr-x 1 runneradmin 197121 47467008 Nov 23 15:00 AerixLauncher-2.4.4.exe
+drwxr-xr-x 1 runneradmin 197121        0 Nov 23 15:06 .
+drwxr-xr-x 1 runneradmin 197121        0 Nov 23 15:05 ..
+-rwxr-xr-x 1 runneradmin 197121 47467008 Nov 23 15:06 AerixLauncher-2.4.4.exe
