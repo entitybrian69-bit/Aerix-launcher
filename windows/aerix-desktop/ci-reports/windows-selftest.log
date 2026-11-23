@@ -1,15 +1,16 @@
 [38;5;44m[aerix][0m compiling (JDK 21.0.13)
 [38;5;44m[aerix][0m kotlin OK
 [38;5;44m[aerix][0m writing jar
-wrote D:\a\Aerix-launcherPc\Aerix-launcherPc\windows\aerix-desktop\build\aerix-launcher.jar (11 MB, 446 entries)
-[38;5;44m[aerix][0m built /d/a/Aerix-launcherPc/Aerix-launcherPc/windows/aerix-desktop/build/aerix-launcher.jar (11.6 MB)
+sha256 cd0510fc78ef6d1a3be02301b614a59192d9b7811eb907ffd326bf7e687af8a4  aerix-launcher.jar
+wrote D:\a\Aerix-launcherPc\Aerix-launcherPc\windows\aerix-desktop\build\aerix-launcher.jar (11 MB, 447 entries)
+[38;5;44m[aerix][0m built /d/a/Aerix-launcherPc/Aerix-launcherPc/windows/aerix-desktop/build/aerix-launcher.jar (11.7 MB)
 [38;5;44m[aerix][0m running headless self test
 WARNING: A restricted method in java.lang.foreign.SymbolLookup has been called
 WARNING: java.lang.foreign.SymbolLookup::libraryLookup has been called by the unnamed module
 WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for this module
 
 
-Aerix Launcher self test — 26518 ms
+Aerix Launcher self test — 25782 ms
 ????????????????????????????????????????????????????????????????
 PASS  settings round-trip
 PASS  secure store seals and opens
@@ -26,7 +27,10 @@ PASS  java discovery
 PASS  data folders exist
 PASS  text is never clipped by its own cell
 PASS  the shipped jar is self-contained
+PASS  everything the launcher needs is in the runtime image
+PASS  instance names cannot smuggle shell characters into paths
+PASS  no shell is used to link or unlink instance folders
 PASS  the offline create page fits its cards
 PASS  every page renders offscreen
 ????????????????????????????????????????????????????????????????
-17 passed, 0 failed. Screenshots: C:\Users\runneradmin\AppData\Roaming\Aerix Launcher\selftest-shots
+20 passed, 0 failed. Screenshots: C:\Users\runneradmin\AppData\Roaming\Aerix Launcher\selftest-shots
