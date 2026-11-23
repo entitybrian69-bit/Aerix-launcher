@@ -7,6 +7,7 @@ import net.kdt.aerix.desktop.core.auth.SecureStore
 import net.kdt.aerix.desktop.core.auth.accounts.Accounts
 import net.kdt.aerix.desktop.core.game.JavaRuntimes
 import net.kdt.aerix.desktop.core.instance.Instance
+import net.kdt.aerix.desktop.core.instance.InstanceLinks
 import net.kdt.aerix.desktop.core.instance.Instances
 import net.kdt.aerix.desktop.core.json.Json
 import net.kdt.aerix.desktop.core.json.JsonObject
@@ -593,6 +594,76 @@ object SelfTest {
         // "a version is needed" paragraph only when no cached Minecraft version list existed, so a
         // paragraph that overflowed its card passed or failed depending on run order. This pins the
         // offline state explicitly instead of hoping for it.
+        // A path reaching cmd.exe is a command-injection hole: cmd re-parses its command line, so
+        // `&` inside a quoted argument still starts a second command. Instance folders are named
+        // by the player, so `Minecraft & mods` used to flow into `cmd /c mklink /J ...`. Nothing
+        // should be handed to a shell at all now.
+        // A path reaching cmd.exe is a command-injection hole: cmd re-parses its command line, so a
+        // `&` inside a quoted argument still starts a second command. Instance folders are named by
+        // the player, and sanitiseName() has no reason to strip `&`, so `Minecraft & mods` used to
+        // flow into `cmd /c mklink /J ...`.
+        //
+        // This is a source-level assertion rather than a runtime one on purpose: the vulnerable
+        // branch only executes when AppEnv.isWindows is true, so a runtime check on any other OS
+        // would pass no matter what the code said. (An earlier version of this check did exactly
+        // that and passed against the vulnerable code.) Asserting on the sources catches a
+        // reintroduction wherever the build runs.
+        // Folder names are player input, and they end up in paths handed to other programs.
+        check("instance names cannot smuggle shell characters into paths") {
+            val nasty = "a&b%PATH%c^d;e`f\$g|h<i>j\"k"
+            val clean = Instances.sanitiseName(nasty)
+            for (ch in listOf('&', '%', '^', ';', '`', '\$', '|', '<', '>', '"', '\\', '/', ':')) {
+                if (clean.contains(ch)) error("sanitiseName left $ch in \"$clean\"")
+            }
+            if (Instances.sanitiseName("   ").isEmpty()) error("blank name should fall back")
+            if (Instances.sanitiseName("CON") != "_CON") error("reserved device name not escaped")
+            // Ordinary names must survive untouched, so nobody's instance gets renamed.
+            for (ok in listOf("Skyblock", "Create 1.21 x64", "Better Than Adventure!")) {
+                if (Instances.sanitiseName(ok) != ok) error("\"$ok\" should be left alone")
+            }
+        }
+
+        check("no shell is used to link or unlink instance folders") {
+            val root = AppEnv.appData.resolve("selftest-links")
+            runCatching { Instances.deleteTree(root) }
+            Files.createDirectories(root)
+            val savedGame = Settings.string("gameDirectory", AppEnv.defaultGameDir.toString())
+            try {
+                Settings.set("gameDirectory", root.toString())
+                Instances.reload()
+                // A name full of cmd.exe metacharacters must still produce a normal folder.
+                val hostile = "Minecraft & calc | whoami > x < y ^ z"
+                val inst = Instances.create(hostile, "1.21.1", "1.21.1", "vanilla")
+                if (!Files.isDirectory(inst.root)) error("instance folder was not created")
+                InstanceLinks.ensure(inst)
+                if (!Files.isDirectory(inst.gameDir)) error("instance is not usable after linking")
+                InstanceLinks.detach(inst)
+            } finally {
+                Settings.set("gameDirectory", savedGame)
+                Instances.reload()
+                runCatching { Instances.deleteTree(root) }
+            }
+
+            // The sources are not on disk in a shipped jar, so read them where they exist.
+            val source = Paths.get("src/main/kotlin/net/kdt/aerix/desktop/core/instance/InstanceLinks.kt")
+            if (!Files.isRegularFile(source)) {
+                Log.i("selftest", "SKIP source assertion, not running from the repository")
+                return@check
+            }
+            // Comments legitimately explain what was removed, so strip them and assert on code.
+            val text = Files.readString(source)
+                .lines()
+                .filterNot { it.trimStart().startsWith("//") || it.trimStart().startsWith("*") || it.trimStart().startsWith("/*") }
+                .joinToString("\n")
+            for (banned in listOf("\"cmd\"", "mklink", "rmdir")) {
+                if (text.contains(banned)) {
+                    error("InstanceLinks still builds a shell command (found $banned); use WinLinks")
+                }
+            }
+            if (!text.contains("WinLinks.createJunction")) error("junction creation is not wired to WinLinks")
+            if (!text.contains("WinLinks.removeJunction")) error("junction removal is not wired to WinLinks")
+        }
+
         check("the offline create page fits its cards") {
             val freshRoot = AppEnv.appData.resolve("selftest-offline")
             runCatching { Instances.deleteTree(freshRoot) }

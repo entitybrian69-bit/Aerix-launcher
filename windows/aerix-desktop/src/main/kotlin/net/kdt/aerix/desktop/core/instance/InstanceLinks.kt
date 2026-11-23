@@ -43,12 +43,9 @@ object InstanceLinks {
 
     private fun link(source: Path, target: Path): Boolean {
         if (AppEnv.isWindows) {
-            val created = runCatching {
-                val process = ProcessBuilder("cmd", "/c", "mklink", "/J", target.toAbsolutePath().toString(), source.toAbsolutePath().toString())
-                    .redirectErrorStream(true).start()
-                process.waitFor() == 0
-            }.getOrDefault(false)
-            if (created) return true
+            // Never through cmd.exe: it re-parses the command line, so `&` inside a folder name
+            // becomes a second command. See WinLinks for the direct calls.
+            if (WinLinks.supported && WinLinks.createJunction(target, source)) return true
         } else {
             val created = runCatching {
                 Files.createSymbolicLink(target, source)
@@ -88,7 +85,13 @@ object InstanceLinks {
             if (!Files.exists(target, java.nio.file.LinkOption.NOFOLLOW_LINKS)) continue
             runCatching {
                 if (Files.isSymbolicLink(target)) Files.delete(target)
-                else if (AppEnv.isWindows) ProcessBuilder("cmd", "/c", "rmdir", target.toAbsolutePath().toString()).start().waitFor()
+                else if (AppEnv.isWindows) {
+                    // A junction is removed as a link, never with Files.delete (which refuses a
+                    // directory) and never with a shell `rmdir`.
+                    if (!(WinLinks.supported && WinLinks.removeJunction(target))) {
+                        Log.w("instances", "could not unlink $target")
+                    }
+                }
             }
         }
     }

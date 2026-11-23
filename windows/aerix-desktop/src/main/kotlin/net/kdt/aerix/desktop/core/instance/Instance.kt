@@ -341,7 +341,11 @@ object Instances {
 
     /** Windows-safe folder/file name: reserved characters and device names are replaced. */
     fun sanitiseName(raw: String): String {
-        var s = raw.trim().replace(Regex("[<>:\"/\\\\|?*\\u0000-\\u001F]"), "-")
+        // `&`, `%`, `^` and `;` are legal in a Windows folder name but are shell and cmd.exe
+        // metacharacters. Nothing should hand these paths to a shell (see InstanceLinks and
+        // WinLinks), and this is defence in depth: the name is also what the game's
+        // `--gameDir` argument carries, where `%` can be expanded by launcher scripts.
+        var s = raw.trim().replace(Regex("[<>:\"/\\\\|?*&%^;`\\$\\u0000-\\u001F]"), "-")
         s = s.trimEnd('.', ' ')
         if (s.isEmpty()) s = "Untitled"
         val reserved = setOf(
