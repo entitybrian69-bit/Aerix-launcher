@@ -208,20 +208,25 @@ jobs:
       - name: Prove the trimmed runtime can run the launcher
         run: |
           set -euxo pipefail
-          app="dist/image/AerixLauncher"
-          runtime="$app/runtime"
+          # jpackage deletes its staging image once the .exe is written, so the runtime that ships is
+          # inside the installer. Extract it the way an installer would, then use it for real.
+          exe="$(ls dist/image/*.exe | head -1)"
+          "$exe" /install /quiet /norestart "INSTALLDIR=$(cygpath -w "$PWD/dist/installed")" | cat
+          installed="dist/installed"
+          ls -la "$installed"
+          runtime="$installed/runtime"
           if [[ ! -x "$runtime/bin/java.exe" ]]; then
-            echo "::error::the installer has no bundled runtime"; exit 1
+            echo "::error::the installed app has no bundled runtime"; exit 1
           fi
           "$runtime/bin/java.exe" -version
-          echo "--- modules in the bundled runtime ---"
           "$runtime/bin/java.exe" --list-modules | sort | tee modules.txt
-          for m in java.base java.desktop java.xml java.net.http java.management jdk.unsupported; do
-            grep -qx "$m@*" modules.txt 2>/dev/null || grep -q "^$m" modules.txt || {
-              echo "::error::module $m is missing from the bundled runtime"; exit 1; }
-          done
-          # It is genuinely smaller than a full JDK, or the trim did nothing.
           echo "runtime size: $(du -sm "$runtime" | cut -f1) MB"
+          # It must actually start: run the shipped jar's own self test under the shipped runtime.
+          "$runtime/bin/java.exe" -Djava.awt.headless=true -Dfile.encoding=UTF-8 \
+            -cp "$installed/app/aerix-launcher.jar" net.kdt.aerix.desktop.MainKt --selftest |
+            tee selftest-under-runtime.log | tail -25
+          grep -qE "^[0-9]+ passed, 0 failed" selftest-under-runtime.log || {
+            echo "::error::the launcher does not pass its self test under the bundled runtime"; exit 1; }
 
       - name: Assert the installers exist
         run: |
