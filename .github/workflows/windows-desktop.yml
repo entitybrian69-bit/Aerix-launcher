@@ -162,9 +162,18 @@ jobs:
             echo "KOTLINC=$RUNNER_TOOL_CACHE/kotlin/kotlinc/bin/kotlinc" >> "$GITHUB_ENV"
           fi
 
+      # `secrets` cannot be read in a step-level `if:` (it is not available at parse time), which
+      # made the whole workflow invalid and every run fail before a job started. The condition is
+      # evaluated in the shell instead; the binary ships with Git for Windows on the runner.
       - name: Install a signing tool
-        if: ${{ secrets.AERIX_SIGN_CERT != '' }}
-        run: choco install openssl --no-progress -y || true
+        env:
+          AERIX_SIGN_CERT: ${{ secrets.AERIX_SIGN_CERT }}
+        run: |
+          if [[ -n "${AERIX_SIGN_CERT:-}" ]]; then
+            command -v osslsigncode >/dev/null 2>&1 || choco install osslsigncode --no-progress -y || true
+          else
+            echo "no signing certificate configured; the installer will be unsigned"
+          fi
 
       - name: Build the portable ZIP and the installers
         env:
