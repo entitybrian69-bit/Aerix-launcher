@@ -143,9 +143,9 @@ fun DiscordPresenceSettingsCard() {
 
         MiraiSwitchSettingsCard(
             position = CardPosition.Middle,
-            title = "Modpack art, clickable info links & buttons",
-            summary = "Show modpack cover artwork, make the headline & status clickable " +
-                "(opening the official Aerix website & Discord), and display \u201CAbout Aerix Launcher\u201D " +
+            title = "Server & modpack art, clickable links & buttons",
+            summary = "Show live server favicons & modpack logos, make headlines clickable " +
+                "(opening server status, modpacks & Aerix), and display \u201CAbout Aerix Launcher\u201D " +
                 "+ \u201CJoin Aerix Discord\u201D buttons on your profile card.",
             checked = clickableLinks,
             enabled = enabled,
@@ -203,15 +203,15 @@ private fun DiscordRichPresenceLivePreview(
     val cardHeader = if (usingOfficialMcProfile) "Playing a game" else "Playing Aerix Launcher"
     val titleLine = when {
         usingOfficialMcProfile -> "Minecraft"
-        previewInGame -> "Playing Minecraft 1.21.4"
+        previewInGame -> "Playing on Hypixel · Mx Boost"
         else -> "In the launcher"
     }
     val detailsLine = when {
-        usingOfficialMcProfile -> "Playing Minecraft 1.21.4 · via Aerix Launcher"
-        previewInGame -> "Aerix Launcher · Survival SMP"
+        usingOfficialMcProfile -> "Playing on Hypixel · Mx Boost · via Aerix Launcher"
+        previewInGame -> "mc.hypixel.net · Fabric 1.21.1 · 48 mods"
         else -> "Browsing the dashboard"
     }
-    val stateLine = if (usingOfficialMcProfile) "Survival SMP (2 of 4)" else null
+    val stateLine = if (usingOfficialMcProfile) "mc.hypixel.net · Fabric 1.21.1 · 48 mods (2 of 4)" else null
 
     Column(
         modifier = Modifier

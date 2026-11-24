@@ -466,9 +466,9 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
             net.kdt.pojavlaunch.aerix.social.SocialBackend.onGameStarted(this, instance, version);
             net.kdt.pojavlaunch.aerix.discord.AerixDiscordPresence.onGameStarted(
                     this,
-                    instance != null ? instance.name : null,
+                    instance,
                     version,
-                    instance != null ? instance.modpackIconUrl : null
+                    launchServer
             );
 
             setTitle("MojoLauncher (" + version + ")");
@@ -728,7 +728,7 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     protected void onDestroy() {
         net.kdt.pojavlaunch.aerix.social.SocialBackend.onGameStopped();
         net.kdt.pojavlaunch.aerix.social.SocialBackend.shutdownBackgroundActivity(getApplicationContext());
-        net.kdt.pojavlaunch.aerix.discord.AerixDiscordPresence.onGameStopped(this);
+        net.kdt.pojavlaunch.aerix.discord.AerixDiscordPresence.onGameDestroyed(this);
         // Nothing of ours outlives the activity: if the player backs out during the boot, the
         // wallpaper goes with the screen.
         net.kdt.pojavlaunch.aerix.loading.AerixLoadingWallpaper.detach();

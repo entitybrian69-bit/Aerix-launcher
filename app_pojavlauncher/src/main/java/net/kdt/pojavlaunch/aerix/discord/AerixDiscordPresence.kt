@@ -36,6 +36,7 @@ import com.discord.socialsdk.rpc.IDiscordRpcService
 import net.kdt.pojavlaunch.aerix.bridge.AerixPreferences
 import net.kdt.pojavlaunch.aerix.social.SocialBackend
 import net.kdt.pojavlaunch.aerix.social.SocialNotificationReceiver
+import net.kdt.pojavlaunch.instances.Instance
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -85,12 +86,25 @@ object AerixDiscordPresence {
     private const val STATE_FILE_NAME = "aerix_discord_presence.json"
 
     const val ACTION_DISCORD_GAME_STARTED = "net.kdt.pojavlaunch.aerix.ACTION_DISCORD_GAME_STARTED"
+    const val ACTION_DISCORD_GAME_UPDATE = "net.kdt.pojavlaunch.aerix.ACTION_DISCORD_GAME_UPDATE"
     const val ACTION_DISCORD_SCHEDULE_CLEAR = "net.kdt.pojavlaunch.aerix.ACTION_DISCORD_SCHEDULE_CLEAR"
     const val ACTION_DISCORD_CLEAR_NOW = "net.kdt.pojavlaunch.aerix.ACTION_DISCORD_CLEAR_NOW"
 
     const val EXTRA_INSTANCE_NAME = "extra_instance_name"
     const val EXTRA_MC_VERSION = "extra_mc_version"
     const val EXTRA_MODPACK_ICON_URL = "extra_modpack_icon_url"
+    const val EXTRA_MODPACK_NAME = "extra_modpack_name"
+    const val EXTRA_MODPACK_PAGE_URL = "extra_modpack_page_url"
+    const val EXTRA_LOADER_NAME = "extra_loader_name"
+    const val EXTRA_MOD_COUNT = "extra_mod_count"
+    const val EXTRA_SERVER_ADDRESS = "extra_server_address"
+    const val EXTRA_SERVER_NAME = "extra_server_name"
+    const val EXTRA_SERVER_ICON_URL = "extra_server_icon_url"
+    const val EXTRA_WORLD_NAME = "extra_world_name"
+    const val EXTRA_DIMENSION = "extra_dimension"
+    const val EXTRA_ACTIVITY_STAGE = "extra_activity_stage"
+    const val EXTRA_ACTIVITY_LINE = "extra_activity_line"
+    const val EXTRA_IS_RECORDING = "extra_is_recording"
     const val EXTRA_STARTED_AT = "extra_started_at"
     const val EXTRA_DELAY_MS = "extra_delay_ms"
 
@@ -137,14 +151,29 @@ object AerixDiscordPresence {
     private var gameInstanceCache: String? = null
     private var gameVersionCache: String? = null
     private var gameModpackIconCache: String? = null
+    private var gameMetaCache: GameInstanceMeta? = null
     private var gameStartedAtCache: Long = 0L
 
     /** Current state published to Discord. */
     private var inGameMode: Boolean = false
     private var activeModpackIconUrl: String? = null
+    private var activeModpackName: String? = null
+    private var activeModpackPageUrl: String? = null
+    private var activeLoaderName: String? = null
+    private var activeModCount: Int = 0
+    private var activeServerAddress: String? = null
+    private var activeServerName: String? = null
+    private var activeServerIconUrl: String? = null
+    private var activeWorldName: String? = null
+    private var activeDimension: String? = null
+    private var activeActivityLine: String? = null
+    private var activeIsRecording: Boolean = false
+    private var activeInstanceName: String? = null
+    private var activeMcVersion: String? = null
     private var details: String = InLauncher.DETAILS
     private var state: String = InLauncher.HOME
     private var startedAt: Long = 0L
+    private var lastSentSignature: String? = null
 
     private data class PresenceDiskState(
         val owner: String, // "launcher" | "game" | "none"
@@ -259,6 +288,7 @@ object AerixDiscordPresence {
                                 writeDiskState(app, d.copy(activeAppId = connectedAppId))
                             }
                         }
+                        lastSentSignature = null
                         sendActivity()
                     }
                 }
@@ -266,6 +296,7 @@ object AerixDiscordPresence {
                 Log.w(TAG, "Discord RPC error frame: $frame")
                 if (!clearOnlyMode && supportsExtendedFields) {
                     supportsExtendedFields = false
+                    lastSentSignature = null
                     main.post { sendActivity() }
                 }
             }
@@ -444,8 +475,16 @@ object AerixDiscordPresence {
 
         val previousDisk = readDiskState(app)
         inGameMode = false
-        activeModpackIconUrl = null
-        if (details.startsWith("Playing Minecraft")) {
+        clearInGameFields()
+        if (details.startsWith("Playing Minecraft") ||
+            details.startsWith("Playing on ") ||
+            details.startsWith("Joining ") ||
+            details.startsWith("Singleplayer") ||
+            details.startsWith("Hosting World Share") ||
+            details.startsWith("In Main Menu") ||
+            details.startsWith("Launching ") ||
+            details.startsWith("Loading world")
+        ) {
             details = InLauncher.DETAILS
             state = InLauncher.HOME
             startedAt = System.currentTimeMillis()
@@ -526,6 +565,28 @@ object AerixDiscordPresence {
         detach()
     }
 
+    /** Called from GameActivity (`initLayout` and `onStart`) in `:game` with full [Instance] context. */
+    @JvmStatic
+    @JvmOverloads
+    fun onGameStarted(
+        context: Context?,
+        instance: Instance?,
+        minecraftVersion: String?,
+        launchServer: String? = null
+    ) {
+        val app = context?.applicationContext ?: return
+        appContext = app
+        val meta = GameDiscordPresenceMonitor.start(app, instance, minecraftVersion, launchServer)
+        gameMetaCache = meta
+        if (!meta.instanceName.isNullOrBlank()) gameInstanceCache = meta.instanceName
+        if (!meta.mcVersion.isNullOrBlank()) gameVersionCache = meta.mcVersion
+        if (!meta.modpackIconUrl.isNullOrBlank()) gameModpackIconCache = meta.modpackIconUrl
+        if (gameStartedAtCache == 0L) gameStartedAtCache = System.currentTimeMillis()
+
+        val initialActivity = GameDiscordPresenceMonitor.currentStateSnapshot()
+        emitGameBroadcast(app, ACTION_DISCORD_GAME_STARTED, meta, initialActivity, writeDiskOwner = true)
+    }
+
     /** Called from GameActivity (`initLayout` and `onStart`) in `:game`. */
     @JvmStatic
     @JvmOverloads
@@ -542,35 +603,74 @@ object AerixDiscordPresence {
         if (!modpackIconUrl.isNullOrBlank()) gameModpackIconCache = modpackIconUrl
         if (gameStartedAtCache == 0L) gameStartedAtCache = System.currentTimeMillis()
 
-        val effInstance = gameInstanceCache
-        val effVer = gameVersionCache
-        val effIcon = gameModpackIconCache
-        val gameDetails = "Playing Minecraft${if (effVer.isNullOrBlank()) "" else " $effVer"}"
-        val gameState = effInstance?.takeIf { it.isNotBlank() } ?: "In game"
-        val prevActiveId = readDiskState(app)?.activeAppId ?: 0L
-
-        writeDiskState(
-            app,
-            PresenceDiskState(
-                owner = "game",
-                exitedAtElapsedMs = 0L,
-                details = gameDetails,
-                state = gameState,
-                startedAt = gameStartedAtCache,
-                activeAppId = prevActiveId,
-                modpackIconUrl = effIcon
-            )
+        val meta = gameMetaCache ?: GameInstanceMeta(
+            instanceName = gameInstanceCache,
+            mcVersion = SocialBackend.extractMcVersion(gameVersionCache) ?: gameVersionCache,
+            loaderName = SocialBackend.detectLoader(gameVersionCache),
+            modCount = 0,
+            modpackName = null,
+            modpackIconUrl = gameModpackIconCache,
+            modpackPageUrl = null
         )
-        cancelClearAlarm(app)
+        val initialActivity = GameDiscordPresenceMonitor.currentStateSnapshot()
+        emitGameBroadcast(app, ACTION_DISCORD_GAME_STARTED, meta, initialActivity, writeDiskOwner = true)
+    }
+
+    internal fun sendInGameActivityUpdate(
+        context: Context,
+        meta: GameInstanceMeta,
+        activityState: LiveGameActivityState
+    ) {
+        val app = context.applicationContext
+        if (readDiskState(app)?.owner != "game") return
+        emitGameBroadcast(app, ACTION_DISCORD_GAME_UPDATE, meta, activityState, writeDiskOwner = false)
+    }
+
+    private fun emitGameBroadcast(
+        app: Context,
+        actionName: String,
+        meta: GameInstanceMeta,
+        activityState: LiveGameActivityState,
+        writeDiskOwner: Boolean
+    ) {
+        val formatted = formatInGamePresence(meta, activityState)
+        if (writeDiskOwner) {
+            val prevActiveId = readDiskState(app)?.activeAppId ?: 0L
+            writeDiskState(
+                app,
+                PresenceDiskState(
+                    owner = "game",
+                    exitedAtElapsedMs = 0L,
+                    details = formatted.details,
+                    state = formatted.state,
+                    startedAt = gameStartedAtCache,
+                    activeAppId = prevActiveId,
+                    modpackIconUrl = meta.modpackIconUrl
+                )
+            )
+            cancelClearAlarm(app)
+        }
 
         // Delegate RPC connection ownership to `:launcher` so `:game` Process.killProcess()
         // never orphans a dead Binder inside Discord.
         runCatching {
             val intent = Intent(app, SocialNotificationReceiver::class.java).apply {
-                action = ACTION_DISCORD_GAME_STARTED
-                putExtra(EXTRA_INSTANCE_NAME, effInstance)
-                putExtra(EXTRA_MC_VERSION, effVer)
-                putExtra(EXTRA_MODPACK_ICON_URL, effIcon)
+                action = actionName
+                putExtra(EXTRA_INSTANCE_NAME, meta.instanceName)
+                putExtra(EXTRA_MC_VERSION, meta.mcVersion)
+                putExtra(EXTRA_MODPACK_ICON_URL, meta.modpackIconUrl)
+                putExtra(EXTRA_MODPACK_NAME, meta.modpackName)
+                putExtra(EXTRA_MODPACK_PAGE_URL, meta.modpackPageUrl)
+                putExtra(EXTRA_LOADER_NAME, meta.loaderName)
+                putExtra(EXTRA_MOD_COUNT, meta.modCount)
+                putExtra(EXTRA_SERVER_ADDRESS, activityState.serverAddress)
+                putExtra(EXTRA_SERVER_NAME, activityState.displayServerName())
+                putExtra(EXTRA_SERVER_ICON_URL, activityState.serverIconUrl)
+                putExtra(EXTRA_WORLD_NAME, activityState.worldName)
+                putExtra(EXTRA_DIMENSION, activityState.dimension)
+                putExtra(EXTRA_ACTIVITY_STAGE, activityState.stage.name)
+                putExtra(EXTRA_ACTIVITY_LINE, activityState.activityLine())
+                putExtra(EXTRA_IS_RECORDING, activityState.isRecording)
                 putExtra(EXTRA_STARTED_AT, gameStartedAtCache)
             }
             app.sendBroadcast(intent)
@@ -580,16 +680,31 @@ object AerixDiscordPresence {
     /** Called from GameActivity.onStart() when resuming an already-running game session. */
     @JvmStatic
     fun onGameResumed(context: Context?) {
+        val app = context?.applicationContext ?: return
+        val cachedMeta = gameMetaCache
+        if (cachedMeta != null) {
+            if (gameStartedAtCache == 0L) gameStartedAtCache = System.currentTimeMillis()
+            GameDiscordPresenceMonitor.resume()
+            emitGameBroadcast(
+                app,
+                ACTION_DISCORD_GAME_STARTED,
+                cachedMeta,
+                GameDiscordPresenceMonitor.currentStateSnapshot(),
+                writeDiskOwner = true
+            )
+            return
+        }
         if (gameInstanceCache != null || gameVersionCache != null || gameStartedAtCache != 0L) {
             onGameStarted(context, gameInstanceCache, gameVersionCache, gameModpackIconCache)
         }
     }
 
-    /** Called from GameActivity.onStop() / onDestroy() in `:game`. */
+    /** Called from GameActivity.onStop() in `:game`. */
     @JvmStatic
     fun onGameStopped(context: Context?) {
         val app = context?.applicationContext ?: appContext ?: resolveAnyContext() ?: return
         appContext = app
+        GameDiscordPresenceMonitor.pause()
         val disk = readDiskState(app)
         if (disk?.owner == "launcher") return
 
@@ -601,6 +716,13 @@ object AerixDiscordPresence {
                 action = ACTION_DISCORD_SCHEDULE_CLEAR
             })
         }
+    }
+
+    /** Called from GameActivity.onDestroy() in `:game`. */
+    @JvmStatic
+    fun onGameDestroyed(context: Context?) {
+        GameDiscordPresenceMonitor.stop()
+        onGameStopped(context)
     }
 
     /**
@@ -628,7 +750,7 @@ object AerixDiscordPresence {
         clearAndDetach(app, onComplete)
     }
 
-    /** Invoked in `:launcher` when SocialNotificationReceiver receives ACTION_DISCORD_GAME_STARTED. */
+    /** Invoked in `:launcher` when SocialNotificationReceiver receives ACTION_DISCORD_GAME_STARTED or UPDATE. */
     @JvmStatic
     @JvmOverloads
     fun handleGameStartedBroadcast(
@@ -638,22 +760,87 @@ object AerixDiscordPresence {
         gameStartedAt: Long,
         modpackIconUrl: String? = null
     ) {
+        val intent = Intent().apply {
+            putExtra(EXTRA_INSTANCE_NAME, instanceName)
+            putExtra(EXTRA_MC_VERSION, minecraftVersion)
+            putExtra(EXTRA_MODPACK_ICON_URL, modpackIconUrl)
+            putExtra(EXTRA_STARTED_AT, gameStartedAt)
+        }
+        handleGameBroadcast(context, intent, isUpdate = false)
+    }
+
+    @JvmStatic
+    fun handleGameBroadcast(context: Context, intent: Intent, isUpdate: Boolean) {
         val app = context.applicationContext
         appContext = app
         AerixPreferences.init(app)
         val prevDisk = readDiskState(app) ?: return
-        // A queued start broadcast must not revive a game that has already exited.
-        if (prevDisk.owner != "game" || prevDisk.startedAt != gameStartedAt) return
+        val gameStartedAt = intent.getLongExtra(EXTRA_STARTED_AT, 0L)
+        // A queued start/update broadcast must not revive a game that has already exited.
+        if (prevDisk.owner != "game" || (gameStartedAt > 0L && prevDisk.startedAt != gameStartedAt)) return
         invalidatePendingClear()
         cancelClearAlarm(app)
         inGameMode = true
-        activeModpackIconUrl = modpackIconUrl?.takeIf { it.isNotBlank() } ?: prevDisk?.modpackIconUrl
-        details = "Playing Minecraft${if (minecraftVersion.isNullOrBlank()) "" else " $minecraftVersion"}"
-        state = instanceName?.takeIf { it.isNotBlank() } ?: "In game"
+
+        val instanceName = intent.getStringExtra(EXTRA_INSTANCE_NAME)
+        val mcVersion = intent.getStringExtra(EXTRA_MC_VERSION)
+        val modpackIconUrl = intent.getStringExtra(EXTRA_MODPACK_ICON_URL)
+        val modpackName = intent.getStringExtra(EXTRA_MODPACK_NAME)
+        val modpackPageUrl = intent.getStringExtra(EXTRA_MODPACK_PAGE_URL)
+        val loaderName = intent.getStringExtra(EXTRA_LOADER_NAME)
+        val modCount = intent.getIntExtra(EXTRA_MOD_COUNT, 0)
+        val serverAddress = intent.getStringExtra(EXTRA_SERVER_ADDRESS)
+        val serverName = intent.getStringExtra(EXTRA_SERVER_NAME)
+        val serverIconUrl = intent.getStringExtra(EXTRA_SERVER_ICON_URL)
+        val worldName = intent.getStringExtra(EXTRA_WORLD_NAME)
+        val dimension = intent.getStringExtra(EXTRA_DIMENSION)
+        val stageName = intent.getStringExtra(EXTRA_ACTIVITY_STAGE)
+        val activityLine = intent.getStringExtra(EXTRA_ACTIVITY_LINE)
+        val isRecording = intent.getBooleanExtra(EXTRA_IS_RECORDING, false)
+
+        activeInstanceName = instanceName?.takeIf { it.isNotBlank() }
+        activeMcVersion = mcVersion?.takeIf { it.isNotBlank() }
+        activeModpackIconUrl = modpackIconUrl?.takeIf { it.isNotBlank() } ?: prevDisk.modpackIconUrl
+        activeModpackName = modpackName?.takeIf { it.isNotBlank() }
+        activeModpackPageUrl = modpackPageUrl?.takeIf { it.isNotBlank() }
+        activeLoaderName = loaderName?.takeIf { it.isNotBlank() }
+        activeModCount = modCount
+        activeServerAddress = serverAddress?.takeIf { it.isNotBlank() }
+        activeServerName = serverName?.takeIf { it.isNotBlank() }
+        activeServerIconUrl = serverIconUrl?.takeIf { it.isNotBlank() }
+        activeWorldName = worldName?.takeIf { it.isNotBlank() }
+        activeDimension = dimension?.takeIf { it.isNotBlank() }
+        activeActivityLine = activityLine?.takeIf { it.isNotBlank() }
+        activeIsRecording = isRecording
+
+        val meta = GameInstanceMeta(
+            instanceName = activeInstanceName,
+            mcVersion = activeMcVersion,
+            loaderName = activeLoaderName,
+            modCount = activeModCount,
+            modpackName = activeModpackName,
+            modpackIconUrl = activeModpackIconUrl,
+            modpackPageUrl = activeModpackPageUrl
+        )
+        val stage = runCatching {
+            stageName?.let { GameActivityStage.valueOf(it) }
+        }.getOrNull() ?: GameActivityStage.LAUNCHING
+        val activitySnapshot = LiveGameActivityState(
+            stage = stage,
+            serverAddress = activeServerAddress,
+            serverName = activeServerName,
+            serverIconUrl = activeServerIconUrl,
+            worldName = activeWorldName,
+            dimension = activeDimension,
+            isRecording = activeIsRecording
+        )
+        val formatted = formatInGamePresence(meta, activitySnapshot)
+        details = formatted.details
+        state = formatted.state
         startedAt = if (gameStartedAt > 0L) gameStartedAt else System.currentTimeMillis()
 
         val desired = resolveDesiredAppId() ?: 0L
-        val prevActive = prevDisk?.activeAppId ?: 0L
+        val prevActive = prevDisk.activeAppId
         if (prevActive > 0L && desired > 0L && prevActive != desired && connectedAppId != prevActive) {
             staleAppIdToClearFirst = prevActive
         }
@@ -736,6 +923,7 @@ object AerixDiscordPresence {
     /** Drop the connection immediately (internal helper; use [clearAndDetach] to clear profile first). */
     fun detach() {
         ready = false
+        lastSentSignature = null
         runCatching { connection?.disconnect() }
         connection = null
         connectedAppId = 0L
@@ -827,6 +1015,7 @@ object AerixDiscordPresence {
         AerixPreferences.init(app)
         rejectedAppIds.clear()
         supportsExtendedFields = true
+        lastSentSignature = null
         if (!AerixPreferences.discordPresenceEnabled) {
             clearAndDetach(app)
             return
@@ -869,7 +1058,7 @@ object AerixDiscordPresence {
         if (diskOwner != null && diskOwner != "launcher") return
         clearOnlyMode = false
         inGameMode = false
-        activeModpackIconUrl = null
+        clearInGameFields()
         lastLauncherSection = section
         details = InLauncher.DETAILS
         state = launcherActivityDetail ?: InLauncher.stateFor(section)
@@ -906,6 +1095,99 @@ object AerixDiscordPresence {
         state = instance?.takeIf { it.isNotBlank() } ?: "In game"
         startedAt = System.currentTimeMillis()
         main.post { switchConnectionIfNeededOrSend() }
+    }
+
+    private fun clearInGameFields() {
+        activeModpackIconUrl = null
+        activeModpackName = null
+        activeModpackPageUrl = null
+        activeLoaderName = null
+        activeModCount = 0
+        activeServerAddress = null
+        activeServerName = null
+        activeServerIconUrl = null
+        activeWorldName = null
+        activeDimension = null
+        activeActivityLine = null
+        activeIsRecording = false
+        activeInstanceName = null
+        activeMcVersion = null
+        lastSentSignature = null
+    }
+
+    internal data class InGameFormatted(val details: String, val state: String)
+
+    internal fun formatInGamePresence(
+        meta: GameInstanceMeta,
+        activity: LiveGameActivityState
+    ): InGameFormatted {
+        val loaderVersion = listOfNotNull(
+            meta.loaderName?.takeIf { it.isNotBlank() },
+            meta.mcVersion?.takeIf { it.isNotBlank() }
+        ).joinToString(" ").ifBlank { "Minecraft" }
+        val modsSuffix = if (meta.modCount > 0) {
+            "${meta.modCount} ${if (meta.modCount == 1) "mod" else "mods"}"
+        } else {
+            null
+        }
+        val stackLabel = meta.modpackName?.takeIf { it.isNotBlank() } ?: loaderVersion
+
+        val serverLabel = activity.displayServerName()?.takeIf { it.isNotBlank() }
+            ?: activity.serverAddress?.takeIf { it.isNotBlank() }
+
+        val detailsLine = when (activity.stage) {
+            GameActivityStage.IN_SERVER, GameActivityStage.CONNECTING_SERVER -> {
+                val target = serverLabel ?: "Multiplayer"
+                val verb = if (activity.stage == GameActivityStage.CONNECTING_SERVER) {
+                    "Joining $target"
+                } else {
+                    "Playing on $target"
+                }
+                val suffix = meta.modpackName?.takeIf { !it.equals(target, ignoreCase = true) } ?: loaderVersion
+                "$verb · $suffix"
+            }
+            GameActivityStage.WORLD_SHARE -> "Hosting World Share · $stackLabel"
+            GameActivityStage.IN_WORLD -> {
+                val world = activity.worldName?.takeIf { it.isNotBlank() }
+                    ?.let { "Singleplayer: $it" } ?: "Playing Singleplayer"
+                "$world · $stackLabel"
+            }
+            GameActivityStage.LAUNCHING,
+            GameActivityStage.MAIN_MENU,
+            GameActivityStage.LOADING_WORLD -> "${activity.activityLine()} · $stackLabel"
+        }.take(120)
+
+        val stateParts = ArrayList<String>(4)
+        if ((activity.stage == GameActivityStage.IN_SERVER || activity.stage == GameActivityStage.CONNECTING_SERVER) &&
+            !activity.serverAddress.isNullOrBlank() &&
+            !activity.serverAddress.equals(serverLabel, ignoreCase = true) &&
+            !GameDiscordPresenceMonitor.isLocalOrLanAddress(activity.serverAddress)
+        ) {
+            stateParts += activity.serverAddress
+        }
+        if (!meta.modpackName.isNullOrBlank()) {
+            stateParts += loaderVersion
+        }
+        if (modsSuffix != null) {
+            stateParts += modsSuffix
+        }
+        if (!activity.dimension.isNullOrBlank() &&
+            (activity.stage == GameActivityStage.IN_WORLD || activity.stage == GameActivityStage.IN_SERVER)
+        ) {
+            stateParts += activity.dimension
+        }
+        if (activity.isRecording) {
+            stateParts += "● Recording"
+        }
+        if (stateParts.isEmpty()) {
+            val fallback = when {
+                !meta.instanceName.isNullOrBlank() -> "Instance: ${meta.instanceName}"
+                else -> "In game"
+            }
+            stateParts += fallback
+        }
+        val stateLine = stateParts.joinToString(" · ").take(120)
+        return InGameFormatted(details = detailsLine, state = stateLine)
     }
 
     /** Remove the card, e.g. when the setting is switched off. */
@@ -981,25 +1263,61 @@ object AerixDiscordPresence {
 
         val assets = JSONObject()
         val validPackIcon = activeModpackIconUrl?.takeIf { clickable && inGameMode && isValidHttpAssetUrl(it) }
-        if (validPackIcon != null) {
-            assets.put("large_image", validPackIcon)
-            assets.put("large_text", "$state · Aerix Launcher")
-            assets.put("small_image", AERIX_LOGO_URL)
-            assets.put("small_text", "Aerix Launcher — Tap to join Discord")
-        } else {
-            assets.put("large_image", AERIX_LOGO_URL)
-            assets.put("large_text", if (usingMinecraftProfile)
-                "Aerix Launcher — Minecraft Java Edition on Android" else "Aerix Launcher — Official Website & Info")
-            if (usingMinecraftProfile) {
+        val validServerIcon = activeServerIconUrl?.takeIf { clickable && inGameMode && isValidHttpAssetUrl(it) }
+        val stackCaption = listOfNotNull(
+            activeModpackName?.let { "Modpack: $it" },
+            listOfNotNull(activeLoaderName, activeMcVersion).joinToString(" ").takeIf { it.isNotBlank() },
+            if (activeModCount > 0) "$activeModCount mods" else null
+        ).joinToString(" · ").ifBlank { state }
+
+        when {
+            validServerIcon != null -> {
+                val serverLabel = activeServerName ?: activeServerAddress ?: "Minecraft Server"
+                val addrNote = activeServerAddress?.takeIf { !it.equals(serverLabel, true) }?.let { " ($it)" } ?: ""
+                assets.put("large_image", validServerIcon)
+                assets.put("large_text", "Server: $serverLabel$addrNote · ${activeActivityLine ?: "Playing Multiplayer"}".take(128))
+                if (validPackIcon != null) {
+                    assets.put("small_image", validPackIcon)
+                    assets.put("small_text", "$stackCaption · via Aerix Launcher".take(128))
+                } else {
+                    assets.put("small_image", AERIX_LOGO_URL)
+                    assets.put("small_text", "Aerix Launcher · $stackCaption".take(128))
+                }
+            }
+            validPackIcon != null -> {
+                assets.put("large_image", validPackIcon)
+                assets.put("large_text", "$stackCaption · ${activeActivityLine ?: state}".take(128))
                 assets.put("small_image", AERIX_LOGO_URL)
-                assets.put("small_text", "Powered by Aerix Launcher")
+                assets.put("small_text", "Aerix Launcher — ${activeActivityLine ?: "Tap to join Discord"}".take(128))
+            }
+            else -> {
+                assets.put("large_image", AERIX_LOGO_URL)
+                assets.put("large_text", if (usingMinecraftProfile) {
+                    "Aerix Launcher · $stackCaption".take(128)
+                } else {
+                    "Aerix Launcher — Official Website & Info"
+                })
+                if (usingMinecraftProfile) {
+                    assets.put("small_image", AERIX_LOGO_URL)
+                    assets.put("small_text", "Powered by Aerix Launcher")
+                }
             }
         }
+        val sig = "$cardName|$effectiveDetails|$state|${assets.optString("large_image")}|${assets.optString("small_image")}|${activity.optString("party")}"
+        if (sig == lastSentSignature) return
+        lastSentSignature = sig
+
         if (clickable) {
-            activity.put("details_url", AERIX_WEBSITE_URL)
+            val serverPageUrl = activeServerAddress?.takeIf { validServerIcon != null }?.let {
+                "https://mcsrvstat.us/server/$it"
+            }
+            val packUrl = activeModpackPageUrl?.takeIf { isValidHttpAssetUrl(it) }
+            activity.put("details_url", packUrl ?: AERIX_WEBSITE_URL)
             activity.put("state_url", AERIX_DISCORD_URL)
-            assets.put("large_url", AERIX_WEBSITE_URL)
-            if (validPackIcon != null || usingMinecraftProfile) assets.put("small_url", AERIX_DISCORD_URL)
+            assets.put("large_url", serverPageUrl ?: packUrl ?: AERIX_WEBSITE_URL)
+            if (validPackIcon != null || validServerIcon != null || usingMinecraftProfile) {
+                assets.put("small_url", packUrl ?: AERIX_DISCORD_URL)
+            }
             if (supportsExtendedFields) {
                 val buttons = JSONArray()
                     .put(
