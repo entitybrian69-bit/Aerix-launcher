@@ -50,6 +50,7 @@ import net.kdt.pojavlaunch.aerix.bridge.PojavTaskBridge
 import net.kdt.pojavlaunch.aerix.theme.AerixLauncherTheme
 import net.kdt.pojavlaunch.extra.ExtraConstants
 import net.kdt.pojavlaunch.extra.ExtraCore
+import net.kdt.pojavlaunch.recording.RecordingOutput
 
 class AerixMainFragment : Fragment() {
     companion object {
@@ -63,7 +64,9 @@ class AerixMainFragment : Fragment() {
         super.onAttach(context)
         AerixPreferences.init(context)
         val retentionDays = AerixPreferences.logRetentionDays
+        val appContext = context.applicationContext
         Thread({ runCatching { PojavFileBridge.pruneOldLogs(retentionDays) } }, "AerixLogPrune").start()
+        Thread({ runCatching { RecordingOutput.recoverAllInstances(appContext) } }, "AerixRecordingRecovery").start()
         PojavTaskBridge.attach()
         PojavInstanceBridge.attach(context)
         PojavAccountBridge.attach(context)

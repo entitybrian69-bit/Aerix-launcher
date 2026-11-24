@@ -31,6 +31,8 @@ import androidx.core.content.ContextCompat
 import net.kdt.pojavlaunch.R
 import java.io.File
 import java.nio.ByteBuffer
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 /**
  * Isolated `:recorder` foreground service running a zero-copy hardware video pipeline:
@@ -172,12 +174,34 @@ class ScreenRecordingService : Service() {
         return START_NOT_STICKY
     }
 
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        finalizeSynchronously()
+        super.onTaskRemoved(rootIntent)
+    }
+
     override fun onDestroy() {
-        if (active && !stopping) {
-            worker.post { stopRecording() }
+        finalizeSynchronously()
+        if (::workerThread.isInitialized) {
+            workerThread.quitSafely()
         }
-        workerThread.quitSafely()
         super.onDestroy()
+    }
+
+    private fun finalizeSynchronously() {
+        if (!::worker.isInitialized || !::workerThread.isInitialized || !workerThread.isAlive) return
+        val latch = CountDownLatch(1)
+        val posted = worker.post {
+            try {
+                if (active && !finished) {
+                    finishStop()
+                }
+            } finally {
+                latch.countDown()
+            }
+        }
+        if (posted) {
+            runCatching { latch.await(1_500L, TimeUnit.MILLISECONDS) }
+        }
     }
 
     private fun promoteToForeground(wantsMic: Boolean): Boolean {

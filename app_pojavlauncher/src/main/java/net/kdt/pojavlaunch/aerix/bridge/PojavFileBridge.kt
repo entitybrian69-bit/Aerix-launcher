@@ -38,6 +38,8 @@ import kotlinx.coroutines.withContext
 import net.kdt.pojavlaunch.R
 import net.kdt.pojavlaunch.Tools
 import net.kdt.pojavlaunch.instances.Instances
+import net.kdt.pojavlaunch.lifecycle.ContextExecutor
+import net.kdt.pojavlaunch.recording.RecordingOutput
 import org.apache.commons.io.FileUtils
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
@@ -96,6 +98,11 @@ object PojavFileBridge {
     fun isArchive(file: File): Boolean = file.extension.lowercase() in archiveExtensions
 
     suspend fun list(dir: File, sort: FileSort, showHidden: Boolean): List<FileItem>? = withContext(Dispatchers.IO) {
+        if (dir.name.equals("recordings", ignoreCase = true)) {
+            ContextExecutor.getApplication()?.let { app ->
+                runCatching { RecordingOutput.recoverStrays(app, dir) }
+            }
+        }
         val files = dir.listFiles() ?: return@withContext null
         val items = files
             .filter { showHidden || !it.name.startsWith(".") }

@@ -6,8 +6,12 @@ import android.media.MediaFormat
 import android.media.MediaMuxer
 import android.media.MediaScannerConnection
 import android.net.Uri
+import android.os.Build
 import android.util.Log
+import net.kdt.pojavlaunch.Tools
+import net.kdt.pojavlaunch.instances.Instances
 import java.io.File
+import java.nio.file.Files
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -30,6 +34,60 @@ internal class RecordingOutput(private val context: Context, private val instanc
     private fun validVideo(file: File): Boolean = playable(file)
 
     companion object {
+    private val recoveryLock = Any()
+
+    /** Pick a non-existing `.mp4` destination without pre-creating a 0-byte placeholder. */
+    private fun uniqueDestination(parent: File, baseName: String, suffix: String): File {
+        var index = 0
+        while (true) {
+            val candidateName = if (index == 0) "$baseName$suffix" else "$baseName-$index$suffix"
+            val candidate = File(parent, candidateName)
+            if (!candidate.exists()) return candidate
+            index++
+        }
+    }
+
+    /**
+     * Move [source] to [destination] without pre-creating [destination].
+     *
+     * Android FUSE / MediaProvider mounts across many devices fail `File.renameTo` when a
+     * placeholder destination already exists (from `createNewFile()`). Fall back to `Files.move`
+     * and buffered copy+delete if `renameTo` still refuses on a device mount.
+     */
+    private fun moveToMp4(source: File, destination: File): Boolean {
+        destination.parentFile?.let { if (!it.exists()) it.mkdirs() }
+        if (runCatching { source.renameTo(destination) }.getOrDefault(false)) {
+            return true
+        }
+        if (Build.VERSION.SDK_INT >= 26) {
+            val moved = runCatching {
+                Files.move(source.toPath(), destination.toPath())
+                true
+            }.getOrDefault(false)
+            if (moved) return true
+        }
+        return try {
+            val expectedLength = source.length()
+            source.inputStream().use { input ->
+                destination.outputStream().use { output ->
+                    input.copyTo(output, 64 * 1024)
+                    output.flush()
+                }
+            }
+            if (destination.isFile && destination.length() == expectedLength) {
+                runCatching { source.delete() }
+                true
+            } else {
+                runCatching { destination.delete() }
+                false
+            }
+        } catch (error: Exception) {
+            Log.w("AerixRecorder", "Failed to move recording to ${destination.name}", error)
+            runCatching { destination.delete() }
+            false
+        }
+    }
+
     /** Extractor checks MP4 structure and first sync sample, not actual hardware decoding. */
     fun playable(file: File): Boolean {
         val extractor = MediaExtractor()
@@ -58,16 +116,15 @@ internal class RecordingOutput(private val context: Context, private val instanc
 
 
     /**
-     * Re-file recordings an interrupted session left behind.
+     * Re-file recordings an interrupted session or earlier `.partial` rename bug left behind.
      *
-     * A crash, a low-memory kill, or swiping the launcher away mid-recording leaves
-     * `Aerix-<stamp>.partial` in the instance's own recordings folder. Nothing lists that name, and
-     * a file manager that has never seen the extension offers to unpack it as an archive - which is
-     * exactly how "they recorded a video and it came out as some zip file" reached us. Nothing may
-     * be left with an extension that lies about what it is: re-publish it as an MP4 when the
-     * structure survived, and name it honestly when it did not.
+     * A crash, a low-memory kill, swiping the launcher away mid-recording, or a blocked `renameTo`
+     * leaves `Aerix-<stamp>.partial` in the instance's own recordings folder. Convert playable
+     * `.partial` files into `.mp4` and publish them to the gallery, and convert unplayable `.partial`
+     * files into `-unfinished.mp4` so no `.partial` file stays behind.
      */
-    fun recoverStrays(context: Context, directory: File): List<Saved> {
+    fun recoverStrays(context: Context, directory: File): List<Saved> = synchronized(recoveryLock) {
+        if (!directory.isDirectory) return@synchronized emptyList()
         val cutoff = System.currentTimeMillis() - 5_000L
         val strays = runCatching {
             directory.listFiles()?.filter {
@@ -80,8 +137,8 @@ internal class RecordingOutput(private val context: Context, private val instanc
             val base = stray.name.removeSuffix(".partial")
             val parent = stray.parentFile ?: continue
             if (playable(stray)) {
-                val playableFile = File(parent, "$base.mp4")
-                if (runCatching { stray.renameTo(playableFile) }.getOrDefault(false)) {
+                val playableFile = uniqueDestination(parent, base, ".mp4")
+                if (moveToMp4(stray, playableFile)) {
                     MediaScannerConnection.scanFile(
                         context, arrayOf(playableFile.absolutePath), arrayOf("video/mp4"), null
                     )
@@ -91,13 +148,37 @@ internal class RecordingOutput(private val context: Context, private val instanc
                 continue
             }
             // The file died with the process, so its index never got written: no player can seek it.
-            // Renaming still beats leaving an extension that invites the archive tooling.
-            val salvage = File(parent, "$base-unfinished.mp4")
-            if (runCatching { stray.renameTo(salvage) }.getOrDefault(false)) {
+            // Renaming still beats leaving a `.partial` extension behind.
+            val salvage = uniqueDestination(parent, base, "-unfinished.mp4")
+            if (moveToMp4(stray, salvage)) {
                 recovered += Saved(salvage.absolutePath, false)
             }
         }
-        return recovered
+        recovered
+    }
+
+    /** Scan every instance's `recordings/` folder and convert any stray `.partial` files to `.mp4`. */
+    fun recoverAllInstances(context: Context): List<Saved> {
+        runCatching { Tools.ensureStorageConstantsIfUnset() }
+        val dirs = LinkedHashSet<File>()
+        runCatching {
+            Instances.getInstancePath()?.listFiles()?.forEach { instanceDir ->
+                if (instanceDir.isDirectory) {
+                    val rec = File(instanceDir, "recordings")
+                    if (rec.isDirectory) dirs += rec
+                }
+            }
+        }
+        runCatching {
+            val sharedRec = File(Instances.getSharedDataDirectory(), "recordings")
+            if (sharedRec.isDirectory) dirs += sharedRec
+        }
+        if (dirs.isEmpty()) return emptyList()
+        val all = ArrayList<Saved>()
+        for (dir in dirs) {
+            runCatching { all += recoverStrays(context, dir) }
+        }
+        return all
     }
     }
 
@@ -105,12 +186,15 @@ internal class RecordingOutput(private val context: Context, private val instanc
         val source = temporary ?: return null
         temporary = null
         if (!source.isFile || source.length() == 0L) { source.delete(); return null }
-        val valid = success && validVideo(source)
-        val name = source.name.removeSuffix(".partial") + if (valid) ".mp4" else "-incomplete.mp4"
-        val destination = File(source.parentFile, name)
-        // Reserve exclusively; never intentionally replace another recording.
-        if (!destination.createNewFile()) return Saved(source.absolutePath, false)
-        if (!source.renameTo(destination)) { destination.delete(); return Saved(source.absolutePath, false) }
+        val containerPlayable = validVideo(source)
+        if (!success && containerPlayable) {
+            Log.w("AerixRecorder", "Muxer reported stop failure, but MP4 container is playable; saving as .mp4")
+        }
+        val valid = containerPlayable
+        val parent = source.parentFile ?: instanceRoot
+        val baseName = source.name.removeSuffix(".partial")
+        val destination = uniqueDestination(parent, baseName, if (valid) ".mp4" else "-incomplete.mp4")
+        if (!moveToMp4(source, destination)) return Saved(source.absolutePath, false)
         if (valid) MediaScannerConnection.scanFile(context, arrayOf(destination.absolutePath), arrayOf("video/mp4"), null)
         // The instance folder is app-private on Android 10 and up, so publishing a copy into
         // Movies/Aerix is what makes the video openable, shareable and visible in a gallery.
