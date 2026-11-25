@@ -116,6 +116,7 @@ if gcc is not None:
             "#include <pthread.h>\n"
             "#include <stdatomic.h>\n"
             "#include <stdbool.h>\n"
+            "#include <stdint.h>\n"
             "#include <unistd.h>\n"
             "static _GLFWwindow* surfaceOwner = NULL;\n"
             "static atomic_bool surfaceDestroyed = true;\n"
@@ -271,7 +272,7 @@ if gcc is not None:
         bin_path = tmp_path / "glfw_guard_smoke"
         subprocess.run(
             [
-                gcc, "-std=c99", "-Wall", "-Wextra", "-Werror", "-pthread",
+                gcc, "-std=c11", "-Wall", "-Wextra", "-Werror", "-pthread",
                 "-DANativeWindow_fromSurface=aerix_ANativeWindow_fromSurface",
                 "-DANativeWindow_acquire=aerix_ANativeWindow_acquire",
                 "-DANativeWindow_release=aerix_ANativeWindow_release",

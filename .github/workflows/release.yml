@@ -10,9 +10,9 @@ name: Release CI
 # RELEASE_MARK=2.4.7
 #
 # Last cut: v2.4.7 - fixes native JRE launch/abort crashes, SM-M015G GLFW libandroid.so surface
-# lifecycle SIGSEGV & deferred :game WebView initialization, and keeps Discord Rich Presence
-# alive for 5 minutes after leaving the launcher; double-signed permanently so 2.4.6, 2.4.5,
-# 2.4.1, and older release builds update in place.
+# lifecycle SIGSEGV, nw_egl_cond lost wakeup & deferred :game WebView init, and keeps Discord
+# Rich Presence alive for 5 minutes after leaving the launcher; double-signed permanently so
+# 2.4.6, 2.4.5, 2.4.1, and older release builds update in place.
 #
 # Previous cut: v2.4.6 - adds the 1080p60 cold-start intro splash, landscape Modpack Browser & Import
 # Controls redesigns, and screen recorder button/responsiveness fixes, double-signed permanently so
