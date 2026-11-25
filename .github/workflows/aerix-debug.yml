@@ -116,12 +116,15 @@ jobs:
           python3 tests/fps_counter_smoke.py
           python3 tests/key_tap_mouse_launch_smoke.py
           python3 tests/logo_visibility_smoke.py
-          python3 tests/release_246_smoke.py
+          python3 tests/release_247_smoke.py
           python3 tests/storage_directory_creation_smoke.py
           python3 tests/recording_partial_conversion_smoke.py
           python3 tests/recorder_panel_smoke.py
           python3 tests/stutter_fixes_smoke.py
           python3 tests/webview_multiprocess_smoke.py
+          python3 tests/jre_launcher_crash_fix_smoke.py
+          python3 tests/glfw_surface_lifecycle_crash_smoke.py
+          python3 tests/discord_presence_grace_period_smoke.py
           mkdir -p "$RUNNER_TEMP/aerix-migration-test"
           javac -d "$RUNNER_TEMP/aerix-migration-test" \
             app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/tasks/DataMigrationPolicy.java \

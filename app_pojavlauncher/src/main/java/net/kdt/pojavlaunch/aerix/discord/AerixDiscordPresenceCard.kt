@@ -112,7 +112,7 @@ fun DiscordPresenceSettingsCard() {
             position = CardPosition.Top,
             title = "Discord Rich Presence",
             summary = "Show what you are doing in Aerix Launcher on your Discord profile, " +
-                "and clear when you leave the app or close the game.",
+                "staying visible for a few minutes after you leave the app and clearing when you close the game.",
             checked = enabled,
             onCheckedChange = { on ->
                 enabled = on

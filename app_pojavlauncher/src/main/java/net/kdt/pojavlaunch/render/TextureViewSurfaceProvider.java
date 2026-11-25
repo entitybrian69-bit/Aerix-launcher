@@ -16,6 +16,7 @@ import net.kdt.pojavlaunch.Tools;
 public class TextureViewSurfaceProvider implements SurfaceProvider {
     private TextureView mTextureView;
     private SurfaceCallback mCallback;
+    private Surface mActiveSurface;
 
     @Override
     public View create(Context context, SurfaceCallback callback) {
@@ -29,10 +30,15 @@ public class TextureViewSurfaceProvider implements SurfaceProvider {
 
     @Override
     public void updateSize() {
+        if (mTextureView == null || windowWidth <= 0 || windowHeight <= 0) return;
         SurfaceTexture surfaceTexture = mTextureView.getSurfaceTexture();
         if(surfaceTexture != null) {
             surfaceTexture.setDefaultBufferSize(windowWidth, windowHeight);
-            Tools.runOnUiThread(()->mCallback.onSurfaceResized());
+            Tools.runOnUiThread(() -> {
+                if (mActiveSurface != null && mActiveSurface.isValid()) {
+                    mCallback.onSurfaceResized();
+                }
+            });
         }
     }
 
@@ -40,20 +46,35 @@ public class TextureViewSurfaceProvider implements SurfaceProvider {
 
         @Override
         public void onSurfaceTextureAvailable(@NonNull SurfaceTexture surfaceTexture, int i, int i1) {
-            if(windowWidth != 0 && windowHeight != 0)
+            if(windowWidth > 0 && windowHeight > 0)
                 surfaceTexture.setDefaultBufferSize(windowWidth, windowHeight);
-            mCallback.onSurfaceAvailable(new Surface(surfaceTexture));
+            if (mActiveSurface != null) {
+                mCallback.onSurfaceDestroyed();
+                mActiveSurface.release();
+                mActiveSurface = null;
+            }
+            Surface surface = new Surface(surfaceTexture);
+            mActiveSurface = surface;
+            if (surface.isValid()) {
+                mCallback.onSurfaceAvailable(surface);
+            }
         }
 
         @Override
         public boolean onSurfaceTextureDestroyed(@NonNull SurfaceTexture surfaceTexture) {
             mCallback.onSurfaceDestroyed();
+            if (mActiveSurface != null) {
+                mActiveSurface.release();
+                mActiveSurface = null;
+            }
             return true;
         }
 
         @Override
         public void onSurfaceTextureSizeChanged(@NonNull SurfaceTexture surfaceTexture, int i, int i1) {
-            mCallback.onSurfaceResized();
+            if (mActiveSurface != null && mActiveSurface.isValid()) {
+                mCallback.onSurfaceResized();
+            }
         }
 
         @Override

@@ -14,5 +14,7 @@ void            hstr_free(heap_str_array* arr);
 
 void openLink(const char* link);
 
+void logger_append_cstr(const char* text);
+
 JNIEnv* get_attached_env(JavaVM* jvm);
 

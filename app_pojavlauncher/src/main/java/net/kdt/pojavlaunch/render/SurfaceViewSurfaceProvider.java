@@ -15,17 +15,27 @@ import net.kdt.pojavlaunch.CallbackBridge;
 
 public class SurfaceViewSurfaceProvider implements SurfaceProvider {
     private SurfaceView mSurfaceView;
+    private int mLastFixedWidth = 0;
+    private int mLastFixedHeight = 0;
+
     @Override
     public View create(Context context, SurfaceCallback callback) {
         mSurfaceView = new SurfaceView(context);
         mSurfaceView.getHolder().addCallback(new CallbackAdapter(callback));
-        if(windowWidth != 0 && windowHeight != 0)
+        if(windowWidth > 0 && windowHeight > 0) {
+            mLastFixedWidth = windowWidth;
+            mLastFixedHeight = windowHeight;
             mSurfaceView.getHolder().setFixedSize(windowWidth, windowHeight);
+        }
         return mSurfaceView;
     }
 
     @Override
     public void updateSize() {
+        if (mSurfaceView == null || windowWidth <= 0 || windowHeight <= 0) return;
+        if (mLastFixedWidth == windowWidth && mLastFixedHeight == windowHeight) return;
+        mLastFixedWidth = windowWidth;
+        mLastFixedHeight = windowHeight;
         mSurfaceView.getHolder().setFixedSize(windowWidth, windowHeight);
     }
 
@@ -38,12 +48,18 @@ public class SurfaceViewSurfaceProvider implements SurfaceProvider {
 
         @Override
         public void surfaceChanged(@NonNull SurfaceHolder surfaceHolder, int fmt, int width, int height) {
-            mCallback.onSurfaceResized();
+            Surface surface = surfaceHolder.getSurface();
+            if (surface != null && surface.isValid()) {
+                mCallback.onSurfaceResized();
+            }
         }
 
         @Override
         public void surfaceCreated(@NonNull SurfaceHolder surfaceHolder) {
-            mCallback.onSurfaceAvailable(surfaceHolder.getSurface());
+            Surface surface = surfaceHolder.getSurface();
+            if (surface != null && surface.isValid()) {
+                mCallback.onSurfaceAvailable(surface);
+            }
         }
 
         @Override

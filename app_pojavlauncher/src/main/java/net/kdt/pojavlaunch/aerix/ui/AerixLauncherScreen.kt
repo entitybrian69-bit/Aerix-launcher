@@ -159,7 +159,7 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
     }
 
     // Discord Rich Presence: the launcher is on screen, and it says which page you are on.
-    // Lifecycle clear-after-1-minute on leaving the app is driven by LauncherActivity.onStart/onStop.
+    // Lifecycle grace-period clear (5 minutes) on leaving the app is driven by LauncherActivity.onStart/onStop.
     LaunchedEffect(Unit) {
         AerixDiscordPresence.attach(activity)
     }

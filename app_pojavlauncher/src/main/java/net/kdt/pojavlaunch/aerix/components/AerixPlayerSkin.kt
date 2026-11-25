@@ -110,6 +110,7 @@ class AerixPlayerSkin(private val context: Context) {
     }
 
     fun loadWebView(viewContext: Context, onPageFinished: () -> Unit): WebView {
+        net.kdt.pojavlaunch.PojavApplication.ensureWebViewDataDirectory(viewContext)
         val view = WebView(viewContext).apply {
             settings.apply {
                 javaScriptEnabled = true

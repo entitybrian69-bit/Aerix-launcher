@@ -25,7 +25,28 @@ get_target_property(AERIX_GLFW_SOURCE_DIR glfw SOURCE_DIR)
 set_property(SOURCE "${AERIX_GLFW_SOURCE_DIR}/context.c"
     DIRECTORY "${AERIX_GLFW_SOURCE_DIR}" APPEND PROPERTY
     COMPILE_DEFINITIONS "glfwSwapBuffers=aerixOriginalSwapBuffers")
-target_sources(glfw PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/fps/glfw_frame_hook.c")
+set_property(SOURCE "${AERIX_GLFW_SOURCE_DIR}/android_window.c"
+    DIRECTORY "${AERIX_GLFW_SOURCE_DIR}" APPEND PROPERTY
+    COMPILE_DEFINITIONS
+        "ANativeWindow_fromSurface=aerix_ANativeWindow_fromSurface"
+        "ANativeWindow_acquire=aerix_ANativeWindow_acquire"
+        "ANativeWindow_release=aerix_ANativeWindow_release"
+        "ANativeWindow_setBuffersGeometry=aerix_ANativeWindow_setBuffersGeometry"
+        "ANativeWindow_getWidth=aerix_ANativeWindow_getWidth"
+        "ANativeWindow_getHeight=aerix_ANativeWindow_getHeight"
+        "pthread_cond_wait=aerix_pthread_cond_wait"
+        "updateNativeWindowDimensions=aerixOriginalUpdateNativeWindowDimensions"
+        "_glfwManageEglSurfaceAndroid=aerixOriginalManageEglSurfaceAndroid"
+        "Java_git_artdeell_dnbootstrap_glfw_GLFW_nativeSurfaceCreated=aerixOriginalNativeSurfaceCreated"
+        "Java_git_artdeell_dnbootstrap_glfw_GLFW_nativeSurfaceDestroyed=aerixOriginalNativeSurfaceDestroyed"
+        "Java_git_artdeell_dnbootstrap_glfw_GLFW_nativeSurfaceUpdated=aerixOriginalNativeSurfaceUpdated")
+set_property(SOURCE "${AERIX_GLFW_SOURCE_DIR}/android_window_hook.c"
+    DIRECTORY "${AERIX_GLFW_SOURCE_DIR}" APPEND PROPERTY
+    COMPILE_DEFINITIONS
+        "_glfwDisablePrerotationAndroid=aerixOriginalDisablePrerotationAndroid")
+target_sources(glfw PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/fps/glfw_frame_hook.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/fps/glfw_android_guard.c")
 target_include_directories(glfw PRIVATE "${AERIX_GLFW_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/fps")
 target_link_libraries(glfw PRIVATE aerix_frame_counter)
 

@@ -92,8 +92,34 @@ public class PojavApplication extends Application {
 		return null;
 	}
 
+	private static final java.util.concurrent.atomic.AtomicBoolean sWebViewSuffixApplied =
+			new java.util.concurrent.atomic.AtomicBoolean(false);
+	private static volatile String sDeferredWebViewProcessName;
+
 	private static void configureWebViewDataDirectory(String procName) {
 		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return;
+		if (procName != null && (procName.endsWith(":game") || procName.endsWith(":recorder"))) {
+			// Defer WebViewFactory initialization in :game/:recorder so 32-bit and low-RAM
+			// game processes do not load Chromium WebView unless a WebView is actually opened.
+			sDeferredWebViewProcessName = procName;
+			return;
+		}
+		applyWebViewDataDirectory(procName);
+	}
+
+	public static void ensureWebViewDataDirectory(Context context) {
+		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return;
+		if (sWebViewSuffixApplied.get()) return;
+		String procName = sDeferredWebViewProcessName;
+		if (procName == null && context != null) {
+			procName = resolveCurrentProcessName(context);
+		}
+		applyWebViewDataDirectory(procName);
+	}
+
+	private static void applyWebViewDataDirectory(String procName) {
+		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return;
+		if (!sWebViewSuffixApplied.compareAndSet(false, true)) return;
 		try {
 			android.webkit.WebView.setDataDirectorySuffix(webViewDataDirSuffixForProcess(procName));
 		} catch (Throwable error) {

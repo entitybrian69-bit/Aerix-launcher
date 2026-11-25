@@ -20,6 +20,7 @@ import net.kdt.pojavlaunch.authenticator.accounts.Account;
 import net.kdt.pojavlaunch.game.renderer.def.Renderers;
 import net.kdt.pojavlaunch.game.renderer.impl.GLESRenderSpec;
 import net.kdt.pojavlaunch.instances.Instance;
+import net.kdt.pojavlaunch.lifecycle.LaunchDiagnostics;
 import net.kdt.pojavlaunch.lifecycle.LifecycleAwareAlertDialog;
 import net.kdt.pojavlaunch.multirt.MultiRTUtils;
 import net.kdt.pojavlaunch.multirt.Runtime;
@@ -492,9 +493,11 @@ public class GameRunner {
         String mainClass = versionInfo.mainClass;
 
         try {
+            LaunchDiagnostics.mark(activity, "Starting Java VM (" + runtime.name + ", " + launchMemoryMb + " MB)");
             JavaRunner.nativeSetupExit(activity);
             JavaRunner.startJvm(runtime, javaArgList, launchClassPath, mainClass, launchArgs, launchMemoryMb);
         }catch (VMLoadException e) {
+            LaunchDiagnostics.fail(activity, "Stopped: Java VM failed to load", e);
             LifecycleAwareAlertDialog.DialogCreator dialogCreator = (dialog, builder) ->
                 builder.setMessage(e.toString(activity)).setPositiveButton(android.R.string.ok, (d, w)->{});
 

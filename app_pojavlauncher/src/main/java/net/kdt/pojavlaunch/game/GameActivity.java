@@ -764,7 +764,11 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         super.onPostResume();
         if(!(PLATFORM instanceof DummyBackend)) hideLoadingScreen();
         if(launcherGLView != null)  // Useful when backing out of the app
-            Tools.MAIN_HANDLER.postDelayed(() -> launcherGLView.refreshSize(), 500);
+            Tools.MAIN_HANDLER.postDelayed(() -> {
+                if (!isFinishing() && !isDestroyed() && launcherGLView != null && launcherGLView.isAttachedToWindow()) {
+                    launcherGLView.refreshSize();
+                }
+            }, 500);
         mResumedForLaunch = true;
         acknowledgeLaunchWhenReady();
     }

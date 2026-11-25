@@ -4,6 +4,8 @@
 
 #include <jni.h>
 #include <dlfcn.h>
+#include <signal.h>
+#include <stdarg.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -16,6 +18,16 @@
 
 #define TAG __FILE_NAME__
 #include "log.h"
+
+static void jre_log(const char* fmt, ...) {
+    char buf[512];
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(buf, sizeof(buf), fmt, args);
+    va_end(args);
+    LOGI("%s", buf);
+    logger_append_cstr(buf);
+}
 
 
 typedef jint (*JNI_CreateJavaVM_t)(JavaVM** p_vm, JNIEnv** p_env, void* vm_args);
@@ -102,12 +114,24 @@ void vm_hinter_free(vm_hinter_t* hinter, bool hasJavaAgents) {
 }
 
 static bool initializeJavaVM(java_vm_t* java_vm, JNIEnv *env, jstring* vmpath, heap_str_array* vmargs, bool hasJavaAgents) {
-    char* fail_msg;
+    const char* fail_msg;
 #define FAIL(msg) {fail_msg = msg; goto fail;}
 
     const char* jvm_path = (*env)->GetStringUTFChars(env, vmpath, NULL);
-    if(!loadJavaVM(java_vm, jvm_path)) {
-        throwException(env, STAGE_LOAD_RUNTIME, JNI_ERR, dlerror());
+    if(jvm_path == NULL) {
+        hstr_free(vmargs);
+        throwException(env, STAGE_LOAD_RUNTIME, JNI_ERR, "GetStringUTFChars(vmpath) returned NULL");
+        return false;
+    }
+    jre_log("jre_launcher: loading JVM from %s", jvm_path);
+    bool loaded = loadJavaVM(java_vm, jvm_path);
+    const char* dl_err = loaded ? NULL : dlerror();
+    (*env)->ReleaseStringUTFChars(env, vmpath, jvm_path);
+    if(!loaded) {
+        const char* err_text = dl_err != NULL ? dl_err : "dlsym(JNI_CreateJavaVM) returned NULL";
+        jre_log("jre_launcher: failed to load JVM: %s", err_text);
+        hstr_free(vmargs);
+        throwException(env, STAGE_LOAD_RUNTIME, JNI_ERR, err_text);
         return false;
     }
 
@@ -135,19 +159,23 @@ static bool initializeJavaVM(java_vm_t* java_vm, JNIEnv *env, jstring* vmpath, h
 
     vm_hinter_t vh;
     vm_hinter_setup(&vh, hasJavaAgents);
+    jre_log("jre_launcher: creating JavaVM (args=%d, agents=%d)", (int)userArgsCount, (int)hasJavaAgents);
     jint result = java_vm->JNI_CreateJavaVM(&java_vm->vm, &java_vm->vm_env, &initArgs);
     vm_hinter_free(&vh, hasJavaAgents);
 
     hstr_free(vmargs);
 
     if(result < 0) {
+        jre_log("jre_launcher: JNI_CreateJavaVM failed with code %d", (int)result);
         dlclose(java_vm->handle);
-        throwException(env, STAGE_CREATE_RUNTIME, result, NULL);
+        throwException(env, STAGE_CREATE_RUNTIME, result, "JNI_CreateJavaVM failed");
         return false;
     }
+    jre_log("jre_launcher: JavaVM created");
     return true;
 
     fail:
+    jre_log("jre_launcher: VM init failed: %s", fail_msg);
     hstr_free(vmargs);
     dlclose(java_vm->handle);
     throwException(env, STAGE_CREATE_RUNTIME, JNI_ERR, fail_msg);
@@ -178,18 +206,15 @@ static void unloadJavaVM(java_vm_t* java_vm) {
 }
 
 static void prepareSignalHandlers() {
-    // Unset all signal handlers to create a good slate for JVM signal detection.
-    struct sigaction clean_sa;
-    memset(&clean_sa, 0, sizeof (struct sigaction));
-    for(int sigid = SIGHUP; sigid < NSIG; sigid++) {
-        // For some reason Android specifically checks if you set SIGSEGV to SIG_DFL.
-        // There's probably a good reason for that but the signal handler here is
-        // temporary and will be replaced by the Java VM's signal/crash handler.
-        // Work around the warning by using SIG_IGN for SIGSEGV
-        if(sigid == SIGSEGV) clean_sa.sa_handler = SIG_IGN;
-        else clean_sa.sa_handler = SIG_DFL;
-        sigaction(sigid, &clean_sa, NULL);
-    }
+    // Preserve Android's Zygote/ART/debuggerd/Bionic signal handlers.
+    // Blanket-resetting SIGHUP..NSIG wiped SIGPIPE=SIG_IGN (making any closed
+    // socket/pipe write fatal), wiped debuggerd crash handlers, wiped Bionic
+    // real-time signals, and set SIGSEGV to SIG_IGN across active ART threads.
+    struct sigaction ignore_sa;
+    memset(&ignore_sa, 0, sizeof(struct sigaction));
+    sigemptyset(&ignore_sa.sa_mask);
+    ignore_sa.sa_handler = SIG_IGN;
+    sigaction(SIGPIPE, &ignore_sa, NULL);
 }
 
 extern bool installClassLoaderHooks(JNIEnv *env, JNIEnv* vm_env);
@@ -199,6 +224,7 @@ Java_net_kdt_pojavlaunch_utils_jre_JavaRunner_nativeLoadJVM(JNIEnv *env, jclass 
     heap_str_array* vmArgs = (heap_str_array*) vmArgsL;
     heap_str_array* appArgs = (heap_str_array*) appArgsL;
     java_vm_t java_vm;
+    jre_log("jre_launcher: nativeLoadJVM entered");
     setup_abort_wait();
     prepareSignalHandlers();
     if(!initializeJavaVM(&java_vm, env, vmpath, vmArgs, hasJavaAgents)) {
@@ -206,11 +232,14 @@ Java_net_kdt_pojavlaunch_utils_jre_JavaRunner_nativeLoadJVM(JNIEnv *env, jclass 
         return JNI_FALSE;
     }
     JNIEnv *vm_env = java_vm.vm_env;
+    jre_log("jre_launcher: installing classloader hooks");
     if(!installClassLoaderHooks(env, vm_env)) {
+        jre_log("jre_launcher: classloader hooks failed");
         hstr_free(appArgs);
         return JNI_FALSE;
     }
 
+    jre_log("jre_launcher: registering exec hooks");
     hookExec(vm_env);
 
     jobjectArray vm_appArgs = hstr_to_jni(vm_env, appArgs, true);
@@ -221,6 +250,7 @@ Java_net_kdt_pojavlaunch_utils_jre_JavaRunner_nativeLoadJVM(JNIEnv *env, jclass 
     strncpy(mainClassName, mainClassNameBuf, mainClassLen + 1);
     (*env)->ReleaseStringUTFChars(env, mainClass, mainClassNameBuf);
 
+    jre_log("jre_launcher: executing main %s", mainClassName);
     bool main_result = executeMain(vm_env, mainClassName, vm_appArgs);
     (*java_vm.vm)->DetachCurrentThread(java_vm.vm);
     (*java_vm.vm)->DestroyJavaVM(java_vm.vm);

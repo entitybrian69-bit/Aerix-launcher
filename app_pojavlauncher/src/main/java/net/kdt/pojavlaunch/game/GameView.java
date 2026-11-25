@@ -372,6 +372,10 @@ public class GameView extends FrameLayout implements PlatformGrabListener, Surfa
             Log.w("MGLSurface", "Attempt to refresh size on null surface");
             return;
         }
+        Context context = getContext();
+        if (context instanceof Activity && ((Activity) context).isDestroyed()) {
+            return;
+        }
         // The surface belongs to us, its display belongs to the system. While a window is being torn
         // down or re-attached - backgrounding the launcher, returning to it, a fold, a second screen -
         // Surface.getDisplay() is allowed to answer null, and reading a rate off that would take the
@@ -439,14 +443,12 @@ public class GameView extends FrameLayout implements PlatformGrabListener, Surfa
 
     @Override
     public void onSurfaceResized() {
-        if(PLATFORM != null)
-            PLATFORM.surfaceUpdated();
+        Platform.updateSurfaceDimensions();
     }
 
     @Override
     public void onSurfaceDestroyed() {
-        if(PLATFORM != null)
-            PLATFORM.surfaceDestroyed();
+        Platform.destroySurface();
     }
 
     /** A small interface called when the listener is ready for the first time */

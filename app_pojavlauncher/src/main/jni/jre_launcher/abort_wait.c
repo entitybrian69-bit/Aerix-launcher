@@ -12,6 +12,8 @@
 #include <stdlib.h>
 
 static uint32_t futex_word = 1;
+static pthread_mutex_t abort_setup_mutex = PTHREAD_MUTEX_INITIALIZER;
+static bool abort_thread_started = false;
 
 struct {
     int code;
@@ -27,6 +29,9 @@ struct {
 
 _Noreturn static void callExit() {
     JavaVM *vm = vm_exit_data.vm;
+    if(vm == NULL || vm_exit_data.exit_class == NULL || vm_exit_data.exit_method == NULL) {
+        abort();
+    }
     JNIEnv *env;
     jint result = (*vm)->GetEnv(vm, (void**)&env, JNI_VERSION_1_6);
     if(result == JNI_EDETACHED) {
@@ -42,21 +47,33 @@ _Noreturn static void callExit() {
 }
 
 static void* abort_wait(void* unused) {
-    syscall(SYS_futex, &futex_word, FUTEX_WAIT, 1, NULL);
+    // FUTEX_WAIT can return early on EINTR (any signal) or spurious wakeups; only exit when
+    // abort_call() has explicitly cleared futex_word.
+    while (__atomic_load_n(&futex_word, __ATOMIC_ACQUIRE) == 1) {
+        syscall(SYS_futex, &futex_word, FUTEX_WAIT, 1, NULL);
+    }
     callExit();
     return NULL;
 }
 
 void setup_abort_wait() {
-    pthread_t abort_thread;
-    pthread_create(&abort_thread, NULL, abort_wait, NULL);
+    pthread_mutex_lock(&abort_setup_mutex);
+    if (!abort_thread_started) {
+        __atomic_store_n(&futex_word, 1, __ATOMIC_RELEASE);
+        pthread_t abort_thread;
+        if (pthread_create(&abort_thread, NULL, abort_wait, NULL) == 0) {
+            pthread_detach(abort_thread);
+            abort_thread_started = true;
+        }
+    }
+    pthread_mutex_unlock(&abort_setup_mutex);
 }
 
 _Noreturn void abort_call(int code, bool is_signal) {
     abort_info.code = code;
     abort_info.is_signal = is_signal;
-    futex_word = 0;
-    syscall(SYS_futex, &futex_word, FUTEX_WAKE, NULL);
+    __atomic_store_n(&futex_word, 0, __ATOMIC_RELEASE);
+    syscall(SYS_futex, &futex_word, FUTEX_WAKE, 1);
     while(true) {}
 }
 

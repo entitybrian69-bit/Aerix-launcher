@@ -49,6 +49,7 @@ public class Platform {
     private static final List<PlatformGrabListener> grabListeners = new ArrayList<>();
     private static PlatformCursorImplementor mCursorImplementor = null;
     private static boolean isGrabbing = false;
+    private static final Object SURFACE_LOCK = new Object();
     private static Surface mPendingSurface;
     private static PlatformGamepad mPlatformGamepad = null;
     private static PlatformCursor mPlatformCursor = null;
@@ -253,8 +254,36 @@ public class Platform {
      * @param surface Surface object
      */
     public static void updateSurface(Surface surface) {
-        mPendingSurface = surface;
-        PLATFORM.surfaceCreated(surface);
+        synchronized (SURFACE_LOCK) {
+            if (surface != null && surface.isValid()) {
+                mPendingSurface = surface;
+                if (PLATFORM != null) PLATFORM.surfaceCreated(surface);
+            } else {
+                mPendingSurface = null;
+                if (PLATFORM != null) PLATFORM.surfaceDestroyed();
+            }
+        }
+    }
+
+    /**
+     * Notify the active backend that the surface dimensions changed, if a valid surface is active.
+     */
+    public static void updateSurfaceDimensions() {
+        synchronized (SURFACE_LOCK) {
+            if (mPendingSurface != null && mPendingSurface.isValid() && PLATFORM != null) {
+                PLATFORM.surfaceUpdated();
+            }
+        }
+    }
+
+    /**
+     * Clear any pending surface and notify the active backend that the surface was destroyed.
+     */
+    public static void destroySurface() {
+        synchronized (SURFACE_LOCK) {
+            mPendingSurface = null;
+            if (PLATFORM != null) PLATFORM.surfaceDestroyed();
+        }
     }
 
     /**
@@ -263,11 +292,16 @@ public class Platform {
      * @param backend implementation backend
      */
     public static void setPlatformLibrary(PlatformBackend backend) {
-        if(PLATFORM != null) PLATFORM.surfaceDestroyed();
-        PLATFORM = backend;
-        // To be picked by platform library
-        if (mPendingSurface != null)
-            PLATFORM.surfaceCreated(mPendingSurface);
+        synchronized (SURFACE_LOCK) {
+            if(PLATFORM != null) PLATFORM.surfaceDestroyed();
+            PLATFORM = backend;
+            // To be picked by platform library
+            if (mPendingSurface != null && mPendingSurface.isValid()) {
+                PLATFORM.surfaceCreated(mPendingSurface);
+            } else {
+                mPendingSurface = null;
+            }
+        }
     }
 
     /**

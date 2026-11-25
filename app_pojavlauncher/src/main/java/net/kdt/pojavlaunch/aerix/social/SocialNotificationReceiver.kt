@@ -88,9 +88,14 @@ class SocialNotificationReceiver : BroadcastReceiver() {
             }
 
             AerixDiscordPresence.ACTION_DISCORD_SCHEDULE_CLEAR -> {
-                val pending = goAsync()
-                AerixDiscordPresence.handleScheduleClearBroadcast(app) {
-                    runCatching { pending.finish() }
+                val delayMs = intent.getLongExtra(AerixDiscordPresence.EXTRA_DELAY_MS, 0L)
+                if (delayMs > 0L) {
+                    AerixDiscordPresence.handleScheduleClearBroadcast(app, delayMs = delayMs)
+                } else {
+                    val pending = goAsync()
+                    AerixDiscordPresence.handleScheduleClearBroadcast(app, delayMs = 0L) {
+                        runCatching { pending.finish() }
+                    }
                 }
             }
 

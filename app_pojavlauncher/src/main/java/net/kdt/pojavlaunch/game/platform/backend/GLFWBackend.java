@@ -18,6 +18,8 @@ public class GLFWBackend implements PlatformBackend {
     /** Slightly above a 60 Hz frame, so the pump is sure to have run. */
     private static final int TEXT_CHUNK_INTERVAL_MS = 18;
     private final android.os.Handler textPump = new android.os.Handler(android.os.Looper.getMainLooper());
+    private final Object mSurfaceLock = new Object();
+    private boolean mHasSurface = false;
 
     public GLFWBackend() {
         // GLFW on the main game we support does not send events to center the cursor on grab loss
@@ -35,17 +37,31 @@ public class GLFWBackend implements PlatformBackend {
 
     @Override
     public void surfaceCreated(Surface surface) {
-        GLFW.nativeSurfaceCreated(surface);
+        synchronized (mSurfaceLock) {
+            if (surface == null || !surface.isValid()) return;
+            if (mHasSurface) {
+                GLFW.nativeSurfaceDestroyed();
+                mHasSurface = false;
+            }
+            GLFW.nativeSurfaceCreated(surface);
+            mHasSurface = true;
+        }
     }
 
     @Override
     public void surfaceUpdated() {
-        GLFW.nativeSurfaceUpdated();
+        synchronized (mSurfaceLock) {
+            if (mHasSurface) GLFW.nativeSurfaceUpdated();
+        }
     }
 
     @Override
     public void surfaceDestroyed() {
-        GLFW.nativeSurfaceDestroyed();
+        synchronized (mSurfaceLock) {
+            if (!mHasSurface) return;
+            mHasSurface = false;
+            GLFW.nativeSurfaceDestroyed();
+        }
     }
 
     @Override

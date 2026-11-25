@@ -7,9 +7,14 @@ name: Release CI
 # A marked push has to touch this file to be seen at all, so each release cuts a
 # one line note here recording what it shipped.
 #
-# RELEASE_MARK=2.4.6
+# RELEASE_MARK=2.4.7
 #
-# Last cut: v2.4.6 - adds the 1080p60 cold-start intro splash, landscape Modpack Browser & Import
+# Last cut: v2.4.7 - fixes native JRE launch/abort crashes, SM-M015G GLFW libandroid.so surface
+# lifecycle SIGSEGV & deferred :game WebView initialization, and keeps Discord Rich Presence
+# alive for 5 minutes after leaving the launcher; double-signed permanently so 2.4.6, 2.4.5,
+# 2.4.1, and older release builds update in place.
+#
+# Previous cut: v2.4.6 - adds the 1080p60 cold-start intro splash, landscape Modpack Browser & Import
 # Controls redesigns, and screen recorder button/responsiveness fixes, double-signed permanently so
 # 2.4.5, 2.4.1, and older release builds update in place.
 #
@@ -204,12 +209,15 @@ jobs:
           python3 tests/fps_counter_smoke.py
           python3 tests/key_tap_mouse_launch_smoke.py
           python3 tests/logo_visibility_smoke.py
-          python3 tests/release_246_smoke.py
+          python3 tests/release_247_smoke.py
           python3 tests/recorder_panel_smoke.py
           python3 tests/fastclient_performance_download_test.py
           python3 tests/recorder_wiring_smoke.py
           python3 tests/intro_splash_smoke.py
           python3 tests/modpack_and_import_control_ui_smoke.py
+          python3 tests/jre_launcher_crash_fix_smoke.py
+          python3 tests/glfw_surface_lifecycle_crash_smoke.py
+          python3 tests/discord_presence_grace_period_smoke.py
           mkdir -p "$RUNNER_TEMP/aerix-migration-smoke"
           javac -d "$RUNNER_TEMP/aerix-migration-smoke" \
             app_pojavlauncher/src/main/java/net/kdt/pojavlaunch/tasks/DataMigrationPolicy.java \

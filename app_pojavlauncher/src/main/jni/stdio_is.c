@@ -18,15 +18,33 @@ static pthread_t logger;
 static jmethodID logger_onEventLogged;
 static volatile jobject logListener = NULL;
 static int latestlog_fd = -1;
+static pthread_mutex_t latestlog_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 
-static bool recordBuffer(char* buf, ssize_t len) {
+static bool recordBuffer(const char* buf, ssize_t len) {
     if(strstr(buf, "Session ID is")) return false;
+    pthread_mutex_lock(&latestlog_mutex);
     if(latestlog_fd != -1) {
         write(latestlog_fd, buf, len);
         fdatasync(latestlog_fd);
     }
+    pthread_mutex_unlock(&latestlog_mutex);
     return true;
+}
+
+void logger_append_cstr(const char* text) {
+    if(text == NULL || text[0] == '\0') return;
+    size_t len = strlen(text);
+    bool hasNewline = text[len - 1] == '\n';
+    char* line = (char*) malloc(len + (hasNewline ? 1 : 2));
+    if(line == NULL) return;
+    memcpy(line, text, len);
+    if(!hasNewline) {
+        line[len++] = '\n';
+    }
+    line[len] = '\0';
+    recordBuffer(line, (ssize_t) len);
+    free(line);
 }
 
 static void *logger_thread(void* param) {
