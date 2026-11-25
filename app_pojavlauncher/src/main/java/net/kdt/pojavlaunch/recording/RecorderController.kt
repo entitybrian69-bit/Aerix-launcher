@@ -1,6 +1,7 @@
 package net.kdt.pojavlaunch.recording
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.BroadcastReceiver
@@ -12,9 +13,14 @@ import android.media.projection.MediaProjectionManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.Message
+import android.os.Messenger
 import android.os.SystemClock
 import android.view.Gravity
+import android.view.MotionEvent
+import android.view.Surface
 import android.view.View
+import android.view.ViewConfiguration
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.TextView
@@ -42,7 +48,8 @@ class RecorderController @JvmOverloads constructor(
 
     private data class PendingStart(
         val config: RecordingOptions.Config,
-        val audioSource: RecordingOptions.AudioSource
+        val audioSource: RecordingOptions.AudioSource,
+        val withControls: Boolean
     )
 
     private var pending: PendingStart? = null
@@ -52,7 +59,44 @@ class RecorderController @JvmOverloads constructor(
     private var startRequested = false
     private var awaitingConsentSheet = false
     private var controlsInRecording = prefs.getBoolean(WITH_CONTROLS, true)
-    private var ghostingControls = false
+    private val touchSlop = ViewConfiguration.get(activity).scaledTouchSlop
+
+    private val surfaceMessenger = Messenger(
+        Handler(Looper.getMainLooper()) { msg: Message ->
+            when (msg.what) {
+                ScreenRecordingService.MSG_CLEAN_SURFACE -> {
+                    val data = msg.data
+                    data.classLoader = Surface::class.java.classLoader
+                    val surface = if (Build.VERSION.SDK_INT >= 33) {
+                        data.getParcelable("surface", Surface::class.java)
+                    } else {
+                        @Suppress("DEPRECATION")
+                        data.getParcelable<Surface>("surface")
+                    }
+                    val width = data.getInt("width")
+                    val height = data.getInt("height")
+                    val fps = data.getInt("fps")
+                    val attached = surface != null &&
+                        (activity as? GameActivity)?.attachCleanRecorderSurface(surface, width, height, fps) == true
+                    if (!attached) {
+                        runCatching { surface?.release() }
+                        Toast.makeText(
+                            activity,
+                            "Clean game capture could not attach on this device.",
+                            Toast.LENGTH_LONG
+                        ).show()
+                        stop()
+                    }
+                    true
+                }
+                ScreenRecordingService.MSG_DETACH_SURFACE -> {
+                    (activity as? GameActivity)?.detachCleanRecorderSurface()
+                    true
+                }
+                else -> false
+            }
+        }
+    )
 
     var options: List<RecordingOptions.Config> = emptyList()
         private set
@@ -63,9 +107,10 @@ class RecorderController @JvmOverloads constructor(
         get() = RecordingOptions.AudioSource.saved(prefs.getString("audio_source", null))
     val savedWithControls: Boolean get() = controlsInRecording
 
+    @SuppressLint("ClickableViewAccessibility")
     private val indicator = TextView(activity).apply {
         val density = activity.resources.displayMetrics.density
-        text = "● REC"
+        text = "⋮⋮ ● REC"
         textSize = 11f
         setTextColor(Color.WHITE)
         setPadding((10 * density).toInt(), (5 * density).toInt(), (10 * density).toInt(), (5 * density).toInt())
@@ -76,7 +121,63 @@ class RecorderController @JvmOverloads constructor(
             setStroke((1 * density).toInt().coerceAtLeast(1), 0xFFFF2E4C.toInt())
         }
         visibility = View.GONE
-        setOnClickListener { stop() }
+        var downRawX = 0f
+        var downRawY = 0f
+        var startX = 0f
+        var startY = 0f
+        var dragging = false
+        setOnTouchListener { v, event ->
+            val container = v.parent as? View ?: return@setOnTouchListener false
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    downRawX = event.rawX
+                    downRawY = event.rawY
+                    startX = v.x
+                    startY = v.y
+                    dragging = false
+                    true
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val dx = event.rawX - downRawX
+                    val dy = event.rawY - downRawY
+                    if (!dragging && (dx * dx + dy * dy) > touchSlop * touchSlop) {
+                        dragging = true
+                    }
+                    if (dragging) {
+                        val maxX = (container.width - v.width).coerceAtLeast(0).toFloat()
+                        val maxY = (container.height - v.height).coerceAtLeast(0).toFloat()
+                        v.x = (startX + dx).coerceIn(0f, maxX)
+                        v.y = (startY + dy).coerceIn(0f, maxY)
+                    }
+                    true
+                }
+                MotionEvent.ACTION_UP -> {
+                    if (dragging) {
+                        val maxX = (container.width - v.width).coerceAtLeast(1).toFloat()
+                        val maxY = (container.height - v.height).coerceAtLeast(1).toFloat()
+                        prefs.edit()
+                            .putFloat(INDICATOR_NX, (v.x / maxX).coerceIn(0f, 1f))
+                            .putFloat(INDICATOR_NY, (v.y / maxY).coerceIn(0f, 1f))
+                            .apply()
+                    } else {
+                        stop()
+                    }
+                    dragging = false
+                    true
+                }
+                MotionEvent.ACTION_CANCEL -> {
+                    dragging = false
+                    true
+                }
+                else -> false
+            }
+        }
+    }
+
+    private val parentLayoutListener = View.OnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+        if (indicator.visibility == View.VISIBLE) {
+            applySavedIndicatorPosition()
+        }
     }
 
     private val timerTick = object : Runnable {
@@ -96,17 +197,25 @@ class RecorderController @JvmOverloads constructor(
 
     private val stateListener: () -> Unit = {
         mainHandler.removeCallbacks(timerTick)
-        indicator.visibility = if (RecordingState.isActive()) View.VISIBLE else View.GONE
+        val shouldShow = RecordingState.isActive()
+        indicator.visibility = if (shouldShow) View.VISIBLE else View.GONE
         updateIndicatorText()
+        if (shouldShow) {
+            indicator.post { applySavedIndicatorPosition() }
+        }
         if (RecordingState.phase == RecordingState.Phase.RECORDING) {
             mainHandler.removeCallbacks(stopWatchdog)
             startRequested = false
             mainHandler.postDelayed(timerTick, 1000L)
-        } else if (!RecordingState.isActive()) {
-            mainHandler.removeCallbacks(stopWatchdog)
-            startRequested = false
+        } else {
+            if (RecordingState.phase == RecordingState.Phase.STOPPING || !RecordingState.isActive()) {
+                (activity as? GameActivity)?.detachCleanRecorderSurface()
+            }
+            if (!RecordingState.isActive()) {
+                mainHandler.removeCallbacks(stopWatchdog)
+                startRequested = false
+            }
         }
-        applyControlsToRecording()
     }
 
     init {
@@ -120,7 +229,9 @@ class RecorderController @JvmOverloads constructor(
             topMargin = (46 * density).toInt()
             marginEnd = (12 * density).toInt()
         }
-        activity.findViewById<ViewGroup>(android.R.id.content)?.addView(indicator, params)
+        val contentRoot = activity.findViewById<ViewGroup>(android.R.id.content)
+        contentRoot?.addView(indicator, params)
+        contentRoot?.addOnLayoutChangeListener(parentLayoutListener)
         RecordingState.addListener(stateListener)
     }
 
@@ -312,9 +423,8 @@ class RecorderController @JvmOverloads constructor(
             .putString("audio_source", audio.name)
             .putBoolean(WITH_CONTROLS, withControls)
             .apply()
-        applyControlsToRecording()
 
-        pending = PendingStart(config, audio)
+        pending = PendingStart(config, audio, withControls)
         val needsAudioPerm = audio != RecordingOptions.AudioSource.NONE
         if (needsAudioPerm &&
             ContextCompat.checkSelfPermission(activity, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED
@@ -323,7 +433,21 @@ class RecorderController @JvmOverloads constructor(
             ActivityCompat.requestPermissions(activity, arrayOf(Manifest.permission.RECORD_AUDIO), REQUEST_AUDIO)
             return
         }
-        requestCaptureConsent()
+        proceedAfterAudioPermission()
+    }
+
+    private fun proceedAfterAudioPermission() {
+        val current = pending ?: run {
+            awaitingConsentSheet = false
+            return
+        }
+        if (current.withControls || current.audioSource.game) {
+            requestCaptureConsent()
+        } else {
+            pending = null
+            awaitingConsentSheet = false
+            launchService(current, Activity.RESULT_CANCELED, null)
+        }
     }
 
     private fun requestCaptureConsent() {
@@ -354,7 +478,7 @@ class RecorderController @JvmOverloads constructor(
             pending = current.copy(audioSource = RecordingOptions.AudioSource.NONE)
             Toast.makeText(activity, "Audio permission skipped — recording video only.", Toast.LENGTH_SHORT).show()
         }
-        requestCaptureConsent()
+        proceedAfterAudioPermission()
         return true
     }
 
@@ -367,11 +491,15 @@ class RecorderController @JvmOverloads constructor(
             Toast.makeText(activity, "Screen recording cancelled.", Toast.LENGTH_SHORT).show()
             return true
         }
+        launchService(current, resultCode, data)
+        return true
+    }
+
+    private fun launchService(current: PendingStart, resultCode: Int, consentData: Intent?) {
         startRequested = true
         val intent = Intent(activity, ScreenRecordingService::class.java)
             .setAction(ScreenRecordingService.START)
             .putExtra("resultCode", resultCode)
-            .putExtra("consent", Intent(data))
             .putExtra("instanceRoot", instanceDir?.absolutePath)
             .putExtra("quality", current.config.quality)
             .putExtra("fps", current.config.fps)
@@ -380,18 +508,23 @@ class RecorderController @JvmOverloads constructor(
             .putExtra("bitrate", current.config.bitrate)
             .putExtra("encoder", current.config.encoder)
             .putExtra("audio_source", current.audioSource.name)
+            .putExtra(ScreenRecordingService.EXTRA_WITH_CONTROLS, current.withControls)
+            .putExtra(ScreenRecordingService.EXTRA_SURFACE_MESSENGER, surfaceMessenger)
+        if (consentData != null) {
+            intent.putExtra("consent", Intent(consentData))
+        }
         runCatching {
             ContextCompat.startForegroundService(activity, intent)
         }.onFailure { err ->
             startRequested = false
             Toast.makeText(activity, err.message ?: "Cannot start screen recorder", Toast.LENGTH_LONG).show()
         }
-        return true
     }
 
     fun stop() {
         startRequested = false
         awaitingConsentSheet = false
+        (activity as? GameActivity)?.detachCleanRecorderSurface()
         mainHandler.removeCallbacks(stopWatchdog)
         mainHandler.postDelayed(stopWatchdog, 4_500L)
         val stopIntent = Intent(activity, ScreenRecordingService::class.java)
@@ -408,14 +541,17 @@ class RecorderController @JvmOverloads constructor(
     fun setControlsDuringRecording(visible: Boolean) {
         controlsInRecording = visible
         prefs.edit().putBoolean(WITH_CONTROLS, visible).apply()
-        applyControlsToRecording()
+        if (RecordingState.isActive()) {
+            Toast.makeText(
+                activity,
+                "Saved — applies to your next recording.",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
     }
 
     fun onControlsRequestedByPlayer() {
-        if (!ghostingControls) return
-        controlsInRecording = true
-        applyControlsToRecording()
-        Toast.makeText(activity, "Controls will be visible in this recording.", Toast.LENGTH_SHORT).show()
+        // Touch controls stay visible on screen in every recording mode.
     }
 
     fun onGameStopped() {
@@ -432,10 +568,12 @@ class RecorderController @JvmOverloads constructor(
         dialog?.dismiss()
         dialog = null
         dismissPanel()
-        ghostingControls = false
-        (activity as? GameActivity)?.setControlsCapturedInRecording(true)
+        (activity as? GameActivity)?.detachCleanRecorderSurface()
         RecordingState.removeListener(stateListener)
-        (indicator.parent as? ViewGroup)?.removeView(indicator)
+        (indicator.parent as? ViewGroup)?.let { parent ->
+            parent.removeOnLayoutChangeListener(parentLayoutListener)
+            parent.removeView(indicator)
+        }
         stateReceiver?.let { receiver ->
             runCatching { activity.unregisterReceiver(receiver) }
         }
@@ -445,18 +583,19 @@ class RecorderController @JvmOverloads constructor(
         if (startRequested || RecordingState.isActive()) stop()
     }
 
-    private fun applyControlsToRecording() {
-        val ghosted = !controlsInRecording && RecordingState.isActive()
-        if (ghosted == ghostingControls) return
-        ghostingControls = ghosted
-        (activity as? GameActivity)?.setControlsCapturedInRecording(!ghosted)
-        if (ghosted) {
-            Toast.makeText(
-                activity,
-                "Controls are hidden while recording, but still work. " +
-                    "Tap your hide/show controls button to show them again.",
-                Toast.LENGTH_LONG
-            ).show()
+    private fun applySavedIndicatorPosition() {
+        val parent = indicator.parent as? View ?: return
+        if (parent.width <= 0 || parent.height <= 0 || indicator.width <= 0 || indicator.height <= 0) return
+        val maxX = (parent.width - indicator.width).coerceAtLeast(0).toFloat()
+        val maxY = (parent.height - indicator.height).coerceAtLeast(0).toFloat()
+        if (prefs.contains(INDICATOR_NX) && prefs.contains(INDICATOR_NY)) {
+            val nx = prefs.getFloat(INDICATOR_NX, 0.9f).coerceIn(0f, 1f)
+            val ny = prefs.getFloat(INDICATOR_NY, 0.1f).coerceIn(0f, 1f)
+            indicator.x = (nx * maxX).coerceIn(0f, maxX)
+            indicator.y = (ny * maxY).coerceIn(0f, maxY)
+        } else {
+            indicator.x = indicator.x.coerceIn(0f, maxX)
+            indicator.y = indicator.y.coerceIn(0f, maxY)
         }
     }
 
@@ -466,14 +605,14 @@ class RecorderController @JvmOverloads constructor(
                 val startedAt = RecordingState.startedAtElapsedMs
                 if (startedAt > 0L) {
                     val secs = ((SystemClock.elapsedRealtime() - startedAt) / 1000L).coerceAtLeast(0L)
-                    "● REC %02d:%02d · Stop".format(secs / 60L, secs % 60L)
+                    "⋮⋮ ● REC %02d:%02d · Stop".format(secs / 60L, secs % 60L)
                 } else {
-                    "● REC · Stop"
+                    "⋮⋮ ● REC · Stop"
                 }
             }
-            RecordingState.Phase.STARTING -> "● Starting…"
-            RecordingState.Phase.STOPPING -> "● Saving…"
-            RecordingState.Phase.IDLE -> "● REC"
+            RecordingState.Phase.STARTING -> "⋮⋮ ● Starting…"
+            RecordingState.Phase.STOPPING -> "⋮⋮ ● Saving…"
+            RecordingState.Phase.IDLE -> "⋮⋮ ● REC"
         }
     }
 
@@ -489,5 +628,7 @@ class RecorderController @JvmOverloads constructor(
         const val REQUEST_AUDIO = 0x52C1
         const val REQUEST_CAPTURE = 0x52C2
         private const val WITH_CONTROLS = "with_controls"
+        private const val INDICATOR_NX = "indicator_nx"
+        private const val INDICATOR_NY = "indicator_ny"
     }
 }

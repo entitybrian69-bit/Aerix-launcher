@@ -19,9 +19,13 @@ import android.media.MediaMuxer
 import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
 import android.os.Build
+import android.os.Bundle
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.IBinder
+import android.os.Message
+import android.os.Messenger
+import android.os.Parcelable
 import android.os.Process
 import android.os.SystemClock
 import android.util.Log
@@ -45,6 +49,10 @@ class ScreenRecordingService : Service() {
     companion object {
         const val START = "net.al.aerixlauncher.recorder.START"
         const val STOP = "net.al.aerixlauncher.recorder.STOP"
+        const val EXTRA_WITH_CONTROLS = "with_controls"
+        const val EXTRA_SURFACE_MESSENGER = "surface_messenger"
+        const val MSG_CLEAN_SURFACE = 1
+        const val MSG_DETACH_SURFACE = 2
         private const val TAG = "AerixRecorderService"
         private const val CHANNEL_ID = "aerix_recorder"
         private const val NOTIF_ID = 4401
@@ -72,6 +80,7 @@ class ScreenRecordingService : Service() {
     private var output: RecordingOutput? = null
     private var audio: RecordingAudio? = null
     private var timestamps: RecordingTimestamps? = null
+    private var surfaceMessenger: Messenger? = null
 
     private var expectAudio = false
     private var audioFinished = true
@@ -109,11 +118,14 @@ class ScreenRecordingService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val action = intent?.action
         val sourceName = intent?.getStringExtra("audio_source")
-        val wantsMic = RecordingOptions.AudioSource.saved(sourceName).microphone
+        val audioSource = RecordingOptions.AudioSource.saved(sourceName)
+        val wantsMic = audioSource.microphone
+        val withControls = intent?.getBooleanExtra(EXTRA_WITH_CONTROLS, true) ?: true
+        val needsProjection = withControls || audioSource.game
 
         // Always promote synchronously before any validation/stopSelf to satisfy Android 14+ FGS timing.
         if (!foregroundPromoted) {
-            if (!promoteToForeground(wantsMic)) {
+            if (!promoteToForeground(wantsMic, needsProjection)) {
                 RecordingState.publish(
                     this,
                     RecordingState.Phase.IDLE,
@@ -127,7 +139,8 @@ class ScreenRecordingService : Service() {
         when (action) {
             START -> {
                 val resultCode = intent.getIntExtra("resultCode", Activity.RESULT_CANCELED)
-                val consent = parcelableIntent(intent, "consent")
+                val consent = parcelableExtra<Intent>(intent, "consent")
+                val messenger = parcelableExtra<Messenger>(intent, EXTRA_SURFACE_MESSENGER)
                 val instancePath = intent.getStringExtra("instanceRoot")
                 val quality = intent.getIntExtra("quality", RecordingOptions.DEFAULT_QUALITY)
                 val fps = intent.getIntExtra("fps", RecordingOptions.DEFAULT_FPS)
@@ -135,9 +148,8 @@ class ScreenRecordingService : Service() {
                 val height = intent.getIntExtra("height", 720)
                 val bitrate = intent.getLongExtra("bitrate", RecordingOptions.bitrate(width, height, fps))
                 val encoder = intent.getStringExtra("encoder").orEmpty()
-                val audioSource = RecordingOptions.AudioSource.saved(sourceName)
 
-                if (resultCode != Activity.RESULT_OK || consent == null || instancePath.isNullOrBlank()) {
+                if (instancePath.isNullOrBlank() || (needsProjection && (resultCode != Activity.RESULT_OK || consent == null))) {
                     RecordingState.publish(
                         this,
                         RecordingState.Phase.IDLE,
@@ -153,7 +165,9 @@ class ScreenRecordingService : Service() {
                         consent = consent,
                         instanceRoot = File(instancePath),
                         config = RecordingOptions.Config(quality, fps, width, height, bitrate, encoder),
-                        audioSource = audioSource
+                        audioSource = audioSource,
+                        withControls = withControls,
+                        messenger = messenger
                     )
                 }
             }
@@ -204,7 +218,7 @@ class ScreenRecordingService : Service() {
         }
     }
 
-    private fun promoteToForeground(wantsMic: Boolean): Boolean {
+    private fun promoteToForeground(wantsMic: Boolean, needsProjection: Boolean): Boolean {
         ensureNotificationChannel()
         val notification = buildNotification("Preparing screen recorder…")
         return try {
@@ -212,23 +226,34 @@ class ScreenRecordingService : Service() {
                 val hasMicPerm = ContextCompat.checkSelfPermission(
                     this, Manifest.permission.RECORD_AUDIO
                 ) == PackageManager.PERMISSION_GRANTED
-                val type = if (wantsMic && hasMicPerm) {
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION or
+                val type = when {
+                    needsProjection && wantsMic && hasMicPerm ->
+                        ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION or
+                            ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+                    needsProjection ->
+                        ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
+                    wantsMic && hasMicPerm ->
                         ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
-                } else {
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
+                    else ->
+                        ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
                 }
                 try {
                     startForeground(NOTIF_ID, notification, type)
                 } catch (sec: SecurityException) {
-                    if (type != ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION) {
+                    if (needsProjection && type != ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION) {
                         startForeground(NOTIF_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)
+                    } else if (!needsProjection && type != ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE) {
+                        startForeground(NOTIF_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
                     } else {
                         throw sec
                     }
                 }
             } else if (Build.VERSION.SDK_INT >= 29) {
-                startForeground(NOTIF_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)
+                if (needsProjection) {
+                    startForeground(NOTIF_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)
+                } else {
+                    startForeground(NOTIF_ID, notification)
+                }
             } else {
                 startForeground(NOTIF_ID, notification)
             }
@@ -242,10 +267,12 @@ class ScreenRecordingService : Service() {
 
     private fun startRecording(
         resultCode: Int,
-        consent: Intent,
+        consent: Intent?,
         instanceRoot: File,
         config: RecordingOptions.Config,
-        audioSource: RecordingOptions.AudioSource
+        audioSource: RecordingOptions.AudioSource,
+        withControls: Boolean,
+        messenger: Messenger?
     ) {
         if (active) return
         active = true
@@ -263,7 +290,8 @@ class ScreenRecordingService : Service() {
         muxedAudioFrames = 0
         preStartSamples.clear()
         preStartBytes = 0
-        sessionDetail = config.label
+        surfaceMessenger = messenger
+        sessionDetail = if (withControls) config.label else "${config.label} · No controls"
         timestamps = RecordingTimestamps(System.nanoTime() / 1_000L)
 
         RecordingState.publish(this, RecordingState.Phase.STARTING, sessionDetail)
@@ -276,30 +304,36 @@ class ScreenRecordingService : Service() {
         }
         muxer = mediaMuxer
 
-        val projMgr = getSystemService(MediaProjectionManager::class.java)
-        val proj = runCatching { projMgr?.getMediaProjection(resultCode, consent) }.getOrNull()
-        if (proj == null) {
-            failStart("Screen capture session could not be created", null)
-            return
+        val needsProjection = withControls || audioSource.game
+        var proj: MediaProjection? = null
+        if (needsProjection) {
+            val projMgr = getSystemService(MediaProjectionManager::class.java)
+            proj = consent?.let {
+                runCatching { projMgr?.getMediaProjection(resultCode, it) }.getOrNull()
+            }
+            if (proj == null) {
+                failStart("Screen capture session could not be created", null)
+                return
+            }
+            projection = proj
+
+            // Android 14+ mandates registering a callback BEFORE calling createVirtualDisplay().
+            val projCb = object : MediaProjection.Callback() {
+                override fun onStop() {
+                    worker.post { if (active) stopRecording() }
+                }
+
+                override fun onCapturedContentResize(width: Int, height: Int) {
+                    // VirtualDisplay scales automatically to the configured encoder surface.
+                }
+
+                override fun onCapturedContentVisibilityChanged(isVisible: Boolean) {
+                    // Keep recording cleanly without disrupting the session.
+                }
+            }
+            projectionCallback = projCb
+            proj.registerCallback(projCb, worker)
         }
-        projection = proj
-
-        // Android 14+ mandates registering a callback BEFORE calling createVirtualDisplay().
-        val projCb = object : MediaProjection.Callback() {
-            override fun onStop() {
-                worker.post { if (active) stopRecording() }
-            }
-
-            override fun onCapturedContentResize(width: Int, height: Int) {
-                // VirtualDisplay scales automatically to the configured encoder surface.
-            }
-
-            override fun onCapturedContentVisibilityChanged(isVisible: Boolean) {
-                // Keep recording cleanly without disrupting the session.
-            }
-        }
-        projectionCallback = projCb
-        proj.registerCallback(projCb, worker)
 
         val startedPair = createConfiguredVideoEncoder(config)
         if (startedPair == null) {
@@ -310,24 +344,53 @@ class ScreenRecordingService : Service() {
         videoEncoder = codec
         inputSurface = surface
 
-        val dpi = resources.displayMetrics.densityDpi.coerceAtLeast(160)
-        val display = runCatching {
-            proj.createVirtualDisplay(
-                "AerixRecorder",
-                config.width,
-                config.height,
-                dpi,
-                DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
-                surface,
-                null,
-                worker
-            )
-        }.getOrNull()
-        if (display == null) {
-            failStart("Could not create virtual display", null)
-            return
+        if (withControls) {
+            val activeProj = proj
+            if (activeProj == null) {
+                failStart("Screen capture session could not be created", null)
+                return
+            }
+            val dpi = resources.displayMetrics.densityDpi.coerceAtLeast(160)
+            val display = runCatching {
+                activeProj.createVirtualDisplay(
+                    "AerixRecorder",
+                    config.width,
+                    config.height,
+                    dpi,
+                    DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
+                    surface,
+                    null,
+                    worker
+                )
+            }.getOrNull()
+            if (display == null) {
+                failStart("Could not create virtual display", null)
+                return
+            }
+            virtualDisplay = display
+        } else {
+            val target = surfaceMessenger
+            val sent = if (target != null) {
+                runCatching {
+                    val msg = Message.obtain().apply {
+                        what = MSG_CLEAN_SURFACE
+                        data = Bundle().apply {
+                            putParcelable("surface", surface)
+                            putInt("width", config.width)
+                            putInt("height", config.height)
+                            putInt("fps", config.fps)
+                        }
+                    }
+                    target.send(msg)
+                }.isSuccess
+            } else {
+                false
+            }
+            if (!sent) {
+                failStart("Could not attach clean game surface for recording", null)
+                return
+            }
         }
-        virtualDisplay = display
 
         val hasAudioPerm = ContextCompat.checkSelfPermission(
             this, Manifest.permission.RECORD_AUDIO
@@ -556,6 +619,7 @@ class ScreenRecordingService : Service() {
         RecordingState.publish(this, RecordingState.Phase.STOPPING, sessionDetail)
         updateNotification("Saving recording…")
 
+        notifyDetachSurface()
         val signaled = runCatching { videoEncoder?.signalEndOfInputStream() }.isSuccess
         if (!signaled) videoEos = true
 
@@ -578,6 +642,8 @@ class ScreenRecordingService : Service() {
         finished = true
         worker.removeCallbacks(stopTimeout)
         worker.removeCallbacks(audioStartTimeout)
+        notifyDetachSurface()
+        surfaceMessenger = null
 
         if (!muxerStarted && hasPreStartKeyframe) {
             tryStartMuxer(forceVideoOnly = true)
@@ -627,6 +693,8 @@ class ScreenRecordingService : Service() {
         Log.e(TAG, message, error)
         worker.removeCallbacks(stopTimeout)
         worker.removeCallbacks(audioStartTimeout)
+        notifyDetachSurface()
+        surfaceMessenger = null
         runCatching { virtualDisplay?.release() }
         virtualDisplay = null
         runCatching { videoEncoder?.release() }
@@ -707,12 +775,17 @@ class ScreenRecordingService : Service() {
         runCatching { mgr.notify(NOTIF_ID, buildNotification(text)) }
     }
 
-    private fun parcelableIntent(intent: Intent, key: String): Intent? {
+    private fun notifyDetachSurface() {
+        val target = surfaceMessenger ?: return
+        runCatching { target.send(Message.obtain().apply { what = MSG_DETACH_SURFACE }) }
+    }
+
+    private inline fun <reified T : Parcelable> parcelableExtra(intent: Intent, key: String): T? {
         return if (Build.VERSION.SDK_INT >= 33) {
-            runCatching { intent.getParcelableExtra(key, Intent::class.java) }.getOrNull()
+            runCatching { intent.getParcelableExtra(key, T::class.java) }.getOrNull()
         } else {
             @Suppress("DEPRECATION")
-            runCatching { intent.getParcelableExtra<Intent>(key) }.getOrNull()
+            runCatching { intent.getParcelableExtra<T>(key) }.getOrNull()
         }
     }
 }

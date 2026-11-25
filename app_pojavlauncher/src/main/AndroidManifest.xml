@@ -188,7 +188,11 @@
         <service android:name="net.kdt.pojavlaunch.recording.ScreenRecordingService"
             android:exported="false" android:process=":recorder"
             android:stopWithTask="true"
-            android:foregroundServiceType="mediaProjection|microphone" />
+            android:foregroundServiceType="mediaProjection|microphone|specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Records pure game surface frames cleanly without touch controls when display mirroring is disabled." />
+        </service>
 
         <service android:name="net.kdt.pojavlaunch.services.ProgressService"
             android:stopWithTask="true"

@@ -29,7 +29,7 @@ import java.nio.ByteBuffer
 internal class RecordingAudio(
     private val worker: Handler,
     private val requested: RecordingOptions.AudioSource,
-    private val projection: MediaProjection,
+    private val projection: MediaProjection?,
     private val listener: Listener
 ) {
     interface Listener {
@@ -294,8 +294,9 @@ internal class RecordingAudio(
     @SuppressLint("MissingPermission")
     private fun openGameRecord(): AudioRecord? {
         if (Build.VERSION.SDK_INT < 29) return null
+        val proj = projection ?: return null
         return runCatching {
-            val config = AudioPlaybackCaptureConfiguration.Builder(projection)
+            val config = AudioPlaybackCaptureConfiguration.Builder(proj)
                 .addMatchingUsage(AudioAttributes.USAGE_MEDIA)
                 .addMatchingUsage(AudioAttributes.USAGE_GAME)
                 .addMatchingUsage(AudioAttributes.USAGE_UNKNOWN)

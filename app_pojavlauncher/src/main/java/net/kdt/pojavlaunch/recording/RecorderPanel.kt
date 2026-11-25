@@ -460,7 +460,7 @@ private fun ControlsRow(
                 text = if (withControls) {
                     "Your touch controls appear in the video."
                 } else {
-                    "Touch controls fade out during capture while staying tappable."
+                    "Touch controls stay visible on your screen, but hidden in the video."
                 },
                 color = TextMuted,
                 fontSize = 11.sp

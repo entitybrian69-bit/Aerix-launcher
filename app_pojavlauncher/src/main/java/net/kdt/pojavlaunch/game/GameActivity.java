@@ -534,15 +534,24 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         mControlLayout.toggleControlVisible();
     }
 
+    public boolean attachCleanRecorderSurface(android.view.Surface encoderSurface, int width, int height, int fps) {
+        if (launcherGLView == null) return false;
+        return launcherGLView.attachCleanRecorderSurface(encoderSurface, width, height, fps);
+    }
+
+    public void detachCleanRecorderSurface() {
+        if (launcherGLView != null) {
+            launcherGLView.detachCleanRecorderSurface();
+        }
+    }
+
     /**
-     * Puts the on-screen controls in or out of what a screen recording captures.
-     *
-     * Uses alpha rather than view visibility so touch controls stay responsive while hidden from
-     * the recording's display capture.
+     * Kept for callers expecting the legacy hook; touch controls now remain visible on screen
+     * while clean surface-tee capture excludes them from the recorded video.
      */
     public void setControlsCapturedInRecording(boolean captured) {
         if (mControlLayout == null) return;
-        mControlLayout.setRecordingOpacity(captured ? 1f : 0f);
+        mControlLayout.setRecordingOpacity(1f);
     }
 
     @Override
@@ -736,6 +745,7 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         // The loopback endpoint that gave the game its profile and skin is done with the game.
         net.kdt.pojavlaunch.aerix.bridge.AerixSkinServer.stop();
         if (mRecorder != null) mRecorder.destroy();
+        if (launcherGLView != null) launcherGLView.releaseSurfaceTee();
         net.kdt.pojavlaunch.aerix.client.AerixKeyTapWindow.dismiss();
         super.onDestroy();
         ContextExecutor.clearActivity();

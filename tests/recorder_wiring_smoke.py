@@ -33,7 +33,7 @@ for forbidden in ("PixelCopy", "ImageWriter", "getBitmap(", "getRecordingSurface
 # 3. Hardware VirtualDisplay -> MediaCodec Surface pipeline + Android 14+ safety in :recorder.
 assert "createVirtualDisplay(" in service and "VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR" in service
 assert "proj.registerCallback(projCb, worker)" in service, "MediaProjection.Callback must register before createVirtualDisplay"
-assert service.index("proj.registerCallback(") < service.index("proj.createVirtualDisplay("), \
+assert service.index("proj.registerCallback(") < service.index(".createVirtualDisplay("), \
     "Android 14+ requires registering MediaProjection.Callback before createVirtualDisplay"
 assert "onCapturedContentResize" in service and "onCapturedContentVisibilityChanged" in service
 assert "if (!foregroundPromoted)" in service and "promoteToForeground(" in service
@@ -77,13 +77,21 @@ assert "RecordingLibrary.publish(context, destination)" in output
 assert "Movies/" in library and "IS_PENDING" in library and "FLAG_GRANT_READ_URI_PERMISSION" in library
 assert "Tools.openPath(context, file, share)" in library
 
-# 7. Clean control-fade via alpha (never View.GONE / View.INVISIBLE).
-controls = (SRC / "customcontrols/ControlLayout.java").read_text()
-assert "private float mRecordingOpacity = 1.0f;" in controls
-setter = controls.split("public void setRecordingOpacity(float opacity)")[1][:700]
-assert "updateButtonOpacity();" in setter
-assert "setVisibility" not in setter and "GONE" not in setter and "INVISIBLE" not in setter
-assert "setControlsCapturedInRecording(!ghosted)" in controller
-assert "Record with controls" in panel
+# 7. Clean GPU SurfaceTexture tee when recording without controls (controls stay visible on screen)
+#    + draggable live REC overlay pill.
+tee = (REC / "RecordingSurfaceTee.kt").read_text()
+for forbidden in ("PixelCopy", "ImageWriter", "getBitmap(", "getRecordingSurfaceView"):
+    assert forbidden not in tee, f"RecordingSurfaceTee must not use CPU readback ({forbidden})"
+assert "GL_TEXTURE_EXTERNAL_OES" in tee and "eglPresentationTimeANDROID" in tee
+assert "attachCleanRecorderSurface(" in game and "detachCleanRecorderSurface(" in game
+assert "mSurfaceTee" in game_view
+assert "EXTRA_WITH_CONTROLS" in controller and "EXTRA_SURFACE_MESSENGER" in controller
+assert "MSG_CLEAN_SURFACE" in service and "MSG_DETACH_SURFACE" in service
+assert "FOREGROUND_SERVICE_TYPE_SPECIAL_USE" in service
+assert "setControlsCapturedInRecording(false)" not in controller, \
+    "touch controls must remain visible to the player on screen when recording without controls"
+assert "Record with controls" in panel and "stay visible on your screen" in panel
+assert "MotionEvent.ACTION_MOVE" in controller and "INDICATOR_NX" in controller and "INDICATOR_NY" in controller, \
+    "live REC indicator overlay must be draggable and persist its position"
 
 print("Recorder wiring smoke test passed")

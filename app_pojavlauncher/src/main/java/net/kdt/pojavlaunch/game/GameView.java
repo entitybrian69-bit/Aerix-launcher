@@ -60,6 +60,11 @@ public class GameView extends FrameLayout implements PlatformGrabListener, Surfa
     /* View holding the surface, either a SurfaceView or a TextureView */
     View mSurface;
     GameCursorView mCursorView;
+    private net.kdt.pojavlaunch.recording.RecordingSurfaceTee mSurfaceTee;
+    private Surface mPendingCleanEncoderSurface;
+    private int mPendingCleanEncoderWidth;
+    private int mPendingCleanEncoderHeight;
+    private int mPendingCleanEncoderFps;
 
     private final InGameEventProcessor mIngameProcessor = new InGameEventProcessor(this, mSensitivityFactor);
     private final InGUIEventProcessor mInGUIProcessor = new InGUIEventProcessor(this);
@@ -435,7 +440,26 @@ public class GameView extends FrameLayout implements PlatformGrabListener, Surfa
 
     @Override
     public void onSurfaceAvailable(Surface surface) {
-        Platform.updateSurface(surface);
+        Surface targetSurface = surface;
+        if (mSurfaceTee == null) {
+            mSurfaceTee = new net.kdt.pojavlaunch.recording.RecordingSurfaceTee();
+        }
+        Surface teeSurface = mSurfaceTee.attachDisplaySurface(surface, windowWidth, windowHeight);
+        if (teeSurface != null) {
+            targetSurface = teeSurface;
+            if (mPendingCleanEncoderSurface != null) {
+                Surface pending = mPendingCleanEncoderSurface;
+                int w = mPendingCleanEncoderWidth;
+                int h = mPendingCleanEncoderHeight;
+                int fps = mPendingCleanEncoderFps;
+                mPendingCleanEncoderSurface = null;
+                mSurfaceTee.attachRecorderSurface(pending, w, h, fps);
+            }
+        } else {
+            mSurfaceTee.release();
+            mSurfaceTee = null;
+        }
+        Platform.updateSurface(targetSurface);
         if(mRefreshOnly) return;
         realStart();
         mRefreshOnly = true;
@@ -443,12 +467,55 @@ public class GameView extends FrameLayout implements PlatformGrabListener, Surfa
 
     @Override
     public void onSurfaceResized() {
+        if (mSurfaceTee != null) {
+            mSurfaceTee.updateDefaultBufferSize(windowWidth, windowHeight);
+        }
         Platform.updateSurfaceDimensions();
     }
 
     @Override
     public void onSurfaceDestroyed() {
         Platform.destroySurface();
+        if (mSurfaceTee != null) {
+            mSurfaceTee.detachDisplaySurface();
+        }
+    }
+
+    public boolean attachCleanRecorderSurface(Surface encoderSurface, int width, int height, int targetFps) {
+        if (encoderSurface == null || !encoderSurface.isValid()) return false;
+        if (mSurfaceTee == null) {
+            mPendingCleanEncoderSurface = encoderSurface;
+            mPendingCleanEncoderWidth = width;
+            mPendingCleanEncoderHeight = height;
+            mPendingCleanEncoderFps = targetFps;
+            return true;
+        }
+        mPendingCleanEncoderSurface = null;
+        return mSurfaceTee.attachRecorderSurface(encoderSurface, width, height, targetFps);
+    }
+
+    public void detachCleanRecorderSurface() {
+        if (mPendingCleanEncoderSurface != null) {
+            try { mPendingCleanEncoderSurface.release(); } catch (Throwable ignored) { }
+            mPendingCleanEncoderSurface = null;
+        }
+        if (mSurfaceTee != null) {
+            mSurfaceTee.detachRecorderSurface();
+        }
+    }
+
+    public void releaseSurfaceTee() {
+        detachCleanRecorderSurface();
+        if (mSurfaceTee != null) {
+            mSurfaceTee.release();
+            mSurfaceTee = null;
+        }
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        releaseSurfaceTee();
+        super.onDetachedFromWindow();
     }
 
     /** A small interface called when the listener is ready for the first time */
