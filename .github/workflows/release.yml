@@ -90,7 +90,7 @@ jobs:
       github.event.inputs.confirm == 'RELEASE' ||
       (github.event_name == 'push' && contains(github.event.head_commit.message, '[build-release]')) ||
       (github.event_name == 'push' && contains(github.event.head_commit.message, 'RELEASE_MARK='))
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     env:
       POJAV_KEYSTORE_PASSWORD: ${{ secrets.POJAV_KEYSTORE_PASSWORD }}
       CURSEFORGE_API_KEY: ${{ secrets.CURSEFORGE_API_KEY }}
@@ -188,7 +188,9 @@ jobs:
           java-version: '21'
 
       - name: Verify launcher and FastClient smoke tests
+        shell: bash
         run: |
+          trap 'echo "::error title=Release smoke failure::Command failed: $BASH_COMMAND"; exit 1' ERR
           python3 tests/branding_identity_smoke.py
           python3 tests/data_migration_smoke.py
           python3 tests/nightly_channel_smoke.py
@@ -411,7 +413,7 @@ jobs:
   # leaves a half-built APK on the Releases page: the assets only go up once both files exist.
   publish:
     needs: build
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:

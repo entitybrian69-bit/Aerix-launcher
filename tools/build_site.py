@@ -22,7 +22,7 @@ def current_version() -> str:
 
 
 VERSION = current_version()
-RELEASE_DATE = "16 Nov 2026"
+RELEASE_DATE = "25 Nov 2026"
 
 NAV = [
     ("index.html", "Home"),
