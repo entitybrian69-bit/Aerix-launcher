@@ -4,11 +4,11 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.widget.Toast
-import androidx.core.content.ContextCompat
 import java.util.concurrent.CopyOnWriteArrayList
 
 /** Cross-process recording phase synchronized between `:recorder` and `:game`. */
@@ -102,7 +102,12 @@ object RecordingState {
                 }
             }
         }
-        ContextCompat.registerReceiver(context, receiver, IntentFilter(ACTION), ContextCompat.RECEIVER_NOT_EXPORTED)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            context.registerReceiver(receiver, IntentFilter(ACTION), Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            @Suppress("UnspecifiedRegisterReceiverFlag")
+            context.registerReceiver(receiver, IntentFilter(ACTION))
+        }
         return receiver
     }
 }

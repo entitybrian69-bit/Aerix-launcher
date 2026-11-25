@@ -61,6 +61,11 @@ assert "postDelayed(" not in controller[controller.index("fun onActivityResult")
 assert "if (awaitingConsentSheet) return" in controller, \
     "onGameStopped must not discard pending consent while system permission dialog is open"
 assert "unregisterReceiver(receiver)" in controller, "state BroadcastReceiver must be unregistered in destroy()"
+state_src = (REC / "RecordingState.kt").read_text()
+assert "ContextCompat.registerReceiver" not in state_src, \
+    "RecordingState must not use ContextCompat.registerReceiver (breaks cloned packages on Android < 13 with DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION)"
+assert "Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU" in state_src and "Context.RECEIVER_NOT_EXPORTED" in state_src, \
+    "RecordingState must gate Context.RECEIVER_NOT_EXPORTED on API 33+"
 assert "RecordingLibrary.view(activity, file, action == 1)" in controller
 assert "RecordingOutput.recoverStrays" in controller
 
