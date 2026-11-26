@@ -312,7 +312,16 @@ and prints the SHA-256 it wrote.
 
 **Verified here:** two clean builds produce
 `51ebc9d36de1180e994f8e874d93df9ebcb4d72fd07c91f0a7f57b462b8a85a0` both times. CI builds twice
-and fails if the hashes differ.
+and fails if the hashes differ. (After the section 2.5 changes the jar hash is
+`12fb94f450bb6804e2e85df8918c5177d48aac4d288a43fc66140aeb87b06cce`, unchanged across two clean
+builds here.)
+
+**The scope of that claim matters.** It means *same toolchain, same bytes* — a given commit built
+twice on the same JDK produces the identical jar. It does **not** mean the jar is the same across
+different compilers: a jar built here with the Kotlin 2.4.21 compiler running on JDK 25 does not
+match the CI jar built with the same compiler on Temurin 21, even though both target Java 17
+bytecode. Reproduce a hash with the JDK named in section 7.1, or take the hash from the CI log for
+the run that produced the artefact you have.
 
 The **installer** is not byte-reproducible, and cannot be made so without a great deal of work:
 `jlink` embeds a build-specific runtime image, WiX embeds GUIDs and timestamps, and the Authenticode
