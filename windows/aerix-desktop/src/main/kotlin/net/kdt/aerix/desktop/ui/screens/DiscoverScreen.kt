@@ -315,7 +315,9 @@ class DiscoverScreen(private val shell: Shell) : JPanel(BorderLayout()), Refresh
             progress("Downloading the modpack", 0.15f)
             val dir = net.kdt.aerix.desktop.app.AppEnv.cacheDir.resolve("modpacks").also { java.nio.file.Files.createDirectories(it) }
             val archive = dir.resolve(ContentInstaller.sanitiseFile(fileName))
-            java.nio.file.Files.write(archive, net.kdt.aerix.desktop.core.net.Http.download(url))
+            // The pack archive is opened and unpacked, so its published hash has to be checked
+            // first. This call used to write the bytes straight out with no verification.
+            ContentInstaller.downloadVerified(url, archive, version.sha1, fileName)
             progress("Installing pack files", 0.35f)
             val result = ContentInstaller.installPack(target, archive) { p ->
                 progress(p.phase, 0.35f + p.fraction * 0.6f)
@@ -327,7 +329,7 @@ class DiscoverScreen(private val shell: Shell) : JPanel(BorderLayout()), Refresh
 
         progress("Downloading $fileName", 0.3f)
         if (kind == Content.Kind.MODPACK) {
-            return installPackFromArchive(project, target, url, fileName, progress)
+            return installPackFromArchive(project, target, url, fileName, progress, version.sha1)
         }
         val folder = kind
         progress("Downloading $fileName", 0.5f)
@@ -404,12 +406,13 @@ class DiscoverScreen(private val shell: Shell) : JPanel(BorderLayout()), Refresh
         target: Instance,
         url: String,
         fileName: String,
-        progress: (String, Float) -> Unit
+        progress: (String, Float) -> Unit,
+        sha1: String? = null
     ): Pair<Int, String> {
         progress("Downloading the modpack", 0.2f)
         val dir = net.kdt.aerix.desktop.app.AppEnv.cacheDir.resolve("modpacks").also { java.nio.file.Files.createDirectories(it) }
         val archive = dir.resolve(ContentInstaller.sanitiseFile(fileName))
-        java.nio.file.Files.write(archive, net.kdt.aerix.desktop.core.net.Http.download(url))
+        ContentInstaller.downloadVerified(url, archive, sha1, fileName)
         progress("Installing pack files", 0.4f)
         val result = ContentInstaller.installPack(target, archive) { p ->
             progress(p.phase, 0.4f + p.fraction * 0.55f)

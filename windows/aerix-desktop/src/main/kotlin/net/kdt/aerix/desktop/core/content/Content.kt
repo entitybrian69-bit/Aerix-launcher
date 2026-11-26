@@ -253,7 +253,11 @@ object Content {
                 loaders = emptyList(),
                 downloadUrl = download,
                 fileName = f.str("fileName"),
-                sha1 = null
+                // CurseForge's own file object carries the hash, so the pack archive downloaded
+                // from its CDN can be verified instead of trusting the CDN blindly. `algo == 1`
+                // is SHA-1 in CurseForge's hash-type enum.
+                sha1 = f.arr("hashes")?.objects()
+                    ?.firstOrNull { h -> h.num("algo")?.toInt() == 1 }?.str("value")
             )
         } ?: emptyList()
     }

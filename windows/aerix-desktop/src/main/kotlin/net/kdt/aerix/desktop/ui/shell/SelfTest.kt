@@ -5,6 +5,7 @@ import net.kdt.aerix.desktop.app.Log
 import net.kdt.aerix.desktop.app.Settings
 import net.kdt.aerix.desktop.core.auth.SecureStore
 import net.kdt.aerix.desktop.core.auth.accounts.Accounts
+import net.kdt.aerix.desktop.core.content.ContentInstaller
 import net.kdt.aerix.desktop.core.game.JavaRuntimes
 import net.kdt.aerix.desktop.core.instance.Instance
 import net.kdt.aerix.desktop.core.instance.InstanceLinks
@@ -683,6 +684,116 @@ object SelfTest {
             }
             if (!text.contains("WinLinks.createJunction")) error("junction creation is not wired to WinLinks")
             if (!text.contains("WinLinks.removeJunction")) error("junction removal is not wired to WinLinks")
+        }
+
+        check("a download with a published hash is rejected when the bytes do not match") {
+            // Behavioural, not a source grep: a real server serves a fixed body and the verified
+            // download helper must accept the correct hash and refuse a wrong one, leaving nothing
+            // behind in the second case.
+            val body = "an installer jar\n".toByteArray()
+            val sha1 = run {
+                val md = java.security.MessageDigest.getInstance("SHA-1")
+                md.digest(body).joinToString("") { "%02x".format(it) }
+            }
+            val server = java.net.ServerSocket(0, 8, java.net.InetAddress.getLoopbackAddress())
+            val port = server.localPort
+            val worker = Thread {
+                while (!server.isClosed) {
+                    val socket = runCatching { server.accept() }.getOrNull() ?: break
+                    socket.use { sck ->
+                        val input = sck.getInputStream().bufferedReader()
+                        while (true) { val line = input.readLine() ?: break; if (line.isEmpty()) break }
+                        val out = sck.getOutputStream()
+                        out.write("HTTP/1.1 200 OK\r\nContent-Length: ${body.size}\r\nConnection: close\r\n\r\n".toByteArray())
+                        out.write(body)
+                        out.flush()
+                    }
+                }
+            }.apply { isDaemon = true; start() }
+            val dir = Files.createTempDirectory("aerix-verify")
+            try {
+                val good = dir.resolve("good.jar")
+                ContentInstaller.downloadVerified("http://127.0.0.1:$port/x", good, sha1, "good.jar")
+                if (!Files.readAllBytes(good).contentEquals(body)) error("verified download wrote the wrong bytes")
+
+                val bad = dir.resolve("bad.jar")
+                val refused = runCatching {
+                    ContentInstaller.downloadVerified("http://127.0.0.1:$port/x", bad, "0".repeat(40), "bad.jar")
+                }.isFailure
+                if (!refused) error("a mismatched hash was accepted")
+                if (Files.exists(bad)) error("a mismatched download was left on disk")
+                if (Files.exists(bad.resolveSibling("bad.jar.part"))) error("a mismatched download left a .part")
+
+                // No published hash still works, but must be recorded as unverified rather than
+                // silently treated as a pass.
+                val unknown = dir.resolve("unknown.jar")
+                ContentInstaller.downloadVerified("http://127.0.0.1:$port/x", unknown, null, "unknown.jar")
+                if (!Files.readAllBytes(unknown).contentEquals(body)) error("unhashed download wrote the wrong bytes")
+            } finally {
+                server.close()
+                dir.toFile().deleteRecursively()
+            }
+        }
+
+        check("every file the launcher opens is hash-checked, or pinned when no hash exists") {
+            // These are behavioural rules, not cosmetics, and Kotlin has no way to assert on them
+            // at runtime without network access, so the sources are read where they are present.
+            val root = Paths.get("src/main/kotlin/net/kdt/aerix/desktop")
+            if (!Files.isDirectory(root)) {
+                Log.i("selftest", "SKIP source assertion, not running from the repository")
+                return@check
+            }
+            fun code(rel: String): String = Files.readString(root.resolve(rel)).lines()
+                .filterNot { it.trimStart().startsWith("//") || it.trimStart().startsWith("*") || it.trimStart().startsWith("/*") }
+                .joinToString("\n")
+
+            val options = setOf(RegexOption.DOT_MATCHES_ALL)
+            fun mustMatch(text: String, pattern: String, why: String) {
+                if (!Regex(pattern, options).containsMatchIn(text)) error(why)
+            }
+
+            // A Java runtime is unpacked and executed, so a missing checksum must abort the install
+            // rather than fall through to "no hash, no check". The guard must delete the archive and
+            // return before the hash is ever compared against a blank expected value.
+            val java = code("core/game/JavaRuntimes.kt")
+            mustMatch(java, "if \\(release\\.sha256\\.isBlank\\(\\)\\)", "the blank-SHA-256 guard is gone")
+            mustMatch(java, "refusing to install \\$\\{release\\.name\\}", "the no-checksum refusal message is gone")
+            // Walk the guard body itself: it must delete the archive and return null, in that order.
+            val guardAt = java.indexOf("if (release.sha256.isBlank())")
+            val guardBody = java.substring(guardAt, minOf(guardAt + 320, java.length))
+            if (!guardBody.contains("Files.deleteIfExists(archive)")) {
+                error("a runtime without a checksum is no longer deleted")
+            }
+            if (!guardBody.contains("return null")) {
+                error("a runtime without a checksum no longer aborts the install")
+            }
+            if (Regex("sha256\\.isNotBlank").containsMatchIn(java)) {
+                error("JavaRuntimes verifies only when a hash happens to be present")
+            }
+
+            // Loader installers are executed jars. The hash must be *assigned at the call site*,
+            // not merely have a helper defined somewhere.
+            val loaders = code("core/loaders/Loaders.kt")
+            mustMatch(loaders, "val expectedSha1\\s*=\\s*fetchSidecarSha1\\(", "loader installers are not checked against their Maven .sha1")
+            mustMatch(loaders, "cachedJarIsTrustworthy\\(jar, expectedSha1", "cached Forge/NeoForge installers are trusted without a hash")
+            mustMatch(loaders, "downloadTo\\(", "downloadTo is gone")
+            mustMatch(loaders, "pinHash\\(jar, expectedSha1", "downloaded installer jars are not pinned")
+
+            // Pack archives are unpacked into the instance.
+            val installer = code("core/content/ContentInstaller.kt")
+            if (!installer.contains("fun downloadVerified")) error("ContentInstaller has no verified-download helper")
+            val discover = code("ui/screens/DiscoverScreen.kt")
+            if (discover.contains("Files.write(archive, net.kdt.aerix.desktop.core.net.Http.download")) {
+                error("the modpack archive is still written without verification")
+            }
+            if (!discover.contains("downloadVerified")) error("the modpack archive is not verified")
+            if (installer.contains("if (sha1 != null && !Downloader.verify")) {
+                error("a null hash is still treated as a skip rather than a decision")
+            }
+            // Pack entries are code loaded by the game; a pack that ships no hash for one is skipped.
+            if (!installer.contains("the pack publishes no hash for it")) {
+                error("pack entries without a hash are installed unverified")
+            }
         }
 
         check("the offline create page fits its cards") {

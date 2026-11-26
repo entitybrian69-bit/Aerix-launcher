@@ -196,21 +196,34 @@ object JavaRuntimes {
         job.onProgress = { j -> onProgress("Downloading Java $major", 0.05f + j.progress() * 0.85f) }
         Downloader.run(job, listOf(DownloadJob.Task(release.url, archive, sha512 = null, size = release.size)))
         if (job.failed > 0) return null
-        if (release.sha256.isNotBlank()) {
-            onProgress("Verifying download", 0.92f)
-            val actual = runCatching {
-                val md = java.security.MessageDigest.getInstance("SHA-256")
-                Files.newInputStream(archive).use { input ->
-                    val buf = ByteArray(128 * 1024)
-                    while (true) { val n = input.read(buf); if (n <= 0) break; md.update(buf, 0, n) }
-                }
-                md.digest().joinToString("") { "%02x".format(it) }
-            }.getOrNull()
-            if (actual != null && !actual.equals(release.sha256, true)) {
-                Log.e("java", "SHA-256 mismatch for ${release.name}")
-                Files.deleteIfExists(archive)
-                return null
+        // A Java runtime downloaded here is unpacked and then *executed* to launch the game, so an
+        // unchecked download is the highest-value place in the whole launcher for a supply-chain
+        // attack (a mirror compromise, a DNS answer, a redirect). The check used to be skipped
+        // entirely whenever Adoptium returned no checksum; it is now mandatory.
+        if (release.sha256.isBlank()) {
+            Log.e("java", "refusing to install ${release.name}: the API published no SHA-256")
+            Files.deleteIfExists(archive)
+            return null
+        }
+        onProgress("Verifying download", 0.92f)
+        val actual = runCatching {
+            val md = java.security.MessageDigest.getInstance("SHA-256")
+            Files.newInputStream(archive).use { input ->
+                val buf = ByteArray(128 * 1024)
+                while (true) { val n = input.read(buf); if (n <= 0) break; md.update(buf, 0, n) }
             }
+            md.digest().joinToString("") { "%02x".format(it) }
+        }.getOrNull()
+        if (actual == null) {
+            // Hashing itself failed; that is not a reason to proceed.
+            Log.e("java", "could not hash ${release.name}; refusing to install it")
+            Files.deleteIfExists(archive)
+            return null
+        }
+        if (!actual.equals(release.sha256, true)) {
+            Log.e("java", "SHA-256 mismatch for ${release.name} (expected ${release.sha256}, got $actual)")
+            Files.deleteIfExists(archive)
+            return null
         }
         onProgress("Unpacking Java $major", 0.94f)
         unpackArchive(archive, target)

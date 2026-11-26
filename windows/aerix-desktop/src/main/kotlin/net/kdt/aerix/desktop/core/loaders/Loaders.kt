@@ -5,6 +5,7 @@ import net.kdt.aerix.desktop.core.game.JavaRuntimes
 import net.kdt.aerix.desktop.core.instance.Loader
 import net.kdt.aerix.desktop.core.json.Json
 import net.kdt.aerix.desktop.core.net.Http
+import net.kdt.aerix.desktop.core.net.Downloader
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
@@ -315,13 +316,15 @@ object Loaders {
     private fun installOptiFine(gameDir: Path, build: Build, onProgress: (String, Float) -> Unit): InstallResult {
         val cacheDir = gameDir.resolve("installers").also { Files.createDirectories(it) }
         val jar = cacheDir.resolve("${build.id}.jar".replace(' ', '_'))
-        if (!Files.isRegularFile(jar) || Files.size(jar) < 200_000) {
+        if (!cachedJarIsTrustworthy(jar, null, minSize = 200_000)) {
             val page = "https://optifine.net/adloadx?f=OptiFine_${build.gameVersion}_${build.label.replace(' ', '_')}.jar"
             onProgress("Locating the OptiFine download", 0.05f)
             val direct = resolveOptiFineDownload(page)
                 ?: throw IllegalStateException("OptiFine did not offer a download for ${build.label} on ${build.gameVersion}")
             onProgress("Downloading OptiFine ${build.label}", 0.2f)
-            downloadTo(direct, jar) { fraction -> onProgress("Downloading OptiFine", 0.2f + 0.6f * fraction) }
+            downloadTo(direct, jar, expectedSha1 = null, label = "The OptiFine installer") { fraction ->
+                onProgress("Downloading OptiFine", 0.2f + 0.6f * fraction)
+            }
         }
         // The OptiFine installer writes versions/<mc>-OptiFine_<label>/; run it in the game dir.
         val java = JavaRuntimes.pick(8) ?: throw IllegalStateException("OptiFine's installer needs Java 8 or newer")
@@ -353,9 +356,14 @@ object Loaders {
         val jarName = "bta-client-$versionName.jar"
         val jarPath = gameDir.resolve("libraries").resolve("bta-client").resolve(jarName)
         Files.createDirectories(jarPath.parent)
-        if (!Files.isRegularFile(jarPath) || Files.size(jarPath) < 10_000) {
+        if (!cachedJarIsTrustworthy(jarPath, null, minSize = 10_000)) {
             onProgress("Downloading Better than Adventure $versionName", 0.15f)
-            downloadTo("$BTA_DOWNLOADS/$kind/$versionName/client.jar", jarPath) { fraction ->
+            downloadTo(
+                "$BTA_DOWNLOADS/$kind/$versionName/client.jar",
+                jarPath,
+                expectedSha1 = null,
+                label = "The Better than Adventure client"
+            ) { fraction ->
                 onProgress("Downloading Better than Adventure", 0.15f + 0.6f * fraction)
             }
         }
@@ -391,8 +399,19 @@ object Loaders {
     /**
      * Streams a URL to [target] via a `.part` file, so a cancelled or failed download never leaves a
      * truncated jar where the launcher expects a complete one.
+     *
+     * [expectedSha1] is checked when the upstream publishes a hash. When it is null the file is
+     * pinned instead: its SHA-1 is written next to the jar and every later reuse of that cached
+     * file is checked against the pin, so a jar that is modified on disk after the first download
+     * is rejected rather than executed.
      */
-    private fun downloadTo(url: String, target: Path, onProgress: (Float) -> Unit) {
+    private fun downloadTo(
+        url: String,
+        target: Path,
+        expectedSha1: String?,
+        label: String,
+        onProgress: (Float) -> Unit
+    ) {
         Files.createDirectories(target.parent)
         val tmp = target.resolveSibling(target.fileName.toString() + ".part")
         // Sizes are unknown up front (the mirror sends no useful Content-Length), so the bar is
@@ -403,8 +422,55 @@ object Loaders {
                 onProgress((bytes / expected).coerceIn(0f, 0.99f))
             }) { input, _ -> input.copyTo(out) }
         }
+        if (!expectedSha1.isNullOrBlank() && !Downloader.verify(tmp, sha1 = expectedSha1)) {
+            val actual = Downloader.sha1(tmp)
+            Files.deleteIfExists(tmp)
+            throw IllegalStateException(
+                "$label failed its SHA-1 check (expected $expectedSha1, got $actual). Nothing was installed."
+            )
+        }
         Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING)
+        pinHash(target, expectedSha1, label)
     }
+
+    /** Writes the `.sha1` pin next to a cached jar, or confirms the upstream hash matches it. */
+    private fun pinHash(jar: Path, upstreamSha1: String?, label: String) {
+        val pin = jar.resolveSibling(jar.fileName.toString() + ".sha1")
+        val actual = Downloader.sha1(jar)
+        if (!upstreamSha1.isNullOrBlank()) {
+            if (!actual.equals(upstreamSha1, true)) {
+                Files.deleteIfExists(jar)
+                throw IllegalStateException("$label changed after download; refusing to keep it")
+            }
+            runCatching { Files.writeString(pin, actual, StandardCharsets.UTF_8) }
+        } else {
+            // No upstream hash exists (OptiFine, Better than Adventure). Record what we got so a
+            // later modification of the cached file is detectable, and say so plainly in the log.
+            runCatching { Files.writeString(pin, actual, StandardCharsets.UTF_8) }
+            Log.w("loaders", "$label publishes no hash; pinned the downloaded file as $actual")
+        }
+    }
+
+    /**
+     * Returns true when [jar] is present, at least [minSize] bytes, and either matches its upstream
+     * [upstreamSha1] or matches the local pin written at download time.
+     */
+    private fun cachedJarIsTrustworthy(jar: Path, upstreamSha1: String?, minSize: Long): Boolean {
+        if (!Files.isRegularFile(jar)) return false
+        if (Files.size(jar) < minSize) return false
+        if (!upstreamSha1.isNullOrBlank()) return Downloader.verify(jar, sha1 = upstreamSha1)
+        val pin = jar.resolveSibling(jar.fileName.toString() + ".sha1")
+        val expected = runCatching { Files.readString(pin, StandardCharsets.UTF_8).trim() }.getOrNull()
+        if (expected.isNullOrBlank()) return false
+        return Downloader.verify(jar, sha1 = expected)
+    }
+
+    /** Fetches the Maven `.sha1` sidecar published next to an installer jar, or null if absent. */
+    private fun fetchSidecarSha1(jarUrl: String): String? = runCatching {
+        val body = Http.get("$jarUrl.sha1", cacheSeconds = 0).trim()
+        val hex = body.takeWhile { it.isLetterOrDigit() }
+        hex.takeIf { it.length == 40 } ?: null
+    }.getOrNull()
 
     /** Runs an installer jar and returns its combined output; a non-zero exit becomes an exception. */
     private fun runInstaller(java: JavaRuntimes.Runtime, jar: Path, gameDir: Path): String {
@@ -453,12 +519,28 @@ object Loaders {
         val cacheDir = gameDir.resolve("installers").also { Files.createDirectories(it) }
         val fileName = "installer-${build.id}.jar"
         val jar = cacheDir.resolve(fileName)
-        if (!Files.isRegularFile(jar) || Files.size(jar) < 10_000) {
+        val url = installerUrl(loader, mcVersion, build)
+        // Forge and NeoForge publish a `.sha1` next to every artefact on their Maven, so the
+        // installer jar that is about to be *executed* can be checked against a hash the project
+        // signed off on rather than trusted on the strength of its URL.
+        val expectedSha1 = fetchSidecarSha1(url)
+        if (expectedSha1 == null) {
+            Log.w("loaders", "no .sha1 sidecar for ${Loader.displayName(loader)} ${build.id}; pinning instead")
+        }
+        if (!cachedJarIsTrustworthy(jar, expectedSha1, minSize = 10_000)) {
             onProgress("Downloading the ${Loader.displayName(loader)} installer", 0.15f)
-            val url = installerUrl(loader, mcVersion, build)
             val bytes = Http.download(url)
             if (bytes.isEmpty()) throw IllegalStateException("The installer download was empty ($url)")
             Files.write(jar, bytes)
+            if (!expectedSha1.isNullOrBlank() && !Downloader.verify(jar, sha1 = expectedSha1)) {
+                val actual = Downloader.sha1(jar)
+                Files.deleteIfExists(jar)
+                throw IllegalStateException(
+                    "The ${Loader.displayName(loader)} installer failed its SHA-1 check " +
+                        "(expected $expectedSha1, got $actual). Nothing was installed."
+                )
+            }
+            pinHash(jar, expectedSha1, "The ${Loader.displayName(loader)} installer")
         }
 
         val requiredJava = when {

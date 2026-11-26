@@ -28,7 +28,7 @@ object SkinFace {
     fun skinUrl(account: Account?): String? = when {
         account == null -> null
         account.skinUrl != null -> account.skinUrl
-        account.isMicrosoft -> "http://textures.minecraft.net/texture/__uuid__"
+        account.isMicrosoft -> "https://textures.minecraft.net/texture/__uuid__"
         else -> null
     }
 
@@ -54,10 +54,17 @@ object SkinFace {
             account.skinUrl != null -> account.skinUrl!!
             else -> null
         }
-        if (url != null && downloading.add(account.effectiveUuid())) {
+        // `skinUrl` comes out of the on-disk account store, so it is treated as untrusted input:
+        // a skin is only ever fetched over TLS, and never over a scheme that could be redirected by
+        // something sitting between the launcher and the network.
+        val safeUrl = url?.takeIf { it.startsWith("https://", ignoreCase = true) }
+        if (url != null && safeUrl == null) {
+            Log.w("skin", "ignoring a non-HTTPS skin URL for ${account.username}")
+        }
+        if (safeUrl != null && downloading.add(account.effectiveUuid())) {
             Scheduler.io("skin") {
                 runCatching {
-                    val bytes = Http.download(url)
+                    val bytes = Http.download(safeUrl)
                     val img = ImageIO.read(bytes.inputStream())
                     if (img != null) {
                         cached.parentFile?.mkdirs()

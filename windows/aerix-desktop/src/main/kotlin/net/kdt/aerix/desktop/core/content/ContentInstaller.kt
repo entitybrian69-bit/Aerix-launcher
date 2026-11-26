@@ -37,6 +37,30 @@ object ContentInstaller {
     fun folderFor(instance: Instance, kind: Content.Kind): Path = instance.gameDir.resolve(kind.folder)
 
     /** A plain file install (the common case from Discover). */
+    /**
+     * Downloads [url] to [target], checking [sha1] when the source publishes one.
+     *
+     * This exists because the same three-line "download, write to a temp file, verify" sequence
+     * was written out by hand in several places and one of them (the modpack archive on the
+     * Discover page) simply left the verification out - an archive that is then unpacked into the
+     * instance. Anything that fetches a file it is going to open should go through here.
+     */
+    fun downloadVerified(url: String, target: Path, sha1: String?, label: String = target.fileName.toString()): Path {
+        Files.createDirectories(target.parent ?: target)
+        val tmp = target.resolveSibling(target.fileName.toString() + ".part")
+        val bytes = Http.download(url)
+        if (bytes.isEmpty()) throw IllegalStateException("The download for $label was empty")
+        Files.write(tmp, bytes)
+        if (!sha1.isNullOrBlank() && !Downloader.verify(tmp, sha1 = sha1, size = bytes.size.toLong())) {
+            val actual = Downloader.sha1(tmp)
+            Files.deleteIfExists(tmp)
+            throw IllegalStateException("$label failed its SHA-1 check (expected $sha1, got $actual)")
+        }
+        if (sha1.isNullOrBlank()) Log.w("content", "no published hash for $label; the file is unverified")
+        Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING)
+        return target
+    }
+
     fun installFile(
         instance: Instance,
         kind: Content.Kind,
@@ -54,10 +78,16 @@ object ContentInstaller {
         if (bytes.isEmpty()) throw IllegalStateException("The download for $safeName was empty")
         val tmp = dir.resolve("$safeName.part")
         Files.write(tmp, bytes)
-        if (sha1 != null && !Downloader.verify(tmp, sha1 = sha1, size = bytes.size.toLong())) {
+        // A hash that was published must be checked. `null` means the source publishes none (the
+        // CurseForge API does not return file hashes without a download round-trip), and that is a
+        // different case from "we have one and skipped it".
+        if (!sha1.isNullOrBlank() && !Downloader.verify(tmp, sha1 = sha1, size = bytes.size.toLong())) {
             val actual = Downloader.sha1(tmp)
             Files.deleteIfExists(tmp)
             throw IllegalStateException("$safeName failed its SHA-1 check (expected $sha1, got $actual)")
+        }
+        if (sha1.isNullOrBlank()) {
+            Log.w("content", "no published hash for $safeName; installing $url unverified")
         }
         Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING)
         onProgress(Progress("Installed $safeName", 1, 1))
@@ -94,7 +124,15 @@ object ContentInstaller {
             val downloads = file.arr("downloads")?.strings() ?: emptyList()
             val hashes = file.obj("hashes")
             val sha1 = hashes?.str("sha1")
+            val sha512 = hashes?.str("sha512")
             if (downloads.isEmpty()) { skipped.add(path); continue }
+            // The mrpack format requires a hash per file, and these jars are loaded by the game as
+            // code. An entry without one is a malformed or tampered pack, so it is reported and
+            // skipped rather than installed on trust.
+            if (sha1.isNullOrBlank() && sha512.isNullOrBlank()) {
+                skipped.add("$path (the pack publishes no hash for it)")
+                continue
+            }
             val target = safeResolve(game, path)
             if (target == null) { skipped.add("$path (would escape the instance)"); continue }
             Files.createDirectories(target.parent)
@@ -104,7 +142,7 @@ object ContentInstaller {
                 try {
                     val bytes = Http.download(url)
                     Files.write(target, bytes)
-                    if (sha1 != null && !Downloader.verify(target, sha1 = sha1, size = bytes.size.toLong())) {
+                    if (!Downloader.verify(target, sha1 = sha1, sha512 = sha512, size = bytes.size.toLong())) {
                         Files.deleteIfExists(target)
                         throw IllegalStateException("hash mismatch")
                     }
@@ -201,7 +239,21 @@ object ContentInstaller {
                     else -> game.resolve("mods").resolve(name)
                 }
                 Files.createDirectories(folder.parent)
-                Files.write(folder, Http.download(url))
+                // The CurseForge file endpoint returns the file's own hashes, so the jar that goes
+                // into `mods/` can be checked the same way a Modrinth one is. `algo == 1` is SHA-1
+                // in CurseForge's hash-type enum.
+                val expectedSha1 = meta.obj("data")?.arr("hashes")?.objects()
+                    ?.firstOrNull { it.num("algo")?.toInt() == 1 }?.str("value")
+                val bytes = Http.download(url)
+                Files.write(folder, bytes)
+                if (!expectedSha1.isNullOrBlank() &&
+                    !Downloader.verify(folder, sha1 = expectedSha1, size = bytes.size.toLong())
+                ) {
+                    val actual = Downloader.sha1(folder)
+                    Files.deleteIfExists(folder)
+                    throw IllegalStateException("hash mismatch (expected $expectedSha1, got $actual)")
+                }
+                if (expectedSha1.isNullOrBlank()) Log.w("content", "CurseForge returned no SHA-1 for $name")
                 installed++
             }.onFailure { skipped.add("project $projectId: ${it.message}") }
         }
