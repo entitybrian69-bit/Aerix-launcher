@@ -188,10 +188,88 @@ section 3.2) every later read would throw. It now degrades to the heap size.
 | `explorer.exe <path>` in `LibraryScreen` | Argument list, no shell; the path is the folder the player clicked. |
 | `rundll32 url.dll,FileProtocolHandler <url>` in `MicrosoftAuth` | Fallback for opening the login page when `Desktop.browse` is unavailable. The URL is assembled from constants; the only variable part is the device code from Microsoft. |
 | `taskkill /PID <pid>` | Kills the game process the launcher itself started, when the player asks to stop a game. |
-| Running Forge/NeoForge/OptiFine installer jars | These loaders only ship installers; this is how every launcher installs them. The jars are downloaded over HTTPS from the loader's own Maven and are the official files. |
+| Running Forge/NeoForge/OptiFine installer jars | These loaders only ship installers; this is how every launcher installs them. HTTPS alone was not enough, so the jars are now hash-verified or pinned — see 2.5.2. |
 | Update check against GitHub | One GET a day for release metadata. It never downloads or executes an update; it shows a link. |
 | `raw.githubusercontent.com` for server banners | Image URLs from a public catalogue, loaded as pictures. |
 | Executing `java` from `PATH` | `JavaRuntimes` scans well-known locations, `JAVA_HOME`, `PATH` and the player's explicit choice; the player can override it in Settings. This is inherent to a launcher. |
+
+### 2.5 Downloaded files were trusted on the strength of their URL — **fixed**
+
+HTTPS tells you who you are talking to. It does not tell you that the bytes you received are the
+bytes the upstream published, and it does not protect a file once it is on disk. Three code paths
+opened a downloaded file and trusted it. All three are the kind of thing that a heuristic engine is
+right to be suspicious of, and all three were ordinary bugs rather than deliberate design.
+
+#### 2.5.1 Java runtimes, verified only when a checksum happened to be present
+
+**Where:** `core/game/JavaRuntimes.kt`
+
+The Adoptium API returns a `checksum` field for most releases. The code was written as
+`if (release.sha256.isNotBlank()) { …verify… }`, so when the field was empty the archive was
+unpacked and then **executed** with no verification at all. A missing field is not evidence the
+file is safe, and this is the single highest-value target in the launcher: a Java runtime is an
+interpreter that the launcher then runs arbitrary game code under.
+
+**Fix:** the check is unconditional. A blank checksum, or a failure to compute the hash, deletes the
+archive and refuses the install with a log line naming the runtime. There is no path from "no
+checksum available" to "install anyway".
+
+#### 2.5.2 Loader installer jars were executed with no integrity check
+
+**Where:** `core/loaders/Loaders.kt`
+
+Forge, NeoForge, OptiFine and Better than Adventure are all installed by downloading an installer
+jar and executing it. Nothing verified those jars, and a cached jar left in `installers/` was reused
+on the strength of its file size alone — so anything that could write to that folder could plant a
+jar the launcher would later run.
+
+**Fix, in two parts:**
+
+- **Where upstream publishes a hash, it is now checked.** Forge and NeoForge publish a `.sha1`
+  sidecar next to every artefact on their Maven; the launcher fetches it and verifies the jar before
+  execution. A mismatch deletes the jar and aborts.
+- **Where upstream publishes no hash, the file is pinned.** OptiFine and Better than Adventure
+  publish no checksum. The jar is hashed at download time, the hash is written next to it, and every
+  later reuse — including a cached jar — must match that pin. A jar modified on disk after download
+  is rejected rather than executed. This is not as strong as an upstream signature and the log says
+  so, but it closes the "plant a file in `installers/`" path.
+
+#### 2.5.3 Modpack archives were unpacked without checking their hash
+
+**Where:** `ui/screens/DiscoverScreen.kt`, `core/content/ContentInstaller.kt`, `core/content/Content.kt`
+
+The Discover page wrote the `.mrpack`/CurseForge archive straight to disk and unpacked it. Modrinth
+publishes a SHA-1 for every version and it was already being parsed into `Content.Version.sha1` — it
+was simply not passed to the download. CurseForge versions were hard-coded to `sha1 = null`.
+
+**Fix:** a single `downloadVerified(...)` helper now owns the download-write-verify-cleanup sequence,
+and both archive paths go through it. CurseForge version metadata now carries the hash the API
+already returns (`algo 1 = SHA-1`, confirmed against the CurseForge OpenAPI contract). Inside a pack,
+each file entry must carry a hash, as the mrpack format requires; an entry without one is reported
+and skipped instead of being installed on trust, and `sha512` is honoured where present. The
+CurseForge pack-file path verifies against the file endpoint's `hashes` array.
+
+#### 2.5.4 What did *not* change
+
+Skins and server banners are still fetched without hashes. They are decoded as images and never
+executed, so a hash would add nothing a decoder does not already have to survive; the skin URL,
+which comes out of the on-disk account store, is now restricted to HTTPS so it cannot be downgraded
+in transit. Image decoders are the one place here where the input is genuinely untrusted, and that
+risk is unchanged by this round.
+
+#### 2.5.5 Evidence that the rules hold
+
+Three self-tests, one behavioural and two source-level, run on every `--test` and `--selftest`:
+
+- A real loopback HTTP server serves a fixed body; `downloadVerified` must accept the correct hash,
+  must refuse a wrong one, and must leave neither the file nor a `.part` behind when it refuses.
+- The Java runtime guard must still delete the archive and abort; the Forge/NeoForge path must
+  still assign its expected hash from the sidecar.
+
+Both source assertions were validated by deliberately re-introducing each bug and confirming the
+suite goes red. That mattered: the first version of the assertion matched the *helper's definition*
+rather than its *call site*, and passed with the bug restored. The version that ships matches the
+call site.
 
 ---
 
@@ -336,8 +414,13 @@ structural false-positive triggers.
 | 5 | Reproducible jar | Two clean builds both produce `51ebc9d3…`; CI builds twice and fails on a mismatch |
 | 6 | Optional Authenticode signing | `osslsigncode` path in `build.sh`, wired to `AERIX_SIGN_CERT`/`AERIX_SIGN_PASSWORD`; inactive until a certificate exists, and says so |
 | 7 | `totalMemoryMb` no longer caches an exception | Covered by the module check (it exercises the same call path) |
+| 8 | Java runtimes must have a checksum, or the install is refused | Guard asserted in the self test; the assertion was **verified to fail** with the guard removed |
+| 9 | Loader installers checked against their Maven `.sha1`; unhashed ones pinned | Call site asserted in the self test; **verified to fail** when the sidecar fetch was stubbed out |
+| 10 | Pack archives verified before unpacking (Modrinth **and** CurseForge) | Loopback-server test proves a wrong hash is refused and leaves nothing on disk |
+| 11 | Pack entries must carry a hash; `sha512` honoured | Assertion pins the skip; a malformed pack is reported, not installed |
+| 12 | Skin URLs restricted to HTTPS | Source-level fix; the non-HTTPS path logs and is not fetched |
 
-**Test state:** 20 checks, 20 passed, 0 failed — run on Linux here and on the Windows runner.
+**Test state:** 22 checks, 22 passed, 0 failed — run on Linux here and on the Windows runner.
 The suite is in `ui/shell/SelfTest.kt`; `./build.sh --selftest` fails the build on any failure.
 
 ### 5.1 Current artefacts
@@ -386,3 +469,81 @@ Stated plainly, because the request asked for it:
    `WinLinks.supported` and fall back to copy, and CI compiles and runs on Windows, but the
    junction calls themselves have not been exercised against a real reparse point in this session.
    This is the one part of the fix that needs a manual test on Windows before release.
+
+---
+
+## 7. Rebuilding this yourself
+
+Everything below runs from `windows/aerix-desktop`. The sources are plain Kotlin compiled by
+`kotlinc`; there is no Gradle, and no build tool that downloads anything at build time.
+
+### 7.1 What you need
+
+| Requirement | Version used here | Notes |
+|---|---|---|
+| JDK | Temurin 21 (any 17+) | `JAVA_HOME` must point at it. `jpackage`/`jlink` are needed only for the installer. |
+| Kotlin compiler | 2.4.21 | `KOTLINC` may point at the `kotlinc` binary; otherwise `PATH` is used. |
+| WiX Toolset | 3.x | Only for `--dist` producing an `.exe`; the CI image has it. |
+
+### 7.2 Commands
+
+```bash
+export JAVA_HOME=/path/to/jdk
+export KOTLINC=/path/to/kotlinc        # optional
+
+./build.sh --test        # compile + run the self test, fail the build on any failure
+./build.sh --selftest    # run the self test against an existing build
+./build.sh --dist        # jar + jlink runtime + installer (.exe) on Windows, portable zip anywhere
+```
+
+Outputs: `build/aerix-launcher.jar`, `dist/AerixLauncher/` (app image), `dist/runtime/` (jlink),
+`dist/AerixLauncher-2.4.4.exe` on Windows, and `dist/AerixLauncher-2.4.4-portable.zip` everywhere.
+
+### 7.3 Verifying a build without trusting me
+
+```bash
+# 1. The jar is byte-reproducible: build twice and compare.
+./build.sh --dist && sha256sum build/aerix-launcher.jar
+./build.sh --dist && sha256sum build/aerix-launcher.jar     # must match
+
+# 2. The self test must report 0 failures, including the verification checks in 2.5.5.
+./build.sh --selftest
+
+# 3. The installer's own file list, without installing it.
+dist/AerixLauncher-2.4.4.exe          # double-click; do not run with /S in a script
+```
+
+The `.exe` is **not** byte-reproducible (see 6.4); compare hashes only within a single CI run.
+
+---
+
+## 8. Final security checklist
+
+Each row is something the audit request asked to be checked. "Where" points at the evidence, so a
+reader can confirm it rather than take it on trust.
+
+| Check | Result | Where |
+|---|---|---|
+| Suspicious APIs / libraries | None. No third-party libraries at all; only the JDK and Win32 calls via `java.lang.foreign`. | 1.1 |
+| Dependency count | Zero. No Gradle, no npm, no bundled `jar`-in-`jar`. | 1.1, 5 |
+| Process injection | Not present. No `VirtualAllocEx`, no thread injection, no remote-process writes. | 1.2 |
+| Persistence | None. No Run key, no startup folder, no scheduled task, no service. | 1.4 |
+| Hidden background execution | None. Background threads are downloads, skin fetches and the update check, all visible in the log and in the UI; each stops when the launcher closes. | 1.2, 1.3 |
+| Privilege escalation | Not requested. No manifest `requireAdministrator`, no UAC prompt from the app. The installer elevates because it writes to `Program Files`, which is ordinary for an installer. | 3 |
+| Suspicious PowerShell / CMD | No `powershell`, `cmd /c`, `wscript`, `mshta`, `certutil`, `bitsadmin` anywhere. The last `cmd /c mklink` was removed in this audit. | 2.1, 5 |
+| Unexplained network traffic | None. Every host is either Mojang/Microsoft (game, auth), the Modrinth or CurseForge API, the loader's own Maven, OptiFine, or GitHub for the update check. No telemetry, no analytics. | 1.3 |
+| Unnecessary file / registry writes | None. Writes are the game directory, the instance store, the log, and a skin cache. No registry writes at all. | 1.4 |
+| Obfuscation / packing | None. No UPX, no ProGuard/R8, no string encryption, no custom class loader. Sources ship uncompiled in the repo and the jar is a plain zip of `.class` files. | 2.4, 5 |
+| App metadata / version info | `Implementation-Title`, `Implementation-Version` set in the manifest; installer carries the product name, version, publisher and icon. | 3.3, 5 |
+| All downloaded files verified | **Now yes.** Runtime archives, loader installers, pack archives and pack entries are verified or pinned before use. Images are decoded, never executed. | 2.5 |
+| HTTPS | All endpoints are HTTPS. Redirects are `NORMAL`, so HTTPS never downgrades. The one plain-HTTP string was a dead template and is now `https`. | 1.3, 2.5.4 |
+| Input validation | Instance names and file names are sanitised; pack paths are checked against directory escape (`safeResolve`). | 2.1, 2.2 |
+| Windows permissions | No admin manifest on the app. Writes stay under `%APPDATA%` and the chosen game directory. | 1.4, 3 |
+| Transparent background processes | Every process the launcher starts is either the game, a loader installer, `taskkill` on the game it started, or the browser for login. All are visible and logged. | 1.2 |
+| Features preserved | None removed. The only behavioural change is that a corrupt or tampered download now fails loudly instead of installing silently. | 5.2 |
+
+### 8.1 What this checklist does not say
+
+It does not say the binary is clean, and it must not be read that way. It says the specific
+behaviours that heuristic engines key on were looked for, and where they were found they were fixed.
+Whether any engine still flags the result is a question only a scan can answer — see section 6.
