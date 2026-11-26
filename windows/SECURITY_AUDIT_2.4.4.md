@@ -12,8 +12,10 @@
 Three things about this investigation need to be stated plainly before any conclusion.
 
 **a) The hash in the request does not match any binary this repository produced.**
-The published installer, as recorded by the CI run that built it, is **68,921,856 bytes** with the
-SHA-256 in its own `SHA256SUMS.txt`. The hash quoted in the request is
+Since this document was first written the installer has been rebuilt twice — once to shrink the
+bundled runtime, and once for the download-verification fixes in section 2.5 — and the published
+`.exe` is now **47,475,200 bytes** (section 5.1). None of those builds matches the request's hash
+either. The hash quoted in the request is
 `0bab8cfa…c8792f9`. The artefacts are served from a host this build environment cannot reach, so
 the uploaded bytes could not be re-hashed here. **Treat the scanned file as unverified** until its
 hash is compared against the release's `SHA256SUMS.txt`:
@@ -429,8 +431,14 @@ Built by the `Windows desktop launcher` workflow on `windows-latest`, after all 
 
 | File | Size | SHA-256 |
 |---|---|---|
-| `AerixLauncher-2.4.4.exe` | 47,467,008 | `130ab57ac14ad9a820172ebc3be32fa15c0f14b72d1510360347280196d20d55` |
-| `AerixLauncher-2.4.4-portable.zip` | 11,597,969 | `8a3e15c30911a6076670ed4869cfb62a52f6534386cc233507d89804a50c5ba9` |
+| `AerixLauncher-2.4.4.exe` | 47,475,200 | `c547ccb7520055a41346f24fb533254252aa88d08ae470d160629ee2e97edc0b` |
+| `AerixLauncher-2.4.4-portable.zip` | 11,605,690 | `53883ad5e79625f7ebcc09efc25398634adc08f9a0da8a24278185045d5402f3` |
+
+These are the artefacts from workflow run `45858781499` on commit `07bf7a5`, which contains the
+download-verification fixes in section 2.5. They replace the earlier build (`…130ab57a`), whose
+hashes are kept in the repository history and in the release notes of the superseded build. Sizes
+went up slightly because the verification code added classes to the jar; the runtime module list is
+unchanged.
 
 Bundled runtime: `java.base java.datatransfer java.desktop java.management java.net.http
 java.prefs java.xml jdk.unsupported` (48 MB, versus the full JDK).
