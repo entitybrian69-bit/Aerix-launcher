@@ -2,6 +2,7 @@ package net.kdt.pojavlaunch.aerix.music
 
 import android.graphics.BitmapFactory
 import android.util.LruCache
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -14,9 +15,15 @@ import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
@@ -27,7 +34,7 @@ import net.kdt.pojavlaunch.R
 import okhttp3.Request
 import java.io.File
 
-private val musicArtworkCache = object : LruCache<String, ImageBitmap>(12 * 1024) {
+private val musicArtworkCache = object : LruCache<String, ImageBitmap>(16 * 1024) {
     override fun sizeOf(key: String, value: ImageBitmap): Int =
         (value.width * value.height * 4 / 1024).coerceAtLeast(1)
 }
@@ -38,8 +45,9 @@ fun clearMusicArtworkCache() {
 
 @Composable
 fun rememberMusicArtwork(source: String?, targetPx: Int = 112): ImageBitmap? {
-    val state = produceState<ImageBitmap?>(initialValue = source?.let { musicArtworkCache.get(it) }, source) {
-        if (source.isNullOrBlank() || value != null) return@produceState
+    val cacheKey = if (source.isNullOrBlank()) null else "$source#$targetPx"
+    val state = produceState<ImageBitmap?>(initialValue = cacheKey?.let { musicArtworkCache.get(it) }, source, targetPx) {
+        if (source.isNullOrBlank() || cacheKey == null || value != null) return@produceState
         value = withContext(Dispatchers.IO) {
             runCatching {
                 val bytes: ByteArray = if (source.startsWith("http://") || source.startsWith("https://")) {
@@ -67,7 +75,7 @@ fun rememberMusicArtwork(source: String?, targetPx: Int = 112): ImageBitmap? {
                     0,
                     bytes.size,
                     BitmapFactory.Options().apply { inSampleSize = sample }
-                )?.asImageBitmap()?.also { musicArtworkCache.put(source, it) }
+                )?.asImageBitmap()?.also { musicArtworkCache.put(cacheKey, it) }
             }.getOrNull()
         }
     }
@@ -79,9 +87,10 @@ fun MusicArtworkImage(
     artworkUrl: String?,
     size: Dp = 48.dp,
     radius: Dp = 10.dp,
-    tint: Color = Color(0xFF8DEFE0)
+    tint: Color = Color(0xFF8DEFE0),
+    targetPx: Int = 112
 ) {
-    val bmp = rememberMusicArtwork(artworkUrl, targetPx = 112)
+    val bmp = rememberMusicArtwork(artworkUrl, targetPx = targetPx)
     Box(
         modifier = Modifier
             .size(size)
@@ -101,7 +110,93 @@ fun MusicArtworkImage(
                 painter = painterResource(R.drawable.aerix_ic_music_note),
                 contentDescription = null,
                 tint = tint,
-                modifier = Modifier.size(size * 0.52f)
+                modifier = Modifier.size(size * 0.48f)
+            )
+        }
+    }
+}
+
+@Composable
+fun MusicSkipPreviousIcon(tint: Color, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+        val barW = w * 0.14f
+        drawRoundRect(
+            color = tint,
+            topLeft = Offset(w * 0.16f, h * 0.2f),
+            size = Size(barW, h * 0.6f),
+            cornerRadius = CornerRadius(barW / 2f, barW / 2f)
+        )
+        val path = Path().apply {
+            moveTo(w * 0.84f, h * 0.2f)
+            lineTo(w * 0.84f, h * 0.8f)
+            lineTo(w * 0.34f, h * 0.5f)
+            close()
+        }
+        drawPath(path, color = tint)
+    }
+}
+
+@Composable
+fun MusicSkipNextIcon(tint: Color, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+        val barW = w * 0.14f
+        drawRoundRect(
+            color = tint,
+            topLeft = Offset(w * 0.70f, h * 0.2f),
+            size = Size(barW, h * 0.6f),
+            cornerRadius = CornerRadius(barW / 2f, barW / 2f)
+        )
+        val path = Path().apply {
+            moveTo(w * 0.16f, h * 0.2f)
+            lineTo(w * 0.16f, h * 0.8f)
+            lineTo(w * 0.66f, h * 0.5f)
+            close()
+        }
+        drawPath(path, color = tint)
+    }
+}
+
+@Composable
+fun MusicSpeakerIcon(muted: Boolean, tint: Color, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+        val speaker = Path().apply {
+            moveTo(w * 0.14f, h * 0.38f)
+            lineTo(w * 0.34f, h * 0.38f)
+            lineTo(w * 0.56f, h * 0.18f)
+            lineTo(w * 0.56f, h * 0.82f)
+            lineTo(w * 0.34f, h * 0.62f)
+            lineTo(w * 0.14f, h * 0.62f)
+            close()
+        }
+        drawPath(speaker, color = tint)
+        val stroke = Stroke(width = w * 0.09f, cap = StrokeCap.Round)
+        if (muted) {
+            drawLine(tint, Offset(w * 0.68f, h * 0.34f), Offset(w * 0.90f, h * 0.66f), strokeWidth = w * 0.09f, cap = StrokeCap.Round)
+            drawLine(tint, Offset(w * 0.90f, h * 0.34f), Offset(w * 0.68f, h * 0.66f), strokeWidth = w * 0.09f, cap = StrokeCap.Round)
+        } else {
+            drawArc(
+                color = tint,
+                startAngle = -50f,
+                sweepAngle = 100f,
+                useCenter = false,
+                topLeft = Offset(w * 0.52f, h * 0.28f),
+                size = Size(w * 0.26f, h * 0.44f),
+                style = stroke
+            )
+            drawArc(
+                color = tint,
+                startAngle = -55f,
+                sweepAngle = 110f,
+                useCenter = false,
+                topLeft = Offset(w * 0.56f, h * 0.14f),
+                size = Size(w * 0.36f, h * 0.72f),
+                style = stroke
             )
         }
     }

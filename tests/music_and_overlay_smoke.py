@@ -51,6 +51,8 @@ for expected in (
     'MC Music: OFF',
     'MusicArtworkImage',
     'AerixMusicController.selectedTab = tab',
+    'NOW PLAYING',
+    'AerixMusicController.seekTo',
 ):
     assert expected in musics_screen, expected
 
@@ -60,6 +62,7 @@ assert 'OverlayMusicSubSheet' in in_game_panel
 assert 'Mute Vanilla Music' in in_game_panel
 assert 'MusicArtworkImage' in in_game_panel
 assert '+10s' in in_game_panel
+assert 'AerixMusicController.seekTo' in in_game_panel
 
 client_overlay = (main / 'java/net/kdt/pojavlaunch/aerix/client/AerixClientOverlayView.kt').read_text()
 assert 'ClientMenuSubPage.MUSIC' in client_overlay

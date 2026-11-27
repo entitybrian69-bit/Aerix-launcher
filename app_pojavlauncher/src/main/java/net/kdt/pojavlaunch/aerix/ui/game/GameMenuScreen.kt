@@ -276,31 +276,15 @@ fun GameMenuScreen(
                         page = GameMenuPage.SOCIALS
                     })
             }
-            GameMenuPage.MUSIC -> Column(
+            GameMenuPage.MUSIC -> Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = AerixSpacing.mdPlus, vertical = AerixSpacing.sm),
-                verticalArrangement = Arrangement.spacedBy(AerixSpacing.xs)
+                    .padding(horizontal = AerixSpacing.mdPlus, vertical = AerixSpacing.sm)
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
-                ) {
-                    TextButton(onClick = { page = GameMenuPage.MAIN }) {
-                        Text("‹ Back", color = palette.accent, fontWeight = FontWeight.Bold)
-                    }
-                    Text(
-                        "Music",
-                        color = AerixSurface.textPrimary,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
                 net.kdt.pojavlaunch.aerix.music.InGameMusicPanel(
                     accent = palette.accent,
-                    modifier = Modifier.weight(1f).fillMaxWidth()
+                    modifier = Modifier.fillMaxSize(),
+                    onBack = { page = GameMenuPage.MAIN }
                 )
             }
             GameMenuPage.MAIN -> AnimatedVisibility(
