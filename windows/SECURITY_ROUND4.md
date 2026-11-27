@@ -130,7 +130,72 @@ Why this is a false positive:
 | Source audit of the five characteristics | **Done** — source and bytecode |
 | `build.sh` changes | Done; `bash -n` clean; signing helper exercised against a stub signer for all four paths (no cert, missing tool, bad signature, good signature) |
 | Self-tests | 23/23 here, including the new packaging checks, each validated by removing the guard |
-| Windows build of the new packaging | **CI only** — no Windows host here |
+| Windows build of the new packaging | **CI only** — no Windows host here; the first two attempts failed and their failures are recorded in §8 |
 | Signing with a real certificate | **Not done** — no certificate exists; the path is wired and fails closed |
 | Launch, auth, mod install, uninstall on Windows | **Not tested here**; CI compiles, self-tests and runs the shipped jar under the bundled runtime |
 | Re-scan | **Not done** — needs the user to upload the new artefact |
+
+## 8. Two failures worth recording
+
+The packaging change went out and failed twice before it produced a portable build. Both failures are
+in the report rather than being quietly fixed, because in each case the useful output was not the fix
+but the guard that now makes the mistake impossible to repeat.
+
+**First attempt: nothing was packaged.** jpackage deletes its staging app image the moment it writes
+`AerixLauncher-2.4.4.exe`. The portable step ran after the installer and looked for that image, found
+nothing, and its `if [[ -d ... ]]` simply did not fire. The build reported success and the release
+gained no portable build at all. Fix: build the app image explicitly, before the installer.
+
+**Second attempt: the order was still wrong.** `make_app_image` was called before
+`make_runtime_image`, so `dist/runtime` did not exist when jpackage ran, no `--runtime-image` was
+passed, and the step failed. Fix: build the runtime first, then the app image, then the installer —
+which is the dependency order, not an arbitrary one.
+
+What changed as a result is not just the ordering. Three checks now exist that would have caught both:
+
+- CI fails if `dist/AerixLauncher-*-windows-portable.zip` is missing, if it contains no
+  `AerixLauncher.exe`, or if it does not bundle `runtime/bin/javaw.exe`.
+- `make_app_image` refuses to run without a runtime image instead of building one that needs a
+  system Java.
+- The self-test asserts that `make_runtime_image` appears before `make_app_image` in the script,
+  and was confirmed to fail when the two lines are swapped back.
+
+A release that silently ships less than it claims is the failure mode this round was supposed to
+eliminate, so it is worth being clear that it happened here.
+
+**A third failure, and this one is a real bug in the launcher.** With the build order fixed, the CI
+self-test failed on a different check with:
+
+```
+ArrayIndexOutOfBoundsException: Index 1 out of bounds for length 0
+    at java.base/java.util.ArrayList.add(ArrayList.java:484)
+    at net.kdt.aerix.desktop.core.instance.Instances.onChange(Instance.kt:295)
+    at net.kdt.aerix.desktop.ui.screens.HomeScreen.<init>(HomeScreen.kt:75)
+```
+
+`Instances` and `Accounts` kept their change listeners in a plain `ArrayList` while `Log` and
+`GameLauncher` already used `CopyOnWriteArrayList`. Listeners are registered as screens are
+constructed; `notifyChanged()` runs on whichever thread made the change, which is normally an IO
+thread. Two threads in `ArrayList` and the array underneath is being resized while another thread
+reads it.
+
+This is not a packaging issue and it is not a false positive — it is a genuine concurrency bug that
+could throw in the field, most likely at exactly the moment a screen is first opened. Both stores now
+use `CopyOnWriteArrayList`, and `notifyChanged()` iterates directly instead of taking a `toList()`
+copy, which was the unsafe operation. `Widgets` keeps its `ArrayList` because it is Swing-only and
+therefore confined to the event thread.
+
+The self-test gained a check that registers and fires listeners from four threads and asserts no
+notifications are lost, plus a source check that the two stores use the concurrent type. Both were
+confirmed to fail when the `ArrayList` is put back.
+
+## 9. The verdict, restated
+
+The security work in this round is real: four of five reported characteristics are absent from the
+code with evidence, the packaging no longer ships a self-extracting stub as the recommended download,
+signing now covers every PE and is verified, and the audit turned up a genuine concurrency bug that
+had nothing to do with antivirus.
+
+What has *not* happened is a new scan. Nothing here establishes that Trapmine will stop flagging the
+build, and a clean result must not be reported until someone uploads the new artefact and reads the
+result. The false-positive submission in §6 is ready for the case where it does not.

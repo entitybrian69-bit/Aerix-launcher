@@ -281,7 +281,12 @@ object Loader {
  */
 object Instances {
     private val instances = ArrayList<Instance>()
-    private val listeners = ArrayList<() -> Unit>()
+    // Copy-on-write, like Log and GameLauncher: listeners are registered as screens are built, but
+    // notifyChanged runs on whatever thread performed the change, which is usually an IO thread.
+    // With a plain ArrayList, `toList()` copies while another thread is appending and dies with
+    // ArrayIndexOutOfBoundsException - it did exactly that on the Windows runner, inside
+    // ArrayList.add, one frame below HomeScreen's constructor.
+    private val listeners = java.util.concurrent.CopyOnWriteArrayList<() -> Unit>()
 
     fun rootDir(): Path = Settings.string("gameDirectory", AppEnv.defaultGameDir.toString()).let { Path.of(it) }
         .resolve("instances")
@@ -294,7 +299,7 @@ object Instances {
 
     fun onChange(listener: () -> Unit) { listeners.add(listener) }
 
-    private fun notifyChanged() = listeners.toList().forEach { runCatching { it() } }
+    private fun notifyChanged() = listeners.forEach { runCatching { it() } }
 
     fun load() {
         instances.clear()

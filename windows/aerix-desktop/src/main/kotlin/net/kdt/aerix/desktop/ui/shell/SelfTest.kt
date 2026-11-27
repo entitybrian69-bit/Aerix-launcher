@@ -631,6 +631,44 @@ object SelfTest {
             }
         }
 
+        check("change listeners survive being registered from several threads") {
+            // A Windows CI run failed here with ArrayIndexOutOfBoundsException inside ArrayList.add,
+            // on the line below HomeScreen's constructor: Instances kept its listeners in a plain
+            // ArrayList, and screens are built while the UI thread is already notifying. The failure
+            // is a race, so it cannot be provoked on demand - this asserts the property that makes it
+            // impossible (registration and notification both tolerate concurrency) rather than
+            // hoping to see the crash.
+            val registry = java.util.concurrent.CopyOnWriteArrayList<() -> Unit>()
+            var fired = java.util.concurrent.atomic.AtomicInteger()
+            val workers = (1..4).map { t ->
+                Thread {
+                    repeat(500) {
+                        registry.add { fired.incrementAndGet() }
+                        registry.forEach { it() }
+                    }
+                }
+            }
+            workers.forEach { it.start() }
+            workers.forEach { it.join() }
+            if (fired.get() < 2000) error("only ${fired.get()} notifications ran; listeners were lost")
+
+            // And the two stores that actually had the bug must be the concurrent type. Reading the
+            // field is not possible from here, so this checks the declaration in the source, which is
+            // what regressed the first time.
+            for ((label, file) in listOf(
+                "Instances" to "core/instance/Instance.kt",
+                "Accounts" to "core/auth/accounts/Accounts.kt",
+            )) {
+                val path = listOf(Paths.get("src/main/kotlin/net/kdt/aerix/desktop/$file"),
+                                  Paths.get("windows/aerix-desktop/src/main/kotlin/net/kdt/aerix/desktop/$file"))
+                    .firstOrNull { Files.isRegularFile(it) } ?: continue
+                val text = path.toFile().readText()
+                if (text.contains("listeners = ArrayList<") && !text.contains("CopyOnWriteArrayList")) {
+                    error("$label stores listeners in a plain ArrayList; concurrent registration races")
+                }
+            }
+        }
+
         check("instance names cannot smuggle shell characters into paths") {
             val nasty = "a&b%PATH%c^d;e`f\$g|h<i>j\"k"
             val clean = Instances.sanitiseName(nasty)
