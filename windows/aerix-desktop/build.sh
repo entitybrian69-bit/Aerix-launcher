@@ -72,6 +72,12 @@ export JAVA_HOME="$JDK"
 
 VERSION="$(grep -E '^versionName=' "$HERE/../../version.properties" 2>/dev/null | cut -d= -f2 | tr -d '\r' || true)"
 VERSION="${VERSION:-2.4.4}"
+
+# Stable identity for the Windows installer. jpackage uses this UUID to decide that a new build is
+# an *upgrade* of an existing installation, so it replaces the old one in place instead of adding a
+# second copy to Add/Remove Programs. It must therefore never change between versions: changing it
+# strands every existing installation. Generated once, hard-coded on purpose.
+AERIX_UPGRADE_UUID="${AERIX_UPGRADE_UUID:-9f2c41a7-5d3e-4b86-8a19-2f7be0c4d153}"
 STDIOUT="$OUT/stdlib"
 mkdir -p "$OUT"
 
@@ -202,6 +208,66 @@ EOF
   log "portable build: $DIST/AerixLauncher-$VERSION-portable.zip"
 }
 
+# Signs each given PE with the configured certificate and then *verifies* the result.
+#
+# A signature that was applied but does not verify is worse than none: the file still shows as
+# unsigned to SmartScreen while the build log claims otherwise. So the verify is part of the build,
+# not a suggestion in the docs.
+sign_pe() {
+  local files=("$@")
+  # Drop empty entries the callers produce when a glob matched nothing.
+  local targets=()
+  for f in "${files[@]}"; do [[ -n "$f" && -f "$f" ]] && targets+=("$f"); done
+  if [[ ${#targets[@]} -eq 0 ]]; then return; fi
+  if [[ -z "${AERIX_SIGN_CERT:-}" || -z "${AERIX_SIGN_PASSWORD:-}" ]]; then
+    for f in "${targets[@]}"; do
+      log "UNSIGNED: $(basename "$f") (set AERIX_SIGN_CERT/AERIX_SIGN_PASSWORD to sign)"
+    done
+    return
+  fi
+  if ! command -v osslsigncode >/dev/null 2>&1; then
+    echo "error: a signing certificate is configured but osslsigncode is not installed" >&2
+    exit 1
+  fi
+  local certdir; certdir="$(mktemp -d)"
+  printf '%s' "$AERIX_SIGN_CERT" | base64 -d > "$certdir/aerix.pfx" 2>/dev/null \
+    || cp "$AERIX_SIGN_CERT" "$certdir/aerix.pfx"
+  local f
+  for f in "${targets[@]}"; do
+    log "signing $(basename "$f")"
+    # -ts is an RFC 3161 timestamp; -t is the older Authenticode one. Some verifiers prefer one or
+    # the other, and a current timestamp keeps the signature valid after the certificate expires,
+    # so both are requested.
+    if ! osslsigncode sign -pkcs12 "$certdir/aerix.pfx" -pass "$AERIX_SIGN_PASSWORD" \
+          -n "Aerix Launcher" -i "https://github.com/luciferstudios/Aerix-launcherPc" \
+          -ts http://timestamp.digicert.com -t http://timestamp.digicert.com \
+          -h sha256 -in "$f" -out "$f.signed" 2>&1 | tail -3; then
+      rm -rf "$certdir"
+      echo "error: signing failed for $(basename "$f")" >&2
+      exit 1
+    fi
+    mv "$f.signed" "$f"
+    # Prove it took. osslsigncode verify exits non-zero only when the signature is absent or
+    # broken; a missing trust anchor is reported on stdout but is expected without a Windows cert
+    # store, so the check is on the digest rather than on the chain.
+    local verify
+    verify="$(osslsigncode verify -in "$f" 2>&1 || true)"
+    if ! printf '%s' "$verify" | grep -qiE "Message digest algorithm|Signature verification"; then
+      rm -rf "$certdir"
+      echo "error: signed $(basename "$f") but it does not verify:" >&2
+      printf '%s\n' "$verify" | tail -5 >&2
+      exit 1
+    fi
+    if printf '%s' "$verify" | grep -qi "verification: failed"; then
+      rm -rf "$certdir"
+      echo "error: signature on $(basename "$f") failed verification" >&2
+      exit 1
+    fi
+    log "signed and verified: $(basename "$f")"
+  done
+  rm -rf "$certdir"
+}
+
 make_installer() {
   make_dist
   local jp="$JDK/bin/jpackage"
@@ -242,9 +308,24 @@ make_installer() {
   local runtime_flag=()
   if [[ -d "$runtime_image" ]]; then runtime_flag=(--runtime-image "$runtime_image"); fi
   log "jpackage --type $type"
+  # Windows-only installer switches. Without --win-upgrade-uuid every release installs *beside* the
+  # previous one, which leaves two launchers in Add/Remove Programs and two copies of a 48 MB
+  # runtime on disk; the UUID fixes that and is deliberately stable across versions so an upgrade
+  # replaces in place. The others give the normal Start Menu entry, a desktop shortcut with a
+  # prompt, and a directory chooser.
+  local win_flags=()
+  if [[ "$type" != "app-image" ]]; then
+    if [[ -z "${AERIX_UPGRADE_UUID:-}" ]]; then
+      echo "error: AERIX_UPGRADE_UUID is empty; refusing to ship an installer that cannot upgrade in place" >&2
+      exit 1
+    fi
+    win_flags=(--win-menu --win-shortcut --win-shortcut-prompt --win-dir-chooser
+               --win-upgrade-uuid "$AERIX_UPGRADE_UUID")
+  fi
   if ! "$jp" --type "$type" --name "AerixLauncher" --app-version "$VERSION" \
       --dest "$DIST/image" --input "$DIST/AerixLauncher" --main-jar aerix-launcher.jar \
       --main-class "$MAIN_CLASS" --icon "$icon" "${runtime_flag[@]}" \
+      "${win_flags[@]}" \
       --description "Aerix Launcher - Minecraft: Java Edition for Windows" \
       --vendor "Aerix Launcher contributors" \
       --java-options "-Xmx1g" --java-options "-Dfile.encoding=UTF-8"; then
@@ -255,33 +336,55 @@ make_installer() {
   found="$(find "$DIST/image" -maxdepth 1 -type f \( -name '*.exe' -o -name '*.msi' \) 2>/dev/null)"
   # Authenticode signing, when a certificate is available.
   #
-  # An unsigned installer is what makes Windows SmartScreen say "unrecognised app" and is the
-  # single largest contributor to heuristic detections: a self-extracting executable that installs
-  # a bundled runtime and launches Java is, structurally, what a lot of droppers look like. Signing
-  # with a certificate that has a reputation is the only thing that actually clears it.
+  # An unsigned installer is what makes Windows SmartScreen say "unrecognised app", and it is the
+  # single largest contributor to a heuristic verdict: a large PE that unpacks a runtime and starts a
+  # child process is structurally what a dropper looks like, and with no signature a model has
+  # nothing to weigh against that shape. Signing is the only thing that actually clears it.
+  #
+  # Everything we ship as a PE gets signed, not just the installer: the app-image launcher is
+  # downloaded and run directly by people using the portable build, so it needs the same treatment.
   #
   # Nothing here invents an identity: without AERIX_SIGN_CERT (a base64 PFX) and
-  # AERIX_SIGN_PASSWORD, the build produces an unsigned installer exactly as before, and says so.
-  if [[ -n "${AERIX_SIGN_CERT:-}" && -n "${AERIX_SIGN_PASSWORD:-}" ]]; then
-    if [[ -z "$found" ]]; then log "signing requested but there is no installer to sign"; return; fi
-    local certdir; certdir="$(mktemp -d)"
-    printf '%s' "$AERIX_SIGN_CERT" | base64 -d > "$certdir/aerix.pfx" 2>/dev/null \
-      || cp "$AERIX_SIGN_CERT" "$certdir/aerix.pfx"
-    for file in $found; do
-      log "signing $(basename "$file")"
-      if ! osslsigncode sign -pkcs12 "$certdir/aerix.pfx" -pass "$AERIX_SIGN_PASSWORD" \
-            -n "Aerix Launcher" -i "https://github.com/luciferstudios/Aerix-launcherPc" \
-            -t http://timestamp.digicert.com -in "$file" -out "$file.signed" 2>&1 | tail -3; then
-        echo "error: signing failed" >&2; exit 1
-      fi
-      mv "$file.signed" "$file"
-    done
-    rm -rf "$certdir"
-    log "installer is signed"
-  else
-    log "installer is UNSIGNED (set AERIX_SIGN_CERT/AERIX_SIGN_PASSWORD to sign)"
-  fi
+  # AERIX_SIGN_PASSWORD the build produces an unsigned installer and says so.
+  local app_exe="$DIST/image/AerixLauncher/AerixLauncher.exe"
+  if [[ -f "$app_exe" ]]; then found="${found:+$found
+}$app_exe"; fi
+  sign_pe $found
+
   if [[ -n "$found" ]]; then log "installer: $found"; else log "app image: $DIST/image/AerixLauncher"; fi
+
+  # The portable build, packaged from the jpackage *app image* rather than from a bare jar.
+  #
+  # This is the download most people will use, and its shape matters: the jar-only ZIP needs a Java
+  # installation on the machine, while the installer is a self-extracting PE. An app-image ZIP is
+  # neither - it is a plain folder holding a real AerixLauncher.exe next to the runtime it uses,
+  # with no stub, no extraction at startup and no temporary directory to clean up afterwards. That
+  # is the least ambiguous thing we can ship, so it becomes the recommended download while the
+  # installer stays available for people who want Start Menu entries and Add/Remove Programs.
+  local app_image="$DIST/image/AerixLauncher"
+  if [[ -d "$app_image" && -f "$app_image/AerixLauncher.exe" ]]; then
+    # The image is signed above, so the ZIP distributes signed binaries rather than a signed
+    # container holding unsigned ones.
+    local portapp="$DIST/AerixLauncher-$VERSION-windows-portable"
+    rm -rf "$portapp" "$DIST/AerixLauncher-$VERSION-windows-portable.zip"
+    mkdir -p "$portapp"
+    cp -R "$app_image/." "$portapp/"
+    cat > "$portapp/README.txt" <<EOF
+Aerix Launcher $VERSION (Windows, portable)
+===========================================
+Run AerixLauncher.exe. No installation and no separate Java are needed: the runtime is in this
+folder and only this launcher uses it.
+
+Your settings live in %APPDATA%\\Aerix Launcher and your game files in %USERPROFILE%\\Aerix, exactly
+as with the installer, so the two builds can be swapped without losing anything.
+
+Move or copy this folder anywhere. Deleting it removes the launcher and nothing else.
+The console build (AerixLauncher-console.exe) is only useful for support: it prints the log.
+EOF
+    "$JAVA" -cp "$OUT/classes:$KOTLIN_LIBS/kotlin-stdlib.jar" net.kdt.aerix.desktop.tools.JarPackMain \
+      "$portapp" "$DIST/AerixLauncher-$VERSION-windows-portable.zip" "" "$VERSION"
+    log "portable (app image) build: $DIST/AerixLauncher-$VERSION-windows-portable.zip"
+  fi
 }
 
 case "${1:-build}" in

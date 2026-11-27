@@ -796,6 +796,50 @@ object SelfTest {
             }
         }
 
+        check("packaging stays transparent: no packers, no self-extract-only download, signed if configured") {
+            // These are release-engineering rules that no runtime test can observe, but a regression
+            // in any of them changes what users download and what a scanner sees. Read the build
+            // script where it exists.
+            val script = Paths.get("build.sh")
+            if (!Files.isRegularFile(script)) {
+                Log.i("selftest", "SKIP packaging assertion, not running from the repository")
+                return@check
+            }
+            val sh = script.toFile().readText()
+            // Comments legitimately *describe* these rules, so they must not be able to satisfy
+            // them: a comment saying "--win-upgrade-uuid" would otherwise pass the check that the
+            // flag is actually passed. Strip comment lines, then assert on what runs.
+            val code = sh.lines()
+                .filterNot { it.trimStart().startsWith("#") }
+                .joinToString("\n")
+
+            // 1. No packer or obfuscator may ever appear in the build.
+            for (banned in listOf("upx", "proguard", "r8 ", "dexguard", "launch4j", "exe4j")) {
+                if (code.contains(banned, ignoreCase = true)) error("build.sh references $banned")
+            }
+
+            // 2. The installer must be able to upgrade in place, or every release leaves a second
+            //    copy of a 48 MB runtime in Add/Remove Programs.
+            if (!code.contains("--win-upgrade-uuid")) error("the installer has no stable upgrade UUID")
+
+            // 3. Every PE we hand out must go through the signing routine, and signing must be
+            //    verified rather than assumed.
+            if (!code.contains("sign_pe ")) error("no shared PE signing routine")
+            if (!code.contains("osslsigncode verify")) error("signatures are applied but never verified")
+            if (!code.contains("AerixLauncher/AerixLauncher.exe")) {
+                error("the app-image launcher is shipped without signing")
+            }
+
+            // 4. A portable build that needs no separate Java must exist, packaged from the app
+            //    image rather than from a bare jar, so the alternative to the self-extracting
+            //    installer is a plain folder with a real javaw.exe in it.
+            if (!code.contains("windows-portable")) error("no app-image portable build")
+
+            // 5. The launcher must not delete itself or anything under its own installation.
+            val selfDelete = Regex("deleteIfExists\\(\\s*(exe|appDir|installDir|MainKt)", RegexOption.IGNORE_CASE)
+            if (selfDelete.containsMatchIn(code)) error("the build deletes its own installation")
+        }
+
         check("the offline create page fits its cards") {
             val freshRoot = AppEnv.appData.resolve("selftest-offline")
             runCatching { Instances.deleteTree(freshRoot) }

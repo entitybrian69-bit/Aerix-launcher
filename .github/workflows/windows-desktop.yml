@@ -236,7 +236,8 @@ jobs:
           echo "exe=${exe[*]}"; echo "msi=${msi[*]}"
           if [[ ${#exe[@]} -eq 0 ]]; then echo "::error::jpackage produced no .exe"; exit 1; fi
           {
-            for f in "${exe[@]}" "${msi[@]}" dist/AerixLauncher-*-portable.zip; do
+            for f in "${exe[@]}" "${msi[@]}" dist/AerixLauncher-*-portable.zip dist/AerixLauncher-*-windows-portable.zip; do
+              [[ -f "$f" ]] || continue
               printf "%s  %s\n" "$(sha256sum "$f" | cut -d" " -f1)" "$(basename "$f")"
             done
           } | tee dist/SHA256SUMS.txt
@@ -253,6 +254,7 @@ jobs:
             windows/aerix-desktop/dist/image/*.exe
             windows/aerix-desktop/dist/image/*.msi
             windows/aerix-desktop/dist/AerixLauncher-*-portable.zip
+            windows/aerix-desktop/dist/AerixLauncher-*-windows-portable.zip
             windows/aerix-desktop/dist/SHA256SUMS.txt
           if-no-files-found: error
 
@@ -285,7 +287,8 @@ jobs:
           # writes a .exe), and a glob that matches nothing makes gh abort the whole call with
           # "no matches found", so collect the files explicitly instead of trusting the shell.
           files=()
-          for f in dist/image/*.exe dist/image/*.msi dist/AerixLauncher-*-portable.zip dist/SHA256SUMS.txt; do
+          for f in dist/image/*.exe dist/image/*.msi dist/AerixLauncher-*-portable.zip \
+                   dist/AerixLauncher-*-windows-portable.zip dist/SHA256SUMS.txt; do
             [[ -f "$f" ]] && files+=("$f")
           done
           printf 'uploading: %s\n' "${files[@]}"
