@@ -199,3 +199,32 @@ had nothing to do with antivirus.
 What has *not* happened is a new scan. Nothing here establishes that Trapmine will stop flagging the
 build, and a clean result must not be reported until someone uploads the new artefact and reads the
 result. The false-positive submission in §6 is ready for the case where it does not.
+
+## 10. The release that finally shipped
+
+The build that produced the current release is `11e610a`. Its release assets, verified by querying
+the release rather than by trusting a log:
+
+| Asset | Size | Uploaded |
+|---|---|---|
+| `AerixLauncher-2.4.4-windows-portable.zip` | 45,822,438 B | 2026-11-27 14:20:32Z |
+| `AerixLauncher-2.4.4.exe` | 47,744,000 B | 2026-11-27 14:20:32Z |
+| `AerixLauncher-2.4.4-portable.zip` | 11,608,438 B | 2026-11-27 14:20:31Z |
+| `SHA256SUMS.txt` | 403 B | 2026-11-27 14:20:30Z |
+
+The app-image portable build exists and contains a real `AerixLauncher.exe` beside the bundled
+runtime — CI asserts both before publishing. The installer job's last step still reported failure,
+but the failure was in its own verification, not in the upload: `gh` exited 4 (not authenticated) on
+a `gh release view` that ran inside the *log-publishing* step where `$TAG` was never defined, and
+`set -u` turned that into a hard error after the assets were already attached. The check has been
+moved into the step that owns the tag and now prints what is attached; the log-push step warns
+instead of dying, because a silent failure there is what made the log look stale while the release
+was fine.
+
+**What is still missing from this report: the SHA-256 values.** The build sandbox cannot reach GitHub
+release assets or Actions artifacts (every request to `release-assets.githubusercontent.com` and
+`productionresultssa*.blob.core.windows.net` ends in `EOF`), and the run's own log/artifact
+downloads are blocked the same way. Rather than copy a hash from a stale log, the table above records
+only what the API actually reports. The hashes for this build should be read from the published
+`SHA256SUMS.txt`, or the build re-run and the checksums copied from the "Assert the installers exist"
+step.

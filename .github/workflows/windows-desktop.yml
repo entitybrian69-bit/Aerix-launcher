@@ -247,12 +247,19 @@ jobs:
           if ! unzip -l dist/AerixLauncher-*-windows-portable.zip | grep -q "runtime/bin/javaw.exe"; then
             echo "::error::the portable build does not bundle a runtime"; exit 1
           fi
-          {
-            for f in "${exe[@]}" "${msi[@]}" dist/AerixLauncher-*-portable.zip dist/AerixLauncher-*-windows-portable.zip; do
-              [[ -f "$f" ]] || continue
-              printf "%s  %s\n" "$(sha256sum "$f" | cut -d" " -f1)" "$(basename "$f")"
-            done
-          } | tee dist/SHA256SUMS.txt
+          # Every artifact gets a line, whatever globbing does: `set -u` plus an empty
+          # ${msi[@]} aborts the whole block, which is how the published SHA256SUMS.txt once came
+          # out empty. Collect first, hash after.
+          shopt -s nullglob
+          hashed=()
+          for f in dist/image/*.exe dist/image/*.msi dist/AerixLauncher-*-portable.zip \
+                   dist/AerixLauncher-*-windows-portable.zip; do
+            [[ -f "$f" ]] && hashed+=("$f")
+          done
+          if [[ ${#hashed[@]} -eq 0 ]]; then echo "::error::nothing to checksum"; exit 1; fi
+          for f in "${hashed[@]}"; do
+            printf "%s  %s\n" "$(sha256sum "$f" | cut -d" " -f1)" "$(basename "$f")"
+          done | tee dist/SHA256SUMS.txt
           # Also print it where the log step can capture it: the hashes are the one thing the
           # release page must state accurately, and they are otherwise only inside an asset.
           echo "--- checksums ---"
@@ -313,6 +320,17 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
           echo "gh exit=$rc"
+
+          # The upload succeeding is not the same as the right files being attached: this step
+          # previously reported failure *after* a successful upload, which made a good release look
+          # broken, and the check that should have caught it lived in the log-publishing step where
+          # $TAG was never defined. Verify here, where TAG is in scope, and report what is attached.
+          echo "--- attached ---"
+          gh release view "$TAG" --json assets --jq '.assets[] | "\(.name) \(.size)"' | tee attached.txt
+          for want in .exe -windows-portable.zip SHA256SUMS.txt; do
+            grep -q -- "$want" attached.txt || { echo "::error::$want is not attached to $TAG"; exit 1; }
+          done
+
           if [[ $rc -ne 0 ]]; then
             echo "::error::gh release upload failed, see the summary"
             exit 1
@@ -346,12 +364,16 @@ jobs:
               git commit -m "CI: Windows installer log for $GITHUB_SHA" || true
             fi
             # The build job may have pushed while this one was running; rebase and retry.
+            pushed=no
             for attempt in 1 2 3; do
-              git push origin "HEAD:$GITHUB_REF_NAME" && break
+              if git push origin "HEAD:$GITHUB_REF_NAME"; then pushed=yes; break; fi
               git pull --rebase origin "$GITHUB_REF_NAME" || true
               sleep 3
             done
+            # This is how a sandbox without blob-storage access reads this job's output, so a
+            # silent failure here means the next person debugs a stale log. It must not fail the
+            # job, but it must be visible.
+            if [[ "$pushed" != "yes" ]]; then
+              echo "::warning::could not push the installer log; the log in the repository is stale"
+            fi
           fi
-          # Prove they really landed.
-          gh release view "$TAG" --json assets --jq '.assets[].name' | tee attached.txt
-          grep -q '\.exe$' attached.txt || { echo "::error::no .exe attached"; exit 1; }
