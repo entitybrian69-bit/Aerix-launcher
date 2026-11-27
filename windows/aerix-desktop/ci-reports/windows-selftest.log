@@ -1,0 +1,40 @@
+[38;5;44m[aerix][0m compiling (JDK 21.0.13)
+[38;5;44m[aerix][0m kotlin OK
+[38;5;44m[aerix][0m writing jar
+sha256 eb35ebdf8e9f5f5e81090b9984ff0d624c480a0683fef688f0993d18f72a2560  aerix-launcher.jar
+wrote D:\a\Aerix-launcherPc\Aerix-launcherPc\windows\aerix-desktop\build\aerix-launcher.jar (11 MB, 447 entries)
+[38;5;44m[aerix][0m built /d/a/Aerix-launcherPc/Aerix-launcherPc/windows/aerix-desktop/build/aerix-launcher.jar (11.7 MB)
+[38;5;44m[aerix][0m running headless self test
+WARNING: A restricted method in java.lang.foreign.SymbolLookup has been called
+WARNING: java.lang.foreign.SymbolLookup::libraryLookup has been called by the unnamed module
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for this module
+
+
+Aerix Launcher self test — 26240 ms
+????????????????????????????????????????????????????????????????
+PASS  settings round-trip
+PASS  secure store seals and opens
+PASS  account store never writes an access token
+PASS  instance create, save, reload, trash, restore
+PASS  bundled assets load
+PASS  version comparison and NeoForge mapping
+PASS  version metadata resolves libraries the way the game needs
+PASS  a modpack import unpacks overrides, adopts its metadata and refuses to escape the instance
+PASS  OptiFine and BTA pages parse
+PASS  launch argument file round-trips through a real JVM
+PASS  downloads survive a server that ignores or shifts ranges
+PASS  java discovery
+PASS  data folders exist
+PASS  text is never clipped by its own cell
+PASS  the shipped jar is self-contained
+PASS  everything the launcher needs is in the runtime image
+PASS  change listeners survive being registered from several threads
+PASS  instance names cannot smuggle shell characters into paths
+PASS  no shell is used to link or unlink instance folders
+PASS  a download with a published hash is rejected when the bytes do not match
+PASS  every file the launcher opens is hash-checked, or pinned when no hash exists
+PASS  packaging stays transparent: no packers, no self-extract-only download, signed if configured
+PASS  the offline create page fits its cards
+PASS  every page renders offscreen
+????????????????????????????????????????????????????????????????
+24 passed, 0 failed. Screenshots: C:\Users\runneradmin\AppData\Roaming\Aerix Launcher\selftest-shots

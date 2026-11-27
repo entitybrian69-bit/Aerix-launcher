@@ -1,0 +1,395 @@
+name: Windows desktop launcher
+
+# Builds windows/aerix-desktop and runs its headless self test.
+#
+# The desktop target deliberately does not use Gradle: build.sh only needs a JDK and the Kotlin
+# compiler, so the CI job is a plain JDK + kotlinc + build.sh pipeline that anyone can reproduce on
+# a laptop. It runs the self test (settings, sealed tokens, instance CRUD, bundled assets, loader
+# parsing, Java discovery) and the offscreen page renderer, then uploads the screenshots so a
+# design review is possible without a Windows machine.
+
+# Both jobs push to the branch (their logs are the only output the build sandbox can read), so two
+# runs pushing at once would reject each other. Serialise per branch and cancel nothing.
+concurrency:
+  group: windows-desktop-${{ github.ref }}
+  cancel-in-progress: false
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "v3_openjdk", "arena/**" ]
+    paths:
+      - "windows/aerix-desktop/**"
+      - ".github/workflows/windows-desktop.yml"
+  pull_request:
+    paths:
+      - "windows/aerix-desktop/**"
+      - ".github/workflows/windows-desktop.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    # Windows, because the launcher is a Windows product: the tray, DPAPI token sealing and the
+    # process handling are all exercised there for real.
+    runs-on: windows-latest
+    permissions:
+      contents: write   # only for pushing the self test log back onto arena/* branches
+    defaults:
+      run:
+        shell: bash
+        working-directory: windows/aerix-desktop
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Install the Kotlin compiler
+        run: |
+          curl -fsSL -o kotlin.zip https://github.com/JetBrains/kotlin/releases/download/v2.1.0/kotlin-compiler-2.1.0.zip
+          unzip -q kotlin.zip -d "$RUNNER_TOOL_CACHE/kotlin"
+          # The archive unpacks to kotlinc/bin/kotlinc (+ kotlinc.bat on Windows). build.sh resolves
+          # the Kotlin home by walking up to lib/kotlin-stdlib.jar, so either launcher works.
+          if [[ -f "$RUNNER_TOOL_CACHE/kotlin/kotlinc/bin/kotlinc.bat" ]]; then
+            echo "KOTLINC=$RUNNER_TOOL_CACHE/kotlin/kotlinc/bin/kotlinc.bat" >> "$GITHUB_ENV"
+          else
+            echo "KOTLINC=$RUNNER_TOOL_CACHE/kotlin/kotlinc/bin/kotlinc" >> "$GITHUB_ENV"
+          fi
+          ls "$RUNNER_TOOL_CACHE/kotlin/kotlinc/lib/kotlin-stdlib.jar"
+
+      - name: Build
+        run: ./build.sh
+
+      - name: Self test
+        # tee so the report also lands in the job summary: workflow logs are not always retrievable
+        # through the API, and a red Windows-only check is useless if its output cannot be read.
+        run: |
+          set +e
+          ./build.sh --selftest > selftest.log 2>&1
+          rc=$?
+          tail -40 selftest.log
+          {
+            echo '## Self test'
+            echo '```'
+            grep -E '^(PASS|FAIL)|passed, ' selftest.log || tail -40 selftest.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit $rc
+
+      - name: Render every page
+        run: ./build.sh --screenshot
+
+      # The runner's stdout, its job summary and its artifacts all live on hosts that the Arena
+      # build sandbox cannot reach, so a failing Windows-only check cannot be diagnosed from there.
+      # Pushing the log into the repository is the one channel that works.
+      - name: Publish the self test log to the repository
+        if: always()
+        run: |
+          git config user.name  "aerix-ci"
+          git config user.email "aerix-ci@users.noreply.github.com"
+          mkdir -p ci-reports || true
+          cp selftest.log ci-reports/windows-selftest.log 2>/dev/null || true
+          cp publish.log ci-reports/windows-publish.log 2>/dev/null || true
+          if [[ "$GITHUB_REF_NAME" == arena/* ]]; then
+            git add -f ci-reports/ 2>/dev/null || true
+            if git diff --cached --quiet; then
+              echo "no log changes to publish"
+              exit 0
+            fi
+            git commit -m "CI: Windows self test log for $GITHUB_SHA" || echo "nothing to commit"
+            git push origin "HEAD:$GITHUB_REF_NAME" || echo "::warning::could not push the log"
+          fi
+
+      - name: Upload the build
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aerix-launcher-jar
+          path: |
+            windows/aerix-desktop/build/aerix-launcher.jar
+            windows/aerix-desktop/selftest.log
+          if-no-files-found: error
+
+      - name: Upload the screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: aerix-launcher-pages
+          path: windows/aerix-desktop/build/screenshots
+          if-no-files-found: error
+
+  installer:
+    # The .exe and .msi cannot be cross-built: jpackage only writes them on Windows, and it needs
+    # WiX on PATH (which windows-latest has). This job is the supported way to get an installer,
+    # because the build sandbox is Linux and has no WiX.
+    runs-on: windows-latest
+    needs: build
+    permissions:
+      contents: write   # release upload, and pushing the installer log back to the branch
+    defaults:
+      run:
+        shell: bash
+        working-directory: windows/aerix-desktop
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Install WiX
+        run: |
+          if ! command -v candle.exe >/dev/null 2>&1; then
+            choco install wixtoolset --no-progress -y
+            echo "C:\Program Files (x86)\WiX Toolset v3.11\bin" >> "$GITHUB_PATH"
+          fi
+
+      - name: Install the Kotlin compiler
+        run: |
+          curl -fsSL -o kotlin.zip https://github.com/JetBrains/kotlin/releases/download/v2.1.0/kotlin-compiler-2.1.0.zip
+          unzip -q kotlin.zip -d "$RUNNER_TOOL_CACHE/kotlin"
+          if [[ -f "$RUNNER_TOOL_CACHE/kotlin/kotlinc/bin/kotlinc.bat" ]]; then
+            echo "KOTLINC=$RUNNER_TOOL_CACHE/kotlin/kotlinc/bin/kotlinc.bat" >> "$GITHUB_ENV"
+          else
+            echo "KOTLINC=$RUNNER_TOOL_CACHE/kotlin/kotlinc/bin/kotlinc" >> "$GITHUB_ENV"
+          fi
+
+      # `secrets` cannot be read in a step-level `if:` (it is not available at parse time), which
+      # made the whole workflow invalid and every run fail before a job started. The condition is
+      # evaluated in the shell instead; the binary ships with Git for Windows on the runner.
+      - name: Install a signing tool
+        env:
+          AERIX_SIGN_CERT: ${{ secrets.AERIX_SIGN_CERT }}
+        run: |
+          if [[ -n "${AERIX_SIGN_CERT:-}" ]]; then
+            command -v osslsigncode >/dev/null 2>&1 || choco install osslsigncode --no-progress -y || true
+          else
+            echo "no signing certificate configured; the installer will be unsigned"
+          fi
+
+      - name: Build the portable ZIP and the installers
+        env:
+          AERIX_SIGN_CERT: ${{ secrets.AERIX_SIGN_CERT }}
+          AERIX_SIGN_PASSWORD: ${{ secrets.AERIX_SIGN_PASSWORD }}
+        run: ./build.sh --installer
+
+      # A missing installer must fail here, not silently publish a ZIP under an "installer" name.
+      # The installer now bundles a jlink image of a fixed module list rather than the whole JDK.
+      # That is the packaging win, but it is only safe if the list is complete, so run the built
+      # application under exactly that runtime before shipping anything. jpackage writes the app
+      # image to dist/image/AerixLauncher; its runtime/bin/java is the trimmed JRE.
+      # Reproducibility evidence, recorded rather than claimed: build the jar a second time from
+      # the same commit and compare hashes. The jar is assembled from a sorted file list with fixed
+      # timestamps, so it is expected to match byte for byte; the installer embeds a jlink image and
+      # WiX metadata, so it is expected to differ and is reported separately.
+      - name: Check the jar builds reproducibly
+        run: |
+          set -euxo pipefail
+          first="$(sha256sum build/aerix-launcher.jar | cut -d' ' -f1)"
+          ./build.sh > rebuild.log 2>&1
+          second="$(sha256sum build/aerix-launcher.jar | cut -d' ' -f1)"
+          echo "first:  $first"
+          echo "second: $second"
+          if [[ "$first" == "$second" ]]; then
+            echo "reproducible: yes" | tee -a reproducibility.txt
+          else
+            echo "reproducible: NO - the jar changed between identical builds" | tee -a reproducibility.txt
+            echo "::error::the jar is not reproducible"; exit 1
+          fi
+
+      - name: Prove the trimmed runtime can run the launcher
+        timeout-minutes: 6
+        run: |
+          set -euxo pipefail
+          # jpackage deletes its staging app image once the .exe is written, and running the .exe
+          # silently blocks on an elevation prompt in a non-interactive session (it hung for
+          # thirteen minutes on the first attempt). The jlink image survives as dist/runtime, so
+          # run the shipped jar under that instead: same binary, same runtime, no install.
+          runtime="dist/runtime"
+          app="dist/AerixLauncher"
+          if [[ ! -d "$runtime" ]]; then echo "::error::the build produced no runtime image"; exit 1; fi
+          cp build/aerix-launcher.jar "$app/aerix-launcher.jar"
+          if [[ ! -x "$runtime/bin/java.exe" ]]; then echo "::error::no bundled runtime"; exit 1; fi
+          "$runtime/bin/java.exe" -version
+          "$runtime/bin/java.exe" --list-modules | sort | tee modules.txt
+          echo "runtime size: $(du -sm "$runtime" | cut -f1) MB"
+          echo "full JDK size for comparison: $(du -sm "$JAVA_HOME" | cut -f1) MB"
+          "$runtime/bin/java.exe" -Djava.awt.headless=true -Dfile.encoding=UTF-8 \
+            -cp "$app/aerix-launcher.jar" net.kdt.aerix.desktop.MainKt --selftest |
+            tee selftest-under-runtime.log | tail -25
+          grep -qE "^[0-9]+ passed, 0 failed" selftest-under-runtime.log || {
+            echo "::error::the launcher does not pass its self test under the bundled runtime"; exit 1; }
+
+      - name: Assert the installers exist
+        run: |
+          ls -la dist
+          shopt -s nullglob
+          exe=(dist/image/*.exe) msi=(dist/image/*.msi)
+          echo "exe=${exe[*]}"; echo "msi=${msi[*]}"
+          if [[ ${#exe[@]} -eq 0 ]]; then echo "::error::jpackage produced no .exe"; exit 1; fi
+          # The portable build is the recommended download, so a missing one must fail the build
+          # rather than quietly publish only the installer. It went missing once already: jpackage
+          # deletes its staging app image, so packaging from it produced nothing and nobody noticed.
+          if ! compgen -G "dist/AerixLauncher-*-windows-portable.zip" >/dev/null; then
+            echo "::error::no app-image portable build was produced"; exit 1
+          fi
+          if ! unzip -l dist/AerixLauncher-*-windows-portable.zip | grep -q "AerixLauncher.exe"; then
+            echo "::error::the portable build does not contain a real AerixLauncher.exe"; exit 1
+          fi
+          if ! unzip -l dist/AerixLauncher-*-windows-portable.zip | grep -q "runtime/bin/javaw.exe"; then
+            echo "::error::the portable build does not bundle a runtime"; exit 1
+          fi
+          # Every artifact gets a line, whatever globbing does: `set -u` plus an empty
+          # ${msi[@]} aborts the whole block, which is how the published SHA256SUMS.txt once came
+          # out empty. Collect first, hash after.
+          shopt -s nullglob
+          hashed=()
+          declare -A seen_sum=()
+          for f in dist/image/*.exe dist/image/*.msi dist/AerixLauncher-*-portable.zip \
+                   dist/AerixLauncher-*-windows-portable.zip; do
+            [[ -f "$f" ]] || continue
+            # The two zip globs overlap on the app-image build; hashing it twice put the same
+            # filename in SHA256SUMS.txt twice, which reads like two different files.
+            key="$(cd "$(dirname "$f")" && pwd)/$(basename "$f")"
+            [[ -n "${seen_sum[$key]:-}" ]] && continue
+            seen_sum[$key]=1
+            hashed+=("$f")
+          done
+          if [[ ${#hashed[@]} -eq 0 ]]; then echo "::error::nothing to checksum"; exit 1; fi
+          for f in "${hashed[@]}"; do
+            printf "%s  %s\n" "$(sha256sum "$f" | cut -d" " -f1)" "$(basename "$f")"
+          done | tee dist/SHA256SUMS.txt
+          # Also print it where the log step can capture it: the hashes are the one thing the
+          # release page must state accurately, and they are otherwise only inside an asset.
+          echo "--- checksums ---"
+          cat dist/SHA256SUMS.txt
+
+      - name: Upload the installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: aerix-launcher-installer
+          path: |
+            windows/aerix-desktop/dist/image/*.exe
+            windows/aerix-desktop/dist/image/*.msi
+            windows/aerix-desktop/dist/AerixLauncher-*-portable.zip
+            windows/aerix-desktop/dist/AerixLauncher-*-windows-portable.zip
+            windows/aerix-desktop/dist/SHA256SUMS.txt
+          if-no-files-found: error
+
+      - name: Read the launcher version
+        id: version
+        run: |
+          v="$(head -1 src/main/resources/aerix/version.txt | tr -d '\r\n ')"
+          echo "value=$v" >> "$GITHUB_OUTPUT"
+          echo "launcher version: $v"
+
+      - name: Publish to the desktop pre-release
+        id: publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # Read from the build rather than repeating it: a hardcoded tag silently stops matching
+          # the artifacts the moment the launcher version moves.
+          VERSION_TAG: ${{ steps.version.outputs.value }}
+        run: |
+          set -euxo pipefail
+          TAG="desktop-$VERSION_TAG"
+          # Create the release if a previous attempt did not; upload to it either way. This used to
+          # end in `|| echo ::warning`, which reported success while attaching nothing.
+          gh release view "$TAG" >/dev/null 2>&1 || \
+            gh release create "$TAG" --title "Aerix Launcher for Windows $VERSION_TAG" \
+              --prerelease --notes "Portable build and Windows installers for Aerix Launcher $VERSION_TAG."
+          # Capture the output into the job summary: this runner's stdout is not reachable from the
+          # build sandbox, and the summary is.
+          set +e
+          # No .msi is produced by --installer (jpackage --type exe masks itself as an installer and
+          # writes a .exe), and a glob that matches nothing makes gh abort the whole call with
+          # "no matches found", so collect the files explicitly instead of trusting the shell.
+          # Deduplicate by resolved path. `AerixLauncher-2.4.4-windows-portable.zip` matches both
+          # zip globs, so it used to be passed to gh twice; gh uploaded it, then tried again, got
+          # HTTP 404 on the second attempt and reported the whole step as failed even though every
+          # asset was attached.
+          files=()
+          declare -A seen=()
+          for f in dist/image/*.exe dist/image/*.msi dist/AerixLauncher-*-portable.zip \
+                   dist/AerixLauncher-*-windows-portable.zip dist/SHA256SUMS.txt; do
+            [[ -f "$f" ]] || continue
+            key="$(cd "$(dirname "$f")" && pwd)/$(basename "$f")"
+            [[ -n "${seen[$key]:-}" ]] && continue
+            seen[$key]=1
+            files+=("$f")
+          done
+          printf 'uploading: %s\n' "${files[@]}"
+          gh release upload "$TAG" "${files[@]}" --clobber > publish.log 2>&1
+          rc=$?
+          {
+            echo '## Release upload (exit '"$rc"')'
+            echo '```'
+            cat publish.log || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "gh exit=$rc"
+
+          # The upload succeeding is not the same as the right files being attached: this step
+          # previously reported failure *after* a successful upload, which made a good release look
+          # broken, and the check that should have caught it lived in the log-publishing step where
+          # $TAG was never defined. Verify here, where TAG is in scope, and report what is attached.
+          echo "--- attached ---"
+          gh release view "$TAG" --json assets --jq '.assets[] | "\(.name) \(.size)"' | tee attached.txt
+          for want in .exe -windows-portable.zip SHA256SUMS.txt; do
+            grep -q -- "$want" attached.txt || { echo "::error::$want is not attached to $TAG"; exit 1; }
+          done
+
+          if [[ $rc -ne 0 ]]; then
+            echo "::error::gh release upload failed, see the summary"
+            exit 1
+          fi
+
+      # Same channel as the build job: push the output to the branch, because neither the runner's
+      # stdout nor its step summary is reachable from the build sandbox.
+      - name: Publish the installer log to the repository
+        # Diagnostic convenience for environments that cannot read this runner's stdout. It must
+        # never fail the job: whether the release upload worked is asserted by the step above.
+        if: always()
+        continue-on-error: true
+        run: |
+          set -x
+          git config user.name  "aerix-ci"
+          git config user.email "aerix-ci@users.noreply.github.com"
+          mkdir -p ci-reports || true
+          {
+            echo "publish exit: ${{ steps.publish.outcome }}"
+            echo "--- checksums ---"; cat dist/SHA256SUMS.txt 2>/dev/null || true
+            echo "--- dist ---"; ls -la dist || true
+            echo "--- dist/image ---"; ls -laR dist/image || true
+            echo "--- runtime ---"
+            dist/runtime/bin/java.exe --list-modules 2>/dev/null | sort || true
+            echo "runtime size: $(du -sm dist/runtime 2>/dev/null | cut -f1) MB"
+            cat publish.log 2>/dev/null || true
+          } > ci-reports/installer.log
+          if [[ "$GITHUB_REF_NAME" == arena/* ]]; then
+            git add -f ci-reports/installer.log 2>/dev/null || true
+            if ! git diff --cached --quiet; then
+              git commit -m "CI: Windows installer log for $GITHUB_SHA" || true
+            fi
+            # The build job may have pushed while this one was running; rebase and retry.
+            pushed=no
+            for attempt in 1 2 3; do
+              if git push origin "HEAD:$GITHUB_REF_NAME"; then pushed=yes; break; fi
+              git pull --rebase origin "$GITHUB_REF_NAME" || true
+              sleep 3
+            done
+            # This is how a sandbox without blob-storage access reads this job's output, so a
+            # silent failure here means the next person debugs a stale log. It must not fail the
+            # job, but it must be visible.
+            if [[ "$pushed" != "yes" ]]; then
+              echo "::warning::could not push the installer log; the log in the repository is stale"
+            fi
+          fi
