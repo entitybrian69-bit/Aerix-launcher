@@ -228,3 +228,36 @@ downloads are blocked the same way. Rather than copy a hash from a stale log, th
 only what the API actually reports. The hashes for this build should be read from the published
 `SHA256SUMS.txt`, or the build re-run and the checksums copied from the "Assert the installers exist"
 step.
+
+## 11. Correction to §10, and the numbers
+
+§10 was written from the release API while the job had already reported failure. It recorded the
+upload as successful *and* left the hashes missing. Both were wrong, and the run has since been read
+properly. This section replaces the table in §10.
+
+**Build `7ce0971` — assets on the release:**
+
+| Asset | Size | SHA-256 |
+|---|---|---|
+| `AerixLauncher-2.4.4.exe` | 47,735,808 B | `b0dfbfa4e5dbbb402ba0b444dfa38a2b0ec2c1fd7c31db842d14bc64647f0edf` |
+| `AerixLauncher-2.4.4-windows-portable.zip` | 45,815,241 B | `6f8a2bf253bb2a512c8b60e4baa3d4e606492804ab84ff3656877c7ce2069882` |
+| `AerixLauncher-2.4.4-portable.zip` | 11,608,438 B | `855dcef74adb28ce256a1674a4c24941677cf1f3275cc6267a9033924529eb19` |
+
+These come from the build's own `SHA256SUMS.txt` and the same hashes appear in the CI log, so the
+published artifacts are the ones the build produced.
+
+**Why the step still said failure.** Three overlapping globs: `dist/AerixLauncher-*-portable.zip` also
+matches `AerixLauncher-2.4.4-windows-portable.zip`, so that 45 MB file was passed to `gh release
+upload` twice. The first upload succeeded; the second hit the same asset name, returned
+`HTTP 404: Not Found`, and `gh` reported the whole step as failed. Every asset was in fact attached
+before the error. The same overlap put the windows-portable filename in `SHA256SUMS.txt` twice, which
+is what gave it away.
+
+The publish and checksum steps now deduplicate by resolved path, and the publish step verifies what
+is attached and prints it.
+
+**What this means for the audit.** This was the fourth distinct packaging failure in this round, and
+each one was a case of the build claiming something it had not verified. The pattern is worth stating
+plainly: every failure was found by a check, none by reading the code and believing it. The launcher
+binaries themselves have now been built and their hashes recorded, which is the first point in this
+round where the VirusTotal work can actually proceed.

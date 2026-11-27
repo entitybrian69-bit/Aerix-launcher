@@ -252,9 +252,16 @@ jobs:
           # out empty. Collect first, hash after.
           shopt -s nullglob
           hashed=()
+          declare -A seen_sum=()
           for f in dist/image/*.exe dist/image/*.msi dist/AerixLauncher-*-portable.zip \
                    dist/AerixLauncher-*-windows-portable.zip; do
-            [[ -f "$f" ]] && hashed+=("$f")
+            [[ -f "$f" ]] || continue
+            # The two zip globs overlap on the app-image build; hashing it twice put the same
+            # filename in SHA256SUMS.txt twice, which reads like two different files.
+            key="$(cd "$(dirname "$f")" && pwd)/$(basename "$f")"
+            [[ -n "${seen_sum[$key]:-}" ]] && continue
+            seen_sum[$key]=1
+            hashed+=("$f")
           done
           if [[ ${#hashed[@]} -eq 0 ]]; then echo "::error::nothing to checksum"; exit 1; fi
           for f in "${hashed[@]}"; do
@@ -305,10 +312,19 @@ jobs:
           # No .msi is produced by --installer (jpackage --type exe masks itself as an installer and
           # writes a .exe), and a glob that matches nothing makes gh abort the whole call with
           # "no matches found", so collect the files explicitly instead of trusting the shell.
+          # Deduplicate by resolved path. `AerixLauncher-2.4.4-windows-portable.zip` matches both
+          # zip globs, so it used to be passed to gh twice; gh uploaded it, then tried again, got
+          # HTTP 404 on the second attempt and reported the whole step as failed even though every
+          # asset was attached.
           files=()
+          declare -A seen=()
           for f in dist/image/*.exe dist/image/*.msi dist/AerixLauncher-*-portable.zip \
                    dist/AerixLauncher-*-windows-portable.zip dist/SHA256SUMS.txt; do
-            [[ -f "$f" ]] && files+=("$f")
+            [[ -f "$f" ]] || continue
+            key="$(cd "$(dirname "$f")" && pwd)/$(basename "$f")"
+            [[ -n "${seen[$key]:-}" ]] && continue
+            seen[$key]=1
+            files+=("$f")
           done
           printf 'uploading: %s\n' "${files[@]}"
           gh release upload "$TAG" "${files[@]}" --clobber > publish.log 2>&1
