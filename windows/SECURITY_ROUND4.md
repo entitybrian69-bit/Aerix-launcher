@@ -82,7 +82,9 @@ document claims no clean result — as before, and for the same reason.
 ## 6. False-positive submission
 
 If the next scan still returns `Suspicious.Low.ML.Score`, this is the material for a submission to
-Trapmine. Fill in the hash of the build that was scanned.
+Trapmine. The hash below is build `0ac4db2`. If a later build replaces the release assets, the hash
+must be updated to match whatever was actually scanned — a submission quoting the wrong hash wastes
+their time and yours.
 
 ```
 Product:      Aerix Launcher for Windows
@@ -90,8 +92,8 @@ Version:      2.4.4
 Vendor:       luciferstudios (open source, MIT)
 Source:       https://github.com/luciferstudios/Aerix-launcherPc
 Download:     https://github.com/luciferstudios/Aerix-launcherPc/releases/tag/desktop-2.4.4
-SHA-256:      <hash of the scanned file>
-Signed:       yes/no — see the release notes
+SHA-256:      2820b7a6b67af009138b1ba3f4e925db5a841c64125ea9bc2ba3e7da986bb4ed
+Signed:       no — no code-signing certificate is configured; the build logs UNSIGNED
 
 Verdict:      Suspicious.Low.ML.Score (single engine, 1/67)
 
@@ -118,9 +120,11 @@ Why this is a false positive:
    Modrinth and CurseForge APIs, the mod loader Mavens, OptiFine and GitHub, and
    every downloaded file is verified against a published hash before use.
 
-5. An alternative distribution with no self-extraction is published alongside
-   the installer (the portable build), and it carries the same verdict/(no
-   verdict) pattern.
+5. An alternative distribution with no self-extraction at all is published
+   alongside the installer: AerixLauncher-2.4.4-windows-portable.zip is a plain
+   folder holding AerixLauncher.exe next to the runtime it uses. If that file
+   does not draw the same verdict, the difference points at the installer stub
+   rather than at the application, which is itself useful evidence.
 ```
 
 ## 7. Verification state, stated plainly
@@ -129,8 +133,8 @@ Why this is a false positive:
 |---|---|
 | Source audit of the five characteristics | **Done** — source and bytecode |
 | `build.sh` changes | Done; `bash -n` clean; signing helper exercised against a stub signer for all four paths (no cert, missing tool, bad signature, good signature) |
-| Self-tests | 23/23 here, including the new packaging checks, each validated by removing the guard |
-| Windows build of the new packaging | **CI only** — no Windows host here; the first two attempts failed and their failures are recorded in §8 |
+| Self-tests | 24/24, locally and on CI, including the new packaging and concurrency checks, each validated by reintroducing the bug |
+| Windows build of the new packaging | **Done on CI** — both jobs green at `0ac4db2`; the four failed attempts are recorded in §8 and §11 |
 | Signing with a real certificate | **Not done** — no certificate exists; the path is wired and fails closed |
 | Launch, auth, mod install, uninstall on Windows | **Not tested here**; CI compiles, self-tests and runs the shipped jar under the bundled runtime |
 | Re-scan | **Not done** — needs the user to upload the new artefact |
@@ -200,64 +204,58 @@ What has *not* happened is a new scan. Nothing here establishes that Trapmine wi
 build, and a clean result must not be reported until someone uploads the new artefact and reads the
 result. The false-positive submission in §6 is ready for the case where it does not.
 
-## 10. The release that finally shipped
+## 10. What shipped, with the numbers
 
-The build that produced the current release is `11e610a`. Its release assets, verified by querying
-the release rather than by trusting a log:
-
-| Asset | Size | Uploaded |
-|---|---|---|
-| `AerixLauncher-2.4.4-windows-portable.zip` | 45,822,438 B | 2026-11-27 14:20:32Z |
-| `AerixLauncher-2.4.4.exe` | 47,744,000 B | 2026-11-27 14:20:32Z |
-| `AerixLauncher-2.4.4-portable.zip` | 11,608,438 B | 2026-11-27 14:20:31Z |
-| `SHA256SUMS.txt` | 403 B | 2026-11-27 14:20:30Z |
-
-The app-image portable build exists and contains a real `AerixLauncher.exe` beside the bundled
-runtime — CI asserts both before publishing. The installer job's last step still reported failure,
-but the failure was in its own verification, not in the upload: `gh` exited 4 (not authenticated) on
-a `gh release view` that ran inside the *log-publishing* step where `$TAG` was never defined, and
-`set -u` turned that into a hard error after the assets were already attached. The check has been
-moved into the step that owns the tag and now prints what is attached; the log-push step warns
-instead of dying, because a silent failure there is what made the log look stale while the release
-was fine.
-
-**What is still missing from this report: the SHA-256 values.** The build sandbox cannot reach GitHub
-release assets or Actions artifacts (every request to `release-assets.githubusercontent.com` and
-`productionresultssa*.blob.core.windows.net` ends in `EOF`), and the run's own log/artifact
-downloads are blocked the same way. Rather than copy a hash from a stale log, the table above records
-only what the API actually reports. The hashes for this build should be read from the published
-`SHA256SUMS.txt`, or the build re-run and the checksums copied from the "Assert the installers exist"
-step.
-
-## 11. Correction to §10, and the numbers
-
-§10 was written from the release API while the job had already reported failure. It recorded the
-upload as successful *and* left the hashes missing. Both were wrong, and the run has since been read
-properly. This section replaces the table in §10.
-
-**Build `7ce0971` — assets on the release:**
+The green build is `0ac4db2`. Both jobs passed — the Linux `build` job (compile, 24/24 self test,
+full page render) and the Windows `installer` job (jpackage, portable build, reproducibility check,
+self test under the bundled runtime, release publish). Its published assets:
 
 | Asset | Size | SHA-256 |
 |---|---|---|
-| `AerixLauncher-2.4.4.exe` | 47,735,808 B | `b0dfbfa4e5dbbb402ba0b444dfa38a2b0ec2c1fd7c31db842d14bc64647f0edf` |
-| `AerixLauncher-2.4.4-windows-portable.zip` | 45,815,241 B | `6f8a2bf253bb2a512c8b60e4baa3d4e606492804ab84ff3656877c7ce2069882` |
+| `AerixLauncher-2.4.4.exe` | 47,735,808 B | `2820b7a6b67af009138b1ba3f4e925db5a841c64125ea9bc2ba3e7da986bb4ed` |
+| `AerixLauncher-2.4.4-windows-portable.zip` | 45,815,241 B | `c2547d8911d94b871a29fcf4dcdf7a762aae2e221378bca4dab3cfb4b5634b61` |
 | `AerixLauncher-2.4.4-portable.zip` | 11,608,438 B | `855dcef74adb28ce256a1674a4c24941677cf1f3275cc6267a9033924529eb19` |
 
-These come from the build's own `SHA256SUMS.txt` and the same hashes appear in the CI log, so the
-published artifacts are the ones the build produced.
+These are the hashes the build computed for the files it then uploaded, so the published artifacts
+are the ones the build produced. Release:
+`https://github.com/luciferstudios/Aerix-launcherPc/releases/tag/desktop-2.4.4` (pre-release).
 
-**Why the step still said failure.** Three overlapping globs: `dist/AerixLauncher-*-portable.zip` also
-matches `AerixLauncher-2.4.4-windows-portable.zip`, so that 45 MB file was passed to `gh release
-upload` twice. The first upload succeeded; the second hit the same asset name, returned
-`HTTP 404: Not Found`, and `gh` reported the whole step as failed. Every asset was in fact attached
-before the error. The same overlap put the windows-portable filename in `SHA256SUMS.txt` twice, which
-is what gave it away.
+**The `.exe` hash is what should go to VirusTotal.** It is the file the original report describes.
+The windows-portable ZIP is the recommended download for users, but it is a container of signed or
+unsigned PEs and a runtime — scanning it is a different question from scanning the installer.
 
-The publish and checksum steps now deduplicate by resolved path, and the publish step verifies what
-is attached and prints it.
+## 11. Every packaging failure, and what found it
 
-**What this means for the audit.** This was the fourth distinct packaging failure in this round, and
-each one was a case of the build claiming something it had not verified. The pattern is worth stating
-plainly: every failure was found by a check, none by reading the code and believing it. The launcher
-binaries themselves have now been built and their hashes recorded, which is the first point in this
-round where the VirusTotal work can actually proceed.
+This round had **four** distinct packaging failures before a green run. All four were the build
+reporting something it had not actually verified, and all four were caught by a check rather than by
+reading the code and believing it.
+
+| # | Failure | What it did to the build | Found by |
+|---|---|---|---|
+| 1 | Portable step ran after jpackage had deleted its staging app image | Reported success, shipped no portable build at all | Comparing the release assets to what was claimed |
+| 2 | App image built before the runtime image existed | Step failed outright; no `--runtime-image` | The new CI assertion that the portable zip must exist and contain a real exe and runtime |
+| 3 | `$TAG` used in the log-publishing step, where it is never defined | `set -u` error, exit 4, *after* a successful upload | The failure annotation contradicting the release API |
+| 4 | `AerixLauncher-*-portable.zip` also matched the windows-portable file | Same 45 MB file uploaded twice; second attempt got HTTP 404 and failed the step after every asset was attached | The filename appearing twice in `SHA256SUMS.txt` |
+
+Failure 2 is the one worth dwelling on. It was not a missing check that let the first attempt through
+— the check that then caught it did not exist either. Writing the assertion (the zip must exist, must
+contain `AerixLauncher.exe`, must bundle `runtime/bin/javaw.exe`) is what turned an unverifiable claim
+into a testable one, and it immediately failed.
+
+An empty `SHA256SUMS.txt` was a fifth, quieter defect: `set -u` plus an empty `${msi[@]}` aborted the
+block, so the file that exists specifically to let people verify their download was published empty.
+
+## 12. What is still not done
+
+Stated plainly, because it is the difference between this report and a clean verdict:
+
+- **No VirusTotal submission has been made from here.** Uploading the hash above and reading the
+  result is the only way to know whether the packaging change affected the verdict. Nothing in this
+  document predicts it.
+- **No authenticode signature exists on this build.** No certificate is configured. Signing is wired
+  and fails closed; the CI log says `UNSIGNED` for both PEs.
+- **No Windows interactive testing.** No one has launched this build from a Windows desktop here.
+  CI compiles, self-tests, runs the shipped jar under the bundled runtime, and asserts the artifact
+  structure. That is not the same as double-clicking it.
+- **The ML verdict may not move at all.** If it does not, §6 is ready to send.
+
