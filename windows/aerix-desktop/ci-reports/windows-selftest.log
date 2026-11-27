@@ -1,4 +1,4 @@
-[38;5;44m[aerix][0m compiling (JDK 21.0.13.1)
+[38;5;44m[aerix][0m compiling (JDK 21.0.13)
 [38;5;44m[aerix][0m kotlin OK
 [38;5;44m[aerix][0m writing jar
 sha256 eb35ebdf8e9f5f5e81090b9984ff0d624c480a0683fef688f0993d18f72a2560  aerix-launcher.jar
@@ -9,9 +9,8 @@ WARNING: A restricted method in java.lang.foreign.SymbolLookup has been called
 WARNING: java.lang.foreign.SymbolLookup::libraryLookup has been called by the unnamed module
 WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for this module
 
-14:29:53.931 E/settings: could not save settings: C:\Users\runneradmin\AppData\Roaming\Aerix Launcher\settings.json.tmp
 
-Aerix Launcher self test — 28335 ms
+Aerix Launcher self test — 26240 ms
 ????????????????????????????????????????????????????????????????
 PASS  settings round-trip
 PASS  secure store seals and opens
