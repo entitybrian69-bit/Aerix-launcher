@@ -118,6 +118,8 @@ jobs:
           python3 tests/logo_visibility_smoke.py
           python3 tests/release_247_smoke.py
           python3 tests/storage_directory_creation_smoke.py
+          python3 tests/intro_splash_smoke.py
+          python3 tests/flashback_compat_smoke.py
           python3 tests/recording_partial_conversion_smoke.py
           python3 tests/recorder_panel_smoke.py
           python3 tests/stutter_fixes_smoke.py

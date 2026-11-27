@@ -1,0 +1,22 @@
+{
+  "required": false,
+  "minVersion": "0.8",
+  "package": "aerix.flashback.compat.mixin",
+  "compatibilityLevel": "JAVA_8",
+  "client": [
+    "MixinAsyncFileDialogsLegacy",
+    "MixinAsyncFileDialogsModern",
+    "MixinVideoCodec",
+    "MixinAudioCodec",
+    "MixinVideoContainer",
+    "MixinAsyncFFmpegVideoWriter",
+    "MixinExportJob",
+    "MixinFFmpegAudioReader",
+    "MixinCustomImGuiImplGl3",
+    "MixinCustomImGuiImplB3D",
+    "MixinFrontendRenderPass"
+  ],
+  "injectors": {
+    "defaultRequire": 0
+  }
+}

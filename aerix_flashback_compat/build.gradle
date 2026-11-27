@@ -1,0 +1,20 @@
+plugins {
+    id 'java-library'
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_1_8
+    targetCompatibility = JavaVersion.VERSION_1_8
+}
+
+jar {
+    exclude 'net/fabricmc/**'
+    exclude 'org/spongepowered/**'
+    exclude 'com/moulberry/**'
+    exclude 'com/mojang/**'
+    exclude 'org/bytedeco/**'
+    exclude 'org/lwjgl/**'
+    manifest {
+        attributes("Manifest-Version": "1.0")
+    }
+}

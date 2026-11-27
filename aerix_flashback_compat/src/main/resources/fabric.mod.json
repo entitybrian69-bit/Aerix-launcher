@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "aerix_flashback_compat",
+  "version": "1.0.0",
+  "name": "Aerix Flashback Compat",
+  "description": "Automatic Android ARM64 native, file-dialog, OpenAL loopback, and FFmpeg compatibility layer for Flashback.",
+  "authors": [
+    "Aerix"
+  ],
+  "environment": "client",
+  "entrypoints": {
+    "preLaunch": [
+      "aerix.flashback.compat.AerixFlashbackPreLaunch"
+    ]
+  },
+  "mixins": [
+    "aerix_flashback_compat.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.12.0"
+  }
+}

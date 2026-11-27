@@ -328,8 +328,8 @@ public class GameRunner {
             boolean isGl4es = renderer instanceof GLESRenderSpec.GL4ESRenderSpec;
             RenderSpec ltw = GameRenderer.getKnownRenderer(Renderers.LTW_RENDERER);
             boolean ltwSupported = ltw != null && ltw.compatibleDevice(activity);
-            // Block Sodium from running with GL4ES on 1.17+
-            if(!isCompatContext(versionInfo) && isGl4es && hasSodium(gamedir)) {
+            // Block Sodium / Flashback from running with GL4ES on 1.17+ (both require OpenGL 3.2+)
+            if(!isCompatContext(versionInfo) && isGl4es && (hasSodium(gamedir) || net.kdt.pojavlaunch.aerix.bridge.AerixFlashbackBridge.hasFlashback(gamedir))) {
                 switchRendererIfSupported(ltwSupported, ltw, gameRenderer, activity, R.string.compat_sodium_not_supported);
             }
 
@@ -455,6 +455,7 @@ public class GameRunner {
                 + " (renderer " + activeRenderer.name() + ")");
         javaArgList.add("-Dorg.lwjgl.opengl.libname=" + activeRenderer.glLibraryPath());
         javaArgList.add("-Dorg.lwjgl.freetype.libname="+ Tools.NATIVE_LIB_DIR+"/libfreetype.so");
+        net.kdt.pojavlaunch.aerix.bridge.AerixFlashbackBridge.appendLaunchArgs(activity, gamedir, javaArgList);
         // Renderer plugins that pick a compatibility core by game version read this property
         // (Emesis does), so state the version instead of letting them guess from the classpath.
         if (versionId != null && !versionId.isEmpty()) {

@@ -456,6 +456,7 @@ afterEvaluate {
         // The Client's in-game half (capes, live options, ZOOM, Server Boost) ships as an asset and is
         // copied into every managed instance by AerixClientModBridge before the game starts.
         registrar.projectJarDependency project(":aerix_client_mod"), "components/aerix_client_mod"
+        registrar.projectJarDependency project(":aerix_flashback_compat"), "components/aerix_flashback_compat"
 		if (variant.getName().toLowerCase().contains("full")) {
             registrar.jreRuntimeDependency 8, "components/jre"
         }

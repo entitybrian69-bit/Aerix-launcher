@@ -5,11 +5,14 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 RAW = ROOT / "app_pojavlauncher/src/main/res/raw/aerix_intro.mp4"
+RAW_COMPAT = ROOT / "app_pojavlauncher/src/main/res/raw/aerix_intro_compat.mp4"
 JAVA = ROOT / "app_pojavlauncher/src/main/java/net/kdt/pojavlaunch"
 
 assert RAW.is_file() and RAW.stat().st_size == 3365447, "aerix_intro.mp4 must preserve original 1080p60 bytes"
+assert RAW_COMPAT.is_file() and RAW_COMPAT.stat().st_size > 100_000, "aerix_intro_compat.mp4 must exist"
 head = RAW.read_bytes()[:32]
 assert head[4:8] == b"ftyp", "aerix_intro.mp4 must be a valid MP4 container"
+assert RAW_COMPAT.read_bytes()[:32][4:8] == b"ftyp", "aerix_intro_compat.mp4 must be a valid MP4 container"
 
 gradle = (ROOT / "app_pojavlauncher/build.gradle").read_text()
 assert "noCompress += 'mp4'" in gradle
@@ -28,10 +31,11 @@ assert "AerixIntroController" in launcher
 assert "mIntroController.onPause()" in launcher and "mIntroController.onDestroy()" in launcher
 
 intro = (JAVA / "aerix/ui/AerixIntroSplash.kt").read_text()
-assert "SurfaceView" in intro and "MediaPlayer" in intro
-assert "R.raw.aerix_intro" in intro
+assert "TextureView" in intro and "MediaPlayer" in intro
+assert "R.raw.aerix_intro" in intro and "R.raw.aerix_intro_compat" in intro
 assert "prepareAsync()" in intro
 assert "MEDIA_INFO_VIDEO_RENDERING_START" in intro
+assert "supportsHardware1080p60Avc" in intro
 assert "maxOf(cw.toFloat() / vw.toFloat(), ch.toFloat() / vh.toFloat())" in intro
 assert "AerixIntroState" in intro
 
