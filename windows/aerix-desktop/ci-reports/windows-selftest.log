@@ -1,7 +1,7 @@
-[38;5;44m[aerix][0m compiling (JDK 21.0.13)
+[38;5;44m[aerix][0m compiling (JDK 21.0.13.1)
 [38;5;44m[aerix][0m kotlin OK
 [38;5;44m[aerix][0m writing jar
-sha256 8ca7cfc204244dc0d22a5411371cfb16f88e730722003817cf7cee08421254b5  aerix-launcher.jar
+sha256 8009b35c61278dab41f976b3fe29cf85942cd3c7ade507259e49342c1954e102  aerix-launcher.jar
 wrote D:\a\Aerix-launcherPc\Aerix-launcherPc\windows\aerix-desktop\build\aerix-launcher.jar (11 MB, 447 entries)
 [38;5;44m[aerix][0m built /d/a/Aerix-launcherPc/Aerix-launcherPc/windows/aerix-desktop/build/aerix-launcher.jar (11.7 MB)
 [38;5;44m[aerix][0m running headless self test
@@ -10,7 +10,7 @@ WARNING: java.lang.foreign.SymbolLookup::libraryLookup has been called by the un
 WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for this module
 
 
-Aerix Launcher self test — 26416 ms
+Aerix Launcher self test — 24010 ms
 ????????????????????????????????????????????????????????????????
 PASS  settings round-trip
 PASS  secure store seals and opens
@@ -32,7 +32,8 @@ PASS  instance names cannot smuggle shell characters into paths
 PASS  no shell is used to link or unlink instance folders
 PASS  a download with a published hash is rejected when the bytes do not match
 PASS  every file the launcher opens is hash-checked, or pinned when no hash exists
+PASS  packaging stays transparent: no packers, no self-extract-only download, signed if configured
 PASS  the offline create page fits its cards
 PASS  every page renders offscreen
 ????????????????????????????????????????????????????????????????
-22 passed, 0 failed. Screenshots: C:\Users\runneradmin\AppData\Roaming\Aerix Launcher\selftest-shots
+23 passed, 0 failed. Screenshots: C:\Users\runneradmin\AppData\Roaming\Aerix Launcher\selftest-shots
