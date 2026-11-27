@@ -97,6 +97,7 @@ import net.kdt.pojavlaunch.aerix.ui.screens.InstanceSelectorScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.JarExecutionScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.QuickToolsScreen
 import net.kdt.pojavlaunch.aerix.ui.screens.LibraryScreen
+import net.kdt.pojavlaunch.aerix.ui.screens.MusicsScreen
 import net.kdt.pojavlaunch.aerix.bridge.AerixInstallQueue
 import net.kdt.pojavlaunch.aerix.ui.screens.AerixInstallPanel
 import net.kdt.pojavlaunch.aerix.ui.screens.AerixInstallPill
@@ -162,6 +163,7 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
     // Lifecycle grace-period clear (5 minutes) on leaving the app is driven by LauncherActivity.onStart/onStop.
     LaunchedEffect(Unit) {
         AerixDiscordPresence.attach(activity)
+        net.kdt.pojavlaunch.aerix.music.AerixMusicController.attach(activity)
     }
     val activePartySnapshot = SocialBackend.parties
         .firstOrNull { !it.isExpired() }
@@ -205,6 +207,7 @@ fun AerixLauncherScreen(activity: FragmentActivity) {
                             LauncherSection.JAR_EXECUTION -> JarExecutionScreen(activity, navigate)
                             LauncherSection.INSTANCE_SELECTOR -> InstanceSelectorScreen(activity, navigate)
                             LauncherSection.AERIX_CLIENT -> ClientHubScreen(activity, clientOwnerPage) { clientOwnerPage = it }
+                            LauncherSection.MUSICS -> MusicsScreen(activity)
                             LauncherSection.LIBRARY -> LibraryScreen(activity)
                             LauncherSection.SERVERS -> ServersScreen(activity)
                             LauncherSection.MODPACKS -> ModpacksScreen(navigate)

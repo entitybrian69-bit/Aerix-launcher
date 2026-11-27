@@ -181,6 +181,8 @@ object AerixDiscordPresence {
     private var activeIsRecording: Boolean = false
     private var activeInstanceName: String? = null
     private var activeMcVersion: String? = null
+    @Volatile
+    private var activeMusicLine: String? = null
     private var details: String = InLauncher.DETAILS
     private var state: String = InLauncher.HOME
     private var startedAt: Long = 0L
@@ -1239,6 +1241,26 @@ object AerixDiscordPresence {
         main.post { switchConnectionIfNeededOrSend() }
     }
 
+    /** Updates the playing music track shown on Discord Rich Presence (launcher and in-game). */
+    fun updateMusicState(context: Context?, title: String?, artist: String?, isPlaying: Boolean) {
+        if (appContext == null && context != null) {
+            appContext = context.applicationContext
+        }
+        val next = if (isPlaying && !title.isNullOrBlank()) {
+            if (!artist.isNullOrBlank()) "♪ $title — $artist" else "♪ $title"
+        } else {
+            null
+        }?.take(80)
+        if (activeMusicLine == next) return
+        activeMusicLine = next
+        lastSentSignature = null
+        main.post {
+            if (appContext != null) {
+                switchConnectionIfNeededOrSend()
+            }
+        }
+    }
+
     /** A game is starting or running: the instance takes over the card. */
     fun playing(instance: String?, minecraftVersion: String?, modpackIconUrl: String? = null) {
         clearOnlyMode = false
@@ -1390,13 +1412,20 @@ object AerixDiscordPresence {
         } else {
             details
         }
+        val effectiveState = activeMusicLine?.let { music ->
+            when {
+                state.contains("♪") -> state
+                state.isBlank() -> music
+                else -> "$music · $state".take(120)
+            }
+        } ?: state
 
         val activity = JSONObject()
             .put("name", cardName)
             .put("type", 0) // PLAYING
             .put("status_display_type", statusDisplayType)
             .put("details", effectiveDetails)
-            .put("state", state)
+            .put("state", effectiveState)
             .put("timestamps", JSONObject().put("start", startedAt.coerceAtLeast(1L)))
 
         // Live Aerix Social Party size `(current of max)` when in an active party!
@@ -1598,6 +1627,7 @@ object AerixDiscordPresence {
 
         const val HOME = "Browsing the dashboard"
         const val LIBRARY = "Browsing instances"
+        const val MUSICS = "Listening to music"
         const val DISCOVER = "Browsing versions"
         const val CREATE_INSTANCE = "Creating an instance"
         const val MODPACKS = "Browsing Aerix modpacks"
@@ -1613,6 +1643,7 @@ object AerixDiscordPresence {
             null, "HOME" -> HOME
             "AERIX_CLIENT" -> AERIX_CLIENT
             "LIBRARY" -> LIBRARY
+            "MUSICS" -> MUSICS
             "DISCOVER", "DOWNLOADS" -> DISCOVER
             "CREATE_INSTANCE" -> CREATE_INSTANCE
             "MODPACKS" -> MODPACKS

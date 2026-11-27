@@ -86,6 +86,7 @@ enum class LauncherSection {
     HOME,
     /** Dedicated Aerix Client (Minecraft 1.16.5 Testing Edition · Liquid Crystal Clear). */
     AERIX_CLIENT,
+    MUSICS,
     LIBRARY,
     SERVERS,
     /** Friends, messages and parties - the social launcher, opened from Home and the rail. */
@@ -198,9 +199,9 @@ fun AerixNavigationRail(
                 RailIconItem(R.drawable.aerix_ic_add, stringResource(R.string.create_instance),
                     selectedSection == LauncherSection.CREATE_INSTANCE, activeAccent, expandedRail, compactRail,
                     onClick = onCreateInstance, guideKey = AerixGuideState.CREATE)
-                RailIconItem(R.drawable.aerix_ic_dashboard_filled, stringResource(R.string.aerix_nav_library),
-                    librarySelected(selectedSection), activeAccent, expandedRail, compactRail,
-                    onClick = { onNavigate(LauncherSection.LIBRARY) }, guideKey = AerixGuideState.LIBRARY)
+                RailIconItem(R.drawable.aerix_ic_music_note, "Music's",
+                    selectedSection == LauncherSection.MUSICS, activeAccent, expandedRail, compactRail,
+                    onClick = { onNavigate(LauncherSection.MUSICS) })
                 RailIconItem(R.drawable.aerix_ic_sports_esports_outlined, "Servers",
                     selectedSection == LauncherSection.SERVERS, activeAccent, expandedRail, compactRail) { onNavigate(LauncherSection.SERVERS) }
                 // Socials is not a rail entry: it opens from the Home dashboard and brings its own
@@ -320,14 +321,15 @@ fun AerixHomeUtilityRail(
             RailIconItem(
                 R.drawable.aerix_ic_videogame_asset_outlined,
                 "Instances",
-                selectedSection == LauncherSection.INSTANCE_SELECTOR,
-                activeAccent, expandedRail, compactRail
+                selectedSection == LauncherSection.INSTANCE_SELECTOR || librarySelected(selectedSection),
+                activeAccent, expandedRail, compactRail,
+                guideKey = AerixGuideState.LIBRARY
             ) { onInstances() }
             RailIconItem(
-                R.drawable.aerix_ic_dashboard_filled,
-                stringResource(R.string.aerix_nav_library),
-                librarySelected(selectedSection), activeAccent, expandedRail, compactRail
-            ) { onNavigate(LauncherSection.LIBRARY) }
+                R.drawable.aerix_ic_music_note,
+                "Music's",
+                selectedSection == LauncherSection.MUSICS, activeAccent, expandedRail, compactRail
+            ) { onNavigate(LauncherSection.MUSICS) }
             RailIconItem(
                 R.drawable.aerix_ic_sports_esports_outlined,
                 "Servers",

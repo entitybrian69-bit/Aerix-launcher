@@ -27,6 +27,11 @@ import java.util.Objects;
 import java.util.TimeZone;
 
 public class JavaRunner {
+    private static volatile boolean sLowRamDevice = false;
+
+    public static void setLowRamDevice(boolean lowRam) {
+        sLowRamDevice = lowRam;
+    }
 
     private static boolean getCacioJavaArgs(List<String> javaArgList, boolean isJava8) {
         // Caciocavallo config AWT-enabled version
@@ -99,7 +104,14 @@ public class JavaRunner {
         String resolvFile;
         resolvFile = new File(Tools.DIR_DATA,"resolv.conf").getAbsolutePath();
 
-        userArguments.addAll(0, Arrays.asList(InstanceMemory.heapOptions(memoryMb)));
+        String[] heapArgs = InstanceMemory.heapOptions(memoryMb);
+        // On <=4GB phones, pre-committing -Xms == -Xmx locks hundreds of MB upfront and triggers
+        // kernel ZRAM/mmap_lock thrashing ~15-20s into play; start at half heap instead.
+        if (sLowRamDevice && memoryMb > 256) {
+            int initialMb = Math.max(256, memoryMb / 2);
+            heapArgs = new String[] { "-Xmx" + memoryMb + "M", "-Xms" + initialMb + "M" };
+        }
+        userArguments.addAll(0, Arrays.asList(heapArgs));
         JvmGcTuning.appendDefaultGcArgs(userArguments, memoryMb, allowG1Gc);
 
         ArrayList<String> overridableArguments = new ArrayList<>(Arrays.asList(

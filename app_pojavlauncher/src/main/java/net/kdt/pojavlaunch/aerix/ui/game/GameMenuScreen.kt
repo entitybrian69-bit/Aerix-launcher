@@ -111,7 +111,7 @@ import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
 import net.kdt.pojavlaunch.aerix.loading.AerixLoadingWallpaper
 
 /** The pages of the in-game menu. */
-enum class GameMenuPage { MAIN, DOWNLOADS, SOCIALS, WORLD_SHARING }
+enum class GameMenuPage { MAIN, DOWNLOADS, SOCIALS, WORLD_SHARING, MUSIC }
 
 /** Everything the menu asks the game activity to do. */
 interface GameMenuCallbacks {
@@ -276,6 +276,33 @@ fun GameMenuScreen(
                         page = GameMenuPage.SOCIALS
                     })
             }
+            GameMenuPage.MUSIC -> Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = AerixSpacing.mdPlus, vertical = AerixSpacing.sm),
+                verticalArrangement = Arrangement.spacedBy(AerixSpacing.xs)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(AerixSpacing.sm)
+                ) {
+                    TextButton(onClick = { page = GameMenuPage.MAIN }) {
+                        Text("‹ Back", color = palette.accent, fontWeight = FontWeight.Bold)
+                    }
+                    Text(
+                        "Music",
+                        color = AerixSurface.textPrimary,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                net.kdt.pojavlaunch.aerix.music.InGameMusicPanel(
+                    accent = palette.accent,
+                    modifier = Modifier.weight(1f).fillMaxWidth()
+                )
+            }
             GameMenuPage.MAIN -> AnimatedVisibility(
                 visible = shown,
                 enter = fadeIn(tween(140)) + scaleIn(tween(180), initialScale = 0.97f),
@@ -294,7 +321,8 @@ fun GameMenuScreen(
                     onCloseRequest = onCloseRequest,
                     onOpenDownloads = { page = GameMenuPage.DOWNLOADS },
                     onOpenSocials = { choosingInviteRecipient = false; page = GameMenuPage.SOCIALS },
-                    onOpenWorldSharing = { page = GameMenuPage.WORLD_SHARING }
+                    onOpenWorldSharing = { page = GameMenuPage.WORLD_SHARING },
+                    onOpenMusic = { page = GameMenuPage.MUSIC }
                 )
             }
         }
@@ -312,7 +340,8 @@ private fun GameMenuMainPage(
     onCloseRequest: () -> Unit,
     onOpenDownloads: () -> Unit,
     onOpenSocials: () -> Unit,
-    onOpenWorldSharing: () -> Unit
+    onOpenWorldSharing: () -> Unit,
+    onOpenMusic: () -> Unit
 ) {
     BoxWithConstraints(
         modifier = Modifier.fillMaxSize(),
@@ -427,6 +456,16 @@ private fun GameMenuMainPage(
                         compact = compact,
                         height = rowHeight,
                         onClick = { onCloseRequest(); callbacks.onScreenRecorder() }
+                    )
+                    CompactMenuButton(
+                        label = net.kdt.pojavlaunch.aerix.music.AerixMusicController.playbackState.currentTrack?.let {
+                            "Music · ${it.title}"
+                        } ?: "Music",
+                        iconRes = R.drawable.aerix_ic_music_note,
+                        color = palette.tiles[2],
+                        compact = compact,
+                        height = rowHeight,
+                        onClick = onOpenMusic
                     )
                     CompactMenuButton(
                         label = stringResource(R.string.aerix_ingame_menu_force_close),

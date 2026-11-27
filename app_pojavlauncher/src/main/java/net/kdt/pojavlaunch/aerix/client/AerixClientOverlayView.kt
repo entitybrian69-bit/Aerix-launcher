@@ -13,8 +13,13 @@ import android.hardware.SensorManager
 import android.os.BatteryManager
 import android.util.AttributeSet
 import android.view.MotionEvent
+import android.view.View
+import android.view.ViewGroup
+import android.view.inputmethod.InputMethodManager
 import android.widget.FrameLayout
 import android.widget.Toast
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.OnBackPressedDispatcherOwner
@@ -158,7 +163,8 @@ private enum class ClientMenuSubPage {
     TRANSFER,
     GALLERY,
     WORLD_SHARING,
-    SOCIALS
+    SOCIALS,
+    MUSIC
 }
 
 private enum class FeatureIconKind {
@@ -182,7 +188,8 @@ private enum class FeatureIconKind {
     AUTOGG,
     THERMAL,
     OLED_AFK,
-    RECORD
+    RECORD,
+    MUSIC
 }
 
 class AerixClientOverlayView @JvmOverloads constructor(
@@ -197,6 +204,7 @@ class AerixClientOverlayView @JvmOverloads constructor(
 
     private var contentInstalled = false
     private var activeClientInstance: Instance? = null
+    private var imeBottomPx = 0
 
     private var bootOverlayVisible by mutableStateOf(true)
     private var activeModal by mutableStateOf(InGameClientModal.NONE)
@@ -253,6 +261,64 @@ class AerixClientOverlayView @JvmOverloads constructor(
         menuSubPage = ClientMenuSubPage.GRID
         AerixOverlayInput.noteOpened()
         activeModal = InGameClientModal.MODULES
+        syncModalFocusState(true)
+    }
+
+    fun onImeInsetsChanged(bottomPx: Int) {
+        val clamped = bottomPx.coerceAtLeast(0)
+        if (imeBottomPx == clamped && composeView.paddingBottom == clamped) return
+        imeBottomPx = clamped
+        if (visibility == VISIBLE && activeModal != InGameClientModal.NONE) {
+            composeView.setPadding(0, 0, 0, clamped)
+        } else if (composeView.paddingBottom != 0) {
+            composeView.setPadding(0, 0, 0, 0)
+        }
+    }
+
+    fun dismissKeyboardIfShown(): Boolean {
+        val rootInsets = ViewCompat.getRootWindowInsets(this)
+        val imeShown = imeBottomPx > 0 ||
+            (rootInsets != null && rootInsets.isVisible(WindowInsetsCompat.Type.ime()))
+        val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+        if (imeShown) {
+            val token = findFocus()?.windowToken ?: windowToken
+            if (token != null) {
+                imm?.hideSoftInputFromWindow(token, 0)
+            }
+            imeBottomPx = 0
+            composeView.setPadding(0, 0, 0, 0)
+            return true
+        }
+        return false
+    }
+
+    private fun syncModalFocusState(modalOpen: Boolean) {
+        if (modalOpen) {
+            isClickable = true
+            isFocusable = true
+            isFocusableInTouchMode = true
+            descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
+            composeView.isFocusable = true
+            composeView.isFocusableInTouchMode = true
+            composeView.setPadding(0, 0, 0, imeBottomPx)
+            gameActivityOf(context)?.onClientModalVisibilityChanged(true)
+            post { composeView.requestFocus() }
+        } else {
+            val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+            val token = findFocus()?.windowToken ?: windowToken
+            if (token != null) {
+                imm?.hideSoftInputFromWindow(token, 0)
+            }
+            clearFocus()
+            imeBottomPx = 0
+            composeView.setPadding(0, 0, 0, 0)
+            composeView.isFocusable = false
+            composeView.isFocusableInTouchMode = false
+            isClickable = false
+            isFocusable = false
+            isFocusableInTouchMode = false
+            gameActivityOf(context)?.onClientModalVisibilityChanged(false)
+        }
     }
 
     fun onGlWindowReady() {
@@ -260,6 +326,16 @@ class AerixClientOverlayView @JvmOverloads constructor(
         postDelayed({
             bootOverlayVisible = false
         }, 700L)
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        // Failsafe: never let bootOverlayVisible trap game/control/A-button touches indefinitely.
+        postDelayed({
+            if (bootOverlayVisible) {
+                bootOverlayVisible = false
+            }
+        }, 12_000L)
     }
 
     fun onHostDestroy() {
@@ -284,6 +360,7 @@ class AerixClientOverlayView @JvmOverloads constructor(
                 AerixClientInputBridge.setRightClickHold(false)
             }
             activeModal = InGameClientModal.NONE
+            syncModalFocusState(false)
             return true
         }
         return false
@@ -379,7 +456,12 @@ class AerixClientOverlayView @JvmOverloads constructor(
                         if (next != InGameClientModal.NONE) {
                             AerixOverlayInput.noteOpened()
                         }
+                        val wasOpen = activeModal != InGameClientModal.NONE
+                        val isOpen = next != InGameClientModal.NONE
                         activeModal = next
+                        if (wasOpen != isOpen) {
+                            syncModalFocusState(isOpen)
+                        }
                         syncGyroRegistration()
                     },
                     onSyncOptionsTxt = {
@@ -632,7 +714,8 @@ private fun AerixClientRootOverlay(
                 lastSysSampleMs = nowMs
                 val sysSample = withContext(Dispatchers.IO) {
                     runCatching {
-                        val ram = (android.os.Debug.getPss() / 1024L).toInt()
+                        val isLowRam = (context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager)?.isLowRamDevice == true
+                        val ram = if (isLowRam) ((android.os.Debug.getNativeHeapAllocatedSize() + (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory())) / (1024L * 1024L)).toInt() else (android.os.Debug.getPss() / 1024L).toInt()
                         val bmIntent = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
                         val pct = if (bmIntent != null) {
                             val lvl = bmIntent.getIntExtra(BatteryManager.EXTRA_LEVEL, 100)
@@ -848,14 +931,19 @@ private fun FamousClientRectangleMenu(
     var choosingInviteRecipient by remember { mutableStateOf(false) }
 
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0x990A0B0E))
-            .pointerInput(Unit) {
-                detectTapGestures(onTap = { if (AerixOverlayInput.acceptTapDismiss()) onClose() })
-            },
+        modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
+        // Sibling scrim behind the modal rectangle so touches/drags inside the card never bubble
+        // to the outside-dismiss detector.
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color(0x990A0B0E))
+                .pointerInput(Unit) {
+                    detectTapGestures(onTap = { if (AerixOverlayInput.acceptTapDismiss()) onClose() })
+                }
+        )
         val rectShape = RoundedCornerShape(14.dp)
 
         // Big Dark Gray & Crimson Red Client Rectangle
@@ -876,7 +964,11 @@ private fun FamousClientRectangleMenu(
                 .background(LiquidCrystalPalette.DarkPanel, rectShape)
                 .border(1.6.dp, LiquidCrystalPalette.CrimsonPrimary, rectShape)
                 .pointerInput(Unit) {
-                    detectTapGestures(onTap = { /* consume inside rectangle */ })
+                    awaitPointerEventScope {
+                        while (true) {
+                            awaitPointerEvent()
+                        }
+                    }
                 }
         ) {
             // Top Bar of the Big Rectangle
@@ -937,6 +1029,7 @@ private fun FamousClientRectangleMenu(
                             ClientMenuSubPage.GALLERY -> "AERIX CLIENT  ·  SCREENSHOTS"
                             ClientMenuSubPage.WORLD_SHARING -> "AERIX CLIENT  ·  WORLD SHARING"
                             ClientMenuSubPage.SOCIALS -> "AERIX CLIENT  ·  CHATS"
+                            ClientMenuSubPage.MUSIC -> "AERIX CLIENT  ·  MUSIC"
                         },
                         color = Color.White,
                         fontSize = 15.sp,
@@ -1021,6 +1114,7 @@ private fun FamousClientRectangleMenu(
                         onOpenGallery = { onChangeSubPage(ClientMenuSubPage.GALLERY) },
                         onOpenWorldSharing = { onChangeSubPage(ClientMenuSubPage.WORLD_SHARING) },
                         onOpenSocials = { choosingInviteRecipient = false; onChangeSubPage(ClientMenuSubPage.SOCIALS) },
+                        onOpenMusic = { onChangeSubPage(ClientMenuSubPage.MUSIC) },
                         onOpenRecorder = {
                             var candidate: Context? = context
                             while (candidate is ContextWrapper && candidate !is net.kdt.pojavlaunch.game.GameActivity) candidate = candidate.baseContext
@@ -1062,6 +1156,9 @@ private fun FamousClientRectangleMenu(
                         onBack = { onChangeSubPage(ClientMenuSubPage.GRID) },
                         chooseInviteRecipient = choosingInviteRecipient
                     )
+                    ClientMenuSubPage.MUSIC -> net.kdt.pojavlaunch.aerix.music.InGameMusicPanel(
+                        accent = LiquidCrystalPalette.CrimsonPrimary
+                    )
                 }
             }
         }
@@ -1097,11 +1194,18 @@ private fun ClientSquaresGridPage(
     onOpenGallery: () -> Unit,
     onOpenWorldSharing: () -> Unit,
     onOpenSocials: () -> Unit,
+    onOpenMusic: () -> Unit,
     onOpenRecorder: () -> Unit,
     onOpenOledAfk: () -> Unit,
     onSyncOptionsTxt: () -> Unit
 ) {
     val modules = listOf(
+        ClientSquareModule("music", "Music", FeatureIconKind.MUSIC,
+            { net.kdt.pojavlaunch.aerix.music.AerixMusicController.playbackState.isPlaying },
+            {
+                net.kdt.pojavlaunch.aerix.music.AerixMusicController.playbackState.currentTrack?.title
+                    ?.take(12) ?: "MUSIC ›"
+            }, onOpenMusic),
         ClientSquareModule("screen_recorder", "Screen Recorder", FeatureIconKind.RECORD,
             { net.kdt.pojavlaunch.recording.RecordingState.isActive() },
             { if (net.kdt.pojavlaunch.recording.RecordingState.isActive()) "RECORDING" else "OPEN ›" }, onOpenRecorder),
@@ -1680,6 +1784,12 @@ private fun DrawScope.drawFeatureSymbol(kind: FeatureIconKind, color: Color) {
         FeatureIconKind.OLED_AFK -> {
             drawCircle(color, radius = 7.5.dp.toPx(), center = Offset(cx, cy), style = Stroke(width = sw * 0.9f))
             drawCircle(color, radius = 3.dp.toPx(), center = Offset(cx + 2.dp.toPx(), cy - 2.dp.toPx()))
+        }
+        FeatureIconKind.MUSIC -> {
+            val stemX = cx + 2.dp.toPx()
+            drawCircle(color, radius = 3.6.dp.toPx(), center = Offset(cx - 2.dp.toPx(), cy + 5.dp.toPx()))
+            drawLine(color, Offset(stemX, cy + 5.dp.toPx()), Offset(stemX, cy - 7.dp.toPx()), sw)
+            drawLine(color, Offset(stemX, cy - 7.dp.toPx()), Offset(stemX + 5.dp.toPx(), cy - 4.dp.toPx()), sw)
         }
     }
 }

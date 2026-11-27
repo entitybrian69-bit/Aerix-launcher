@@ -60,6 +60,7 @@ public class GameView extends FrameLayout implements PlatformGrabListener, Surfa
     /* View holding the surface, either a SurfaceView or a TextureView */
     View mSurface;
     GameCursorView mCursorView;
+    private Surface mDisplaySurface;
     private net.kdt.pojavlaunch.recording.RecordingSurfaceTee mSurfaceTee;
     private Surface mPendingCleanEncoderSurface;
     private int mPendingCleanEncoderWidth;
@@ -440,24 +441,27 @@ public class GameView extends FrameLayout implements PlatformGrabListener, Surfa
 
     @Override
     public void onSurfaceAvailable(Surface surface) {
+        mDisplaySurface = surface;
         Surface targetSurface = surface;
-        if (mSurfaceTee == null) {
-            mSurfaceTee = new net.kdt.pojavlaunch.recording.RecordingSurfaceTee();
-        }
-        Surface teeSurface = mSurfaceTee.attachDisplaySurface(surface, windowWidth, windowHeight);
-        if (teeSurface != null) {
-            targetSurface = teeSurface;
-            if (mPendingCleanEncoderSurface != null) {
-                Surface pending = mPendingCleanEncoderSurface;
-                int w = mPendingCleanEncoderWidth;
-                int h = mPendingCleanEncoderHeight;
-                int fps = mPendingCleanEncoderFps;
-                mPendingCleanEncoderSurface = null;
-                mSurfaceTee.attachRecorderSurface(pending, w, h, fps);
+        if (mPendingCleanEncoderSurface != null || mSurfaceTee != null) {
+            if (mSurfaceTee == null) {
+                mSurfaceTee = new net.kdt.pojavlaunch.recording.RecordingSurfaceTee();
             }
-        } else {
-            mSurfaceTee.release();
-            mSurfaceTee = null;
+            Surface teeSurface = mSurfaceTee.attachDisplaySurface(surface, windowWidth, windowHeight);
+            if (teeSurface != null) {
+                targetSurface = teeSurface;
+                if (mPendingCleanEncoderSurface != null) {
+                    Surface pending = mPendingCleanEncoderSurface;
+                    int w = mPendingCleanEncoderWidth;
+                    int h = mPendingCleanEncoderHeight;
+                    int fps = mPendingCleanEncoderFps;
+                    mPendingCleanEncoderSurface = null;
+                    mSurfaceTee.attachRecorderSurface(pending, w, h, fps);
+                }
+            } else {
+                mSurfaceTee.release();
+                mSurfaceTee = null;
+            }
         }
         Platform.updateSurface(targetSurface);
         if(mRefreshOnly) return;
@@ -475,6 +479,7 @@ public class GameView extends FrameLayout implements PlatformGrabListener, Surfa
 
     @Override
     public void onSurfaceDestroyed() {
+        mDisplaySurface = null;
         Platform.destroySurface();
         if (mSurfaceTee != null) {
             mSurfaceTee.detachDisplaySurface();
@@ -483,15 +488,31 @@ public class GameView extends FrameLayout implements PlatformGrabListener, Surfa
 
     public boolean attachCleanRecorderSurface(Surface encoderSurface, int width, int height, int targetFps) {
         if (encoderSurface == null || !encoderSurface.isValid()) return false;
-        if (mSurfaceTee == null) {
+        if (mDisplaySurface == null || !mDisplaySurface.isValid()) {
             mPendingCleanEncoderSurface = encoderSurface;
             mPendingCleanEncoderWidth = width;
             mPendingCleanEncoderHeight = height;
             mPendingCleanEncoderFps = targetFps;
             return true;
         }
+        if (mSurfaceTee == null) {
+            mSurfaceTee = new net.kdt.pojavlaunch.recording.RecordingSurfaceTee();
+        }
+        Surface teeSurface = mSurfaceTee.attachDisplaySurface(mDisplaySurface, windowWidth, windowHeight);
+        if (teeSurface == null) {
+            mSurfaceTee.release();
+            mSurfaceTee = null;
+            return false;
+        }
         mPendingCleanEncoderSurface = null;
-        return mSurfaceTee.attachRecorderSurface(encoderSurface, width, height, targetFps);
+        boolean attached = mSurfaceTee.attachRecorderSurface(encoderSurface, width, height, targetFps);
+        if (!attached) {
+            mSurfaceTee.release();
+            mSurfaceTee = null;
+            return false;
+        }
+        Platform.updateSurface(teeSurface);
+        return true;
     }
 
     public void detachCleanRecorderSurface() {
@@ -501,6 +522,11 @@ public class GameView extends FrameLayout implements PlatformGrabListener, Surfa
         }
         if (mSurfaceTee != null) {
             mSurfaceTee.detachRecorderSurface();
+            if (mDisplaySurface != null && mDisplaySurface.isValid()) {
+                Platform.updateSurface(mDisplaySurface);
+            }
+            mSurfaceTee.release();
+            mSurfaceTee = null;
         }
     }
 

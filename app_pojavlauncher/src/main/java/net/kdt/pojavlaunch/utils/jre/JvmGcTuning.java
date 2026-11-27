@@ -20,7 +20,27 @@ public final class JvmGcTuning {
         if (!allowG1Gc || hasExplicitGcArg(args)) return;
 
         String regionSize = memoryMb >= 1024 ? "8M" : "4M";
-        String[] g1Defaults = {
+        boolean lowMemHeap = memoryMb <= 1280;
+        String[] g1Defaults = lowMemHeap ? new String[] {
+                "-XX:+UseG1GC",
+                "-XX:+ParallelRefProcEnabled",
+                "-XX:MaxGCPauseMillis=50",
+                "-XX:+UnlockExperimentalVMOptions",
+                "-XX:+DisableExplicitGC",
+                "-XX:ConcGCThreads=1",
+                "-XX:ParallelGCThreads=2",
+                "-XX:G1NewSizePercent=10",
+                "-XX:G1MaxNewSizePercent=25",
+                "-XX:G1HeapRegionSize=" + regionSize,
+                "-XX:G1ReservePercent=10",
+                "-XX:G1HeapWastePercent=5",
+                "-XX:G1MixedGCCountTarget=4",
+                "-XX:InitiatingHeapOccupancyPercent=30",
+                "-XX:G1MixedGCLiveThresholdPercent=90",
+                "-XX:G1RSetUpdatingPauseTimePercent=5",
+                "-XX:SurvivorRatio=32",
+                "-XX:MaxTenuringThreshold=1"
+        } : new String[] {
                 "-XX:+UseG1GC",
                 "-XX:+ParallelRefProcEnabled",
                 "-XX:MaxGCPauseMillis=50",

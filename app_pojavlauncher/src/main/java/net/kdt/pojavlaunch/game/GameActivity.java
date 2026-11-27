@@ -143,6 +143,7 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     private ResultReceiver mStartAck;
     private boolean mStartupPrepared;
     private boolean mResumedForLaunch;
+    private long mSuppressEscapeUntilMs = 0L;
 
     private QuickSettingSideDialog mQuickSettingSideDialog;
 
@@ -286,9 +287,13 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
             if (mGameMenuOverlay != null) {
                 mGameMenuOverlay.onImeInsetsChanged(imeBottom);
             }
+            if (mAerixClientOverlay != null) {
+                mAerixClientOverlay.onImeInsetsChanged(imeBottom);
+            }
             if(launcherGLView.mSurface == null)
                 return insets;
-            if (mGameMenuOverlay != null && mGameMenuOverlay.isMenuShown()) {
+            if ((mGameMenuOverlay != null && mGameMenuOverlay.isMenuShown())
+                    || (mAerixClientOverlay != null && mAerixClientOverlay.isBlockingModalOpen())) {
                 launcherGLView.mSurface.setTranslationY(0);
                 launcherGLView.mCursorView.setTranslationY(0);
                 mImeHeight = 0;
@@ -666,6 +671,7 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         super.onStart();
         PLATFORM.setVisible(true);
         net.kdt.pojavlaunch.aerix.discord.AerixDiscordPresence.onGameResumed(this);
+        net.kdt.pojavlaunch.aerix.music.AerixMusicController.INSTANCE.attach(this);
     }
 
     @Override
@@ -674,6 +680,22 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         PLATFORM.setVisible(false);
         net.kdt.pojavlaunch.aerix.discord.AerixDiscordPresence.onGameStopped(this);
         super.onStop();
+    }
+
+    @Override
+    public void onTrimMemory(int level) {
+        super.onTrimMemory(level);
+        if (level >= TRIM_MEMORY_RUNNING_MODERATE) {
+            net.kdt.pojavlaunch.aerix.music.MusicArtworkImageKt.clearMusicArtworkCache();
+            net.kdt.pojavlaunch.aerix.loading.AerixLoadingWallpaper.detach();
+        }
+    }
+
+    @Override
+    public void onLowMemory() {
+        super.onLowMemory();
+        net.kdt.pojavlaunch.aerix.music.MusicArtworkImageKt.clearMusicArtworkCache();
+        net.kdt.pojavlaunch.aerix.loading.AerixLoadingWallpaper.detach();
     }
 
     /**
@@ -967,8 +989,28 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
                 launcherGLView.releasePointerCapture();
             }
             launcherGLView.clearFocus();
-        } else if (mGameMenuOverlay == null || !mGameMenuOverlay.isMenuShown()) {
-            launcherGLView.requestFocus();
+        } else {
+            mSuppressEscapeUntilMs = android.os.SystemClock.uptimeMillis() + 300L;
+            if ((mGameMenuOverlay == null || !mGameMenuOverlay.isMenuShown())
+                    && (mAerixClientOverlay == null || !mAerixClientOverlay.isBlockingModalOpen())) {
+                launcherGLView.requestFocus();
+            }
+        }
+    }
+
+    public void onClientModalVisibilityChanged(boolean shown) {
+        if (launcherGLView == null) return;
+        if (shown) {
+            if (touchCharInput != null) touchCharInput.disable();
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                launcherGLView.releasePointerCapture();
+            }
+            launcherGLView.clearFocus();
+        } else {
+            mSuppressEscapeUntilMs = android.os.SystemClock.uptimeMillis() + 300L;
+            if (mGameMenuOverlay == null || !mGameMenuOverlay.isMenuShown()) {
+                launcherGLView.requestFocus();
+            }
         }
     }
 
@@ -1090,7 +1132,9 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
             }
             if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_ESCAPE) {
                 if (event.getAction() == KeyEvent.ACTION_UP) {
-                    mAerixClientOverlay.handleBackPress();
+                    if (!mAerixClientOverlay.dismissKeyboardIfShown()) {
+                        mAerixClientOverlay.handleBackPress();
+                    }
                 }
                 return true;
             }
@@ -1108,6 +1152,7 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         if(!(handleEvent = launcherGLView.processKeyEvent(event))) {
             if (event.getKeyCode() == KeyEvent.KEYCODE_BACK && !touchCharInput.isEnabled()) {
                 if(event.getAction() != KeyEvent.ACTION_UP) return true; // We eat it anyway
+                if (android.os.SystemClock.uptimeMillis() < mSuppressEscapeUntilMs) return true;
                 CallbackBridge.sendKeyPress(KeyEvent.KEYCODE_ESCAPE);
                 return true;
             }
@@ -1180,6 +1225,7 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
 
     private void hideGameMenu() {
         if (mGameMenuOverlay == null) return;
+        mSuppressEscapeUntilMs = android.os.SystemClock.uptimeMillis() + 300L;
         mDrawerPullButton.setMenuShowing(false);
         mGameMenuOverlay.hideMenu();
         if (launcherGLView != null) {

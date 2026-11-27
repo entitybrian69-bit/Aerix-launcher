@@ -181,7 +181,7 @@ class GameMenuOverlayView @JvmOverloads constructor(
         if (handler != null) {
             handler()
         } else {
-            hideMenu()
+            callbacksState.value?.onResumeGame() ?: hideMenu()
         }
         return true
     }
@@ -216,7 +216,7 @@ class GameMenuOverlayView @JvmOverloads constructor(
                     target = targetState.value,
                     versionLine = versionLine,
                     onBackHandlerChanged = { backHandler = it },
-                    onCloseRequest = { hideMenu() }
+                    onCloseRequest = { callbacksState.value?.onResumeGame() ?: hideMenu() }
                 )
             }
         }

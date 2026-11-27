@@ -16,11 +16,13 @@ client_components = (main / 'java/net/kdt/pojavlaunch/aerix/client/LiquidCrystal
 focus_scroll = (main / 'java/net/kdt/pojavlaunch/aerix/components/BringFocusedItemIntoView.kt').read_text()
 glass = (main / 'java/net/kdt/pojavlaunch/aerix/components/LiquidGlass.kt').read_text()
 surfaces = (main / 'java/net/kdt/pojavlaunch/aerix/theme/AerixSurface.kt').read_text()
-for section in ('HOME', 'LIBRARY', 'DISCOVER', 'AERIX_CLIENT', 'SOCIALS', 'SETTINGS', 'ACCOUNTS', 'INSTANCE_EDITOR'):
+for section in ('HOME', 'MUSICS', 'LIBRARY', 'DISCOVER', 'AERIX_CLIENT', 'SOCIALS', 'SETTINGS', 'ACCOUNTS', 'INSTANCE_EDITOR'):
     assert 'LauncherSection.' + section in shell, section
 assert 'AerixNavigationRail(' in shell and 'HomeScreen(activity, navigate)' in shell
 assert 'GlassHomeScreen' not in shell and 'AerixBottomNavigation' not in shell
 assert 'LauncherSection.AERIX_CLIENT' in nav and 'LauncherSection.CREATE_INSTANCE' in nav
+assert 'LauncherSection.MUSICS' in nav and 'LauncherSection.INSTANCE_SELECTOR' in nav
+assert 'onClick = { onNavigate(LauncherSection.LIBRARY) }' not in nav
 for action in ('PojavLaunchBridge.play(activity)', 'PojavInstanceBridge.edit', 'PojavNavigator.openCustomControls',
                'LauncherSection.CREATE_INSTANCE', 'LauncherSection.FILES', 'LauncherSection.LOGS'):
     assert action in home, action

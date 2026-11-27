@@ -479,6 +479,7 @@ public class GameRunner {
         // announced whatever the slider had been dragged to.
         final int launchMemoryMb = LaunchMemory.clamp(activity, requestedMemoryMb);
         final int deviceRamMb = net.kdt.pojavlaunch.Tools.getTotalDeviceMemory(activity);
+        JavaRunner.setLowRamDevice(deviceRamMb > 0 && deviceRamMb <= 4096);
         final boolean clamped = launchMemoryMb != requestedMemoryMb;
         Logger.appendToLog("Java heap allocation: " + launchMemoryMb + " MB" +
                 (InstanceMemory.overrideMb(instance.jvmArgs) > 0 ? " (instance override)" : " (launcher default)") +
