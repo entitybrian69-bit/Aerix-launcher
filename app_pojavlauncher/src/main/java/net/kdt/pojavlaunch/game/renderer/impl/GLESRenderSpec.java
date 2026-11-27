@@ -45,6 +45,23 @@ public abstract class GLESRenderSpec implements RenderSpec {
     }
 
     public static class LTWRenderSpec extends GLESRenderSpec {
+        @Override
+        public void setupEnvironment(Context context, Map<String, String> envMap) {
+            super.setupEnvironment(context, envMap);
+            // LTW defaults LTW_COHERENT_DYNAMIC_STORAGE=true and advertises GL_ARB_buffer_storage,
+            // which maps dynamic buffers as persistent-coherent and crashes on world entry on
+            // mobile drivers with MC 1.20.1 modded renderers (Embeddium/EpicFight/Avalon).
+            // Users can still override via custom_env.txt (applied later in JREUtils).
+            if (!envMap.containsKey("LTW_HIDE_BUFFER_STORAGE")) {
+                envMap.put("LTW_HIDE_BUFFER_STORAGE", "1");
+            }
+            if (!envMap.containsKey("LTW_COHERENT_DYNAMIC_STORAGE")) {
+                envMap.put("LTW_COHERENT_DYNAMIC_STORAGE", "0");
+            }
+            if (!envMap.containsKey("AERIX_LTW_COMPAT_GUARD")) {
+                envMap.put("AERIX_LTW_COMPAT_GUARD", "1");
+            }
+        }
         public boolean compatibleDevice(Context context) {
             return JREUtils.getDetectedVersion() >= 3 && new File(Tools.NATIVE_LIB_DIR, this.library()).exists();
         }

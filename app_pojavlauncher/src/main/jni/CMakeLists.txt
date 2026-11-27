@@ -21,10 +21,16 @@ add_subdirectory(glfw)
 # swap-interval changes, Java callback per frame, or edits to the GLFW submodule.
 add_library(aerix_frame_counter SHARED fps/frame_counter.c fps/frame_counter_jni.c)
 set_target_properties(aerix_frame_counter PROPERTIES C_STANDARD 11 C_STANDARD_REQUIRED ON)
+add_library(aerix_ltw_guard SHARED ltw_guard/ltw_compat_guard.c)
+set_target_properties(aerix_ltw_guard PROPERTIES C_STANDARD 11 C_STANDARD_REQUIRED ON)
+target_link_libraries(aerix_ltw_guard PRIVATE dl log)
 get_target_property(AERIX_GLFW_SOURCE_DIR glfw SOURCE_DIR)
 set_property(SOURCE "${AERIX_GLFW_SOURCE_DIR}/context.c"
     DIRECTORY "${AERIX_GLFW_SOURCE_DIR}" APPEND PROPERTY
     COMPILE_DEFINITIONS "glfwSwapBuffers=aerixOriginalSwapBuffers")
+set_property(SOURCE "${AERIX_GLFW_SOURCE_DIR}/egl_context.c"
+    DIRECTORY "${AERIX_GLFW_SOURCE_DIR}" APPEND PROPERTY
+    COMPILE_DEFINITIONS "_glfwInitEGL=aerixOriginalInitEGL")
 set_property(SOURCE "${AERIX_GLFW_SOURCE_DIR}/android_window.c"
     DIRECTORY "${AERIX_GLFW_SOURCE_DIR}" APPEND PROPERTY
     COMPILE_DEFINITIONS
@@ -46,9 +52,13 @@ set_property(SOURCE "${AERIX_GLFW_SOURCE_DIR}/android_window_hook.c"
         "_glfwDisablePrerotationAndroid=aerixOriginalDisablePrerotationAndroid")
 target_sources(glfw PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/fps/glfw_frame_hook.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/fps/glfw_android_guard.c")
-target_include_directories(glfw PRIVATE "${AERIX_GLFW_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/fps")
-target_link_libraries(glfw PRIVATE aerix_frame_counter)
+    "${CMAKE_CURRENT_SOURCE_DIR}/fps/glfw_android_guard.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ltw_guard/glfw_ltw_guard.c")
+target_include_directories(glfw PRIVATE
+    "${AERIX_GLFW_SOURCE_DIR}"
+    "${CMAKE_CURRENT_SOURCE_DIR}/fps"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ltw_guard")
+target_link_libraries(glfw PRIVATE aerix_frame_counter aerix_ltw_guard)
 
 
 target_compile_options(glfw PRIVATE -Wno-nullability-completeness)
@@ -84,8 +94,8 @@ add_library(pojavexec SHARED
         minibridge.c
 )
 
-target_include_directories(pojavexec PRIVATE .)
-target_link_libraries(pojavexec PRIVATE log mojoexec)
+target_include_directories(pojavexec PRIVATE . ltw_guard)
+target_link_libraries(pojavexec PRIVATE log mojoexec aerix_ltw_guard)
 
 add_library(pojavexec_awt SHARED
 		awt/awt.c

@@ -459,7 +459,8 @@ public class GameRunner {
         // (Emesis does), so state the version instead of letting them guess from the classpath.
         if (versionId != null && !versionId.isEmpty()) {
             javaArgList.add("-Dpojav.mc.version=" + versionId);
-            if (activeRenderer instanceof net.kdt.pojavlaunch.aerix.bridge.AerixRendererPlugin) {
+            if (activeRenderer instanceof net.kdt.pojavlaunch.aerix.bridge.AerixRendererPlugin
+                    || activeRenderer instanceof net.kdt.pojavlaunch.game.renderer.impl.EmesisRenderSpec) {
                 // The same value as an environment variable: a plugin reads /proc/self/cmdline for
                 // the -D form, and that file holds the application's command line, not the JVM
                 // arguments of an in-process VM. Without it the plugin cannot tell which core to
