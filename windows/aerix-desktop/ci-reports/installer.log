@@ -1,27 +1,26 @@
-publish exit: failure
+publish exit: success
 --- checksums ---
-68fe8b9c0a942d7da154e39f9418e1622d1ca0b0965e0671636414914de21261  AerixLauncher-2.4.4.exe
+2820b7a6b67af009138b1ba3f4e925db5a841c64125ea9bc2ba3e7da986bb4ed  AerixLauncher-2.4.4.exe
 855dcef74adb28ce256a1674a4c24941677cf1f3275cc6267a9033924529eb19  AerixLauncher-2.4.4-portable.zip
-c2547d8911d94b871a29fcf4dcdf7a762aae2e221378bca4dab3cfb4b5634b61  AerixLauncher-2.4.4-windows-portable.zip
 c2547d8911d94b871a29fcf4dcdf7a762aae2e221378bca4dab3cfb4b5634b61  AerixLauncher-2.4.4-windows-portable.zip
 --- dist ---
 total 56093
-drwxr-xr-x 1 runneradmin 197121        0 Nov 27 14:34 .
-drwxr-xr-x 1 runneradmin 197121        0 Nov 27 14:34 ..
-drwxr-xr-x 1 runneradmin 197121        0 Nov 27 14:32 AerixLauncher
--rw-r--r-- 1 runneradmin 197121 11608438 Nov 27 14:32 AerixLauncher-2.4.4-portable.zip
-drwxr-xr-x 1 runneradmin 197121        0 Nov 27 14:32 AerixLauncher-2.4.4-windows-portable
--rw-r--r-- 1 runneradmin 197121 45815241 Nov 27 14:32 AerixLauncher-2.4.4-windows-portable.zip
--rw-r--r-- 1 runneradmin 197121      403 Nov 27 14:34 SHA256SUMS.txt
-drwxr-xr-x 1 runneradmin 197121        0 Nov 27 14:32 app-image
-drwxr-xr-x 1 runneradmin 197121        0 Nov 27 14:32 image
-drwxr-xr-x 1 runneradmin 197121        0 Nov 27 14:32 runtime
+drwxr-xr-x 1 runneradmin 197121        0 Nov 27 14:50 .
+drwxr-xr-x 1 runneradmin 197121        0 Nov 27 14:50 ..
+drwxr-xr-x 1 runneradmin 197121        0 Nov 27 14:47 AerixLauncher
+-rw-r--r-- 1 runneradmin 197121 11608438 Nov 27 14:47 AerixLauncher-2.4.4-portable.zip
+drwxr-xr-x 1 runneradmin 197121        0 Nov 27 14:48 AerixLauncher-2.4.4-windows-portable
+-rw-r--r-- 1 runneradmin 197121 45815241 Nov 27 14:48 AerixLauncher-2.4.4-windows-portable.zip
+-rw-r--r-- 1 runneradmin 197121      296 Nov 27 14:50 SHA256SUMS.txt
+drwxr-xr-x 1 runneradmin 197121        0 Nov 27 14:48 app-image
+drwxr-xr-x 1 runneradmin 197121        0 Nov 27 14:48 image
+drwxr-xr-x 1 runneradmin 197121        0 Nov 27 14:48 runtime
 --- dist/image ---
 dist/image:
 total 46624
-drwxr-xr-x 1 runneradmin 197121        0 Nov 27 14:32 .
-drwxr-xr-x 1 runneradmin 197121        0 Nov 27 14:34 ..
--rwxr-xr-x 1 runneradmin 197121 47735808 Nov 27 14:32 AerixLauncher-2.4.4.exe
+drwxr-xr-x 1 runneradmin 197121        0 Nov 27 14:48 .
+drwxr-xr-x 1 runneradmin 197121        0 Nov 27 14:50 ..
+-rwxr-xr-x 1 runneradmin 197121 47735808 Nov 27 14:48 AerixLauncher-2.4.4.exe
 --- runtime ---
 java.base@21.0.13
 java.datatransfer@21.0.13
@@ -32,4 +31,3 @@ java.prefs@21.0.13
 java.xml@21.0.13
 jdk.unsupported@21.0.13
 runtime size: 48 MB
-HTTP 404: Not Found (https://uploads.github.com/repos/luciferstudios/Aerix-launcherPc/releases/454539847/assets?label=&name=AerixLauncher-2.4.4-windows-portable.zip)
