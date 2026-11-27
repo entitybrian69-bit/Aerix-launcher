@@ -268,6 +268,33 @@ sign_pe() {
   rm -rf "$certdir"
 }
 
+# Creates the trimmed runtime image that both the installer and the portable build carry.
+#
+# jpackage with no --runtime-image links in every module in the JDK, so the installer ends up
+# carrying jdk.compiler, jdk.jshell and jdk.jcmd - tens of megabytes of development tools a launcher
+# never loads, and a bad look for a file a scanner will pick apart. These are the modules it needs:
+#   java.base      - everything else, and javax.crypto (AES-GCM) lives here since Java 9
+#   java.desktop   - Swing, Java2D, ImageIO, AWT
+#   java.xml       - the XML icon parser (DocumentBuilderFactory)
+#   java.net.http  - the HttpClient every download and API call goes through
+#   java.management- java.lang.management, used to size the RAM slider from physical memory
+#   jdk.unsupported- sun.misc.Unsafe, which older libraries and some JDK internals still reach for
+#
+# A missing module is a silent runtime failure, so build.sh --selftest exercises this image.
+make_runtime_image() {
+  local runtime_image="$DIST/runtime"
+  if [[ ! -x "$JDK/bin/jlink" ]]; then return 0; fi
+  rm -rf "$runtime_image"
+  log "jlink --add-modules java.base,java.desktop,java.xml,java.net.http,java.management,jdk.unsupported"
+  if ! "$JDK/bin/jlink" --add-modules java.base,java.desktop,java.xml,java.net.http,java.management,jdk.unsupported \
+      --strip-debug --no-header-files --no-man-pages --compress=2 \
+      --output "$runtime_image" 2>&1 | tail -3; then
+    echo "error: jlink failed" >&2
+    return 1
+  fi
+  return 0
+}
+
 # Builds the jpackage *app image* (a folder, not an installer): AerixLauncher.exe next to the
 # runtime image it uses.
 #
@@ -278,64 +305,49 @@ make_app_image() {
   local jp="$JDK/bin/jpackage"
   if [[ ! -x "$jp" || ! -x "$JDK/bin/jlink" ]]; then return 1; fi
   local icon="$HERE/packaging/aerix.ico"
-  local runtime_image="$DIST/runtime"
-  local runtime_flag=()
-  [[ -d "$runtime_image" ]] && runtime_flag=(--runtime-image "$runtime_image")
+  if [[ ! -d "$DIST/runtime" ]]; then
+    echo "warning: no runtime image; refusing to build an app image that would need a system Java" >&2
+    return 1
+  fi
   rm -rf "$DIST/app-image"; mkdir -p "$DIST/app-image"
   log "jpackage --type app-image (for the portable build)"
   "$jp" --type app-image --name "AerixLauncher" --app-version "$VERSION" \
     --dest "$DIST/app-image" --input "$DIST/AerixLauncher" --main-jar aerix-launcher.jar \
-    --main-class "$MAIN_CLASS" --icon "$icon" "${runtime_flag[@]}" \
+    --main-class "$MAIN_CLASS" --icon "$icon" --runtime-image "$DIST/runtime" \
     --description "Aerix Launcher - Minecraft: Java Edition for Windows" \
     --vendor "Aerix Launcher contributors" \
-    --java-options "-Xmx1g" --java-options "-Dfile.encoding=UTF-8" >/dev/null 2>&1 || return 1
+    --java-options "-Xmx1g" --java-options "-Dfile.encoding=UTF-8" 2>&1 | tail -5 || return 1
   [[ -f "$DIST/app-image/AerixLauncher/AerixLauncher.exe" ]]
 }
 
 make_installer() {
   make_dist
-  # Build the app image first: it is what the portable build is packaged from, and it disappears
-  # once jpackage writes the installer below. Its bundled jar is replaced with the final one
-  # afterwards, so the portable build always matches the installer exactly.
-  local app_image_ok=0
-  make_app_image && app_image_ok=1 || true
   local jp="$JDK/bin/jpackage"
-  if [[ ! -x "$jp" ]]; then log "jpackage missing (JDK without jpackage) - portable zip only"; return; fi
+  if [[ ! -x "$jp" ]]; then log "jpackage missing (JDK without jpackage) - jar-only portable zip only"; return; fi
   # jpackage wants a JDK image with jlink; a JRE-based one fails here, and failing loudly is better
   # than the quiet `|| true` this used to be, which reported success without producing anything.
-  if [[ ! -x "$JDK/bin/jlink" ]]; then log "jlink missing (JRE image) - portable zip only"; return; fi
+  if [[ ! -x "$JDK/bin/jlink" ]]; then log "jlink missing (JRE image) - jar-only portable zip only"; return; fi
   local icon="$HERE/packaging/aerix.ico"
   if [[ ! -f "$icon" ]]; then echo "error: missing $icon" >&2; exit 1; fi
+
+  # Order matters, and it used to be wrong here. The trimmed runtime is built first because both
+  # artifacts are built from it; the app image is built second because jpackage deletes its staging
+  # copy the moment it writes the installer, and the portable build is packaged from that image.
+  # Building the image after the installer silently produced nothing at all.
+  local runtime_image="$DIST/runtime"
+  make_runtime_image || exit 1
+  local runtime_flag=(--runtime-image "$runtime_image")
+
+  local app_image_ok=0
+  make_app_image && app_image_ok=1 || true
+  if [[ "$app_image_ok" != "1" ]]; then
+    echo "warning: could not build the app image; the portable build will be jar-only" >&2
+  fi
   rm -rf "$DIST/image"; mkdir -p "$DIST/image"
   # .exe and .msi are Windows-only formats. Elsewhere jpackage can still produce a runnable
   # app-image, which is the same layout an .exe installs, so it is worth building.
   local type="app-image"
   case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) type="exe"; [[ -n "${AERIX_MSI:-}" ]] && type="msi";; esac
-  # Build a *minimal* runtime image instead of bundling the whole JDK.
-  #
-  # jpackage with no --runtime-image links in every module in the JDK, and the resulting installer
-  # carries jdk.compiler, jdk.jshell, jdk.jcmd and friends - tens of megabytes of development tools
-  # that a launcher never loads. It is also a bad look for an installer that a security scanner will
-  # pick apart. These are the modules the launcher actually needs:
-  #   java.base     - everything else, and javax.crypto (AES-GCM) lives here since Java 9
-  #   java.desktop  - Swing, Java2D, ImageIO, AWT
-  #   java.xml      - the XML icon parser (DocumentBuilderFactory)
-  #   java.net.http  - the HttpClient every download and API call goes through
-  #   java.management - java.lang.management, used to size the RAM slider from physical memory
-  #   jdk.unsupported - sun.misc.Unsafe, which older libraries and some JDK internals still reach for
-  local runtime_image="$DIST/runtime"
-  if [[ -x "$JDK/bin/jlink" ]]; then
-    rm -rf "$runtime_image"
-    log "jlink --add-modules java.base,java.desktop,java.xml,java.net.http,java.management,jdk.unsupported"
-    if ! "$JDK/bin/jlink" --add-modules java.base,java.desktop,java.xml,java.net.http,java.management,jdk.unsupported \
-        --strip-debug --no-header-files --no-man-pages --compress=2 \
-        --output "$runtime_image" 2>&1 | tail -3; then
-      echo "error: jlink failed" >&2
-      exit 1
-    fi
-  fi
-  local runtime_flag=()
-  if [[ -d "$runtime_image" ]]; then runtime_flag=(--runtime-image "$runtime_image"); fi
   log "jpackage --type $type"
   # Windows-only installer switches. Without --win-upgrade-uuid every release installs *beside* the
   # previous one, which leaves two launchers in Add/Remove Programs and two copies of a 48 MB

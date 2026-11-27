@@ -835,6 +835,19 @@ object SelfTest {
             //    installer is a plain folder with a real javaw.exe in it.
             if (!code.contains("windows-portable")) error("no app-image portable build")
 
+            // 4b. The app image must be built *after* the runtime image and *before* the installer.
+            //     Both halves have already gone wrong once: jpackage deletes its staging app image
+            //     when it writes the installer, so an image built afterwards is empty; and an image
+            //     built before jlink exists silently falls back to a runtime-less layout. Either way
+            //     the portable build quietly disappears instead of failing.
+            val runtimeAt = code.indexOf("make_runtime_image || exit 1")
+            val imageAt = code.indexOf("make_app_image && app_image_ok=1")
+            if (runtimeAt < 0) error("the trimmed runtime image is never built explicitly")
+            if (imageAt < 0) error("the app image is never built explicitly")
+            if (runtimeAt > imageAt) {
+                error("the app image is built before the runtime image it must carry")
+            }
+
             // 5. The launcher must not delete itself or anything under its own installation.
             val selfDelete = Regex("deleteIfExists\\(\\s*(exe|appDir|installDir|MainKt)", RegexOption.IGNORE_CASE)
             if (selfDelete.containsMatchIn(code)) error("the build deletes its own installation")
