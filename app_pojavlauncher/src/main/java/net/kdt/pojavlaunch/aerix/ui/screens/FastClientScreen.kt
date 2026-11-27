@@ -11,12 +11,16 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -29,28 +33,43 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import androidx.fragment.app.FragmentActivity
 import kotlinx.coroutines.launch
 import net.kdt.pojavlaunch.aerix.bridge.PojavInstanceBridge
 import net.kdt.pojavlaunch.aerix.bridge.PojavLaunchBridge
 import net.kdt.pojavlaunch.aerix.components.GlassPanel
 import net.kdt.pojavlaunch.aerix.components.PageHeader
+import net.kdt.pojavlaunch.aerix.fastclient.FastClientBuild
 import net.kdt.pojavlaunch.aerix.fastclient.FastClientInstaller
+import net.kdt.pojavlaunch.aerix.modpacks.AerixModpack
+import net.kdt.pojavlaunch.aerix.modpacks.AerixModpackCatalog
+import net.kdt.pojavlaunch.aerix.modpacks.AerixModpackInstaller
+import net.kdt.pojavlaunch.aerix.modpacks.AerixModpackVersion
 import net.kdt.pojavlaunch.aerix.theme.AerixLayoutDefaults
 import net.kdt.pojavlaunch.aerix.theme.AerixRadii
 import net.kdt.pojavlaunch.aerix.theme.AerixSpacing
 import net.kdt.pojavlaunch.aerix.theme.AerixSurface
 import net.kdt.pojavlaunch.instances.Instances
 
-/** The creator's builds are separate profiles and never receive Aerix Client's own mod stack. */
+/** The creator's builds can be installed standalone or combined with a matching-version modpack. */
 @Composable
 fun FastClientScreen(activity: FragmentActivity, onBack: () -> Unit) {
     var refresh by remember { mutableIntStateOf(0) }
     val scope = rememberCoroutineScope()
     var searchPacks by remember { mutableStateOf(false) }
-    val instances = remember(refresh, FastClientInstaller.installingVersion) {
+    var lockedPackSearchMc by remember { mutableStateOf<String?>(null) }
+    var installChoiceFor by remember { mutableStateOf<FastClientBuild?>(null) }
+    var combinedInstalling by remember { mutableStateOf(false) }
+    var combinedError by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(Unit) { AerixModpackCatalog.load() }
+
+    val instances = remember(refresh, FastClientInstaller.installingVersion, combinedInstalling) {
         runCatching { Instances.loadAllInstances() }.getOrDefault(emptyList())
     }
+    val busyAny = FastClientInstaller.installingVersion != null ||
+        AerixModpackInstaller.isInstalling || combinedInstalling
     Column(Modifier.fillMaxSize().padding(AerixLayoutDefaults.pagePadding()), verticalArrangement = Arrangement.spacedBy(AerixSpacing.md)) {
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             if (maxWidth >= 560.dp) {
@@ -67,13 +86,19 @@ fun FastClientScreen(activity: FragmentActivity, onBack: () -> Unit) {
             }
         }
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(AerixSpacing.sm)) {
-            Text("Install a separate FastClient instance. The client, Fabric Loader, Fabric API, Lithium and Entity Culling are downloaded during setup, so nothing is bundled in the app; Minecraft files download when you launch.", color = AerixSurface.textSecondary, fontSize = 12.sp)
-            // The same pack search the Aerix Client page has, filtered by the versions FastClient is
-            // actually built for. A pack keeps its own mods here: FastClient is an instance of its own,
-            // not a mod that can be dropped into somebody else's.
+            Text("Install a standalone FastClient instance or pair the matching version with a modpack. The client, Fabric Loader, Fabric API, Lithium and Entity Culling are downloaded during setup, so nothing is bundled in the app; Minecraft files download when you launch.", color = AerixSurface.textSecondary, fontSize = 12.sp)
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(AerixSpacing.sm)) {
-                Button(onClick = { searchPacks = true }) { Text("Search modpacks") }
-                Text("Pick a pack, then pick which Minecraft version of it to take.", color = AerixSurface.textSecondary, fontSize = 11.sp)
+                Button(enabled = !busyAny, onClick = {
+                    lockedPackSearchMc = null
+                    searchPacks = true
+                }) { Text("Search modpacks") }
+                Text("Pick a pack, then choose whether to install it with FastClient or on its own.", color = AerixSurface.textSecondary, fontSize = 11.sp)
+            }
+            if (AerixModpackInstaller.isInstalling) {
+                GlassPanel(Modifier.fillMaxWidth(), radius = AerixRadii.card) {
+                    Text(AerixModpackInstaller.statusHeadline.ifBlank { "Installing modpack…" }, color = Color.White, fontWeight = FontWeight.Bold)
+                    LinearProgressIndicator(progress = { AerixModpackInstaller.progressFraction.coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth(), color = AerixSurface.accent)
+                }
             }
             if (FastClientInstaller.installingVersion != null) {
                 GlassPanel(Modifier.fillMaxWidth(), radius = AerixRadii.card) {
@@ -81,14 +106,13 @@ fun FastClientScreen(activity: FragmentActivity, onBack: () -> Unit) {
                     LinearProgressIndicator(progress = { FastClientInstaller.progress }, modifier = Modifier.fillMaxWidth(), color = AerixSurface.accent)
                 }
             }
-            FastClientInstaller.lastError?.let { error ->
+            (combinedError ?: AerixModpackInstaller.lastError ?: FastClientInstaller.lastError)?.let { error ->
                 GlassPanel(Modifier.fillMaxWidth(), radius = AerixRadii.card, color = AerixSurface.errorDarkContainer.copy(alpha = 0.55f)) {
                     Text(error, color = Color.White, fontSize = 12.sp)
                 }
             }
             FastClientInstaller.builds.forEach { build ->
                 val installed = FastClientInstaller.findInstalled(build, instances)
-                val busy = FastClientInstaller.installingVersion != null
                 GlassPanel(Modifier.fillMaxWidth(), radius = AerixRadii.card) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                         Column(Modifier.weight(1f)) {
@@ -96,19 +120,11 @@ fun FastClientScreen(activity: FragmentActivity, onBack: () -> Unit) {
                             Text("Fabric · Java ${build.java}" + if (installed != null) " · Installed" else "", color = AerixSurface.textSecondary, fontSize = 12.sp)
                         }
                         if (installed == null) {
-                            Button(enabled = !busy, onClick = {
-                                scope.launch {
-                                    FastClientInstaller.install(activity, build).onSuccess {
-                                        Toast.makeText(activity, "FastClient ${build.minecraft} ready", Toast.LENGTH_SHORT).show()
-                                    }.onFailure { error ->
-                                        Toast.makeText(activity, error.message ?: "Installation failed", Toast.LENGTH_LONG).show()
-                                    }
-                                    refresh++
-                                    PojavInstanceBridge.reload()
-                                }
+                            Button(enabled = !busyAny, onClick = {
+                                installChoiceFor = build
                             }) { Text(if (FastClientInstaller.installingVersion == build.minecraft) "Installing…" else "Install") }
                         } else {
-                            Button(enabled = !busy, onClick = {
+                            Button(enabled = !busyAny, onClick = {
                                 Instances.setSelectedInstance(installed)
                                 PojavInstanceBridge.reload()
                                 PojavLaunchBridge.play(activity)
@@ -121,15 +137,134 @@ fun FastClientScreen(activity: FragmentActivity, onBack: () -> Unit) {
         }
     }
 
-        if (searchPacks) {
-            // A pack creates its own instance, so the list of FastClient installs below is stale once
-            // it finishes; the reload is what makes the new one appear without leaving the page.
-            AerixPackSearchDialog(activity, ClientOwnerPage.MX_INSPIRE, onDismiss = { searchPacks = false }) {
-                refresh++
-                PojavInstanceBridge.reload()
+    installChoiceFor?.let { build ->
+        val matchingPacks: List<Pair<AerixModpack, AerixModpackVersion>> = AerixModpackCatalog.packs.mapNotNull { pack ->
+            val ver = pack.offeredVersions.firstOrNull { it.mcVersion == build.minecraft }
+            if (ver != null) pack to ver else null
+        }
+        Dialog(onDismissRequest = { if (!busyAny) installChoiceFor = null }) {
+            Surface(shape = RoundedCornerShape(22.dp), color = AerixSurface.panel) {
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        "Install FastClient ${build.minecraft}?",
+                        color = AerixSurface.textPrimary,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                    Text(
+                        "Choose whether to install FastClient ${build.minecraft} on its own or " +
+                            "together with a matching Minecraft ${build.minecraft} modpack.",
+                        color = AerixSurface.textSecondary,
+                        fontSize = 12.sp
+                    )
+                    Button(
+                        enabled = !busyAny,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = AerixSurface.accent,
+                            contentColor = AerixSurface.onAccent
+                        ),
+                        onClick = {
+                            installChoiceFor = null
+                            combinedError = null
+                            scope.launch {
+                                FastClientInstaller.install(activity, build).onSuccess {
+                                    Toast.makeText(activity, "FastClient ${build.minecraft} ready", Toast.LENGTH_SHORT).show()
+                                }.onFailure { error ->
+                                    Toast.makeText(activity, error.message ?: "Installation failed", Toast.LENGTH_LONG).show()
+                                }
+                                refresh++
+                                PojavInstanceBridge.reload()
+                            }
+                        }
+                    ) {
+                        Text("Install client only (FastClient ${build.minecraft})")
+                    }
+                    matchingPacks.forEach { (pack, version) ->
+                        Button(
+                            enabled = !busyAny,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = AerixSurface.accent.copy(alpha = 0.22f),
+                                contentColor = AerixSurface.textPrimary
+                            ),
+                            onClick = {
+                                installChoiceFor = null
+                                combinedError = null
+                                combinedInstalling = true
+                                scope.launch {
+                                    AerixModpackInstaller.install(activity, pack, version)
+                                    val created = AerixModpackInstaller.installedInstance
+                                    if (created != null && AerixModpackInstaller.lastError == null) {
+                                        FastClientInstaller.installIntoInstance(activity, created, build)
+                                            .onSuccess {
+                                                Instances.setSelectedInstance(created)
+                                                Toast.makeText(
+                                                    activity,
+                                                    "${pack.name} (${version.mcVersion}) + FastClient ready",
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
+                                            }
+                                            .onFailure { error ->
+                                                combinedError = error.message ?: "Could not add FastClient"
+                                                Toast.makeText(activity, combinedError, Toast.LENGTH_LONG).show()
+                                            }
+                                    } else if (AerixModpackInstaller.lastError != null) {
+                                        combinedError = AerixModpackInstaller.lastError
+                                    }
+                                    combinedInstalling = false
+                                    refresh++
+                                    PojavInstanceBridge.reload()
+                                }
+                            }
+                        ) {
+                            Text("Install with ${pack.name} modpack (${version.mcVersion})")
+                        }
+                    }
+                    Button(
+                        enabled = !busyAny,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = AerixSurface.accent.copy(alpha = 0.16f),
+                            contentColor = AerixSurface.textPrimary
+                        ),
+                        onClick = {
+                            installChoiceFor = null
+                            lockedPackSearchMc = build.minecraft
+                            searchPacks = true
+                        }
+                    ) {
+                        Text("Install with modpack (search ${build.minecraft})")
+                    }
+                    TextButton(
+                        onClick = { installChoiceFor = null },
+                        modifier = Modifier.align(Alignment.End)
+                    ) {
+                        Text("Cancel", color = AerixSurface.textSecondary)
+                    }
+                }
             }
         }
     }
+
+    if (searchPacks) {
+        AerixPackSearchDialog(activity, ClientOwnerPage.MX_INSPIRE, lockedMinecraft = lockedPackSearchMc, onDismiss = {
+            searchPacks = false
+            lockedPackSearchMc = null
+        }) {
+            refresh++
+            PojavInstanceBridge.reload()
+        }
+    }
+}
 
 @Composable
 private fun FastClientTitle() {

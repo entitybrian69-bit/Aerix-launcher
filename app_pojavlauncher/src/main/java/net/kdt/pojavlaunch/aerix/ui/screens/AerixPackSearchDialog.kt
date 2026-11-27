@@ -83,21 +83,36 @@ internal class PackClientProfile(
     val withClientNote: String
 )
 
-internal fun packClientProfile(owner: ClientOwnerPage): PackClientProfile = when (owner) {
-    ClientOwnerPage.MX_INSPIRE -> PackClientProfile(
-        clientName = "FastClient",
-        loader = "fabric",
-        minecraftVersions = FastClientInstaller.builds.map { it.minecraft },
-        canJoinThePack = false,
-        withClientNote = "FastClient is an instance of its own, so this pack keeps the mods it ships with."
-    )
-    else -> PackClientProfile(
-        clientName = "Aerix Client",
-        loader = "fabric",
-        minecraftVersions = ClientVersions.RELEASES.toList(),
-        canJoinThePack = true,
-        withClientNote = "With client adds the Aerix Client mod and the Fabric API only - the pack keeps every " +
-            "mod it ships with, and no optimization mods are put in beside them."
+internal fun packClientProfile(
+    owner: ClientOwnerPage,
+    lockedMinecraft: String? = null
+): PackClientProfile {
+    val base = when (owner) {
+        ClientOwnerPage.MX_INSPIRE -> PackClientProfile(
+            clientName = "FastClient",
+            loader = "fabric",
+            minecraftVersions = FastClientInstaller.builds.map { it.minecraft },
+            canJoinThePack = true,
+            withClientNote = "With client adds FastClient and Fabric API (if missing) only - the pack keeps " +
+                "every mod it ships with, and no extra optimization mods are put in beside them."
+        )
+        else -> PackClientProfile(
+            clientName = "Aerix Client",
+            loader = "fabric",
+            minecraftVersions = ClientVersions.RELEASES.toList(),
+            canJoinThePack = true,
+            withClientNote = "With client adds the Aerix Client mod and the Fabric API only - the pack keeps every " +
+                "mod it ships with, and no optimization mods are put in beside them."
+        )
+    }
+    if (lockedMinecraft.isNullOrBlank()) return base
+    val narrowed = base.minecraftVersions.filter { it == lockedMinecraft }
+    return PackClientProfile(
+        clientName = base.clientName,
+        loader = base.loader,
+        minecraftVersions = if (narrowed.isNotEmpty()) narrowed else listOf(lockedMinecraft),
+        canJoinThePack = base.canJoinThePack,
+        withClientNote = base.withClientNote
     )
 }
 
@@ -151,12 +166,13 @@ internal fun packOffers(files: List<AssetFile>, profile: PackClientProfile): Lis
 internal fun AerixPackSearchDialog(
     activity: FragmentActivity,
     owner: ClientOwnerPage,
+    lockedMinecraft: String? = null,
     onDismiss: () -> Unit,
     onInstalled: () -> Unit
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val profile = remember(owner) { packClientProfile(owner) }
+    val profile = remember(owner, lockedMinecraft) { packClientProfile(owner, lockedMinecraft) }
     var query by remember { mutableStateOf(TextFieldValue("")) }
     var results by remember { mutableStateOf<List<AssetProject>?>(null) }
     var busy by remember { mutableStateOf(false) }
@@ -245,6 +261,11 @@ internal fun AerixPackSearchDialog(
                         confirm = null
                         choosingFor = null
                         installing = picked.id
+                        status = if (withClient) {
+                            "Installing ${picked.title} (${chosen.minecraft}) with ${profile.clientName}…"
+                        } else {
+                            "Installing ${picked.title} (${chosen.minecraft})…"
+                        }
                         runPackInstall(context, scope, activity, picked, chosen, withClient, profile) { message ->
                             status = message
                             installing = null
@@ -254,9 +275,16 @@ internal fun AerixPackSearchDialog(
                     onBack = { confirm = null }
                 )
                 else -> Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Modpacks", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
                     Text(
-                        "Only packs that ${profile.clientName} can run on ${profile.loader} are offered a version here.",
+                        if (lockedMinecraft != null) "Modpacks · Minecraft $lockedMinecraft" else "Modpacks",
+                        color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold
+                    )
+                    Text(
+                        if (lockedMinecraft != null) {
+                            "Only ${profile.loader} packs for Minecraft $lockedMinecraft are offered here."
+                        } else {
+                            "Only packs that ${profile.clientName} can run on ${profile.loader} are offered a version here."
+                        },
                         color = Color(0x99FFFFFF), fontSize = 10.sp
                     )
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -522,14 +550,25 @@ private fun runPackInstall(
             return@launch
         }
         if (created == null) {
-            report("Installed, but the new instance could not be found - open it and use \"Update my mods\".")
+            report("Installed, but the new instance could not be found - open it and add your client mods.")
             return@launch
         }
-        val summary = AerixClientInstaller.updateOwnMods(activity, created).getOrElse { error ->
-            report("Pack installed; the client could not be added (${error.message}).")
+        val summaryResult = if (profile.clientName == "FastClient") {
+            val build = FastClientInstaller.builds.firstOrNull { it.minecraft == offer.minecraft }
+            if (build == null) {
+                Result.failure(IllegalStateException("No FastClient build exists for Minecraft ${offer.minecraft}"))
+            } else {
+                FastClientInstaller.installIntoInstance(activity, created, build)
+            }
+        } else {
+            AerixClientInstaller.updateOwnMods(activity, created)
+        }
+        val summary = summaryResult.getOrElse { error ->
+            report("Pack installed; ${profile.clientName} could not be added (${error.message}).")
             return@launch
         }
         Instances.setSelectedInstance(created)
+        PojavInstanceBridge.reload()
         report("Minecraft ${offer.minecraft} ready for ${profile.clientName} · $summary")
     }
 }

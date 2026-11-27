@@ -270,6 +270,93 @@ object FastClientInstaller {
         }
     }
 
+    private fun hasModIdInDir(modsDir: File, targetIds: Set<String>): Boolean {
+        val files = modsDir.listFiles() ?: return false
+        return files.any { file ->
+            file.isFile && file.extension.equals("jar", ignoreCase = true) &&
+                runCatching { modId(file) in targetIds }.getOrDefault(false)
+        }
+    }
+
+    /**
+     * Adds FastClient (and Fabric API if the pack does not already carry one) into an existing
+     * modpack instance without overwriting any of the pack's own mods.
+     */
+    suspend fun installIntoInstance(
+        context: Context,
+        instance: Instance,
+        build: FastClientBuild
+    ): Result<String> = withContext(Dispatchers.IO) {
+        if (!installationLock.compareAndSet(false, true)) {
+            return@withContext Result.failure(IOException("Another FastClient installation is in progress"))
+        }
+        installingVersion = build.minecraft
+        lastError = null
+        progress = 0.1f
+        var staging: File? = null
+        try {
+            Tools.ensureStorageConstants(context)
+            require(build in builds) { "Unknown FastClient version" }
+            val gameDir = instance.gameDirectory
+                ?: throw IOException("This instance has no game directory")
+            val modsDir = File(gameDir, "mods")
+            net.kdt.pojavlaunch.utils.FileUtils.ensureDirectory(modsDir)
+
+            staging = File(context.cacheDir, "fastclient-pack-" + java.util.UUID.randomUUID()).apply {
+                if (!mkdirs()) throw IOException("Could not create installation staging folder")
+            }
+
+            status = "Downloading FastClient ${build.minecraft}…"
+            progress = 0.35f
+            val client = File(staging, "client.jar")
+            downloadClient(build, client)
+            if (modId(client) !in CLIENT_MOD_IDS) throw IOException("FastClient mod metadata is invalid")
+
+            val added = mutableListOf<String>()
+            val hasClientAlready = hasModIdInDir(modsDir, CLIENT_MOD_IDS) ||
+                modsDir.listFiles()?.any {
+                    it.isFile && it.extension.equals("jar", true) &&
+                        it.name.startsWith("fastclient-hud", ignoreCase = true)
+                } == true
+            if (!hasClientAlready) {
+                client.copyTo(File(modsDir, "fastclient-hud-${build.minecraft}.jar"), overwrite = false)
+                added += "FastClient ${build.minecraft}"
+            }
+
+            progress = 0.7f
+            val hasFabricApi = hasModIdInDir(modsDir, setOf("fabric-api")) ||
+                modsDir.listFiles()?.any {
+                    it.isFile && it.extension.equals("jar", true) &&
+                        it.name.replace("-", "").replace("_", "").lowercase().contains("fabricapi")
+                } == true
+            if (!hasFabricApi) {
+                status = "Downloading Fabric API ${build.minecraft}…"
+                val api = File(staging, "fabric-api.jar")
+                fabricApi(build.minecraft, api)
+                api.copyTo(File(modsDir, "fabric-api.jar"), overwrite = false)
+                added += "Fabric API"
+            }
+
+            progress = 1f
+            val summary = if (added.isEmpty()) {
+                "FastClient ${build.minecraft} was already present · modpack kept its own mods"
+            } else {
+                "Added ${added.joinToString(" + ")} · modpack kept its own mods"
+            }
+            status = summary
+            Result.success(summary)
+        } catch (error: Exception) {
+            val detail = error.message ?: "Could not add FastClient"
+            lastError = detail
+            status = "Installation failed"
+            Result.failure(IOException(detail, error))
+        } finally {
+            staging?.deleteRecursively()
+            installingVersion = null
+            installationLock.set(false)
+        }
+    }
+
     /** Creates a separate private instance. Never changes an existing instance or its mods. */
     suspend fun install(context: Context, build: FastClientBuild): Result<Instance> = withContext(Dispatchers.IO) {
         if (!installationLock.compareAndSet(false, true)) return@withContext Result.failure(IOException("Another FastClient installation is in progress"))

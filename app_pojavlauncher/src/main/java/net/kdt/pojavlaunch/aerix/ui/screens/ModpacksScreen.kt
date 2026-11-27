@@ -84,11 +84,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import net.kdt.pojavlaunch.R
+import net.kdt.pojavlaunch.aerix.bridge.PojavInstanceBridge
+import net.kdt.pojavlaunch.aerix.client.AerixClientInstaller
+import net.kdt.pojavlaunch.aerix.client.ClientVersions
 import net.kdt.pojavlaunch.aerix.components.AerixImageWell
+import net.kdt.pojavlaunch.aerix.fastclient.FastClientInstaller
 import net.kdt.pojavlaunch.aerix.modpacks.AerixModpack
 import net.kdt.pojavlaunch.aerix.modpacks.AerixModpackCatalog
 import net.kdt.pojavlaunch.aerix.modpacks.AerixModpackInstaller
@@ -96,6 +101,7 @@ import net.kdt.pojavlaunch.aerix.modpacks.AerixModpackVersion
 import net.kdt.pojavlaunch.aerix.theme.AerixSurface
 import net.kdt.pojavlaunch.aerix.theme.AerixThemeManager
 import net.kdt.pojavlaunch.aerix.ui.LauncherSection
+import net.kdt.pojavlaunch.instances.Instances
 import net.kdt.pojavlaunch.utils.DownloadUtils
 import java.io.ByteArrayOutputStream
 
@@ -335,11 +341,25 @@ private fun ModpackPage(
 
     var selectedFile by remember(pack.id) { mutableStateOf(versions.first().file) }
     val selected = versions.firstOrNull { it.file == selectedFile } ?: versions.first()
+    val fastClientBuild = FastClientInstaller.builds.firstOrNull { it.minecraft == selected.mcVersion }
+    val supportsAerixClient = selected.mcVersion in ClientVersions.RELEASES
+
+    var showInstallChoice by remember(pack.id, selected.file) { mutableStateOf(false) }
+    var isAttachingClient by remember { mutableStateOf(false) }
+    var attachHeadline by remember { mutableStateOf("") }
+    var attachSummary by remember { mutableStateOf<String?>(null) }
+    var attachError by remember { mutableStateOf<String?>(null) }
 
     val installingThis = AerixModpackInstaller.isInstalling &&
         AerixModpackInstaller.installingName == pack.name
-    val liveProgress = if (installingThis) AerixModpackInstaller.progressFraction else 0f
-    val installedThis = !AerixModpackInstaller.isInstalling &&
+    val busyHere = installingThis || isAttachingClient
+    val busyAny = AerixModpackInstaller.isInstalling || isAttachingClient
+    val liveProgress = when {
+        installingThis -> AerixModpackInstaller.progressFraction
+        isAttachingClient -> FastClientInstaller.progress.coerceIn(0f, 1f)
+        else -> 0f
+    }
+    val installedThis = !busyAny &&
         AerixModpackInstaller.installedInstance?.name == pack.name
 
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
@@ -414,32 +434,50 @@ private fun ModpackPage(
                     VersionRow(
                         version = version,
                         selected = version.file == selected.file,
-                        enabled = !AerixModpackInstaller.isInstalling,
+                        enabled = !busyAny,
                         onSelect = { selectedFile = version.file }
                     )
                 }
 
-                if (installingThis) {
+                if (busyHere) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        LinearProgressIndicator(
-                            progress = { liveProgress.coerceIn(0f, 1f) },
-                            modifier = Modifier.fillMaxWidth(),
-                            color = accent,
-                            trackColor = AerixSurface.panelTrack
-                        )
+                        if (isAttachingClient && FastClientInstaller.installingVersion == null) {
+                            LinearProgressIndicator(
+                                modifier = Modifier.fillMaxWidth(),
+                                color = accent,
+                                trackColor = AerixSurface.panelTrack
+                            )
+                        } else {
+                            LinearProgressIndicator(
+                                progress = { liveProgress.coerceIn(0f, 1f) },
+                                modifier = Modifier.fillMaxWidth(),
+                                color = accent,
+                                trackColor = AerixSurface.panelTrack
+                            )
+                        }
                         Text(
-                            AerixModpackInstaller.statusHeadline.ifBlank { "Installing…" },
+                            if (isAttachingClient) attachHeadline.ifBlank { "Adding client…" }
+                            else AerixModpackInstaller.statusHeadline.ifBlank { "Installing…" },
                             style = MaterialTheme.typography.bodySmall,
                             color = AerixSurface.textSecondary
                         )
                     }
                 }
 
-                if (installingThis && AerixModpackInstaller.lastError != null) {
+                val displayError = attachError ?: AerixModpackInstaller.lastError
+                if (displayError != null) {
                     Text(
-                        AerixModpackInstaller.lastError ?: "",
+                        displayError,
                         style = MaterialTheme.typography.bodyMedium,
                         color = AerixSurface.danger
+                    )
+                }
+
+                if (!busyHere && attachSummary != null) {
+                    Text(
+                        attachSummary ?: "",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = AerixSurface.textSecondary
                     )
                 }
 
@@ -449,10 +487,18 @@ private fun ModpackPage(
                 ) {
                     Button(
                         onClick = {
-                            // One press: download the chosen build and install it.
-                            scope.launch { AerixModpackInstaller.install(context, pack, selected) }
+                            if (fastClientBuild != null || supportsAerixClient) {
+                                showInstallChoice = true
+                            } else {
+                                attachSummary = null
+                                attachError = null
+                                scope.launch {
+                                    AerixModpackInstaller.install(context, pack, selected)
+                                    PojavInstanceBridge.reload()
+                                }
+                            }
                         },
-                        enabled = !AerixModpackInstaller.isInstalling,
+                        enabled = !busyAny,
                         shape = RoundedCornerShape(16.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = accent,
@@ -460,7 +506,7 @@ private fun ModpackPage(
                         ),
                         contentPadding = PaddingValues(horizontal = 22.dp, vertical = 14.dp)
                     ) {
-                        if (installingThis) {
+                        if (busyHere) {
                             CircularProgressIndicator(
                                 Modifier.size(16.dp),
                                 strokeWidth = 2.dp,
@@ -493,6 +539,127 @@ private fun ModpackPage(
                     style = MaterialTheme.typography.bodySmall,
                     color = AerixSurface.textSecondary
                 )
+            }
+        }
+    }
+
+    if (showInstallChoice) {
+        Dialog(onDismissRequest = { if (!busyAny) showInstallChoice = false }) {
+            Surface(
+                shape = RoundedCornerShape(22.dp),
+                color = AerixSurface.panel
+            ) {
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        "Install ${pack.name}?",
+                        color = AerixSurface.textPrimary,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        "Minecraft ${selected.mcVersion} · Choose whether to install the modpack " +
+                            "on its own or together with a matching Minecraft ${selected.mcVersion} client.",
+                        color = AerixSurface.textSecondary,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Button(
+                        onClick = {
+                            showInstallChoice = false
+                            attachSummary = null
+                            attachError = null
+                            scope.launch {
+                                AerixModpackInstaller.install(context, pack, selected)
+                                PojavInstanceBridge.reload()
+                            }
+                        },
+                        enabled = !busyAny,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = accent,
+                            contentColor = AerixSurface.onAccent
+                        )
+                    ) {
+                        Text("Install modpack only (${selected.mcVersion})")
+                    }
+                    if (fastClientBuild != null) {
+                        Button(
+                            onClick = {
+                                showInstallChoice = false
+                                attachSummary = null
+                                attachError = null
+                                scope.launch {
+                                    AerixModpackInstaller.install(context, pack, selected)
+                                    val created = AerixModpackInstaller.installedInstance
+                                    if (created != null && AerixModpackInstaller.lastError == null) {
+                                        isAttachingClient = true
+                                        attachHeadline = "Adding FastClient ${fastClientBuild.minecraft}…"
+                                        FastClientInstaller.installIntoInstance(context, created, fastClientBuild)
+                                            .onSuccess { attachSummary = it }
+                                            .onFailure { attachError = it.message ?: "Could not add FastClient" }
+                                        Instances.setSelectedInstance(created)
+                                        PojavInstanceBridge.reload()
+                                        isAttachingClient = false
+                                        attachHeadline = ""
+                                    }
+                                }
+                            },
+                            enabled = !busyAny,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = accent.copy(alpha = 0.22f),
+                                contentColor = AerixSurface.textPrimary
+                            )
+                        ) {
+                            Text("Install with FastClient (${fastClientBuild.minecraft})")
+                        }
+                    }
+                    if (supportsAerixClient) {
+                        Button(
+                            onClick = {
+                                showInstallChoice = false
+                                attachSummary = null
+                                attachError = null
+                                scope.launch {
+                                    AerixModpackInstaller.install(context, pack, selected)
+                                    val created = AerixModpackInstaller.installedInstance
+                                    if (created != null && AerixModpackInstaller.lastError == null) {
+                                        isAttachingClient = true
+                                        attachHeadline = "Adding Aerix Client ${selected.mcVersion}…"
+                                        AerixClientInstaller.updateOwnMods(context, created)
+                                            .onSuccess { attachSummary = it }
+                                            .onFailure { attachError = it.message ?: "Could not add Aerix Client" }
+                                        Instances.setSelectedInstance(created)
+                                        PojavInstanceBridge.reload()
+                                        isAttachingClient = false
+                                        attachHeadline = ""
+                                    }
+                                }
+                            },
+                            enabled = !busyAny,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = accent.copy(alpha = 0.22f),
+                                contentColor = AerixSurface.textPrimary
+                            )
+                        ) {
+                            Text("Install with Aerix Client (${selected.mcVersion})")
+                        }
+                    }
+                    TextButton(
+                        onClick = { showInstallChoice = false },
+                        modifier = Modifier.align(Alignment.End)
+                    ) {
+                        Text("Cancel", color = AerixSurface.textSecondary)
+                    }
+                }
             }
         }
     }

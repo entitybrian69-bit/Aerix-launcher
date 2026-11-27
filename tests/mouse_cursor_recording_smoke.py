@@ -260,8 +260,10 @@ check("install still asks with three answers",
       'Text("Install with client")' in pack_dialog and 'Text("Install without client")' in pack_dialog
       and 'Text("Cancel")' in pack_dialog)
 check("a pack keeps its own mods", "updateOwnMods" in pack_dialog)
-check("FastClient is never pushed into somebody else's pack",
-      "canJoinThePack = false" in pack_dialog and "canJoinThePack) {" in pack_dialog)
+check("FastClient pack installs also ask with client vs without client and use matching build",
+      "canJoinThePack = true" in pack_dialog
+      and "FastClientInstaller.installIntoInstance(activity, created, build)" in pack_dialog
+      and "FastClientInstaller.builds.firstOrNull { it.minecraft == offer.minecraft }" in pack_dialog)
 check("the new instance is found by diffing, not guessing", "instance.name !in before" in pack_dialog)
 check("the pack install goes through the launcher's own path",
       "PojavAssetBridge.install(context, project, offer.file)" in pack_dialog)
