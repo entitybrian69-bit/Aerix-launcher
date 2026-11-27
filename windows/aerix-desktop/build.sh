@@ -268,8 +268,37 @@ sign_pe() {
   rm -rf "$certdir"
 }
 
+# Builds the jpackage *app image* (a folder, not an installer): AerixLauncher.exe next to the
+# runtime image it uses.
+#
+# This exists separately from make_installer because jpackage deletes its staging app image once it
+# has written an .exe or .msi - so by the time the installer exists, the only copy of the app image
+# is inside it. The portable build has to be made before that happens.
+make_app_image() {
+  local jp="$JDK/bin/jpackage"
+  if [[ ! -x "$jp" || ! -x "$JDK/bin/jlink" ]]; then return 1; fi
+  local icon="$HERE/packaging/aerix.ico"
+  local runtime_image="$DIST/runtime"
+  local runtime_flag=()
+  [[ -d "$runtime_image" ]] && runtime_flag=(--runtime-image "$runtime_image")
+  rm -rf "$DIST/app-image"; mkdir -p "$DIST/app-image"
+  log "jpackage --type app-image (for the portable build)"
+  "$jp" --type app-image --name "AerixLauncher" --app-version "$VERSION" \
+    --dest "$DIST/app-image" --input "$DIST/AerixLauncher" --main-jar aerix-launcher.jar \
+    --main-class "$MAIN_CLASS" --icon "$icon" "${runtime_flag[@]}" \
+    --description "Aerix Launcher - Minecraft: Java Edition for Windows" \
+    --vendor "Aerix Launcher contributors" \
+    --java-options "-Xmx1g" --java-options "-Dfile.encoding=UTF-8" >/dev/null 2>&1 || return 1
+  [[ -f "$DIST/app-image/AerixLauncher/AerixLauncher.exe" ]]
+}
+
 make_installer() {
   make_dist
+  # Build the app image first: it is what the portable build is packaged from, and it disappears
+  # once jpackage writes the installer below. Its bundled jar is replaced with the final one
+  # afterwards, so the portable build always matches the installer exactly.
+  local app_image_ok=0
+  make_app_image && app_image_ok=1 || true
   local jp="$JDK/bin/jpackage"
   if [[ ! -x "$jp" ]]; then log "jpackage missing (JDK without jpackage) - portable zip only"; return; fi
   # jpackage wants a JDK image with jlink; a JRE-based one fails here, and failing loudly is better
@@ -346,8 +375,8 @@ make_installer() {
   #
   # Nothing here invents an identity: without AERIX_SIGN_CERT (a base64 PFX) and
   # AERIX_SIGN_PASSWORD the build produces an unsigned installer and says so.
-  local app_exe="$DIST/image/AerixLauncher/AerixLauncher.exe"
-  if [[ -f "$app_exe" ]]; then found="${found:+$found
+  local app_exe="$DIST/app-image/AerixLauncher/AerixLauncher.exe"
+  if [[ "$app_image_ok" == "1" && -f "$app_exe" ]]; then found="${found:+$found
 }$app_exe"; fi
   sign_pe $found
 
@@ -361,8 +390,13 @@ make_installer() {
   # with no stub, no extraction at startup and no temporary directory to clean up afterwards. That
   # is the least ambiguous thing we can ship, so it becomes the recommended download while the
   # installer stays available for people who want Start Menu entries and Add/Remove Programs.
-  local app_image="$DIST/image/AerixLauncher"
-  if [[ -d "$app_image" && -f "$app_image/AerixLauncher.exe" ]]; then
+  local app_image="$DIST/app-image/AerixLauncher"
+  if [[ "$app_image_ok" == "1" && -d "$app_image" && -f "$app_image/AerixLauncher.exe" ]]; then
+    # jpackage copies the jar it was given; replace it with the final one so the portable build and
+    # the installer contain byte-identical application code. The location differs between
+    # `app/aerix-launcher.jar` and (for some jpackage versions) the image root, so replace every
+    # copy found rather than assuming one.
+    while IFS= read -r j; do cp "$OUT/aerix-launcher.jar" "$j"; done < <(find "$app_image" -name 'aerix-launcher.jar' -type f)
     # The image is signed above, so the ZIP distributes signed binaries rather than a signed
     # container holding unsigned ones.
     local portapp="$DIST/AerixLauncher-$VERSION-windows-portable"

@@ -235,6 +235,18 @@ jobs:
           exe=(dist/image/*.exe) msi=(dist/image/*.msi)
           echo "exe=${exe[*]}"; echo "msi=${msi[*]}"
           if [[ ${#exe[@]} -eq 0 ]]; then echo "::error::jpackage produced no .exe"; exit 1; fi
+          # The portable build is the recommended download, so a missing one must fail the build
+          # rather than quietly publish only the installer. It went missing once already: jpackage
+          # deletes its staging app image, so packaging from it produced nothing and nobody noticed.
+          if ! compgen -G "dist/AerixLauncher-*-windows-portable.zip" >/dev/null; then
+            echo "::error::no app-image portable build was produced"; exit 1
+          fi
+          if ! unzip -l dist/AerixLauncher-*-windows-portable.zip | grep -q "AerixLauncher.exe"; then
+            echo "::error::the portable build does not contain a real AerixLauncher.exe"; exit 1
+          fi
+          if ! unzip -l dist/AerixLauncher-*-windows-portable.zip | grep -q "runtime/bin/javaw.exe"; then
+            echo "::error::the portable build does not bundle a runtime"; exit 1
+          fi
           {
             for f in "${exe[@]}" "${msi[@]}" dist/AerixLauncher-*-portable.zip dist/AerixLauncher-*-windows-portable.zip; do
               [[ -f "$f" ]] || continue
