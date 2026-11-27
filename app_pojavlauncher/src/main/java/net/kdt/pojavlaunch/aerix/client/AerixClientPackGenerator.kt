@@ -13,6 +13,7 @@ import android.graphics.Typeface
 import net.kdt.pojavlaunch.R
 import net.kdt.pojavlaunch.Tools
 import net.kdt.pojavlaunch.aerix.resourcepack.ResourcePackOptions
+import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
@@ -22,6 +23,9 @@ import java.util.zip.ZipOutputStream
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.hypot
+import kotlin.math.max
+import kotlin.math.min
+import kotlin.math.roundToInt
 
 /**
  * Generates `Aerix-Client-Pack.zip` inside the Aerix Client instance's `resourcepacks/` folder,
@@ -81,7 +85,8 @@ object AerixClientPackGenerator {
             append("shield=").append(AerixClientStore.packLoweredShield).append('|')
             append("totem=").append(AerixClientStore.packCompactTotem).append('|')
             append("pump=").append(AerixClientStore.packNoPumpkinBlur).append('|')
-            append("water=").append(AerixClientStore.packClearWater)
+            append("water=").append(AerixClientStore.packClearWater).append('|')
+            append("allDarkGui=1")
         }
         val currentStamp = if (stampFile.isFile) runCatching { stampFile.readText().trim() }.getOrDefault("") else ""
         if (!zipFile.isFile || zipFile.length() < 1024L || currentStamp != desiredStamp) {
@@ -103,6 +108,7 @@ object AerixClientPackGenerator {
         val rpDir = File(instanceGameDir, "resourcepacks").apply { mkdirs() }
         val zipFile = File(rpDir, PACK_FILE_NAME)
         val packFmt = packFormatForVersion(mcVersion)
+        val writtenPaths = HashSet<String>()
 
         ZipOutputStream(FileOutputStream(zipFile)).use { zos ->
             val modernRange = if (packFmt >= 69) ",\n    \"min_format\": [$packFmt, ${ClientVersions.formatMinor(mcVersion)}],\n    \"max_format\": [$packFmt, ${ClientVersions.formatMinor(mcVersion)}]" else ""
@@ -114,8 +120,8 @@ object AerixClientPackGenerator {
                   }
                 }
             """.trimIndent()
-            putText(zos, "pack.mcmeta", mcmeta)
-            putBitmap(zos, "pack.png", buildPackIcon(context))
+            putText(zos, "pack.mcmeta", mcmeta, writtenPaths)
+            putBitmap(zos, "pack.png", buildPackIcon(context), writtenPaths)
 
             // 1. Title Screen: Replace "MINECRAFT JAVA EDITION" with "AERIX CLIENT" + Misty Forest Background
             if (AerixClientStore.packCustomMainMenu) {
@@ -124,28 +130,23 @@ object AerixClientPackGenerator {
                 } else {
                     buildAerixTitleLogoLegacySplit(context)
                 }
-                putBitmap(zos, "assets/minecraft/textures/gui/title/minecraft.png", logoBmp)
-                putBitmap(zos, "assets/minecraft/textures/gui/title/minceraft.png", logoBmp)
+                putBitmap(zos, "assets/minecraft/textures/gui/title/minecraft.png", logoBmp, writtenPaths)
+                putBitmap(zos, "assets/minecraft/textures/gui/title/minceraft.png", logoBmp, writtenPaths)
 
                 // Transparent edition.png so vanilla "JAVA EDITION" never appears over "AERIX CLIENT"
                 val emptyEdition = Bitmap.createBitmap(128, 16, Bitmap.Config.ARGB_8888)
                 emptyEdition.eraseColor(Color.TRANSPARENT)
-                putBitmap(zos, "assets/minecraft/textures/gui/title/edition.png", emptyEdition)
+                putBitmap(zos, "assets/minecraft/textures/gui/title/edition.png", emptyEdition, writtenPaths)
 
                 // Transparent panorama_overlay.png so Minecraft never adds milky white gradient washout
                 val clearOverlay = Bitmap.createBitmap(16, 128, Bitmap.Config.ARGB_8888)
                 clearOverlay.eraseColor(Color.TRANSPARENT)
-                putBitmap(zos, "assets/minecraft/textures/gui/title/background/panorama_overlay.png", clearOverlay)
+                putBitmap(zos, "assets/minecraft/textures/gui/title/background/panorama_overlay.png", clearOverlay, writtenPaths)
 
                 // Cubemap faces projected from the shared Client landscape.
                 val panoFaces = buildClientPanoramaFaces(context)
                 panoFaces.forEachIndexed { idx, face ->
-                    putBitmap(zos, "assets/minecraft/textures/gui/title/background/panorama_$idx.png", face)
-                }
-
-                // Crimson & Dark Gray GUI widgets (1.16.5 - 1.20.1; 1.20.2+ uses gui/sprites which keep crisp defaults)
-                if (packFmt < 18) {
-                    putBitmap(zos, "assets/minecraft/textures/gui/widgets.png", buildCrimsonDarkWidgets())
+                    putBitmap(zos, "assets/minecraft/textures/gui/title/background/panorama_$idx.png", face, writtenPaths)
                 }
 
                 putText(
@@ -157,9 +158,16 @@ object AerixClientPackGenerator {
                         "Maximum Mobile FPS!",
                         "Waving 3D Animated Capes!",
                         "Powered by Aerix Launcher!"
-                    ).joinToString("\n")
+                    ).joinToString("\n"),
+                    writtenPaths
                 )
             }
+
+            // 1b. All-Dark GUI across ALL Minecraft versions (1.16.5 - 26.3: containers, menus, widgets, sprites)
+            if (packFmt < 18) {
+                putBitmap(zos, "assets/minecraft/textures/gui/widgets.png", buildCrimsonDarkWidgets(), writtenPaths)
+            }
+            appendAllDarkGuiTextures(zos, mcVersion, instanceGameDir, packFmt, writtenPaths)
 
             // 2. 100% Genuine Vanilla Item, Tool, Weapon & Armor Skins + Shimmer & Sparkle Particle Animation!
             if (AerixClientStore.packVanillaAnimatedGear) {
@@ -241,6 +249,7 @@ object AerixClientPackGenerator {
 
         if (!map.containsKey("panoramaScrollSpeed")) map["panoramaScrollSpeed"] = "0.0"
         if (!map.containsKey("monochromeLogo")) map["monochromeLogo"] = if (AerixClientStore.packCustomMojangSplash) "true" else "false"
+        if (!map.containsKey("darkMojangStudiosBackground")) map["darkMojangStudiosBackground"] = "true"
         map["gamma"] = if (AerixClientStore.fullbrightEnabled) "100.0" else "1.0"
         // Initial defaults only: never overwrite existing user graphics or audio choices on launch.
         if (!map.containsKey("autoJump")) map["autoJump"] = "false"
@@ -797,14 +806,382 @@ object AerixClientPackGenerator {
         }
     """.trimIndent()
 
-    private fun putText(zos: ZipOutputStream, path: String, content: String) {
+    /* ═══════════════════════════════════════════════════════════════════════
+     * 4. ALL-DARK GUI ACROSS ALL MINECRAFT VERSIONS (1.16.5 – 26.3)
+     * ═══════════════════════════════════════════════════════════════════════ */
+
+    /**
+     * Transforms every vanilla GUI texture & sprite under `assets/minecraft/textures/gui/` from
+     * `<mcVersion>.jar` (plus `.png.mcmeta` 9-slice metadata and container title formatting in
+     * `en_us.json`) into Aerix's Obsidian Dark + Crimson theme, and emits built-in dark
+     * fallbacks when the vanilla JAR is not yet downloaded.
+     */
+    private fun appendAllDarkGuiTextures(
+        zos: ZipOutputStream,
+        mcVersion: String,
+        instanceGameDir: File,
+        packFmt: Int,
+        writtenPaths: MutableSet<String>
+    ) {
+        val jar = findVanillaClientJar(mcVersion, instanceGameDir)
+        if (jar != null) {
+            runCatching {
+                ZipFile(jar).use { zf ->
+                    val entries = zf.entries()
+                    while (entries.hasMoreElements()) {
+                        val entry = entries.nextElement()
+                        if (entry.isDirectory) continue
+                        val path = entry.name
+                        if (!path.startsWith("assets/minecraft/textures/gui/") || !path.endsWith(".png")) continue
+                        if (writtenPaths.contains(path) || shouldKeepUntouchedGuiPath(path, packFmt)) continue
+
+                        val bytes = zf.getInputStream(entry).use { it.readBytes() }
+                        val rawBmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: continue
+                        val darkBmp = try {
+                            darkenGuiBitmap(rawBmp, path)
+                        } finally {
+                            rawBmp.recycle()
+                        } ?: continue
+                        try {
+                            putBitmap(zos, path, darkBmp, writtenPaths)
+                        } finally {
+                            darkBmp.recycle()
+                        }
+
+                        // Preserve 1.20.2+ 9-slice sprite scaling & animation .mcmeta alongside each PNG.
+                        val metaEntry = zf.getEntry("$path.mcmeta")
+                        if (metaEntry != null && !writtenPaths.contains("$path.mcmeta")) {
+                            val metaBytes = zf.getInputStream(metaEntry).use { it.readBytes() }
+                            putBytes(zos, "$path.mcmeta", metaBytes, writtenPaths)
+                        }
+                    }
+
+                    darkenContainerLangJson(zos, zf, writtenPaths)
+                }
+            }
+        }
+
+        appendDarkFallbackGuiAssets(zos, packFmt, writtenPaths)
+    }
+
+    private fun shouldKeepUntouchedGuiPath(path: String, packFmt: Int): Boolean {
+        if (path == "assets/minecraft/textures/gui/title/minecraft.png" ||
+            path == "assets/minecraft/textures/gui/title/minceraft.png" ||
+            path == "assets/minecraft/textures/gui/title/edition.png" ||
+            path == "assets/minecraft/textures/gui/title/mojangstudios.png" ||
+            path.startsWith("assets/minecraft/textures/gui/title/background/panorama")
+        ) return true
+
+        if (packFmt < 18 && path == "assets/minecraft/textures/gui/widgets.png") return true
+        if (path == "assets/minecraft/textures/gui/icons.png" || path == "assets/minecraft/textures/gui/bars.png") return true
+
+        if (path.contains("/mob_effect/") ||
+            path.contains("/presets/") ||
+            path.contains("/sprites/boss_bar/") ||
+            path.contains("/sprites/icon/") ||
+            path.contains("/sprites/hud/heart/") ||
+            path.contains("/sprites/hud/food_") ||
+            path.contains("/sprites/hud/armor_") ||
+            path.contains("/sprites/hud/air") ||
+            path.contains("/sprites/hud/crosshair") ||
+            path.contains("/sprites/hud/experience_bar_progress") ||
+            path.contains("/sprites/hud/jump_bar_progress") ||
+            path.contains("/sprites/hud/locator_bar_progress")
+        ) return true
+
+        if (path.contains("/sprites/container/") && (
+                path.contains("_progress") ||
+                    path.contains("bubbles") ||
+                    path.contains("fuel_length") ||
+                    path.contains("dye_slot") ||
+                    path.contains("armor_slot") ||
+                    path.contains("smithing_template") ||
+                    path.contains("banner_pattern") ||
+                    path.contains("error")
+                )
+        ) return true
+
+        return false
+    }
+
+    private fun darkenGuiBitmap(src: Bitmap, path: String): Bitmap? {
+        val w = src.width
+        val h = src.height
+        if (w <= 0 || h <= 0) return null
+
+        val pixels = IntArray(w * h)
+        src.getPixels(pixels, 0, w, 0, 0, w, h)
+
+        val isHighlighted = path.contains("_highlighted") ||
+            path.contains("hotbar_selection") ||
+            path.contains("tab_selected")
+        val isSliderThumb = path.contains("slider_handle") || path.endsWith("/scroller.png")
+        val isCheckboxSelected = path.contains("checkbox_selected")
+        val isLegacyProgressContainer = path.endsWith("/furnace.png") ||
+            path.endsWith("/blast_furnace.png") ||
+            path.endsWith("/smoker.png") ||
+            path.endsWith("/brewing_stand.png")
+        val isBook = path.endsWith("/book.png")
+        val isEarthOrMenuBg = path.endsWith("options_background.png") ||
+            path.endsWith("demo_background.png") ||
+            path.contains("menu_background") ||
+            path.contains("menu_list_background") ||
+            path.contains("advancements/backgrounds/")
+
+        for (i in pixels.indices) {
+            val c = pixels[i]
+            val a = Color.alpha(c)
+            if (a == 0) continue
+
+            val r = Color.red(c)
+            val g = Color.green(c)
+            val b = Color.blue(c)
+            val maxC = max(r, max(g, b))
+            val minC = min(r, min(g, b))
+            val sat = maxC - minC
+            val luma = 0.299f * r + 0.587f * g + 0.114f * b
+
+            val x = i % w
+            val y = i / w
+
+            if (isLegacyProgressContainer && x >= 176 && y < 60 && sat <= 26 && luma >= 240f) {
+                pixels[i] = Color.argb(a, 230, 234, 242)
+                continue
+            }
+            if (isCheckboxSelected && sat <= 26 && luma >= 245f && x in 3 until (w - 3) && y in 3 until (h - 3)) {
+                pixels[i] = Color.argb(a, 242, 244, 248)
+                continue
+            }
+
+            if (isBook) {
+                // Keep black book ink readable while removing bright cream glare.
+                if (luma > 135f) {
+                    val scale = if (sat > 24) 0.52f else 0.48f
+                    pixels[i] = Color.argb(
+                        a,
+                        (r * scale).roundToInt().coerceIn(22, 128),
+                        (g * scale).roundToInt().coerceIn(24, 122),
+                        (b * scale).roundToInt().coerceIn(28, 114)
+                    )
+                }
+                continue
+            }
+
+            if (sat <= 26) {
+                val (nr, ng, nb) = when {
+                    luma >= 235f -> when {
+                        isHighlighted -> Triple(220, 30, 58)
+                        isSliderThumb -> Triple(82, 88, 104)
+                        else -> Triple(56, 60, 71)
+                    }
+                    luma >= 175f -> {
+                        val t = ((luma - 175f) / 60f).coerceIn(0f, 1f)
+                        if (isSliderThumb) {
+                            Triple((56 + t * 14).roundToInt(), (60 + t * 16).roundToInt(), (72 + t * 18).roundToInt())
+                        } else if (isHighlighted) {
+                            Triple((40 + t * 14).roundToInt(), (24 + t * 8).roundToInt(), (32 + t * 10).roundToInt())
+                        } else {
+                            Triple((28 + t * 10).roundToInt(), (30 + t * 11).roundToInt(), (37 + t * 13).roundToInt())
+                        }
+                    }
+                    luma >= 115f -> {
+                        val t = ((luma - 115f) / 60f).coerceIn(0f, 1f)
+                        if (isSliderThumb) {
+                            Triple((42 + t * 12).roundToInt(), (45 + t * 13).roundToInt(), (55 + t * 15).roundToInt())
+                        } else {
+                            Triple((18 + t * 8).roundToInt(), (20 + t * 8).roundToInt(), (25 + t * 10).roundToInt())
+                        }
+                    }
+                    luma >= 55f -> {
+                        val t = ((luma - 55f) / 60f).coerceIn(0f, 1f)
+                        Triple((11 + t * 6).roundToInt(), (12 + t * 6).roundToInt(), (16 + t * 8).roundToInt())
+                    }
+                    else -> Triple(8, 9, 12)
+                }
+                pixels[i] = Color.argb(a, nr, ng, nb)
+            } else if (isEarthOrMenuBg && r >= g && g >= b && (r - b) <= 80) {
+                // Darken brown dirt / stone / menu backgrounds into obsidian dark slate.
+                val darkLuma = (luma * 0.24f).roundToInt().coerceIn(12, 34)
+                pixels[i] = Color.argb(a, darkLuma, darkLuma + 1, darkLuma + 5)
+            }
+        }
+
+        val out = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        out.setPixels(pixels, 0, w, 0, 0, w, h)
+        return out
+    }
+
+    private fun darkenContainerLangJson(
+        zos: ZipOutputStream,
+        zf: ZipFile,
+        writtenPaths: MutableSet<String>
+    ) {
+        val langPath = "assets/minecraft/lang/en_us.json"
+        if (writtenPaths.contains(langPath)) return
+        val entry = zf.getEntry(langPath) ?: return
+        runCatching {
+            val rawJson = zf.getInputStream(entry).use { it.readBytes().toString(Charsets.UTF_8) }
+            val src = JSONObject(rawJson)
+            val dst = JSONObject()
+            val keys = src.keys()
+            while (keys.hasNext()) {
+                val key = keys.next()
+                val value = src.optString(key, "")
+                val isTitleKey = (key.startsWith("container.") &&
+                    key != "container.isLocked" &&
+                    key != "container.spectatorCantOpen") ||
+                    key.startsWith("itemGroup.") ||
+                    key.startsWith("merchant.") ||
+                    key == "gui.advancements" ||
+                    key == "inventory.binSlot" ||
+                    key == "advancements.sad_label" ||
+                    key == "advancements.empty"
+                if (isTitleKey && value.isNotEmpty() && !value.startsWith("\u00a7")) {
+                    dst.put(key, "\u00a77$value")
+                } else {
+                    dst.put(key, value)
+                }
+            }
+            putText(zos, langPath, dst.toString(), writtenPaths)
+        }
+    }
+
+    private fun appendDarkFallbackGuiAssets(
+        zos: ZipOutputStream,
+        packFmt: Int,
+        writtenPaths: MutableSet<String>
+    ) {
+        val darkTile = buildDarkBackdropTile(16, 16, 0xFF13151B.toInt(), 0xFF181B22.toInt())
+        try {
+            putBitmap(zos, "assets/minecraft/textures/gui/options_background.png", darkTile, writtenPaths)
+            if (packFmt >= 18) {
+                putBitmap(zos, "assets/minecraft/textures/gui/menu_background.png", darkTile, writtenPaths)
+                putBitmap(zos, "assets/minecraft/textures/gui/menu_list_background.png", darkTile, writtenPaths)
+                putBitmap(zos, "assets/minecraft/textures/gui/tab_header_background.png", darkTile, writtenPaths)
+            }
+        } finally {
+            darkTile.recycle()
+        }
+
+        if (packFmt < 18) return
+
+        val inworldTile = buildDarkBackdropTile(16, 16, 0xC8101217.toInt(), 0xC814171E.toInt())
+        try {
+            putBitmap(zos, "assets/minecraft/textures/gui/inworld_menu_background.png", inworldTile, writtenPaths)
+            putBitmap(zos, "assets/minecraft/textures/gui/inworld_menu_list_background.png", inworldTile, writtenPaths)
+        } finally {
+            inworldTile.recycle()
+        }
+
+        val sep = Bitmap.createBitmap(32, 2, Bitmap.Config.ARGB_8888)
+        sep.setPixels(
+            IntArray(64) { idx -> if (idx < 32) 0xFF0A0B0E.toInt() else 0xFF2D313C.toInt() },
+            0, 32, 0, 0, 32, 2
+        )
+        try {
+            putBitmap(zos, "assets/minecraft/textures/gui/header_separator.png", sep, writtenPaths)
+            putBitmap(zos, "assets/minecraft/textures/gui/footer_separator.png", sep, writtenPaths)
+            putBitmap(zos, "assets/minecraft/textures/gui/inworld_header_separator.png", sep, writtenPaths)
+            putBitmap(zos, "assets/minecraft/textures/gui/inworld_footer_separator.png", sep, writtenPaths)
+        } finally {
+            sep.recycle()
+        }
+
+        val buttonMeta = """{"gui":{"scaling":{"type":"nine_slice","width":200,"height":20,"border":3}}}"""
+        val buttons = listOf(
+            "assets/minecraft/textures/gui/sprites/widget/button.png" to Pair(0xD2181A20.toInt(), 0xFF383C47.toInt()),
+            "assets/minecraft/textures/gui/sprites/widget/button_disabled.png" to Pair(0x96121418.toInt(), 0xFF252830.toInt()),
+            "assets/minecraft/textures/gui/sprites/widget/button_highlighted.png" to Pair(0xE634141C.toInt(), 0xFFDC1E3A.toInt())
+        )
+        for ((btnPath, colors) in buttons) {
+            if (!writtenPaths.contains(btnPath)) {
+                val bmp = Bitmap.createBitmap(200, 20, Bitmap.Config.ARGB_8888)
+                drawCrimsonButton(Canvas(bmp), 0f, 0f, 200f, 20f, colors.first, colors.second)
+                try {
+                    putBitmap(zos, btnPath, bmp, writtenPaths)
+                    putText(zos, "$btnPath.mcmeta", buttonMeta, writtenPaths)
+                } finally {
+                    bmp.recycle()
+                }
+            }
+        }
+
+        val hotbarPath = "assets/minecraft/textures/gui/sprites/hud/hotbar.png"
+        if (!writtenPaths.contains(hotbarPath)) {
+            val hb = Bitmap.createBitmap(182, 22, Bitmap.Config.ARGB_8888)
+            val c = Canvas(hb)
+            val fp = Paint().apply { color = Color.argb(185, 18, 20, 25) }
+            val bp = Paint().apply { style = Paint.Style.STROKE; strokeWidth = 1f; color = Color.argb(215, 220, 30, 58) }
+            c.drawRect(0f, 0f, 182f, 22f, fp)
+            c.drawRect(0.5f, 0.5f, 181.5f, 21.5f, bp)
+            bp.color = Color.argb(90, 90, 96, 112)
+            for (i in 1..8) c.drawLine(1f + i * 20f, 2f, 1f + i * 20f, 20f, bp)
+            try {
+                putBitmap(zos, hotbarPath, hb, writtenPaths)
+                putText(zos, "$hotbarPath.mcmeta", """{"gui":{"scaling":{"type":"nine_slice","width":182,"height":22,"border":2}}}""", writtenPaths)
+            } finally {
+                hb.recycle()
+            }
+        }
+
+        val hotbarSelPath = "assets/minecraft/textures/gui/sprites/hud/hotbar_selection.png"
+        if (!writtenPaths.contains(hotbarSelPath)) {
+            val sel = Bitmap.createBitmap(24, 24, Bitmap.Config.ARGB_8888)
+            val c = Canvas(sel)
+            val fp = Paint().apply { color = Color.argb(75, 220, 30, 58) }
+            val bp = Paint().apply { style = Paint.Style.STROKE; strokeWidth = 1f; color = Color.argb(255, 255, 46, 76) }
+            c.drawRect(1f, 1f, 23f, 23f, fp)
+            c.drawRect(0.5f, 0.5f, 23.5f, 23.5f, bp)
+            try {
+                putBitmap(zos, hotbarSelPath, sel, writtenPaths)
+            } finally {
+                sel.recycle()
+            }
+        }
+    }
+
+    private fun buildDarkBackdropTile(w: Int, h: Int, primary: Int, accent: Int): Bitmap {
+        val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        val pixels = IntArray(w * h)
+        for (y in 0 until h) {
+            for (x in 0 until w) {
+                val hash = (x * 73856093) xor (y * 19349663)
+                pixels[y * w + x] = if ((hash and 3) == 0) accent else primary
+            }
+        }
+        bmp.setPixels(pixels, 0, w, 0, 0, w, h)
+        return bmp
+    }
+
+    private fun putBytes(
+        zos: ZipOutputStream,
+        path: String,
+        bytes: ByteArray,
+        writtenPaths: MutableSet<String>? = null
+    ) {
+        if (writtenPaths != null && !writtenPaths.add(path)) return
         val entry = ZipEntry(path)
         zos.putNextEntry(entry)
-        zos.write(content.toByteArray(Charsets.UTF_8))
+        zos.write(bytes)
         zos.closeEntry()
     }
 
-    private fun putBitmap(zos: ZipOutputStream, path: String, bmp: Bitmap) {
+    private fun putText(
+        zos: ZipOutputStream,
+        path: String,
+        content: String,
+        writtenPaths: MutableSet<String>? = null
+    ) {
+        putBytes(zos, path, content.toByteArray(Charsets.UTF_8), writtenPaths)
+    }
+
+    private fun putBitmap(
+        zos: ZipOutputStream,
+        path: String,
+        bmp: Bitmap,
+        writtenPaths: MutableSet<String>? = null
+    ) {
+        if (writtenPaths != null && !writtenPaths.add(path)) return
         val entry = ZipEntry(path)
         zos.putNextEntry(entry)
         val out = ByteArrayOutputStream()

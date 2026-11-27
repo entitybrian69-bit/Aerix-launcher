@@ -16,6 +16,12 @@ assert 'assets.open(CLIENT_BACKGROUND_ASSET)' in pack
 assert 'assets.open(AerixClientPackGenerator.CLIENT_BACKGROUND_ASSET)' in overlay
 assert 'v6_aerix_dark_landscape_2026' in pack
 assert 'append(PACK_SCHEMA_REV)' in pack
+assert 'allDarkGui=1' in pack
+assert 'appendAllDarkGuiTextures(' in pack
+assert 'darkenGuiBitmap(' in pack
+assert 'darkenContainerLangJson(' in pack
+assert 'appendDarkFallbackGuiAssets(' in pack
+assert 'darkMojangStudiosBackground' in pack
 assert 'if (AerixClientStore.packCustomMainMenu)' in pack
 assert 'for (faceIdx in 0..5)' in pack
 assert 'panorama_$idx.png' in pack
