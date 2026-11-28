@@ -116,7 +116,7 @@ jobs:
           python3 tests/fps_counter_smoke.py
           python3 tests/key_tap_mouse_launch_smoke.py
           python3 tests/logo_visibility_smoke.py
-          python3 tests/release_247_smoke.py
+          python3 tests/release_250_smoke.py
           python3 tests/storage_directory_creation_smoke.py
           python3 tests/intro_splash_smoke.py
           python3 tests/flashback_compat_smoke.py
