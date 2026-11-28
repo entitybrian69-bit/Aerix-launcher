@@ -37,8 +37,6 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -527,40 +525,53 @@ fun MusicsScreen(activity: FragmentActivity) {
                     }
                 }
 
-                // Compact Bottom Pagination Row for Songs tab
+                // Slim Left-Aligned Pagination Strip for Songs tab (leaves maximum room for scrolling)
                 if (selectedTab == MusicSectionTab.SONGS) {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(24.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.Start),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        TextButton(
-                            enabled = searchPage.hasPrev && !isSearching,
-                            onClick = { AerixMusicController.previousPage() },
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp)
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(50))
+                                .background(if (searchPage.hasPrev) Color(0x20FFFFFF) else Color.Transparent)
+                                .clickable(enabled = searchPage.hasPrev && !isSearching) {
+                                    AerixMusicController.previousPage()
+                                }
+                                .padding(horizontal = 8.dp, vertical = 2.dp),
+                            contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 "Previous",
                                 color = if (searchPage.hasPrev) accent else AerixSurface.textMuted,
-                                fontSize = 12.sp,
+                                fontSize = 10.5.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         }
                         Text(
                             "Page ${AerixMusicController.currentPage}",
                             color = AerixSurface.textSecondary,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold
+                            fontSize = 10.5.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(horizontal = 2.dp)
                         )
-                        TextButton(
-                            enabled = searchPage.hasNext && !isSearching,
-                            onClick = { AerixMusicController.nextPage() },
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp)
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(50))
+                                .background(if (searchPage.hasNext) Color(0x20FFFFFF) else Color.Transparent)
+                                .clickable(enabled = searchPage.hasNext && !isSearching) {
+                                    AerixMusicController.nextPage()
+                                }
+                                .padding(horizontal = 8.dp, vertical = 2.dp),
+                            contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 "Next",
                                 color = if (searchPage.hasNext) accent else AerixSurface.textMuted,
-                                fontSize = 12.sp,
+                                fontSize = 10.5.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         }
@@ -573,7 +584,8 @@ fun MusicsScreen(activity: FragmentActivity) {
         Surface(
             modifier = Modifier
                 .weight(0.42f)
-                .fillMaxHeight(),
+                .fillMaxHeight()
+                .clip(RoundedCornerShape(22.dp)),
             shape = RoundedCornerShape(22.dp),
             color = Color.Transparent,
             border = BorderStroke(1.dp, Color(0x36FFFFFF))
@@ -589,19 +601,10 @@ fun MusicsScreen(activity: FragmentActivity) {
                             )
                         )
                     )
-                    .padding(horizontal = 14.dp, vertical = 12.dp)
+                    .padding(horizontal = 14.dp, vertical = 10.dp)
             ) {
-                val artSize = (maxHeight * 0.32f).coerceIn(78.dp, 138.dp)
+                val artSize = (maxHeight * 0.30f).coerceIn(66.dp, 128.dp)
                 val current = playback.currentTrack
-                val totalMs = (playback.durationMs.takeIf { it > 0L } ?: ((current?.durationSec ?: 0) * 1000L)).coerceAtLeast(1L)
-                var scrubbingFraction by remember(current?.id) { mutableStateOf<Float?>(null) }
-                val progressFraction = scrubbingFraction
-                    ?: (playback.positionMs.toFloat() / totalMs.toFloat()).coerceIn(0f, 1f)
-                val displayPosMs = if (scrubbingFraction != null) {
-                    (scrubbingFraction!! * totalMs).toLong()
-                } else {
-                    playback.positionMs
-                }
 
                 Column(
                     modifier = Modifier.fillMaxSize(),
@@ -621,8 +624,8 @@ fun MusicsScreen(activity: FragmentActivity) {
                     Box(contentAlignment = Alignment.Center) {
                         Box(
                             modifier = Modifier
-                                .size(artSize + 18.dp)
-                                .clip(RoundedCornerShape(24.dp))
+                                .size(artSize + 16.dp)
+                                .clip(RoundedCornerShape(22.dp))
                                 .background(
                                     Brush.radialGradient(
                                         colors = listOf(
@@ -665,46 +668,8 @@ fun MusicsScreen(activity: FragmentActivity) {
                         )
                     }
 
-                    // Seek Slider + Timestamps
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = if (current != null) formatDurationMs(displayPosMs) else "0:00",
-                                color = Color(0xBBFFFFFF),
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Medium
-                            )
-                            Text(
-                                text = if (current != null) formatDurationMs(totalMs) else "0:00",
-                                color = Color(0xBBFFFFFF),
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
-                        Slider(
-                            value = if (current != null) progressFraction else 0f,
-                            enabled = current != null,
-                            onValueChange = { scrubbingFraction = it.coerceIn(0f, 1f) },
-                            onValueChangeFinished = {
-                                val target = ((scrubbingFraction ?: progressFraction) * totalMs).toLong()
-                                scrubbingFraction = null
-                                AerixMusicController.seekTo(context, target)
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(22.dp),
-                            colors = SliderDefaults.colors(
-                                thumbColor = accent,
-                                activeTrackColor = accent,
-                                inactiveTrackColor = Color(0x36FFFFFF),
-                                disabledThumbColor = Color(0x55FFFFFF),
-                                disabledActiveTrackColor = Color(0x33FFFFFF)
-                            )
-                        )
-                    }
+                    // Isolated Seek Slider + Timestamps (per-second ticks only recompose this row)
+                    LauncherNowPlayingSeekBar(current = current, accent = accent)
 
                     // Transport Row: [-10s / Rewind] [Prev] [Big Play/Pause] [+10s] [Next]
                     Row(
@@ -821,37 +786,6 @@ fun MusicsScreen(activity: FragmentActivity) {
                                 thumbColor = accent,
                                 activeTrackColor = accent,
                                 inactiveTrackColor = Color(0x36FFFFFF)
-                            )
-                        )
-                    }
-
-                    // MC Music Switch Row (preserves 'MC Music: OFF' / 'MC Music: ON' indicator)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = if (playback.vanillaMusicMuted) "MC Music: OFF" else "MC Music: ON",
-                            color = Color.White,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Switch(
-                            checked = !playback.vanillaMusicMuted,
-                            onCheckedChange = { enabled ->
-                                AerixMusicController.setVanillaMusicMuted(context, !enabled)
-                                Toast.makeText(
-                                    context,
-                                    if (!enabled) "Vanilla background music muted" else "Vanilla background music enabled",
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color(0xFF0A121A),
-                                checkedTrackColor = accent,
-                                uncheckedThumbColor = Color.White,
-                                uncheckedTrackColor = Color(0x36FFFFFF)
                             )
                         )
                     }
@@ -1494,6 +1428,62 @@ private fun CreatePlaylistDialog(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun LauncherNowPlayingSeekBar(current: MusicTrack?, accent: Color) {
+    val context = LocalContext.current
+    val posMs = AerixMusicController.playbackPositionMs
+    val durMs = AerixMusicController.playbackDurationMs
+    val totalMs = (durMs.takeIf { it > 0L } ?: ((current?.durationSec ?: 0) * 1000L)).coerceAtLeast(1L)
+    var scrubbingFraction by remember(current?.id) { mutableStateOf<Float?>(null) }
+    val progressFraction = scrubbingFraction
+        ?: (posMs.toFloat() / totalMs.toFloat()).coerceIn(0f, 1f)
+    val displayPosMs = if (scrubbingFraction != null) {
+        (scrubbingFraction!! * totalMs).toLong()
+    } else {
+        posMs
+    }
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = if (current != null) formatDurationMs(displayPosMs) else "0:00",
+                color = Color(0xBBFFFFFF),
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Medium
+            )
+            Text(
+                text = if (current != null) formatDurationMs(totalMs) else "0:00",
+                color = Color(0xBBFFFFFF),
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Medium
+            )
+        }
+        Slider(
+            value = if (current != null) progressFraction else 0f,
+            enabled = current != null,
+            onValueChange = { scrubbingFraction = it.coerceIn(0f, 1f) },
+            onValueChangeFinished = {
+                val target = ((scrubbingFraction ?: progressFraction) * totalMs).toLong()
+                scrubbingFraction = null
+                AerixMusicController.seekTo(context, target)
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(22.dp),
+            colors = SliderDefaults.colors(
+                thumbColor = accent,
+                activeTrackColor = accent,
+                inactiveTrackColor = Color(0x36FFFFFF),
+                disabledThumbColor = Color(0x55FFFFFF),
+                disabledActiveTrackColor = Color(0x33FFFFFF)
+            )
+        )
     }
 }
 

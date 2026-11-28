@@ -40,12 +40,14 @@ class AerixMusicService : Service() {
         const val ACTION_SYNC_STATE = "net.kdt.pojavlaunch.aerix.music.SYNC_STATE"
 
         const val ACTION_MUSIC_STATE_CHANGED = "net.kdt.pojavlaunch.aerix.ACTION_MUSIC_STATE_CHANGED"
+        const val ACTION_MUSIC_POSITION_TICK = "net.kdt.pojavlaunch.aerix.ACTION_MUSIC_POSITION_TICK"
 
         const val EXTRA_QUEUE_JSON = "extra_queue_json"
         const val EXTRA_START_INDEX = "extra_start_index"
         const val EXTRA_PLAYLIST_ID = "extra_playlist_id"
         const val EXTRA_PLAYLIST_NAME = "extra_playlist_name"
         const val EXTRA_POSITION_MS = "extra_position_ms"
+        const val EXTRA_DURATION_MS = "extra_duration_ms"
         const val EXTRA_VOLUME = "extra_volume"
         const val EXTRA_STATE_JSON = "extra_state_json"
 
@@ -68,11 +70,17 @@ class AerixMusicService : Service() {
         override fun run() {
             val mp = mediaPlayer
             if (mp != null && isPrepared && state.isPlaying) {
-                val pos = runCatching { mp.currentPosition.toLong() }.getOrDefault(state.positionMs)
+                val pos = runCatching { mp.currentPosition.toLong() }.getOrDefault(state.positionMs).coerceAtLeast(0L)
                 val dur = runCatching { mp.duration.toLong() }.getOrDefault(state.durationMs)
                     .let { if (it > 0L) it else (state.currentTrack?.durationSec?.times(1000L) ?: 0L) }
-                state = state.copy(positionMs = pos.coerceAtLeast(0L), durationMs = dur.coerceAtLeast(0L))
-                publishState(persist = false, updateNotification = false)
+                    .coerceAtLeast(0L)
+                state = state.copy(positionMs = pos, durationMs = dur)
+                sendBroadcast(
+                    Intent(ACTION_MUSIC_POSITION_TICK)
+                        .setPackage(packageName)
+                        .putExtra(EXTRA_POSITION_MS, pos)
+                        .putExtra(EXTRA_DURATION_MS, dur)
+                )
             }
             if (state.isPlaying) {
                 mainHandler.postDelayed(this, 1000L)

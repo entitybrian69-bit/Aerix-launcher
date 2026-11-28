@@ -665,7 +665,8 @@ private fun AerixClientRootOverlay(
 
         while (true) {
             val nowMs = System.currentTimeMillis()
-            val combatTimerActive = AerixClientStore.hitmarkerEnabled || AerixClientStore.swordCooldownBarEnabled || AerixClientStore.speedrunTimerEnabled
+            val combatTimerActive = modal == InGameClientModal.NONE &&
+                (AerixClientStore.hitmarkerEnabled || AerixClientStore.swordCooldownBarEnabled || AerixClientStore.speedrunTimerEnabled)
             if (combatTimerActive) frameTickMs = nowMs
             if (AerixClientStore.cpsPillEnabled || AerixClientStore.keystrokesEnabled) AerixClientInputBridge.refreshCps(nowMs)
             if (AerixClientStore.matchStatsEnabled) sessionElapsedSec = (nowMs - startWall) / 1000L
@@ -859,15 +860,19 @@ private fun AerixClientRootOverlay(
 
         // Famous-Client Style Big Dark Gray & Crimson Red Rectangle Menu
         if (!bootVisible && modal == InGameClientModal.MODULES) {
+            val latestTelemetry by rememberUpdatedState(telemetry)
+            val closeModules = remember(onChangeModal) { { onChangeModal(InGameClientModal.NONE) } }
+            val openHudEditor = remember(onChangeModal) { { onChangeModal(InGameClientModal.HUD_EDITOR) } }
+            val openOledAfk = remember(onChangeModal) { { onChangeModal(InGameClientModal.OLED_AFK) } }
             FamousClientRectangleMenu(
                 subPage = subPage,
                 onChangeSubPage = onChangeSubPage,
-                onClose = { onChangeModal(InGameClientModal.NONE) },
-                onOpenHudEditor = { onChangeModal(InGameClientModal.HUD_EDITOR) },
-                onOpenOledAfk = { onChangeModal(InGameClientModal.OLED_AFK) },
+                onClose = closeModules,
+                onOpenHudEditor = openHudEditor,
+                onOpenOledAfk = openOledAfk,
                 onSyncOptionsTxt = onSyncOptionsTxt,
                 onSyncCape = onSyncCape,
-                telemetry = telemetry,
+                telemetryProvider = { latestTelemetry },
                 gameDir = gameDir,
                 worldSharingTarget = worldSharingTarget
             )
@@ -923,7 +928,7 @@ private fun FamousClientRectangleMenu(
     onOpenOledAfk: () -> Unit,
     onSyncOptionsTxt: () -> Unit,
     onSyncCape: () -> Unit,
-    telemetry: ClientTelemetrySnapshot?,
+    telemetryProvider: () -> ClientTelemetrySnapshot?,
     gameDir: File?,
     worldSharingTarget: net.kdt.pojavlaunch.aerix.bridge.GameDownloadTarget
 ) {
@@ -1135,7 +1140,7 @@ private fun FamousClientRectangleMenu(
                     ClientMenuSubPage.PERFORMANCE -> ClientPerformancePage(gameDir, onClose)
                     ClientMenuSubPage.UTILITY -> ClientUtilityPage(onClose)
                     ClientMenuSubPage.INFORMATION -> ClientInformationPage()
-                    ClientMenuSubPage.WAYPOINTS -> ClientWaypointsPage(telemetry)
+                    ClientMenuSubPage.WAYPOINTS -> ClientWaypointsPage(telemetryProvider())
                     ClientMenuSubPage.VISUALS -> ClientVisualPage(gameDir)
                     ClientMenuSubPage.GAME_OPTIONS -> ClientGameOptionsPage()
                     ClientMenuSubPage.CHAT_SHORTCUTS -> ClientChatShortcutsPage(onClose)

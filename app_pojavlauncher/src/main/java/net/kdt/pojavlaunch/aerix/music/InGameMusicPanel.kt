@@ -3,6 +3,7 @@ package net.kdt.pojavlaunch.aerix.music
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -215,15 +216,6 @@ fun InGameMusicPanel(
                     ) {
                         val artSize = (maxHeight * 0.34f).coerceIn(72.dp, 124.dp)
                         val current = playback.currentTrack
-                        val totalMs = (playback.durationMs.takeIf { it > 0L } ?: ((current?.durationSec ?: 0) * 1000L)).coerceAtLeast(1L)
-                        var scrubbingFraction by remember(current?.id) { mutableStateOf<Float?>(null) }
-                        val progressFraction = scrubbingFraction
-                            ?: (playback.positionMs.toFloat() / totalMs.toFloat()).coerceIn(0f, 1f)
-                        val displayPosMs = if (scrubbingFraction != null) {
-                            (scrubbingFraction!! * totalMs).toLong()
-                        } else {
-                            playback.positionMs
-                        }
 
                         Column(
                             modifier = Modifier.fillMaxSize(),
@@ -263,41 +255,8 @@ fun InGameMusicPanel(
                                 )
                             }
 
-                            // Thin Amber Scrub Slider + Centered Time
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Slider(
-                                    value = if (current != null) progressFraction else 0f,
-                                    enabled = current != null,
-                                    onValueChange = { scrubbingFraction = it.coerceIn(0f, 1f) },
-                                    onValueChangeFinished = {
-                                        val target = ((scrubbingFraction ?: progressFraction) * totalMs).toLong()
-                                        scrubbingFraction = null
-                                        AerixMusicController.seekTo(context, target)
-                                    },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(20.dp),
-                                    colors = SliderDefaults.colors(
-                                        thumbColor = accent,
-                                        activeTrackColor = accent,
-                                        inactiveTrackColor = Color(0x33FFFFFF),
-                                        disabledThumbColor = Color(0x44FFFFFF),
-                                        disabledActiveTrackColor = Color(0x22FFFFFF)
-                                    )
-                                )
-                                Text(
-                                    if (current != null) {
-                                        "${formatDurationMs(displayPosMs)} / ${formatDurationMs(totalMs)}"
-                                    } else {
-                                        "0:00 / 0:00"
-                                    },
-                                    color = Color(0xBBFFFFFF),
-                                    fontSize = 10.sp
-                                )
-                            }
+                            // Isolated Scrub Slider + Time (per-second ticks never recompose the track list)
+                            OverlayNowPlayingSeekBar(current = current, accent = accent)
 
                             // Transport Controls: [Prev] [Big Play/Pause] [+10s] [Next]
                             Row(
@@ -749,40 +708,53 @@ fun InGameMusicPanel(
                             }
                         }
 
-                        // Bottom Pagination Strip for Songs
+                        // Slim Left-Aligned Pagination Strip for Songs
                         if (selectedTab == MusicSectionTab.SONGS) {
                             Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(22.dp),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.Start),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                TextButton(
-                                    enabled = searchPage.hasPrev && !isSearching,
-                                    onClick = { AerixMusicController.previousPage() },
-                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(50))
+                                        .background(if (searchPage.hasPrev) Color(0x1EFFFFFF) else Color.Transparent)
+                                        .clickable(enabled = searchPage.hasPrev && !isSearching) {
+                                            AerixMusicController.previousPage()
+                                        }
+                                        .padding(horizontal = 7.dp, vertical = 2.dp),
+                                    contentAlignment = Alignment.Center
                                 ) {
                                     Text(
                                         "Previous",
                                         color = if (searchPage.hasPrev) accent else Color(0x55FFFFFF),
-                                        fontSize = 11.sp,
+                                        fontSize = 10.sp,
                                         fontWeight = FontWeight.Bold
                                     )
                                 }
                                 Text(
                                     "Page ${AerixMusicController.currentPage}",
                                     color = Color(0xCCFFFFFF),
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.SemiBold
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier.padding(horizontal = 2.dp)
                                 )
-                                TextButton(
-                                    enabled = searchPage.hasNext && !isSearching,
-                                    onClick = { AerixMusicController.nextPage() },
-                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(50))
+                                        .background(if (searchPage.hasNext) Color(0x1EFFFFFF) else Color.Transparent)
+                                        .clickable(enabled = searchPage.hasNext && !isSearching) {
+                                            AerixMusicController.nextPage()
+                                        }
+                                        .padding(horizontal = 7.dp, vertical = 2.dp),
+                                    contentAlignment = Alignment.Center
                                 ) {
                                     Text(
                                         "Next",
                                         color = if (searchPage.hasNext) accent else Color(0x55FFFFFF),
-                                        fontSize = 11.sp,
+                                        fontSize = 10.sp,
                                         fontWeight = FontWeight.Bold
                                     )
                                 }
@@ -935,6 +907,57 @@ fun InGameMusicPanel(
 }
 
 @Composable
+private fun OverlayNowPlayingSeekBar(current: MusicTrack?, accent: Color) {
+    val context = LocalContext.current
+    val posMs = AerixMusicController.playbackPositionMs
+    val durMs = AerixMusicController.playbackDurationMs
+    val totalMs = (durMs.takeIf { it > 0L } ?: ((current?.durationSec ?: 0) * 1000L)).coerceAtLeast(1L)
+    var scrubbingFraction by remember(current?.id) { mutableStateOf<Float?>(null) }
+    val progressFraction = scrubbingFraction
+        ?: (posMs.toFloat() / totalMs.toFloat()).coerceIn(0f, 1f)
+    val displayPosMs = if (scrubbingFraction != null) {
+        (scrubbingFraction!! * totalMs).toLong()
+    } else {
+        posMs
+    }
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Slider(
+            value = if (current != null) progressFraction else 0f,
+            enabled = current != null,
+            onValueChange = { scrubbingFraction = it.coerceIn(0f, 1f) },
+            onValueChangeFinished = {
+                val target = ((scrubbingFraction ?: progressFraction) * totalMs).toLong()
+                scrubbingFraction = null
+                AerixMusicController.seekTo(context, target)
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(20.dp),
+            colors = SliderDefaults.colors(
+                thumbColor = accent,
+                activeTrackColor = accent,
+                inactiveTrackColor = Color(0x33FFFFFF),
+                disabledThumbColor = Color(0x44FFFFFF),
+                disabledActiveTrackColor = Color(0x22FFFFFF)
+            )
+        )
+        Text(
+            if (current != null) {
+                "${formatDurationMs(displayPosMs)} / ${formatDurationMs(totalMs)}"
+            } else {
+                "0:00 / 0:00"
+            },
+            color = Color(0xBBFFFFFF),
+            fontSize = 10.sp
+        )
+    }
+}
+
+@Composable
 private fun OverlayTrackRow(
     track: MusicTrack,
     isCurrent: Boolean,
@@ -946,19 +969,18 @@ private fun OverlayTrackRow(
     onAddPlaylist: () -> Unit,
     onDownload: (() -> Unit)?
 ) {
-    Surface(
-        shape = RoundedCornerShape(10.dp),
-        color = if (isCurrent) accent.copy(alpha = 0.16f) else Color(0x16FFFFFF),
-        border = BorderStroke(1.dp, if (isCurrent) accent.copy(alpha = 0.58f) else Color(0x1EFFFFFF)),
-        onClick = onPlay
+    val rowShape = RoundedCornerShape(10.dp)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(rowShape)
+            .background(if (isCurrent) accent.copy(alpha = 0.16f) else Color(0x16FFFFFF))
+            .border(1.dp, if (isCurrent) accent.copy(alpha = 0.58f) else Color(0x1EFFFFFF), rowShape)
+            .clickable(onClick = onPlay)
+            .padding(horizontal = 9.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 9.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
             MusicArtworkImage(track.artworkUrl, size = 34.dp, radius = 7.dp, tint = accent)
             Column(Modifier.weight(1f)) {
                 Text(
@@ -1057,7 +1079,6 @@ private fun OverlayTrackRow(
                 )
             }
         }
-    }
 }
 
 @Composable

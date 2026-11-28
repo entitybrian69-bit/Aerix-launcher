@@ -8,6 +8,7 @@ import android.content.IntentFilter
 import android.os.Build
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
@@ -29,6 +30,8 @@ object AerixMusicController {
     private var appContext: Context? = null
     @Volatile
     private var receiverRegistered = false
+    @Volatile
+    private var initialized = false
     private var searchJob: Job? = null
     private var libraryJob: Job? = null
 
@@ -57,18 +60,38 @@ object AerixMusicController {
         private set
     var openedPlaylistId by mutableStateOf<String?>(null)
 
-    // Playback state synced with AerixMusicService
+    // Playback state synced with AerixMusicService; position/duration tick separately so
+    // per-second timer updates never recompose track lists or artwork.
     var playbackState by mutableStateOf(MusicPlaybackState())
+        private set
+    var playbackPositionMs by mutableLongStateOf(0L)
+        private set
+    var playbackDurationMs by mutableLongStateOf(0L)
         private set
 
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
+                AerixMusicService.ACTION_MUSIC_POSITION_TICK -> {
+                    playbackPositionMs = intent.getLongExtra(AerixMusicService.EXTRA_POSITION_MS, playbackPositionMs)
+                    val dur = intent.getLongExtra(AerixMusicService.EXTRA_DURATION_MS, playbackDurationMs)
+                    if (dur > 0L && dur != playbackDurationMs) {
+                        playbackDurationMs = dur
+                    }
+                }
                 AerixMusicService.ACTION_MUSIC_STATE_CHANGED -> {
                     val raw = intent.getStringExtra(AerixMusicService.EXTRA_STATE_JSON)
                     val parsed = raw?.let { parsePlaybackJson(it) } ?: AerixMusicStorage.loadPlaybackState(context)
-                    val merged = parsed.copy(vanillaMusicMuted = playbackState.vanillaMusicMuted)
-                    playbackState = merged
+                    playbackPositionMs = parsed.positionMs
+                    playbackDurationMs = parsed.durationMs
+                    val merged = parsed.copy(
+                        positionMs = 0L,
+                        durationMs = 0L,
+                        vanillaMusicMuted = playbackState.vanillaMusicMuted
+                    )
+                    if (playbackState != merged) {
+                        playbackState = merged
+                    }
                     AerixDiscordPresence.updateMusicState(
                         context,
                         merged.currentTrack?.title,
@@ -90,22 +113,37 @@ object AerixMusicController {
             receiverRegistered = true
             val filter = IntentFilter().apply {
                 addAction(AerixMusicService.ACTION_MUSIC_STATE_CHANGED)
+                addAction(AerixMusicService.ACTION_MUSIC_POSITION_TICK)
                 addAction(AerixMusicDownloader.ACTION_MUSIC_PLAYLISTS_CHANGED)
             }
             registerInternalReceiver(app, receiver, filter)
         }
-        val persisted = AerixMusicStorage.loadPlaybackState(app)
-        val vanillaMuted = runCatching {
-            ClientPerformanceSettings.init(app)
-            ClientPerformanceSettings.overrides["soundCategory_music"] == "0.0" ||
-                MCOptionUtils.get("soundCategory_music") == "0.0"
-        }.getOrDefault(persisted.vanillaMusicMuted)
-        playbackState = persisted.copy(vanillaMusicMuted = vanillaMuted)
-        refreshLibrary(app)
-        runCatching {
-            app.startService(
-                Intent(app, AerixMusicService::class.java).setAction(AerixMusicService.ACTION_SYNC_STATE)
-            )
+        if (!initialized) {
+            initialized = true
+            scope.launch {
+                val (persisted, vanillaMuted) = withContext(Dispatchers.IO) {
+                    val p = AerixMusicStorage.loadPlaybackState(app)
+                    val muted = runCatching {
+                        ClientPerformanceSettings.init(app)
+                        ClientPerformanceSettings.overrides["soundCategory_music"] == "0.0" ||
+                            MCOptionUtils.get("soundCategory_music") == "0.0"
+                    }.getOrDefault(p.vanillaMusicMuted)
+                    p to muted
+                }
+                playbackPositionMs = persisted.positionMs
+                playbackDurationMs = persisted.durationMs
+                playbackState = persisted.copy(
+                    positionMs = 0L,
+                    durationMs = 0L,
+                    vanillaMusicMuted = vanillaMuted
+                )
+                refreshLibrary(app)
+                runCatching {
+                    app.startService(
+                        Intent(app, AerixMusicService::class.java).setAction(AerixMusicService.ACTION_SYNC_STATE)
+                    )
+                }
+            }
         }
         if (searchPage.tracks.isEmpty() && !isSearching && searchError == null) {
             loadSearchPage(page = 1)
@@ -233,7 +271,10 @@ object AerixMusicController {
         val clamped = volume.coerceIn(0f, 1f)
         playbackState = playbackState.copy(volume = clamped)
         val app = context.applicationContext
-        AerixMusicStorage.savePlaybackState(app, playbackState)
+        val snapshot = playbackState.copy(positionMs = playbackPositionMs, durationMs = playbackDurationMs)
+        scope.launch(Dispatchers.IO) {
+            AerixMusicStorage.savePlaybackState(app, snapshot)
+        }
         app.startService(
             Intent(app, AerixMusicService::class.java)
                 .setAction(AerixMusicService.ACTION_SET_VOLUME)
@@ -245,14 +286,17 @@ object AerixMusicController {
         val app = context.applicationContext
         val value = if (muted) "0.0" else "1.0"
         playbackState = playbackState.copy(vanillaMusicMuted = muted)
-        AerixMusicStorage.savePlaybackState(app, playbackState)
-        runCatching {
-            ClientPerformanceSettings.init(app)
-            ClientPerformanceSettings.set("soundCategory_music", value)
-        }
-        runCatching {
-            MCOptionUtils.set("soundCategory_music", value)
-            MCOptionUtils.save()
+        val snapshot = playbackState.copy(positionMs = playbackPositionMs, durationMs = playbackDurationMs)
+        scope.launch(Dispatchers.IO) {
+            AerixMusicStorage.savePlaybackState(app, snapshot)
+            runCatching {
+                ClientPerformanceSettings.init(app)
+                ClientPerformanceSettings.set("soundCategory_music", value)
+            }
+            runCatching {
+                MCOptionUtils.set("soundCategory_music", value)
+                MCOptionUtils.save()
+            }
         }
     }
 

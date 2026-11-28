@@ -48,21 +48,29 @@ for expected in (
     'Previous',
     'Next',
     'Make new playlist',
-    'MC Music: OFF',
     'MusicArtworkImage',
     'AerixMusicController.selectedTab = tab',
     'NOW PLAYING',
-    'AerixMusicController.seekTo',
+    'LauncherNowPlayingSeekBar',
+    'Arrangement.spacedBy(6.dp, Alignment.Start)',
 ):
     assert expected in musics_screen, expected
+assert 'Switch(' not in musics_screen, 'Bottom switch in launcher MusicsScreen must stay removed'
+
+artwork = (music_dir / 'MusicArtworkImage.kt').read_text()
+assert 'remember(cacheKey)' in artwork and 'LaunchedEffect(cacheKey)' in artwork
+
+service = (music_dir / 'AerixMusicService.kt').read_text()
+assert 'ACTION_MUSIC_POSITION_TICK' in service
+assert 'playbackPositionMs' in controller
 
 in_game_panel = (music_dir / 'InGameMusicPanel.kt').read_text()
 assert 'Dialog(' not in in_game_panel, 'InGameMusicPanel must use inline sheets, not Dialog windows'
 assert 'OverlayMusicSubSheet' in in_game_panel
 assert 'Mute Vanilla Music' in in_game_panel
 assert 'MusicArtworkImage' in in_game_panel
+assert 'OverlayNowPlayingSeekBar' in in_game_panel
 assert '+10s' in in_game_panel
-assert 'AerixMusicController.seekTo' in in_game_panel
 
 client_overlay = (main / 'java/net/kdt/pojavlaunch/aerix/client/AerixClientOverlayView.kt').read_text()
 assert 'ClientMenuSubPage.MUSIC' in client_overlay
